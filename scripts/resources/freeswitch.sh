@@ -255,10 +255,23 @@ configure_tallpbx_media_root() {
     # so these values win without editing the packaged unit.
     printf 'USER=freeswitch\nGROUP=tallpbx-media\n' > /etc/default/freeswitch
 
+    # Create the top-level roots and core shared subdirectories with setgid mode
+    # (2775) and owned by www-data:tallpbx-media so both the web application
+    # and FreeSWITCH can create per-tenant runtime and spool subdirectories.
     install -d -m 2775 -o www-data -g tallpbx-media \
         "$media_root" \
         "$media_root/store" \
+        "$media_root/store/runtime" \
+        "$media_root/store/archive" \
         "$media_root/spool"
+
+    # Ensure the parent directory allows directory traversal by the service users.
+    chmod 755 "$(dirname "$media_root")" 2>/dev/null || true
+
+    # Reconcile ownership and directory permissions across existing media directories
+    # on upgrade or re-runs so root-created directories never lock out www-data.
+    chown -R www-data:tallpbx-media "$media_root" 2>/dev/null || true
+    find "$media_root" -type d -exec chmod 2775 {} + 2>/dev/null || true
 }
 
 # Write FreeSWITCH's XML-curl connection so dialplans and directory data come

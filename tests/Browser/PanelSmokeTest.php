@@ -246,6 +246,10 @@ it('renders the feature codes list page', function () {
 
 it('expands description from single line text box into text area on hover when long', function () {
     $tenant = Tenant::first() ?? Tenant::factory()->create();
+    $tenantManager = app(\App\Services\TenantManager::class);
+    $tenantManager->setTenantId((string) $tenant->id);
+
+    FeatureCode::where('tenant_id', $tenant->id)->where('code', '*999')->delete();
     $longCode = FeatureCode::create([
         'tenant_id' => $tenant->id,
         'name' => 'Custom Long Route',
@@ -266,6 +270,7 @@ it('expands description from single line text box into text area on hover when l
     });
 
     $longCode->delete();
+    $tenantManager->clear();
 });
 
 it('renders the call centers list page', function () {
@@ -387,6 +392,20 @@ it('renders the create sip account form', function () {
             ->assertPathIs('/panel/sip-accounts/create')
             ->assertPresent('input')
             ->assertPresent('button[type="submit"]');
+    });
+});
+
+it('creates a new tenant via the browser form', function () {
+    $this->browse(function (Browser $browser) {
+        $slug = 'browser-tenant-'.bin2hex(random_bytes(3));
+        $browser->loginAs($this->admin, 'admin')
+            ->visit('/panel/tenants/create')
+            ->waitFor('form', 5)
+            ->type('#name', 'Browser Created Tenant')
+            ->type('#slug', $slug)
+            ->press('Create Tenant')
+            ->waitForRoute('panel.tenants.index', [], 10)
+            ->assertSee('Browser Created Tenant');
     });
 });
 

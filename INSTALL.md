@@ -534,8 +534,8 @@ chmod 2775 /var/lib/tallpbx/media/spool/*/call-recording \
     /var/lib/tallpbx/media/store/runtime/*/voicemail-message
 ```
 
-Directories that only the application writes (`store`, `spool`, `runtime` and
-per-tenant subdirectories) stay owned by `www-data:tallpbx-media` with mode
+Directories that only the application writes (`store`, `spool`, `runtime`, `archive`,
+and per-tenant subdirectories) stay owned by `www-data:tallpbx-media` with mode
 `2775` so group-write survives and the setgid bit keeps new subdirectories in
 the `tallpbx-media` group.
 

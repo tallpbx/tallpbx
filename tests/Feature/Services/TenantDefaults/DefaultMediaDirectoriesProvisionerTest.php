@@ -37,6 +37,12 @@ it('provisions per-tenant media directories with a shared group', function (): v
         .'/runtime/'.$this->tenant->id.'/voicemail-message';
     expect(is_dir($voicemailDeposit))->toBeTrue()
         ->and(fileperms($voicemailDeposit) & 07777)->toBe(02775);
+
+    // Parent directories must also carry the 02775 setgid mode
+    $storeRoot = rtrim((string) config('media-storage.store_root'), '/');
+    expect(fileperms($storeRoot.'/runtime') & 07777)->toBe(02775)
+        ->and(fileperms($storeRoot.'/runtime/'.$this->tenant->id) & 07777)->toBe(02775)
+        ->and(fileperms($spoolRoot) & 07777)->toBe(02775);
 });
 
 it('is idempotent across repeated provisioning runs', function (): void {
