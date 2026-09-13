@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "call-broadcast",
+    "version": "1.0.0",
+    "namespace": "Modules\\CallBroadcast",
+    "display_name": "Call Broadcast",
+    "description": "Outbound call broadcasting for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 370,
+    "providers": [
+        "Modules\\CallBroadcast\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

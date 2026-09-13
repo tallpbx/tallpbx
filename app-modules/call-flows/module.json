@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "call-flows",
+    "version": "1.0.0",
+    "namespace": "Modules\\CallFlows",
+    "display_name": "Call Flows",
+    "description": "Call flow routing rules for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 320,
+    "providers": [
+        "Modules\\CallFlows\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

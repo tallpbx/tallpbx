@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "logs",
+    "version": "1.0.0",
+    "namespace": "Modules\\Logs",
+    "display_name": "Log Viewer",
+    "description": "Tail and filter application log files",
+    "category": "System",
+    "required": false,
+    "protected": false,
+    "priority": 0,
+    "providers": [
+        "Modules\\Logs\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

@@ -1,0 +1,724 @@
+# Installation Guide
+
+This guide explains how to set up TallPBX on a new Debian 13 server. Most
+installations only need the first five sections; later sections cover optional
+certificates, maintenance, and advanced tuning.
+
+TallPBX is a web-managed phone system that runs on your own server. It lets you
+manage phones, extensions, call routing, voicemail, recordings, and related
+PBX features. It installs FreeSWITCH to handle calls. It does not include a
+telephone carrier connection; add a SIP trunk or gateway later for public phone
+network calling.
+
+By the end of the basic install, you will have a working TallPBX web panel and
+the Default tenant. You can then add your own phones, users, extensions,
+numbers, and SIP trunk through the panel. Selecting demo data additionally
+creates sample tenants and callable PBX data for evaluation.
+
+## 1. Create the Virtual Machine
+
+- **Platform**: VMware or VirtualBox for a test system; KVM or a physical server for a live system
+- **OS Type**: Linux, Debian 13 (64-bit)
+- **Hardware**:
+  - RAM: 1 GB + 2 GB swap minimum (4 GB+ recommended for more active PBX workloads)
+  - CPU: 1 vCPU minimum (2 vCPU recommended for more active PBX workloads)
+  - Disk: 25 GB minimum (40 GB+ recommended for local call recordings and voicemail storage)
+  - Network: Bridged or Host-Only adapter (enp0s3)
+
+## 2. Attach the Installer
+
+Download the Debian 13 amd64 netinst ISO and attach it as the VM's optical drive.
+
+## 3. Install Debian 13
+
+Boot the VM and proceed through the Debian installer UI:
+
+1. Select language, location, and keyboard layout
+2. Configure network (DHCP is fine for initial install)
+3. Set hostname and domain
+4. Set root password
+5. Create a standard user account
+6. Partition disk (guided - use entire disk is simplest)
+7. **Software selection**: check only:
+   - SSH server
+   - Standard system utilities
+8. Install GRUB boot loader to the master boot record
+
+After installation completes, the VM will reboot. Log in as root.
+
+### Configure a Swapfile (When Total Swap Is Below 2 GB)
+
+Check whether the server already has an active swap partition or swapfile:
+
+```bash
+swapon --show
+```
+
+If the command produces no output or reports less than 2 GB total swap, create a
+2 GB swapfile or make it large enough to bring total swap to at least 2 GB.
+
+The command uses `MiB` rather than `MB` because `MiB` is the binary unit used
+by Linux memory tools. With `count=2048`, it creates a swapfile a little over
+2 GB in decimal terms.
+
+```bash
+swapoff /swapfile
+rm -f /swapfile
+dd if=/dev/zero of=/swapfile count=2048 bs=1MiB
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+```
+
+Make the swapfile persistent across reboots:
+
+```bash
+nano /etc/fstab
+```
+
+Add the following line to the bottom of `/etc/fstab` if it is not already present:
+
+```text
+/swapfile swap swap defaults 0 0
+```
+
+Verify that the swapfile is active:
+
+```bash
+swapon --show
+free -h
+```
+
+### Prefer IPv4 When the Host Has No IPv6 Default Route
+
+Some VPS providers assign a global IPv6 address without a default IPv6 route.
+PHP then tries IPv6 first when it downloads files from dual-stack hosts such as
+`getcomposer.org`, waits for the connection to time out, and the installer
+fails at the "Installing Composer" step with:
+
+```text
+PHP Warning: copy(https://getcomposer.org/installer): Failed to open stream: Connection timed out
+```
+
+Check whether the host is affected:
+
+```bash
+ip -6 route show | grep default
+curl -6 -sS --max-time 10 -o /dev/null https://getcomposer.org/installer
+```
+
+If the first command prints nothing and the second times out while a plain
+`curl` download succeeds, tell every PHP process on the host to prefer IPv4 by
+uncommenting the IPv4 precedence rule in the system name-resolution policy:
+
+```bash
+sed -i 's/^#\s*precedence ::ffff:0:0\/96  100$/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
+```
+
+Verify that IPv4 now resolves first and the installer download succeeds:
+
+```bash
+getent ahosts getcomposer.org | head -1   # should show an IPv4 address
+php -r 'copy("https://getcomposer.org/installer", "/tmp/composer-setup.php"); echo filesize("/tmp/composer-setup.php"), PHP_EOL;'
+```
+
+This host-level fix is required before the installer can finish: Composer
+itself uses PHP streams, so every Packagist download would time out the same
+way without it.
+
+## 4. Configure a Static IP Address (Optional)
+
+If you need a static IP address, edit the network interfaces file:
+
+```bash
+nano /etc/network/interfaces
+```
+
+Replace the DHCP line for your interface with:
+
+```
+iface enp0s3 inet static
+address 192.168.1.76
+netmask 255.255.255.0
+gateway 192.168.1.254
+dns-nameservers 192.168.1.254 8.8.8.8 8.8.4.4
+```
+
+Restart networking to apply:
+
+```bash
+systemctl restart networking
+```
+
+Verify the configuration:
+
+```bash
+ip addr show enp0s3
+```
+
+## 5. Run the Install Script
+
+Clone the repository and run the automated install script:
+
+```bash
+apt-get install -y git && mkdir -p /var/www && cd /var/www && git clone https://github.com/tallpbx/tallpbx.git
+cd /var/www/tallpbx && bash ./scripts/install.sh
+```
+
+With no flags, the interactive installer asks whether to include demo data and
+development tooling. Choose `No` for demo data on a production install; this
+creates the shared Default tenant without sample tenants, users, or extensions.
+The installer separately asks how to create the first administrator. For
+unattended automation, use one or both of these commands:
+
+```bash
+bash ./scripts/install.sh              # ask both questions
+bash ./scripts/install.sh --no-demo    # do not ask to add demo data
+bash ./scripts/install.sh --no-development # do not install development tooling
+bash ./scripts/install.sh --no-demo --no-development
+```
+
+A headless run that cannot answer the FreeSWITCH installation-method prompt
+must supply the method as an environment value:
+
+```bash
+FSPBX_FREESWITCH_INSTALL_METHOD=packages bash ./scripts/install.sh --no-demo --no-development
+```
+
+### Automated Bootstrap Installer (Roadmap)
+
+Currently, TallPBX is installed directly by cloning the public Git repository
+as shown above.
+
+A future release milestone may provide a standalone bootstrap installer script
+(`curl | bash`), accompanied by published release packages and SHA-256
+checksum verification. The file
+[`scripts/bootstrap.sh.example`](scripts/bootstrap.sh.example) serves as an
+inactive reference template for that planned workflow.
+
+### Installer Questionnaire
+
+Before it installs or changes packages, services, databases, or application
+files, the main installer collects every choice needed for that run: demo data,
+development tooling, database password, FreeSWITCH method, any required
+SignalWire token, an existing source-build decision, and first-install
+administrator setup mode. The choices and any installer-mode credentials are
+validated and saved in the root-only `/etc/pbx/installer.env` state file. The
+installation phase then does not stop for more questions. If a run fails,
+re-running it reuses those saved choices by default.
+
+Individual resource scripts can still be run directly for maintenance. In that
+case they may ask only for the value needed by that standalone operation.
+
+### Demo Data Modes
+
+- **No flags**: The installer asks both questions on every interactive run.
+  The previous choices are the defaults, so pressing Enter preserves them.
+- **`--no-demo`**: Does not ask to add demo data, skips demo-data
+  reconciliation, and never deletes previously seeded demo records.
+
+### Development Tooling
+
+Development tooling is only for people who will write or test TallPBX code on
+this server. It adds developer utilities such as automated tests and Laravel
+Boost. It is not needed to make calls, manage users, or run the PBX.
+
+For a normal PBX server, choose **No** when asked about development tooling, or
+run:
+
+```bash
+bash ./scripts/install.sh --no-development
+```
+
+This keeps only the software needed to run TallPBX and removes previously
+installed developer packages. Choose **Yes** only when this server will also be
+used for TallPBX development.
+
+The installer remembers the last choice. With no flags, it asks again and
+pressing Enter keeps the current choice. When either installer flag is used,
+the installer skips both the demo-data and development-tooling questions; the
+choice not named by the flag stays as it was.
+
+### First Administrator Setup
+
+The installer asks this question before it changes packages, services, or the
+database. The default is option 1.
+
+1. **Create administrator during installation (default)** — enter the
+   administrator email and password during installation. TallPBX creates the
+   account before the installer finishes. The password is never displayed or
+   written to the installer log.
+2. **Create administrator in the web browser with a one-time activation code**
+   — the installer creates no administrator. Instead, it shows a one-time
+   activation code in your terminal and `/var/log/pbx-install.log`. Open
+   `http://SERVER-IP/panel/setup`, enter the code, then choose the
+   administrator email and password. After success the code stops working.
+3. **Create administrator in the web browser without an activation code —
+   trusted network only** — the installer creates no administrator. The first
+   person to open `http://SERVER-IP/panel/setup` can create it. Use this only
+   on a private, trusted network; do not use it on an internet-reachable
+   server.
+
+All three choices use the same TallPBX administrator-creation code. It creates
+the account, grants Super Administrator access, and closes first-time setup as
+one database operation. Re-runs preserve the selected mode and never replace
+an existing administrator or activation code.
+
+The script installs the following automatically:
+
+- **PHP 8.5** and the extensions TallPBX needs
+- **Nginx 1.26** (web server)
+- **MariaDB 11.8** (database server)
+- **Redis** (fast temporary storage)
+- **Node.js** and **Composer** (used while installing TallPBX)
+- **FreeSWITCH** (the phone system)
+- **TallPBX and its web application dependencies**
+- **Developer tools** only when you choose development tooling
+
+TallPBX is installed in `/var/www/tallpbx` as a normal Git working copy. The
+installer also creates server-only files there, such as passwords, installed
+packages, and generated web assets. Do not add those files to Git.
+
+After installation, open the server's IP address in a browser to reach TallPBX.
+Sign in with the administrator email and password you chose in option 1, or
+complete the browser setup page when you selected option 2 or 3. There is no
+default TallPBX administrator password.
+
+### Outgoing Mail Configuration (SMTP Connector)
+
+To enable email delivery for password resets, voicemail notifications, backup reports, and system alerts, sign in to the web panel and open **SMTP Connector** from the navigation menu (sidebar or top header). TallPBX supports standard username/password SMTP authentication (including Gmail App Passwords) as well as modern token-based OAuth 2.0 authentication for Google (Gmail), Microsoft 365, or custom OAuth 2.0 providers.
+
+### Check That TallPBX Is Working
+
+For a quick health check after installation, run:
+
+```bash
+cd /var/www/tallpbx
+php artisan app:test --smoke
+```
+
+This checks important application functions without using the real TallPBX
+database. Developers who need broader checks can use:
+
+```bash
+# Run all application tests.
+php artisan app:test
+
+# Also run browser tests. Chromium is required.
+php artisan app:test --full
+
+# Run one test process at a time when investigating a failure.
+php artisan app:test --sequential
+```
+
+Tests run in a temporary in-memory database, not in the real TallPBX database.
+They stop if that safety rule is not in effect. TallPBX also blocks Laravel
+commands that would erase or rebuild the primary database. These safeguards do
+not prevent a person with MariaDB access from running destructive SQL manually.
+
+### Browser Testing (Dusk)
+
+Browser tests open TallPBX in Chrome or Chromium and check that the panel works
+as a user would see it. They are optional and mainly useful for development.
+
+```bash
+# Install Chromium (Debian 13)
+apt-get install -y chromium
+
+# Install matching ChromeDriver
+php artisan dusk:chrome-driver
+
+# Run browser tests against the isolated tallpbx_dusk database
+bash scripts/dusk.sh
+```
+
+The installer gives browser tests their own `tallpbx_dusk` database and login.
+That login cannot access the real `tallpbx` database, so browser testing cannot
+reset normal PBX data.
+
+### Service Management
+
+FreeSWITCH, the TallPBX call-event listener, and Redis run as background
+services. Use these commands to check or restart them:
+
+*   **FreeSWITCH Service**:
+    ```bash
+    systemctl status freeswitch      # Check FreeSWITCH status
+    systemctl restart freeswitch     # Restart FreeSWITCH
+    ```
+*   **ESL Event Listener Daemon**:
+    ```bash
+    systemctl status freeswitch-listener    # Check the listener status
+    systemctl restart freeswitch-listener   # Restart the event listener
+    ```
+*   **Redis Service**:
+    ```bash
+    systemctl status redis-server    # Check Redis status
+    redis-cli ping                   # Expect: PONG
+    ```
+
+### Running the Installer Again
+
+It is safe to run the installer again after an interrupted install or an
+ordinary software update. It keeps existing call data, users, settings, and
+database records. It reuses saved passwords and choices, keeps the existing
+application key, and applies only missing database updates.
+
+On a re-run, the installer:
+
+- Ensures PHP, MariaDB, Nginx, Redis, and FreeSWITCH are installed and running.
+- Preserves the TallPBX application, its settings file, the administrator
+  account, and existing database data.
+- Restores the expected cache, session, media, and file-permission settings.
+
+The installer also renews the TallPBX-to-FreeSWITCH connection, keeps required
+phone-system modules enabled, and installs default prompts and music. It keeps
+recordings, voicemail, faxes, and other media as files; it does not store them
+inside the database.
+
+Demo data is added only when selected. The installer never removes previously
+created demo data. A new demo install includes two sample extensions, `1000`
+and `1001`, so you can make a basic internal test call.
+
+If you intentionally change between the package and source versions of
+FreeSWITCH, the installer removes the old FreeSWITCH program before installing
+the selected alternative. That switch affects the phone-system software, not
+your TallPBX database or stored media.
+
+### Application Mode
+
+When development tooling is enabled, TallPBX uses Laravel's local development
+mode. When it is disabled, TallPBX uses production mode with developer details
+hidden from normal users. The installer sets this automatically; most
+administrators do not need to change `APP_ENV` themselves.
+
+If an install stops because of a network problem or missing dependency, run the
+installer again after fixing the problem. It continues safely from the saved
+state.
+
+### Redis Cache And Session Storage
+
+Redis is TallPBX's fast temporary storage. It keeps logins, cached information,
+and phone-system lookups responsive. A new install configures it automatically.
+
+For an older server that does not yet use Redis, run:
+
+```bash
+apt-get install -y redis-server redis-tools php8.5-redis
+systemctl enable --now redis-server
+redis-cli ping
+
+cd /var/www/tallpbx
+sed -i 's/^CACHE_STORE=.*/CACHE_STORE=redis/' .env
+sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=redis/' .env
+grep -q '^SESSION_CONNECTION=' .env \
+  && sed -i 's/^SESSION_CONNECTION=.*/SESSION_CONNECTION=cache/' .env \
+  || echo 'SESSION_CONNECTION=cache' >> .env
+grep -q '^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=' .env \
+  && sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis/' .env \
+  || echo 'FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis' >> .env
+
+php artisan optimize:clear
+php artisan optimize
+```
+
+For a short-lived local development system without Redis, use file-based cache
+and sessions instead, then rebuild Laravel's configuration.
+
+### FreeSWITCH Session Rate
+
+Fresh installs set FreeSWITCH's core `sessions-per-second` default to `60`:
+
+```xml
+<param name="sessions-per-second" value="60"/>
+```
+
+This is a safety limit for new calls. Most servers should leave it at `60`.
+Change it only after measured load testing shows that this specific limit is
+holding back a server with enough CPU, memory, and network capacity.
+
+### PHP-FPM Worker Sizing
+
+PHP-FPM runs the Laravel web application. The Debian default is suitable for a
+small or lightly used system. Change these settings only when monitoring shows
+that the server is running out of PHP-FPM workers or needs faster response to
+large bursts of calls.
+
+For a busier 1 GB server, this optional setting can help:
+
+```ini
+pm = static
+pm.max_children = 6
+```
+
+For a typical 4 GB server running TallPBX, MariaDB, Redis, and FreeSWITCH:
+
+```ini
+pm = static
+pm.max_children = 12
+```
+
+Leave the other static-worker settings unchanged. Leave `pm.max_requests` at
+its default of `0` unless monitoring shows that PHP workers steadily grow in
+memory use.
+
+General sizing guidance:
+
+| Server size | Suggested setting | Notes |
+| --- | --- | --- |
+| Minimum, 1 GB RAM | Keep Debian defaults | Change only after monitoring. |
+| Small, 2 GB RAM | `pm.max_children = 6` | A reasonable starting point. |
+| Standard, 4 GB RAM | `pm.max_children = 12` | Recommended starting point. |
+| Larger, 8 GB RAM | `pm.max_children = 24` | Confirm memory is still available. |
+| High-volume | Measure first | Tune from real traffic data. |
+
+For high-volume systems, measure worker memory under normal call traffic before
+choosing a larger value:
+
+```text
+available RAM reserved for PHP-FPM / average warm PHP-FPM worker RSS
+```
+
+Always leave memory for FreeSWITCH, MariaDB, Redis, Nginx, recordings, and the
+operating system. More workers are not always faster. Check
+`/var/log/php8.5-fpm.log` for worker-limit warnings and test changes under real
+call traffic.
+
+### Application File Permissions
+
+TallPBX keeps application code protected from the web server while allowing
+Laravel to write logs, cache files, and media. The installer applies the right
+ownership and permissions automatically.
+
+After a manual deployment, Composer update, or permission error, run:
+
+```bash
+cd /var/www/tallpbx
+sudo php artisan permissions:repair --scope=full
+```
+
+Do not run broad recursive `chown` or `chmod` commands over the application
+directory. They can make the source writable by the web server or break helper
+scripts. If a normal repair cannot start because Laravel itself will not boot,
+use the emergency fallback:
+
+```bash
+cd /var/www/tallpbx
+sudo bash scripts/repair-application-permissions.sh
+```
+
+Restarting FreeSWITCH does not change TallPBX file permissions. Run a repair
+only after an application-file deployment, a root-owned maintenance operation,
+or an actual permission error.
+
+### Managed Media Permissions
+
+Call recordings, faxes, and voicemail are written by FreeSWITCH into
+`/var/lib/tallpbx/media` and read back by PHP-FPM (`www-data`) for archiving.
+The service user `freeswitch` runs without supplementary groups (FreeSWITCH
+drops them at startup even when the installer adds it to `tallpbx-media`), so
+the whole media tree must be traversable by "other" and the FreeSWITCH-owned
+leaf directories must carry the setgid bit:
+
+```bash
+# Traversal for the group-less freeswitch process
+chmod 755 /var/lib/tallpbx /var/lib/tallpbx/media /var/lib/tallpbx/media/store /var/lib/tallpbx/media/spool
+chmod 755 /var/lib/tallpbx/media/store/runtime /var/lib/tallpbx/media/store/runtime/*
+
+# FreeSWITCH-owned leaf directories (files inherit tallpbx-media via setgid)
+chown freeswitch:tallpbx-media /var/lib/tallpbx/media/spool/*/call-recording \
+    /var/lib/tallpbx/media/spool/*/fax-inbound \
+    /var/lib/tallpbx/media/store/runtime/*/voicemail-message
+chmod 2775 /var/lib/tallpbx/media/spool/*/call-recording \
+    /var/lib/tallpbx/media/spool/*/fax-inbound \
+    /var/lib/tallpbx/media/store/runtime/*/voicemail-message
+```
+
+Directories that only the application writes (`store`, `spool`, `runtime` and
+per-tenant subdirectories) stay owned by `www-data:tallpbx-media` with mode
+`2775` so group-write survives and the setgid bit keeps new subdirectories in
+the `tallpbx-media` group.
+
+The `freeswitch-listener` systemd unit runs under `ProtectSystem=strict` and
+explicitly allows write access to `/var/www/tallpbx/storage` and
+`/var/lib/tallpbx/media` via `ReadWritePaths`. If you configure a custom
+`TALLPBX_MEDIA_ROOT`, add that path to the unit's `ReadWritePaths` line in
+`/etc/systemd/system/freeswitch-listener.service` and run
+`systemctl daemon-reload && systemctl restart freeswitch-listener`.
+
+
+## 6. FreeSWITCH Installation Choice
+
+The installer asks whether to install FreeSWITCH from packages or from source
+code. It remembers the choice for later runs. You can switch later, but the
+installer must remove the old FreeSWITCH program before installing the other
+type. This does not remove your TallPBX database or stored recordings.
+
+### Package Install
+
+This is the recommended choice for most servers. It is faster to install and
+update, but requires a SignalWire Personal Access Token. The installer asks
+for the token before it begins installation and saves it securely for future
+runs. It installs the modules TallPBX needs for SIP phones, voicemail,
+recordings, call queues, music, and dynamic configuration.
+
+TallPBX automatically configures FreeSWITCH to request its phone directory and
+call-routing instructions from the application. It writes a small connection
+file similar to this:
+
+```xml
+<configuration name="xml_curl.conf" description="cURL XML Gateway">
+  <bindings>
+    <binding name="tallpbx">
+      <param name="gateway-url" value="http://SERVER/api/v1/xml-handler?token=TOKEN" bindings="directory|dialplan|configuration"/>
+      <param name="timeout" value="5"/>
+    </binding>
+  </bindings>
+</configuration>
+```
+
+If you manually change `FREESWITCH_XML_HANDLER_TOKEN`, run the following and
+then restart FreeSWITCH:
+
+```bash
+cd /var/www/tallpbx
+bash scripts/resources/freeswitch.sh --configure-only
+systemctl restart freeswitch
+```
+
+To get a SignalWire token:
+
+1. Go to https://signalwire.com
+2. Sign up or log in
+3. Navigate to Personal Access Tokens
+4. Create a new token with repo access
+
+### Source Build
+
+Use this only when you need to change FreeSWITCH itself or cannot use the
+SignalWire package repository. It takes much longer because the server compiles
+FreeSWITCH from source code. No SignalWire token is needed. On later runs, the
+installer asks whether to rebuild the existing source installation.
+
+## 7. HTTPS Certificates (Optional)
+
+TallPBX includes helper scripts for free Let's Encrypt certificates and
+Cloudflare DNS. Run them after the main install when you are ready to use a
+public domain name.
+
+### Let's Encrypt (Single Domain)
+
+Use this for one domain name. Nginx must be running, and the internet must be
+able to reach port 80 on this server.
+
+```bash
+cd /var/www/tallpbx/scripts/resources
+
+# Interactive (prompts for domain and email):
+bash letsencrypt.sh
+
+# Non-interactive:
+bash letsencrypt.sh --domain pbx.example.com --email admin@example.com
+
+# Test with staging environment first (no rate limits):
+bash letsencrypt.sh --domain pbx.example.com --staging
+```
+
+After success, the script updates Nginx to use HTTPS. Certificates renew
+automatically.
+
+### Wildcard Certificate (Cloudflare DNS)
+
+Use this only when you need a wildcard certificate such as `*.example.com`.
+It requires Cloudflare DNS access.
+
+```bash
+cd /var/www/tallpbx/scripts/resources
+
+# Save Cloudflare API token:
+bash cloudflare-dns.sh
+
+# Issue wildcard certificate:
+bash letsencrypt.sh --wildcard --domain pbx.example.com
+```
+
+The Cloudflare token needs `Zone:Zone:Read` and `Zone:DNS:Edit` permissions.
+Create one at https://dash.cloudflare.com/profile/api-tokens.
+
+### Manual Certificate
+
+If you have a certificate from another provider, place the files at the
+standard paths and reload Nginx:
+
+```bash
+# Place your certificate files:
+#   Full chain: /etc/letsencrypt/live/<domain>/fullchain.pem
+#   Private key: /etc/letsencrypt/live/<domain>/privkey.pem
+
+# Then update Nginx and reload:
+nginx -t && systemctl reload nginx
+```
+
+### Certificates for Tenant Domains
+
+Add the domain under **Admin → Domains**, then issue a certificate with the
+same `letsencrypt.sh` command. Nginx can serve more than one domain.
+
+## Upgrading TallPBX
+
+Before upgrading, take a backup. Then run these commands from
+`/var/www/tallpbx`:
+
+```bash
+# 1. Pull the latest code. This only accepts a straightforward update.
+git pull --ff-only origin main
+
+# 2. Install the required PHP packages
+composer install --no-dev --optimize-autoloader
+
+# 3. Rebuild the browser files
+npm ci
+npm run build
+
+# 4. Run database migrations
+php artisan migrate --force
+
+# 5. Refresh TallPBX module information
+php artisan module:sync --only-local
+
+# 6. Clear all caches
+php artisan optimize:clear
+
+# 7. Restore normal application permissions
+sudo php artisan permissions:repair --scope=full
+
+# 8. Tell FreeSWITCH to load any new call-routing settings
+fs_cli -x "reloadxml"
+```
+
+### If Git Will Not Pull the Update
+
+Git may refuse the update when this server has local changes that conflict with
+the new code. Do not delete those changes. First save them temporarily, update
+TallPBX, then restore them:
+
+```bash
+# Save local changes, including new files, outside the working copy for now.
+git stash push --include-untracked -m "before TallPBX upgrade"
+
+# Download the straightforward update from the main branch.
+git pull --ff-only origin main
+
+# Put the saved local changes back after the update.
+git stash pop
+```
+
+If the final command reports a conflict, do not continue with the upgrade until
+the conflicting local change has been reviewed and resolved. The saved change
+remains available as a Git stash until it is applied successfully.
+
+After upgrading, confirm that the panel opens, FreeSWITCH is running, and a
+test call works. If an upgrade fails, restore the backup. `php artisan migrate
+--force` applies only database updates that have not already run; it does not
+erase the database. Database updates move forward and should not be rolled back
+casually.

@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "hot-desking",
+    "version": "1.0.0",
+    "namespace": "Modules\\HotDesking",
+    "display_name": "Hot Desking",
+    "description": "Manage hot desking device and extension mobility",
+    "category": "PBX Features",
+    "required": false,
+    "protected": false,
+    "priority": 0,
+    "providers": [
+        "Modules\\HotDesking\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

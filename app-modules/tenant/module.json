@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "tenant",
+    "version": "1.0.0",
+    "namespace": "Modules\\Tenant",
+    "display_name": "Tenant Portal",
+    "description": "Tenant-facing portal shell (dashboard and login).",
+    "category": "System",
+    "required": true,
+    "protected": false,
+    "priority": -80,
+    "providers": [
+        "Modules\\Tenant\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

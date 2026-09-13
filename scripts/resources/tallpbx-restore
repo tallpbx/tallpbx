@@ -1,0 +1,14 @@
+#!/bin/bash
+# This root-only wrapper accepts a UUID and exposes no user-controlled shell input.
+set -euo pipefail
+
+operation_id="${1:?restore operation UUID is required}"
+application_root=/var/www/tallpbx
+
+if [[ ! "$operation_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+    echo "invalid restore operation UUID" >&2
+    exit 64
+fi
+
+cd "$application_root"
+php artisan backups:restore-operation "$operation_id"

@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // ─── Auth ───────────────────────────────────────────────────────────────
+    'sign_in' => 'Iniciar Sesión',
+    'sign_out' => 'Cerrar Sesión',
+    'sign_in_title' => 'Inicie sesión en su cuenta',
+    'login_title' => 'TallPBX',
+    'create_account' => 'Crear Cuenta',
+    'forgot_password' => 'Olvidé mi Contraseña',
+    'reset_password' => 'Restablecer Contraseña',
+    'back_to_sign_in' => 'Volver a Iniciar Sesión',
+    'register_title' => 'Cree su cuenta',
+    'already_have_account' => '¿Ya tiene una cuenta?',
+    'remember_me' => 'Recordarme',
+    'forgot_password_intro' => 'Ingrese su correo electrónico y le enviaremos un enlace para restablecer su contraseña.',
+    'reset_password_intro' => 'Ingrese su nueva contraseña a continuación.',
+    'authenticating' => 'Autenticando...',
+
+    // ─── Form Labels ────────────────────────────────────────────────────────
+    'email' => 'Correo Electrónico',
+    'email_placeholder' => 'usted@ejemplo.com',
+    'password' => 'Contraseña',
+    'password_placeholder' => 'Mín. 8 caracteres',
+    'password_confirmation' => 'Confirmar Contraseña',
+    'name' => 'Nombre',
+    'name_placeholder' => 'Nombre completo',
+    'phone' => 'Teléfono',
+    'phone_placeholder' => '+1 (555) 000-0000',
+
+    // ─── Navigation ─────────────────────────────────────────────────────────
+    'dashboard' => 'Panel',
+    'services' => 'Servicios',
+    'inbound_routes' => 'Rutas Entrantes',
+    'outbound_routes' => 'Rutas Salientes',
+    'billing' => 'Facturación',
+    'profile' => 'Perfil',
+    'settings' => 'Configuración',
+    'logout' => 'Cerrar Sesión',
+
+    // ─── Actions ────────────────────────────────────────────────────────────
+    'save' => 'Guardar',
+    'cancel' => 'Cancelar',
+    'delete' => 'Eliminar',
+    'edit' => 'Editar',
+    'create' => 'Crear',
+    'update' => 'Actualizar',
+    'close' => 'Cerrar',
+    'back' => 'Volver',
+    'confirm' => 'Confirmar',
+    'search' => 'Buscar',
+    'filter' => 'Filtrar',
+    'clear' => 'Limpiar',
+    'apply' => 'Aplicar',
+    'send' => 'Enviar',
+    'upload' => 'Subir',
+    'download' => 'Descargar',
+    'enable' => 'Habilitar',
+    'disable' => 'Deshabilitar',
+    'enabled' => 'Habilitado',
+    'disabled' => 'Deshabilitado',
+    'active' => 'Activo',
+    'inactive' => 'Inactivo',
+    'yes' => 'Sí',
+    'no' => 'No',
+    'all' => 'Todos',
+    'none' => 'Ninguno',
+    'loading' => 'Cargando...',
+    'no_results' => 'No se encontraron resultados.',
+    'no_items' => 'No se encontraron :items.',
+    'no_items_configured' => 'No hay :items configurados aún.',
+    'are_you_sure' => '¿Está seguro?',
+    'are_you_sure_delete' => '¿Está seguro de que desea eliminar este(a) :item?',
+    'confirm_delete' => '¿Eliminar este(a) :item?',
+
+    // ─── Table Headers ──────────────────────────────────────────────────────
+    'actions' => 'Acciones',
+    'status' => 'Estado',
+    'type' => 'Tipo',
+    'date' => 'Fecha',
+    'created_at' => 'Creado',
+    'updated_at' => 'Actualizado',
+    'description' => 'Descripción',
+    'value' => 'Valor',
+    'key' => 'Clave',
+    'order' => 'Orden',
+
+    // ─── Badges ─────────────────────────────────────────────────────────────
+    'online' => 'En línea',
+    'offline' => 'Fuera de línea',
+    'registered' => 'Registrado',
+    'unregistered' => 'No registrado',
+    'success' => 'Éxito',
+    'warning' => 'Advertencia',
+    'error' => 'Error',
+    'info' => 'Información',
+
+    // ─── Impersonation ──────────────────────────────────────────────────────
+    'impersonating' => 'Está viendo como <strong>:name</strong> &mdash; Suplantado por <strong>:admin</strong>',
+    'stop_impersonating' => 'Dejar de Suplantar',
+
+    // ─── Dashboard ──────────────────────────────────────────────────────────
+    'dashboard_overview' => 'Resumen del Panel',
+    'total_users' => 'Usuarios Totales',
+    'total_tenants' => 'Inquilinos Totales',
+    'system_status' => 'Estado del Sistema',
+    'healthy' => 'Saludable',
+    'freeswitch_version' => 'FreeSWITCH :version',
+
+    // ─── Errors ─────────────────────────────────────────────────────────────
+    'page_not_found' => 'Página No Encontrada',
+    'page_not_found_desc' => 'La página que busca no existe.',
+    'unauthorized' => 'No Autorizado',
+    'unauthorized_desc' => 'No tiene permiso para acceder a esta página.',
+    'server_error' => 'Error del Servidor',
+    'server_error_desc' => 'Algo salió mal. Por favor, intente nuevamente.',
+];

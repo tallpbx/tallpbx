@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "ivr-menus",
+    "version": "1.0.0",
+    "namespace": "Modules\\IvrMenus",
+    "display_name": "IVR Menus",
+    "description": "Manage interactive voice response (IVR) menus with digit-mapped options for call routing.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 190,
+    "providers": [
+        "Modules\\IvrMenus\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

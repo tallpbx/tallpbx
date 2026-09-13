@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "pin-numbers",
+    "version": "1.0.0",
+    "namespace": "Modules\\PinNumbers",
+    "display_name": "PIN Numbers",
+    "description": "Manage PIN numbers for restricted dialing.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 240,
+    "providers": [
+        "Modules\\PinNumbers\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

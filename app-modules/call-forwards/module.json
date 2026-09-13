@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "call-forwards",
+    "version": "1.0.0",
+    "namespace": "Modules\\CallForwards",
+    "display_name": "Call Forward",
+    "description": "Manage per-extension call forwarding settings with unconditional, busy, no-answer, and not-found strategies.",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 220,
+    "providers": [
+        "Modules\\CallForwards\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

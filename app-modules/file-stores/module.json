@@ -1,0 +1,26 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "file-stores",
+    "version": "1.0.0",
+    "namespace": "Modules\\FileStores",
+    "display_name": "File Stores",
+    "description": "Reusable local and remote file destination profiles.",
+    "category": "Advanced",
+    "required": false,
+    "protected": false,
+    "priority": 91,
+    "providers": [
+        "Modules\\FileStores\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": [
+            "league/flysystem-aws-s3-v3",
+            "league/flysystem-ftp",
+            "league/flysystem-sftp-v3",
+            "spatie/flysystem-dropbox"
+        ]
+    }
+}

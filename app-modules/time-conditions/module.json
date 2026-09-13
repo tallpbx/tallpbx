@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "time-conditions",
+    "version": "1.0.0",
+    "namespace": "Modules\\TimeConditions",
+    "display_name": "Time Conditions",
+    "description": "Time-based call routing conditions for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 300,
+    "providers": [
+        "Modules\\TimeConditions\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

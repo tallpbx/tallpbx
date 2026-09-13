@@ -1,0 +1,39 @@
+[Unit]
+Description=TallPBX Laravel Reverb WebSocket Server
+Documentation=https://github.com/tallpbx/tallpbx
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/tallpbx
+ExecStart=/usr/bin/php artisan reverb:start --host=127.0.0.1 --port=8080
+
+# Restart policy: always restart on failure, with a 5-second delay
+Restart=always
+RestartSec=5
+
+# Prevent systemd from restarting too aggressively
+StartLimitInterval=60
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tallpbx-reverb
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/www/tallpbx/storage
+ReadOnlyPaths=/var/www/tallpbx
+
+# Environment (adjust APP_ENV as needed)
+Environment=APP_ENV=production
+
+[Install]
+WantedBy=multi-user.target

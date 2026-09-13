@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "conferences",
+    "version": "1.0.0",
+    "namespace": "Modules\\Conferences",
+    "display_name": "Conferences",
+    "description": "Conference room management for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 280,
+    "providers": [
+        "Modules\\Conferences\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "name": "tallpbx/module-admin",
+    "type": "tallpbx-module",
+    "description": "Core administration module for TallPBX.",
+    "require": {
+        "php": ">=8.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Admin\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Admin\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

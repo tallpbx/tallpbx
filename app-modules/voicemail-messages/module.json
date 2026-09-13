@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "voicemail-messages",
+    "version": "1.0.0",
+    "namespace": "Modules\\VoicemailMessages",
+    "display_name": "Voicemail Messages",
+    "description": "Voicemail message inbox for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 330,
+    "providers": [
+        "Modules\\VoicemailMessages\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

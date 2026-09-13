@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "access-controls",
+    "version": "1.0.0",
+    "namespace": "Modules\\AccessControls",
+    "display_name": "Access Controls",
+    "description": "Manage network-level allow/deny rules with CIDR, domain, and IP nodes.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 150,
+    "providers": [
+        "Modules\\AccessControls\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

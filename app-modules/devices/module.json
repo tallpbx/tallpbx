@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "devices",
+    "version": "1.0.0",
+    "namespace": "Modules\\Devices",
+    "display_name": "Devices",
+    "description": "Manage physical and soft phones with vendor, model, MAC address, and provisioning templates.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 130,
+    "providers": [
+        "Modules\\Devices\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

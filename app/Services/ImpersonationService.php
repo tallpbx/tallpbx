@@ -1,0 +1,149 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Exceptions\ImpersonationException;
+use App\Models\Admin;
+use App\Models\ImpersonationLog;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Cross-cutting service for admin user impersonation.
+ *
+ * System admins can temporarily assume the identity of any tenant user
+ * to troubleshoot tenant-specific issues. All impersonation actions
+ * are permission-gated and fully audited.
+ *
+ * Session keys used during impersonation:
+ * - impersonation.original_admin_id — the admin who initiated
+ * - impersonation.target_user_id — the user being impersonated
+ * - impersonation.started_at — timestamp of impersonation start
+ */
+class ImpersonationService implements ImpersonationServiceInterface
+{
+    private const SESSION_ORIGINAL_ADMIN_ID = 'impersonation.original_admin_id';
+
+    private const SESSION_TARGET_USER_ID = 'impersonation.target_user_id';
+
+    private const SESSION_STARTED_AT = 'impersonation.started_at';
+
+    /**
+     * Begin impersonating the given user as the current admin.
+     *
+     * Validates that the current admin has the impersonate permission,
+     * is not already in an impersonation session, and the target is
+     * a valid tenant user. Stores admin identity in session and logs
+     * in as the target user on the web guard.
+     */
+    public function impersonate(User $user): void
+    {
+        $admin = Auth::guard('admin')->user();
+
+        if (! $admin instanceof Admin) {
+            throw ImpersonationException::unauthorized();
+        }
+
+        // Prevent chaining: cannot impersonate while already impersonating
+        if ($this->isImpersonating()) {
+            throw ImpersonationException::alreadyImpersonating();
+        }
+
+        // Permission gate
+        if (! $admin->hasPermission('admin.impersonate')) {
+            throw ImpersonationException::unauthorized();
+        }
+
+        DB::transaction(function () use ($admin, $user) {
+            // Store admin identity in session before switching guards
+            session()->put(self::SESSION_ORIGINAL_ADMIN_ID, $admin->id);
+            session()->put(self::SESSION_TARGET_USER_ID, $user->id);
+            session()->put(self::SESSION_STARTED_AT, now());
+
+            // Log the impersonation start
+            ImpersonationLog::create([
+                'admin_id' => $admin->id,
+                'user_id' => $user->id,
+                'action' => 'start',
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+
+            // Switch to the web guard as the target user
+            Auth::guard('web')->login($user);
+        });
+    }
+
+    /**
+     * End the current impersonation session and restore the original admin.
+     *
+     * Logs the stop action, clears impersonation session data, and
+     * re-authenticates as the original admin — unless the admin was
+     * disabled while the impersonation was active, in which case
+     * the stop is logged but re-authentication is blocked.
+     */
+    public function stop(): void
+    {
+        if (! $this->isImpersonating()) {
+            throw ImpersonationException::notImpersonating();
+        }
+
+        $adminId = session()->get(self::SESSION_ORIGINAL_ADMIN_ID);
+        $userId = session()->get(self::SESSION_TARGET_USER_ID);
+
+        // Verify the original admin still exists
+        $admin = Admin::findOrFail($adminId);
+
+        DB::transaction(function () use ($adminId, $userId) {
+            // Log the impersonation stop
+            ImpersonationLog::create([
+                'admin_id' => $adminId,
+                'user_id' => $userId,
+                'action' => 'stop',
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        });
+
+        // Clear impersonation session data
+        session()->forget([
+            self::SESSION_ORIGINAL_ADMIN_ID,
+            self::SESSION_TARGET_USER_ID,
+            self::SESSION_STARTED_AT,
+        ]);
+
+        // Logout the web guard (impersonated user)
+        Auth::guard('web')->logout();
+
+        // Prevent re-authentication of a disabled admin
+        if (! $admin->enabled) {
+            throw ImpersonationException::adminDisabled();
+        }
+
+        // Re-authenticate as the original admin
+        Auth::guard('admin')->login($admin);
+    }
+
+    /**
+     * Check whether the current session is an impersonation.
+     */
+    public function isImpersonating(): bool
+    {
+        return session()->has(self::SESSION_ORIGINAL_ADMIN_ID);
+    }
+
+    /**
+     * Get the original admin who initiated the current impersonation, or null.
+     */
+    public function getOriginalAdmin(): ?Admin
+    {
+        if (! $this->isImpersonating()) {
+            return null;
+        }
+
+        return Admin::find(session()->get(self::SESSION_ORIGINAL_ADMIN_ID));
+    }
+}

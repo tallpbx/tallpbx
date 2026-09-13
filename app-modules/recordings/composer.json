@@ -1,0 +1,28 @@
+{
+    "name": "tallpbx/module-recordings",
+    "type": "tallpbx-module",
+    "description": "Recordings module for FreeSwitchPBX",
+    "require": {
+        "php": ">=8.3"
+    },
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "FreeSwitchPBX",
+            "homepage": "https://pbx.local"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Modules\\Recordings\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Recordings\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

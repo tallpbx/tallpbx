@@ -1,0 +1,20 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "name": "tallpbx",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build && bash scripts/fix-generated-permissions.sh",
+        "dev": "vite"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "^4.3.1",
+        "concurrently": "^9.0.1",
+        "daisyui": "^5.6.3",
+        "laravel-echo": "^2.4.0",
+        "laravel-vite-plugin": "^3.1",
+        "pusher-js": "^8.6.0",
+        "tailwindcss": "^4.3.1",
+        "vite": "^8.0.0"
+    }
+}

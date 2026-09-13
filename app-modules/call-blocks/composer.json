@@ -1,0 +1,23 @@
+{
+    "name": "tallpbx/call-blocks",
+    "type": "tallpbx-module",
+    "description": "Call blocking rule management module for FreeSwitchPBX.",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Modules\\CallBlocks\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.3",
+        "laravel/framework": ">=13.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\CallBlocks\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "music-on-hold",
+    "version": "1.0.0",
+    "namespace": "Modules\\MusicOnHold",
+    "display_name": "Music on Hold",
+    "description": "Manage music on hold audio files and settings.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 250,
+    "providers": [
+        "Modules\\MusicOnHold\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

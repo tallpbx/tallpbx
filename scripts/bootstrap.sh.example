@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# TallPBX Public-Release Bootstrap Reference (inactive template)
+# ==============================================================================
+# This file is intentionally a commented reference, not an active installer.
+# Although the TallPBX repository is public, official packaged release
+# distributions (with signed bootstrap artifacts and checksum verification)
+# are not yet active. Install by cloning https://github.com/tallpbx/tallpbx.git directly.
+#
+# Before activation, the public release process must publish this bootstrap at
+# a pinned release URL with a SHA-256 checksum. The final active version must
+# verify that checksum, clone an immutable release over HTTPS, and reject a
+# non-empty non-Git /var/www/tallpbx directory. It must then invoke the
+# repository's existing idempotent scripts/install.sh entry point.
+#
+# Intended future flow, kept commented until those release safeguards exist:
+#
+# set -euo pipefail
+# bootstrap_url="https://release.example.invalid/tallpbx/bootstrap.sh"
+# bootstrap_sha256="published-release-checksum"
+# curl --fail --silent --show-error --location "$bootstrap_url" -o /tmp/tallpbx-bootstrap.sh
+# echo "$bootstrap_sha256  /tmp/tallpbx-bootstrap.sh" | sha256sum --check --status
+# sudo bash /tmp/tallpbx-bootstrap.sh --ref "vX.Y.Z"
+#
+# The active bootstrap would then perform the following checks before calling
+# the main installer:
+#
+# apt-get update
+# apt-get install -y git
+# test ! -e /var/www/tallpbx || test -d /var/www/tallpbx/.git
+# git clone --branch "vX.Y.Z" --depth 1 https://github.com/tallpbx/tallpbx.git /var/www/tallpbx
+# exec bash /var/www/tallpbx/scripts/install.sh

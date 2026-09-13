@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "conference-centers",
+    "version": "1.0.0",
+    "namespace": "Modules\\ConferenceCenters",
+    "display_name": "Conference Centers",
+    "description": "Conference center dial-in service for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 290,
+    "providers": [
+        "Modules\\ConferenceCenters\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

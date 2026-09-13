@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "sip-profiles",
+    "version": "1.0.0",
+    "namespace": "Modules\\SipProfiles",
+    "display_name": "SIP Profiles",
+    "description": "Manage FreeSWITCH Sofia SIP profiles with per-tenant JSON settings.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 100,
+    "providers": [
+        "Modules\\SipProfiles\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

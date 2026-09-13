@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch TallPBX restore requests
+
+[Path]
+PathChanged=/var/lib/tallpbx/restore-requests
+Unit=tallpbx-restore-dispatch.service
+
+[Install]
+WantedBy=multi-user.target

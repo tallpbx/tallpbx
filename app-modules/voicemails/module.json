@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "voicemails",
+    "version": "1.0.0",
+    "namespace": "Modules\\Voicemails",
+    "display_name": "Voicemails",
+    "description": "Manage voicemail mailboxes for extensions with PIN access, email forwarding, and greeting settings.",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 210,
+    "providers": [
+        "Modules\\Voicemails\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

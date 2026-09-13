@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // ─── Auth ───────────────────────────────────────────────────────────────
+    'sign_in' => 'Sign In',
+    'sign_out' => 'Sign Out',
+    'sign_in_title' => 'Sign in to your account',
+    'login_title' => 'TallPBX',
+    'create_account' => 'Create Account',
+    'forgot_password' => 'Forgot Password',
+    'reset_password' => 'Reset Password',
+    'back_to_sign_in' => 'Back to Sign In',
+    'register_title' => 'Create your account',
+    'already_have_account' => 'Already have an account?',
+    'remember_me' => 'Remember me',
+    'forgot_password_intro' => 'Enter your email address and we\'ll send you a link to reset your password.',
+    'reset_password_intro' => 'Enter your new password below.',
+    'authenticating' => 'Authenticating...',
+
+    // ─── Form Labels ────────────────────────────────────────────────────────
+    'email' => 'Email',
+    'email_placeholder' => 'you@example.com',
+    'password' => 'Password',
+    'password_placeholder' => 'Min 8 characters',
+    'password_confirmation' => 'Confirm Password',
+    'name' => 'Name',
+    'name_placeholder' => 'Full name',
+    'phone' => 'Phone',
+    'phone_placeholder' => '+1 (555) 000-0000',
+
+    // ─── Navigation ─────────────────────────────────────────────────────────
+    'dashboard' => 'Dashboard',
+    'services' => 'Services',
+    'inbound_routes' => 'Inbound Routes',
+    'outbound_routes' => 'Outbound Routes',
+    'billing' => 'Billing',
+    'profile' => 'Profile',
+    'settings' => 'Settings',
+    'logout' => 'Logout',
+
+    // ─── Actions ────────────────────────────────────────────────────────────
+    'save' => 'Save',
+    'cancel' => 'Cancel',
+    'delete' => 'Delete',
+    'edit' => 'Edit',
+    'create' => 'Create',
+    'update' => 'Update',
+    'close' => 'Close',
+    'back' => 'Back',
+    'confirm' => 'Confirm',
+    'search' => 'Search',
+    'filter' => 'Filter',
+    'clear' => 'Clear',
+    'apply' => 'Apply',
+    'send' => 'Send',
+    'upload' => 'Upload',
+    'download' => 'Download',
+    'enable' => 'Enable',
+    'disable' => 'Disable',
+    'enabled' => 'Enabled',
+    'disabled' => 'Disabled',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
+    'yes' => 'Yes',
+    'no' => 'No',
+    'all' => 'All',
+    'none' => 'None',
+    'loading' => 'Loading...',
+    'select_tenant' => 'Select a tenant',
+    'optional' => 'Optional',
+    'no_results' => 'No results found.',
+    'no_items' => 'No :items found.',
+    'no_items_configured' => 'No :items configured yet.',
+    'are_you_sure' => 'Are you sure?',
+    'are_you_sure_delete' => 'Are you sure you want to delete this :item?',
+    'confirm_delete' => 'Delete this :item?',
+
+    // ─── Table Headers ──────────────────────────────────────────────────────
+    'actions' => 'Actions',
+    'status' => 'Status',
+    'type' => 'Type',
+    'date' => 'Date',
+    'created_at' => 'Created',
+    'updated_at' => 'Updated',
+    'description' => 'Description',
+    'value' => 'Value',
+    'key' => 'Key',
+    'order' => 'Order',
+
+    // ─── Badges ─────────────────────────────────────────────────────────────
+    'online' => 'Online',
+    'offline' => 'Offline',
+    'registered' => 'Registered',
+    'unregistered' => 'Unregistered',
+    'success' => 'Success',
+    'warning' => 'Warning',
+    'error' => 'Error',
+    'info' => 'Info',
+
+    // ─── Impersonation ──────────────────────────────────────────────────────
+    'impersonating' => 'You are viewing as <strong>:name</strong> &mdash; Impersonated by <strong>:admin</strong>',
+    'stop_impersonating' => 'Stop Impersonating',
+
+    // ─── Dashboard ──────────────────────────────────────────────────────────
+    'dashboard_overview' => 'Dashboard Overview',
+    'total_users' => 'Total Users',
+    'total_tenants' => 'Total Tenants',
+    'system_status' => 'System Status',
+    'healthy' => 'Healthy',
+    'freeswitch_version' => 'FreeSWITCH :version',
+
+    // ─── Errors ─────────────────────────────────────────────────────────────
+    'page_not_found' => 'Page Not Found',
+    'page_not_found_desc' => 'The page you are looking for does not exist.',
+    'unauthorized' => 'Unauthorized',
+    'unauthorized_desc' => 'You do not have permission to access this page.',
+    'server_error' => 'Server Error',
+    'server_error_desc' => 'Something went wrong. Please try again later.',
+];

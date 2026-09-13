@@ -1,0 +1,16 @@
+{
+    "name": "tallpbx/backups",
+    "description": "Database, file, media, and configuration backup with Laravel UI, scheduling, retention, compression, and restore.",
+    "type": "tallpbx-module",
+    "license": "Apache-2.0",
+    "autoload": {
+        "classmap": ["src/"]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Backups\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    }
+}

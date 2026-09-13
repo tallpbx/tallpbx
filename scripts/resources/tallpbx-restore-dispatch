@@ -1,0 +1,14 @@
+#!/bin/bash
+# Starts only UUID-named restore service instances requested by the web worker.
+set -euo pipefail
+
+request_directory=/var/lib/tallpbx/restore-requests
+
+shopt -s nullglob
+for request_path in "$request_directory"/*.request; do
+    operation_id=$(basename "$request_path" .request)
+
+    if [[ "$operation_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+        systemctl start "tallpbx-restore@${operation_id}.service"
+    fi
+done

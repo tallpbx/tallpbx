@@ -1,0 +1,12 @@
+/*
+ * Custom Tailwind v4 source scanning for dynamically-generated classes.
+ *
+ * The x-tooltip Blade component constructs DaisyUI position class names
+ * at runtime (e.g. 'tooltip-' . $position), so Tailwind v4's static
+ * analyzer never sees the literal strings 'tooltip-right' or 'tooltip-left'
+ * and treeshakes them from the compiled CSS.
+ *
+ * The @source directive below tells Tailwind to scan a small Blade partial
+ * that contains these class names as literals, forcing their inclusion.
+ */
+@source "../views/components/tooltip-safelist.blade.php";

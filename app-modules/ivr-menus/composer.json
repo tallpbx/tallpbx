@@ -1,0 +1,23 @@
+{
+    "name": "tallpbx/ivr-menus",
+    "type": "tallpbx-module",
+    "description": "IVR menu builder and audio prompt management module for FreeSwitchPBX.",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Modules\\IvrMenus\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.3",
+        "laravel/framework": ">=13.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\IvrMenus\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

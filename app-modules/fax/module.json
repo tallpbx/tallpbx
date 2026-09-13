@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "fax",
+    "version": "1.0.0",
+    "namespace": "Modules\\Fax",
+    "display_name": "Fax",
+    "description": "Fax send and receive for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 360,
+    "providers": [
+        "Modules\\Fax\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

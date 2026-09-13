@@ -1,0 +1,14 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "provision",
+    "version": "1.0.0",
+    "namespace": "Modules\\Provision",
+    "display_name": "Device Provisioning",
+    "description": "HTTP provisioning server for IP phones",
+    "category": "Provisioning",
+    "required": false,
+    "protected": false,
+    "priority": 510,
+    "providers": ["Modules\\Provision\\Providers\\ModuleServiceProvider"],
+    "requirements": {"php": ">=8.3", "laravel": ">=13.0", "modules": [], "packages": []}
+}

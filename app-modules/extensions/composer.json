@@ -1,0 +1,23 @@
+{
+    "name": "tallpbx/extensions",
+    "type": "tallpbx-module",
+    "description": "Phone extension management module for FreeSwitchPBX.",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Modules\\Extensions\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.3",
+        "laravel/framework": ">=13.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Extensions\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

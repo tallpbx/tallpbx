@@ -1,0 +1,52 @@
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <h1 class="text-2xl font-bold mb-6">{{ __('admin.create_call_broadcast') }}</h1>
+
+        <form wire:submit="save" class="space-y-6">
+            <div class="form-control w-full">
+                <label class="label justify-start gap-2 pb-1" for="tenantId">
+                    <span class="label-text font-medium">Tenant</span>
+                    <x-tooltip :tip="__('admin.tenant_select_tooltip')" position="right">
+                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                    </x-tooltip>
+                </label>
+                <select wire:model="tenantId" id="tenantId" class="select select-bordered w-full">
+                    <option value="">Select a tenant...</option>
+                    @foreach ($tenants as $tenant)
+                        <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
+                    @endforeach
+                </select>
+                @error('tenantId')
+                    <span class="text-error text-xs mt-1">{{ $message }}</span>
+                @enderror
+            </div>
+
+            <div class="form-control w-full">
+                <label class="label justify-start gap-2 pb-1" for="name">
+                    <span class="label-text font-medium">{{ __('admin.call_broadcast_name') }}</span>
+                </label>
+                <input wire:model="name" type="text" id="name" class="input input-bordered w-full" placeholder="e.g., Emergency Alert" />
+                @error('name')
+                    <span class="text-error text-xs mt-1">{{ $message }}</span>
+                @enderror
+            </div>
+
+            <div class="form-control w-full">
+                <label class="label justify-start gap-2 pb-1" for="phoneNumbers">
+                    <span class="label-text font-medium">{{ __('admin.call_broadcast_phone_numbers') }}</span>
+                </label>
+                <textarea wire:model="phoneNumbers" id="phoneNumbers" class="textarea textarea-bordered w-full" rows="5" placeholder="+15551234567&#10;+15559876543"></textarea>
+                @error('phoneNumbers')
+                    <span class="text-error text-xs mt-1">{{ $message }}</span>
+                @enderror
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button type="submit" class="btn btn-primary">
+                    {{ __('admin.create_call_broadcast') }}
+                </button>
+                <a href="{{ route('panel.call-broadcast.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+            </div>
+        </form>
+    </div>
+</div>

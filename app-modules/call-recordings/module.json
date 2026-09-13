@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "call-recordings",
+    "version": "1.0.0",
+    "namespace": "Modules\\CallRecordings",
+    "display_name": "Call Recordings",
+    "description": "Call recording management for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 340,
+    "providers": [
+        "Modules\\CallRecordings\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "xml-cdr",
+    "version": "1.0.0",
+    "namespace": "Modules\\XmlCdr",
+    "display_name": "XML CDR",
+    "description": "Call detail record management for FreeSWITCH",
+    "category": "Monitoring",
+    "required": false,
+    "protected": false,
+    "priority": 410,
+    "providers": [
+        "Modules\\XmlCdr\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

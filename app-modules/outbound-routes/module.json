@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "outbound-routes",
+    "version": "1.0.0",
+    "namespace": "Modules\\OutboundRoutes",
+    "display_name": "Outbound Routes",
+    "description": "Manage outbound call routing rules with dial pattern matching, gateway selection, and caller ID manipulation.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 210,
+    "providers": [
+        "Modules\\OutboundRoutes\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

@@ -1,0 +1,23 @@
+{
+    "name": "tallpbx/sip-accounts",
+    "type": "tallpbx-module",
+    "description": "SIP authentication account management for FreeSwitchPBX.",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Modules\\SipAccounts\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.3",
+        "laravel/framework": ">=13.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\SipAccounts\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

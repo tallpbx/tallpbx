@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "active-calls",
+    "version": "1.0.0",
+    "namespace": "Modules\\ActiveCalls",
+    "display_name": "Active Calls",
+    "description": "Real-time active call monitoring for FreeSWITCH",
+    "category": "Monitoring",
+    "required": false,
+    "protected": false,
+    "priority": 420,
+    "providers": [
+        "Modules\\ActiveCalls\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

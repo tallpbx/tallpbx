@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "gateways",
+    "version": "1.0.0",
+    "namespace": "Modules\\Gateways",
+    "display_name": "Gateways",
+    "description": "Manage SIP trunks and upstream provider connections for outbound routing.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 140,
+    "providers": [
+        "Modules\\Gateways\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

@@ -1,0 +1,119 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "TallPBX Module Manifest",
+    "description": "Schema for TallPBX module.json manifest files.",
+    "type": "object",
+    "required": [
+        "name",
+        "version",
+        "namespace",
+        "display_name"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "Reference to this JSON schema file."
+        },
+        "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$",
+            "description": "Machine name (lowercase, underscore-separated)."
+        },
+        "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "description": "Semantic version (e.g., 1.0.0)."
+        },
+        "namespace": {
+            "type": "string",
+            "pattern": "^Modules\\\\[A-Z][a-zA-Z0-9_]*$",
+            "description": "PHP namespace (e.g., Modules\\CallForwarding)."
+        },
+        "display_name": {
+            "type": "string",
+            "description": "Human-readable name shown in the UI."
+        },
+        "description": {
+            "type": "string",
+            "description": "Short description of the module's purpose."
+        },
+        "category": {
+            "type": "string",
+            "description": "UI grouping category (e.g., System, PBX Core, Call Features).",
+            "default": "General"
+        },
+        "required": {
+            "type": "boolean",
+            "description": "If true, the module cannot be disabled.",
+            "default": false
+        },
+        "protected": {
+            "type": "boolean",
+            "description": "If true, the module cannot be uninstalled.",
+            "default": false
+        },
+        "priority": {
+            "type": "integer",
+            "description": "Loading order (lower values load first).",
+            "default": 0
+        },
+        "providers": {
+            "type": "array",
+            "description": "Service provider classes to register.",
+            "items": {
+                "type": "string"
+            },
+            "uniqueItems": true
+        },
+        "requirements": {
+            "type": "object",
+            "description": "Runtime dependency constraints.",
+            "properties": {
+                "php": {
+                    "type": "string",
+                    "description": "Required PHP version constraint (e.g., >=8.3)."
+                },
+                "laravel": {
+                    "type": "string",
+                    "description": "Required Laravel version constraint (e.g., >=13.0)."
+                },
+                "modules": {
+                    "type": "array",
+                    "description": "Required TallPBX modules.",
+                    "items": {
+                        "type": "object",
+                        "required": ["name", "version"],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Module machine name."
+                            },
+                            "version": {
+                                "type": "string",
+                                "description": "Version constraint (e.g., >=1.0.0, ~1.0, ^1.0)."
+                            }
+                        }
+                    }
+                },
+                "packages": {
+                    "type": "array",
+                    "description": "Required Composer packages.",
+                    "items": {
+                        "type": "object",
+                        "required": ["name", "version"],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Composer package name."
+                            },
+                            "version": {
+                                "type": "string",
+                                "description": "Version constraint."
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

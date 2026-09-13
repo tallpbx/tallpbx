@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "follow-me",
+    "version": "1.0.0",
+    "namespace": "Modules\\FollowMe",
+    "display_name": "Follow Me",
+    "description": "Follow-me call forwarding for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 310,
+    "providers": [
+        "Modules\\FollowMe\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

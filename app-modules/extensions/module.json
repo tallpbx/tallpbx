@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "extensions",
+    "version": "1.0.0",
+    "namespace": "Modules\\Extensions",
+    "display_name": "Extensions",
+    "description": "Manage tenant-local phone extensions and extension-level settings.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 120,
+    "providers": [
+        "Modules\\Extensions\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

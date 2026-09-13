@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "destinations",
+    "version": "1.0.0",
+    "namespace": "Modules\\Destinations",
+    "display_name": "Destinations",
+    "description": "Manage named call destinations (conferences, IVRs, voicemails, ring groups).",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 180,
+    "providers": [
+        "Modules\\Destinations\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<scenario name="TallPBX call-block UAC">
+  <!--
+    Authenticates as a registered extension (e.g. 2000) but sets the
+    From header to a blocked caller ID (15550000123). FreeSWITCH sets
+    caller_id_number from the auth identity, but the sip_from_user
+    channel variable retains the original From header user.
+
+    The call-block dialplan contributor checks sip_from_user against
+    the block pattern (^15550000\d{3}$) and hangs up with CALL_REJECTED.
+
+    Proves the call-block dialplan contributor correctly rejects
+    blocked callers even after successful SIP authentication.
+  -->
+  <send retrans="500">
+    <![CDATA[
+
+INVITE sip:[field3]@[field2] SIP/2.0
+Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+From: "Blocked Caller" <sip:15550000123@[field2]>;tag=[call_number]
+To: <sip:[field3]@[field2]>
+Call-ID: [call_id]
+CSeq: 1 INVITE
+Contact: <sip:15550000123@[local_ip]:[local_port];transport=[transport]>
+Max-Forwards: 70
+Subject: TallPBX call-block test
+Content-Type: application/sdp
+Content-Length: [len]
+
+v=0
+o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+s=-
+c=IN IP[media_ip_type] [media_ip]
+t=0 0
+m=audio [media_port] RTP/AVP 0 8
+a=rtpmap:0 PCMU/8000
+a=rtpmap:8 PCMA/8000
+
+    ]]>
+  </send>
+
+  <recv response="100" optional="true"/>
+  <recv response="407" auth="true"/>
+
+  <send>
+    <![CDATA[
+
+ACK sip:[field3]@[field2] SIP/2.0
+[last_Via:]
+[last_From:]
+[last_To:]
+[last_Call-ID:]
+CSeq: 1 ACK
+Contact: <sip:15550000123@[local_ip]:[local_port];transport=[transport]>
+Max-Forwards: 70
+Content-Length: 0
+
+    ]]>
+  </send>
+
+  <send retrans="500">
+    <![CDATA[
+
+INVITE sip:[field3]@[field2] SIP/2.0
+Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+From: "Blocked Caller" <sip:15550000123@[field2]>;tag=[call_number]
+To: <sip:[field3]@[field2]>
+Call-ID: [call_id]
+CSeq: 2 INVITE
+Contact: <sip:15550000123@[local_ip]:[local_port];transport=[transport]>
+[field5]
+Max-Forwards: 70
+Subject: TallPBX call-block test
+Content-Type: application/sdp
+Content-Length: [len]
+
+v=0
+o=user1 53655765 2353687637 IN IP[local_ip_type] [local_ip]
+s=-
+c=IN IP[media_ip_type] [media_ip]
+t=0 0
+m=audio [media_port] RTP/AVP 0 8
+a=rtpmap:0 PCMU/8000
+a=rtpmap:8 PCMA/8000
+
+    ]]>
+  </send>
+
+  <!--
+    After auth, FreeSWITCH hits the dialplan. The call-block extension
+    checks sip_from_user (15550000123) against the block pattern and
+    hangs up with CALL_REJECTED. Accept 403, 603, or 488.
+  -->
+  <recv response="100" optional="true"/>
+  <recv response="403" optional="true"/>
+  <recv response="603" optional="true"/>
+  <recv response="488" optional="true"/>
+  <recv response="480" optional="true"/>
+</scenario>

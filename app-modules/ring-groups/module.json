@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "ring-groups",
+    "version": "1.0.0",
+    "namespace": "Modules\\RingGroups",
+    "display_name": "Ring Groups",
+    "description": "Manage ring groups with multiple extensions for simultaneous or sequential call distribution.",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 270,
+    "providers": [
+        "Modules\\RingGroups\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

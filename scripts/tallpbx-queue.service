@@ -1,0 +1,42 @@
+[Unit]
+Description=TallPBX Laravel Queue Worker
+Documentation=https://github.com/tallpbx/tallpbx
+After=network.target mariadb.service redis-server.service
+Wants=mariadb.service redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/tallpbx
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3
+
+# Restart policy: always restart on failure, with a 5-second delay
+Restart=always
+RestartSec=5
+
+# Prevent systemd from restarting too aggressively
+StartLimitInterval=60
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tallpbx-queue
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+# The queue runs backup archives, restore staging, and writes privileged
+# restore request files, so the backup and restore roots must be writable
+# in addition to the app storage and media roots.
+ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/lib/tallpbx/backups /var/lib/tallpbx/restore-requests
+ReadOnlyPaths=/var/www/tallpbx
+
+# Environment (adjust APP_ENV as needed)
+Environment=APP_ENV=production
+
+[Install]
+WantedBy=multi-user.target

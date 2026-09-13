@@ -1,0 +1,400 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "tallpbx/tallpbx",
+    "type": "project",
+    "description": "TallPBX is a multi-tenant, Laravel-based PBX management platform for FreeSWITCH.",
+    "keywords": [
+        "pbx",
+        "freeswitch",
+        "voip",
+        "sip",
+        "telephony",
+        "laravel",
+        "multi-tenant"
+    ],
+    "license": "Apache-2.0",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "app-modules/access-controls"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/active-calls"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/active-conferences"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/admin"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/auth"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/backups"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/bridges"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-blocks"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-broadcast"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-center-active"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-centers"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-flows"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-forwards"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/call-recordings"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/click-to-call"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/conference-centers"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/conferences"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/destinations"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/devices"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/dialplan-tools"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/dialplans"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/email-queue"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/smtp-connector"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/email-templates"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/emergency"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/event-guard"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/extension-settings"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/extensions"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/fax"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/file-stores"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/feature-codes"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/follow-me"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/hot-desking"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/gateways"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/inbound-routes"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/ivr-menus"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/logs"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/music-on-hold"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/number-translations"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/operator-panel"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/outbound-routes"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/pin-numbers"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/provision"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/recordings"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/registrations"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/ring-groups"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/sip-accounts"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/sip-profiles"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/sip-status"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/sip-trunks"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/speech"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/tenant"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/tenant-limits"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/time-conditions"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/transcribe"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/voicemail-messages"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/voicemails"
+        },
+        {
+            "type": "path",
+            "url": "app-modules/xml-cdr"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "blade-ui-kit/blade-heroicons": "^2.7",
+        "laravel/framework": "^13.8",
+        "laravel/reverb": "^1.11",
+        "laravel/tinker": "^3.0",
+        "livewire/livewire": "^4.0",
+        "tallpbx/access-controls": "*",
+        "tallpbx/auth": "*",
+        "tallpbx/backups": "@dev",
+        "tallpbx/bridges": "*",
+        "tallpbx/call-blocks": "*",
+        "tallpbx/call-forwards": "*",
+        "tallpbx/destinations": "*",
+        "tallpbx/devices": "*",
+        "tallpbx/dialplans": "*",
+        "tallpbx/extensions": "*",
+        "tallpbx/feature-codes": "*",
+        "tallpbx/file-stores": "@dev",
+        "tallpbx/gateways": "*",
+        "tallpbx/inbound-routes": "*",
+        "tallpbx/ivr-menus": "*",
+        "tallpbx/logs": "*",
+        "tallpbx/module-active-calls": "*",
+        "tallpbx/module-active-conferences": "*",
+        "tallpbx/module-admin": "*",
+        "tallpbx/module-call-broadcast": "*",
+        "tallpbx/module-call-center-active": "*",
+        "tallpbx/module-call-centers": "*",
+        "tallpbx/module-call-flows": "*",
+        "tallpbx/module-call-recordings": "*",
+        "tallpbx/module-click-to-call": "*",
+        "tallpbx/module-conference-centers": "*",
+        "tallpbx/module-conferences": "*",
+        "tallpbx/module-dialplan-tools": "*",
+        "tallpbx/module-email-queue": "*",
+        "tallpbx/module-email-templates": "*",
+        "tallpbx/module-emergency": "*",
+        "tallpbx/module-event-guard": "*",
+        "tallpbx/module-extension-settings": "*",
+        "tallpbx/module-fax": "*",
+        "tallpbx/module-follow-me": "*",
+        "tallpbx/module-hot-desking": "*",
+        "tallpbx/module-number-translations": "*",
+        "tallpbx/module-operator-panel": "*",
+        "tallpbx/module-provision": "*",
+        "tallpbx/module-recordings": "*",
+        "tallpbx/module-registrations": "*",
+        "tallpbx/module-sip-status": "*",
+        "tallpbx/module-sip-trunks": "*",
+        "tallpbx/module-speech": "*",
+        "tallpbx/module-tenant-limits": "*",
+        "tallpbx/module-time-conditions": "*",
+        "tallpbx/module-transcribe": "*",
+        "tallpbx/module-voicemail-messages": "*",
+        "tallpbx/module-xml-cdr": "*",
+        "tallpbx/music-on-hold": "*",
+        "tallpbx/outbound-routes": "*",
+        "tallpbx/pin-numbers": "*",
+        "tallpbx/ring-groups": "*",
+        "tallpbx/sip-accounts": "*",
+        "tallpbx/sip-profiles": "*",
+        "tallpbx/smtp-connector": "@dev",
+        "tallpbx/tenant": "*",
+        "tallpbx/voicemails": "*"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.23",
+        "laravel/boost": "^2.4",
+        "laravel/dusk": "^8.6",
+        "laravel/pail": "^1.2.5",
+        "laravel/pao": "^1.0.6",
+        "laravel/pint": "^1.27",
+        "mockery/mockery": "^1.6",
+        "netresearch/composer-agent-skill-plugin": "^2.1",
+        "nunomaduro/collision": "^8.6",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-laravel": "^4.1",
+        "phpunit/phpunit": "^12.5.12"
+    },
+    "autoload": {
+        "files": [
+            "app/helpers.php"
+        ],
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/",
+            "Modules\\Backups\\": "app-modules/backups/src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force",
+            "npm install --ignore-scripts",
+            "npm run build"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan test"
+        ],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "@php artisan permissions:repair --scope=full --ansi"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan migrate --graceful --ansi"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "netresearch/composer-agent-skill-plugin": true,
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

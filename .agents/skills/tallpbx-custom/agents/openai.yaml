@@ -1,0 +1,4 @@
+interface:
+  display_name: "TallPBX Custom"
+  short_description: "TallPBX-specific frontend patterns, auth, tenancy, and module conventions"
+  default_prompt: "Use $tallpbx-custom when working on TallPBX-specific patterns: tooltips, CSS safelisting, Alpine+Livewire reactivity, scroll preservation, auth guards, tenant isolation, or module development conventions."

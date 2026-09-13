@@ -1,0 +1,28 @@
+{
+    "name": "tallpbx/module-call-centers",
+    "type": "tallpbx-module",
+    "description": "Call centers module for FreeSwitchPBX",
+    "require": {
+        "php": ">=8.3"
+    },
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "FreeSwitchPBX",
+            "homepage": "https://pbx.local"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Modules\\CallCenters\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\CallCenters\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

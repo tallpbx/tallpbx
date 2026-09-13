@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "inbound-routes",
+    "version": "1.0.0",
+    "namespace": "Modules\\InboundRoutes",
+    "display_name": "Inbound Routes",
+    "description": "Manage inbound call routing rules with DID matching, destination selection, and time conditions.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 200,
+    "providers": [
+        "Modules\\InboundRoutes\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

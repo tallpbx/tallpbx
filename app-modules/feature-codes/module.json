@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "feature-codes",
+    "version": "1.0.0",
+    "namespace": "Modules\\FeatureCodes",
+    "display_name": "Feature Codes",
+    "description": "Manage star codes and feature codes like *97 voicemail for per-tenant customization.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 160,
+    "providers": [
+        "Modules\\FeatureCodes\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

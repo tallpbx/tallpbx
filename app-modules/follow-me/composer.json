@@ -1,0 +1,28 @@
+{
+    "name": "tallpbx/module-follow-me",
+    "type": "tallpbx-module",
+    "description": "Follow-me call forwarding module for FreeSwitchPBX",
+    "require": {
+        "php": ">=8.3"
+    },
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "FreeSwitchPBX",
+            "homepage": "https://pbx.local"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Modules\\FollowMe\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\FollowMe\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

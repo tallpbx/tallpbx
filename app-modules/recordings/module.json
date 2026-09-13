@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "recordings",
+    "version": "1.0.0",
+    "namespace": "Modules\\Recordings",
+    "display_name": "Recordings",
+    "description": "Audio recording management for FreeSWITCH",
+    "category": "Call Features",
+    "required": false,
+    "protected": false,
+    "priority": 350,
+    "providers": [
+        "Modules\\Recordings\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

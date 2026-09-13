@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "auth",
+    "version": "1.0.0",
+    "namespace": "Modules\\Auth",
+    "display_name": "Authentication",
+    "description": "Tenant authentication pages (forgot password, register, reset password).",
+    "category": "System",
+    "required": true,
+    "protected": false,
+    "priority": -90,
+    "providers": [
+        "Modules\\Auth\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}
