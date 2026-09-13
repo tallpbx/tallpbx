@@ -38,7 +38,7 @@ The current minimum-hardware capacity lab uses the first size in a sequential in
 
 | Role | Host | Specification |
 | --- | --- | --- |
-| PBX under test | `134.199.230.218` | Debian 13 VPS, 1 Intel vCPU, 967 MiB RAM, 2 GiB swap, 35 GB disk |
+| PBX under test | `x.x.x.218` | Debian 13 VPS, 1 Intel vCPU, 967 MiB RAM, 2 GiB swap, 35 GB disk |
 | HTTP and SIPp load generator | `192.168.1.76` | Separate Debian 13 host on a LAN behind NAT |
 | Bidirectional SIP/RTP path | WireGuard | PBX `10.77.0.1`, load generator `10.77.0.2`, public endpoint UDP/51820 on the PBX |
 
@@ -746,7 +746,7 @@ Use the same code commit, seed size, mixed scenario, cache settings, PHP-FPM con
 | Profile | Environment | CPU | RAM | Swap | Load path | Status |
 | --- | --- | ---: | ---: | ---: | --- | --- |
 | `virtualbox-4c-4g` | Windows 11 / VirtualBox comparison VM | 4 vCPU | 3.8 GiB | 2.0 GiB | Local/LAN | Baseline complete |
-| `vps-1c-1g` | Remote datacenter VPS at `134.199.230.218`, initial size | 1 vCPU | 967 MiB | 2.0 GiB | WAN from `192.168.1.76` | XML capacity and SIPp complete |
+| `vps-1c-1g` | Remote datacenter VPS at `x.x.x.218`, initial size | 1 vCPU | 967 MiB | 2.0 GiB | WAN from `192.168.1.76` | XML capacity and SIPp complete |
 | `vps-1c-2g` | Same remote datacenter VPS after resize | 1 vCPU | 1973 MiB | 2.0 GiB | Same WAN path | XML capacity and low-volume SIPp complete |
 | `vps-2c-2g` | Same remote datacenter VPS after second resize | 2 vCPU | 1973 MiB | 2.0 GiB | Same WAN path | XML capacity and low-volume SIPp complete |
 | `vps-2c-4g` | Remote datacenter VPS at optional larger size | 2 vCPU | 4 GiB | Record at run time | Same WAN path | Optional |
@@ -969,7 +969,7 @@ even after removing the session-rate ceiling.
 
 #### Post Tenant-Identity Cache Optimization Remote Result
 
-On July 18, 2026, the 2-vCPU/2-GB datacenter VPS at `146.190.135.236` was
+On July 18, 2026, the 2-vCPU/2-GB datacenter VPS at `x.x.x.236` was
 retested after further cache optimization in commit `30c8dea`. The optimization
 caches FreeSWITCH tenant-identity resolution for repeated directory/auth XML
 lookups. In plain language: when FreeSWITCH asks Laravel "which tenant/user is
@@ -981,9 +981,9 @@ used.
 
 The test used the correct remote datacenter topology:
 
-- PBX under test: datacenter VPS `146.190.135.236`, WireGuard `10.77.0.1`
+- PBX under test: datacenter VPS `x.x.x.236`, WireGuard `10.77.0.1`
 - SIPp load generator: `192.168.1.76`, WireGuard `10.77.0.2`
-- SIP realm: `146.190.135.236`
+- SIP realm: `x.x.x.236`
 - FreeSWITCH `sessions-per-second`: `60`
 - XML handler cache stores: Redis
 

@@ -163,9 +163,9 @@ The representative minimum-hardware test environment currently uses this exact s
 
 | Role | Address |
 | --- | --- |
-| Public PBX | `134.199.230.218` (`10.77.0.1` on `wg0`) |
+| Public PBX | `x.x.x.218` (`10.77.0.1` on `wg0`) |
 | SIPp load generator | `192.168.1.76` behind NAT (`10.77.0.2` on `wg0`) |
-| WireGuard endpoint | `134.199.230.218:51820/udp` |
+| WireGuard endpoint | `x.x.x.218:51820/udp` |
 
 Only UDP port `51820` needs to be reachable publicly. Keep SIPp signaling listeners and media ports private inside WireGuard. Restrict any host or cloud firewall rules accordingly.
 
@@ -1185,11 +1185,11 @@ Runtime fixes discovered during this testing:
 
 ## July 17, 2026 Remote VPS Results
 
-The 1-vCPU/1-GB remote VPS was tested from the NATed `192.168.1.76` load generator through WireGuard (`10.77.0.1`/`10.77.0.2`). The PBX Sofia profile remained bound to `134.199.230.218`; the WireGuard-only DNAT/SNAT bridge above carried SIP and RTP without exposing the SIPp host publicly.
+The 1-vCPU/1-GB remote VPS was tested from the NATed `192.168.1.76` load generator through WireGuard (`10.77.0.1`/`10.77.0.2`). The PBX Sofia profile remained bound to `x.x.x.218`; the WireGuard-only DNAT/SNAT bridge above carried SIP and RTP without exposing the SIPp host publicly.
 
 | Test | Result | Important observation |
 | --- | --- | --- |
-| Register 20 users | Passed | The synthetic accounts used the forced PBX realm `134.199.230.218`; all 20 registrations succeeded. |
+| Register 20 users | Passed | The synthetic accounts used the forced PBX realm `x.x.x.218`; all 20 registrations succeeded. |
 | Extension calls | Passed | 10 authenticated extension calls completed through the tunnel. |
 | Outbound-route calls | Passed | 5 calls reached the SIPp UAS at `10.77.0.2:5088` after PBX egress SNAT was enabled. |
 | Recording media to `*732` | Failed | The dialplan ran `record_session` and immediately ran `hangup`; SIPp received `480`, and FreeSWITCH discarded the empty recording. |
@@ -1204,7 +1204,7 @@ After the same VPS was resized in place to 1 vCPU and 1973 MiB RAM, a low-volume
 
 | Test | Result | Important observation |
 | --- | --- | --- |
-| Register 5 users | Passed | The synthetic accounts used the forced PBX realm `134.199.230.218`; XML curl directory POSTs were observed. |
+| Register 5 users | Passed | The synthetic accounts used the forced PBX realm `x.x.x.218`; XML curl directory POSTs were observed. |
 | Extension calls | Passed | 2 authenticated extension calls completed through the tunnel. |
 | Outbound-route calls | Passed | 1 call reached the SIPp UAS at `10.77.0.2:5088`. |
 
@@ -1216,7 +1216,7 @@ After the same VPS was resized in place to 2 vCPU and 1973 MiB RAM, the same low
 
 | Test | Result | Important observation |
 | --- | --- | --- |
-| Register 5 users | Passed | The synthetic accounts used the forced PBX realm `134.199.230.218`; XML curl directory POSTs were observed. |
+| Register 5 users | Passed | The synthetic accounts used the forced PBX realm `x.x.x.218`; XML curl directory POSTs were observed. |
 | Extension calls | Passed | 2 authenticated extension calls completed through the tunnel. |
 | Outbound-route calls | Passed | 1 call reached the SIPp UAS at `10.77.0.2:5088`. |
 
