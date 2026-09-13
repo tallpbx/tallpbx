@@ -43,7 +43,7 @@ it('ensures edit routes have correctly formed parameter braces', function () {
     // Convention-based edit routes should produce URIs like /bridges/{bridge}/edit,
     // NOT /bridges/{bridge/edit (which was a bug in ModuleServiceProvider).
     // Singleton forms (no mount parameter) are skipped — they intentionally
-    // use a flat URL like /smtp-connector without an ID segment.
+    // use a flat URL like /email-connector without an ID segment.
     $editRoutes = collect(Route::getRoutes()->getRoutesByName())
         ->filter(fn ($route) => str_ends_with($route->getName(), '.edit'))
         ->filter(function ($route) {

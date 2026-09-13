@@ -104,7 +104,7 @@
         },
         {
             "type": "path",
-            "url": "app-modules/smtp-connector"
+            "url": "app-modules/email-connector"
         },
         {
             "type": "path",
@@ -309,7 +309,7 @@
         "tallpbx/ring-groups": "*",
         "tallpbx/sip-accounts": "*",
         "tallpbx/sip-profiles": "*",
-        "tallpbx/smtp-connector": "@dev",
+        "tallpbx/email-connector": "@dev",
         "tallpbx/tenant": "*",
         "tallpbx/voicemails": "*"
     },

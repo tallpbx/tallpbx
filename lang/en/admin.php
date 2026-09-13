@@ -723,9 +723,15 @@ return [
     'no_email_queue_items_found' => 'No queued emails found.',
     'confirm_delete_email_queue' => 'Are you sure you want to delete this email?',
 
-    // ─── SMTP Connector ────────────────────────────────────────────────
-    'smtp_connector' => 'SMTP Connector',
-    'smtp_connector_title' => 'SMTP Mail Configuration',
+    // ─── Email Connector ────────────────────────────────────────────────
+    'email_connector' => 'Email Connector',
+    'email_connector_title' => 'Email Connector Configuration',
+    'email_connector_description' => 'Configure outgoing email delivery using standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft, or custom provider).',
+    'email_connector_tooltip' => 'Configure how the PBX sends email — password resets, voicemail notifications, backup reports, and system alerts. Supports standard username/password SMTP authentication as well as OAuth 2.0 (Google, Microsoft, or custom providers). For password auth: enter your SMTP username and password (or App Password). For OAuth 2.0: select your provider, enter your Client ID and Secret, and authorize.',
+
+    // ─── SMTP Connector (Legacy Aliases) ────────────────────────────────
+    'smtp_connector' => 'Email Connector',
+    'smtp_connector_title' => 'Email Connector Configuration',
     'smtp_connector_description' => 'Configure outgoing email delivery using standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft, or custom provider).',
     'smtp_configured' => 'Configured',
     'smtp_not_configured' => 'Not Configured',

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\SmtpConnector\Services;
+namespace Modules\EmailConnector\Services;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\Crypt;
@@ -30,7 +30,7 @@ use Symfony\Component\Mime\Email;
  *              Built-in provider configs for Google and Microsoft;
  *              custom provider option for any OAuth2-compliant SMTP host.
  */
-class SmtpConnectorService implements SmtpConnectorServiceInterface
+class EmailConnectorService implements EmailConnectorServiceInterface
 {
     /**
      * Setting keys managed by this service.
@@ -275,7 +275,7 @@ class SmtpConnectorService implements SmtpConnectorServiceInterface
 
         $query = http_build_query([
             'client_id' => $clientId,
-            'redirect_uri' => route('panel.smtp-connector.oauth-callback'),
+            'redirect_uri' => route('panel.email-connector.oauth-callback'),
             'response_type' => 'code',
             'scope' => $config['scope'],
             'access_type' => 'offline',
@@ -315,7 +315,7 @@ class SmtpConnectorService implements SmtpConnectorServiceInterface
             'code' => $code,
             'client_id' => $settings['smtp_oauth_client_id'],
             'client_secret' => $settings['smtp_oauth_client_secret'],
-            'redirect_uri' => route('panel.smtp-connector.oauth-callback'),
+            'redirect_uri' => route('panel.email-connector.oauth-callback'),
             'grant_type' => 'authorization_code',
         ]);
 

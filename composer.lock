@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fc7756d0b2eb0f2a92d3b8275ce0398f",
+    "content-hash": "3270ebda96959acbe2b2f5dd8f4cf05b",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -8097,6 +8097,35 @@
             }
         },
         {
+            "name": "tallpbx/email-connector",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/email-connector",
+                "reference": "817f0c867a9d22f6ed33cd4285def389e1c36a31"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\EmailConnector\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\EmailConnector\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/extensions",
             "version": "1.0.0",
             "dist": {
@@ -9767,35 +9796,6 @@
                 "Apache-2.0"
             ],
             "description": "SIP profile configuration module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/smtp-connector",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/smtp-connector",
-                "reference": "0ce21d0ca611c9b5ede8fe06af67829c5958d39e"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\SmtpConnector\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\SmtpConnector\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Admin SMTP connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
             "transport-options": {
                 "relative": true
             }
@@ -14153,8 +14153,8 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "tallpbx/backups": 20,
-        "tallpbx/file-stores": 20,
-        "tallpbx/smtp-connector": 20
+        "tallpbx/email-connector": 20,
+        "tallpbx/file-stores": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

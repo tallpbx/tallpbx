@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Modules\SmtpConnector\Livewire;
+namespace Modules\EmailConnector\Livewire;
 
 use App\Support\Concerns\HasOperationalFeedback;
 use Livewire\Component;
-use Modules\SmtpConnector\Services\SmtpConnectorServiceInterface;
+use Modules\EmailConnector\Services\EmailConnectorServiceInterface;
 
 /**
  * Livewire component for configuring the SMTP connector.
@@ -21,7 +21,7 @@ use Modules\SmtpConnector\Services\SmtpConnectorServiceInterface;
  *              Client ID / Secret fields replace the password field,
  *              and an "Authorize" button initiates the consent flow.
  */
-class SmtpConnectorEdit extends Component
+class EmailConnectorEdit extends Component
 {
     use HasOperationalFeedback;
 
@@ -72,12 +72,12 @@ class SmtpConnectorEdit extends Component
     /** Expected disconnection failure shown inside the confirmation dialog. */
     public ?string $oauthDisconnectError = null;
 
-    private SmtpConnectorServiceInterface $service;
+    private EmailConnectorServiceInterface $service;
 
     /**
-     * Inject the SMTP connector service via Livewire's dependency injection.
+     * Inject the email connector service via Livewire's dependency injection.
      */
-    public function boot(SmtpConnectorServiceInterface $service): void
+    public function boot(EmailConnectorServiceInterface $service): void
     {
         $this->service = $service;
     }
@@ -329,7 +329,7 @@ class SmtpConnectorEdit extends Component
      */
     public function render()
     {
-        return view('smtp-connector::smtp-connector-edit')
+        return view('email-connector::email-connector-edit')
             ->layout('layouts.app');
     }
 }

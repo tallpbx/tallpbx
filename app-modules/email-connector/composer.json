@@ -1,0 +1,19 @@
+{
+    "name": "tallpbx/email-connector",
+    "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
+    "version": "1.0.0",
+    "type": "tallpbx-module",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Modules\\EmailConnector\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\EmailConnector\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    }
+}

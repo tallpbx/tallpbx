@@ -112,7 +112,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | Feature / Capability | TallPBX Module | FusionPBX Equivalent | FreePBX Equivalent | Parity Assessment |
 | :--- | :--- | :--- | :--- | :---: |
 | **Backups & Restores** | `backups` (GPG encrypted, SQL, media, config, restore helper) | `app/backup` | `backup` | 🟢 **Full Parity** |
-| **SMTP Delivery** | `smtp-connector` (standard username/password SMTP & OAuth 2.0 via Google, Microsoft, or custom) | Basic PHP mailer / settings | Postfix / `sysadmin` (commercial) | 🚀 **Superior in TallPBX** |
+| **SMTP Delivery** | `email-connector` (standard username/password SMTP & OAuth 2.0 via Google, Microsoft, or custom) | Basic PHP mailer / settings | Postfix / `sysadmin` (commercial) | 🚀 **Superior in TallPBX** |
 | **Software Updates** | `admin` (Git update flow with preflight & asset rollback) | `app/upgrade` (Git pull script) | `moduleadmin` | 🟢 **Full Parity** |
 | **Panel Layout Modes** | `admin` (collapsible mini "icon rail" sidebar + switchable horizontal topbar with per-user persistence) | Fixed top navbar only | Fixed top navbar only | 🚀 **Superior in TallPBX** |
 | **Tenant Limits** | `tenant-limits` (soft & hard resource capping per tenant) | Dialplan limits only | *Not applicable* | 🚀 **Superior in TallPBX** |

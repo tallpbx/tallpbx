@@ -51,7 +51,7 @@ beforeEach(function () {
     $pagePermissions = [
         'extensions.view', 'extensions.create', 'extensions.edit',
         'feature-codes.view',
-        'smtp-connector.view',
+        'email-connector.view',
         'backups.view', 'backups.create', 'backups.restore',
         'admin.git-update.view',
         'admin.queue.view',
@@ -499,12 +499,12 @@ it('renders the conference centers list page', function () {
 //  WORKSTREAMS #4–#8 — New Feature Pages (July 2026)
 // ═══════════════════════════════════════════════════════════════════
 
-it('renders the SMTP connector configuration page', function () {
+it('renders the email connector configuration page', function () {
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
-            ->visit('/panel/smtp-connector')
-            ->waitForText('SMTP Mail Configuration', 5)
-            ->assertSee('SMTP Mail Configuration')
+            ->visit('/panel/email-connector')
+            ->waitForText('Email Connector Configuration', 5)
+            ->assertSee('Email Connector Configuration')
             ->assertPresent('.tooltip[data-tip]');
     });
 });

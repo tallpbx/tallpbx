@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Modules\SmtpConnector\Services;
+namespace Modules\EmailConnector\Services;
 
 /**
- * Contract for managing SMTP connector configuration.
+ * Contract for managing email connector configuration.
  */
-interface SmtpConnectorServiceInterface
+interface EmailConnectorServiceInterface
 {
     /**
      * Get all SMTP settings as a key-value array.

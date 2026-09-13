@@ -284,9 +284,9 @@ Sign in with the administrator email and password you chose in option 1, or
 complete the browser setup page when you selected option 2 or 3. There is no
 default TallPBX administrator password.
 
-### Outgoing Mail Configuration (SMTP Connector)
+### Outgoing Mail Configuration (Email Connector)
 
-To enable email delivery for password resets, voicemail notifications, backup reports, and system alerts, sign in to the web panel and open **SMTP Connector** from the navigation menu (sidebar or top header). TallPBX supports standard username/password SMTP authentication (including Gmail App Passwords) as well as modern token-based OAuth 2.0 authentication for Google (Gmail), Microsoft 365, or custom OAuth 2.0 providers.
+To enable email delivery for password resets, voicemail notifications, backup reports, and system alerts, sign in to the web panel and open **Email Connector** from the navigation menu (sidebar or top header). TallPBX supports standard username/password SMTP authentication (including Gmail App Passwords) as well as modern token-based OAuth 2.0 authentication for Google (Gmail), Microsoft 365, or custom OAuth 2.0 providers.
 
 ### Check That TallPBX Is Working
 

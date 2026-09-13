@@ -11,12 +11,12 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
-use Modules\SmtpConnector\Livewire\SmtpConnectorEdit;
-use Modules\SmtpConnector\Services\SmtpConnectorService;
-use Modules\SmtpConnector\Services\SmtpConnectorServiceInterface;
+use Modules\EmailConnector\Livewire\EmailConnectorEdit;
+use Modules\EmailConnector\Services\EmailConnectorService;
+use Modules\EmailConnector\Services\EmailConnectorServiceInterface;
 
 /**
- * Create an admin that has the smtp-connector.view permission.
+ * Create an admin that has the email-connector.view permission.
  */
 function createSmtpAdmin(): Admin
 {
@@ -28,7 +28,7 @@ function createSmtpAdmin(): Admin
         ['description' => 'Test group for SMTP connector tests'],
     );
 
-    $permId = Permission::where('name', 'smtp-connector.view')->value('id');
+    $permId = Permission::where('name', 'email-connector.view')->value('id');
     if ($permId !== null) {
         $group->permissions()->syncWithoutDetaching([$permId]);
     }
@@ -48,16 +48,16 @@ it('shows SMTP connector form to authenticated admin', function (): void {
     $admin = createSmtpAdmin();
 
     $this->actingAs($admin, 'admin')
-        ->get(route('panel.smtp-connector.edit'))
+        ->get(route('panel.email-connector.edit'))
         ->assertOk()
-        ->assertSee('SMTP Mail Configuration')
-        ->assertSee(__('admin.smtp_connector_description'))
-        ->assertSee(__('admin.smtp_connector_tooltip'));
+        ->assertSee('Email Connector Configuration')
+        ->assertSee(__('admin.email_connector_description'))
+        ->assertSee(__('admin.email_connector_tooltip'));
 });
 
 it('saves SMTP settings with encrypted password', function (): void {
     $admin = Admin::factory()->create();
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
 
     $service->updateSettings([
         'smtp_host' => 'smtp.example.com',
@@ -83,7 +83,7 @@ it('saves SMTP settings with encrypted password', function (): void {
 });
 
 it('detects when SMTP is configured', function (): void {
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
 
     expect($service->isConfigured())->toBeFalse();
 
@@ -96,7 +96,7 @@ it('detects when SMTP is configured', function (): void {
 });
 
 it('does not send test email when not configured', function (): void {
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
 
     expect(fn () => $service->sendTestEmail('test@example.com'))
         ->toThrow(RuntimeException::class, 'SMTP is not configured');
@@ -108,7 +108,7 @@ it('handles corrupted encrypted password gracefully', function (): void {
         ['value' => 'not-valid-ciphertext'],
     );
 
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
     $settings = $service->getSettings();
 
     expect($settings['smtp_password'])->toBe('');
@@ -120,9 +120,9 @@ it('handles corrupted encrypted password gracefully', function (): void {
  * Seed OAuth settings so the service is in "OAuth configured" state
  * for tests that need a real refresh_token but mock the HTTP layer.
  */
-function seedOAuthSettings(string $provider = 'google', bool $withTokens = false): SmtpConnectorService
+function seedOAuthSettings(string $provider = 'google', bool $withTokens = false): EmailConnectorService
 {
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
     $service->updateSettings([
         'smtp_host' => 'smtp.gmail.com',
         'smtp_port' => '587',
@@ -198,7 +198,7 @@ it('generates correct Microsoft OAuth authorization URL', function (): void {
 });
 
 it('throws when generating OAuth URL without OAuth configured', function (): void {
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
 
     expect(fn () => $service->getOAuthAuthorizationUrl())
         ->toThrow(RuntimeException::class, 'OAuth is not configured');
@@ -242,7 +242,7 @@ it('rejects OAuth callback with mismatched state', function (): void {
 });
 
 it('detects when OAuth is configured', function (): void {
-    $service = app(SmtpConnectorService::class);
+    $service = app(EmailConnectorService::class);
 
     expect($service->hasOAuth())->toBeFalse();
 
@@ -331,7 +331,7 @@ it('opens the shared confirmation modal before disconnecting OAuth', function ()
     seedOAuthSettings('google', withTokens: true);
 
     Livewire::actingAs($admin, 'admin')
-        ->test(SmtpConnectorEdit::class)
+        ->test(EmailConnectorEdit::class)
         ->assertSet('oauthAuthorized', true)
         ->call('confirmOAuthDisconnect')
         ->assertSet('confirmingOAuthDisconnect', true)
@@ -342,12 +342,12 @@ it('keeps the modal open with a safe error when OAuth disconnection fails', func
     $admin = createSmtpAdmin();
     seedOAuthSettings('google', withTokens: true);
 
-    $service = Mockery::mock(SmtpConnectorService::class)->makePartial();
+    $service = Mockery::mock(EmailConnectorService::class)->makePartial();
     $service->shouldReceive('revokeOAuth')->once()->andThrow(new RuntimeException('provider unavailable'));
-    app()->instance(SmtpConnectorServiceInterface::class, $service);
+    app()->instance(EmailConnectorServiceInterface::class, $service);
 
     Livewire::actingAs($admin, 'admin')
-        ->test(SmtpConnectorEdit::class)
+        ->test(EmailConnectorEdit::class)
         ->call('confirmOAuthDisconnect')
         ->call('disconnectOAuth')
         ->assertSet('oauthDisconnectError', 'OAuth could not be disconnected. Please try again.')

@@ -1,12 +1,12 @@
 <div class="max-w-2xl">
     <div class="mb-6">
         <div class="flex items-center gap-2">
-            <h2 class="text-2xl font-semibold">{{ __('admin.smtp_connector_title') }}</h2>
-            <x-tooltip :tip="__('admin.smtp_connector_tooltip')" align="start" position="right">
+            <h2 class="text-2xl font-semibold">{{ __('admin.email_connector_title') }}</h2>
+            <x-tooltip :tip="__('admin.email_connector_tooltip')" align="start" position="right">
                 <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
             </x-tooltip>
         </div>
-        <p class="text-sm text-base-content/60 mt-1">{{ __('admin.smtp_connector_description') }}</p>
+        <p class="text-sm text-base-content/60 mt-1">{{ __('admin.email_connector_description') }}</p>
     </div>
 
     @if ($operationalMessage !== null)
@@ -247,7 +247,7 @@
                     {{-- Instructions (provider-specific, shows before authorization) --}}
                     @if (! $oauthAuthorized)
                         @php
-                            $oauthCallbackUrl = url('/panel/smtp-connector/oauth-callback');
+                            $oauthCallbackUrl = url('/panel/email-connector/oauth-callback');
                         @endphp
                         <p class="text-xs text-base-content/50">
                             @if ($smtp_oauth_provider === 'google')
