@@ -33,10 +33,28 @@ TallPBX delivers feature and function parity with established open-source PBX pl
 | **Configuration Model** | **Dynamic `mod_xml_curl`** (No static XML on disk) | Dynamic `mod_xml_curl` (PHP scripts) | Static `.conf` files written to disk (`#include`) |
 | **Multi-Tenancy** | **Native Multi-Tenant** (Isolated contexts, domains, data) | **Native Multi-Tenant** (Domain-based) | **Single-Tenant Core** (Multi-tenant requires commercial PBXact) |
 | **User Interface & Layout** | **Dual Layouts**: Collapsible mini-rail sidebar (`w-16` / `w-64`) & horizontal topbar dropdowns with per-user persistence | Fixed top navbar (legacy procedural HTML) | Fixed top navbar (classic FreePBX theme) |
-| **Automated Testing** | **1,930 Pest tests + 43 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **1,993 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 58 PBX modules (Extensions, Routing, PBX Features, Media, Operations, and Administration).
+
+## User Interface & Visual Tour
+
+TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, Laravel 13) with DaisyUI components, offering a modern responsive control panel with light and dark themes and three switchable navigation layouts:
+
+| Public Landing (Light Theme) | Public Landing (Dark Theme) |
+| :---: | :---: |
+| [![TallPBX Landing Page (Light)](docs/images/landing-light.png)](docs/ui-tour.md#1-public-guest-landing-page) | [![TallPBX Landing Page (Dark)](docs/images/landing-dark.png)](docs/ui-tour.md#1-public-guest-landing-page) |
+
+### Unified Panel & Flexible Navigation Layouts
+
+The single unified panel (`/panel/`) adapts to administrator preference with instant theme and layout toggles persisted to the database:
+
+| Full Sidebar (`w-64`) | Mini Icon Rail (`w-16`) | Horizontal Topbar |
+| :---: | :---: | :---: |
+| [![Full Sidebar](docs/images/dashboard-full-sidebar.png)](docs/ui-tour.md#mode-a-full-sidebar-navigation-w-64) | [![Mini Rail](docs/images/dashboard-compressed-sidebar.png)](docs/ui-tour.md#mode-b-mini-icon-rail-sidebar-w-16) | [![Horizontal Menu](docs/images/dashboard-horizontal-menu.png)](docs/ui-tour.md#mode-c-horizontal-topbar-navigation) |
+
+👉 **[Explore the Complete Visual Tour (Tenants, Extensions, Devices & Layouts) →](docs/ui-tour.md)**
 
 ## Quick Start
 
