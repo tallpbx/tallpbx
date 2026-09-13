@@ -1,4 +1,4 @@
-# GPT55 SIP Call Simulation And Load Testing
+# SIP Call Simulation And Load Testing
 
 Date: July 15, 2026
 
@@ -1073,7 +1073,7 @@ and failures came from local `mod_xml_curl` timeouts to the Laravel XML handler,
 not from the FreeSWITCH session-rate ceiling or network packet loss.
 
 Before repeating these VirtualBox SIPp CPS tests after a reboot, FreeSWITCH
-restart, database refresh, or interrupted Codex/SIPp run, follow the recovery
+restart, database refresh, or interrupted SIPp run, follow the recovery
 runbook in `docs/sipp-server-to-server-validation.md` under
 “VirtualBox CPS Lab Recovery After Reboot Or Interrupted Runs”. In short: run
 the mandatory preflight gate first. It must confirm the PBX still has enabled

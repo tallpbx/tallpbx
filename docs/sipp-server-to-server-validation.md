@@ -1,4 +1,4 @@
-# GPT55 SIPp Server-To-Server Validation
+# SIPp Server-To-Server Validation
 
 Date: July 16, 2026
 
@@ -6,12 +6,12 @@ Updated: July 20, 2026 (extended parity scenarios)
 
 ## Audience
 
-This guide is written for both humans and AI agents.
+This guide is written for both engineers and automated test harnesses.
 
-- Humans should be able to skim the purpose, quick commands, expected results, and troubleshooting notes without needing to understand every SIP detail.
-- AI agents should use the exact commands, file paths, environment variables, and artifact names when running or debugging the tests.
+- Engineers should be able to skim the purpose, quick commands, expected results, and troubleshooting notes without needing to understand every SIP detail.
+- Automated harnesses and test runners should use the exact commands, file paths, environment variables, and artifact names when running or debugging the tests.
 
-The first half explains the tests in plain language. The later manual sections are more detailed on purpose, so an agent or engineer can reproduce the exact server-to-server checks.
+The first half explains the tests in plain language. The later manual sections are more detailed on purpose, so an engineer or operator can reproduce the exact server-to-server checks.
 
 ## Purpose
 
@@ -487,7 +487,7 @@ Useful settings:
 
 ## Advanced: Manual Server-To-Server Run
 
-Most people should use the full runner above. This manual section is for AI agents or engineers who need to debug one step at a time from the PBX server while SIPp is installed on WSL2.
+Most people should use the full runner above. This manual section is for engineers or operators who need to debug one step at a time from the PBX server while SIPp is installed on WSL2.
 
 ### 1. Confirm SSH To WSL2
 
@@ -599,7 +599,7 @@ Out-of-call `NOTIFY` messages after registration are expected because FreeSWITCH
 
 Use this runbook before any VirtualBox calls-per-second run from WSL. It exists
 so the lab does not need to be rediscovered after every reboot, FreeSWITCH
-restart, Codex restart, or interrupted SIPp process.
+restart, test runner restart, or interrupted SIPp process.
 
 Known-good lab addresses:
 
