@@ -20,8 +20,7 @@ it('shows landing page for guests with locale prefix', function () {
         ->assertSee('modular architecture keeps each installation focused')
         ->assertSee('third-party developers')
         ->assertSee('trusted repositories')
-        ->assertSee('Client Sign In')
-        ->assertSee('Administrator');
+        ->assertSee('Sign In');
 });
 
 it('redirects authenticated admin to admin dashboard', function () {

@@ -16,6 +16,7 @@ return [
         'client_sign_in' => 'Inicio de Sesión',
         'administrator' => 'Administrador',
         'get_started' => 'Comenzar',
+        'sign_in' => 'Iniciar Sesión',
     ],
 
     'hero' => [

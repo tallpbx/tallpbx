@@ -97,7 +97,7 @@ The application uses a single unified panel with one layout (`layouts.app`), one
 - `admin` guard → `Admin` model → system administrators
 - `web` guard → `User` model → tenant users
 
-**AuthPanelMiddleware** (`auth.panel` alias) checks both guards. Unauthenticated users are redirected to `/panel/login` (admin login page), which has a link to `/panel/login/tenant` (tenant user login).
+**AuthPanelMiddleware** (`auth.panel` alias) checks both guards. Unauthenticated users are redirected to `/panel/login` (unified login page authenticating both system administrators and tenant users).
 
 ### ModuleServiceProvider Base Class
 

@@ -57,7 +57,7 @@ Route::get('lang/{locale}', function (string $locale) {
     return redirect()->back();
 })->name('lang.switch');
 
-// ─── Public Guest Pages (locale-prefixed for SEO) ─────────────────────────────
+// ─── Public Guest Pages (locale-prefixed) ─────────────────────────────────────
 Route::group(['prefix' => '{locale}', 'where' => ['locale' => 'en|es|fr']], function () {
     Route::get('/', fn () => view('pages.home'))->name('home');
 });

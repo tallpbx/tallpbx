@@ -8,7 +8,7 @@ The interface provides instant light and dark color themes, three switchable nav
 
 ## 1. Public Guest Landing Page
 
-The public landing page is localized for SEO (`/en`, `/es`, `/fr`) and provides quick access for both client tenant users and system administrators. It features an interactive SVG telephony network diagram and instant color-theme switching.
+The public landing page is localized (`/en`, `/es`, `/fr`) and provides direct sign-in access to the unified management panel. It features an interactive SVG telephony network diagram and instant color-theme switching.
 
 ### Light Theme
 ![TallPBX Landing Page — Light Theme](images/landing-light.png)

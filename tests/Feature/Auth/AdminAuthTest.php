@@ -38,10 +38,10 @@ beforeEach(function () {
     ]);
 });
 
-it('shows the admin login page', function () {
+it('shows the unified login page', function () {
     get(route('panel.login'))
         ->assertOk()
-        ->assertSee('TallPBX Admin')
+        ->assertSee('TallPBX')
         ->assertSee('email')
         ->assertSee('password');
 });
@@ -59,6 +59,20 @@ it('authenticates an admin with valid credentials', function () {
     ])->assertRedirect(route('panel.dashboard'));
 
     $this->assertAuthenticatedAs($this->admin, 'admin');
+});
+
+it('authenticates a tenant user with valid credentials through the unified login', function () {
+    $user = \App\Models\User::factory()->create([
+        'email' => 'tenantuser@example.com',
+        'password' => bcrypt('password'),
+    ]);
+
+    post(route('panel.login.store'), [
+        'email' => 'tenantuser@example.com',
+        'password' => 'password',
+    ])->assertRedirect(route('panel.dashboard'));
+
+    $this->assertAuthenticatedAs($user, 'web');
 });
 
 it('rejects invalid credentials', function () {

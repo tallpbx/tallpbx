@@ -21,76 +21,19 @@ use Illuminate\View\View;
 class AuthenticatedSessionController extends Controller
 {
     /**
-     * Show the portal login form.
+     * Show the unified panel login form.
      */
     public function create(): View
     {
-        return view('tenant::auth.tenant-login');
+        return view('admin::auth.admin-login');
     }
 
     /**
-     * Handle an incoming login request.
-     *
-     * Validates credentials, checks the user account is enabled,
-     * regenerates the session, and redirects to the dashboard.
+     * Handle an incoming login request via the unified authentication handler.
      */
     public function store(Request $request): RedirectResponse
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ]);
-
-        if (! Auth::guard('web')->attempt($credentials, $request->boolean('remember'))) {
-            throw ValidationException::withMessages([
-                'email' => __('auth.failed'),
-            ]);
-        }
-
-        /** @var User $user */
-        $user = Auth::guard('web')->user();
-
-        if (! $user->enabled) {
-            Auth::guard('web')->logout();
-
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-
-            throw ValidationException::withMessages([
-                'email' => __('auth.disabled'),
-            ]);
-        }
-
-        $request->session()->regenerate();
-
-        // When the user logs in through a tenant-specific domain, resolve
-        // the tenant from the login host and set it as the active context.
-        // Users who belong to a single tenant always get that tenant; users
-        // with multiple tenants get the domain-matched tenant if they belong
-        // to it, otherwise they keep their default tenant context.
-        $loginDomain = $request->getHost();
-
-        if ($loginDomain !== '' && filter_var($loginDomain, FILTER_VALIDATE_IP) === false) {
-            $resolver = app(TenantIdentityResolver::class);
-            $identity = $resolver->resolveFromDomain($loginDomain);
-
-            if ($identity !== null) {
-                // Verify the user belongs to the resolved tenant.
-                $belongs = $user->tenants()
-                    ->where('tenant_id', $identity->tenantId)
-                    ->exists();
-
-                if ($belongs) {
-                    $tenant = Tenant::find($identity->tenantId);
-
-                    if ($tenant !== null) {
-                        app(TenantContext::class)->switch($tenant);
-                    }
-                }
-            }
-        }
-
-        return redirect()->intended(route('panel.dashboard'));
+        return app(\App\Http\Controllers\Admin\AuthController::class)->store($request);
     }
 
     /**

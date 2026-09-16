@@ -17,7 +17,7 @@ beforeEach(function () {
     $this->tenant->users()->attach($this->user, ['role' => 'admin']);
 });
 
-it('shows the tenant login page', function () {
+it('shows the tenant login page via unified login', function () {
     get(route('panel.login.tenant'))
         ->assertOk()
         ->assertSee('Sign in to your account')

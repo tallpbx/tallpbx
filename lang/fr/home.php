@@ -16,6 +16,7 @@ return [
         'client_sign_in' => 'Connexion Client',
         'administrator' => 'Administrateur',
         'get_started' => 'Commencer',
+        'sign_in' => 'Connexion',
     ],
 
     'hero' => [

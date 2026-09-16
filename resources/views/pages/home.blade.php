@@ -8,7 +8,7 @@
         <meta name="description" content="{{ __('home.seo.description') }}">
         <meta name="keywords" content="{{ __('home.seo.keywords') }}">
 
-        <!-- Hreflang Tags for SEO -->
+        <!-- Alternate language links -->
         <link rel="alternate" hreflang="en" href="{{ url('en') }}" />
         <link rel="alternate" hreflang="es" href="{{ url('es') }}" />
         <link rel="alternate" hreflang="fr" href="{{ url('fr') }}" />
@@ -66,11 +66,8 @@
 
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-3">
-                        <a href="{{ route('panel.login') }}" class="px-4 py-2 text-sm font-medium text-base-content/70 hover:text-base-content transition-colors">
-                            {{ __('home.nav.client_sign_in') }}
-                        </a>
-                        <a href="{{ route('panel.login') }}" class="px-4 py-2 text-sm font-medium text-base-content/70 border border-base-300 hover:bg-base-200 rounded-xl transition-all">
-                            {{ __('home.nav.administrator') }}
+                        <a href="{{ route('panel.login') }}" class="btn btn-primary btn-sm rounded-xl px-4">
+                            {{ __('home.nav.sign_in') }}
                         </a>
                     </div>
 
@@ -110,16 +107,6 @@
                     <p class="text-base text-base-content/60 max-w-xl leading-relaxed">
                         {{ __('home.hero.modular_summary') }}
                     </p>
-
-                    <div class="flex flex-col sm:flex-row gap-4 pt-4">
-                        <a href="{{ route('panel.login') }}" class="btn btn-primary gap-2 rounded-2xl">
-                            <span>{{ __('home.nav.client_sign_in') }}</span>
-                            <x-heroicon-o-arrow-right class="w-4 h-4" />
-                        </a>
-                        <a href="{{ route('panel.login') }}" class="btn btn-ghost rounded-2xl border border-base-300">
-                            {{ __('home.nav.administrator') }}
-                        </a>
-                    </div>
                 </div>
 
                 <div class="lg:col-span-5 flex justify-center items-center">

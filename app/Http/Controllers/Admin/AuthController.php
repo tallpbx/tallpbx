@@ -34,10 +34,12 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle an incoming admin login request.
+     * Handle an incoming login request for the unified panel.
      *
-     * Validates credentials, checks the admin account is enabled,
-     * regenerates the session, and redirects to the dashboard.
+     * Validates credentials and attempts authentication against the admin guard
+     * first (system administrators), then falls back to the web guard (tenant users).
+     * Ensures the matching account is enabled, regenerates the session, and redirects
+     * to the unified panel dashboard.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -46,29 +48,77 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (! Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
-            throw ValidationException::withMessages([
-                'email' => __('auth.failed'),
-            ]);
+        $remember = $request->boolean('remember');
+
+        // 1. Attempt admin authentication (system administrators)
+        if (Auth::guard('admin')->attempt($credentials, $remember)) {
+            /** @var Admin $admin */
+            $admin = Auth::guard('admin')->user();
+
+            if (! $admin->enabled) {
+                Auth::guard('admin')->logout();
+
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                throw ValidationException::withMessages([
+                    'email' => __('auth.disabled'),
+                ]);
+            }
+
+            $request->session()->regenerate();
+
+            return redirect()->intended(route('panel.dashboard'));
         }
 
-        /** @var Admin $admin */
-        $admin = Auth::guard('admin')->user();
+        // 2. Attempt web authentication (tenant users)
+        if (Auth::guard('web')->attempt($credentials, $remember)) {
+            /** @var \App\Models\User $user */
+            $user = Auth::guard('web')->user();
 
-        if (! $admin->enabled) {
-            Auth::guard('admin')->logout();
+            if (! $user->enabled) {
+                Auth::guard('web')->logout();
 
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
 
-            throw ValidationException::withMessages([
-                'email' => __('auth.disabled'),
-            ]);
+                throw ValidationException::withMessages([
+                    'email' => __('auth.disabled'),
+                ]);
+            }
+
+            $request->session()->regenerate();
+
+            // When the user logs in through a tenant-specific domain, resolve
+            // the tenant from the login host and set it as the active context.
+            $loginDomain = $request->getHost();
+
+            if ($loginDomain !== '' && filter_var($loginDomain, FILTER_VALIDATE_IP) === false) {
+                $resolver = app(\App\Services\TenantIdentityResolver::class);
+                $identity = $resolver->resolveFromDomain($loginDomain);
+
+                if ($identity !== null) {
+                    $belongs = $user->tenants()
+                        ->where('tenant_id', $identity->tenantId)
+                        ->exists();
+
+                    if ($belongs) {
+                        $tenant = \App\Models\Tenant::find($identity->tenantId);
+
+                        if ($tenant !== null) {
+                            app(\App\Services\TenantContext::class)->switch($tenant);
+                        }
+                    }
+                }
+            }
+
+            return redirect()->intended(route('panel.dashboard'));
         }
 
-        $request->session()->regenerate();
-
-        return redirect()->intended(route('panel.dashboard'));
+        // 3. Neither admin nor tenant user matched the credentials
+        throw ValidationException::withMessages([
+            'email' => __('auth.failed'),
+        ]);
     }
 
     /**

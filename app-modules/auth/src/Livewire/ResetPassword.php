@@ -45,7 +45,7 @@ class ResetPassword extends Component
         );
 
         if ($status === Password::PASSWORD_RESET) {
-            $this->redirect(route('panel.login.tenant'));
+            $this->redirect(route('panel.login'));
         } else {
             $this->addError('email', __($status));
         }

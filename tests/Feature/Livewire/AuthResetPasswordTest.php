@@ -33,7 +33,7 @@ it('resets the password with valid token', function () {
         ->set('password', 'new-secret-123')
         ->set('password_confirmation', 'new-secret-123')
         ->call('resetPassword')
-        ->assertRedirect(route('panel.login.tenant'));
+        ->assertRedirect(route('panel.login'));
 
     // Verify the password was actually changed
     $this->assertTrue(Hash::check('new-secret-123', $user->fresh()->password));

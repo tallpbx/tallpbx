@@ -40,7 +40,7 @@
 
             <div class="text-center mt-4 text-sm text-base-content/60">
                 {{ __('client.already_have_account') }}
-                <a href="{{ route('panel.login.tenant') }}" class="link link-primary">{{ __('client.sign_in') }}</a>
+                <a href="{{ route('panel.login') }}" class="link link-primary">{{ __('client.sign_in') }}</a>
             </div>
         </div>
     </div>
