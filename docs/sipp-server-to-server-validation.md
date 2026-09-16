@@ -2,7 +2,7 @@
 
 Date: July 16, 2026
 
-Updated: July 20, 2026 (extended parity scenarios)
+Updated: August 31, 2026 (public VPS validation, media flow, and dialplan routing fixes)
 
 ## Audience
 
@@ -1270,6 +1270,8 @@ not already exercised by the basic runner.
 | Time condition had no `destination_number` constraint — acted as global redirect | `TimeConditionService.php` |
 | `user/` channel type unsupported in FreeSWITCH bridge → `CHAN_NOT_IMPLEMENTED` | `RingGroupService.php`, `FollowMeService.php` |
 | `sip_from_uri` empty post-auth; call-block switched to `orig_caller_id_number` export | `XmlHandlerController.php`, `CallBlockService.php` |
+| Feature-code log markers shadowed real feature dialplans (`continue=false`) + single-leg stereo | `XmlHandlerController.php`, `recording-start` dialplan |
+| Call forward condition matched extension UUID instead of number; bridge lacked tenant context | `CallForwardService.php`, `XmlHandlerController.php` |
 
 ### Extended Seed Command
 

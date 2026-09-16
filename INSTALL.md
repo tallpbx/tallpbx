@@ -338,23 +338,37 @@ reset normal PBX data.
 
 ### Service Management
 
-FreeSWITCH, the TallPBX call-event listener, and Redis run as background
-services. Use these commands to check or restart them:
+TallPBX relies on background systemd services for call events, queue workers, scheduled tasks, real-time WebSockets, and Redis. Use these commands to check or restart them:
 
-*   **FreeSWITCH Service**:
+*   **FreeSWITCH Telephony Engine**:
     ```bash
-    systemctl status freeswitch      # Check FreeSWITCH status
-    systemctl restart freeswitch     # Restart FreeSWITCH
+    systemctl status freeswitch          # Check FreeSWITCH status
+    systemctl restart freeswitch         # Restart FreeSWITCH
     ```
-*   **ESL Event Listener Daemon**:
+*   **ESL Call Event Listener**:
     ```bash
-    systemctl status freeswitch-listener    # Check the listener status
-    systemctl restart freeswitch-listener   # Restart the event listener
+    systemctl status freeswitch-listener # Check ESL event listener status
+    systemctl restart freeswitch-listener # Restart the event listener
     ```
-*   **Redis Service**:
+*   **Background Queue Worker**:
     ```bash
-    systemctl status redis-server    # Check Redis status
-    redis-cli ping                   # Expect: PONG
+    systemctl status tallpbx-queue       # Check async queue worker (recordings, media archival, mail)
+    systemctl restart tallpbx-queue      # Restart queue worker
+    ```
+*   **Background Scheduler**:
+    ```bash
+    systemctl status tallpbx-scheduler   # Check cron scheduler (reconcile, backup retention, broadcast sweeps)
+    systemctl restart tallpbx-scheduler  # Restart scheduler
+    ```
+*   **Reverb WebSocket Server**:
+    ```bash
+    systemctl status tallpbx-reverb      # Check real-time Livewire broadcasting daemon (port 8080)
+    systemctl restart tallpbx-reverb     # Restart WebSocket server
+    ```
+*   **Redis Temporary Storage**:
+    ```bash
+    systemctl status redis-server        # Check Redis status
+    redis-cli ping                       # Expect: PONG
     ```
 
 ### Running the Installer Again
@@ -539,12 +553,12 @@ and per-tenant subdirectories) stay owned by `www-data:tallpbx-media` with mode
 `2775` so group-write survives and the setgid bit keeps new subdirectories in
 the `tallpbx-media` group.
 
-The `freeswitch-listener` systemd unit runs under `ProtectSystem=strict` and
-explicitly allows write access to `/var/www/tallpbx/storage` and
-`/var/lib/tallpbx/media` via `ReadWritePaths`. If you configure a custom
-`TALLPBX_MEDIA_ROOT`, add that path to the unit's `ReadWritePaths` line in
-`/etc/systemd/system/freeswitch-listener.service` and run
-`systemctl daemon-reload && systemctl restart freeswitch-listener`.
+The `freeswitch-listener` and `tallpbx-queue` systemd units run under `ProtectSystem=strict`
+and explicitly allow write access to `/var/www/tallpbx/storage`, `/var/lib/tallpbx/media`,
+`/var/lib/tallpbx/backups`, and `/var/lib/tallpbx/restore-requests` via `ReadWritePaths`.
+If you configure a custom `TALLPBX_MEDIA_ROOT`, add that path to the unit's `ReadWritePaths` line in
+`/etc/systemd/system/freeswitch-listener.service` and `/etc/systemd/system/tallpbx-queue.service`,
+then run `systemctl daemon-reload && systemctl restart freeswitch-listener tallpbx-queue`.
 
 
 ## 6. FreeSWITCH Installation Choice
@@ -671,7 +685,11 @@ Before upgrading, take a backup. Then run these commands from
 
 ```bash
 # 1. Pull the latest code. This only accepts a straightforward update.
-git pull --ff-only origin main
+# For stable production releases, track origin/1.0:
+git pull --ff-only origin 1.0
+
+# Or to track latest development:
+# git pull --ff-only origin main
 
 # 2. Install the required PHP packages
 composer install --no-dev --optimize-autoloader
@@ -706,8 +724,8 @@ TallPBX, then restore them:
 # Save local changes, including new files, outside the working copy for now.
 git stash push --include-untracked -m "before TallPBX upgrade"
 
-# Download the straightforward update from the main branch.
-git pull --ff-only origin main
+# Download the straightforward update from the release branch (1.0 or main).
+git pull --ff-only origin 1.0
 
 # Put the saved local changes back after the update.
 git stash pop

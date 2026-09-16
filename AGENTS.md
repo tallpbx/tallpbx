@@ -341,6 +341,7 @@ protected function menuItems(): array
 - Validate installer and installer-rerun idempotency on a fresh disposable Debian server. Do not use a host that has been repeatedly resized, tuned, or populated with synthetic load-test data for production installer conclusions.
 - When reviewing PHP-FPM limits, inspect `php-fpm8.5 -tt` and `/var/log/php8.5-fpm.log` for `pm.max_children` saturation. The standard install recommendation is `pm = static` and `pm.max_children = 12` for a 4 GB combined PBX/application server; leave `pm.max_requests` at its default of `0` unless sustained monitoring demonstrates worker memory growth. See `INSTALL.md` before changing sizing guidance. More workers may help moderate concurrency but can make CPU contention worse; confirm with before/after `pbx:load-test:dialplan` reports.
 - When changing XML handler, dialplan contributor, module-state, load-test code, or hot-path XML-handler indexes, run focused tests such as `php artisan test --compact tests/Feature/Http/XmlHandlerControllerTest.php tests/Feature/Services/ModuleStateTest.php tests/Feature/XmlHandlerContributorIndexTest.php tests/Feature/PbxLoadTestSeedCommandTest.php tests/Feature/PbxDialplanLoadTestCommandTest.php`, then run `php artisan app:test --smoke` for shared hot-path changes. Before real PHP-FPM load testing, run `php artisan optimize` after the required `php artisan optimize:clear`; do not clear optimized files while test traffic is active.
+- Key FreeSWITCH 1.11 runtime rules learned from operational drills: FreeSWITCH drops supplementary groups at startup, so its runtime group must be `tallpbx-media` with managed media directories using mode `2775`; `mod_voicemail` resolves deposit directory paths from directory user `<params>` (`vm-domain-storage-dir`), not `<variables>`; ESL event listening must decode framed message bodies beyond frame headers; and feature code extensions must specify `continue="true"` so subsequent call-processing extensions can execute.
 
 ## Testing
 - Use Pest for all tests (not PHPUnit).
@@ -351,7 +352,7 @@ protected function menuItems(): array
 # Smoke — critical-path only (~200 tests, ~20s)
 php artisan app:test --smoke
 
-# Default — all feature tests with --parallel (935 tests, ~65s)
+# Default — all feature tests with --parallel (~1,993 tests, ~65s)
 php artisan app:test
 
 # Full — features + Dusk browser tests (~150s)

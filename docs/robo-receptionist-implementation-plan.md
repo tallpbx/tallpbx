@@ -1,5 +1,9 @@
 # Robo Receptionist Module Implementation Plan
 
+> [!NOTE]
+> **Status: Future Roadmap Specification (Unimplemented)**
+> This document specifies the planned architecture and task-by-task implementation plan for the upcoming `robo-receptionist` AI IVR module (`app-modules/robo-receptionist/`). It serves as the durable implementation guide for when this module is scheduled for development.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the `robo-receptionist` module: an AI-agent-driven IVR where administrators configure system-wide AI provider credentials (assignable to tenants), per-tenant receptionist agents with TTS greeting text, voice selection, and intent-phrase routes pointing at standard PBX destinations — with the call-time media transport stubbed for a later release.

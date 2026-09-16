@@ -2,7 +2,7 @@
 
 Date: July 15, 2026
 
-Updated: July 17, 2026
+Updated: August 31, 2026 (public VPS Nginx/PHP-FPM capacity benchmarks)
 
 ## Status
 
@@ -1256,6 +1256,21 @@ Record this after each run:
 - MariaDB observations
 - suspected bottleneck
 - next recommended tier or fix
+
+## August 31, 2026 Public VPS Validation Benchmarks
+
+Conducted on a minimum-hardware Debian 13 VPS (1 vCPU, 1 GB RAM, 2 GB swap) testing the real Nginx/PHP-FPM endpoint (`storage/app/load-tests/`):
+
+| Metric / Run | 100 x 5 (Small Office Smoke) | 500 x 25 (Moderate Burst) |
+|---|---|---|
+| **Result** | ✅ **Thresholds Passed** | ⚠️ **Completed (0 Failures, Tail Latency Ceilings)** |
+| **Completed Requests** | 100 / 100 (0 failures) | 500 / 500 (0 failures) |
+| **Throughput** | 16.1 req/sec | 14.2 req/sec |
+| **Average Latency** | 278 ms | 1,014 ms |
+| **p50 (Median)** | ~250 ms | ~920 ms |
+| **p95 Latency** | 418 ms (Threshold < 1,000 ms) | 1,716 ms |
+| **p99 Latency** | 551 ms | 2,354 ms |
+| **Finding** | Baseline production capacity verified on minimal 1-vCPU/1-GB VPS. | Tail latencies on 500x25 reflect single-vCPU CPU saturation with default Debian dynamic FPM pool; larger deployments recommend 2+ vCPU and static FPM worker tuning (`pm = static`, `pm.max_children = 12`). |
 
 ## Current Limitations
 
