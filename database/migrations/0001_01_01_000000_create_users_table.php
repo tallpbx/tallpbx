@@ -21,6 +21,8 @@ return new class extends Migration
             $table->boolean('enabled')->default(true);
             $table->rememberToken();
             $table->string('theme', 20)->default('system');
+            $table->string('layout_mode', 20)->default('sidebar');
+            $table->boolean('sidebar_collapsed')->default(false);
             $table->timestamps();
         });
 

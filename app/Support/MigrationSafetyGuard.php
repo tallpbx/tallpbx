@@ -26,9 +26,6 @@ final class MigrationSafetyGuard
         'truncate',
     ];
 
-    /** The one reviewed migration that replaces an empty-schema tenant-domain index. */
-    private const FRESH_SCHEMA_TENANT_DOMAIN_INDEX_MIGRATION = '2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite';
-
     /** @var array<int, int> Connections that already have the SQL safety callback. */
     private array $protectedConnections = [];
 
@@ -40,9 +37,6 @@ final class MigrationSafetyGuard
 
     /** The protected connection used to confirm whether the reviewed schema is empty. */
     private ?Connection $protectedConnection = null;
-
-    /** Whether the active migration may remove its obsolete index from an empty table. */
-    private bool $allowingFreshTenantDomainIndexDrop = false;
 
     /**
      * Reject every pending migration that contains a destructive operation in up().
@@ -88,7 +82,6 @@ final class MigrationSafetyGuard
         $this->protectingMigrationRun = false;
         $this->activeMigration = null;
         $this->protectedConnection = null;
-        $this->allowingFreshTenantDomainIndexDrop = false;
     }
 
     /** Record the migration whose up method is about to run. */
@@ -96,8 +89,6 @@ final class MigrationSafetyGuard
     {
         if ($this->protectingMigrationRun) {
             $this->activeMigration = $migrationName;
-            $this->allowingFreshTenantDomainIndexDrop = $migrationName === self::FRESH_SCHEMA_TENANT_DOMAIN_INDEX_MIGRATION
-                && $this->tenantDomainsTableIsEmpty();
         }
     }
 
@@ -105,17 +96,12 @@ final class MigrationSafetyGuard
     public function finishMigration(): void
     {
         $this->activeMigration = null;
-        $this->allowingFreshTenantDomainIndexDrop = false;
     }
 
     /** Reject destructive SQL immediately before the database receives it. */
     public function assertSqlIsSafe(string $query): void
     {
         if ($this->activeMigration === null || ! $this->isDestructiveSql($query)) {
-            return;
-        }
-
-        if ($this->isApprovedFreshTenantDomainIndexDrop($query)) {
             return;
         }
 
@@ -232,31 +218,5 @@ final class MigrationSafetyGuard
         $statement = trim($query, " \t\n\r\0\x0B'\\\"");
 
         return preg_match('/^(?:DROP\\b|TRUNCATE\\b|DELETE\\b|ALTER\\s+TABLE\\b.*\\bDROP\\b)/i', $statement) === 1;
-    }
-
-    /** Confirm that the tenant-domain table exists and contains no application data. */
-    private function tenantDomainsTableIsEmpty(): bool
-    {
-        if ($this->protectedConnection === null || ! $this->protectedConnection->getSchemaBuilder()->hasTable('tenant_domains')) {
-            return false;
-        }
-
-        return $this->protectedConnection->table('tenant_domains')->doesntExist();
-    }
-
-    /** Allow only the reviewed obsolete-index drop while the tenant-domain table is empty. */
-    private function isApprovedFreshTenantDomainIndexDrop(string $query): bool
-    {
-        if (! $this->allowingFreshTenantDomainIndexDrop
-            || $this->activeMigration !== self::FRESH_SCHEMA_TENANT_DOMAIN_INDEX_MIGRATION) {
-            return false;
-        }
-
-        $statement = trim($query, " \t\n\r\0\x0B;");
-
-        return preg_match(
-            '/^ALTER\\s+TABLE\\s+[`\"]?tenant_domains[`\"]?\\s+DROP\\s+(?:INDEX|KEY)\\s+[`\"]?tenant_domains_domain_unique[`\"]?$/i',
-            $statement,
-        ) === 1;
     }
 }

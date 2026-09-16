@@ -18,6 +18,8 @@ return new class extends Migration
             $table->string('language', 5)->default('en');
             $table->string('password');
             $table->string('theme', 20)->default('system');
+            $table->string('layout_mode', 20)->default('sidebar');
+            $table->boolean('sidebar_collapsed')->default(false);
             $table->boolean('enabled')->default(true);
             $table->rememberToken();
             $table->timestamps();

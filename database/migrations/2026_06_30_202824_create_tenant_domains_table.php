@@ -14,10 +14,12 @@ return new class extends Migration
         Schema::create('tenant_domains', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->string('domain')->unique();
+            $table->string('domain');
             $table->string('purpose')->default('sip_realm'); // sip_realm, provisioning, web, alias
             $table->boolean('enabled')->default(true);
             $table->timestamps();
+
+            $table->unique(['domain', 'purpose', 'tenant_id'], 'tenant_domains_domain_purpose_tenant_unique');
         });
     }
 

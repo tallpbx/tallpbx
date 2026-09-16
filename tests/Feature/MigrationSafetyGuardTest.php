@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Database\SafeMigrator;
-use App\Models\Tenant;
-use App\Models\TenantDomain;
 use App\Support\MigrationSafetyGuard;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -85,57 +83,14 @@ it('rejects destructive SQL before it is executed while a migration up method is
         ->toThrow(RuntimeException::class, 'remove_backup_data');
 });
 
-it('allows the reviewed tenant-domain index replacement only on an empty schema', function (): void {
-    $migration = database_path('migrations/2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite.php');
-    $guard = app(MigrationSafetyGuard::class);
-
-    DB::table('tenant_domains')->delete();
-
-    $guard->assertPendingMigrationsAreSafe([$migration]);
-    $guard->beginProtectedMigrationRun(DB::connection());
-    $guard->startMigration('2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite');
-
-    expect(fn (): null => $guard->assertSqlIsSafe('ALTER TABLE tenant_domains DROP INDEX tenant_domains_domain_unique'))
-        ->not->toThrow(RuntimeException::class);
-});
-
-it('blocks the reviewed tenant-domain index replacement when domains already exist', function (): void {
-    $migration = database_path('migrations/2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite.php');
-    $tenant = Tenant::factory()->create();
-    $guard = app(MigrationSafetyGuard::class);
-
-    TenantDomain::factory()->create(['tenant_id' => $tenant->id]);
-
-    $guard->assertPendingMigrationsAreSafe([$migration]);
-    $guard->beginProtectedMigrationRun(DB::connection());
-    $guard->startMigration('2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite');
-
-    expect(fn (): null => $guard->assertSqlIsSafe('ALTER TABLE tenant_domains DROP INDEX tenant_domains_domain_unique'))
-        ->toThrow(RuntimeException::class, 'Destructive migration blocked to protect TallPBX data');
-});
-
-it('allows no other destructive SQL during the reviewed fresh-schema migration', function (): void {
-    $migration = database_path('migrations/2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite.php');
-    $guard = app(MigrationSafetyGuard::class);
-
-    DB::table('tenant_domains')->delete();
-
-    $guard->assertPendingMigrationsAreSafe([$migration]);
-    $guard->beginProtectedMigrationRun(DB::connection());
-    $guard->startMigration('2026_07_13_222217_replace_tenant_domains_domain_unique_with_composite');
-
-    expect(fn (): null => $guard->assertSqlIsSafe('ALTER TABLE tenant_domains DROP COLUMN domain'))
-        ->toThrow(RuntimeException::class, 'Destructive migration blocked to protect TallPBX data');
-});
-
 it('blocks artisan migrate before a destructive pending migration can run', function (): void {
     $migration = temporaryMigrationFile('Schema::dropIfExists(\'migration_safety_guard_probe\');');
     $originalPrimaryDatabase = config('app.primary_database');
     $originalDatabaseName = config('database.connections.sqlite.database');
 
-    // The shared test connection is in-memory, which is intentionally never
-    // protected. Name it as a protected connection while retaining its PDO so
-    // this test can exercise the protected-database migrator path.
+    // Ensure test database is already migrated before simulating a protected database
+    DB::table('migrations')->count();
+
     config([
         'app.primary_database' => 'migration_safety_guard_test',
         'database.connections.sqlite.database' => 'migration_safety_guard_test',
