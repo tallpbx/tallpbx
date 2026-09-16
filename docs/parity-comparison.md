@@ -17,8 +17,10 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Database Support** | **MariaDB / MySQL** (SQLite in testing) | PostgreSQL / SQLite / MariaDB | MariaDB / MySQL |
 | **Configuration Model** | **Dynamic `mod_xml_curl`** (No static XML on disk) | Dynamic `mod_xml_curl` (PHP scripts) | Static `.conf` files written to disk (`#include`) |
 | **Multi-Tenancy** | **Native Multi-Tenant** (Isolated contexts, domains, data) | **Native Multi-Tenant** (Domain-based) | **Single-Tenant Core** (Multi-tenant requires commercial PBXact) |
+| **User Impersonation** | **1-Click Native Impersonation** (Instant tenant user perspective, persistent recovery banner & audit trail) | Limited (Domain switching only, no direct user session impersonation) | None (Separate UCP logins, no multi-tenant user impersonation) |
+| **Multi-Language Support** | **Native Multi-Lingual** (English, Spanish, French with instant topbar switcher, SEO routes, & per-user email locale) | Partial / Community arrays (`app_languages.php`) | Partial gettext / PO files (often incomplete, English-centric) |
 | **User Interface & Layout** | **Dual Layouts**: Collapsible mini-rail sidebar (`w-16` / `w-64`) & horizontal topbar dropdowns with per-user persistence | Fixed top navbar (legacy procedural HTML) | Fixed top navbar (classic FreePBX theme) |
-| **Automated Testing** | **1,930 Pest tests + 43 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **1,993 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 | Metric / Feature Category | TallPBX | FusionPBX Equivalent | FreePBX Equivalent | Parity Assessment |
@@ -38,6 +40,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | :--- | :--- | :--- | :--- | :---: |
 | **Extensions** | `extensions`, `sip-accounts` | `app/extensions` | `core` (extensions) | 🟢 **Full Parity** |
 | **User Management** | `admin` (Users, Groups, Permissions) | `core/users`, `core/groups` | `userman` | 🟢 **Full Parity** |
+| **User Impersonation** | `admin` (1-click tenant user impersonation with persistent restore banner) | Limited (`core/users` domain switch only) | *None* | 🚀 **Superior in TallPBX** |
 | **Device Directory** | `devices` (SIP account association) | `app/devices` | `core` (devices) | 🟢 **Full Parity** |
 | **Extension Settings** | `extension-settings` (Directory XML overrides) | `app/extension_settings` | `customcontexts` | 🟢 **Full Parity** |
 | **Auto-Provisioning** | `provision` (Templates, HTTP/TFTP, CIDR/Basic auth) | `app/provision` | `endpoint` (commercial) / OSS PBX End Point | 🟢 **Functional Parity** |
@@ -115,6 +118,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **SMTP Delivery** | `email-connector` (standard username/password SMTP & OAuth 2.0 via Google, Microsoft, or custom) | Basic PHP mailer / settings | Postfix / `sysadmin` (commercial) | 🚀 **Superior in TallPBX** |
 | **Software Updates** | `admin` (Git update flow with preflight & asset rollback) | `app/upgrade` (Git pull script) | `moduleadmin` | 🟢 **Full Parity** |
 | **Panel Layout Modes** | `admin` (collapsible mini "icon rail" sidebar + switchable horizontal topbar with per-user persistence) | Fixed top navbar only | Fixed top navbar only | 🚀 **Superior in TallPBX** |
+| **Multi-Language (i18n)** | Core localization (`en`, `es`, `fr` dictionaries, topbar switcher, SEO routing) | Monolithic `app_languages.php` | Gettext PO/MO files (often untranslated) | 🚀 **Superior in TallPBX** |
 | **Tenant Limits** | `tenant-limits` (soft & hard resource capping per tenant) | Dialplan limits only | *Not applicable* | 🚀 **Superior in TallPBX** |
 | **Dangerous Tools** | *Intentionally Omitted* | `app/database` (raw SQL web runner), `app/exec` (web shell) | *None in core* | 🛡️ **Intentionally excluded for security** |
 
@@ -126,7 +130,7 @@ This document provides a detailed feature-by-feature and architectural compariso
    - Built on **Laravel 13**, **Livewire 4**, and **Tailwind CSS v4** with clean architectural boundaries (`App\Support\ModuleServiceProvider`, `BaseListComponent`, `BaseEditComponent`).
    - FusionPBX and FreePBX are 15–20 year-old procedural PHP codebases with deeply nested global state, direct SQL string concatenation, and minimal test coverage.
 2. **Quality & Test Automation**:
-   - **1,930 automated Pest tests** and **43 Dusk browser tests** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
+   - **1,993 automated Pest tests** and **44 Dusk browser tests** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
 3. **Multi-Tenant Security Model**:
    - Multi-tenant defense-in-depth:
      - `TenantMutationGuard` enforces data boundary checks on model lifecycle events.
@@ -138,3 +142,7 @@ This document provides a detailed feature-by-feature and architectural compariso
    - FreePBX and FusionPBX rely on basic SMTP username/password authentication. TallPBX supports standard username/password SMTP authentication (including app passwords) as well as native token-based OAuth 2.0 support for Google (Gmail), Microsoft 365, and custom OAuth 2.0 providers without third-party dependencies.
 6. **Modern UI with Dual Layout Modes & Collapsible Navigation**:
    - TallPBX gives operators flexible control over their workspace. Administrators can collapse the vertical sidebar into an icon-only mini rail (`64px`) to maximize table width for dense views (CDRs, routing rules, active calls), or switch to a horizontal top-bar header with standard dropdown menus for users accustomed to legacy PBX navigation. Layout preferences and sidebar sizes are saved per-user and rendered with zero layout shift.
+7. **Seamless 1-Click User Impersonation**:
+   - TallPBX provides built-in user impersonation for system administrators. Administrators can troubleshoot tenant issues directly from the user's perspective with a single click from the user management directory. The session is securely scoped to the tenant user's allowed permissions and active tenant, marked by a persistent amber warning banner across every page with an instant "Stop Impersonating" recovery button. FusionPBX only supports tenant domain switching without individual user impersonation, while FreePBX lacks multi-tenant user impersonation entirely.
+8. **Native Multi-Language Architecture (i18n)**:
+   - TallPBX is fully internationalized out-of-the-box with complete translations for English, Spanish, and French across both the public landing area and the unified management panel. Users and administrators can switch languages on the fly via the topbar language dropdown with country flag indicators. Language preferences are persisted to the database on the `User` and `Admin` models (`HasLocalePreference`), ensuring all transactional emails (voicemail notifications, password resets, system alerts) are delivered in each user's chosen language. Public pages feature SEO-friendly locale routing (`/en`, `/es`, `/fr`). In contrast, FusionPBX relies on legacy monolithic PHP array files, and FreePBX depends on cumbersome gettext PO/MO files with incomplete coverage in commercial modules.

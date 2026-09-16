@@ -7,6 +7,7 @@ namespace Tests\Browser;
 use App\Models\Admin;
 use App\Models\Group;
 use App\Models\Tenant;
+use App\Models\User;
 use Laravel\Dusk\Browser;
 use Modules\Devices\Models\Device;
 use Modules\Extensions\Models\Extension;
@@ -73,6 +74,21 @@ class DocumentationScreenshotsTest extends DuskTestCase
             ['slug' => 'pacific-health'],
             ['name' => 'Pacific Health Services', 'purpose' => Tenant::PURPOSE_CUSTOMER, 'enabled' => true],
         );
+
+        // Seed realistic sample user for impersonation tour
+        $acmeTenant = Tenant::where('slug', 'acme')->first();
+        if ($acmeTenant) {
+            $sampleUser = User::firstOrCreate(
+                ['email' => 'john.doe@acme.test'],
+                [
+                    'name' => 'John Doe',
+                    'password' => bcrypt('secret123'),
+                ],
+            );
+            $acmeTenant->users()->syncWithoutDetaching([
+                $sampleUser->id => ['role' => 'admin'],
+            ]);
+        }
 
         // Seed realistic sample extensions
         Extension::withoutGlobalScope('tenant')->firstOrCreate(
@@ -264,6 +280,22 @@ class DocumentationScreenshotsTest extends DuskTestCase
                 ->waitForText('Extensions', 10)
                 ->pause(1200)
                 ->screenshot('pbx-extensions');
+
+            // 9. User Impersonation & Support View
+            $browser->visit('/panel/users')
+                ->waitForText('Users', 10)
+                ->waitForText('john.doe@acme.test', 10)
+                ->click('form[action*="impersonate"] button')
+                ->waitForText('Stop Impersonating', 10)
+                ->pause(1200)
+                ->screenshot('pbx-impersonation');
+
+            // 10. Multi-Language Switcher
+            $browser->press('Stop Impersonating')
+                ->waitForText('Dashboard', 10)
+                ->click('div[x-data*="locales"] button')
+                ->pause(600)
+                ->screenshot('pbx-multi-language');
         });
 
         // Copy captured screenshots into docs/images/
@@ -276,6 +308,8 @@ class DocumentationScreenshotsTest extends DuskTestCase
             'pbx-tenants.png',
             'pbx-devices.png',
             'pbx-extensions.png',
+            'pbx-impersonation.png',
+            'pbx-multi-language.png',
         ];
 
         foreach ($images as $img) {

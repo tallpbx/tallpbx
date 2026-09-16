@@ -57,3 +57,19 @@ Configure SIP extensions with custom caller ID, directory display names, voicema
 Assign SIP accounts to physical VoIP desk phones (Yealink, Polycom, Grandstream, Cisco) or softphones with auto-provisioning MAC address tracking and templates.
 
 ![TallPBX Device Provisioning](images/pbx-devices.png)
+
+### User Impersonation & Tenant Support Troubleshooting
+System administrators can troubleshoot tenant issues in real time by impersonating any tenant user with a single click from the Users directory.
+
+The panel immediately reconfigures into the tenant user's perspective, applying their exact tenant scope and permissions. A prominent, persistent amber banner at the top of every page alerts the administrator that impersonation is active and provides an instant **"Stop Impersonating"** button to safely return to the admin session with zero session leakage.
+
+![TallPBX User Impersonation](images/pbx-impersonation.png)
+
+### Multi-Language Localization (English, Spanish, French)
+TallPBX provides comprehensive multi-language support across the unified control panel and public interfaces.
+
+Users can toggle their preferred language instantly via the topbar language dropdown menu. The selection is immediately applied to all interface text, labels, and tooltips, while being saved to the user's database record (`HasLocalePreference`) so all system notifications, emails, and voicemail alerts are dispatched in their chosen language.
+
+![TallPBX Multi-Language Localization](images/pbx-multi-language.png)
+
+
