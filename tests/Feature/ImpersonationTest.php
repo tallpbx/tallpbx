@@ -9,6 +9,9 @@ use App\Models\Permission;
 use App\Models\User;
 use App\Services\ImpersonationServiceInterface;
 use App\Services\PermissionService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     // Register the impersonate permission in memory
@@ -44,7 +47,9 @@ it('allows admin with permission to impersonate a user', function () {
 
     $this->assertDatabaseHas('impersonation_logs', [
         'admin_id' => $admin->id,
+        'admin_name' => $admin->name,
         'user_id' => $user->id,
+        'user_email' => $user->email,
         'action' => 'start',
     ]);
 });
@@ -87,7 +92,9 @@ it('stops impersonation and restores admin session', function () {
 
     $this->assertDatabaseHas('impersonation_logs', [
         'admin_id' => $admin->id,
+        'admin_name' => $admin->name,
         'user_id' => $user->id,
+        'user_email' => $user->email,
         'action' => 'stop',
     ]);
 });
@@ -232,3 +239,57 @@ it('requires authentication to impersonate', function () {
 
     $response->assertRedirect(route('panel.login'));
 });
+
+it('guarantees no notifications are sent to the target user when impersonated', function () {
+    Notification::fake();
+    Mail::fake();
+
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $user = User::factory()->create();
+    giveAdminImpersonatePermission($admin);
+
+    $this->actingAs($admin, 'admin')
+        ->post(route('panel.users.impersonate', $user));
+
+    Notification::assertNothingSent();
+    Mail::assertNothingSent();
+    expect($user->notifications()->count())->toBe(0);
+
+    // Stop impersonation
+    $this->post(route('panel.impersonation.stop'));
+
+    Notification::assertNothingSent();
+    Mail::assertNothingSent();
+    expect($user->notifications()->count())->toBe(0);
+});
+
+it('writes structured audit records to application logs on start and stop', function () {
+    Log::spy();
+
+    $admin = Admin::factory()->create(['name' => 'Audit Admin', 'enabled' => true]);
+    $user = User::factory()->create(['email' => 'audituser@example.com']);
+    giveAdminImpersonatePermission($admin);
+
+    $impersonationService = app(ImpersonationServiceInterface::class);
+    $this->actingAs($admin, 'admin');
+    $impersonationService->impersonate($user);
+
+    Log::shouldHaveReceived('info')->withArgs(function (string $message, array $context) use ($admin, $user) {
+        return str_contains($message, 'Audit Admin')
+            && str_contains($message, 'audituser@example.com')
+            && ($context['event'] ?? '') === 'impersonation.start'
+            && ($context['admin_id'] ?? null) === $admin->id
+            && ($context['user_id'] ?? null) === $user->id;
+    })->once();
+
+    $impersonationService->stop();
+
+    Log::shouldHaveReceived('info')->withArgs(function (string $message, array $context) use ($admin, $user) {
+        return str_contains($message, 'Audit Admin')
+            && str_contains($message, 'audituser@example.com')
+            && ($context['event'] ?? '') === 'impersonation.stop'
+            && ($context['admin_id'] ?? null) === $admin->id
+            && ($context['user_id'] ?? null) === $user->id;
+    })->once();
+});
+

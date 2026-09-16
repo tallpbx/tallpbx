@@ -29,9 +29,5 @@ return [
         'view_invoice' => 'Voir la Facture',
         'thank_you' => 'Merci pour votre confiance.',
     ],
-
-    'impersonation' => [
-        'subject' => 'Alerte d\'Usurpation',
-        'body' => 'Votre compte a été consulté par un administrateur.',
-    ],
 ];
+

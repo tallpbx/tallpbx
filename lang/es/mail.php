@@ -29,9 +29,5 @@ return [
         'view_invoice' => 'Ver Factura',
         'thank_you' => 'Gracias por su preferencia.',
     ],
-
-    'impersonation' => [
-        'subject' => 'Alerta de Suplantación',
-        'body' => 'Un administrador accedió a su cuenta.',
-    ],
 ];
+

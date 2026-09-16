@@ -1,12 +1,22 @@
 <div>
     <div class="flex items-center justify-between mb-6">
         <h2 class="text-2xl font-semibold">{{ __('admin.users_title') }}</h2>
-        <x-tooltip :tip="__('admin.create_user_tooltip')" position="left">
-            <a href="{{ route('panel.users.create') }}" class="btn btn-primary btn-sm">
-                <x-heroicon-o-plus class="w-4 h-4" />
-                {{ __('admin.create_user') }}
-            </a>
-        </x-tooltip>
+        <div class="flex items-center gap-2">
+            @if(Auth::guard('admin')->user()?->hasPermission('admin.impersonate'))
+                <x-tooltip :tip="__('admin.impersonation_logs_tooltip')" position="left">
+                    <a href="{{ route('panel.impersonation-logs.index') }}" class="btn btn-outline btn-sm">
+                        <x-heroicon-o-clipboard-document-list class="w-4 h-4" />
+                        {{ __('admin.impersonation_logs') }}
+                    </a>
+                </x-tooltip>
+            @endif
+            <x-tooltip :tip="__('admin.create_user_tooltip')" position="left">
+                <a href="{{ route('panel.users.create') }}" class="btn btn-primary btn-sm">
+                    <x-heroicon-o-plus class="w-4 h-4" />
+                    {{ __('admin.create_user') }}
+                </a>
+            </x-tooltip>
+        </div>
     </div>
 
     @if ($operationalMessage !== null)

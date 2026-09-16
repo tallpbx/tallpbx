@@ -10,6 +10,7 @@ use Modules\Admin\Livewire\Dashboard;
 use Modules\Admin\Livewire\GitUpdate;
 use Modules\Admin\Livewire\GroupsEdit;
 use Modules\Admin\Livewire\GroupsList;
+use Modules\Admin\Livewire\ImpersonationLogsList;
 use Modules\Admin\Livewire\ModulesList;
 use Modules\Admin\Livewire\Monitoring;
 use Modules\Admin\Livewire\NotificationsList;
@@ -52,6 +53,9 @@ Route::prefix('panel')->name('panel.')->middleware(['web', 'auth.panel', 'thrott
         ->name('users.impersonate');
     Route::post('/impersonation/stop', [ImpersonationController::class, 'stop'])
         ->name('impersonation.stop');
+    Route::get('/impersonation-logs', ImpersonationLogsList::class)
+        ->middleware('admin.can:admin.impersonate')
+        ->name('impersonation-logs.index');
 
     // ── Administrators ────────────────────────────────────────────────────
     Route::get('/admins', AdminsList::class)->middleware('admin.can:admin.users.view')->name('admins.index');

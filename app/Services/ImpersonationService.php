@@ -10,6 +10,7 @@ use App\Models\ImpersonationLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Cross-cutting service for admin user impersonation.
@@ -63,13 +64,31 @@ class ImpersonationService implements ImpersonationServiceInterface
             session()->put(self::SESSION_TARGET_USER_ID, $user->id);
             session()->put(self::SESSION_STARTED_AT, now());
 
-            // Log the impersonation start
+            // Log the impersonation start with snapshot information
             ImpersonationLog::create([
                 'admin_id' => $admin->id,
+                'admin_name' => $admin->name,
                 'user_id' => $user->id,
+                'user_email' => $user->email,
                 'action' => 'start',
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
+            ]);
+
+            Log::info(sprintf(
+                'Admin [%s] (ID: %d) started impersonating user [%s] (ID: %d) from IP [%s].',
+                $admin->name,
+                $admin->id,
+                $user->email,
+                $user->id,
+                request()->ip() ?? 'unknown'
+            ), [
+                'event' => 'impersonation.start',
+                'admin_id' => $admin->id,
+                'admin_name' => $admin->name,
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'ip' => request()->ip(),
             ]);
 
             // Switch to the web guard as the target user
@@ -96,15 +115,35 @@ class ImpersonationService implements ImpersonationServiceInterface
 
         // Verify the original admin still exists
         $admin = Admin::findOrFail($adminId);
+        $user = User::find($userId);
+        $userEmail = $user?->email;
 
-        DB::transaction(function () use ($adminId, $userId) {
-            // Log the impersonation stop
+        DB::transaction(function () use ($admin, $userId, $userEmail) {
+            // Log the impersonation stop with snapshot information
             ImpersonationLog::create([
-                'admin_id' => $adminId,
+                'admin_id' => $admin->id,
+                'admin_name' => $admin->name,
                 'user_id' => $userId,
+                'user_email' => $userEmail,
                 'action' => 'stop',
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
+            ]);
+
+            Log::info(sprintf(
+                'Admin [%s] (ID: %d) stopped impersonating user [%s] (ID: %d) from IP [%s].',
+                $admin->name,
+                $admin->id,
+                $userEmail ?? ('User #'.$userId),
+                $userId,
+                request()->ip() ?? 'unknown'
+            ), [
+                'event' => 'impersonation.stop',
+                'admin_id' => $admin->id,
+                'admin_name' => $admin->name,
+                'user_id' => $userId,
+                'user_email' => $userEmail,
+                'ip' => request()->ip(),
             ]);
         });
 

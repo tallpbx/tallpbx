@@ -29,9 +29,5 @@ return [
         'view_invoice' => 'View Invoice',
         'thank_you' => 'Thank you for your business.',
     ],
-
-    'impersonation' => [
-        'subject' => 'Impersonation Alert',
-        'body' => 'Your account was accessed by an administrator.',
-    ],
 ];
+
