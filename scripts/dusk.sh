@@ -11,6 +11,19 @@ DUSK_DRIVER_URL="${DUSK_DRIVER_URL:-http://localhost:${DUSK_CHROMEDRIVER_PORT}}"
 # environment file and the browser always targets the temporary server.
 cd "$ROOT_DIR"
 
+# Ensure the local Dusk environment file exists with a dedicated test encryption
+# key. We track .env.dusk.example without credentials to prevent secret-scanner
+# alerts, while auto-provisioning the untracked .env.dusk fixture for tests.
+if [ ! -f .env.dusk ]; then
+    if [ -f .env.dusk.example ]; then
+        cp .env.dusk.example .env.dusk
+    fi
+fi
+
+if [ -f .env.dusk ] && ! grep -qE '^APP_KEY=.+' .env.dusk 2>/dev/null; then
+    php artisan key:generate --env=dusk --force
+fi
+
 # Keep the disposable browser-test database current and give its Super
 # Administrators group the same permissions as a real installation. This is
 # intentionally the existing PHP seeder, rather than a second Dusk-only

@@ -108,7 +108,7 @@ set_env_value .env FSPBX_DEVELOPMENT_MODE "${FSPBX_DEVELOPMENT_MODE:-false}"
 set_env_value .env FSPBX_FREESWITCH_INSTALL_METHOD "${FSPBX_FREESWITCH_INSTALL_METHOD}"
 
 # The installer still provisions the isolated Dusk database and user, but it
-# never changes the tracked .env.dusk test fixture in the application source.
+# never changes the tracked .env.dusk.example test fixture in the application source.
 
 # Keep caller-created recordings and voicemail outside the Git worktree. Read
 # an existing choice first so an installer re-run never moves stored media.

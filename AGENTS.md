@@ -61,7 +61,7 @@ bash scripts/fix-generated-permissions.sh
 - Do not commit generated cache/build artifacts or permission-only mode changes.
 
 ## Dusk Database Isolation
-- Dusk must use `.env.dusk` with `DUSK_TESTING=true`, a database name ending in `_dusk`, and a database user name ending in `_dusk`. `App\Support\DuskDatabaseSafety` fails application boot when any of these conditions would allow a browser test to use the primary application database.
+- Dusk must use local `.env.dusk` (auto-provisioned from `.env.dusk.example` by `scripts/dusk.sh`) with `DUSK_TESTING=true`, a database name ending in `_dusk`, and a database user name ending in `_dusk`. `App\Support\DuskDatabaseSafety` fails application boot when any of these conditions would allow a browser test to use the primary application database.
 - The installer creates a separate `${database_name}_dusk` database and `${database_username}_dusk` MariaDB user. The Dusk user receives privileges only on the disposable Dusk database; never grant it access to the primary database.
 - Run browser tests with `bash scripts/dusk.sh`. It starts an isolated `APP_ENV=dusk` Laravel server on `127.0.0.1:8001`; do not point Dusk at Nginx/PHP-FPM. `php artisan app:test --full` invokes this runner automatically.
 

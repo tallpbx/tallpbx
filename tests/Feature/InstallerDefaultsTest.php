@@ -598,6 +598,18 @@ it('prepares the isolated Dusk database with the shared administrator seeder', f
         ->and($script)->toContain('chromedriver --port="$DUSK_CHROMEDRIVER_PORT"');
 });
 
+it('tracks .env.dusk.example without secrets and auto-provisions isolated test key in dusk.sh', function (): void {
+    $duskExample = (string) file_get_contents(base_path('.env.dusk.example'));
+    $gitignore = (string) file_get_contents(base_path('.gitignore'));
+    $script = (string) file_get_contents(base_path('scripts/dusk.sh'));
+
+    expect($duskExample)->toContain('APP_KEY=')
+        ->and($duskExample)->not->toMatch('/^APP_KEY=.+/m')
+        ->and($gitignore)->toContain('.env.dusk')
+        ->and($script)->toContain('cp .env.dusk.example .env.dusk')
+        ->and($script)->toContain('php artisan key:generate --env=dusk --force');
+});
+
 it('stops the TALL setup when migrations or seeding fail', function (): void {
     $script = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
