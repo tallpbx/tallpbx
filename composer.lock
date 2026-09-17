@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3270ebda96959acbe2b2f5dd8f4cf05b",
+    "content-hash": "03c975eccfc96f6fb884cf0a5f3fc6dc",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -9294,6 +9294,44 @@
                 }
             ],
             "description": "Registrations module for FreeSwitchPBX",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-security",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/security",
+                "reference": "c46b9e6beff488f72b004acd704851c4f6a72881"
+            },
+            "require": {
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Security\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Security\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "TallPBX",
+                    "homepage": "https://tallpbx.com"
+                }
+            ],
+            "description": "Native security module for TallPBX providing host firewall, trusted IP lists, and automatic intrusion protection",
             "transport-options": {
                 "relative": true
             }

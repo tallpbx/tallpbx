@@ -1256,4 +1256,20 @@ return [
     'cancel' => 'Cancel',
     'delete' => 'Delete',
     'actions' => 'Actions',
+
+    // ─── Security Module ────────────────────────────────────────────────
+    'security' => 'Security',
+    'security_title' => 'Security Center',
+    'security_description' => 'Host firewall, trusted IP addresses, and automatic attack protection.',
+    'security_firewall_status' => 'Firewall Status',
+    'security_firewall_help' => 'Inspects incoming packets and blocks unauthorized ports.',
+    'security_attack_protection' => 'Attack Protection',
+    'security_attack_help' => 'Monitors failed password attempts and blocks attackers.',
+    'security_blocked_attackers' => 'Blocked Attackers',
+    'security_active_bans' => 'Currently Blocked',
+    'security_bans_help' => 'IPs temporarily blocked for repeated failed attempts.',
+    'security_your_connection' => 'Your Connection (Safe)',
+    'security_protected' => 'Protected',
+    'security_lockout_help' => 'Your connection is protected from being accidentally blocked.',
 ];
+

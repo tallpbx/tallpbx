@@ -200,6 +200,10 @@
         },
         {
             "type": "path",
+            "url": "app-modules/security"
+        },
+        {
+            "type": "path",
             "url": "app-modules/sip-accounts"
         },
         {
@@ -295,6 +299,7 @@
         "tallpbx/module-provision": "*",
         "tallpbx/module-recordings": "*",
         "tallpbx/module-registrations": "*",
+        "tallpbx/module-security": "*",
         "tallpbx/module-sip-status": "*",
         "tallpbx/module-sip-trunks": "*",
         "tallpbx/module-speech": "*",

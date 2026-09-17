@@ -1,0 +1,28 @@
+{
+    "name": "tallpbx/module-security",
+    "type": "tallpbx-module",
+    "description": "Native security module for TallPBX providing host firewall, trusted IP lists, and automatic intrusion protection",
+    "require": {
+        "php": ">=8.3"
+    },
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "TallPBX",
+            "homepage": "https://tallpbx.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Modules\\Security\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Security\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

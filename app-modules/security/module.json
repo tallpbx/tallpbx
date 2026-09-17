@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "security",
+    "version": "1.0.0",
+    "namespace": "Modules\\Security",
+    "display_name": "Security",
+    "description": "Host firewall, trusted and blocked IP lists, and automatic attack protection.",
+    "category": "PBX",
+    "required": false,
+    "protected": false,
+    "priority": 140,
+    "providers": [
+        "Modules\\Security\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}
