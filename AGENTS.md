@@ -46,6 +46,35 @@ php artisan route:list --name=<feature-name>
 
 **Any deviation from this checklist is a bug.** Do not skip steps when claiming completion.
 
+## Changelog Maintenance & Release Management
+
+### CHANGELOG.md Rules
+- The authoritative changelog is `CHANGELOG.md`, following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) standard and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+- Keep an active `## [Unreleased]` section at the top of the file for in-progress work.
+- When adding features, fixing bugs, or modifying security/system behavior, update `[Unreleased]` under the appropriate standard subheading:
+  - `### Added` for new features or modules
+  - `### Changed` for changes in existing functionality
+  - `### Deprecated` for soon-to-be-removed features
+  - `### Removed` for removed features
+  - `### Fixed` for any bug fixes
+  - `### Security` for vulnerability fixes or hardening
+- Do not dump raw git commit logs; explain changes clearly in plain English from the perspective of an administrator or user.
+- If a change requires database migrations (`php artisan migrate`), new Linux packages (e.g. `nftables`), FreeSWITCH reloads, or `.env` updates, note it explicitly.
+- When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
+
+### Branching & Sync Strategy
+- `main` is the primary development branch.
+- Minor release branches (`1.0`, `1.1`) represent release series.
+  - `1.0` is the frozen maintenance branch for 1.0.x (bug fixes only). Do not push new feature work (like the Security module) to `1.0`.
+  - `1.1` is the current release branch for 1.1.x features.
+  - When syncing development work, keep `main` and the active release branch (`1.1`) synchronized.
+
+### Tagging Best Practices (Do NOT Tag Every Commit)
+- **Never tag individual commits or task completions.**
+- Tags (`v1.0.0`, `v1.1.0`, `v1.0.1`) are reserved strictly for official, finished production releases.
+- Use branch heads and commit SHAs for intermediate work and references.
+- Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
+
 ## Application File Permissions
 - `ApplicationFilePermissions` is the authoritative PHP permission service. It exposes `generated`, `runtime`, and `full` scopes through `php artisan permissions:repair --scope=<scope>`. Full repair keeps deployed source owned by `root:www-data` (directories `755`, ordinary files `644`), Composer dependencies owned by `root:www-data` (directories `2775`, files `664`, preserving executable `vendor/bin` entry points), dependency lockfiles `root:www-data` with mode `664`, `.env` `root:www-data` with mode `640`, and `storage/` and `bootstrap/cache/` writable by `www-data` (directories `2775`, files `664`). The setgid directory mode ensures newly created runtime and vendor files keep the `www-data` group.
 - The installer runs `php artisan permissions:repair --scope=full` during the Laravel setup step, again after caches/build files are created, and once more as its final reconciliation step. Installer re-runs therefore repair the complete application tree automatically.
