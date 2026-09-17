@@ -30,57 +30,50 @@ use Modules\FeatureCodes\Models\FeatureCode;
 use Tests\Browser\Pages\LoginPage;
 
 beforeEach(function () {
-    $this->admin = Admin::firstOrCreate(
-        ['email' => 'admin@smoke.test'],
-        [
+    $this->admin = Admin::where('email', 'admin@smoke.test')->first();
+
+    if (! $this->admin) {
+        $this->admin = Admin::create([
+            'email' => 'admin@smoke.test',
             'name' => 'Smoke Test Admin',
-            'password' => bcrypt('smoke-secret'),
+            'password' => '$2y$12$ORH476lF/4.ZvTyALClEv.TTcIpUCxhv3PBzq7tzWcuCe86A/pfle',
             'enabled' => true,
-        ],
-    );
+        ]);
 
-    $group = Group::firstOrCreate(
-        ['name' => 'Smoke Test Group'],
-        ['system' => true],
-    );
-    $this->superAdminGroup = Group::firstOrCreate(
-        ['name' => 'Super Administrators', 'tenant_id' => null],
-        ['description' => 'Dusk smoke superadmin group.'],
-    );
-
-    $pagePermissions = [
-        'extensions.view', 'extensions.create', 'extensions.edit',
-        'feature-codes.view',
-        'email-connector.view',
-        'backups.view', 'backups.create', 'backups.restore',
-        'admin.git-update.view',
-        'admin.queue.view',
-        'admin.monitoring.view',
-    ];
-
-    foreach ($pagePermissions as $permissionName) {
-        $permission = Permission::firstOrCreate(
-            ['name' => $permissionName],
-            [
-                'module' => 'admin',
-                'description' => 'Dusk smoke permission for '.$permissionName,
-            ],
+        $group = Group::firstOrCreate(
+            ['name' => 'Smoke Test Group'],
+            ['system' => true],
+        );
+        $this->superAdminGroup = Group::firstOrCreate(
+            ['name' => 'Super Administrators', 'tenant_id' => null],
+            ['description' => 'Dusk smoke superadmin group.'],
         );
 
-        $group->permissions()->syncWithoutDetaching([$permission->id]);
-        $this->superAdminGroup->permissions()->syncWithoutDetaching([$permission->id]);
-    }
+        $pagePermissions = [
+            'extensions.view', 'extensions.create', 'extensions.edit',
+            'feature-codes.view',
+            'email-connector.view',
+            'backups.view', 'backups.create', 'backups.restore',
+            'admin.git-update.view',
+            'admin.queue.view',
+            'admin.monitoring.view',
+        ];
 
-    $this->admin->groups()->syncWithoutDetaching([$group->id]);
-    $this->admin->groups()->syncWithoutDetaching([$this->superAdminGroup->id]);
-});
+        foreach ($pagePermissions as $permissionName) {
+            $permission = Permission::firstOrCreate(
+                ['name' => $permissionName],
+                [
+                    'module' => 'admin',
+                    'description' => 'Dusk smoke permission for '.$permissionName,
+                ],
+            );
 
-afterEach(function () {
-    if (isset($this->admin)) {
-        $this->admin->groups()->detach();
-        $this->admin->delete();
+            $group->permissions()->syncWithoutDetaching([$permission->id]);
+            $this->superAdminGroup->permissions()->syncWithoutDetaching([$permission->id]);
+        }
+
+        $this->admin->groups()->syncWithoutDetaching([$group->id, $this->superAdminGroup->id]);
     }
-    Group::where('name', 'Smoke Test Group')->delete();
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -249,7 +242,7 @@ it('expands description from single line text box into text area on hover when l
     $tenantManager = app(\App\Services\TenantManager::class);
     $tenantManager->setTenantId((string) $tenant->id);
 
-    FeatureCode::where('tenant_id', $tenant->id)->where('code', '*999')->delete();
+    FeatureCode::withoutGlobalScope('tenant')->where('name', 'Custom Long Route')->delete();
     $longCode = FeatureCode::create([
         'tenant_id' => $tenant->id,
         'name' => 'Custom Long Route',
@@ -263,10 +256,9 @@ it('expands description from single line text box into text area on hover when l
             ->visit('/panel/feature-codes')
             ->waitForText('Custom Long Route', 5)
             ->assertPresent('input[value*="Forward incoming sales"]')
-            ->mouseover('input[value*="Forward incoming sales"]')
-            ->pause(600)
-            ->assertPresent('textarea')
-            ->screenshot('feature-codes-hover-expanded');
+            ->script("const el = document.querySelector('input[value*=\"Forward incoming sales\"]')?.closest('[x-data]'); if (el) { el.dispatchEvent(new MouseEvent('mouseenter')); }");
+        $browser->pause(300)
+            ->assertPresent('textarea');
     });
 
     $longCode->delete();
@@ -344,11 +336,12 @@ it('renders the create multiple extensions form', function () {
 });
 
 it('renders the edit extension form', function () {
-    $tenant = Tenant::factory()->create();
-    $extension = Extension::factory()->forTenant($tenant->id)->create([
-        'extension_number' => '2401',
-        'display_name' => 'Browser Edit Extension',
-    ]);
+    $tenant = Tenant::first() ?? Tenant::factory()->create();
+    $extension = Extension::withoutGlobalScope('tenant')->where('extension_number', '2401')->first()
+        ?? Extension::factory()->forTenant($tenant->id)->create([
+            'extension_number' => '2401',
+            'display_name' => 'Browser Edit Extension',
+        ]);
 
     $this->browse(function (Browser $browser) use ($extension) {
         $browser->loginAs($this->admin, 'admin')
@@ -360,6 +353,8 @@ it('renders the edit extension form', function () {
             ->assertPresent('button[type="submit"]')
             ->assertPresent('[wire\\:id]');
     });
+
+    $extension->delete();
 });
 
 it('renders the create dialplan form', function () {

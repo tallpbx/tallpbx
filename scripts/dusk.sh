@@ -73,8 +73,9 @@ if [ "$DUSK_DRIVER_URL" = "http://localhost:${DUSK_CHROMEDRIVER_PORT}" ]; then
 fi
 
 # Start an isolated Dusk application server instead of sending browser tests to
-# the production Nginx/PHP-FPM service.
-APP_ENV=dusk php artisan serve --host="$HOST" --port="$PORT" > storage/logs/dusk-server.log 2>&1 &
+# the production Nginx/PHP-FPM service. Use concurrent CLI server workers and
+# disable .env reload to avoid serial asset bottlenecks and mid-run restarts.
+PHP_CLI_SERVER_WORKERS="${PHP_CLI_SERVER_WORKERS:-4}" APP_ENV=dusk php artisan serve --host="$HOST" --port="$PORT" --no-reload > storage/logs/dusk-server.log 2>&1 &
 SERVER_PID=$!
 
 # Wait briefly for Laravel to finish booting before launching the browser.

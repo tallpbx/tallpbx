@@ -35,6 +35,13 @@ abstract class DuskTestCase extends BaseTestCase
             // where Chrome's own sandbox cannot initialize (bwrap, Docker, CI).
             '--no-sandbox',
             '--disable-dev-shm-usage',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-extensions',
+            '--disable-sync',
+            '--disable-translate',
+            '--no-first-run',
+            '--mute-audio',
         ])->unless($this->hasHeadlessDisabled(), function (Collection $items) {
             return $items->merge([
                 '--disable-gpu',
@@ -42,11 +49,19 @@ abstract class DuskTestCase extends BaseTestCase
             ]);
         })->all());
 
-        return RemoteWebDriver::create(
+        $driver = RemoteWebDriver::create(
             $_ENV['DUSK_DRIVER_URL'] ?? env('DUSK_DRIVER_URL') ?? 'http://localhost:9515',
             DesiredCapabilities::chrome()->setCapability(
                 ChromeOptions::CAPABILITY, $options
-            )
+            ),
+            10000,
+            60000
         );
+
+        // Fail fast: Prevent W3C WebDriver's default 300-second (5 minute) hang on stalled page loads or script errors
+        $driver->manage()->timeouts()->pageLoadTimeout(15);
+        $driver->manage()->timeouts()->setScriptTimeout(15);
+
+        return $driver;
     }
 }

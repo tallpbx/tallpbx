@@ -79,12 +79,22 @@ For a normal PBX server, choose **No** when the installer asks about demo data
 and development tooling. The `--no-demo` and `--no-development` flags skip
 those individual choices for an unattended install. [Full installation guide →](INSTALL.md)
 
-## Prerequisites
+## Prerequisites & Hardware Requirements
 
-- Debian 13 server
-- Root / sudo access
-- Internet connectivity
-- Minimum resources: 1 GB RAM with a minimum of 2 GiB swap configured, 1 vCPU, 25 GB disk
+- **Operating System**: Debian 13 server (64-bit)
+- **Access**: Root / sudo access
+- **Network**: Internet connectivity with static IP or bridged network adapter
+- **Recommended Minimum Hardware (Development)**:
+  - **CPU**: 4 CPUs or vCPUs
+  - **Storage**: 40GB storage
+  - **RAM**: 4GB RAM
+  - **Swap**: 2GB swap
+  *(Recommended for running Vite frontend compilation, Pest test suites in parallel, and Dusk headless browser testing).*
+- **Minimum Hardware (Production)**:
+  - **CPU**: 1 vCPU (2+ vCPUs recommended for active PBX workloads)
+  - **Storage**: 25 GB disk space (40 GB+ recommended for local call recordings and voicemail storage)
+  - **RAM**: 1 GB RAM
+  - **Swap**: 2 GB swap
 
 ## Modular Architecture
 

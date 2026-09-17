@@ -19,11 +19,19 @@ creates sample tenants and callable PBX data for evaluation.
 
 - **Platform**: VMware or VirtualBox for a test system; KVM or a physical server for a live system
 - **OS Type**: Linux, Debian 13 (64-bit)
-- **Hardware**:
-  - RAM: 1 GB + 2 GB swap minimum (4 GB+ recommended for more active PBX workloads)
-  - CPU: 1 vCPU minimum (2 vCPU recommended for more active PBX workloads)
-  - Disk: 25 GB minimum (40 GB+ recommended for local call recordings and voicemail storage)
-  - Network: Bridged or Host-Only adapter (enp0s3)
+- **Hardware Requirements**:
+  - **Recommended Minimum (Development)**:
+    - CPU: 4 CPUs or vCPUs
+    - Storage: 40GB storage
+    - RAM: 4GB RAM
+    - Swap: 2GB swap
+    *(Provides sufficient capacity for Vite/Tailwind asset compilation, running Pest test suites in parallel, and Dusk headless browser testing).*
+  - **Minimum (Production)**:
+    - CPU: 1 vCPU minimum (2+ vCPUs recommended for active PBX workloads)
+    - Storage: 25 GB minimum (40 GB+ recommended for local call recordings and voicemail storage)
+    - RAM: 1 GB minimum
+    - Swap: 2 GB swap minimum
+  - **Network**: Bridged or Host-Only adapter (enp0s3)
 
 ## 2. Attach the Installer
 
@@ -222,6 +230,11 @@ case they may ask only for the value needed by that standalone operation.
 Development tooling is only for people who will write or test TallPBX code on
 this server. It adds developer utilities such as automated tests and Laravel
 Boost. It is not needed to make calls, manage users, or run the PBX.
+
+For development servers, the recommended minimum hardware requirements are
+**4 CPUs or vCPUs, 40GB storage, 4GB RAM, and 2GB swap** to accommodate running
+automated test suites (over 2,000 unit/feature tests and Dusk browser tests)
+and compiling frontend assets with Vite.
 
 For a normal PBX server, choose **No** when asked about development tooling, or
 run:
