@@ -36,7 +36,7 @@ beforeEach(function () {
         $this->admin = Admin::create([
             'email' => 'admin@smoke.test',
             'name' => 'Smoke Test Admin',
-            'password' => '$2y$12$ORH476lF/4.ZvTyALClEv.TTcIpUCxhv3PBzq7tzWcuCe86A/pfle',
+            'password' => bcrypt('smoke-secret'),
             'enabled' => true,
         ]);
 

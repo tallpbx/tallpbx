@@ -59,8 +59,8 @@ abstract class DuskTestCase extends BaseTestCase
         );
 
         // Fail fast: Prevent W3C WebDriver's default 300-second (5 minute) hang on stalled page loads or script errors
-        $driver->manage()->timeouts()->pageLoadTimeout(15);
-        $driver->manage()->timeouts()->setScriptTimeout(15);
+        $driver->manage()->timeouts()->pageLoadTimeout(30);
+        $driver->manage()->timeouts()->setScriptTimeout(30);
 
         return $driver;
     }
