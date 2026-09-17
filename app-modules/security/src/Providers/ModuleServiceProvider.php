@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Security\Providers;
 
+use Illuminate\Auth\Events\Failed;
+use Modules\Security\Contracts\SecurityIncidentServiceInterface;
+use Modules\Security\Listeners\LogFailedLoginListener;
+use Modules\Security\Services\SecurityIncidentService;
+
 /**
  * Service provider for the security module.
  *
@@ -54,6 +59,15 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     }
 
     /**
+     * All container singletons and bindings registered by this module.
+     *
+     * @var array<class-string, class-string>
+     */
+    public $bindings = [
+        SecurityIncidentServiceInterface::class => SecurityIncidentService::class,
+    ];
+
+    /**
      * Register permissions for the security module.
      *
      * These permissions control access to viewing the security dashboard,
@@ -66,6 +80,22 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         return [
             'security.view' => 'View security dashboard, firewall rules, and blocked IP lists',
             'security.edit' => 'Manage firewall rules, trusted/blocked IP lists, and protection settings',
+        ];
+    }
+
+    /**
+     * Register event listeners for the security module.
+     *
+     * Listens for authentication failure events to track brute-force attacks in-process.
+     *
+     * @return array<class-string, array<int, class-string>>
+     */
+    protected function listeners(): array
+    {
+        return [
+            Failed::class => [
+                LogFailedLoginListener::class,
+            ],
         ];
     }
 }

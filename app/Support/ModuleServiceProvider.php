@@ -7,6 +7,7 @@ namespace App\Support;
 use App\Services\MenuService;
 use App\Services\ModuleState;
 use App\Services\PermissionService;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -72,6 +73,7 @@ abstract class ModuleServiceProvider extends ServiceProvider
         $this->registerLivewire();
         $this->registerMenu($menu);
         $this->registerPermissions($permission);
+        $this->registerListeners();
     }
 
     // ─── Path resolution ────────────────────────────────────────────────
@@ -135,7 +137,31 @@ abstract class ModuleServiceProvider extends ServiceProvider
         return [];
     }
 
+    /**
+     * Return the event listeners to register for this module.
+     *
+     * Format: [EventClass => [ListenerClass, ...]] or [EventClass => ListenerClass].
+     *
+     * @return array<class-string, class-string|array<int, class-string>>
+     */
+    protected function listeners(): array
+    {
+        return [];
+    }
+
     // ─── Private registration helpers ────────────────────────────────────
+
+    /**
+     * Register module event listeners with the Laravel Event dispatcher.
+     */
+    private function registerListeners(): void
+    {
+        foreach ($this->listeners() as $event => $listeners) {
+            foreach ((array) $listeners as $listener) {
+                Event::listen($event, $listener);
+            }
+        }
+    }
 
     /**
      * Register the module's Blade view namespace.
