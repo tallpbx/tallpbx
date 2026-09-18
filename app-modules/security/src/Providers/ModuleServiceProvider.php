@@ -7,9 +7,13 @@ namespace Modules\Security\Providers;
 use App\Events\FreeSwitch\CustomEvent;
 use App\Events\FreeSwitch\SofiaFailedAuth;
 use Illuminate\Auth\Events\Failed;
+use Modules\Security\Contracts\SecurityBanServiceInterface;
+use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 use Modules\Security\Listeners\LogFailedLoginListener;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
+use Modules\Security\Services\SecurityBanService;
+use Modules\Security\Services\SecurityExecutor;
 use Modules\Security\Services\SecurityIncidentService;
 
 /**
@@ -68,6 +72,8 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      */
     public $bindings = [
         SecurityIncidentServiceInterface::class => SecurityIncidentService::class,
+        SecurityBanServiceInterface::class => SecurityBanService::class,
+        SecurityExecutorInterface::class => SecurityExecutor::class,
     ];
 
     /**

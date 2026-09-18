@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Security\Contracts;
 
+use Illuminate\Database\Eloquent\Collection;
 use Modules\Security\Models\SecurityBan;
 
 /**
@@ -31,4 +32,25 @@ interface SecurityBanServiceInterface
      * @param  int|null  $adminId  Administrator ID performing the unban if manual
      */
     public function unban(string $ip, ?int $adminId = null): bool;
+
+    /**
+     * Determine if an IP address currently has an active ban.
+     *
+     * @param  string  $ip  IPv4 or IPv6 address to check
+     */
+    public function isBanned(string $ip): bool;
+
+    /**
+     * Get all currently active, non-expired bans.
+     *
+     * @return Collection<int, SecurityBan>
+     */
+    public function getActiveBans(): Collection;
+
+    /**
+     * Mark expired bans as inactive in the database.
+     *
+     * @return int Number of bans updated
+     */
+    public function pruneExpiredBans(): int;
 }
