@@ -1358,7 +1358,7 @@ return [
     'security_protect_ssh' => 'Protect Server Terminal (SSH)',
     'security_settings_saved' => 'Protection settings saved successfully.',
     'security_pipeline_title' => 'Packet Filtering Pipeline Order',
-    'security_pipeline_subtitle' => 'Incoming traffic evaluates sequentially through these stages from left to right',
+    'security_pipeline_subtitle' => 'Incoming traffic evaluates sequentially through these stages from top to bottom',
     'security_pipeline_step1' => '1. Blacklist & Bans',
     'security_pipeline_step1_badge' => 'Drop',
     'security_pipeline_step1_desc' => 'Instant kernel drop',
