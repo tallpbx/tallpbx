@@ -55,7 +55,7 @@ return [
     'destinations' => 'Destinations',
     'dialplans' => 'Dialplans',
     'feature_codes' => 'Feature Codes',
-    'access_controls' => 'Access Controls',
+    'access_controls' => 'Access Control Lists',
     'ivr_menus' => 'IVR Menus',
     'tools' => 'Tools',
 
@@ -375,17 +375,18 @@ return [
     'no_feature_codes_found' => 'No feature codes found.',
     'confirm_delete_feature_code' => 'Are you sure you want to delete this feature code?',
 
-    // ─── Access Controls ────────────────────────────────────────────────────
-    'access_controls_title' => 'Access Controls',
-    'create_access_control' => 'Create Access Control',
-    'edit_access_control' => 'Edit Access Control',
+    // ─── Access Control Lists ────────────────────────────────────────────────
+    'access_controls_title' => 'Access Control Lists',
+    'access_controls_tooltip' => 'Creates IP address lists that control which networks and devices are allowed or blocked from connecting to your phone system (FreeSWITCH).',
+    'create_access_control' => 'Create Access Control List',
+    'edit_access_control' => 'Edit Access Control List',
     'access_control_cidr' => 'Network (CIDR)',
     'access_control_action' => 'Action',
     'access_control_nodes' => 'Nodes',
     'access_control_action_allow' => 'Allow',
     'access_control_action_deny' => 'Deny',
-    'no_access_controls_found' => 'No access control rules found.',
-    'confirm_delete_access_control' => 'Are you sure you want to delete this access control?',
+    'no_access_controls_found' => 'No access control lists found.',
+    'confirm_delete_access_control' => 'Are you sure you want to delete this access control list?',
 
     // ─── IVR Menus ─────────────────────────────────────────────────────────
     'ivr_menus_title' => 'IVR Menus',

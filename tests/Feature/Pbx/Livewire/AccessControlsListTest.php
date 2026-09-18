@@ -17,7 +17,7 @@ it('renders the access controls list component', function () {
     Livewire::actingAs($this->admin, 'admin')
         ->test(AccessControlsList::class)
         ->assertOk()
-        ->assertSee('Access Controls')
+        ->assertSee('Access Control Lists')
         ->assertViewHas('rules', function ($rules) {
             return $rules->count() === 2;
         });
@@ -54,5 +54,5 @@ it('opens the shared confirmation modal before deleting an access control rule',
 it('shows empty state when no rules exist', function () {
     Livewire::actingAs($this->admin, 'admin')
         ->test(AccessControlsList::class)
-        ->assertSee('No access control rules found');
+        ->assertSee('No access control lists found');
 });

@@ -66,7 +66,7 @@ it('renders admin PBX sub-items', function (): void {
         ->assertSee('Gateways')
         ->assertSee('Extensions')
         ->assertSee('Devices')
-        ->assertSee('Access Controls')
+        ->assertSee('Access Control Lists')
         ->assertSee('Feature Codes')
         ->assertSee('PIN Numbers')
         ->assertSee('Time Conditions')

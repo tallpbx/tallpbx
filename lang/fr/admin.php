@@ -38,7 +38,7 @@ return [
     'destinations' => 'Destinations',
     'dialplans' => 'Plans de Numérotation',
     'feature_codes' => 'Codes de Fonction',
-    'access_controls' => 'Contrôles d\'Accès',
+    'access_controls' => 'Listes de Contrôle d\'Accès',
     'ivr_menus' => 'Menus IVR',
     'tools' => 'Outils',
 
@@ -338,17 +338,18 @@ return [
     'no_feature_codes_found' => 'Aucun code de fonction trouvé.',
     'confirm_delete_feature_code' => 'Êtes-vous sûr de vouloir supprimer ce code de fonction ?',
 
-    // ─── Access Controls ────────────────────────────────────────────────────
-    'access_controls_title' => 'Contrôles d\'Accès',
-    'create_access_control' => 'Créer un Contrôle d\'Accès',
-    'edit_access_control' => 'Modifier le Contrôle d\'Accès',
+    // ─── Access Control Lists ────────────────────────────────────────────────
+    'access_controls_title' => 'Listes de Contrôle d\'Accès',
+    'access_controls_tooltip' => 'Crée des listes d\'adresses IP pour contrôler quels réseaux et appareils sont autorisés ou bloqués sur le système téléphonique (FreeSWITCH).',
+    'create_access_control' => 'Créer une Liste de Contrôle d\'Accès',
+    'edit_access_control' => 'Modifier la Liste de Contrôle d\'Accès',
     'access_control_cidr' => 'Réseau (CIDR)',
     'access_control_action' => 'Action',
     'access_control_nodes' => 'Nœuds',
     'access_control_action_allow' => 'Autoriser',
     'access_control_action_deny' => 'Refuser',
-    'no_access_controls_found' => 'Aucune règle de contrôle d\'accès trouvée.',
-    'confirm_delete_access_control' => 'Êtes-vous sûr de vouloir supprimer ce contrôle d\'accès ?',
+    'no_access_controls_found' => 'Aucune liste de contrôle d\'accès trouvée.',
+    'confirm_delete_access_control' => 'Êtes-vous sûr de vouloir supprimer cette liste de contrôle d\'accès ?',
 
     // ─── IVR Menus ─────────────────────────────────────────────────────────
     'ivr_menus_title' => 'Menus IVR',

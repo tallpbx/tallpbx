@@ -1,8 +1,11 @@
 <div>
-    <div class="mb-6">
+    <div class="flex items-center gap-2 mb-6">
         <h2 class="text-2xl font-semibold">
-            {{ $this->isEdit ? 'Edit Access Control' : 'Create Access Control' }}
+            {{ $this->isEdit ? __('admin.edit_access_control') : __('admin.create_access_control') }}
         </h2>
+        <x-tooltip :tip="__('admin.access_controls_tooltip')" position="right">
+            <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
+        </x-tooltip>
     </div>
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">
