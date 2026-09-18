@@ -12,7 +12,7 @@ TallPBX is a self-hosted business phone system named after its foundation on the
 - Deliver voicemail notifications, password resets, and system alerts via standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft 365, or custom providers).
 - Operate one or more customer or business tenants from the same system.
 - Keep backups and restore approved backup operations.
-- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP and web vectors, automatic ban management, and zero-lockout protection.
+- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP and web vectors, automatic ban management, and zero-lockout protection ([Security Architecture & Flow Guide →](docs/security-architecture.md)).
 
 TallPBX is the phone-system software, not a telephone carrier. You need a SIP
 trunk or gateway from a provider if you want to place or receive public phone
@@ -42,6 +42,8 @@ TallPBX delivers feature and function parity with established open-source PBX pl
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 59 PBX modules (Extensions, Routing, PBX Features, Media, Operations, Security, and Administration).
+
+👉 **[Explore the Security Architecture & Packet Flow Guide (Firewall, Intrusion Defense & Flow Diagrams) →](docs/security-architecture.md)**
 
 ## User Interface & Visual Tour
 
