@@ -79,6 +79,13 @@ case "$ACTION" in
             exit 3
         fi
 
+        # Ensure table exists in kernel before adding element; restore active ruleset if needed
+        if ! /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
+            if [ -f "$FIREWALL_ACTIVE" ]; then
+                /usr/sbin/nft -f "$FIREWALL_ACTIVE" 2>/dev/null || true
+            fi
+        fi
+
         # If seconds is 0, ban permanently (no timeout), otherwise apply kernel timeout
         if [ "$SECS" -eq 0 ]; then
             /usr/sbin/nft add element inet tallpbx_filter banned_ips { "$IP" }
@@ -94,6 +101,13 @@ case "$ACTION" in
 
         # Validate the IP address parameter
         validate_ip "$IP"
+
+        # Ensure table exists in kernel before deleting element
+        if ! /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
+            if [ -f "$FIREWALL_ACTIVE" ]; then
+                /usr/sbin/nft -f "$FIREWALL_ACTIVE" 2>/dev/null || true
+            fi
+        fi
 
         # Remove the IP element from the kernel dynamic set; ignore if element was not present
         /usr/sbin/nft delete element inet tallpbx_filter banned_ips { "$IP" } 2>/dev/null || true
