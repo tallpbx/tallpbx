@@ -269,6 +269,7 @@ class SecurityManager extends Component
     {
         $adminId = Auth::guard('admin')->id();
         $banService->unban($ip, is_int($adminId) ? $adminId : null);
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_unbanned_success'));
     }
 
@@ -345,11 +346,11 @@ class SecurityManager extends Component
                 ['type' => 'blacklist', 'ip_address' => $ip],
                 ['description' => $reason]
             );
-            $this->autoApplyFirewallRuleset();
         } else {
             $banService->ban($ip, 'manual', $reason, $this->manualBanDuration);
         }
 
+        $this->autoApplyFirewallRuleset();
         $this->showManualBanModal = false;
         $this->notifySuccess((string) __('admin.security_manual_ban_success'));
     }
