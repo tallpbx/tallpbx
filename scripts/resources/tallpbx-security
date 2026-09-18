@@ -58,6 +58,7 @@ case "$ACTION" in
 
         # Step 3: Promote the pending file to the active configuration file atomically
         mv "$FIREWALL_PENDING" "$FIREWALL_ACTIVE"
+        chown root:www-data "$FIREWALL_ACTIVE"
         chmod 0640 "$FIREWALL_ACTIVE"
 
         # Step 4: Load the validated configuration into the Linux kernel atomically

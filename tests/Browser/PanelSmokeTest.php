@@ -57,6 +57,8 @@ beforeEach(function () {
             'admin.git-update.view',
             'admin.queue.view',
             'admin.monitoring.view',
+            'security.view',
+            'security.manage',
         ];
 
         foreach ($pagePermissions as $permissionName) {
@@ -581,6 +583,17 @@ it('renders the monitoring dashboard with metrics', function () {
             ->assertSee('Services')
             ->assertSee('Disk Usage')
             ->assertSee('Memory');
+    });
+});
+
+it('renders the security manager dashboard', function () {
+    $this->browse(function (Browser $browser) {
+        $browser->loginAs($this->admin, 'admin')
+            ->visit('/panel/security')
+            ->waitForText('Security Center', 5)
+            ->assertSee('Security Center')
+            ->assertSee('Firewall Status')
+            ->assertSee('Attack Protection');
     });
 });
 

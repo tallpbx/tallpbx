@@ -57,6 +57,7 @@ class DatabaseSeeder extends Seeder
         DB::transaction(function (): void {
             $this->call(DefaultSettingsSeeder::class);
             $this->call(LocalMediaFileStoreSeeder::class);
+            $this->call(SecurityServiceSeeder::class);
             $this->tenants->defaultTenant();
 
             if ($this->isDemoMode()) {

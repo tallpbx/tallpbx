@@ -565,6 +565,12 @@ if ! run_step "TALL Stack (Laravel, Livewire, Tailwind, DaisyUI)" resources/tall
     exit 1
 fi
 
+# Configure host-level packet filtering (nftables), the bounded security helper,
+# and baseline rules for VoIP, Web, and SSH services. This protects the host from
+# brute-force and port scanning attacks while ensuring all administrative and phone
+# traffic remains fully operational.
+run_step "Security & Firewall (nftables)" resources/security.sh
+
 # Reconcile source and generated-file permissions after installer re-runs.
 if [ -f /var/www/tallpbx/artisan ]; then
     (cd /var/www/tallpbx && php artisan permissions:repair --scope=full)

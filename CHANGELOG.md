@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Zero-lockout protection service (`LockoutGuardService`) evaluating administrator session reachability before applying restrictive firewall policies, complete with 1-click rescue whitelisting.
   - Artisan management CLI commands: `security:apply` (atomic firewall ruleset application with lockout check), `security:status` (active engine and ban overview), and `security:unban <ip>` (instant cross-layer unbanning).
   - Declarative event listener and console command registration support (`listeners()`, `consoleCommands()`) in the base `ModuleServiceProvider`.
+  - **Unified Single-Screen Security Command Center (`SecurityManager`)**: Complete interactive administrative interface (`/panel/security`) unifying all 5 security zones on a single responsive screen:
+    - Real-time status cards for Kernel Firewall, Attack Protection, Active Banned Attackers, and Administrator Connection with dynamic Lockout Guard.
+    - Whitelist and Blacklist IP address management supporting individual IPv4 addresses and CIDR subnets with live search, instant deletion, and validation.
+    - Active Threat Monitor displaying banned attacker IPs, attack vectors (SIP, Web, SSH), failure attempt counts, expiration countdowns, 1-click manual unbanning, permanent blocking, and safe-whitelisting.
+    - Sequential Firewall Rule builder with live Up/Down priority reordering, enable/disable toggles, PBX Port Catalog quick-add dropdown, custom rule creation modal, and pulsing `[ Save & Apply Changes ]` action.
+    - Attack Protection configuration slide-over drawer for tuning failure thresholds (`max_retry`, `find_time`, `ban_time`) and toggling protection per vector (SIP, Web, SSH).
+  - **Installer Integration (`scripts/resources/security.sh`)**: Automated installer step installing `nftables`, establishing the `/etc/tallpbx` configuration directory (mode 2775 `root:www-data`), installing `/usr/local/sbin/tallpbx-security` (mode 0750 `root:www-data`), configuring sudoers drop-in `/etc/sudoers.d/tallpbx-security` (mode 0440), registering `SecurityServiceSeeder` in `DatabaseSeeder`, and generating the initial baseline firewall ruleset.
+  - **Browser & Smoke Tests**: Dusk browser test coverage and Pest feature test suite (`SecurityManagerLivewireTest.php`) validating Livewire component reactivity, lockout warning display, tab switching, rule reordering, port catalog rule addition, and threat table actions.
 - **User & Administrator Security Documentation**: Comprehensive guides and parity analysis added to `README.md`, `INSTALL.md`, and `docs/parity-comparison.md` detailing the native Linux kernel `nftables` firewall, multi-vector intrusion prevention across SIP, Web, and SSH, zero-lockout protection, and the hardened Bounded Sudoers host command execution architecture.
 
 ### Changed
@@ -32,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrade Notes
 - Requires running database migrations: `php artisan migrate`.
+- Requires installing Linux package: `apt install nftables`.
+- Requires installing bounded security helper and sudoers rule (`scripts/resources/security.sh`).
 
 ## [1.0.0] - 2026-09-17
 
