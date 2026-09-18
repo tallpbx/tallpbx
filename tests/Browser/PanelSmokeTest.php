@@ -600,7 +600,7 @@ it('renders the security manager dashboard', function () {
             ->assertSee('PACKET FILTERING PIPELINE ORDER')
             ->assertSee('Blacklist IPs')
             ->assertSee('Whitelist IPs')
-            ->assertSee('Currently Blocked Attackers')
+            ->assertSee('Blocked Attackers')
             ->assertSee('STAGE 1')
             ->assertSee('STAGE 2')
             ->assertSee('STAGE 3')
