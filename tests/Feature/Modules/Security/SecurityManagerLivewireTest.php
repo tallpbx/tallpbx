@@ -290,3 +290,81 @@ it('reactively updates status upon receiving refresh-security or echo push event
     $component->dispatch('refresh-security')
         ->assertSet('firewallDefaultPolicy', 'accept');
 });
+
+it('renders the unified firewall rules table with pipeline stages and core PBX services', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSee('Permanent IP Blacklist')
+        ->assertSee('@blacklist_ips')
+        ->assertSee('Trusted IP Whitelist')
+        ->assertSee('@whitelist_ips')
+        ->assertSee('STAGE 1')
+        ->assertSee('STAGE 2')
+        ->assertSee('STAGE 3')
+        ->assertSee('STAGE 5')
+        ->assertSee('Default Inbound Policy')
+        ->assertSee('SIP Signaling')
+        ->assertSee('RTP Voice/Video Media')
+        ->assertSee('Web Admin Portal')
+        ->assertSee('SSH Console');
+});
+
+it('opens, edits, and saves a core PBX system service with custom port and source restrictions', function (): void {
+    $service = SecurityService::where('name', 'FreeSWITCH ESL')->first();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openEditSystemServiceModal', $service->id)
+        ->assertSet('showSystemServiceModal', true)
+        ->assertSet('systemServiceName', 'FreeSWITCH ESL')
+        ->assertSet('systemServicePortRange', '8021')
+        ->set('systemServicePortRange', '8022')
+        ->set('systemServiceSourceIp', '10.8.0.0/24')
+        ->call('saveSystemService')
+        ->assertSet('showSystemServiceModal', false);
+
+    expect($service->fresh()->port_range)->toBe('8022')
+        ->and($service->fresh()->source_ip)->toBe('10.8.0.0/24');
+});
+
+it('prevents administrator lockout when modifying Web Admin Portal without whitelisting', function (): void {
+    $webService = SecurityService::where('name', 'Web Admin Portal')->first();
+
+    // Admin IP is 203.0.113.88 (not loopback, not whitelisted)
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class);
+
+    $component->set('adminIp', '203.0.113.88')
+        ->call('openEditSystemServiceModal', $webService->id)
+        // Try restricting Web Admin away from 203.0.113.88
+        ->set('systemServiceSourceIp', '10.0.0.0/8')
+        ->call('saveSystemService')
+        ->assertSee('Zero-Lockout Safety Alert');
+
+    // Verify service was NOT modified
+    expect($webService->fresh()->source_ip)->not->toBe('10.0.0.0/8');
+});
+
+it('toggles a core PBX service and resets it to factory defaults', function (): void {
+    $webrtc = SecurityService::where('name', 'WebRTC WSS')->first();
+    expect($webrtc->enabled)->toBeTrue();
+
+    // 1. Toggle disabled
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('toggleSystemService', $webrtc->id);
+
+    expect($webrtc->fresh()->enabled)->toBeFalse();
+
+    // 2. Modify port
+    $webrtc->update(['port_range' => '9999']);
+
+    // 3. Reset to default
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('resetSystemServiceToDefault', $webrtc->id);
+
+    expect($webrtc->fresh()->port_range)->toBe('7443')
+        ->and($webrtc->fresh()->enabled)->toBeTrue();
+});
+

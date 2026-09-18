@@ -22,12 +22,64 @@ use Illuminate\Support\Carbon;
  * @property string $protocol
  * @property string $port_range
  * @property bool $is_system
+ * @property bool $enabled
+ * @property string $source_ip
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, SecurityRule> $rules
  */
 class SecurityService extends Model
 {
+    /**
+     * Standard default configuration catalog for system services.
+     *
+     * @var array<string, array{protocol: string, port_range: string, source_ip: string, description: string}>
+     */
+    public const DEFAULT_SYSTEM_SERVICES = [
+        'SIP Signaling' => [
+            'protocol' => 'both',
+            'port_range' => '5060,5061,5080',
+            'source_ip' => 'any',
+            'description' => 'SIP phone registration and call signaling (FreeSWITCH internal and external profiles)',
+        ],
+        'RTP Voice/Video Media' => [
+            'protocol' => 'udp',
+            'port_range' => '16384:32768',
+            'source_ip' => 'any',
+            'description' => 'Audio and video media packet streams',
+        ],
+        'Web Admin Portal' => [
+            'protocol' => 'tcp',
+            'port_range' => '80,443',
+            'source_ip' => 'any',
+            'description' => 'HTTP and HTTPS secure web administrative interface',
+        ],
+        'SSH Console' => [
+            'protocol' => 'tcp',
+            'port_range' => '22',
+            'source_ip' => 'any',
+            'description' => 'Secure Shell host administrative terminal access',
+        ],
+        'FreeSWITCH ESL' => [
+            'protocol' => 'tcp',
+            'port_range' => '8021',
+            'source_ip' => 'any',
+            'description' => 'Event Socket Layer remote control interface',
+        ],
+        'Reverb WebSockets' => [
+            'protocol' => 'tcp',
+            'port_range' => '8080',
+            'source_ip' => 'any',
+            'description' => 'Real-time WebSocket event broadcasting for web panels',
+        ],
+        'WebRTC WSS' => [
+            'protocol' => 'tcp',
+            'port_range' => '7443',
+            'source_ip' => 'any',
+            'description' => 'Secure WebRTC SIP signaling for browser communicators',
+        ],
+    ];
+
     /**
      * The table associated with the model.
      *
@@ -46,6 +98,8 @@ class SecurityService extends Model
         'protocol',
         'port_range',
         'is_system',
+        'enabled',
+        'source_ip',
     ];
 
     /**
@@ -57,6 +111,7 @@ class SecurityService extends Model
     {
         return [
             'is_system' => 'boolean',
+            'enabled' => 'boolean',
         ];
     }
 
@@ -68,6 +123,17 @@ class SecurityService extends Model
     public function rules(): HasMany
     {
         return $this->hasMany(SecurityRule::class, 'service_id');
+    }
+
+    /**
+     * Scope query to active (enabled) services only.
+     *
+     * @param  Builder<SecurityService>  $query
+     * @return Builder<SecurityService>
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('enabled', true);
     }
 
     /**
@@ -90,5 +156,15 @@ class SecurityService extends Model
     public function scopeCustom(Builder $query): Builder
     {
         return $query->where('is_system', false);
+    }
+
+    /**
+     * Get the factory default configuration for this system service.
+     *
+     * @return array{protocol: string, port_range: string, source_ip: string, description: string}|null
+     */
+    public function getDefaultConfig(): ?array
+    {
+        return self::DEFAULT_SYSTEM_SERVICES[$this->name] ?? null;
     }
 }

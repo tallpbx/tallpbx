@@ -23,6 +23,7 @@ use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
+use Symfony\Component\HttpFoundation\IpUtils;
 
 #[Layout('layouts.app')]
 
@@ -117,6 +118,31 @@ class SecurityManager extends Component
     public string $ruleAction = 'accept';
 
     public bool $ruleEnabled = true;
+
+    /**
+     * Visibility state for the system service configuration modal.
+     */
+    public bool $showSystemServiceModal = false;
+
+    /**
+     * ID of the system service being edited.
+     */
+    public ?int $editingSystemServiceId = null;
+
+    /**
+     * Form inputs for editing a core PBX system service.
+     */
+    public string $systemServiceName = '';
+
+    public string $systemServiceDescription = '';
+
+    public string $systemServicePortRange = '';
+
+    public string $systemServiceProtocol = 'tcp';
+
+    public string $systemServiceSourceIp = 'any';
+
+    public bool $systemServiceEnabled = true;
 
     /**
      * Visibility state for the attack protection settings slide-over drawer.
@@ -451,6 +477,134 @@ class SecurityManager extends Component
     }
 
     /**
+     * Open modal to customize a core PBX system service.
+     */
+    public function openEditSystemServiceModal(int $serviceId): void
+    {
+        $service = SecurityService::findOrFail($serviceId);
+        $this->editingSystemServiceId = $service->id;
+        $this->systemServiceName = $service->name;
+        $this->systemServiceDescription = (string) ($service->description ?? '');
+        $this->systemServicePortRange = (string) $service->port_range;
+        $this->systemServiceProtocol = (string) $service->protocol;
+        $this->systemServiceSourceIp = (string) ($service->source_ip ?? 'any');
+        $this->systemServiceEnabled = (bool) $service->enabled;
+        $this->showSystemServiceModal = true;
+    }
+
+    /**
+     * Save customized settings for a core PBX system service.
+     */
+    public function saveSystemService(?LockoutGuardService $lockoutGuard = null): void
+    {
+        $lockoutGuard ??= app(LockoutGuardService::class);
+
+        $this->validate([
+            'systemServicePortRange' => ['required', 'string', 'max:100'],
+            'systemServiceProtocol' => ['required', 'in:tcp,udp,both'],
+            'systemServiceSourceIp' => ['required', 'string', 'max:100'],
+            'systemServiceEnabled' => ['boolean'],
+        ]);
+
+        $service = SecurityService::findOrFail($this->editingSystemServiceId);
+
+        // Zero-lockout protection check for administrative portal / SSH
+        if (in_array($service->name, ['Web Admin Portal', 'SSH Console'], true)) {
+            $source = trim($this->systemServiceSourceIp);
+            $isRestricted = ($source !== '' && $source !== 'any' && $source !== '0.0.0.0/0');
+            $isLoopback = in_array($this->adminIp, ['127.0.0.1', '::1'], true);
+            $isWhitelisted = $lockoutGuard->isWhitelisted($this->adminIp);
+
+            if (! $this->systemServiceEnabled && ! $isLoopback && ! $isWhitelisted) {
+                $this->notifyError("Zero-Lockout Safety Alert: Disabling {$service->name} would disconnect your active administrator session from {$this->adminIp}. Please whitelist your IP address before disabling this service.");
+
+                return;
+            }
+
+            if ($isRestricted && ! $isLoopback && ! $isWhitelisted) {
+                $matchesSource = false;
+                try {
+                    $matchesSource = IpUtils::checkIp($this->adminIp, [$source]);
+                } catch (\Throwable) {
+                    $matchesSource = false;
+                }
+
+                if (! $matchesSource) {
+                    $this->notifyError("Zero-Lockout Safety Alert: Restricting {$service->name} to {$source} would lock out your active administrator session from {$this->adminIp}. Please whitelist your IP address before applying this restriction.");
+
+                    return;
+                }
+            }
+        }
+
+        $service->update([
+            'port_range' => trim($this->systemServicePortRange),
+            'protocol' => $this->systemServiceProtocol,
+            'source_ip' => trim($this->systemServiceSourceIp),
+            'enabled' => $this->systemServiceEnabled,
+        ]);
+
+        $this->showSystemServiceModal = false;
+        $this->autoApplyFirewallRuleset();
+        $this->notifySuccess((string) __('admin.security_service_updated'));
+    }
+
+    /**
+     * Toggle a core PBX system service between enabled and disabled.
+     */
+    public function toggleSystemService(int $serviceId, ?LockoutGuardService $lockoutGuard = null): void
+    {
+        $lockoutGuard ??= app(LockoutGuardService::class);
+        $service = SecurityService::findOrFail($serviceId);
+
+        // Prevent disabling Web Admin Portal or SSH Console if admin would be locked out
+        if ($service->enabled && in_array($service->name, ['Web Admin Portal', 'SSH Console'], true)) {
+            $isLoopback = in_array($this->adminIp, ['127.0.0.1', '::1'], true);
+            $isWhitelisted = $lockoutGuard->isWhitelisted($this->adminIp);
+
+            if (! $isLoopback && ! $isWhitelisted) {
+                $this->notifyError("Zero-Lockout Safety Alert: Disabling {$service->name} would disconnect your active administrator session from {$this->adminIp}. Please whitelist your IP address before disabling this service.");
+
+                return;
+            }
+        }
+
+        $service->enabled = ! $service->enabled;
+        $service->save();
+
+        $this->autoApplyFirewallRuleset();
+        $this->notifySuccess((string) __('admin.security_service_updated'));
+    }
+
+    /**
+     * Reset a core PBX system service to its factory default ports, protocol, and unrestricted access.
+     */
+    public function resetSystemServiceToDefault(int $serviceId): void
+    {
+        $service = SecurityService::findOrFail($serviceId);
+        $default = $service->getDefaultConfig();
+
+        if ($default !== null) {
+            $service->update([
+                'port_range' => $default['port_range'],
+                'protocol' => $default['protocol'],
+                'source_ip' => $default['source_ip'],
+                'enabled' => true,
+            ]);
+
+            if ($this->editingSystemServiceId === $serviceId) {
+                $this->systemServicePortRange = $default['port_range'];
+                $this->systemServiceProtocol = $default['protocol'];
+                $this->systemServiceSourceIp = $default['source_ip'];
+                $this->systemServiceEnabled = true;
+            }
+
+            $this->autoApplyFirewallRuleset();
+            $this->notifySuccess((string) __('admin.security_service_reset_success'));
+        }
+    }
+
+    /**
      * Open modal to create or edit a custom firewall rule.
      */
     public function openCustomRuleModal(?int $ruleId = null): void
@@ -697,6 +851,8 @@ class SecurityManager extends Component
             ->get();
 
         $bannedCount = SecurityBan::active()->count();
+        $whitelistCount = SecurityIpList::whitelist()->count();
+        $blacklistCount = SecurityIpList::blacklist()->count();
 
         return view('security::security-manager', [
             'ipLists' => $ipLists,
@@ -704,6 +860,8 @@ class SecurityManager extends Component
             'firewallRules' => $firewallRules,
             'catalogServices' => $catalogServices,
             'bannedCount' => $bannedCount,
+            'whitelistCount' => $whitelistCount,
+            'blacklistCount' => $blacklistCount,
         ]);
     }
 }

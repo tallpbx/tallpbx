@@ -37,6 +37,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'both',
                 'port_range' => '5060,5061,5080',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
             [
                 'name' => 'RTP Voice/Video Media',
@@ -44,6 +46,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'udp',
                 'port_range' => '16384:32768',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
             [
                 'name' => 'Web Admin Portal',
@@ -51,6 +55,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'tcp',
                 'port_range' => '80,443',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
             [
                 'name' => 'SSH Console',
@@ -58,6 +64,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'tcp',
                 'port_range' => '22',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
             [
                 'name' => 'FreeSWITCH ESL',
@@ -65,6 +73,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'tcp',
                 'port_range' => '8021',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
             [
                 'name' => 'Reverb WebSockets',
@@ -72,6 +82,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'tcp',
                 'port_range' => '8080',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
             [
                 'name' => 'WebRTC WSS',
@@ -79,6 +91,8 @@ class SecurityServiceSeeder extends Seeder
                 'protocol' => 'tcp',
                 'port_range' => '7443',
                 'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
             ],
         ];
 

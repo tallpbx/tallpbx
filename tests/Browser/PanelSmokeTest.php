@@ -598,7 +598,12 @@ it('renders the security manager dashboard', function () {
             ->assertSee('Firewall Status')
             ->assertSee('Attack Protection')
             ->assertSee('PACKET FILTERING PIPELINE ORDER')
-            ->assertSee('Core PBX Services (Active in Kernel)')
+            ->assertSee('Permanent IP Blacklist')
+            ->assertSee('Trusted IP Whitelist')
+            ->assertSee('STAGE 1')
+            ->assertSee('STAGE 2')
+            ->assertSee('STAGE 3')
+            ->assertSee('SIP Signaling')
             ->screenshot('security-dashboard-full');
     });
 });

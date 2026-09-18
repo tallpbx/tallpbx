@@ -154,11 +154,17 @@ class SecurityConfigGenerator
 
             // Step 6: System PBX services from port catalog
             $lines[] = '        # STEP 6: CORE PBX TELEPHONY PORTS';
-            $systemServices = SecurityService::system()->get();
+            $systemServices = SecurityService::system()->active()->get();
             foreach ($systemServices as $service) {
                 $lines[] = "        # Service: {$service->name}";
+                $prefix = '';
+                $source = trim((string) ($service->source_ip ?? 'any'));
+                if ($source !== '' && $source !== 'any' && $source !== '0.0.0.0/0') {
+                    $prefix = "ip saddr {$source} ";
+                }
+
                 $formattedPort = $this->formatPortRange($service->port_range);
-                foreach ($this->generateServiceRules($service->protocol, $formattedPort, 'accept') as $ruleLine) {
+                foreach ($this->generateServiceRules($service->protocol, $formattedPort, 'accept', $prefix) as $ruleLine) {
                     $lines[] = "        {$ruleLine}";
                 }
             }

@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - Unreleased
 
 ### Added
+- **Unified Firewall Rules Table & Editable Core PBX Services**:
+  - Transformed the **Firewall Rules & Port Access** table into a single, unified view representing the complete 5-stage packet filtering pipeline:
+    - **Stage 1 & 2 Summary Rows**: Permanent Blacklist (`@blacklist_ips`), Active Intrusion Bans (`@banned_ips`), and Trusted Whitelist (`@whitelist_ips`) with live counts and 1-click management shortcuts (`Manage Blacklist`, `Manage Whitelist`).
+    - **Stage 3 Core PBX Services**: Fully integrated all 7 telephony and management services (SIP Signaling, RTP Media, Web Admin, SSH, FreeSWITCH ESL, Reverb WebSockets, and WebRTC) into the table with individual status toggles and customization controls.
+    - **Stage 4 Custom Sequential Rules**: Administrator-defined sequential rules with priority Up/Down reordering and quick creation controls.
+    - **Stage 5 Default Inbound Fallback Policy**: Clean fallback summary row showing default action (`Drop` or `Accept`) with direct configuration shortcut.
+  - **Core PBX Service Customization & Zero-Lockout Safety**:
+    - Added customization for core PBX services, allowing administrators to modify port ranges, network protocols (`TCP`, `UDP`, `Both`), and apply source IP / CIDR network restrictions (e.g. restricting SSH or Web Admin access to an administrative VPN).
+    - Safety warning modal with plain-English guidance on preventing call disruption.
+    - Zero-lockout protection (`LockoutGuardService`) preventing administrators from restricting or disabling Web Admin or SSH access away from their active connection IP.
+    - 1-click "Restore Factory Defaults" action to instantly revert core PBX services to factory ports and unrestricted access.
+  - Database schema update: added `enabled` and `source_ip` columns to `security_services` via migration `2026_09_18_000007_add_enabled_and_source_ip_to_security_services_table.php`.
 - **Security Module**: Integrated native host security and attack protection command center (`app-modules/security`).
   - Single-screen management for host firewall rules, standard PBX port access, trusted and blocked IP lists, and real-time intruder monitoring.
   - Native Linux `nftables` packet filtering with zero-lockout protection ensuring active administrator sessions are never blocked.

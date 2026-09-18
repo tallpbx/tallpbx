@@ -432,33 +432,13 @@
                 </div>
             </div>
 
-            {{-- Core PBX Services (Active in Kernel) --}}
-            <div class="bg-base-200/50 rounded-box p-3 border border-base-200 space-y-2">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <div class="flex items-center gap-1.5 text-xs font-semibold text-base-content">
-                        <x-heroicon-o-check-badge class="w-4 h-4 text-success" />
-                        <span>{{ __('admin.security_core_services_title') }}</span>
-                    </div>
-                    <span class="text-[11px] text-base-content/60">{{ __('admin.security_core_services_note') }}</span>
-                </div>
-                <div class="flex flex-wrap items-center gap-1.5">
-                    @foreach ($catalogServices as $service)
-                        <div class="badge badge-sm badge-outline gap-1.5 bg-base-100 py-2.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span>
-                            <span class="font-medium text-xs">{{ $service->name }}</span>
-                            <span class="font-mono text-[10px] text-base-content/60">{{ $service->port_range }}/{{ strtoupper($service->protocol) }}</span>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-
-            {{-- Rules Table --}}
+            {{-- Unified Firewall Rules Table --}}
             <div class="overflow-x-auto border border-base-200 rounded-box">
                 <table class="table table-sm">
                     <thead>
-                        <tr>
-                            <th class="w-16">{{ __('admin.security_rule_priority') }}</th>
-                            <th class="w-12">{{ __('client.status') }}</th>
+                        <tr class="bg-base-200/40 text-base-content/70">
+                            <th class="w-20">{{ __('admin.security_rule_priority') }}</th>
+                            <th class="w-14 text-center">{{ __('client.status') }}</th>
                             <th>{{ __('admin.security_rule_name') }}</th>
                             <th>{{ __('admin.security_service_port') }}</th>
                             <th>{{ __('admin.security_source_ip') }}</th>
@@ -466,7 +446,193 @@
                             <th class="text-right">{{ __('admin.actions') }}</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-base-200">
+                        {{-- STAGE 1 & 2: Ingress IP Pre-Filters Section Header --}}
+                        <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
+                            <td colspan="7" class="py-1.5 px-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="badge badge-error badge-outline badge-xs font-mono font-bold">{{ __('admin.security_stage_1_badge') }}</span>
+                                    <span class="badge badge-success badge-outline badge-xs font-mono font-bold">{{ __('admin.security_stage_2_badge') }}</span>
+                                    <span class="uppercase tracking-wider text-[11px]">{{ __('admin.security_ip_prefilters_badge') }}</span>
+                                </div>
+                            </td>
+                        </tr>
+
+                        {{-- Stage 1: Permanent Blacklist --}}
+                        <tr class="hover">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-error badge-xs font-mono font-semibold">STAGE 1</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-error" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_permanent_blacklist') }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono">@blacklist_ips</span>
+                                </div>
+                            </td>
+                            <td class="text-xs text-base-content/60">
+                                {{ __('admin.security_all_ports_protocols') }}
+                            </td>
+                            <td>
+                                <span class="font-mono text-xs {{ $blacklistCount > 0 ? 'text-error font-semibold' : 'text-base-content/60' }}">
+                                    {{ $blacklistCount }} {{ trans_choice('admin.security_entries_count', $blacklistCount) }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-error badge-xs font-semibold">{{ __('admin.security_action_drop') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <button wire:click="switchIpListType('blacklist')" type="button" class="btn btn-ghost btn-xs text-primary gap-1">
+                                    <x-heroicon-o-list-bullet class="w-3.5 h-3.5" />
+                                    <span>{{ __('admin.security_manage_blacklist') }}</span>
+                                </button>
+                            </td>
+                        </tr>
+
+                        {{-- Stage 1: Active Intrusion Bans --}}
+                        <tr class="hover">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-error badge-xs font-mono font-semibold">STAGE 1</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-error {{ $bannedCount > 0 ? 'animate-pulse' : '' }}" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_active_attackers') }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono">@banned_ips</span>
+                                </div>
+                            </td>
+                            <td class="text-xs text-base-content/60">
+                                {{ __('admin.security_all_ports_protocols') }}
+                            </td>
+                            <td>
+                                <span class="font-mono text-xs {{ $bannedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60' }}">
+                                    {{ $bannedCount }} {{ trans_choice('admin.security_threats_count', $bannedCount) }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-error badge-xs font-semibold">{{ __('admin.security_action_drop') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <span class="text-xs text-base-content/50 italic mr-2">{{ __('admin.security_dynamic_kernel') }}</span>
+                            </td>
+                        </tr>
+
+                        {{-- Stage 2: Trusted Whitelist --}}
+                        <tr class="hover">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-success badge-xs font-mono font-semibold">STAGE 2</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-success" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_trusted_whitelist') }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono">@whitelist_ips</span>
+                                </div>
+                            </td>
+                            <td class="text-xs text-base-content/60">
+                                {{ __('admin.security_all_ports_protocols') }}
+                            </td>
+                            <td>
+                                <span class="font-mono text-xs {{ $whitelistCount > 0 ? 'text-success font-semibold' : 'text-base-content/60' }}">
+                                    {{ $whitelistCount }} {{ trans_choice('admin.security_entries_count', $whitelistCount) }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-success badge-xs font-semibold">{{ __('admin.security_action_allow') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <button wire:click="switchIpListType('whitelist')" type="button" class="btn btn-ghost btn-xs text-success gap-1">
+                                    <x-heroicon-o-shield-check class="w-3.5 h-3.5" />
+                                    <span>{{ __('admin.security_manage_whitelist') }}</span>
+                                </button>
+                            </td>
+                        </tr>
+
+                        {{-- STAGE 3: Core PBX Telephony & Management Services Header --}}
+                        <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
+                            <td colspan="7" class="py-1.5 px-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="badge badge-neutral badge-outline badge-xs font-mono font-bold">{{ __('admin.security_stage_3_badge') }}</span>
+                                        <span class="uppercase tracking-wider text-[11px]">{{ __('admin.security_core_services_title') }}</span>
+                                    </div>
+                                    <span class="text-[11px] font-normal text-base-content/60">{{ __('admin.security_core_services_note') }}</span>
+                                </div>
+                            </td>
+                        </tr>
+
+                        {{-- Core PBX Services Rows --}}
+                        @foreach ($catalogServices as $service)
+                            <tr class="hover {{ ! $service->enabled ? 'opacity-50' : '' }}">
+                                <td class="whitespace-nowrap">
+                                    <span class="badge badge-neutral badge-xs font-mono font-semibold">STAGE 3</span>
+                                </td>
+                                <td class="text-center">
+                                    <input wire:click="toggleSystemService({{ $service->id }})" type="checkbox"
+                                           class="toggle toggle-success toggle-sm"
+                                           @checked($service->enabled)
+                                           title="{{ $service->enabled ? __('client.enabled') : __('client.disabled') }}" />
+                                </td>
+                                <td>
+                                    <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                        <span>{{ $service->name }}</span>
+                                        <span class="badge badge-ghost badge-xs text-[10px]">{{ __('admin.security_core_service_badge') }}</span>
+                                        @if ($service->description)
+                                            <x-tooltip :tip="$service->description" align="start" position="right">
+                                                <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/50 cursor-help" />
+                                            </x-tooltip>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="font-mono text-xs font-semibold text-base-content">{{ $service->port_range }}</span>
+                                        <span class="text-xs text-base-content/60">/{{ strtoupper($service->protocol) }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if ($service->source_ip === 'any' || $service->source_ip === '0.0.0.0/0' || empty($service->source_ip))
+                                        <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
+                                    @else
+                                        <span class="font-mono text-xs text-primary font-medium">{{ $service->source_ip }}</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($service->enabled)
+                                        <span class="badge badge-success badge-xs">{{ __('admin.security_action_allow') }}</span>
+                                    @else
+                                        <span class="badge badge-ghost badge-xs">{{ __('client.disabled') }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <button wire:click="openEditSystemServiceModal({{ $service->id }})" type="button" class="btn btn-ghost btn-xs text-primary gap-1" title="{{ __('admin.security_edit_service') }}">
+                                        <x-heroicon-o-pencil-square class="w-4 h-4" />
+                                        <span class="hidden sm:inline">{{ __('client.edit') }}</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+
+                        {{-- STAGE 4: Custom Sequential Rules Header --}}
+                        <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
+                            <td colspan="7" class="py-1.5 px-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="badge badge-primary badge-outline badge-xs font-mono font-bold">{{ __('admin.security_stage_4_badge') }}</span>
+                                        <span class="uppercase tracking-wider text-[11px]">{{ __('admin.security_firewall_rules') }}</span>
+                                    </div>
+                                    <span class="text-[11px] font-normal text-base-content/60">{{ __('admin.security_pipeline_step4_desc') }}</span>
+                                </div>
+                            </td>
+                        </tr>
+
+                        {{-- Custom Sequential Rules Rows --}}
                         @forelse ($firewallRules as $rule)
                             <tr class="hover {{ ! $rule->enabled ? 'opacity-50' : '' }}">
                                 {{-- Priority & Up/Down Arrows --}}
@@ -485,10 +651,10 @@
                                 </td>
 
                                 {{-- Status Toggle --}}
-                                <td>
+                                <td class="text-center">
                                     <input wire:click="toggleRule({{ $rule->id }})" type="checkbox"
                                            class="toggle toggle-primary toggle-sm"
-                                           {{ $rule->enabled ? 'checked' : '' }} />
+                                           @checked($rule->enabled) />
                                 </td>
 
                                 {{-- Rule Name / Description --}}
@@ -536,15 +702,60 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-6 text-base-content/60">
-                                    <div class="flex flex-col items-center gap-1.5">
-                                        <x-heroicon-o-shield-check class="w-8 h-8 text-base-content/30" />
-                                        <span class="font-medium text-sm text-base-content/80">{{ __('admin.security_no_rules') }}</span>
-                                        <span class="text-xs text-base-content/50 max-w-md">{{ __('admin.security_no_rules_help') }}</span>
+                                <td colspan="7" class="text-center py-4 text-base-content/60">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <x-heroicon-o-shield-check class="w-4 h-4 text-success" />
+                                        <span class="text-xs text-base-content/70">{{ __('admin.security_no_rules_help') }}</span>
                                     </div>
                                 </td>
                             </tr>
                         @endforelse
+
+                        {{-- STAGE 5: Default Inbound Fallback Policy --}}
+                        <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
+                            <td colspan="7" class="py-1.5 px-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="badge badge-neutral badge-outline badge-xs font-mono font-bold">{{ __('admin.security_stage_5_badge') }}</span>
+                                        <span class="uppercase tracking-wider text-[11px]">{{ __('admin.security_default_policy') }}</span>
+                                    </div>
+                                    <span class="text-[11px] font-normal text-base-content/60">{{ __('admin.security_pipeline_step5_desc') }}</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="hover">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-neutral badge-xs font-mono font-semibold">STAGE 5</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2 h-2 rounded-full bg-base-content/40" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_default_policy') }}</span>
+                                    <span class="badge badge-ghost badge-xs">{{ __('admin.security_unmatched_traffic') }}</span>
+                                </div>
+                            </td>
+                            <td class="text-xs text-base-content/60">
+                                {{ __('admin.security_all_remaining_traffic') }}
+                            </td>
+                            <td>
+                                <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
+                            </td>
+                            <td>
+                                @if ($firewallDefaultPolicy === 'drop')
+                                    <span class="badge badge-error badge-xs font-semibold">{{ __('admin.security_action_drop') }}</span>
+                                @else
+                                    <span class="badge badge-success badge-xs font-semibold">{{ __('admin.security_action_allow') }}</span>
+                                @endif
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <button wire:click="openSettingsDrawer" type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/70">
+                                    <x-heroicon-o-cog-6-tooth class="w-3.5 h-3.5" />
+                                    <span>{{ __('admin.security_configure') }}</span>
+                                </button>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -776,6 +987,99 @@
                         <button type="submit" class="btn btn-primary btn-sm">
                             {{ __('client.save') }}
                         </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal: Edit Core PBX System Service --}}
+    @if ($showSystemServiceModal)
+        <div class="modal modal-open">
+            <div class="modal-box max-w-lg">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg text-base-content">
+                            {{ __('admin.security_edit_service_title', ['name' => $systemServiceName]) }}
+                        </h3>
+                        <p class="text-xs text-base-content/60 mt-0.5">{{ $systemServiceDescription }}</p>
+                    </div>
+                    <button wire:click="$set('showSystemServiceModal', false)" type="button" class="btn btn-ghost btn-circle btn-sm">
+                        <x-heroicon-o-x-mark class="w-5 h-5" />
+                    </button>
+                </div>
+
+                {{-- Safety Alert Banner --}}
+                <div class="alert alert-warning text-xs mt-4 py-2.5 px-3 rounded-lg flex items-start gap-2">
+                    <x-heroicon-o-exclamation-triangle class="w-5 h-5 shrink-0 text-warning" />
+                    <div class="space-y-1">
+                        <div class="font-semibold">{{ __('admin.security_edit_service_warning') }}</div>
+                        @if (in_array($systemServiceName, ['Web Admin Portal', 'SSH Console'], true))
+                            <div class="text-[11px] opacity-90">{{ __('admin.security_edit_service_lockout_note', ['ip' => $adminIp]) }}</div>
+                        @endif
+                    </div>
+                </div>
+
+                <form wire:submit="saveSystemService" class="space-y-4 mt-4">
+                    {{-- Port Range --}}
+                    <div class="form-control">
+                        <label class="label justify-start gap-2">
+                            <span class="label-text font-medium">{{ __('admin.security_service_port_range') }}</span>
+                            <x-tooltip :tip="__('admin.security_service_port_range_help')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </label>
+                        <input wire:model="systemServicePortRange" type="text"
+                               class="input input-bordered input-sm font-mono @error('systemServicePortRange') input-error @enderror" />
+                        @error('systemServicePortRange') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Protocol --}}
+                    <div class="form-control">
+                        <label class="label"><span class="label-text font-medium">{{ __('admin.security_service_protocol') }}</span></label>
+                        <select wire:model="systemServiceProtocol" class="select select-bordered select-sm w-full">
+                            <option value="both">{{ __('admin.security_service_protocol_both') }}</option>
+                            <option value="tcp">{{ __('admin.security_service_protocol_tcp') }}</option>
+                            <option value="udp">{{ __('admin.security_service_protocol_udp') }}</option>
+                        </select>
+                        @error('systemServiceProtocol') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Source Network Restriction --}}
+                    <div class="form-control">
+                        <label class="label justify-start gap-2">
+                            <span class="label-text font-medium">{{ __('admin.security_service_source_ip') }}</span>
+                            <x-tooltip :tip="__('admin.security_service_source_ip_help')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </label>
+                        <input wire:model="systemServiceSourceIp" type="text" placeholder="any or 10.8.0.0/24"
+                               class="input input-bordered input-sm font-mono @error('systemServiceSourceIp') input-error @enderror" />
+                        @error('systemServiceSourceIp') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    {{-- Status Enabled / Disabled --}}
+                    <div class="form-control pt-1">
+                        <label class="label cursor-pointer justify-start gap-3">
+                            <input wire:model="systemServiceEnabled" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                            <span class="label-text font-medium">{{ __('admin.security_service_enabled') }}</span>
+                        </label>
+                    </div>
+
+                    <div class="modal-action flex items-center justify-between pt-2">
+                        <button wire:click="resetSystemServiceToDefault({{ (int) $editingSystemServiceId }})" type="button"
+                                class="btn btn-outline btn-warning btn-sm gap-1">
+                            <x-heroicon-o-arrow-path class="w-4 h-4" />
+                            <span>{{ __('admin.security_restore_defaults') }}</span>
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <button wire:click="$set('showSystemServiceModal', false)" type="button" class="btn btn-outline btn-sm">
+                                {{ __('client.cancel') }}
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                {{ __('client.save') }}
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>

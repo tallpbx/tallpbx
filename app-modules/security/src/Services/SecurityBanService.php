@@ -164,7 +164,7 @@ class SecurityBanService implements SecurityBanServiceInterface
 
         // 2. Record audit log
         SecurityAuditLog::record(
-            action: 'ban_removed',
+            action: 'unban_executed',
             ipAddress: $ip,
             description: "Unbanned IP {$ip}",
             details: [
