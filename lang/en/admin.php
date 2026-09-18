@@ -377,7 +377,7 @@ return [
 
     // ─── Access Control Lists ────────────────────────────────────────────────
     'access_controls_title' => 'Access Control Lists',
-    'access_controls_tooltip' => 'Creates IP address lists that control which networks and devices are allowed or blocked from connecting to your phone system (FreeSWITCH).',
+    'access_controls_tooltip' => 'Controls which trusted networks and devices can register phones or connect SIP trunks directly inside FreeSWITCH. Unlike the server firewall which protects the entire operating system from unwanted traffic, Access Control Lists apply specifically to internal phone system features.',
     'create_access_control' => 'Create Access Control List',
     'edit_access_control' => 'Edit Access Control List',
     'access_control_cidr' => 'Network (CIDR)',

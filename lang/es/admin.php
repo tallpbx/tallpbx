@@ -339,7 +339,7 @@ return [
 
     // ─── Access Control Lists ────────────────────────────────────────────────
     'access_controls_title' => 'Listas de Control de Acceso',
-    'access_controls_tooltip' => 'Crea listas de direcciones IP para controlar qué redes y dispositivos pueden conectarse o bloquearse en el sistema telefónico (FreeSWITCH).',
+    'access_controls_tooltip' => 'Controla qué redes y dispositivos de confianza pueden registrar teléfonos o conectar troncales SIP directamente dentro de FreeSWITCH. A diferencia del firewall del servidor que protege todo el sistema operativo del tráfico no deseado, las Listas de Control de Acceso se aplican específicamente a las funciones internas del sistema telefónico.',
     'create_access_control' => 'Crear Lista de Control de Acceso',
     'edit_access_control' => 'Editar Lista de Control de Acceso',
     'access_control_cidr' => 'Red (CIDR)',

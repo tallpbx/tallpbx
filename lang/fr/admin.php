@@ -340,7 +340,7 @@ return [
 
     // ─── Access Control Lists ────────────────────────────────────────────────
     'access_controls_title' => 'Listes de Contrôle d\'Accès',
-    'access_controls_tooltip' => 'Crée des listes d\'adresses IP pour contrôler quels réseaux et appareils sont autorisés ou bloqués sur le système téléphonique (FreeSWITCH).',
+    'access_controls_tooltip' => 'Contrôle quels réseaux et appareils de confiance peuvent enregistrer des téléphones ou connecter des liaisons SIP directement dans FreeSWITCH. Contrairement au pare-feu du serveur qui protège l\'ensemble du système d\'exploitation contre le trafic indésirable, les Listes de Contrôle d\'Accès s\'appliquent spécifiquement aux fonctionnalités internes du système téléphonique.',
     'create_access_control' => 'Créer une Liste de Contrôle d\'Accès',
     'edit_access_control' => 'Modifier la Liste de Contrôle d\'Accès',
     'access_control_cidr' => 'Réseau (CIDR)',
