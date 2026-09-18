@@ -40,7 +40,7 @@ TallPBX enforces a strict two-tier policy for running host Linux commands to pre
 - **Unprivileged Commands**: Use `Symfony\Component\Process\Process` passing discrete argument arrays (`new Process(['git', '-C', $path, 'status'])`) under `www-data`. When shell string execution is unavoidable, wrap dynamic parameters with `escapeshellarg()` and bound with GNU `timeout -k 30s <seconds>`.
 - **Privileged Operations (Root)**: Direct sudo execution of general-purpose system binaries (e.g. `sudo bash`, `sudo nft`, `sudo systemctl`, or wildcard `ALL=(ALL) NOPASSWD: ALL`) is STRICTLY FORBIDDEN.
 - **The Bounded Helper Pattern**:
-  1. Dedicated Helper: Encapsulate root operations in a dedicated script under `/usr/local/bin/` with permissions `0750 root:www-data` (e.g. `/usr/local/bin/tallpbx-security`, `/usr/local/bin/tallpbx-restore`).
+  1. Dedicated Helper: Encapsulate root operations in a dedicated script under `/usr/local/sbin/` with permissions `0750 root:www-data` (e.g. `/usr/local/sbin/tallpbx-security`, `/usr/local/sbin/tallpbx-restore`).
   2. Matching Sudoers Drop-In: `/etc/sudoers.d/` grants `NOPASSWD` exclusively to that single executable for `www-data`.
   3. Strict Regex Whitelisting: Reject all unexpected arguments. Every parameter (IP address, duration, operation UUID) MUST be validated against strict regular expressions before calling underlying utilities.
   4. Non-Interactive: Run with `set -euo pipefail` and hardcoded absolute paths (`/usr/sbin/nft`). Never call pagers, editors, or utilities with interactive escape vectors (GTFOBins).

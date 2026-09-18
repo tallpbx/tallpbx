@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Single-screen management for host firewall rules, standard PBX port access, trusted and blocked IP lists, and real-time intruder monitoring.
   - Native Linux `nftables` packet filtering with zero-lockout protection ensuring active administrator sessions are never blocked.
   - High-performance in-process authentication failure tracking with automatic IP banning across SIP, Web, and SSH access vectors.
-  - Bounded root execution helper (`/usr/local/bin/tallpbx-security`) for safe, atomic kernel firewall updates.
+  - Bounded root execution helper (`/usr/local/sbin/tallpbx-security`) for safe, atomic kernel firewall updates.
   - Unified admin panel route (`/panel/security`) and navigation under PBX → Advanced with `security.view` and `security.edit` permissions.
   - Host security database schema and Eloquent models (`SecurityRule`, `SecurityService`, `SecurityIpList`, `SecuritySetting`, `SecurityBan`, `SecurityAuditLog`).
   - Standard PBX Port Catalog seeder (`SecurityServiceSeeder`) pre-populating SIP (5060/5061/5080), RTP (16384-32768), Web Admin (80/443), SSH (22), ESL (8021), Reverb (8080), and WebRTC (7443).

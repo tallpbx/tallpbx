@@ -8,7 +8,7 @@ namespace Modules\Security\Contracts;
  * Contract for executing bounded kernel security operations.
  *
  * Coordinates atomic nftables ruleset application, dynamic banned_ips set updates,
- * and status queries via the bounded helper script /usr/local/bin/tallpbx-security.
+ * and status queries via the bounded helper script /usr/local/sbin/tallpbx-security.
  */
 interface SecurityExecutorInterface
 {

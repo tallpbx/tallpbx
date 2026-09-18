@@ -255,7 +255,7 @@ TallPBX includes a first-party Security module (`app-modules/security`) that rep
 ### 4. Hardened Linux CLI Execution & Jailbreak Defense
 TallPBX enforces a strict two-tier execution policy to prevent command injection (CWE-78) and root privilege escalation:
 - **Unprivileged Execution**: The web application and PHP-FPM run under the unprivileged `www-data` user with zero direct access to root shells or general system utilities.
-- **Bounded Sudoers Architecture**: Privileged operations (firewall compilation, kernel set ban/unban) are encapsulated in a dedicated root-owned script (`/usr/local/bin/tallpbx-security`, mode `0750 root:www-data`).
+- **Bounded Sudoers Architecture**: Privileged operations (firewall compilation, kernel set ban/unban) are encapsulated in a dedicated root-owned script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`).
 - **Strict Parameter Whitelisting**: The sudoers drop-in (`/etc/sudoers.d/tallpbx-security`) permits execution exclusively for that single binary. The script strictly regex-validates all parameters (IPs, CIDRs, actions) and runs non-interactively (`set -euo pipefail`) without subshell escape vectors.
 - **Zero Dangerous Web Tools**: Dangerous legacy utilities like web shells (`app/exec`) and raw SQL runners (`app/database`) present in older PBX platforms are intentionally excluded from TallPBX.
 

@@ -273,7 +273,7 @@ The firewall evaluates traffic through a strict, multi-tiered hierarchy in `nfta
 - **Strict Types**: `declare(strict_types=1);` on all PHP files with native type hints.
 - **Documentation**: Clear, plain-language PHPDoc comments on all classes and methods explaining intent.
 - **Admin-Only Guard**: The security module manages host-level network interfaces and packet filtering. It is **exclusively accessible to the `admin` guard** (`App\Models\Admin`) with `security.view` and `security.edit` permissions. Tenant users (`web` guard) never see or access this module.
-- **Privilege Boundary**: `www-data` executes only `/usr/local/bin/tallpbx-security` via sudoers. No raw shell interpolation or arbitrary commands.
+- **Privilege Boundary**: `www-data` executes only `/usr/local/sbin/tallpbx-security` via sudoers. No raw shell interpolation or arbitrary commands.
 - **Zero-Lockout Guarantee**: The `LockoutGuardService` validates that applying any firewall ruleset or default drop policy will never block the active administrator's IP address (`request()->ip()`). If an admin session would be blocked, the system fails closed with an explanatory alert.
 - **Atomic Kernel Transactions**: All packet filtering rules compile into a single `nftables` atomic transaction. The helper executes `nft -c` for syntax verification before atomic loading (`nft -f`). If a rule is invalid, the active kernel state is left completely untouched.
 - **Cache Clearing**: Run `php artisan optimize:clear` after any code change.
@@ -306,7 +306,7 @@ Module root: `app-modules/security/`
 | `src/Contracts/SecurityBanServiceInterface.php` | Contract for executing bans and unbans |
 | `src/Services/SecurityBanService.php` | Manages MariaDB bans and `nftables` dynamic set sync |
 | `src/Services/SecurityConfigGenerator.php` | Compiles `/etc/tallpbx/firewall.nft` ruleset |
-| `src/Services/SecurityExecutor.php` | Executes bounded helper `/usr/local/bin/tallpbx-security` |
+| `src/Services/SecurityExecutor.php` | Executes bounded helper `/usr/local/sbin/tallpbx-security` |
 | `src/Services/LockoutGuardService.php` | Preflight validator ensuring admin IP remains reachable |
 | `src/Listeners/LogFailedLoginListener.php` | Listens to `Illuminate\Auth\Events\Failed` -> `SecurityIncidentService` |
 | `src/Livewire/SecurityManager.php` | Unified Livewire 4 component driving the entire single-screen UI |
@@ -320,7 +320,7 @@ System & Installer Files:
 
 | File | Purpose |
 | --- | --- |
-| `scripts/resources/tallpbx-security` | Bounded root helper script (`/usr/local/bin/tallpbx-security`) |
+| `scripts/resources/tallpbx-security` | Bounded root helper script (`/usr/local/sbin/tallpbx-security`) |
 | `scripts/resources/tallpbx-security.sudoers` | Sudoers rule (`/etc/sudoers.d/tallpbx-security`) |
 | `scripts/resources/security.sh` | Installer resource script (installs `nftables`, sets baseline) |
 | `scripts/install.sh` | Integrates `security.sh` into server installation |
@@ -554,10 +554,10 @@ public function recordFailure(string $ip, string $vector, string $details): void
 
 ### 8.1 `/etc/sudoers.d/tallpbx-security`
 ```sudoers
-www-data ALL=(ALL) NOPASSWD: /usr/local/bin/tallpbx-security
+www-data ALL=(ALL) NOPASSWD: /usr/local/sbin/tallpbx-security
 ```
 
-### 8.2 `/usr/local/bin/tallpbx-security`
+### 8.2 `/usr/local/sbin/tallpbx-security`
 File permissions: `0750 root:www-data`.
 ```bash
 #!/bin/bash
@@ -609,11 +609,11 @@ esac
 ### 8.3 Threat Model & Jailbreak Defense Guarantees
 
 1. **Zero Shell Interpolation (CWE-78 Prevention)**:
-   PHP invokes `/usr/local/bin/tallpbx-security` strictly via Symfony Process using discrete argv string arrays:
-   `new Process(['sudo', '-n', '/usr/local/bin/tallpbx-security', 'ban', $ip, $seconds])`
+   PHP invokes `/usr/local/sbin/tallpbx-security` strictly via Symfony Process using discrete argv string arrays:
+   `new Process(['sudo', '-n', '/usr/local/sbin/tallpbx-security', 'ban', $ip, $seconds])`
    Because arguments are passed directly to `execve()`, shell metacharacters (`;`, `|`, `&&`, `$()`, backticks) are NEVER evaluated as shell operators.
 2. **Bounded Sudoers Scope (Least Privilege)**:
-   `/etc/sudoers.d/tallpbx-security` restricts `www-data` execution privileges solely to `/usr/local/bin/tallpbx-security`. The web server user cannot invoke `bash`, `cat`, `rm`, or any arbitrary system binary as root.
+   `/etc/sudoers.d/tallpbx-security` restricts `www-data` execution privileges solely to `/usr/local/sbin/tallpbx-security`. The web server user cannot invoke `bash`, `cat`, `rm`, or any arbitrary system binary as root.
 3. **Hardcoded Command Paths**:
    All underlying utility calls inside the helper script use absolute hardcoded paths (`/usr/sbin/nft`, `/bin/mv`, `/bin/chmod`), eliminating PATH hijacking vulnerabilities.
 4. **Strict Regex Parameter Whitelisting**:
@@ -815,7 +815,7 @@ class SecurityManager extends Component
 ### Task 10: Installer Integration & End-to-End Verification
 - [ ] Create `scripts/resources/security.sh`:
   * Installs `nftables`.
-  * Installs `/usr/local/bin/tallpbx-security` and `/etc/sudoers.d/tallpbx-security`.
+  * Installs `/usr/local/sbin/tallpbx-security` and `/etc/sudoers.d/tallpbx-security`.
   * Sets baseline `nftables` rules (ensuring SSH, Web, SIP, and RTP remain accessible).
   * Enables and starts `nftables` systemd service.
 - [ ] Hook `security.sh` into `scripts/install.sh`.

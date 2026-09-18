@@ -14,7 +14,7 @@ use Symfony\Component\Process\Process;
  * and strict bash input validation (IP format, seconds, pending file checks).
  */
 it('builds expected command arguments for ban action', function (): void {
-    $executor = new SecurityExecutor('/usr/local/bin/tallpbx-security');
+    $executor = new SecurityExecutor('/usr/local/sbin/tallpbx-security');
 
     $process = $executor->createProcess(['ban', '203.0.113.50', '3600']);
     $commandLine = $process->getCommandLine();
@@ -26,7 +26,7 @@ it('builds expected command arguments for ban action', function (): void {
 });
 
 it('builds expected command arguments for unban action', function (): void {
-    $executor = new SecurityExecutor('/usr/local/bin/tallpbx-security');
+    $executor = new SecurityExecutor('/usr/local/sbin/tallpbx-security');
 
     $process = $executor->createProcess(['unban', '203.0.113.50']);
     $commandLine = $process->getCommandLine();
@@ -37,7 +37,7 @@ it('builds expected command arguments for unban action', function (): void {
 });
 
 it('builds expected command arguments for apply action', function (): void {
-    $executor = new SecurityExecutor('/usr/local/bin/tallpbx-security');
+    $executor = new SecurityExecutor('/usr/local/sbin/tallpbx-security');
 
     $process = $executor->createProcess(['apply']);
     $commandLine = $process->getCommandLine();
@@ -47,7 +47,7 @@ it('builds expected command arguments for apply action', function (): void {
 });
 
 it('builds expected command arguments for status action', function (): void {
-    $executor = new SecurityExecutor('/usr/local/bin/tallpbx-security');
+    $executor = new SecurityExecutor('/usr/local/sbin/tallpbx-security');
 
     $process = $executor->createProcess(['status']);
     $commandLine = $process->getCommandLine();

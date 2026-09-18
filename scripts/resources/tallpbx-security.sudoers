@@ -2,10 +2,10 @@
 # TallPBX Bounded Host Security Sudoers Configuration
 #
 # Allows the web application user (www-data) to invoke the bounded host security
-# helper script (/usr/local/bin/tallpbx-security) with root privileges without a password.
+# helper script (/usr/local/sbin/tallpbx-security) with root privileges without a password.
 #
 # Security Controls:
-# - Restricted strictly to a single executable (/usr/local/bin/tallpbx-security).
+# - Restricted strictly to a single executable (/usr/local/sbin/tallpbx-security).
 # - No wildcard arguments or arbitrary shell commands are permitted.
 # ==============================================================================
-www-data ALL=(ALL) NOPASSWD: /usr/local/bin/tallpbx-security
+www-data ALL=(ALL) NOPASSWD: /usr/local/sbin/tallpbx-security

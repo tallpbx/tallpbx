@@ -9,7 +9,7 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Symfony\Component\Process\Process;
 
 /**
- * Executes bounded host security operations via /usr/local/bin/tallpbx-security.
+ * Executes bounded host security operations via /usr/local/sbin/tallpbx-security.
  *
  * Uses Symfony Process to safely invoke the sudoers-bounded root helper script,
  * applying atomic nftables rulesets and synchronizing kernel dynamic banned sets.
@@ -28,7 +28,7 @@ class SecurityExecutor implements SecurityExecutorInterface
      */
     public function __construct(?string $helperPath = null)
     {
-        $this->helperPath = $helperPath ?? '/usr/local/bin/tallpbx-security';
+        $this->helperPath = $helperPath ?? '/usr/local/sbin/tallpbx-security';
     }
 
     /**

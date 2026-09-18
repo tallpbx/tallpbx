@@ -600,8 +600,8 @@ The installer configures baseline firewall rules to permit necessary PBX service
 #### 2. Privilege Separation & Bounded Sudoers Helper Pattern
 TallPBX enforces strict least-privilege boundaries to eliminate command injection (CWE-78) and root privilege escalation:
 - **Unprivileged Web User**: All PHP-FPM and web requests execute strictly under `www-data`. Direct execution of system binaries like `/usr/sbin/nft` under `sudo` is forbidden.
-- **Dedicated Root Helper**: Privileged firewall modifications are isolated within `/usr/local/bin/tallpbx-security` (`mode 0750 root:www-data`).
-- **Bounded Sudoers Drop-In**: `/etc/sudoers.d/tallpbx-security` grants `www-data` permission to invoke *only* `/usr/local/bin/tallpbx-security`. Wildcard sudo access (`ALL=(ALL) NOPASSWD: ALL`) is never used.
+- **Dedicated Root Helper**: Privileged firewall modifications are isolated within `/usr/local/sbin/tallpbx-security` (`mode 0750 root:www-data`).
+- **Bounded Sudoers Drop-In**: `/etc/sudoers.d/tallpbx-security` grants `www-data` permission to invoke *only* `/usr/local/sbin/tallpbx-security`. Wildcard sudo access (`ALL=(ALL) NOPASSWD: ALL`) is never used.
 - **Strict Parameter Whitelisting**: The helper script validates every input parameter against strict regular expressions (`^[0-9a-fA-F:.]+$`) before executing any action, preventing command chaining or jailbreaking.
 
 #### 3. Real-Time Multi-Vector Threat Defense
@@ -620,7 +620,7 @@ TallPBX enforces strict least-privilege boundaries to eliminate command injectio
   php artisan security:unban <IP_ADDRESS>
 
   # Or invoke the bounded helper directly
-  sudo /usr/local/bin/tallpbx-security unban <IP_ADDRESS>
+  sudo /usr/local/sbin/tallpbx-security unban <IP_ADDRESS>
 
   # Emergency fallback: temporarily flush all rules if locked out
   sudo nft flush ruleset

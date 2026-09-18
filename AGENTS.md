@@ -110,7 +110,7 @@ TallPBX enforces a strict two-tier policy for executing Linux commands to preven
 - **Scope**: Kernel firewall configuration (`nftables`) and full system database/telephony restores (`tallpbx-restore`).
 - **Policy**: Direct sudo execution of general-purpose system binaries (e.g. `sudo bash`, `sudo nft`, `sudo systemctl`, or wildcard `ALL=(ALL) NOPASSWD: ALL`) is STRICTLY FORBIDDEN.
 - **Required Architecture**:
-  1. **Dedicated Bounded Helper**: Privileged operations MUST be encapsulated in a dedicated root-owned script located in `/usr/local/bin/` with permissions `0750 root:www-data` (e.g. `/usr/local/bin/tallpbx-security`, `/usr/local/bin/tallpbx-restore`).
+  1. **Dedicated Bounded Helper**: Privileged operations MUST be encapsulated in a dedicated root-owned script located in `/usr/local/sbin/` with permissions `0750 root:www-data` (e.g. `/usr/local/sbin/tallpbx-security`, `/usr/local/sbin/tallpbx-restore`).
   2. **Bounded Sudoers File**: A matching sudoers drop-in under `/etc/sudoers.d/` grants `NOPASSWD` access exclusively to that single executable path for `www-data` (e.g. `/etc/sudoers.d/tallpbx-security`).
   3. **Strict Input Whitelisting**: Helper scripts must reject all unexpected arguments. Every parameter (IP address, duration, operation UUID) MUST be validated against strict regular expressions before executing underlying utilities.
   4. **Non-Interactive & Non-Escapable**: Helpers must run non-interactively (`set -euo pipefail`), invoke underlying binaries with hardcoded absolute paths (`/usr/sbin/nft`), and NEVER call tools with subshell or interactive escape vectors (e.g. editors, pagers, or `find -exec`).
