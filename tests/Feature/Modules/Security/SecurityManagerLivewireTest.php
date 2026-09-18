@@ -46,6 +46,7 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Trusted & Blocked IP Addresses')
         ->assertSee('Firewall Rules & Port Access')
         ->assertSee('Standard PBX Ports')
+        ->assertSee('Rules are checked in order from top to bottom')
         ->assertDontSee('wire:click="refreshStatus"', false)
         ->assertDontSee('wire:click="applyFirewallChanges"', false)
         ->assertDontSee('wire:poll', false);

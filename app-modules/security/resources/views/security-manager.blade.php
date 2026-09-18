@@ -337,7 +337,7 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_firewall_rules') }}</h2>
-                        <x-tooltip :tip="__('admin.security_firewall_rules_desc')" align="start" position="right">
+                        <x-tooltip :tip="__('admin.security_firewall_rules_tooltip')" align="start" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
                     </div>

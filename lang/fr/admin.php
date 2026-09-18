@@ -1222,6 +1222,7 @@ return [
     'vector_manual' => 'Blocage Manuel',
     'security_firewall_rules' => 'Règles du Pare-feu et Ports',
     'security_firewall_rules_desc' => 'Règles séquentielles de filtrage évaluées de haut en bas.',
+    'security_firewall_rules_tooltip' => 'Les règles sont vérifiées dans l\'ordre, du haut vers le bas. La première règle correspondant au trafic entrant décide de l\'action (Autoriser ou Bloquer), et les règles suivantes sont ignorées. Par exemple, pour autoriser votre bureau tout en bloquant les autres, placez votre règle \'Autoriser Bureau\' AU-DESSUS de la règle générale \'Bloquer\' afin que votre bureau ne soit pas bloqué en premier.',
     'security_add_rule' => 'Ajouter une Règle Personnalisée',
     'security_quick_add_service' => 'Ports Standard PBX',
     'security_rule_priority' => 'Priorité',

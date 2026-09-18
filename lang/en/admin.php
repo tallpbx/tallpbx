@@ -1325,6 +1325,7 @@ return [
     'vector_manual' => 'Manual Block',
     'security_firewall_rules' => 'Firewall Rules & Port Access',
     'security_firewall_rules_desc' => 'Sequential packet filtering rules evaluated from top to bottom.',
+    'security_firewall_rules_tooltip' => 'Rules are checked in order from top to bottom. The first rule that matches incoming traffic decides what to do (Allow or Block), and all rules below it are ignored. For example, to allow your office while blocking everyone else, place your \'Allow Office\' rule ABOVE the general \'Block\' rule so your office isn\'t blocked first.',
     'security_add_rule' => 'Add Custom Rule',
     'security_quick_add_service' => 'Standard PBX Ports',
     'security_rule_priority' => 'Priority',

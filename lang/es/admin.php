@@ -1223,6 +1223,7 @@ return [
     'vector_manual' => 'Bloqueo Manual',
     'security_firewall_rules' => 'Reglas del Firewall y Puertos',
     'security_firewall_rules_desc' => 'Reglas secuenciales de filtrado evaluadas de arriba hacia abajo.',
+    'security_firewall_rules_tooltip' => 'Las reglas se verifican en orden de arriba hacia abajo. La primera regla que coincida con el tráfico entrante decide qué hacer (Permitir o Bloquear), y las reglas inferiores se ignoran. Por ejemplo, para permitir su oficina y bloquear al resto, coloque la regla \'Permitir Oficina\' ARRIBA de la regla general de \'Bloquear\' para evitar que se bloquee a su oficina primero.',
     'security_add_rule' => 'Añadir Regla Personalizada',
     'security_quick_add_service' => 'Puertos Estándar de PBX',
     'security_rule_priority' => 'Prioridad',
