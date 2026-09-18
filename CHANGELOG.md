@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Access Control Lists (ACL)**: Renamed "Access Controls" to "Access Control Lists" across English, Spanish, and French translations for consistency with FreeSWITCH naming, and added plain-language explanatory tooltips differentiating internal phone system ACLs from the OS-level kernel firewall.
 - **Rate Limits (formerly Event Guard)**: Renamed "Event Guard" to "Rate Limits" across the navigation menu, page headers, descriptions, and translations (English, Spanish, French) to align with standard FreeSWITCH telephony terminology and eliminate confusion with legacy FusionPBX naming. Updated tooltips to clearly differentiate telephony event rate limiting from the OS-level packet firewall.
 
+### Fixed
+- **Tailwind v4 Modular View Scanning**: Added `@source "../../app-modules/**/*.blade.php"` to `resources/css/app.css` so utility classes across all modular Blade views are scanned and compiled into production CSS bundles.
+- **Empty Threat Monitor Table Sizing**: Adjusted the "No active threats" empty state icon in the Security Command Center from an oversized, unconstrained element to a compact `w-6 h-6` (24px) bounded icon with reduced padding (`py-6`), eliminating unintended vertical scrolling.
+
 ### Upgrade Notes
 - Requires running database migrations: `php artisan migrate`.
 - Requires installing Linux package: `apt install nftables`.

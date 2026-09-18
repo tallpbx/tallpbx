@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "../views/**/*.blade.php";
+@source "../../app-modules/**/*.blade.php";
 @source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
 @plugin "daisyui";
 @import "./custom.css";

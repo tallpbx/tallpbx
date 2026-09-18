@@ -316,9 +316,9 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center py-10 text-base-content/60">
-                                            <x-heroicon-o-shield-check class="w-10 h-10 mx-auto text-success/60 mb-2" />
-                                            <div>{{ __('admin.security_no_attackers') }}</div>
+                                        <td colspan="5" class="text-center py-6 text-base-content/60">
+                                            <x-heroicon-o-shield-check class="w-6 h-6 mx-auto text-success/60 mb-1.5" style="width: 1.5rem; height: 1.5rem;" />
+                                            <div class="text-xs font-medium">{{ __('admin.security_no_attackers') }}</div>
                                         </td>
                                     </tr>
                                 @endforelse
