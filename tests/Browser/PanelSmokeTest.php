@@ -587,13 +587,19 @@ it('renders the monitoring dashboard with metrics', function () {
 });
 
 it('renders the security manager dashboard', function () {
+    $this->seed(\Database\Seeders\SecurityServiceSeeder::class);
+
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
+            ->resize(1920, 2200)
             ->visit('/panel/security')
             ->waitForText('Security Center', 5)
             ->assertSee('Security Center')
             ->assertSee('Firewall Status')
-            ->assertSee('Attack Protection');
+            ->assertSee('Attack Protection')
+            ->assertSee('PACKET FILTERING PIPELINE ORDER')
+            ->assertSee('Core PBX Services (Active in Kernel)')
+            ->screenshot('security-dashboard-full');
     });
 });
 

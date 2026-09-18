@@ -132,19 +132,78 @@
         </div>
     </div>
 
+    {{-- Zone: Traffic Filtering Pipeline Order Indicator --}}
+    <div class="card bg-base-100 shadow-sm border border-base-200">
+        <div class="card-body p-3.5 space-y-2">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-queue-list class="w-4 h-4 text-primary" />
+                    <span class="text-xs font-bold uppercase tracking-wider text-base-content/80">{{ __('admin.security_pipeline_title') }}</span>
+                </div>
+                <span class="text-[11px] text-base-content/60">{{ __('admin.security_pipeline_subtitle') }}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-1 text-xs">
+                {{-- Step 1 --}}
+                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
+                    <div class="flex flex-col">
+                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step1') }}</span>
+                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step1_desc') }}</span>
+                    </div>
+                    <span class="badge badge-error badge-xs">{{ __('admin.security_pipeline_step1_badge') }}</span>
+                </div>
+                {{-- Step 2 --}}
+                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
+                    <div class="flex flex-col">
+                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step2') }}</span>
+                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step2_desc') }}</span>
+                    </div>
+                    <span class="badge badge-success badge-xs">{{ __('admin.security_pipeline_step2_badge') }}</span>
+                </div>
+                {{-- Step 3 --}}
+                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
+                    <div class="flex flex-col">
+                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step3') }}</span>
+                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step3_desc') }}</span>
+                    </div>
+                    <span class="badge badge-info badge-xs">{{ __('admin.security_pipeline_step3_badge') }}</span>
+                </div>
+                {{-- Step 4 --}}
+                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
+                    <div class="flex flex-col">
+                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step4') }}</span>
+                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step4_desc') }}</span>
+                    </div>
+                    <span class="badge badge-neutral badge-xs">{{ __('admin.security_pipeline_step4_badge') }}</span>
+                </div>
+                {{-- Step 5 --}}
+                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
+                    <div class="flex flex-col">
+                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step5') }}</span>
+                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step5_desc') }}</span>
+                    </div>
+                    <span class="badge badge-ghost badge-xs">{{ __('admin.security_pipeline_step5_badge') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Middle Section: Left Deck & Right Deck --}}
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {{-- Left Deck: Trusted & Blocked IP Addresses (5 cols) --}}
         <div class="lg:col-span-5 space-y-4">
             <div class="card bg-base-100 shadow-sm border border-base-200">
                 <div class="card-body p-4 space-y-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_ip_management') }}</h2>
-                            <x-tooltip :tip="__('admin.security_protect_ip_help')" align="start" position="right">
-                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                            </x-tooltip>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_ip_management') }}</h2>
+                                <x-tooltip :tip="__('admin.security_protect_ip_help')" align="start" position="right">
+                                    <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                </x-tooltip>
+                            </div>
+                            <span class="badge badge-neutral badge-xs font-mono">{{ __('admin.security_ip_prefilters_badge') }}</span>
                         </div>
+                        <p class="text-xs text-base-content/60">{{ __('admin.security_ip_management_desc') }}</p>
                     </div>
 
                     {{-- Segmented Tabs: Whitelist vs Blacklist --}}
@@ -242,8 +301,9 @@
                             <div class="flex items-center gap-2">
                                 <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
                                 <span class="badge badge-neutral badge-sm">{{ $activeBans->count() }}</span>
+                                <span class="badge badge-error badge-xs font-mono">{{ __('admin.security_active_threats_badge') }}</span>
                             </div>
-                            <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_banned_attackers_desc') }}</p>
+                            <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_threats_desc') }}</p>
                         </div>
                         <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1 self-start sm:self-auto">
                             <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
@@ -337,6 +397,7 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_firewall_rules') }}</h2>
+                        <span class="badge badge-primary badge-xs font-mono">{{ __('admin.security_port_rules_badge') }}</span>
                         <x-tooltip :tip="__('admin.security_firewall_rules_tooltip')" align="start" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
@@ -368,6 +429,26 @@
                         <x-heroicon-o-plus class="w-4 h-4" />
                         <span>{{ __('admin.security_add_rule') }}</span>
                     </button>
+                </div>
+            </div>
+
+            {{-- Core PBX Services (Active in Kernel) --}}
+            <div class="bg-base-200/50 rounded-box p-3 border border-base-200 space-y-2">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div class="flex items-center gap-1.5 text-xs font-semibold text-base-content">
+                        <x-heroicon-o-check-badge class="w-4 h-4 text-success" />
+                        <span>{{ __('admin.security_core_services_title') }}</span>
+                    </div>
+                    <span class="text-[11px] text-base-content/60">{{ __('admin.security_core_services_note') }}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                    @foreach ($catalogServices as $service)
+                        <div class="badge badge-sm badge-outline gap-1.5 bg-base-100 py-2.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span>
+                            <span class="font-medium text-xs">{{ $service->name }}</span>
+                            <span class="font-mono text-[10px] text-base-content/60">{{ $service->port_range }}/{{ strtoupper($service->protocol) }}</span>
+                        </div>
+                    @endforeach
                 </div>
             </div>
 
@@ -456,7 +537,11 @@
                         @empty
                             <tr>
                                 <td colspan="7" class="text-center py-6 text-base-content/60">
-                                    {{ __('admin.security_no_rules') }}
+                                    <div class="flex flex-col items-center gap-1.5">
+                                        <x-heroicon-o-shield-check class="w-8 h-8 text-base-content/30" />
+                                        <span class="font-medium text-sm text-base-content/80">{{ __('admin.security_no_rules') }}</span>
+                                        <span class="text-xs text-base-content/50 max-w-md">{{ __('admin.security_no_rules_help') }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
