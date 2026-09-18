@@ -45,7 +45,7 @@ it('registers security permissions and assigns them to super administrators', fu
     expect($this->superAdminGroup->fresh()->permissions->pluck('name'))->toContain('security.view', 'security.edit');
 });
 
-it('registers security menu item under pbx.advanced in MenuService', function (): void {
+it('registers security menu item as top-level item on main panel menu in MenuService', function (): void {
     $menuService = app(MenuService::class);
     $items = $menuService->getFlat('admin');
 
@@ -55,7 +55,8 @@ it('registers security menu item under pbx.advanced in MenuService', function ()
         ->and($securityItem['label'])->toBe('admin.security')
         ->and($securityItem['route'])->toBe('panel.security.index')
         ->and($securityItem['permission'])->toBe('security.view')
-        ->and($securityItem['parent'])->toBe('pbx.advanced');
+        ->and($securityItem['parent'] ?? null)->toBeNull()
+        ->and($securityItem['order'])->toBe(45);
 });
 
 it('protects panel.security.index with auth and permission middleware', function (): void {

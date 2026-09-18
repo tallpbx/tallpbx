@@ -743,7 +743,7 @@ class SecurityManager extends Component
 - [ ] Register path repository in root `composer.json` and run `composer update tallpbx/module-security`.
 - [ ] Create `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider`.
 - [ ] Register permissions: `security.view` and `security.edit`.
-- [ ] Register unified sidebar navigation under `pbx.advanced.security` (guard `admin`).
+- [ ] Register primary server-wide navigation on the main panel menu (`security`, route `panel.security.index`).
 
 ### Task 2: Database Migrations, Models & Seeder
 - [ ] Create migration `2026_09_18_000001_create_security_rules_table.php`.

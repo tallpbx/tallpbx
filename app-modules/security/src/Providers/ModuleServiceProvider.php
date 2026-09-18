@@ -47,7 +47,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     /**
      * Register sidebar navigation menu items.
      *
-     * Places the Security Center in the admin panel under PBX -> Advanced.
+     * Places the Security Center as a primary server-wide item on the main panel menu.
      * Visibility is governed by the 'security.view' permission.
      *
      * @return array<int, array<string, mixed>>
@@ -61,9 +61,8 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.security.index',
                 'permission' => 'security.view',
                 'icon' => 'heroicon-o-shield-check',
-                'parent' => 'pbx.advanced',
                 'guard' => 'admin',
-                'order' => 15,
+                'order' => 45,
             ],
         ];
     }
