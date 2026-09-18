@@ -606,6 +606,24 @@ case "$ACTION" in
 esac
 ```
 
+### 8.3 Threat Model & Jailbreak Defense Guarantees
+
+1. **Zero Shell Interpolation (CWE-78 Prevention)**:
+   PHP invokes `/usr/local/bin/tallpbx-security` strictly via Symfony Process using discrete argv string arrays:
+   `new Process(['sudo', '-n', '/usr/local/bin/tallpbx-security', 'ban', $ip, $seconds])`
+   Because arguments are passed directly to `execve()`, shell metacharacters (`;`, `|`, `&&`, `$()`, backticks) are NEVER evaluated as shell operators.
+2. **Bounded Sudoers Scope (Least Privilege)**:
+   `/etc/sudoers.d/tallpbx-security` restricts `www-data` execution privileges solely to `/usr/local/bin/tallpbx-security`. The web server user cannot invoke `bash`, `cat`, `rm`, or any arbitrary system binary as root.
+3. **Hardcoded Command Paths**:
+   All underlying utility calls inside the helper script use absolute hardcoded paths (`/usr/sbin/nft`, `/bin/mv`, `/bin/chmod`), eliminating PATH hijacking vulnerabilities.
+4. **Strict Regex Parameter Whitelisting**:
+   The helper script validates every input against strict regular expressions:
+   - IPv4/IPv6: `^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$` or `^(([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}(/[0-9]{1,3})?)$`
+   - Duration: `^[0-9]{1,9}$`
+   Any invalid or malformed parameter immediately exits with code `2` or `3` before touching the Linux packet filtering subsystem.
+5. **No Interactive Escape Vectors (GTFOBins Immunity)**:
+   The script does not invoke pagers (`less`, `more`), editors (`vi`, `nano`), or commands with interactive subshells (`find -exec`), guaranteeing that the helper cannot be leveraged for a root shell breakout.
+
 ---
 
 ## 9. Streamlined Single-Screen Livewire Component Architecture

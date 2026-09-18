@@ -94,6 +94,28 @@ bash scripts/fix-generated-permissions.sh
 - The installer creates a separate `${database_name}_dusk` database and `${database_username}_dusk` MariaDB user. The Dusk user receives privileges only on the disposable Dusk database; never grant it access to the primary database.
 - Run browser tests with `bash scripts/dusk.sh`. It starts an isolated `APP_ENV=dusk` Laravel server on `127.0.0.1:8001`; do not point Dusk at Nginx/PHP-FPM. `php artisan app:test --full` invokes this runner automatically.
 
+## Linux Command Execution & Privileged Host Helper Policy
+
+TallPBX enforces a strict two-tier policy for executing Linux commands to prevent command injection (CWE-78) and root privilege escalation:
+
+### 1. Unprivileged Application Commands (Non-Root)
+- **Scope**: Git update operations, Composer package actions, application cache/build commands, and non-mutating system diagnostics (`df`, `systemctl is-active`, `getconf`).
+- **Implementation**: Use `Symfony\Component\Process\Process` or `App\Support\SystemProcessRunner`.
+- **Security Controls**:
+  - Run exclusively under the unprivileged web/CLI user (`www-data`).
+  - Always pass discrete argument arrays (`new Process(['git', '-C', $path, 'status'])`) rather than interpolated shell strings.
+  - When shell string execution is unavoidable (e.g. piped shell diagnostics), all dynamic arguments MUST be wrapped with `escapeshellarg()`, executed with standard binary paths explicitly defined in `PATH`, and bounded with `timeout -k 30s <seconds>`.
+
+### 2. Privileged Host Commands (Bounded Sudoers Helper Pattern)
+- **Scope**: Kernel firewall configuration (`nftables`) and full system database/telephony restores (`tallpbx-restore`).
+- **Policy**: Direct sudo execution of general-purpose system binaries (e.g. `sudo bash`, `sudo nft`, `sudo systemctl`, or wildcard `ALL=(ALL) NOPASSWD: ALL`) is STRICTLY FORBIDDEN.
+- **Required Architecture**:
+  1. **Dedicated Bounded Helper**: Privileged operations MUST be encapsulated in a dedicated root-owned script located in `/usr/local/bin/` with permissions `0750 root:www-data` (e.g. `/usr/local/bin/tallpbx-security`, `/usr/local/bin/tallpbx-restore`).
+  2. **Bounded Sudoers File**: A matching sudoers drop-in under `/etc/sudoers.d/` grants `NOPASSWD` access exclusively to that single executable path for `www-data` (e.g. `/etc/sudoers.d/tallpbx-security`).
+  3. **Strict Input Whitelisting**: Helper scripts must reject all unexpected arguments. Every parameter (IP address, duration, operation UUID) MUST be validated against strict regular expressions before executing underlying utilities.
+  4. **Non-Interactive & Non-Escapable**: Helpers must run non-interactively (`set -euo pipefail`), invoke underlying binaries with hardcoded absolute paths (`/usr/sbin/nft`), and NEVER call tools with subshell or interactive escape vectors (e.g. editors, pagers, or `find -exec`).
+  5. **Preflight Syntax Verification**: State-altering operations (such as firewall application) must validate syntax atomically (e.g. `nft -c -f <pending>`) before replacing active configuration, ensuring system integrity and preventing administrative lockout.
+
 ## Code style
 - Follow TALL stack best practices; fall back to general PHP best practices for anything TALL does not cover.
 - Comment all functions, methods, and classes explaining what they do in simple language. Also comment any line or section where the intent is not obvious. Every class and every method must have a PHPDoc comment explaining what it does in easy-to-understand language, and inline comments must be added to code sections where the intent is not immediately obvious.
