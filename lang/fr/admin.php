@@ -103,6 +103,8 @@ return [
     'tenant_provisioning' => 'URL de Provisionnement',
     'enabled' => 'Activé',
     'disabled' => 'Désactivé',
+    'active' => 'Actif',
+    'inactive' => 'Inactif',
     'primary_user' => 'Utilisateur Principal',
     'no_tenants_found' => 'Aucun locataire trouvé.',
     'confirm_delete_tenant' => 'Êtes-vous sûr de vouloir supprimer ce locataire ?',
@@ -1154,4 +1156,19 @@ return [
     'git_no_stable_branches' => 'Aucune branche de version stable trouvée sur le dépôt. Suivi de la branche de développement.',
     'git_switch_and_update' => 'Changer de Branche et Mettre à Jour',
     'git_view_commits' => 'Commits Récents',
+
+    // ─── Security Module ────────────────────────────────────────────────
+    'security' => 'Sécurité',
+    'security_title' => 'Centre de Sécurité',
+    'security_description' => 'Pare-feu du serveur, adresses IP de confiance et protection automatique contre les attaques.',
+    'security_firewall_status' => 'État du Pare-feu',
+    'security_firewall_help' => 'Inspecte les paquets entrants et bloque les ports non autorisés.',
+    'security_attack_protection' => 'Protection contre les Attaques',
+    'security_attack_help' => 'Surveille les tentatives de mot de passe échouées et bloque les attaquants.',
+    'security_blocked_attackers' => 'Attaquants Bloqués',
+    'security_active_bans' => 'Actuellement Bloqués',
+    'security_bans_help' => 'IP temporairement bloquées pour des tentatives répétées infructueuses.',
+    'security_your_connection' => 'Votre Connexion (Sécurisée)',
+    'security_protected' => 'Protégée',
+    'security_lockout_help' => 'Votre connexion est protégée contre tout blocage accidentel.',
 ];

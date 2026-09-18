@@ -102,6 +102,8 @@ return [
     'tenant_provisioning' => 'URL de Aprovisionamiento',
     'enabled' => 'Habilitado',
     'disabled' => 'Deshabilitado',
+    'active' => 'Activo',
+    'inactive' => 'Inactivo',
     'primary_user' => 'Usuario Principal',
     'no_tenants_found' => 'No se encontraron inquilinos.',
     'confirm_delete_tenant' => '¿Está seguro de que desea eliminar este inquilino?',
@@ -1155,4 +1157,19 @@ return [
     'git_no_stable_branches' => 'No se encontraron ramas de versión estable en el repositorio. Siguiendo la rama de desarrollo.',
     'git_switch_and_update' => 'Cambiar de Rama y Actualizar',
     'git_view_commits' => 'Confirmaciones Recientes',
+
+    // ─── Security Module ────────────────────────────────────────────────
+    'security' => 'Seguridad',
+    'security_title' => 'Centro de Seguridad',
+    'security_description' => 'Firewall del host, direcciones IP de confianza y protección automática contra ataques.',
+    'security_firewall_status' => 'Estado del Firewall',
+    'security_firewall_help' => 'Inspecciona los paquetes entrantes y bloquea los puertos no autorizados.',
+    'security_attack_protection' => 'Protección contra Ataques',
+    'security_attack_help' => 'Supervisa los intentos fallidos de contraseña y bloquea a los atacantes.',
+    'security_blocked_attackers' => 'Atacantes Bloqueados',
+    'security_active_bans' => 'Actualmente Bloqueados',
+    'security_bans_help' => 'Direcciones IP bloqueadas temporalmente por intentos fallidos repetidos.',
+    'security_your_connection' => 'Su Conexión (Segura)',
+    'security_protected' => 'Protegida',
+    'security_lockout_help' => 'Su conexión está protegida contra bloqueos accidentales.',
 ];

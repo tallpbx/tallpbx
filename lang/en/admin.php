@@ -124,6 +124,8 @@ return [
     'tenant_provisioning' => 'Provisioning URL',
     'enabled' => 'Enabled',
     'disabled' => 'Disabled',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
     'primary_user' => 'Primary User',
     'primary_user_tooltip' => 'The main contact person for this tenant.',
     'users_count_tooltip' => 'Number of users who belong to this tenant.',
