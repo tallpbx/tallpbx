@@ -132,61 +132,6 @@
         </div>
     </div>
 
-    {{-- Zone: Traffic Filtering Pipeline Order Indicator --}}
-    <div class="card bg-base-100 shadow-sm border border-base-200">
-        <div class="card-body p-3.5 space-y-2">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-queue-list class="w-4 h-4 text-primary" />
-                    <span class="text-xs font-bold uppercase tracking-wider text-base-content/80">{{ __('admin.security_pipeline_title') }}</span>
-                </div>
-                <span class="text-[11px] text-base-content/60">{{ __('admin.security_pipeline_subtitle') }}</span>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-1 text-xs">
-                {{-- Step 1 --}}
-                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
-                    <div class="flex flex-col">
-                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step1') }}</span>
-                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step1_desc') }}</span>
-                    </div>
-                    <span class="badge badge-error badge-xs">{{ __('admin.security_pipeline_step1_badge') }}</span>
-                </div>
-                {{-- Step 2 --}}
-                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
-                    <div class="flex flex-col">
-                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step2') }}</span>
-                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step2_desc') }}</span>
-                    </div>
-                    <span class="badge badge-success badge-xs">{{ __('admin.security_pipeline_step2_badge') }}</span>
-                </div>
-                {{-- Step 3 --}}
-                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
-                    <div class="flex flex-col">
-                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step3') }}</span>
-                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step3_desc') }}</span>
-                    </div>
-                    <span class="badge badge-info badge-xs">{{ __('admin.security_pipeline_step3_badge') }}</span>
-                </div>
-                {{-- Step 4 --}}
-                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
-                    <div class="flex flex-col">
-                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step4') }}</span>
-                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step4_desc') }}</span>
-                    </div>
-                    <span class="badge badge-neutral badge-xs">{{ __('admin.security_pipeline_step4_badge') }}</span>
-                </div>
-                {{-- Step 5 --}}
-                <div class="flex items-center justify-between p-2 rounded-lg bg-base-200/60 border border-base-300/40">
-                    <div class="flex flex-col">
-                        <span class="font-semibold text-base-content">{{ __('admin.security_pipeline_step5') }}</span>
-                        <span class="text-[10px] text-base-content/60">{{ __('admin.security_pipeline_step5_desc') }}</span>
-                    </div>
-                    <span class="badge badge-ghost badge-xs">{{ __('admin.security_pipeline_step5_badge') }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
     {{-- Sequential Pipeline Stages 1 & 2: Blacklist, Attackers, and Whitelist --}}
     <div class="space-y-6">
         {{-- Card 1: Blacklist IPs (Stage 1 Permanent Kernel Drop) --}}

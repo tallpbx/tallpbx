@@ -597,7 +597,6 @@ it('renders the security manager dashboard', function () {
             ->assertSee('Security Center')
             ->assertSee('Firewall Status')
             ->assertSee('Attack Protection')
-            ->assertSee('PACKET FILTERING PIPELINE ORDER')
             ->assertSee('Blacklist IPs')
             ->assertSee('Whitelist IPs')
             ->assertSee('Blocked Attackers')
