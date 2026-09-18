@@ -36,6 +36,14 @@ class SecurityService extends Model
      * @var array<string, array{protocol: string, port_range: string, source_ip: string, description: string}>
      */
     public const DEFAULT_SYSTEM_SERVICES = [
+        'ICMP Ping Diagnostics' => [
+            'protocol' => 'icmp',
+            'port_range' => 'echo-request',
+            'source_ip' => 'any',
+            'description' => 'Network reachability ping (IPv4 echo-request with burstable rate limit) and essential IPv6 neighbor discovery',
+            'rate_limit' => 5,
+            'burst' => 5,
+        ],
         'SIP Signaling' => [
             'protocol' => 'both',
             'port_range' => '5060,5061,5080',
@@ -100,6 +108,8 @@ class SecurityService extends Model
         'is_system',
         'enabled',
         'source_ip',
+        'rate_limit',
+        'burst',
     ];
 
     /**
@@ -112,6 +122,8 @@ class SecurityService extends Model
         return [
             'is_system' => 'boolean',
             'enabled' => 'boolean',
+            'rate_limit' => 'integer',
+            'burst' => 'integer',
         ];
     }
 

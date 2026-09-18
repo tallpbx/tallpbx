@@ -174,6 +174,12 @@ class SecurityManager extends Component
 
     public bool $systemServiceEnabled = true;
 
+    public bool $systemServiceRateLimitEnabled = true;
+
+    public ?int $systemServiceRateLimit = 5;
+
+    public ?int $systemServiceBurst = 5;
+
     /**
      * Visibility state for the attack protection settings slide-over drawer.
      */
@@ -589,6 +595,17 @@ class SecurityManager extends Component
         $this->systemServiceProtocol = (string) $service->protocol;
         $this->systemServiceSourceIp = (string) ($service->source_ip ?? 'any');
         $this->systemServiceEnabled = (bool) $service->enabled;
+
+        if ($service->protocol === 'icmp') {
+            $this->systemServiceRateLimit = $service->rate_limit ?? 5;
+            $this->systemServiceBurst = $service->burst ?? 5;
+            $this->systemServiceRateLimitEnabled = ($service->rate_limit !== null && $service->rate_limit > 0);
+        } else {
+            $this->systemServiceRateLimit = null;
+            $this->systemServiceBurst = null;
+            $this->systemServiceRateLimitEnabled = false;
+        }
+
         $this->showSystemServiceModal = true;
     }
 
@@ -601,9 +618,12 @@ class SecurityManager extends Component
 
         $this->validate([
             'systemServicePortRange' => ['required', 'string', 'max:100'],
-            'systemServiceProtocol' => ['required', 'in:tcp,udp,both'],
+            'systemServiceProtocol' => ['required', 'in:tcp,udp,both,icmp'],
             'systemServiceSourceIp' => ['required', 'string', 'max:100'],
             'systemServiceEnabled' => ['boolean'],
+            'systemServiceRateLimitEnabled' => ['boolean'],
+            'systemServiceRateLimit' => ['nullable', 'integer', 'min:1', 'max:10000'],
+            'systemServiceBurst' => ['nullable', 'integer', 'min:1', 'max:10000'],
         ]);
 
         $service = SecurityService::findOrFail($this->editingSystemServiceId);
@@ -637,10 +657,21 @@ class SecurityManager extends Component
             }
         }
 
+        $rateLimit = null;
+        $burst = null;
+        if ($this->systemServiceProtocol === 'icmp') {
+            if ($this->systemServiceRateLimitEnabled) {
+                $rateLimit = $this->systemServiceRateLimit ?: 5;
+                $burst = $this->systemServiceBurst ?: 5;
+            }
+        }
+
         $service->update([
             'port_range' => trim($this->systemServicePortRange),
             'protocol' => $this->systemServiceProtocol,
             'source_ip' => trim($this->systemServiceSourceIp),
+            'rate_limit' => $rateLimit,
+            'burst' => $burst,
             'enabled' => $this->systemServiceEnabled,
         ]);
 
@@ -689,6 +720,8 @@ class SecurityManager extends Component
                 'port_range' => $default['port_range'],
                 'protocol' => $default['protocol'],
                 'source_ip' => $default['source_ip'],
+                'rate_limit' => $default['rate_limit'] ?? null,
+                'burst' => $default['burst'] ?? null,
                 'enabled' => true,
             ]);
 
@@ -696,6 +729,9 @@ class SecurityManager extends Component
                 $this->systemServicePortRange = $default['port_range'];
                 $this->systemServiceProtocol = $default['protocol'];
                 $this->systemServiceSourceIp = $default['source_ip'];
+                $this->systemServiceRateLimit = $default['rate_limit'] ?? null;
+                $this->systemServiceBurst = $default['burst'] ?? null;
+                $this->systemServiceRateLimitEnabled = isset($default['rate_limit']);
                 $this->systemServiceEnabled = true;
             }
 
@@ -962,7 +998,7 @@ class SecurityManager extends Component
             ->get();
 
         $catalogServices = SecurityService::where('is_system', true)
-            ->orderBy('name', 'asc')
+            ->orderByRaw("CASE WHEN protocol = 'icmp' THEN 0 ELSE 1 END, name ASC")
             ->get();
 
         $bannedCount = SecurityBan::active()->count();

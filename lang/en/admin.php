@@ -1445,5 +1445,17 @@ return [
     'security_icmp_tooltip' => 'Network reachability ping (IPv4 echo-request with 5/sec rate limit) and essential IPv6 neighbor discovery & router solicitation.',
     'security_rate_limit_badge' => '5/sec limit',
     'security_dual_stack_badge' => 'IPv4 & IPv6',
+    'security_system_invariants_prefilters' => 'Base System Invariants & Pre-Filters',
+    'security_invariants_rules_count' => ':count Rules Active',
+    'security_show_rules' => 'Show Rules',
+    'security_hide_rules' => 'Hide Rules',
+    'security_toggle_invariants_tooltip' => 'Click to expand or collapse system invariants and pre-filter rules',
+    'security_rate_limit_unlimited' => 'unlimited',
+    'security_enable_rate_limit' => 'Enable Burstable Rate Limiting',
+    'security_rate_limited_active' => 'Protected from Flood',
+    'security_unlimited_active' => 'Unrestricted / No Rate Limit',
+    'security_rate_limit_pps' => 'Max Rate (packets/sec)',
+    'security_rate_burst_packets' => 'Burst Allowance (packets)',
+    'security_icmp_dual_stack_note' => 'Applies to IPv4 and IPv6 ICMP echo-requests. Essential IPv6 Neighbor Discovery (ND) and Router Advertisements are always preserved.',
 ];
 

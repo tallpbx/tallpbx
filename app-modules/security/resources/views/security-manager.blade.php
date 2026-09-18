@@ -504,7 +504,7 @@
             </div>
 
             {{-- Unified Firewall Rules Table --}}
-            <div class="overflow-x-auto border border-base-200 rounded-box">
+            <div x-data="{ showSystemPreFilters: false }" class="overflow-x-auto border border-base-200 rounded-box">
                 <table class="table">
                     <thead>
                         <tr class="bg-base-200/40 text-base-content/70">
@@ -518,20 +518,29 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200">
-                        {{-- STAGE 1 & 2: Ingress IP Pre-Filters & System Invariants Header --}}
-                        <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="7" class="py-2 px-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="badge badge-neutral badge-outline badge-sm font-mono font-bold">{{ __('admin.security_system_badge') }}</span>
-                                    <span class="badge badge-error badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_1_badge') }}</span>
-                                    <span class="badge badge-success badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_2_badge') }}</span>
-                                    <span class="uppercase tracking-wider text-xs">{{ __('admin.security_ip_prefilters_badge') }}</span>
+                        {{-- SYSTEM, STAGE 1 & 2: Ingress IP Pre-Filters & System Invariants Collapsible Header --}}
+                        <tr class="bg-base-200/40 text-xs font-semibold text-base-content/80 cursor-pointer hover:bg-base-200/70 transition-colors select-none"
+                            @click="showSystemPreFilters = !showSystemPreFilters"
+                            title="{{ __('admin.security_toggle_invariants_tooltip') }}">
+                            <td colspan="7" class="py-2.5 px-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="badge badge-neutral badge-sm font-mono font-bold">SYSTEM + STAGES 1 & 2</span>
+                                        <span class="uppercase tracking-wider text-xs font-bold">{{ __('admin.security_system_invariants_prefilters') }}</span>
+                                        <span class="badge badge-ghost badge-sm text-xs font-normal">
+                                            {{ __('admin.security_invariants_rules_count', ['count' => 6]) }}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 text-xs font-medium text-primary">
+                                        <span x-text="showSystemPreFilters ? '{{ __('admin.security_hide_rules') }}' : '{{ __('admin.security_show_rules') }}'"></span>
+                                        <x-heroicon-s-chevron-down class="w-4 h-4 transition-transform duration-200" ::class="showSystemPreFilters ? 'rotate-180' : ''" />
+                                    </div>
                                 </div>
                             </td>
                         </tr>
 
                         {{-- Base Invariant: Unconditional Loopback Interface --}}
-                        <tr class="hover bg-base-200/5">
+                        <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
                             <td class="whitespace-nowrap">
                                 <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
                             </td>
@@ -563,7 +572,7 @@
                         </tr>
 
                         {{-- Stage 1: Permanent Blacklist --}}
-                        <tr class="hover">
+                        <tr class="hover" x-show="showSystemPreFilters" x-cloak>
                             <td class="whitespace-nowrap">
                                 <span class="badge badge-error badge-sm font-mono font-semibold">STAGE 1</span>
                             </td>
@@ -596,7 +605,7 @@
                         </tr>
 
                         {{-- Stage 1: Active Intrusion Bans --}}
-                        <tr class="hover">
+                        <tr class="hover" x-show="showSystemPreFilters" x-cloak>
                             <td class="whitespace-nowrap">
                                 <span class="badge badge-error badge-sm font-mono font-semibold">STAGE 1</span>
                             </td>
@@ -629,7 +638,7 @@
                         </tr>
 
                         {{-- Base Invariant: Stateful Connection Tracking (Return Fastpath) --}}
-                        <tr class="hover bg-base-200/5">
+                        <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
                             <td class="whitespace-nowrap">
                                 <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
                             </td>
@@ -661,7 +670,7 @@
                         </tr>
 
                         {{-- Base Invariant: Invalid Packets Defense --}}
-                        <tr class="hover bg-base-200/5">
+                        <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
                             <td class="whitespace-nowrap">
                                 <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
                             </td>
@@ -693,7 +702,7 @@
                         </tr>
 
                         {{-- Stage 2: Trusted Whitelist --}}
-                        <tr class="hover">
+                        <tr class="hover" x-show="showSystemPreFilters" x-cloak>
                             <td class="whitespace-nowrap">
                                 <span class="badge badge-success badge-sm font-mono font-semibold">STAGE 2</span>
                             </td>
@@ -725,39 +734,6 @@
                             </td>
                         </tr>
 
-                        {{-- Base Invariant: ICMP & ICMPv6 Diagnostics --}}
-                        <tr class="hover bg-base-200/5">
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
-                            </td>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span>{{ __('admin.security_rule_icmp') }}</span>
-                                    <span class="badge badge-ghost badge-sm font-mono">icmp / icmpv6</span>
-                                    <x-tooltip :tip="__('admin.security_icmp_tooltip')" align="start" position="right">
-                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                                    </x-tooltip>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="text-sm text-base-content/60">echo-request, ND, RA</span>
-                                <span class="badge badge-neutral badge-xs font-mono ml-1">{{ __('admin.security_rate_limit_badge') }}</span>
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
-                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
-                            </td>
-                        </tr>
-
                         {{-- STAGE 3: Core PBX Telephony & Management Services Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
                             <td colspan="7" class="py-2 px-3">
@@ -786,7 +762,11 @@
                                 <td>
                                     <div class="flex items-center gap-1.5 font-medium text-base-content">
                                         <span>{{ $service->name }}</span>
-                                        <span class="badge badge-ghost badge-sm">{{ __('admin.security_core_service_badge') }}</span>
+                                        @if ($service->protocol === 'icmp')
+                                            <span class="badge badge-neutral badge-sm font-mono">{{ __('admin.security_system_badge') }}</span>
+                                        @else
+                                            <span class="badge badge-ghost badge-sm">{{ __('admin.security_core_service_badge') }}</span>
+                                        @endif
                                         @if ($service->description)
                                             <x-tooltip :tip="$service->description" align="start" position="right">
                                                 <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/50 cursor-help" />
@@ -795,10 +775,23 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="font-mono text-sm font-semibold text-base-content">{{ $service->port_range }}</span>
-                                        <span class="text-sm text-base-content/60">/{{ strtoupper($service->protocol) }}</span>
-                                    </div>
+                                    @if ($service->protocol === 'icmp')
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="font-mono text-sm font-semibold text-base-content">echo-request</span>
+                                            <span class="text-sm text-base-content/60">/ICMP</span>
+                                            @if ($service->rate_limit)
+                                                <span class="badge badge-neutral badge-xs font-mono ml-1">{{ $service->rate_limit }}/s limit (burst {{ $service->burst ?? $service->rate_limit }})</span>
+                                            @else
+                                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_rate_limit_unlimited') }}</span>
+                                            @endif
+                                            <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                                        </div>
+                                    @else
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="font-mono text-sm font-semibold text-base-content">{{ $service->port_range }}</span>
+                                            <span class="text-sm text-base-content/60">/{{ strtoupper($service->protocol) }}</span>
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>
                                     @if ($service->source_ip === 'any' || $service->source_ip === '0.0.0.0/0' || empty($service->source_ip))
@@ -1225,29 +1218,80 @@
                 </div>
 
                 <form wire:submit="saveSystemService" class="space-y-4 mt-4">
-                    {{-- Port Range --}}
-                    <div class="form-control">
-                        <label class="label justify-start gap-2">
-                            <span class="label-text font-medium">{{ __('admin.security_service_port_range') }}</span>
-                            <x-tooltip :tip="__('admin.security_service_port_range_help')" align="start" position="right">
-                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                            </x-tooltip>
-                        </label>
-                        <input wire:model="systemServicePortRange" type="text"
-                               class="input input-bordered input-sm font-mono @error('systemServicePortRange') input-error @enderror" />
-                        @error('systemServicePortRange') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
-                    </div>
+                    @if ($systemServiceProtocol === 'icmp')
+                        {{-- ICMP Diagnostic Echo --}}
+                        <div class="form-control">
+                            <label class="label justify-start gap-2">
+                                <span class="label-text font-medium">{{ __('admin.security_service_port_range') }}</span>
+                            </label>
+                            <input type="text" value="echo-request (ICMP & ICMPv6 Echo)" disabled
+                                   class="input input-bordered input-sm font-mono bg-base-200/60 cursor-not-allowed text-base-content/80" />
+                        </div>
 
-                    {{-- Protocol --}}
-                    <div class="form-control">
-                        <label class="label"><span class="label-text font-medium">{{ __('admin.security_service_protocol') }}</span></label>
-                        <select wire:model="systemServiceProtocol" class="select select-bordered select-sm w-full">
-                            <option value="both">{{ __('admin.security_service_protocol_both') }}</option>
-                            <option value="tcp">{{ __('admin.security_service_protocol_tcp') }}</option>
-                            <option value="udp">{{ __('admin.security_service_protocol_udp') }}</option>
-                        </select>
-                        @error('systemServiceProtocol') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
-                    </div>
+                        {{-- Protocol --}}
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-medium">{{ __('admin.security_service_protocol') }}</span></label>
+                            <select wire:model="systemServiceProtocol" disabled class="select select-bordered select-sm w-full bg-base-200/60 cursor-not-allowed">
+                                <option value="icmp">ICMP (Ping Diagnostics & IPv6)</option>
+                            </select>
+                        </div>
+
+                        {{-- Burstable Rate Limiting Option --}}
+                        <div class="p-3.5 bg-base-200/50 rounded-lg space-y-3 border border-base-200">
+                            <div class="flex items-center justify-between">
+                                <label class="label cursor-pointer justify-start gap-2 p-0">
+                                    <input wire:model.live="systemServiceRateLimitEnabled" type="checkbox" class="checkbox checkbox-primary checkbox-xs" />
+                                    <span class="label-text font-semibold text-xs">{{ __('admin.security_enable_rate_limit') }}</span>
+                                </label>
+                                <span class="text-[11px] font-mono px-2 py-0.5 rounded {{ $systemServiceRateLimitEnabled ? 'bg-success/10 text-success' : 'bg-base-content/10 text-base-content/70' }}">
+                                    {{ $systemServiceRateLimitEnabled ? __('admin.security_rate_limited_active') : __('admin.security_unlimited_active') }}
+                                </span>
+                            </div>
+                            @if ($systemServiceRateLimitEnabled)
+                                <div class="grid grid-cols-2 gap-2 pt-1">
+                                    <div class="form-control">
+                                        <label class="label p-0 pb-1">
+                                            <span class="label-text text-xs">{{ __('admin.security_rate_limit_pps') }}</span>
+                                        </label>
+                                        <input wire:model="systemServiceRateLimit" type="number" min="1" max="1000" class="input input-bordered input-xs font-mono" />
+                                    </div>
+                                    <div class="form-control">
+                                        <label class="label p-0 pb-1">
+                                            <span class="label-text text-xs">{{ __('admin.security_rate_burst_packets') }}</span>
+                                        </label>
+                                        <input wire:model="systemServiceBurst" type="number" min="1" max="1000" class="input input-bordered input-xs font-mono" />
+                                    </div>
+                                </div>
+                            @endif
+                            <div class="text-[11px] text-base-content/60 italic pt-1 border-t border-base-200/50">
+                                {{ __('admin.security_icmp_dual_stack_note') }}
+                            </div>
+                        </div>
+                    @else
+                        {{-- Port Range --}}
+                        <div class="form-control">
+                            <label class="label justify-start gap-2">
+                                <span class="label-text font-medium">{{ __('admin.security_service_port_range') }}</span>
+                                <x-tooltip :tip="__('admin.security_service_port_range_help')" align="start" position="right">
+                                    <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                </x-tooltip>
+                            </label>
+                            <input wire:model="systemServicePortRange" type="text"
+                                   class="input input-bordered input-sm font-mono @error('systemServicePortRange') input-error @enderror" />
+                            @error('systemServicePortRange') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                        </div>
+
+                        {{-- Protocol --}}
+                        <div class="form-control">
+                            <label class="label"><span class="label-text font-medium">{{ __('admin.security_service_protocol') }}</span></label>
+                            <select wire:model="systemServiceProtocol" class="select select-bordered select-sm w-full">
+                                <option value="both">{{ __('admin.security_service_protocol_both') }}</option>
+                                <option value="tcp">{{ __('admin.security_service_protocol_tcp') }}</option>
+                                <option value="udp">{{ __('admin.security_service_protocol_udp') }}</option>
+                            </select>
+                            @error('systemServiceProtocol') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                        </div>
+                    @endif
 
                     {{-- Source Network Restriction --}}
                     <div class="form-control">

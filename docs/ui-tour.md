@@ -80,7 +80,7 @@ The **Security Command Center** provides system administrators with real-time vi
 
 * **Reactive Live Updates**: Connected directly to Laravel Reverb WebSockets — active threat counters, ban expirations, and rule changes update instantaneously across sessions without manual page refreshes.
 * **Pipeline-Aligned IP Workbenches**: Dedicated tables for Permanent Blacklists, Temporarily Blocked Attackers (with 1-click unban and threshold controls), and Whitelist IPs with administrator self-protection.
-* **Living Kernel Ruleset**: Displays base system invariants (unconditional loopback access, stateful connection tracking, invalid packet defense, and rate-limited ICMP ping) alongside PBX telephony ports and custom sequential rules.
+* **Living Kernel Ruleset**: Displays base system invariants and pre-filters in an interactive collapsible section (unconditional loopback access, blacklist IP drops, active banned attacker drops, stateful connection tracking, invalid packet defense, and whitelist bypass) alongside configurable core PBX services (starting with ICMP ping diagnostics with rate limiting) and custom sequential rules.
 * **Zero-Lockout Protection**: Automatic preflight safety testing prevents administrators from inadvertently dropping or blocking their own connection IP.
 
 ![TallPBX Security Command Center](images/security-dashboard-full.png)

@@ -591,7 +591,7 @@ it('renders the security manager dashboard', function () {
 
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
-            ->resize(1920, 3200)
+            ->resize(1920, 2400)
             ->visit('/panel/security')
             ->waitForText('Security Center', 5)
             ->assertSee('Security Center')
@@ -600,19 +600,29 @@ it('renders the security manager dashboard', function () {
             ->assertSee('Blacklist IPs')
             ->assertSee('Whitelist IPs')
             ->assertSee('Blocked Attackers')
-            ->assertSee('STAGE 1')
-            ->assertSee('STAGE 2')
+            ->assertSee('SYSTEM + STAGES 1 & 2')
             ->assertSee('STAGE 3')
             ->assertSee('STAGE 5')
+            ->assertSee('ICMP Ping Diagnostics')
             ->assertSee('SIP Signaling');
 
-        // Dynamically measure document height and resize to fit completely with margin
-        $measuredHeight = (int) ($browser->script('return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);')[0] ?? 3200);
-        $targetHeight = max(3200, $measuredHeight + 120);
-
-        $browser->resize(1920, $targetHeight)
+        // Measure document height in clean collapsed state
+        $measuredHeight = (int) ($browser->script('return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);')[0] ?? 2400);
+        $browser->resize(1920, max(2400, $measuredHeight + 120))
             ->pause(500)
             ->screenshot('security-dashboard-full');
+
+        // Click to expand the collapsible System + Stage 1 & 2 pre-filter section
+        $browser->click('tr[title*="expand or collapse"]')
+            ->pause(500)
+            ->assertSee('Loopback Interface')
+            ->assertSee('Stateful Connection Tracking');
+
+        // Measure document height in expanded state and capture screenshot
+        $expandedHeight = (int) ($browser->script('return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);')[0] ?? 2900);
+        $browser->resize(1920, max(2900, $expandedHeight + 120))
+            ->pause(300)
+            ->screenshot('security-dashboard-expanded');
     });
 });
 

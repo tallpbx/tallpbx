@@ -32,6 +32,17 @@ class SecurityServiceSeeder extends Seeder
         // 1. Seed standard PBX services into the port catalog
         $standardServices = [
             [
+                'name' => 'ICMP Ping Diagnostics',
+                'description' => 'Network reachability ping (IPv4 echo-request with burstable rate limit) and essential IPv6 neighbor discovery',
+                'protocol' => 'icmp',
+                'port_range' => 'echo-request',
+                'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
+                'rate_limit' => 5,
+                'burst' => 5,
+            ],
+            [
                 'name' => 'SIP Signaling',
                 'description' => 'SIP phone registration and call signaling (FreeSWITCH internal and external profiles)',
                 'protocol' => 'both',

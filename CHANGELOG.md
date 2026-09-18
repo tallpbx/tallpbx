@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - Unreleased
 
 ### Changed
+- **Collapsible System & Pre-Filters Pipeline Section**:
+  - Compacted System Base Invariants, Stage 1 Drops, and Stage 2 Whitelist into a single interactive header row (`SYSTEM + STAGES 1 & 2: BASE INVARIANTS & PRE-FILTERS (6 Rules Active)`), decluttering the **Firewall Rules & Port Access** table and reducing vertical height while preserving full visibility on demand.
+  - Clicking the header expands/collapses the full 6 sequential rules in exact evaluation order: unconditional loopback (`iif "lo"`), permanent blacklist IP drops (`@blacklist_ips`), active banned intruder drops (`@banned_ips`), stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and trusted whitelist bypass (`@whitelist_ips`).
+- **ICMP Ping Diagnostics Configurable Core Service**:
+  - Moved ICMP Ping Diagnostics from static pre-filters into **Stage 3 Core Services** as the first rule, matching its position in sequential rule evaluation.
+  - Added full administration controls for ICMP: administrators can toggle echo-request ping diagnostics on/off, restrict echo-requests to specific source IP networks or CIDRs (e.g. monitoring servers), and configure rate-limiting thresholds (custom packet/sec rate limit and burst allowance or completely unlimited).
+  - Added 1-click "Restore Factory Defaults" for ICMP diagnostics (defaults: enabled, unrestricted source IP, 5 packets/sec rate limit with burst of 5).
+  - Protected critical IPv6 connectivity: echo-request rules control ICMP/ICMPv6 ping, while IPv6 Neighbor Discovery (ND) and Router Advertisements (RA) remain unconditionally accepted at the kernel level so IPv6 routing and layer-2 reachability are never severed.
+  - Added database migration `2026_09_18_000008_update_security_services_for_icmp_support.php` extending `protocol` column to `VARCHAR(20)` and adding `rate_limit` and `burst` columns.
 - **Kernel Pipeline Invariants & Loopback Step 1 Reordering**:
   - Reordered the Linux `nftables` inbound pipeline in `SecurityConfigGenerator` so unconditional loopback access (`iif "lo" accept`) evaluates at Step 1 before blacklists and dynamic bans, guaranteeing uninterrupted internal localhost IPC between PHP-FPM, MariaDB, Redis, FreeSWITCH ESL, and Laravel Reverb WebSockets.
   - Implemented burstable ICMP rate limiting (`limit rate 5/second burst 5 packets accept` for IPv4 and IPv6) with full support for IPv6 Neighbor Discovery and Router Solicitation, safeguarding against ping floods while preserving essential network diagnostics.

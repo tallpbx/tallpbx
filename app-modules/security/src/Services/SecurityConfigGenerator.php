@@ -159,16 +159,37 @@ class SecurityConfigGenerator
             $lines[] = '        ip saddr @whitelist_ips accept';
             $lines[] = '';
 
-            // STEP 6: ICMP (Ping with rate limiting) & ICMPv6 (Neighbor Discovery)
-            $lines[] = '        # STEP 6: ICMP (Ping) & ICMPv6 (Neighbor Discovery)';
-            $lines[] = '        ip protocol icmp icmp type echo-request limit rate 5/second burst 5 packets accept';
-            $lines[] = '        ip6 nexthdr ipv6-icmp icmpv6 type echo-request limit rate 5/second burst 5 packets accept';
+            // STEP 6: ICMP Ping Diagnostics (Core System Service)
+            $icmpService = SecurityService::system()->where('protocol', 'icmp')->first();
+            $icmpEnabled = $icmpService ? (bool) $icmpService->enabled : true;
+            $icmpSource = trim((string) ($icmpService?->source_ip ?? 'any'));
+            $icmpPrefix = '';
+            if ($icmpSource !== '' && $icmpSource !== 'any' && $icmpSource !== '0.0.0.0/0') {
+                $icmpPrefix = "ip saddr {$icmpSource} ";
+            }
+
+            if ($icmpEnabled) {
+                $rateLimit = $icmpService?->rate_limit;
+                $burst = $icmpService?->burst;
+                $limitClause = '';
+                if ($rateLimit !== null && $rateLimit > 0) {
+                    $burstClause = ($burst !== null && $burst > 0) ? " burst {$burst} packets" : '';
+                    $limitClause = "limit rate {$rateLimit}/second{$burstClause} ";
+                }
+
+                $lines[] = '        # STEP 6: ICMP PING DIAGNOSTICS';
+                $lines[] = "        {$icmpPrefix}ip protocol icmp icmp type echo-request {$limitClause}accept";
+                $lines[] = "        {$icmpPrefix}ip6 nexthdr ipv6-icmp icmpv6 type echo-request {$limitClause}accept";
+            } else {
+                $lines[] = '        # STEP 6: ICMP PING DISABLED (STEALTH MODE)';
+            }
+            // Essential IPv6 neighbor discovery & router solicitation invariant is ALWAYS preserved
             $lines[] = '        ip6 nexthdr ipv6-icmp accept';
             $lines[] = '';
 
-            // Step 7: System PBX services from port catalog
+            // Step 7: System PBX services from port catalog (excluding icmp which is handled above in step 6)
             $lines[] = '        # STEP 7: CORE PBX TELEPHONY PORTS';
-            $systemServices = SecurityService::system()->active()->get();
+            $systemServices = SecurityService::system()->active()->where('protocol', '!=', 'icmp')->get();
             foreach ($systemServices as $service) {
                 $lines[] = "        # Service: {$service->name}";
                 $prefix = '';

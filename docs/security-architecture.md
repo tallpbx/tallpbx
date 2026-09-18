@@ -131,9 +131,8 @@ The **Security Command Center** provides a single, unified view of the complete 
    - **Blocked Attackers**: Active intrusion bans with vector badges (`SIP`, `Web`, `SSH`), automated hardware timeout countdowns, and protection sensitivity settings.
    - **Whitelist IPs (Always Allowed)**: Permanent bypass list with 1-click self-protection for administrator IPs.
 3. **Unified Firewall Rules & Port Access Table**: Shows the complete, living Linux kernel packet filtering pipeline:
-   - **Base System Invariants**: Unconditional loopback access (`lo`), stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and ICMP/ICMPv6 reachability ping with rate limiting.
-   - **Stage 1 & 2 Drops & Bypass**: Blacklist drops, active intruder bans, and whitelist bypass.
-   - **Stage 3 Core PBX Telephony Ports**: Service toggles and custom port/protocol editing with zero-lockout validation.
+   - **Base System Invariants & Pre-Filters (Collapsible)**: A one-click collapsible header row consolidating the 6 sequential kernel invariants and pre-filters: unconditional loopback access (`lo`), permanent blacklist IP drops, active intruder bans, stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and trusted whitelist IP bypass.
+   - **Stage 3 Core PBX Telephony Ports & Services**: Core system services evaluated top-to-bottom starting with **ICMP Ping Diagnostics** (configurable source network, toggleable, and customizable rate limit/burst allowance with dual-stack IPv4/IPv6 protection), followed by SIP Signaling, RTP Media, Web UI, SSH, FreeSWITCH ESL, Reverb WebSockets, and WebRTC.
    - **Stage 4 Custom Rules**: Sequential port rules with priority reordering.
    - **Stage 5 Default Policy**: Inbound fallback policy (`drop` or `accept`).
 
