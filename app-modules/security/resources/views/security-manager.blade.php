@@ -762,11 +762,6 @@
                                 <td>
                                     <div class="flex items-center gap-1.5 font-medium text-base-content">
                                         <span>{{ $service->name }}</span>
-                                        @if ($service->protocol === 'icmp')
-                                            <span class="badge badge-neutral badge-sm font-mono">{{ __('admin.security_system_badge') }}</span>
-                                        @else
-                                            <span class="badge badge-ghost badge-sm">{{ __('admin.security_core_service_badge') }}</span>
-                                        @endif
                                         @if ($service->description)
                                             <x-tooltip :tip="$service->description" align="start" position="right">
                                                 <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/50 cursor-help" />

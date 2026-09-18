@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Collapsible System & Pre-Filters Pipeline Section**:
-  - Compacted System Base Invariants, Stage 1 Drops, and Stage 2 Whitelist into a single interactive header row (`SYSTEM + STAGES 1 & 2: BASE INVARIANTS & PRE-FILTERS (6 Rules Active)`), decluttering the **Firewall Rules & Port Access** table and reducing vertical height while preserving full visibility on demand.
+  - Compacted System Base Invariants, Stage 1 Drops, and Stage 2 Whitelist into a single interactive header row (`SYSTEM + STAGES 1 & 2: BUILT-IN RULES & PRE-FILTERS (6 Rules Active)`), decluttering the **Firewall Rules & Port Access** table and reducing vertical height while preserving full visibility on demand.
+  - Replaced technical "Kernel Invariant" jargon with clear, plain-English "Built-in" action labels for non-editable rules (Loopback, Connection Tracking, and Invalid Packet Defense).
+  - Streamlined Stage 3 into **Standard Services**, eliminating repetitive and inaccurate "Core PBX" and "System" badges next to individual service names.
   - Clicking the header expands/collapses the full 6 sequential rules in exact evaluation order: unconditional loopback (`iif "lo"`), permanent blacklist IP drops (`@blacklist_ips`), active banned intruder drops (`@banned_ips`), stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and trusted whitelist bypass (`@whitelist_ips`).
 - **ICMP Ping Diagnostics Configurable Core Service**:
   - Moved ICMP Ping Diagnostics from static pre-filters into **Stage 3 Core Services** as the first rule, matching its position in sequential rule evaluation.
