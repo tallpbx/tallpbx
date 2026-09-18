@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Access Control Lists (ACL)**: Renamed "Access Controls" to "Access Control Lists" across English, Spanish, and French translations for consistency with FreeSWITCH naming, and added plain-language explanatory tooltips differentiating internal phone system ACLs from the OS-level kernel firewall.
+- **Rate Limits (formerly Event Guard)**: Renamed "Event Guard" to "Rate Limits" across the navigation menu, page headers, descriptions, and translations (English, Spanish, French) to align with standard FreeSWITCH telephony terminology and eliminate confusion with legacy FusionPBX naming. Updated tooltips to clearly differentiate telephony event rate limiting from the OS-level packet firewall.
 
 ### Upgrade Notes
 - Requires running database migrations: `php artisan migrate`.

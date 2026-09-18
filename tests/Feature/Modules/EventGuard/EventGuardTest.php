@@ -17,7 +17,7 @@ it('renders the event guard settings form', function () {
     Livewire::actingAs($this->admin, 'admin')
         ->test(EventGuardSettings::class)
         ->assertOk()
-        ->assertSee('Event Guard');
+        ->assertSee('Rate Limits');
 });
 
 it('loads default values when no settings exist', function () {

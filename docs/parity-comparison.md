@@ -29,7 +29,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | :--- | :--- | :--- | :--- | :---: |
 | **Total Analyzed Feature Areas** | **59** | **57** | **53** | High Convergence |
 | **Functional / Feature Parity** | **57 (96.6%)** | 57 (100%) | 50 (94.3%) | 🟢 **Core Parity Met** |
-| **Architecturally Superior in TallPBX** | **9 modules** (OAuth, Limits, Event Guard, Backups, Local Spooling, Security Firewall, Bounded CLI Security) | Legacy PHP scripts | Commercial closed modules | 🚀 **Substantial Advantage** |
+| **Architecturally Superior in TallPBX** | **9 modules** (OAuth, Limits, Rate Limits, Backups, Local Spooling, Security Firewall, Bounded CLI Security) | Legacy PHP scripts | Commercial closed modules | 🚀 **Substantial Advantage** |
 | **Intentionally Excluded (Security)** | **2 modules** (Web DB client, Web shell) | Exposes `app/database`, `app/exec` | None in core | 🛡️ **Superior Security** |
 
 ---
@@ -108,7 +108,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Active Call Center** | `call-center-active` (agent status, pause/resume, logout)| `app/call_center_active` | `queues` FOP2 view | 🟢 **Full Parity** |
 | **SIP Status / Regs** | `sip-status`, `registrations` (real-time registrations) | `app/sip_status`, `app/registrations` | `core` registrations / `sipsettings` | 🟢 **Full Parity** |
 | **Call Detail Records** | `xml-cdr` (billsec, caller, destination, hangup cause) | `app/xml_cdr` | `cdr`, `cel` | 🟢 **Full Parity** |
-| **Event Rate Limiting** | `event-guard` (FreeSWITCH event flood protection) | *None* | `firewall` (Fail2ban IP only) | 🚀 **Superior in TallPBX** |
+| **Rate Limits** | `event-guard` (FreeSWITCH event flood protection) | *None* | `firewall` (Fail2ban IP only) | 🚀 **Superior in TallPBX** |
 
 ---
 

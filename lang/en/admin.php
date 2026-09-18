@@ -656,11 +656,11 @@ return [
     'no_extension_settings_found' => 'No settings found.',
     'confirm_delete_extension_setting' => 'Are you sure you want to delete this setting?',
 
-    // ─── Event Guard ──────────────────────────────────────────────────
-    'event_guard' => 'Event Guard',
-    'event_guard_title' => 'Event Guard',
-    'event_guard_description' => 'Configure rate limiting for FreeSWITCH events to prevent overload.',
-    'event_guard_tooltip' => 'FreeSWITCH generates real-time events for every call, registration, DTMF tone, and state change. If a misconfigured device, a network storm, or a malicious actor floods the system with events, the PBX can become unresponsive. Event Guard caps the incoming event rate: when the allowed events per minute are exceeded, the offending source is temporarily blocked, protecting the PBX from overload.',
+    // ─── Rate Limits (FreeSWITCH Event Rate Limiting) ─────────────────
+    'event_guard' => 'Rate Limits',
+    'event_guard_title' => 'Rate Limits',
+    'event_guard_description' => 'Configure rate limiting for FreeSWITCH events to prevent system overload and event floods.',
+    'event_guard_tooltip' => 'FreeSWITCH generates real-time events for every call, registration, DTMF tone, and state change. Rate Limits protect the PBX from event storms or misconfigured devices flooding the system by capping incoming events per minute and burst volumes. Unlike the OS kernel firewall (which blocks network packets), Rate Limits throttle internal telephony event processing to prevent PBX lockups.',
     'event_guard_max_events' => 'Max Events Per Minute',
     'event_guard_max_events_tooltip' => 'The maximum number of FreeSWITCH events allowed from a single source (IP address or SIP account) within one minute before rate limiting kicks in. Default is 300. Lower this on busy production systems to catch floods earlier; raise it for lightly loaded dev/staging environments where false positives are more disruptive than the protection is worth.',
     'event_guard_burst' => 'Burst Limit',
