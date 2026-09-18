@@ -7,6 +7,9 @@ namespace Modules\Security\Providers;
 use App\Events\FreeSwitch\CustomEvent;
 use App\Events\FreeSwitch\SofiaFailedAuth;
 use Illuminate\Auth\Events\Failed;
+use Modules\Security\Console\Commands\SecurityApplyCommand;
+use Modules\Security\Console\Commands\SecurityStatusCommand;
+use Modules\Security\Console\Commands\SecurityUnbanCommand;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
@@ -111,6 +114,20 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             SofiaFailedAuth::class => [
                 LogFailedSipAuthListener::class,
             ],
+        ];
+    }
+
+    /**
+     * Register Artisan console commands for the security module.
+     *
+     * @return array<int, class-string>
+     */
+    protected function consoleCommands(): array
+    {
+        return [
+            SecurityApplyCommand::class,
+            SecurityStatusCommand::class,
+            SecurityUnbanCommand::class,
         ];
     }
 }

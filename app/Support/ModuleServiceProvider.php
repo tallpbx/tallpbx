@@ -74,6 +74,7 @@ abstract class ModuleServiceProvider extends ServiceProvider
         $this->registerMenu($menu);
         $this->registerPermissions($permission);
         $this->registerListeners();
+        $this->registerCommands();
     }
 
     // ─── Path resolution ────────────────────────────────────────────────
@@ -149,6 +150,16 @@ abstract class ModuleServiceProvider extends ServiceProvider
         return [];
     }
 
+    /**
+     * Return the Artisan console commands to register for this module.
+     *
+     * @return array<int, class-string>
+     */
+    protected function consoleCommands(): array
+    {
+        return [];
+    }
+
     // ─── Private registration helpers ────────────────────────────────────
 
     /**
@@ -159,6 +170,20 @@ abstract class ModuleServiceProvider extends ServiceProvider
         foreach ($this->listeners() as $event => $listeners) {
             foreach ((array) $listeners as $listener) {
                 Event::listen($event, $listener);
+            }
+        }
+    }
+
+    /**
+     * Register module console commands when running in console.
+     */
+    private function registerCommands(): void
+    {
+        if ($this->app->runningInConsole()) {
+            $commands = $this->consoleCommands();
+
+            if ($commands !== []) {
+                $this->commands($commands);
             }
         }
     }

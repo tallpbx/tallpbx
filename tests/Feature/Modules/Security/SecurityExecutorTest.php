@@ -125,6 +125,10 @@ it('validates shell script rejects invalid IP in unban command', function (): vo
 
 it('validates shell script apply fails when pending file is missing', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $pendingFile = '/etc/tallpbx/firewall.nft.pending';
+    if (file_exists($pendingFile)) {
+        @unlink($pendingFile);
+    }
 
     $process = new Process(['bash', $scriptPath, 'apply']);
     $process->run();
