@@ -28,6 +28,7 @@ use App\Events\FreeSwitch\RecordStart;
 use App\Events\FreeSwitch\RecordStop;
 use App\Events\FreeSwitch\SessionHeartbeat;
 use App\Events\FreeSwitch\SofiaExpire;
+use App\Events\FreeSwitch\SofiaFailedAuth;
 use App\Events\FreeSwitch\SofiaRegister;
 use App\Services\FreeSwitchServiceInterface;
 use Illuminate\Console\Command;
@@ -192,6 +193,10 @@ class FreeSwitchListenCommand extends Command
     {
         $eventName = $rawEvent['event_name'];
         $eventClass = self::EVENT_MAP[$eventName] ?? CustomEvent::class;
+
+        if ($eventName === 'CUSTOM' && ($rawEvent['headers']['Event-Subclass'] ?? null) === 'sofia::failed_auth') {
+            $eventClass = SofiaFailedAuth::class;
+        }
 
         $laravelEvent = new $eventClass(
             eventName: $eventName,

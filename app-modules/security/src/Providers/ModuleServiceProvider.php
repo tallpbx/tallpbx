@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Security\Providers;
 
+use App\Events\FreeSwitch\CustomEvent;
+use App\Events\FreeSwitch\SofiaFailedAuth;
 use Illuminate\Auth\Events\Failed;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 use Modules\Security\Listeners\LogFailedLoginListener;
+use Modules\Security\Listeners\LogFailedSipAuthListener;
 use Modules\Security\Services\SecurityIncidentService;
 
 /**
@@ -95,6 +98,12 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         return [
             Failed::class => [
                 LogFailedLoginListener::class,
+            ],
+            CustomEvent::class => [
+                LogFailedSipAuthListener::class,
+            ],
+            SofiaFailedAuth::class => [
+                LogFailedSipAuthListener::class,
             ],
         ];
     }
