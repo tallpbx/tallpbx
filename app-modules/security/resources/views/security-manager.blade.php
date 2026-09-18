@@ -187,203 +187,329 @@
         </div>
     </div>
 
-    {{-- Middle Section: Left Deck & Right Deck --}}
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {{-- Left Deck: Trusted & Blocked IP Addresses (5 cols) --}}
-        <div class="lg:col-span-5 space-y-4">
-            <div class="card bg-base-100 shadow-sm border border-base-200">
-                <div class="card-body p-4 space-y-4">
-                    <div class="flex flex-col gap-1">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_ip_management') }}</h2>
-                                <x-tooltip :tip="__('admin.security_protect_ip_help')" align="start" position="right">
-                                    <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                                </x-tooltip>
+    {{-- Sequential Pipeline Stages 1 & 2: Blacklist, Attackers, and Whitelist --}}
+    <div class="space-y-6">
+        {{-- Card 1: Blacklist IPs (Stage 1 Permanent Kernel Drop) --}}
+        <div id="blacklist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
+            <div class="card-body p-4 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_blacklist_ips') }}</h2>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
+                            <span class="badge badge-error badge-xs font-mono font-bold">{{ __('admin.security_stage_1_badge') }}</span>
+                            <x-tooltip :tip="__('admin.security_blacklist_desc')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
+                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_blacklist_desc') }}</p>
+                    </div>
+                </div>
+
+                {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
+                <div class="flex flex-col lg:flex-row gap-6 items-start">
+                    {{-- Left Column: Quick-Add Form & Kernel Rule Helper (Fixed Ergonomic Width) --}}
+                    <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
+                        <form wire:submit="addBlacklistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
+                            <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
+                                <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
+                                <span>{{ __('admin.security_add_to_blacklist') }}</span>
                             </div>
-                            <span class="badge badge-neutral badge-xs font-mono">{{ __('admin.security_ip_prefilters_badge') }}</span>
+                            <div class="space-y-2">
+                                <div>
+                                    <input wire:model="newBlacklistIp" type="text"
+                                           placeholder="{{ __('admin.security_ip_or_cidr') }}"
+                                           class="input input-bordered input-sm w-full font-mono @error('newBlacklistIp') input-error @enderror" />
+                                    @error('newBlacklistIp')
+                                        <span class="text-error text-xs mt-0.5 block">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                <input wire:model="newBlacklistDescription" type="text"
+                                       placeholder="{{ __('admin.security_ip_description') }}"
+                                       class="input input-bordered input-sm w-full" />
+                                <button type="submit" class="btn btn-error btn-sm w-full gap-1 shadow-xs">
+                                    <x-heroicon-o-plus class="w-4 h-4" />
+                                    <span>{{ __('admin.security_add_to_blacklist') }}</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="p-3 bg-base-200/40 rounded-box border border-base-200/80 text-xs text-base-content/70 space-y-1">
+                            <div class="font-semibold flex items-center gap-1.5 text-error">
+                                <x-heroicon-o-shield-exclamation class="w-4 h-4 shrink-0" />
+                                <span>{{ __('admin.security_stage_1_badge') }}: Instant Drop</span>
+                            </div>
+                            <p class="leading-relaxed">{{ __('admin.security_blacklist_helper') }}</p>
                         </div>
-                        <p class="text-xs text-base-content/60">{{ __('admin.security_ip_management_desc') }}</p>
                     </div>
 
-                    {{-- Segmented Tabs: Whitelist vs Blacklist --}}
-                    <div class="join grid grid-cols-2 w-full">
-                        <button wire:click="switchIpListType('whitelist')" type="button"
-                                class="btn btn-sm join-item {{ $ipListType === 'whitelist' ? 'btn-primary' : 'btn-outline' }}">
-                            <x-heroicon-o-check-circle class="w-4 h-4" />
-                            <span>{{ __('admin.security_trusted_ips') }}</span>
-                        </button>
-                        <button wire:click="switchIpListType('blacklist')" type="button"
-                                class="btn btn-sm join-item {{ $ipListType === 'blacklist' ? 'btn-error' : 'btn-outline' }}">
-                            <x-heroicon-o-no-symbol class="w-4 h-4" />
-                            <span>{{ __('admin.security_blocked_ips') }}</span>
-                        </button>
-                    </div>
-
-                    {{-- Quick-Add Form --}}
-                    <form wire:submit="addIp" class="space-y-2 bg-base-200/50 p-3 rounded-box">
-                        <div class="text-xs font-semibold text-base-content/70">
-                            {{ $ipListType === 'whitelist' ? __('admin.security_add_to_trusted') : __('admin.security_add_to_blocked') }}
+                    {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
+                    <div class="w-full lg:flex-1 space-y-3">
+                        <div class="relative">
+                            <input wire:model.live.debounce.250ms="blacklistSearch" type="text"
+                                   placeholder="{{ __('admin.security_search_blacklist') }}"
+                                   class="input input-bordered input-sm w-full pl-9" />
+                            <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <input wire:model="newIp" type="text"
-                                   placeholder="{{ __('admin.security_ip_or_cidr') }}"
-                                   class="input input-bordered input-sm w-full font-mono @error('newIp') input-error @enderror" />
-                            @error('newIp')
-                                <span class="text-error text-xs">{{ $message }}</span>
-                            @enderror
-                            <input wire:model="newIpDescription" type="text"
-                                   placeholder="{{ __('admin.security_ip_description') }}"
-                                   class="input input-bordered input-sm w-full" />
-                            <button type="submit" class="btn {{ $ipListType === 'whitelist' ? 'btn-primary' : 'btn-error' }} btn-sm w-full">
-                                <x-heroicon-o-plus class="w-4 h-4" />
-                                <span>{{ $ipListType === 'whitelist' ? __('admin.security_add_to_trusted') : __('admin.security_add_to_blocked') }}</span>
-                            </button>
-                        </div>
-                    </form>
 
-                    {{-- Search Filter --}}
-                    <div class="relative">
-                        <input wire:model.live.debounce.250ms="ipSearch" type="text"
-                               placeholder="{{ __('admin.security_search_ips') }}"
-                               class="input input-bordered input-sm w-full pl-9" />
-                        <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
-                    </div>
-
-                    {{-- IP Table / List --}}
-                    <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
-                        <table class="table table-xs table-pin-rows">
-                            <thead>
-                                <tr>
-                                    <th>{{ __('admin.security_ip_or_cidr') }}</th>
-                                    <th>{{ __('admin.description') }}</th>
-                                    <th class="text-right">{{ __('admin.actions') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($ipLists as $item)
-                                    <tr class="hover">
-                                        <td class="font-mono font-medium">
-                                            {{ $item->ip_address }}
-                                            @if ($item->ip_address === $adminIp)
-                                                <span class="badge badge-success badge-xs ml-1">You</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
-                                        <td class="text-right">
-                                            <button wire:click="deleteIp({{ $item->id }})" type="button"
-                                                    class="btn btn-ghost btn-xs text-error p-1"
-                                                    title="{{ __('admin.delete') }}">
-                                                <x-heroicon-o-trash class="w-4 h-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                @empty
+                        <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                            <table class="table table-xs table-pin-rows">
+                                <thead>
                                     <tr>
-                                        <td colspan="3" class="text-center py-6 text-base-content/60">
-                                            {{ __('admin.security_no_ips_found') }}
-                                        </td>
+                                        <th>{{ __('admin.security_ip_or_cidr') }}</th>
+                                        <th>{{ __('admin.description') }}</th>
+                                        <th class="text-right">{{ __('admin.actions') }}</th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    @forelse ($blacklistIps as $item)
+                                        <tr class="hover">
+                                            <td class="font-mono font-medium text-error">
+                                                {{ $item->ip_address }}
+                                            </td>
+                                            <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
+                                            <td class="text-right">
+                                                <button wire:click="deleteIp({{ $item->id }})" type="button"
+                                                        class="btn btn-ghost btn-xs text-error p-1"
+                                                        title="{{ __('admin.delete') }}">
+                                                    <x-heroicon-o-trash class="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="text-center py-6 text-base-content/60">
+                                                {{ __('admin.security_no_blacklist_found') }}
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {{-- Right Deck: Currently Blocked Attackers (7 cols) --}}
-        <div class="lg:col-span-7 space-y-4">
-            <div class="card bg-base-100 shadow-sm border border-base-200">
-                <div class="card-body p-4 space-y-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
-                                <span class="badge badge-neutral badge-sm">{{ $activeBans->count() }}</span>
-                                <span class="badge badge-error badge-xs font-mono">{{ __('admin.security_active_threats_badge') }}</span>
-                            </div>
-                            <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_threats_desc') }}</p>
+        {{-- Card 2: Currently Blocked Attackers (Stage 1 Dynamic Drops) --}}
+        <div id="attackers-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
+            <div class="card-body p-4 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $activeBans->count() }}</span>
+                            <span class="badge badge-error badge-xs font-mono font-bold">{{ __('admin.security_active_threats_badge') }}</span>
+                            <x-tooltip :tip="__('admin.security_threats_desc')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
                         </div>
-                        <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1 self-start sm:self-auto">
-                            <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
-                            <span>{{ __('admin.security_block_manually') }}</span>
-                        </button>
+                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_banned_attackers_desc') }}</p>
+                    </div>
+                    <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1 self-start sm:self-auto">
+                        <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
+                        <span>{{ __('admin.security_block_manually') }}</span>
+                    </button>
+                </div>
+
+                {{-- Threat Table --}}
+                <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                    <table class="table table-xs table-pin-rows">
+                        <thead>
+                            <tr>
+                                <th>{{ __('admin.security_attacker_ip') }}</th>
+                                <th>{{ __('admin.security_attack_type') }}</th>
+                                <th>{{ __('admin.security_attempts') }}</th>
+                                <th>{{ __('admin.security_expires') }}</th>
+                                <th class="text-right">{{ __('admin.actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($activeBans as $ban)
+                                <tr class="hover">
+                                    <td class="font-mono font-medium text-error">
+                                        {{ $ban->ip_address }}
+                                    </td>
+                                    <td>
+                                        @php
+                                            $vectorLabel = match ($ban->vector) {
+                                                'sip_auth' => __('admin.vector_sip'),
+                                                'web_auth' => __('admin.vector_web'),
+                                                'ssh' => __('admin.vector_ssh'),
+                                                default => __('admin.vector_manual'),
+                                            };
+                                            $vectorBadge = match ($ban->vector) {
+                                                'sip_auth' => 'badge-primary',
+                                                'web_auth' => 'badge-info',
+                                                'ssh' => 'badge-secondary',
+                                                default => 'badge-neutral',
+                                            };
+                                        @endphp
+                                        <span class="badge {{ $vectorBadge }} badge-xs">{{ $vectorLabel }}</span>
+                                    </td>
+                                    <td>{{ $ban->attempt_count }}</td>
+                                    <td class="text-base-content/70">
+                                        @if ($ban->expires_at)
+                                            {{ $ban->expires_at->diffForHumans() }}
+                                        @else
+                                            <span class="badge badge-ghost badge-xs">Permanent</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-right whitespace-nowrap">
+                                        <div class="join">
+                                            <button wire:click="unban('{{ $ban->ip_address }}')" type="button"
+                                                    class="btn btn-outline btn-xs join-item"
+                                                    title="{{ __('admin.security_unblock') }}">
+                                                {{ __('admin.security_unblock') }}
+                                            </button>
+                                            <button wire:click="promoteToWhitelist('{{ $ban->ip_address }}')" type="button"
+                                                    class="btn btn-success btn-xs join-item"
+                                                    title="{{ __('admin.security_trust_ip') }}">
+                                                {{ __('admin.security_trust_ip') }}
+                                            </button>
+                                            <button wire:click="promoteToBlacklist('{{ $ban->ip_address }}')" type="button"
+                                                    class="btn btn-error btn-xs join-item"
+                                                    title="{{ __('admin.security_block_permanently') }}">
+                                                {{ __('admin.security_block_permanently') }}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center py-6 text-base-content/60">
+                                        <x-heroicon-o-shield-check class="w-6 h-6 mx-auto text-success/60 mb-1.5" style="width: 1.5rem; height: 1.5rem;" />
+                                        <div class="text-xs font-medium">{{ __('admin.security_no_attackers') }}</div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {{-- Card 3: Whitelist IPs (Stage 2 Allowed Bypass) --}}
+        <div id="whitelist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
+            <div class="card-body p-4 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_whitelist_ips') }}</h2>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $whitelistCount }}</span>
+                            <span class="badge badge-success badge-xs font-mono font-bold">{{ __('admin.security_stage_2_badge') }}</span>
+                            <x-tooltip :tip="__('admin.security_whitelist_desc')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
+                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_whitelist_desc') }}</p>
+                    </div>
+                </div>
+
+                {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
+                <div class="flex flex-col lg:flex-row gap-6 items-start">
+                    {{-- Left Column: Quick-Add Form, Self-Whitelisting & Rule Helper (Fixed Ergonomic Width) --}}
+                    <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
+                        <form wire:submit="addWhitelistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
+                            <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
+                                <x-heroicon-o-shield-check class="w-4 h-4 text-success" />
+                                <span>{{ __('admin.security_add_to_whitelist') }}</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div>
+                                    <input wire:model="newWhitelistIp" type="text"
+                                           placeholder="{{ __('admin.security_ip_or_cidr') }}"
+                                           class="input input-bordered input-sm w-full font-mono @error('newWhitelistIp') input-error @enderror" />
+                                    @error('newWhitelistIp')
+                                        <span class="text-error text-xs mt-0.5 block">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                <input wire:model="newWhitelistDescription" type="text"
+                                       placeholder="{{ __('admin.security_ip_description') }}"
+                                       class="input input-bordered input-sm w-full" />
+                                <button type="submit" class="btn btn-primary btn-sm w-full gap-1 shadow-xs">
+                                    <x-heroicon-o-plus class="w-4 h-4" />
+                                    <span>{{ __('admin.security_add_to_whitelist') }}</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        {{-- Admin Self-Whitelisting Lockout Guard --}}
+                        @if (! $isCurrentIpWhitelisted)
+                            <div class="p-3 bg-warning/10 border border-warning/30 rounded-box flex items-center justify-between gap-2">
+                                <div class="text-xs">
+                                    <div class="font-semibold text-warning-content flex items-center gap-1">
+                                        <x-heroicon-o-exclamation-triangle class="w-3.5 h-3.5 text-warning shrink-0" />
+                                        <span>Lockout Safety</span>
+                                    </div>
+                                    <div class="text-base-content/70 text-[11px] mt-0.5">Your IP (<span class="font-mono">{{ $adminIp }}</span>) is not whitelisted.</div>
+                                </div>
+                                <button wire:click="whitelistCurrentIp" type="button" class="btn btn-warning btn-xs whitespace-nowrap shadow-xs">
+                                    {{ __('admin.security_protect_my_ip') }}
+                                </button>
+                            </div>
+                        @else
+                            <div class="p-2.5 bg-success/10 border border-success/30 rounded-box flex items-center gap-2 text-xs text-success font-medium">
+                                <x-heroicon-o-shield-check class="w-4 h-4 text-success shrink-0" />
+                                <span>Your current IP (<span class="font-mono font-bold">{{ $adminIp }}</span>) is whitelisted.</span>
+                            </div>
+                        @endif
+
+                        <div class="p-3 bg-base-200/40 rounded-box border border-base-200/80 text-xs text-base-content/70 space-y-1">
+                            <div class="font-semibold flex items-center gap-1.5 text-success">
+                                <x-heroicon-o-check-badge class="w-4 h-4 shrink-0" />
+                                <span>{{ __('admin.security_stage_2_badge') }}: Complete Bypass</span>
+                            </div>
+                            <p class="leading-relaxed">{{ __('admin.security_whitelist_helper') }}</p>
+                        </div>
                     </div>
 
-                    {{-- Threat Table --}}
-                    <div class="overflow-x-auto max-h-96 overflow-y-auto border border-base-200 rounded-box">
-                        <table class="table table-xs table-pin-rows">
-                            <thead>
-                                <tr>
-                                    <th>{{ __('admin.security_attacker_ip') }}</th>
-                                    <th>{{ __('admin.security_attack_type') }}</th>
-                                    <th>{{ __('admin.security_attempts') }}</th>
-                                    <th>{{ __('admin.security_expires') }}</th>
-                                    <th class="text-right">{{ __('admin.actions') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($activeBans as $ban)
-                                    <tr class="hover">
-                                        <td class="font-mono font-medium text-error">
-                                            {{ $ban->ip_address }}
-                                        </td>
-                                        <td>
-                                            @php
-                                                $vectorLabel = match ($ban->vector) {
-                                                    'sip_auth' => __('admin.vector_sip'),
-                                                    'web_auth' => __('admin.vector_web'),
-                                                    'ssh' => __('admin.vector_ssh'),
-                                                    default => __('admin.vector_manual'),
-                                                };
-                                                $vectorBadge = match ($ban->vector) {
-                                                    'sip_auth' => 'badge-primary',
-                                                    'web_auth' => 'badge-info',
-                                                    'ssh' => 'badge-secondary',
-                                                    default => 'badge-neutral',
-                                                };
-                                            @endphp
-                                            <span class="badge {{ $vectorBadge }} badge-xs">{{ $vectorLabel }}</span>
-                                        </td>
-                                        <td>{{ $ban->attempt_count }}</td>
-                                        <td class="text-base-content/70">
-                                            @if ($ban->expires_at)
-                                                {{ $ban->expires_at->diffForHumans() }}
-                                            @else
-                                                <span class="badge badge-ghost badge-xs">Permanent</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-right whitespace-nowrap">
-                                            <div class="join">
-                                                <button wire:click="unban('{{ $ban->ip_address }}')" type="button"
-                                                        class="btn btn-outline btn-xs join-item"
-                                                        title="{{ __('admin.security_unblock') }}">
-                                                    {{ __('admin.security_unblock') }}
-                                                </button>
-                                                <button wire:click="promoteToWhitelist('{{ $ban->ip_address }}')" type="button"
-                                                        class="btn btn-success btn-xs join-item"
-                                                        title="{{ __('admin.security_trust_ip') }}">
-                                                    {{ __('admin.security_trust_ip') }}
-                                                </button>
-                                                <button wire:click="promoteToBlacklist('{{ $ban->ip_address }}')" type="button"
-                                                        class="btn btn-error btn-xs join-item"
-                                                        title="{{ __('admin.security_block_permanently') }}">
-                                                    {{ __('admin.security_block_permanently') }}
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @empty
+                    {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
+                    <div class="w-full lg:flex-1 space-y-3">
+                        <div class="relative">
+                            <input wire:model.live.debounce.250ms="whitelistSearch" type="text"
+                                   placeholder="{{ __('admin.security_search_whitelist') }}"
+                                   class="input input-bordered input-sm w-full pl-9" />
+                            <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
+                        </div>
+
+                        <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                            <table class="table table-xs table-pin-rows">
+                                <thead>
                                     <tr>
-                                        <td colspan="5" class="text-center py-6 text-base-content/60">
-                                            <x-heroicon-o-shield-check class="w-6 h-6 mx-auto text-success/60 mb-1.5" style="width: 1.5rem; height: 1.5rem;" />
-                                            <div class="text-xs font-medium">{{ __('admin.security_no_attackers') }}</div>
-                                        </td>
+                                        <th>{{ __('admin.security_ip_or_cidr') }}</th>
+                                        <th>{{ __('admin.description') }}</th>
+                                        <th class="text-right">{{ __('admin.actions') }}</th>
                                     </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    @forelse ($whitelistIps as $item)
+                                        <tr class="hover">
+                                            <td class="font-mono font-medium text-success">
+                                                {{ $item->ip_address }}
+                                                @if ($item->ip_address === $adminIp)
+                                                    <span class="badge badge-success badge-xs ml-1">You</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
+                                            <td class="text-right">
+                                                <button wire:click="deleteIp({{ $item->id }})" type="button"
+                                                        class="btn btn-ghost btn-xs text-error p-1"
+                                                        title="{{ __('admin.delete') }}">
+                                                    <x-heroicon-o-trash class="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="text-center py-6 text-base-content/60">
+                                                {{ __('admin.security_no_whitelist_found') }}
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -484,10 +610,10 @@
                                 <span class="badge badge-error badge-xs font-semibold">{{ __('admin.security_action_drop') }}</span>
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <button wire:click="switchIpListType('blacklist')" type="button" class="btn btn-ghost btn-xs text-primary gap-1">
-                                    <x-heroicon-o-list-bullet class="w-3.5 h-3.5" />
+                                <a href="#blacklist-section" class="btn btn-ghost btn-xs text-error gap-1">
+                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
                                     <span>{{ __('admin.security_manage_blacklist') }}</span>
-                                </button>
+                                </a>
                             </td>
                         </tr>
 
@@ -517,7 +643,10 @@
                                 <span class="badge badge-error badge-xs font-semibold">{{ __('admin.security_action_drop') }}</span>
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <span class="text-xs text-base-content/50 italic mr-2">{{ __('admin.security_dynamic_kernel') }}</span>
+                                <a href="#attackers-section" class="btn btn-ghost btn-xs text-error gap-1">
+                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
+                                    <span>{{ __('admin.security_view_threats') }}</span>
+                                </a>
                             </td>
                         </tr>
 
@@ -547,10 +676,10 @@
                                 <span class="badge badge-success badge-xs font-semibold">{{ __('admin.security_action_allow') }}</span>
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <button wire:click="switchIpListType('whitelist')" type="button" class="btn btn-ghost btn-xs text-success gap-1">
-                                    <x-heroicon-o-shield-check class="w-3.5 h-3.5" />
+                                <a href="#whitelist-section" class="btn btn-ghost btn-xs text-success gap-1">
+                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
                                     <span>{{ __('admin.security_manage_whitelist') }}</span>
-                                </button>
+                                </a>
                             </td>
                         </tr>
 

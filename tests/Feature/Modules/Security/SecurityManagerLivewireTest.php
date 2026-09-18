@@ -42,8 +42,8 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Firewall Status')
         ->assertSee('Attack Protection')
         ->assertSee('Currently Blocked Attackers')
-        ->assertSee('Your Connection')
-        ->assertSee('Trusted & Blocked IP Addresses')
+        ->assertSee('Blacklist IPs')
+        ->assertSee('Whitelist IPs')
         ->assertSee('Firewall Rules & Port Access')
         ->assertSee('Standard PBX Ports')
         ->assertSee('Rules are checked in order from top to bottom')
@@ -294,9 +294,9 @@ it('reactively updates status upon receiving refresh-security or echo push event
 it('renders the unified firewall rules table with pipeline stages and core PBX services', function (): void {
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
-        ->assertSee('Permanent IP Blacklist')
+        ->assertSee('Blacklist IPs')
         ->assertSee('@blacklist_ips')
-        ->assertSee('Trusted IP Whitelist')
+        ->assertSee('Whitelist IPs')
         ->assertSee('@whitelist_ips')
         ->assertSee('STAGE 1')
         ->assertSee('STAGE 2')
@@ -366,5 +366,27 @@ it('toggles a core PBX service and resets it to factory defaults', function (): 
 
     expect($webrtc->fresh()->port_range)->toBe('7443')
         ->and($webrtc->fresh()->enabled)->toBeTrue();
+});
+
+it('manages blacklist and whitelist simultaneously in sequential pipeline cards', function (): void {
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        // Add to Blacklist
+        ->set('newBlacklistIp', '198.51.100.25')
+        ->set('newBlacklistDescription', 'Aggressive probe')
+        ->call('addBlacklistIp')
+        ->assertHasNoErrors()
+        ->assertSee('198.51.100.25')
+        ->assertSee('Aggressive probe')
+        // Add to Whitelist
+        ->set('newWhitelistIp', '192.0.2.10')
+        ->set('newWhitelistDescription', 'Branch Office Router')
+        ->call('addWhitelistIp')
+        ->assertHasNoErrors()
+        ->assertSee('192.0.2.10')
+        ->assertSee('Branch Office Router');
+
+    expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '198.51.100.25')->exists())->toBeTrue()
+        ->and(SecurityIpList::where('type', 'whitelist')->where('ip_address', '192.0.2.10')->exists())->toBeTrue();
 });
 

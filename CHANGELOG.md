@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - Unreleased
 
+### Changed
+- **Pipeline-Aligned 3-Deck IP Architecture & Standardized Blacklist/Whitelist Terminology**:
+  - Replaced the tab-switched IP management deck with three sequential full-width workbench cards arranged in the exact order traffic is evaluated in the Linux `nftables` packet filtering pipeline:
+    1. **Blacklist IPs (Always Dropped)**: Stage 1 permanent kernel drop rules with a Split-Panel layout (Quick-Add Form and Stage 1 advisory helper on left, search filter and scrollable table on right).
+    2. **Currently Blocked Attackers**: Stage 1 dynamic fail2ban drop rules with active threat counters, attack vector badges (`SIP`, `Web`, `SSH`), expiry countdowns, and manual ban creation.
+    3. **Whitelist IPs (Always Allowed)**: Stage 2 kernel bypass rules with a Split-Panel layout (Quick-Add Form, 1-click admin IP self-protection, and Stage 2 advisory helper on left, search filter and scrollable table on right).
+  - Standardized terminology across the UI and translation keys (`lang/en/admin.php`) to strictly use **"Blacklist"** and **"Whitelist"** everywhere (e.g. `Blacklist IPs (Always Dropped)`, `Whitelist IPs (Always Allowed)`, `Add to Blacklist`, `Add to Whitelist`, `Blacklist IPs @blacklist_ips`, `Whitelist IPs @whitelist_ips`).
+  - Added smooth anchor navigation (`↑ View Blacklist`, `↑ View Threats`, `↑ View Whitelist`) from the Unified Firewall Rules table directly to the corresponding cards.
+  - Eliminated horizontal dead space with a responsive flex layout (`w-full lg:w-80 lg:shrink-0` for form, `w-full lg:flex-1` for table).
+
 ### Added
 - **Unified Firewall Rules Table & Editable Core PBX Services**:
   - Transformed the **Firewall Rules & Port Access** table into a single, unified view representing the complete 5-stage packet filtering pipeline:

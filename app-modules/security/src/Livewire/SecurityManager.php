@@ -58,6 +58,36 @@ class SecurityManager extends Component
     public string $ipSearch = '';
 
     /**
+     * New IP or CIDR to add to the blacklist.
+     */
+    public string $newBlacklistIp = '';
+
+    /**
+     * Optional label or note for the new blacklist IP entry.
+     */
+    public string $newBlacklistDescription = '';
+
+    /**
+     * Search query for filtering blacklist IP entries.
+     */
+    public string $blacklistSearch = '';
+
+    /**
+     * New IP or CIDR to add to the whitelist.
+     */
+    public string $newWhitelistIp = '';
+
+    /**
+     * Optional label or note for the new whitelist IP entry.
+     */
+    public string $newWhitelistDescription = '';
+
+    /**
+     * Search query for filtering whitelist IP entries.
+     */
+    public string $whitelistSearch = '';
+
+    /**
      * The IP address of the currently connected administrator.
      */
     public string $adminIp = '';
@@ -238,6 +268,76 @@ class SecurityManager extends Component
         if (in_array($type, ['whitelist', 'blacklist'], true)) {
             $this->ipListType = $type;
         }
+    }
+
+    /**
+     * Add a new IP or CIDR subnet to the permanent blacklist.
+     */
+    public function addBlacklistIp(LockoutGuardService $lockoutGuard): void
+    {
+        $this->validate([
+            'newBlacklistIp' => [
+                'required',
+                'string',
+                'regex:/^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?|([0-9a-fA-F:]+)(\/[0-9]+)?)$/',
+            ],
+            'newBlacklistDescription' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $ip = trim($this->newBlacklistIp);
+
+        if (SecurityIpList::where('type', 'blacklist')->where('ip_address', $ip)->exists()) {
+            $this->addError('newBlacklistIp', 'This IP address is already present in the blacklist.');
+
+            return;
+        }
+
+        SecurityIpList::create([
+            'type' => 'blacklist',
+            'ip_address' => $ip,
+            'description' => $this->newBlacklistDescription ? trim($this->newBlacklistDescription) : null,
+        ]);
+
+        $this->newBlacklistIp = '';
+        $this->newBlacklistDescription = '';
+        $this->checkAdminIpStatus($lockoutGuard);
+        $this->autoApplyFirewallRuleset($lockoutGuard);
+        $this->notifySuccess((string) __('admin.security_ip_added'));
+    }
+
+    /**
+     * Add a new IP or CIDR subnet to the trusted whitelist.
+     */
+    public function addWhitelistIp(LockoutGuardService $lockoutGuard): void
+    {
+        $this->validate([
+            'newWhitelistIp' => [
+                'required',
+                'string',
+                'regex:/^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?|([0-9a-fA-F:]+)(\/[0-9]+)?)$/',
+            ],
+            'newWhitelistDescription' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $ip = trim($this->newWhitelistIp);
+
+        if (SecurityIpList::where('type', 'whitelist')->where('ip_address', $ip)->exists()) {
+            $this->addError('newWhitelistIp', 'This IP address is already present in the whitelist.');
+
+            return;
+        }
+
+        SecurityIpList::create([
+            'type' => 'whitelist',
+            'ip_address' => $ip,
+            'description' => $this->newWhitelistDescription ? trim($this->newWhitelistDescription) : null,
+        ]);
+
+        $this->newWhitelistIp = '';
+        $this->newWhitelistDescription = '';
+        $this->checkAdminIpStatus($lockoutGuard);
+        $this->autoApplyFirewallRuleset($lockoutGuard);
+        $this->notifySuccess((string) __('admin.security_ip_added'));
     }
 
     /**
@@ -829,16 +929,31 @@ class SecurityManager extends Component
      */
     public function render(SecurityBanServiceInterface $banService): View
     {
-        $ipLists = SecurityIpList::query()
-            ->where('type', $this->ipListType)
-            ->when($this->ipSearch, function ($query): void {
-                $query->where(function ($q): void {
-                    $q->where('ip_address', 'like', "%{$this->ipSearch}%")
-                        ->orWhere('description', 'like', "%{$this->ipSearch}%");
+        $blacklistIps = SecurityIpList::query()
+            ->where('type', 'blacklist')
+            ->when($this->blacklistSearch ?: $this->ipSearch, function ($query): void {
+                $search = $this->blacklistSearch ?: $this->ipSearch;
+                $query->where(function ($q) use ($search): void {
+                    $q->where('ip_address', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->orderBy('id', 'desc')
             ->get();
+
+        $whitelistIps = SecurityIpList::query()
+            ->where('type', 'whitelist')
+            ->when($this->whitelistSearch ?: $this->ipSearch, function ($query): void {
+                $search = $this->whitelistSearch ?: $this->ipSearch;
+                $query->where(function ($q) use ($search): void {
+                    $q->where('ip_address', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $ipLists = $this->ipListType === 'blacklist' ? $blacklistIps : $whitelistIps;
 
         $activeBans = $banService->getActiveBans();
 
@@ -856,6 +971,8 @@ class SecurityManager extends Component
 
         return view('security::security-manager', [
             'ipLists' => $ipLists,
+            'blacklistIps' => $blacklistIps,
+            'whitelistIps' => $whitelistIps,
             'activeBans' => $activeBans,
             'firewallRules' => $firewallRules,
             'catalogServices' => $catalogServices,
