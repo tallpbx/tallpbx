@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - Unreleased
 
 ### Changed
+- **Security Menu Placement Before PBX**:
+  - Positioned the **Security** navigation link directly before the **PBX** section in the main sidebar menu (order 39), grouping core server administration, monitoring, and security together before telephony domains.
+- **Security Center Table Typography & Text Size Standardization**:
+  - Enlarged table text size across all Security Command Center tables (Blacklist, Blocked Attackers, Whitelist, and Firewall Rules) to match the standard sizing and typography of Users, Administrators, and other core panels.
+  - Replaced compact `table-xs` and `table-sm` sizing with standard table sizing (`0.875rem` / 14px body text, 14px monospace ports/protocols/IPs, and `badge-sm` tags), improving legibility and visual consistency across the application.
 - **Protection Settings Relocated to Blocked Attackers Header**:
   - Moved the **Attack Protection Settings** button from the top page header directly into the **Blocked Attackers** section header alongside "Block IP Manually", grouping intrusion detection thresholds (`max_retry`, `find_time`, `ban_time`) and attack vector toggles (SIP, Web, SSH) directly with the live threat management workbench.
 - **Pipeline-Aligned 3-Deck IP Architecture & Standardized Blacklist/Whitelist Terminology**:

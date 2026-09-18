@@ -56,7 +56,22 @@ it('registers security menu item as top-level item on main panel menu in MenuSer
         ->and($securityItem['route'])->toBe('panel.security.index')
         ->and($securityItem['permission'])->toBe('security.view')
         ->and($securityItem['parent'] ?? null)->toBeNull()
-        ->and($securityItem['order'])->toBe(45);
+        ->and($securityItem['order'])->toBe(39);
+});
+
+it('places security nav link before pbx nav link in menu tree', function (): void {
+    $this->actingAs($this->admin, 'admin');
+
+    $menuService = app(MenuService::class);
+    $tree = $menuService->getTree();
+    $keys = collect($tree)->pluck('key')->all();
+
+    $securityIndex = array_search('security', $keys, true);
+    $pbxIndex = array_search('pbx', $keys, true);
+
+    expect($securityIndex)->not->toBeFalse()
+        ->and($pbxIndex)->not->toBeFalse()
+        ->and($securityIndex)->toBeLessThan($pbxIndex);
 });
 
 it('protects panel.security.index with auth and permission middleware', function (): void {

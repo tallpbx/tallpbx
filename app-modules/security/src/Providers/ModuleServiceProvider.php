@@ -62,7 +62,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'permission' => 'security.view',
                 'icon' => 'heroicon-o-shield-check',
                 'guard' => 'admin',
-                'order' => 45,
+                'order' => 39,
             ],
         ];
     }

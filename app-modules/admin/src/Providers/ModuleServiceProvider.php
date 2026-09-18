@@ -122,7 +122,7 @@ class ModuleServiceProvider extends ServiceProvider
                 'route' => 'panel.notifications.index',
                 'permission' => 'admin.notifications.view',
                 'icon' => 'heroicon-o-bell',
-                'order' => 38,
+                'order' => 37,
             ],
             [
                 'key' => 'monitoring',
@@ -130,7 +130,7 @@ class ModuleServiceProvider extends ServiceProvider
                 'route' => 'panel.monitoring',
                 'permission' => 'admin.monitoring.view',
                 'icon' => 'heroicon-o-chart-bar',
-                'order' => 39,
+                'order' => 38,
             ],
             [
                 'key' => 'backups',
