@@ -1304,7 +1304,7 @@ return [
     'security_no_whitelist_found' => 'No IP addresses in the Whitelist.',
     'security_blacklist_desc' => 'Permanent drop rules. Traffic matching these addresses is blocked immediately in the kernel at Stage 1, taking precedence over the whitelist and general traffic.',
     'security_whitelist_desc' => 'Permanent accept rules. Traffic matching these addresses bypasses firewall restrictions and is always allowed at Stage 2.',
-    'security_blacklist_helper' => 'Blacklist rules take precedence over the whitelist and general traffic. Matching packets are dropped in kernel space before any daemon or socket handles them.',
+    'security_blacklist_helper' => 'Blacklist rules take precedence over general traffic. Matching packets are dropped in kernel space before the whitelist and before any daemon or socket handles them.',
     'security_whitelist_helper' => 'Whitelist rules guarantee unrestricted access for your administrative workstations, branch offices, and trusted SIP trunks.',
     'security_ip_added' => 'IP address added successfully.',
     'security_ip_deleted' => 'IP address removed.',
