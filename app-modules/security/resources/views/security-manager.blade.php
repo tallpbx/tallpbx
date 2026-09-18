@@ -518,14 +518,47 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200">
-                        {{-- STAGE 1 & 2: Ingress IP Pre-Filters Section Header --}}
+                        {{-- STAGE 1 & 2: Ingress IP Pre-Filters & System Invariants Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
                             <td colspan="7" class="py-2 px-3">
                                 <div class="flex items-center gap-2">
+                                    <span class="badge badge-neutral badge-outline badge-sm font-mono font-bold">{{ __('admin.security_system_badge') }}</span>
                                     <span class="badge badge-error badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_1_badge') }}</span>
                                     <span class="badge badge-success badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_2_badge') }}</span>
                                     <span class="uppercase tracking-wider text-xs">{{ __('admin.security_ip_prefilters_badge') }}</span>
                                 </div>
+                            </td>
+                        </tr>
+
+                        {{-- Base Invariant: Unconditional Loopback Interface --}}
+                        <tr class="hover bg-base-200/5">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_rule_loopback') }}</span>
+                                    <span class="badge badge-ghost badge-sm font-mono">iif "lo"</span>
+                                    <x-tooltip :tip="__('admin.security_loopback_tooltip')" align="start" position="right">
+                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                    </x-tooltip>
+                                </div>
+                            </td>
+                            <td class="text-sm text-base-content/60">
+                                {{ __('admin.security_all_ports_protocols') }}
+                            </td>
+                            <td>
+                                <span class="font-mono text-sm text-base-content/70">127.0.0.1/8, ::1</span>
+                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
                             </td>
                         </tr>
 
@@ -595,6 +628,70 @@
                             </td>
                         </tr>
 
+                        {{-- Base Invariant: Stateful Connection Tracking (Return Fastpath) --}}
+                        <tr class="hover bg-base-200/5">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_rule_conntrack') }}</span>
+                                    <span class="badge badge-ghost badge-sm font-mono">ct state established,related</span>
+                                    <x-tooltip :tip="__('admin.security_conntrack_tooltip')" align="start" position="right">
+                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                    </x-tooltip>
+                                </div>
+                            </td>
+                            <td class="text-sm text-base-content/60">
+                                {{ __('admin.security_all_ports_protocols') }}
+                            </td>
+                            <td>
+                                <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
+                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                            </td>
+                        </tr>
+
+                        {{-- Base Invariant: Invalid Packets Defense --}}
+                        <tr class="hover bg-base-200/5">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_rule_invalid_packets') }}</span>
+                                    <span class="badge badge-ghost badge-sm font-mono">ct state invalid</span>
+                                    <x-tooltip :tip="__('admin.security_invalid_tooltip')" align="start" position="right">
+                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                    </x-tooltip>
+                                </div>
+                            </td>
+                            <td class="text-sm text-base-content/60">
+                                {{ __('admin.security_all_ports_protocols') }}
+                            </td>
+                            <td>
+                                <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
+                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                            </td>
+                        </tr>
+
                         {{-- Stage 2: Trusted Whitelist --}}
                         <tr class="hover">
                             <td class="whitespace-nowrap">
@@ -625,6 +722,39 @@
                                     <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
                                     <span>{{ __('admin.security_manage_whitelist') }}</span>
                                 </a>
+                            </td>
+                        </tr>
+
+                        {{-- Base Invariant: ICMP & ICMPv6 Diagnostics --}}
+                        <tr class="hover bg-base-200/5">
+                            <td class="whitespace-nowrap">
+                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                    <span>{{ __('admin.security_rule_icmp') }}</span>
+                                    <span class="badge badge-ghost badge-sm font-mono">icmp / icmpv6</span>
+                                    <x-tooltip :tip="__('admin.security_icmp_tooltip')" align="start" position="right">
+                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                    </x-tooltip>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-sm text-base-content/60">echo-request, ND, RA</span>
+                                <span class="badge badge-neutral badge-xs font-mono ml-1">{{ __('admin.security_rate_limit_badge') }}</span>
+                            </td>
+                            <td>
+                                <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
+                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                            </td>
+                            <td class="text-right whitespace-nowrap">
+                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
                             </td>
                         </tr>
 

@@ -133,27 +133,41 @@ class SecurityConfigGenerator
             $lines[] = '        accept';
             $lines[] = '    }';
         } else {
-            $lines[] = '        # STEP 1: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY';
+            // STEP 1: Loopback interface (unconditional immunity for localhost IPC)
+            $lines[] = '        # STEP 1: BASE INVARIANT: UNCONDITIONAL LOOPBACK ACCESS';
+            $lines[] = '        iif "lo" accept';
+            $lines[] = '';
+
+            // STEP 2: Drop blacklisted networks & IPs immediately
+            $lines[] = '        # STEP 2: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY';
             $lines[] = '        ip saddr @blacklist_ips drop';
             $lines[] = '';
-            $lines[] = '        # STEP 2: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS';
+
+            // STEP 3: Drop temporarily banned brute-force attackers
+            $lines[] = '        # STEP 3: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS';
             $lines[] = '        ip saddr @banned_ips drop';
             $lines[] = '';
-            $lines[] = '        # STEP 3: BASE INVARIANTS: LOOPBACK & ESTABLISHED CONNECTIONS';
-            $lines[] = '        iif "lo" accept';
+
+            // STEP 4: Base invariants: established connections & invalid packet defense
+            $lines[] = '        # STEP 4: STATEFUL CONNECTION TRACKING & PACKET DEFENSE';
             $lines[] = '        ct state established,related accept';
             $lines[] = '        ct state invalid drop';
             $lines[] = '';
-            $lines[] = '        # STEP 4: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
+
+            // STEP 5: Accept whitelisted / trusted IPs unconditionally
+            $lines[] = '        # STEP 5: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
             $lines[] = '        ip saddr @whitelist_ips accept';
             $lines[] = '';
-            $lines[] = '        # STEP 5: ICMP (Ping) & ICMPv6 (Neighbor Discovery)';
-            $lines[] = '        ip protocol icmp icmp type echo-request accept';
-            $lines[] = '        ip6 nexthdr icmpv6 accept';
+
+            // STEP 6: ICMP (Ping with rate limiting) & ICMPv6 (Neighbor Discovery)
+            $lines[] = '        # STEP 6: ICMP (Ping) & ICMPv6 (Neighbor Discovery)';
+            $lines[] = '        ip protocol icmp icmp type echo-request limit rate 5/second burst 5 packets accept';
+            $lines[] = '        ip6 nexthdr ipv6-icmp icmpv6 type echo-request limit rate 5/second burst 5 packets accept';
+            $lines[] = '        ip6 nexthdr ipv6-icmp accept';
             $lines[] = '';
 
-            // Step 6: System PBX services from port catalog
-            $lines[] = '        # STEP 6: CORE PBX TELEPHONY PORTS';
+            // Step 7: System PBX services from port catalog
+            $lines[] = '        # STEP 7: CORE PBX TELEPHONY PORTS';
             $systemServices = SecurityService::system()->active()->get();
             foreach ($systemServices as $service) {
                 $lines[] = "        # Service: {$service->name}";
@@ -170,8 +184,8 @@ class SecurityConfigGenerator
             }
             $lines[] = '';
 
-            // Step 7: Custom sequential rules
-            $lines[] = '        # STEP 7: CUSTOM SEQUENTIAL RULES';
+            // Step 8: Custom sequential rules
+            $lines[] = '        # STEP 8: CUSTOM SEQUENTIAL RULES';
             $customRules = SecurityRule::ordered()->active()->with('service')->get();
             foreach ($customRules as $rule) {
                 $lines[] = "        # Rule {$rule->sequence}: {$rule->description}";
@@ -198,8 +212,8 @@ class SecurityConfigGenerator
             }
             $lines[] = '';
 
-            // Step 8: Default policy enforcement
-            $lines[] = '        # STEP 8: DEFAULT INBOUND POLICY';
+            // Step 9: Default policy enforcement
+            $lines[] = '        # STEP 9: DEFAULT INBOUND POLICY';
             $lines[] = "        {$defaultPolicy}";
             $lines[] = '    }';
         }

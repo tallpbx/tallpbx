@@ -1432,5 +1432,18 @@ return [
     'security_stage_4_badge' => 'Stage 4: Custom',
     'security_stage_5_badge' => 'Stage 5: Fallback',
     'security_dynamic_kernel' => 'Dynamic Kernel Drop',
+    'security_system_invariants_title' => 'Base System Invariants & Kernel Invariants',
+    'security_system_badge' => 'SYSTEM',
+    'security_kernel_invariant' => 'Kernel Invariant',
+    'security_rule_loopback' => 'Loopback Interface (lo)',
+    'security_loopback_tooltip' => 'Internal server communication (127.0.0.1 and ::1). Essential for inter-process communication between PHP-FPM, MySQL, Redis, FreeSWITCH ESL, and Reverb WebSockets. Always allowed.',
+    'security_rule_conntrack' => 'Stateful Connection Tracking',
+    'security_conntrack_tooltip' => 'Fastpath kernel acceleration for already-established connections (active SIP calls, RTP audio streams, SSH, and web sessions). Bypasses port matching.',
+    'security_rule_invalid_packets' => 'Invalid Packets Defense',
+    'security_invalid_tooltip' => 'Drops malformed packets, out-of-window TCP segments, and stealth evasion scans before any PBX services or ports are evaluated.',
+    'security_rule_icmp' => 'ICMP & ICMPv6 Diagnostics',
+    'security_icmp_tooltip' => 'Network reachability ping (IPv4 echo-request with 5/sec rate limit) and essential IPv6 neighbor discovery & router solicitation.',
+    'security_rate_limit_badge' => '5/sec limit',
+    'security_dual_stack_badge' => 'IPv4 & IPv6',
 ];
 

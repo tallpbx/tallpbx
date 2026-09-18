@@ -19,42 +19,50 @@ flowchart TD
     classDef svc fill:#1f242c,stroke:#d29922,stroke-width:2px,color:#f0e6c8
 
     %% Root Ingress Trunk (Centered)
-    A["🌐 Incoming Network Packet<br/>(Internet / LAN)"]:::spine --> B["🔌 Physical Network Card<br/>(eth0 / ens3)"]:::spine
+    A["🌐 Incoming Network Packet<br/>(Internet / LAN)"]:::spine --> B["🔌 Physical Network Card<br/>(eth0 / ens3 / lo)"]:::spine
     B --> C["🛡️ Linux Kernel Firewall<br/>(nftables tallpbx_filter)"]:::spine
 
     %% Pre-Filter Decisions: Drops on Left, Passes on Right, Center Spine
-    C --> D{"Step 1: Permanent Blacklist?<br/>(@blacklist_ips)"}:::spine
-    D -->|YES: Blacklisted| DROP1["❌ DROP IMMEDIATELY<br/>(Zero CPU / Discard)"]:::drop
-    D -->|NO: Safe| E{"Step 2: Active Banned Attacker?<br/>(@banned_ips)"}:::spine
+    C --> D{"Step 1: Loopback Interface?<br/>(iif 'lo')"}:::spine
+    D -->|YES: Local IPC| PASS0["✅ ALLOW UNCONDITIONALLY<br/>(Protected Localhost)"]:::allow
+    D -->|NO: External| E{"Step 2: Permanent Blacklist?<br/>(@blacklist_ips)"}:::spine
 
-    E -->|YES: Timed Ban| DROP2["❌ DROP IMMEDIATELY<br/>(Kernel Auto-Timeout)"]:::drop
-    E -->|NO: Safe| F{"Step 3: Established or Loopback?<br/>(ct state / lo)"}:::spine
+    E -->|YES: Blacklisted| DROP1["❌ DROP IMMEDIATELY<br/>(Zero CPU / Discard)"]:::drop
+    E -->|NO: Safe| F{"Step 3: Active Banned Attacker?<br/>(@banned_ips)"}:::spine
 
-    F -->|NO| G{"Step 4: Trusted Whitelist?<br/>(@whitelist_ips)"}:::spine
-    F -->|YES: Valid Session| PASS1["✅ ALLOW DIRECTLY<br/>(Fast-path Conntrack)"]:::allow
+    F -->|YES: Timed Ban| DROP2["❌ DROP IMMEDIATELY<br/>(Kernel Auto-Timeout)"]:::drop
+    F -->|NO: Safe| G{"Step 4: Established or Invalid?<br/>(ct state)"}:::spine
 
-    G -->|NO: New Traffic| H{"Step 5: Matches Allowed PBX Port?<br/>(Sequential Rule Order)"}:::spine
-    G -->|YES: Admin / Office| PASS2["✅ ALLOW UNCONDITIONALLY<br/>(Bypass Port Checks)"]:::allow
+    G -->|Invalid Packet| DROP_INV["❌ DROP PACKET<br/>(Malformed / Out-of-Window)"]:::drop
+    G -->|Established / Related| PASS1["✅ ALLOW DIRECTLY<br/>(Fast-path Conntrack)"]:::allow
+    G -->|New Connection| H{"Step 5: Trusted Whitelist?<br/>(@whitelist_ips)"}:::spine
+
+    H -->|YES: Admin / Office| PASS2["✅ ALLOW UNCONDITIONALLY<br/>(Bypass Port Checks)"]:::allow
+    H -->|NO: Untrusted| I{"Step 6: Diagnostic Ping?<br/>(ICMP / ICMPv6)"}:::spine
+
+    I -->|ICMP Echo > 5/sec| DROP_ICMP["❌ DROP FLOOD<br/>(Rate Limited)"]:::drop
+    I -->|ICMP <= 5/sec or ND/RA| PASS_ICMP["✅ ALLOW REACHABILITY<br/>(Controlled Diagnostics)"]:::allow
+    I -->|Non-ICMP Traffic| J{"Step 7 & 8: Matches PBX Port or Custom Rule?"}:::spine
 
     %% PBX Services Subgraph (Evenly Distributed)
     subgraph SERVICES ["PBX Services & Application Routing"]
         direction TB
-        H -->|SIP 5060/5061/5080| I["📞 FreeSWITCH Telephony"]:::svc
-        H -->|RTP 16384-32768| J["🔊 Audio Stream (RTP)"]:::svc
-        H -->|Web 80/443| K["🌐 Nginx & Web Admin"]:::svc
-        H -->|SSH 22| L["🔒 Secure Shell (SSH)"]:::svc
-        H -->|No Rule Matched| M{"Default Policy?"}:::spine
+        J -->|SIP 5060/5061/5080| K["📞 FreeSWITCH Telephony"]:::svc
+        J -->|RTP 16384-32768| L["🔊 Audio Stream (RTP)"]:::svc
+        J -->|Web 80/443| M["🌐 Nginx & Web Admin"]:::svc
+        J -->|SSH 22| N["🔒 Secure Shell (SSH)"]:::svc
+        J -->|No Rule Matched| O{"Step 9: Default Policy?"}:::spine
 
-        M -->|Policy = DROP| DROP3["❌ DROP PACKET<br/>(Blocked by Default)"]:::drop
-        M -->|Policy = ACCEPT| PASS3["✅ ACCEPT PACKET"]:::allow
+        O -->|Policy = DROP| DROP3["❌ DROP PACKET<br/>(Blocked by Default)"]:::drop
+        O -->|Policy = ACCEPT| PASS3["✅ ACCEPT PACKET"]:::allow
 
-        I --> N{"SIP Auth & ACL Guard"}:::svc
-        N -->|Failed Password| O["🚨 Trigger Kernel Ban & Live Alert"]:::drop
-        N -->|Trusted Trunk / Extension| P["📱 Call Connected & Audio Rings"]:::allow
+        K --> P{"SIP Auth & ACL Guard"}:::svc
+        P -->|Failed Password| Q["🚨 Trigger Kernel Ban & Live Alert"]:::drop
+        P -->|Trusted Trunk / Extension| R["📱 Call Connected & Audio Rings"]:::allow
 
-        K --> Q{"Web Auth Guard"}:::svc
-        Q -->|Failed Login| R["🚨 Trigger Kernel Ban & Live Alert"]:::drop
-        Q -->|Valid Credentials| S["🖥️ Access Control Panel"]:::allow
+        M --> S{"Web Auth Guard"}:::svc
+        S -->|Failed Login| T["🚨 Trigger Kernel Ban & Live Alert"]:::drop
+        S -->|Valid Credentials| U["🖥️ Access Control Panel"]:::allow
     end
 ```
 
@@ -110,7 +118,28 @@ sequenceDiagram
 
 ---
 
-## 4. Understanding Sequential Firewall Rules: "Top to Bottom"
+## 4. Security Command Center Interface
+
+The **Security Command Center** provides a single, unified view of the complete host firewall, active intrusion bans, trusted IP networks, and the sequential packet filtering pipeline:
+
+![TallPBX Security Command Center](images/security-dashboard-full.png)
+
+### Key Interface Components
+1. **Status & Threat Overview**: Real-time indicators for `nftables` firewall state, intrusion detection engine status, active ban counters, and administrator zero-lockout protection.
+2. **Pipeline-Aligned IP Workbenches**: Arranged in the exact sequential order traffic is evaluated:
+   - **Blacklist IPs (Always Dropped)**: Permanent drop list with preflight guidance and search filtering.
+   - **Blocked Attackers**: Active intrusion bans with vector badges (`SIP`, `Web`, `SSH`), automated hardware timeout countdowns, and protection sensitivity settings.
+   - **Whitelist IPs (Always Allowed)**: Permanent bypass list with 1-click self-protection for administrator IPs.
+3. **Unified Firewall Rules & Port Access Table**: Shows the complete, living Linux kernel packet filtering pipeline:
+   - **Base System Invariants**: Unconditional loopback access (`lo`), stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and ICMP/ICMPv6 reachability ping with rate limiting.
+   - **Stage 1 & 2 Drops & Bypass**: Blacklist drops, active intruder bans, and whitelist bypass.
+   - **Stage 3 Core PBX Telephony Ports**: Service toggles and custom port/protocol editing with zero-lockout validation.
+   - **Stage 4 Custom Rules**: Sequential port rules with priority reordering.
+   - **Stage 5 Default Policy**: Inbound fallback policy (`drop` or `accept`).
+
+---
+
+## 5. Understanding Sequential Firewall Rules: "Top to Bottom"
 
 Firewall rules in the **Security Command Center** are evaluated sequentially from top to bottom.
 
@@ -137,7 +166,7 @@ You can use the **Up** and **Down** priority buttons in the Security Center to a
 
 ---
 
-## 5. Multi-Layer PBX Security: What Protects What?
+## 6. Multi-Layer PBX Security: What Protects What?
 
 TallPBX features distinct layers of security designed for different parts of the system:
 
@@ -150,7 +179,7 @@ TallPBX features distinct layers of security designed for different parts of the
 
 ---
 
-## 6. Two-Tier Persistence & Server Reboot Retention
+## 7. Two-Tier Persistence & Server Reboot Retention
 
 TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, and active attacker bans survive reboots:
 
@@ -168,14 +197,14 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, and
 
 ---
 
-## 7. Real-Time Responsiveness: No Polling, Zero Staging
+## 8. Real-Time Responsiveness: No Polling, Zero Staging
 
 * **No Manual Refresh Buttons**: The Security Command Center connects directly to **Laravel Reverb WebSockets** via **Laravel Echo**. When an attacker is banned, unbanned, or a rule is updated, status cards and threat tables update reactively within milliseconds.
 * **Instant Auto-Application**: Administrators do not have to perform awkward multi-step "stage changes, then click Save & Apply" flows. Modifying an IP list, toggling a firewall rule, or adding a port catalog service immediately validates syntax atomically and applies to the running Linux kernel in real time.
 
 ---
 
-## 8. Linux CLI Administration & nftables Manual Management
+## 9. Linux CLI Administration & nftables Manual Management
 
 While the TallPBX Security Command Center provides an intuitive web interface, system administrators can view, inspect, and update firewall rules and intruder bans directly from the Linux command-line interface (CLI).
 
@@ -186,7 +215,7 @@ TallPBX provides three complementary levels of CLI control:
 
 ---
 
-### 8.1 Method 1: TallPBX Artisan CLI (Recommended)
+### 9.1 Method 1: TallPBX Artisan CLI (Recommended)
 
 Running Artisan commands from the project root (`/var/www/tallpbx`) ensures that changes update the MariaDB authoritative database, Redis sliding windows, and the Linux kernel simultaneously.
 
@@ -212,7 +241,7 @@ php artisan security:apply
 
 ---
 
-### 8.2 Method 2: Bounded Root Helper (`/usr/local/sbin/tallpbx-security`)
+### 9.2 Method 2: Bounded Root Helper (`/usr/local/sbin/tallpbx-security`)
 
 TallPBX installs a dedicated, root-owned helper script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`) with a matching sudoers entry (`/etc/sudoers.d/tallpbx-security`). This script enforces strict parameter regex validation before executing kernel operations:
 
@@ -245,7 +274,7 @@ sudo /usr/local/sbin/tallpbx-security apply
 
 ---
 
-### 8.3 Method 3: Direct Linux `nftables` Commands
+### 9.3 Method 3: Direct Linux `nftables` Commands
 
 System administrators with root or sudo access can inspect and interact directly with Linux `nftables`:
 
@@ -306,7 +335,7 @@ sudo systemctl status nftables
 
 ---
 
-### 8.4 Action Comparison: Web UI vs. CLI vs. Direct nftables
+### 9.4 Action Comparison: Web UI vs. CLI vs. Direct nftables
 
 The table below outlines how common security tasks are performed across the Web UI, TallPBX CLI tools, and direct OS commands:
 

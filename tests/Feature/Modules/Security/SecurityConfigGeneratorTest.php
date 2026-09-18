@@ -37,8 +37,8 @@ it('generates valid nftables ruleset structure with invariants and default drop 
         ->and($nft)->toContain('iif "lo" accept')
         ->and($nft)->toContain('ct state established,related accept')
         ->and($nft)->toContain('ct state invalid drop')
-        ->and($nft)->toContain('ip protocol icmp icmp type echo-request accept')
-        ->and($nft)->toContain('ip6 nexthdr icmpv6 accept')
+        ->and($nft)->toContain('ip protocol icmp icmp type echo-request limit rate 5/second burst 5 packets accept')
+        ->and($nft)->toContain('ip6 nexthdr ipv6-icmp accept')
         ->and($nft)->toContain('chain forward {')
         ->and($nft)->toContain('chain output {');
 });

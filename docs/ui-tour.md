@@ -72,4 +72,18 @@ Users can toggle their preferred language instantly via the topbar language drop
 
 ![TallPBX Multi-Language Localization](images/pbx-multi-language.png)
 
+---
+
+## 4. Security Command Center & Host Firewall
+
+The **Security Command Center** provides system administrators with real-time visibility into the Linux kernel `nftables` host firewall, automated intrusion detection, and sequential packet filtering pipelines.
+
+* **Reactive Live Updates**: Connected directly to Laravel Reverb WebSockets — active threat counters, ban expirations, and rule changes update instantaneously across sessions without manual page refreshes.
+* **Pipeline-Aligned IP Workbenches**: Dedicated tables for Permanent Blacklists, Temporarily Blocked Attackers (with 1-click unban and threshold controls), and Whitelist IPs with administrator self-protection.
+* **Living Kernel Ruleset**: Displays base system invariants (unconditional loopback access, stateful connection tracking, invalid packet defense, and rate-limited ICMP ping) alongside PBX telephony ports and custom sequential rules.
+* **Zero-Lockout Protection**: Automatic preflight safety testing prevents administrators from inadvertently dropping or blocking their own connection IP.
+
+![TallPBX Security Command Center](images/security-dashboard-full.png)
+
+
 

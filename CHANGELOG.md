@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - Unreleased
 
 ### Changed
+- **Kernel Pipeline Invariants & Loopback Step 1 Reordering**:
+  - Reordered the Linux `nftables` inbound pipeline in `SecurityConfigGenerator` so unconditional loopback access (`iif "lo" accept`) evaluates at Step 1 before blacklists and dynamic bans, guaranteeing uninterrupted internal localhost IPC between PHP-FPM, MariaDB, Redis, FreeSWITCH ESL, and Laravel Reverb WebSockets.
+  - Implemented burstable ICMP rate limiting (`limit rate 5/second burst 5 packets accept` for IPv4 and IPv6) with full support for IPv6 Neighbor Discovery and Router Solicitation, safeguarding against ping floods while preserving essential network diagnostics.
+- **Base System Invariants Displayed in Security Command Center**:
+  - Displayed living Base System Invariants directly in the **Firewall Rules & Port Access** table (`security-manager.blade.php`), exposing loopback interface access, stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and ICMP diagnostics with rate limiting and dual-stack IPv4/IPv6 indicators.
+  - Added full multilingual translations across English, Spanish, and French (`lang/en/admin.php`, `lang/es/admin.php`, `lang/fr/admin.php`) for all invariant tooltips, badges, and rule descriptions.
+- **Documentation & UI Tour Showcase**:
+  - Added the Security Command Center high-resolution screencapture and architecture overview to `docs/security-architecture.md` and `docs/ui-tour.md`.
+  - Updated the inbound ingress Mermaid flowcharts and sequential rule documentation to reflect the 9-step kernel filtering pipeline.
 - **Blacklist IP Precedence Clarification & Multilingual Translations**:
   - Updated the Blacklist section description and advisory helper across English, Spanish, and French (`lang/en/admin.php`, `lang/es/admin.php`, `lang/fr/admin.php`) to explicitly state that Blacklist drop rules take precedence over general traffic and are dropped before the whitelist.
   - Fully synchronized all 50+ new Security Center pipeline, table, and service keys across `es` and `fr` translation catalogs.
