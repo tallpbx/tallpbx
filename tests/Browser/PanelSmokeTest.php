@@ -591,7 +591,7 @@ it('renders the security manager dashboard', function () {
 
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
-            ->resize(1920, 2200)
+            ->resize(1920, 3200)
             ->visit('/panel/security')
             ->waitForText('Security Center', 5)
             ->assertSee('Security Center')
@@ -603,7 +603,15 @@ it('renders the security manager dashboard', function () {
             ->assertSee('STAGE 1')
             ->assertSee('STAGE 2')
             ->assertSee('STAGE 3')
-            ->assertSee('SIP Signaling')
+            ->assertSee('STAGE 5')
+            ->assertSee('SIP Signaling');
+
+        // Dynamically measure document height and resize to fit completely with margin
+        $measuredHeight = (int) ($browser->script('return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);')[0] ?? 3200);
+        $targetHeight = max(3200, $measuredHeight + 120);
+
+        $browser->resize(1920, $targetHeight)
+            ->pause(500)
             ->screenshot('security-dashboard-full');
     });
 });
