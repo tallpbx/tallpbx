@@ -60,7 +60,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Outbound Routes** | `outbound-routes` (Prefix/length patterns, gateways) | `app/dialplan_outbound` | `core` (Outbound Routes) | 🟢 **Full Parity** |
 | **Number Translations** | `number-translations` (Inbound/Outbound digit rewrites) | Dialplan regex actions | `core` (Dial Rules) | 🟢 **Full Parity** |
 | **Bridges & Destinations**| `bridges`, `destinations` | `app/bridges`, `app/destinations` | `customappsreg`, `miscapps` | 🟢 **Full Parity** |
-| **Access Controls (ACL)** | `access-controls` (Dynamic `acl.conf.xml` generation) | `app/access_controls` | `firewall` (Fail2ban/iptables) | 🟢 **Full Parity** |
+| **Access Control Lists (ACL)** | `access-controls` (FreeSWITCH application-level `acl.conf.xml` for SIP/ESL trust) | `app/access_controls` | `sipsettings` / Asterisk ACLs (`permit/deny`) | 🟢 **Full Parity** |
 
 ---
 

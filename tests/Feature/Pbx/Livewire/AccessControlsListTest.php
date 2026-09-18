@@ -56,3 +56,9 @@ it('shows empty state when no rules exist', function () {
         ->test(AccessControlsList::class)
         ->assertSee('No access control lists found');
 });
+
+it('displays the access control list tooltip differentiating from firewall settings', function () {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(AccessControlsList::class)
+        ->assertSee(__('admin.access_controls_tooltip'));
+});
