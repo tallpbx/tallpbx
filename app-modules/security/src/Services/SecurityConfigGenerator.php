@@ -147,8 +147,9 @@ class SecurityConfigGenerator
             $lines[] = '        # STEP 4: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
             $lines[] = '        ip saddr @whitelist_ips accept';
             $lines[] = '';
-            $lines[] = '        # STEP 5: ICMP (Ping)';
+            $lines[] = '        # STEP 5: ICMP (Ping) & ICMPv6 (Neighbor Discovery)';
             $lines[] = '        ip protocol icmp icmp type echo-request accept';
+            $lines[] = '        ip6 nexthdr icmpv6 accept';
             $lines[] = '';
 
             // Step 6: System PBX services from port catalog
