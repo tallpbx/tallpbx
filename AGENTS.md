@@ -373,6 +373,42 @@ protected function menuItems(): array
 - Admin module components (admin has its own patterns)
 - Components with custom render methods that pass data to views (keep the render method, but add `->layout('layouts.app')` to the return)
 
+### Real-Time Responsiveness & Push Events Policy (No Polling, No Manual Refresh Buttons)
+
+- **Strict Prohibitions**:
+  - `wire:poll` and manual "Refresh Status" / "Reload" buttons are STRICTLY PROHIBITED project-wide for any status indicators, metrics, tables, or operational dashboards that can be pushed or reactively updated.
+  - Periodic polling wastes network bandwidth, database queries, and CPU cycles, while manual refresh buttons introduce poor UX and stale data.
+- **Canonical Implementation (`resources/views/components/dashboard/stats.blade.php`)**:
+  - Livewire components must be real-time reactive using push-based mechanisms:
+    1. **WebSocket Broadcasting (Laravel Reverb)**: Listen to real-time events via Livewire 4's Echo attributes:
+       ```php
+       #[On('echo:<channel>,.<EventClass>')]
+       public function refreshData(): void { /* update properties */ }
+       ```
+    2. **Livewire Event Binding**: For user interactions and local actions across components, listen using `#[On('event-name')]`:
+       ```php
+       #[On('refresh-monitoring')]
+       #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
+       public function refreshMonitoringData(): void
+       ```
+    3. **Computed Properties**: Use `#[Computed]` for derived data so Livewire re-computes them automatically when dependencies change.
+  - Automated tests must assert the absence of polling and manual refresh:
+    ```php
+    ->assertDontSee('wire:poll')
+    ->assertDontSee('wire:click="refreshStatus"', false);
+    ```
+
+### Instant Auto-Application of System Configuration (Zero-Staging Workflow)
+
+- **Avoid Manual "Stage then Apply" Workflows**:
+  - Do NOT require users to perform a multi-step staging workflow (e.g. edit a rule, increment a pending counter, and then click a separate "Save & Apply Changes" button) when atomic execution is practical and safe.
+  - Modern administrative interfaces must apply state changes immediately upon user interaction without fragile, cumbersome staging intermediate states.
+- **Immediate Subsystem Synchronization**:
+  - When an administrator or user modifies a configuration (e.g. whitelisting/blacklisting an IP, toggling a firewall rule, changing a sensitivity threshold, or reordering priorities), the change must be persisted to the database AND immediately applied to the underlying subsystem (e.g. Linux kernel `nftables` packet filter, FreeSWITCH runtime XML, cache).
+- **Atomic Safety & Rollback**:
+  - Always execute preflight safety checks (e.g. `LockoutGuardService::assertSafe()`) and atomic syntax checks (e.g. `nft -c`) before loading configuration into the kernel or FreeSWITCH.
+  - If a preflight check fails, reject the change immediately, notify the user with a descriptive toast alert (`$this->showError(...)`), and keep active running configuration untouched.
+
 ## FreeSWITCH Telephony Integration
 - Do not write static XML configuration files to disk. Instead, serve dynamic dialplans, directories, configurations, and phrases using FreeSWITCH's `mod_xml_curl` through the application's XML Handler API (`/api/v1/xml-handler`).
 - Store media payloads such as call recordings, uploaded recordings, voicemails, and fax files as files. Database tables should store file paths and metadata only; do not introduce base64/blob media storage for these payloads.

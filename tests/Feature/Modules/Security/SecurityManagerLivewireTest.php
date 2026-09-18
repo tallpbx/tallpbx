@@ -45,7 +45,10 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Your Connection')
         ->assertSee('Trusted & Blocked IP Addresses')
         ->assertSee('Firewall Rules & Port Access')
-        ->assertSee('Standard PBX Ports');
+        ->assertSee('Standard PBX Ports')
+        ->assertDontSee('wire:click="refreshStatus"', false)
+        ->assertDontSee('wire:click="applyFirewallChanges"', false)
+        ->assertDontSee('wire:poll', false);
 });
 
 it('detects the administrator IP and allows 1-click whitelisting', function (): void {
@@ -274,4 +277,15 @@ it('applies firewall changes atomically via executor when lockout safe', functio
         ->test(SecurityManager::class)
         ->call('applyFirewallChanges')
         ->assertSet('pendingChangesCount', 0);
+});
+
+it('reactively updates status upon receiving refresh-security or echo push events without manual page reload', function (): void {
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('firewallDefaultPolicy', 'drop');
+
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'accept']);
+
+    $component->dispatch('refresh-security')
+        ->assertSet('firewallDefaultPolicy', 'accept');
 });

@@ -11,10 +11,6 @@
             <p class="text-sm text-base-content/70 mt-1">{{ __('admin.security_description') }}</p>
         </div>
         <div class="flex items-center gap-2">
-            <button wire:click="refreshStatus" type="button" class="btn btn-outline btn-sm gap-2">
-                <x-heroicon-o-arrow-path class="w-4 h-4" />
-                <span>{{ __('admin.security_refresh') }}</span>
-            </button>
             <button wire:click="openSettingsDrawer" type="button" class="btn btn-neutral btn-sm gap-2">
                 <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
                 <span>{{ __('admin.security_settings') }}</span>
@@ -371,16 +367,6 @@
                     <button wire:click="openCustomRuleModal" type="button" class="btn btn-neutral btn-sm gap-1">
                         <x-heroicon-o-plus class="w-4 h-4" />
                         <span>{{ __('admin.security_add_rule') }}</span>
-                    </button>
-
-                    {{-- Save & Apply Changes (pulsing when pending) --}}
-                    <button wire:click="applyFirewallChanges" type="button"
-                            class="btn {{ $pendingChangesCount > 0 ? 'btn-primary animate-pulse' : 'btn-outline' }} btn-sm gap-2">
-                        <x-heroicon-o-check class="w-4 h-4" />
-                        <span>{{ __('admin.security_apply_changes') }}</span>
-                        @if ($pendingChangesCount > 0)
-                            <span class="badge badge-warning badge-xs font-mono font-bold">{{ $pendingChangesCount }}</span>
-                        @endif
                     </button>
                 </div>
             </div>

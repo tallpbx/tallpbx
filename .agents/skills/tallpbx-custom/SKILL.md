@@ -241,6 +241,22 @@ The `@click` on the label fires reliably regardless of DaisyUI's radio styling,
 updating both Alpine state (instant UI) and the Livewire property (next
 server request).
 
+## Real-Time Push Responsiveness (No Polling or Manual Refresh)
+
+- **Strict Prohibitions**: `wire:poll` and manual "Refresh" / "Reload" buttons are strictly prohibited for dashboards, tables, and system statuses.
+- **Push Architecture (See `components/dashboard/stats.blade.php`)**:
+  - Livewire components must be real-time reactive using push-based mechanisms:
+    1. **Laravel Reverb (WebSockets)**: `#[On('echo:<channel>,.<EventClass>')]`
+    2. **Livewire Event Binding**: `#[On('event-name')]`
+    3. **Computed Properties**: `#[Computed]`
+  - Automated tests must assert `->assertDontSee('wire:poll')` and `->assertDontSee('wire:click="refreshStatus"', false)`.
+
+## Instant Auto-Application of System Configuration (Zero-Staging Workflow)
+
+- **Avoid Staging Friction**: Never force users into multi-step "stage changes, then click Save & Apply" flows when atomic application is safe.
+- **Immediate Subsystem Synchronization**: When an administrator toggles a rule, updates sensitivity, adds an IP, or reorders priorities, persist to the DB and apply to the kernel (`nftables`) or FreeSWITCH immediately.
+- **Atomic Preflight Safety**: Always run `LockoutGuardService::assertSafe()` and preflight syntax checks (`nft -c`) before applying. On failure, notify via toast alert and preserve active configuration.
+
 ## DaisyUI 5 CSS Compilation Behavior
 
 DaisyUI 5 registers utility classes (tooltip, btn, badge, etc.) via Tailwind v4's

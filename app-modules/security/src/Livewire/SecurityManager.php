@@ -9,6 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
@@ -184,18 +185,22 @@ class SecurityManager extends Component
     {
         $lockoutGuard->whitelistIp($this->adminIp, 'Auto-whitelisted administrator session');
         $this->isCurrentIpWhitelisted = true;
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset($lockoutGuard);
         $this->notifySuccess((string) __('admin.security_ip_protected_success'));
     }
 
     /**
-     * Refresh the component state and recalculate active threat metrics.
+     * Real-time push-event listener and status updater.
      */
-    public function refreshStatus(LockoutGuardService $lockoutGuard): void
+    #[On('refresh-security')]
+    #[On('echo:security.alerts,.SecurityBanUpdated')]
+    #[On('echo:security.alerts,.SecurityIncidentLogged')]
+    #[On('echo:security.alerts,.FirewallRulesetUpdated')]
+    public function refreshStatus(?LockoutGuardService $lockoutGuard = null): void
     {
+        $lockoutGuard ??= app(LockoutGuardService::class);
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
-        $this->notifySuccess((string) __('admin.security_refresh'));
     }
 
     /**
@@ -240,7 +245,7 @@ class SecurityManager extends Component
         $this->newIp = '';
         $this->newIpDescription = '';
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset($lockoutGuard);
         $this->notifySuccess((string) __('admin.security_ip_added'));
     }
 
@@ -253,7 +258,7 @@ class SecurityManager extends Component
         $entry->delete();
 
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset($lockoutGuard);
         $this->notifySuccess((string) __('admin.security_ip_deleted'));
     }
 
@@ -283,7 +288,7 @@ class SecurityManager extends Component
         }
 
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset($lockoutGuard);
         $this->notifySuccess((string) __('admin.security_promoted_whitelist'));
     }
 
@@ -302,7 +307,7 @@ class SecurityManager extends Component
             );
         }
 
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_promoted_blacklist'));
     }
 
@@ -340,7 +345,7 @@ class SecurityManager extends Component
                 ['type' => 'blacklist', 'ip_address' => $ip],
                 ['description' => $reason]
             );
-            $this->incrementPendingChanges();
+            $this->autoApplyFirewallRuleset();
         } else {
             $banService->ban($ip, 'manual', $reason, $this->manualBanDuration);
         }
@@ -368,7 +373,7 @@ class SecurityManager extends Component
                 $previous->save();
             });
 
-            $this->incrementPendingChanges();
+            $this->autoApplyFirewallRuleset();
             $this->notifySuccess((string) __('admin.security_rule_reordered'));
         }
     }
@@ -392,7 +397,7 @@ class SecurityManager extends Component
                 $next->save();
             });
 
-            $this->incrementPendingChanges();
+            $this->autoApplyFirewallRuleset();
             $this->notifySuccess((string) __('admin.security_rule_reordered'));
         }
     }
@@ -406,7 +411,7 @@ class SecurityManager extends Component
         $rule->enabled = ! $rule->enabled;
         $rule->save();
 
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_rule_updated'));
     }
 
@@ -418,7 +423,7 @@ class SecurityManager extends Component
         $rule = SecurityRule::findOrFail($ruleId);
         $rule->delete();
 
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_rule_deleted'));
     }
 
@@ -439,7 +444,7 @@ class SecurityManager extends Component
             'enabled' => true,
         ]);
 
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_rule_created'));
     }
 
@@ -507,27 +512,31 @@ class SecurityManager extends Component
         }
 
         $this->showRuleModal = false;
-        $this->incrementPendingChanges();
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_rule_created'));
     }
 
     /**
-     * Compile and atomically apply firewall changes to the Linux kernel via nftables.
+     * Automatically compile and atomically apply firewall changes to the Linux kernel.
      */
-    public function applyFirewallChanges(
-        LockoutGuardService $lockoutGuard,
-        SecurityConfigGenerator $generator,
-        SecurityExecutorInterface $executor,
+    public function autoApplyFirewallRuleset(
+        ?LockoutGuardService $lockoutGuard = null,
+        ?SecurityConfigGenerator $generator = null,
+        ?SecurityExecutorInterface $executor = null,
         bool $force = false
-    ): void {
+    ): bool {
+        $lockoutGuard ??= app(LockoutGuardService::class);
+        $generator ??= app(SecurityConfigGenerator::class);
+        $executor ??= app(SecurityExecutorInterface::class);
+
         // 1. Zero-lockout preflight validation
-        if (! $force) {
+        if (! $force && $this->adminIp !== null && $this->adminIp !== '') {
             try {
                 $lockoutGuard->assertSafe($this->adminIp, $this->firewallDefaultPolicy);
             } catch (LockoutException $e) {
                 $this->notifyError($e->getMessage());
 
-                return;
+                return false;
             }
         }
 
@@ -537,34 +546,49 @@ class SecurityManager extends Component
         } catch (\Throwable $e) {
             $this->notifyError("Failed to write pending configuration: {$e->getMessage()}");
 
-            return;
+            return false;
         }
 
         // 3. Preflight syntax check
         if (! $generator->validateSyntax($pendingFile)) {
             $this->notifyError('Pending firewall configuration failed nftables syntax validation. Kernel ruleset was not modified.');
 
-            return;
+            return false;
         }
 
         // 4. Apply via bounded host helper
         if (! $executor->apply()) {
             $this->notifyError('Failed to apply firewall ruleset via bounded helper.');
 
-            return;
+            return false;
         }
 
         // 5. Audit log and reset pending changes counter
         SecurityAuditLog::record(
             action: 'firewall_applied_ui',
             ipAddress: $this->adminIp,
-            description: 'Firewall ruleset applied from Security Command Center UI',
+            description: 'Firewall ruleset applied automatically from Security Command Center UI',
             adminId: Auth::guard('admin')->id()
         );
 
         $this->pendingChangesCount = 0;
         SecuritySetting::updateOrCreate(['key' => 'pending_changes_count'], ['value' => '0']);
-        $this->notifySuccess((string) __('admin.security_firewall_applied_success'));
+
+        return true;
+    }
+
+    /**
+     * Compile and atomically apply firewall changes to the Linux kernel via nftables.
+     */
+    public function applyFirewallChanges(
+        ?LockoutGuardService $lockoutGuard = null,
+        ?SecurityConfigGenerator $generator = null,
+        ?SecurityExecutorInterface $executor = null,
+        bool $force = false
+    ): void {
+        if ($this->autoApplyFirewallRuleset($lockoutGuard, $generator, $executor, $force)) {
+            $this->notifySuccess((string) __('admin.security_firewall_applied_success'));
+        }
     }
 
     /**
@@ -606,8 +630,8 @@ class SecurityManager extends Component
         SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => $this->firewallEnabled ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'attack_protection_enabled'], ['value' => $this->attackProtectionEnabled ? '1' : '0']);
 
-        $this->incrementPendingChanges();
         $this->showSettingsDrawer = false;
+        $this->autoApplyFirewallRuleset();
         $this->notifySuccess((string) __('admin.security_settings_saved'));
     }
 
