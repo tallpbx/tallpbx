@@ -12,6 +12,7 @@ TallPBX is a self-hosted business phone system named after its foundation on the
 - Deliver voicemail notifications, password resets, and system alerts via standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft 365, or custom providers).
 - Operate one or more customer or business tenants from the same system.
 - Keep backups and restore approved backup operations.
+- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP and web vectors, automatic ban management, and zero-lockout protection.
 
 TallPBX is the phone-system software, not a telephone carrier. You need a SIP
 trunk or gateway from a provider if you want to place or receive public phone
@@ -35,10 +36,12 @@ TallPBX delivers feature and function parity with established open-source PBX pl
 | **User Impersonation** | **1-Click Native Impersonation** (Instant tenant user perspective, persistent recovery banner & audit trail) | Limited (Domain switching only, no direct user session impersonation) | None (Separate UCP logins, no multi-tenant user impersonation) |
 | **Multi-Language Support** | **Native Multi-Lingual** (English, Spanish, French with instant topbar switcher, locale routing & user preference) | Partial / Community arrays (`app_languages.php`) | Partial gettext / PO files (often incomplete, English-centric) |
 | **User Interface & Layout** | **Dual Layouts**: Collapsible mini-rail sidebar (`w-16` / `w-64`) & horizontal topbar dropdowns with per-user persistence | Fixed top navbar (legacy procedural HTML) | Fixed top navbar (classic FreePBX theme) |
+| **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Multi-Vector Defense** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
+| **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
 | **Automated Testing** | **1,993 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
-See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 58 PBX modules (Extensions, Routing, PBX Features, Media, Operations, and Administration).
+See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 59 PBX modules (Extensions, Routing, PBX Features, Media, Operations, Security, and Administration).
 
 ## User Interface & Visual Tour
 
@@ -229,6 +232,45 @@ After changing these settings, clear and rebuild Laravel caches:
 ```bash
 php artisan optimize:clear
 php artisan optimize
+```
+
+## Integrated Security & Threat Defense
+
+TallPBX includes a first-party Security module (`app-modules/security`) that replaces legacy log scrapers (like Fail2ban) with native Linux kernel packet filtering and real-time application intrusion defense:
+
+### 1. Linux Kernel Firewall (nftables)
+- **High-Performance Kernel Sets**: Fast in-kernel lookups with `@whitelist_ips`, `@blacklist_ips`, and `@banned_ips` (supporting dynamic kernel timeouts).
+- **Atomic Preflight Verification**: Proposed firewall rules are compiled to `/etc/tallpbx/firewall.nft.pending` and verified atomically using `nft -c -f` before replacing the active ruleset, preventing syntax corruption or broken rules from taking down host networking.
+- **Critical Protocol Safeguards**: IPv6 Neighbor Discovery (`ip6 nexthdr icmpv6 accept`) and standard ICMP echo requests are explicitly allowed so DNS resolution and network diagnostics never stall.
+
+### 2. Multi-Vector Real-Time Intrusion Prevention
+- **FreeSWITCH SIP Auth Scanning**: FreeSWITCH Event Socket Layer (ESL) captures `sofia::failed_auth` events as they happen, blocking SIP registration brute-force attackers in sub-seconds.
+- **Web Control Panel Brute-Force**: In-process interception of Laravel authentication failures (`Illuminate\Auth\Events\Failed`), blocking web brute-force attacks before they exhaust server resources.
+- **Sliding-Window Rate Limiting**: Redis-backed incident tracking evaluates configurable retry limits (`max_retry`), time windows (`find_time`), and ban durations (`ban_time`).
+
+### 3. Zero-Lockout Safety Guard
+- **Pre-Flight Protection**: The system inspects the administrator's current remote IP, session context, and local network subnets before applying restrictive default `DROP` firewall policies.
+- **Bypass Protection**: Banning services refuse to block whitelisted IPs, subnets, or loopback addresses, preventing accidental administrative lockouts.
+
+### 4. Hardened Linux CLI Execution & Jailbreak Defense
+TallPBX enforces a strict two-tier execution policy to prevent command injection (CWE-78) and root privilege escalation:
+- **Unprivileged Execution**: The web application and PHP-FPM run under the unprivileged `www-data` user with zero direct access to root shells or general system utilities.
+- **Bounded Sudoers Architecture**: Privileged operations (firewall compilation, kernel set ban/unban) are encapsulated in a dedicated root-owned script (`/usr/local/bin/tallpbx-security`, mode `0750 root:www-data`).
+- **Strict Parameter Whitelisting**: The sudoers drop-in (`/etc/sudoers.d/tallpbx-security`) permits execution exclusively for that single binary. The script strictly regex-validates all parameters (IPs, CIDRs, actions) and runs non-interactively (`set -euo pipefail`) without subshell escape vectors.
+- **Zero Dangerous Web Tools**: Dangerous legacy utilities like web shells (`app/exec`) and raw SQL runners (`app/database`) present in older PBX platforms are intentionally excluded from TallPBX.
+
+### 5. CLI Management Commands
+Administrators can inspect and manage security directly from the terminal:
+
+```bash
+# Check firewall status, active kernel sets, and banned attackers
+php artisan security:status
+
+# Atomically recompile and apply pending firewall rules
+php artisan security:apply
+
+# Unban an IP address and remove it from the kernel
+php artisan security:unban 198.51.100.25
 ```
 
 ## Running the Application

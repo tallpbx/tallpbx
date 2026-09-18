@@ -383,6 +383,12 @@ TallPBX relies on background systemd services for call events, queue workers, sc
     systemctl status redis-server        # Check Redis status
     redis-cli ping                       # Expect: PONG
     ```
+*   **Kernel Firewall (`nftables`)**:
+    ```bash
+    systemctl status nftables            # Check kernel firewall service status
+    nft list ruleset                     # Display active kernel firewall rules and sets
+    php artisan security:status          # Check TallPBX security module status and active bans
+    ```
 
 ### Running the Installer Again
 
@@ -573,6 +579,52 @@ If you configure a custom `TALLPBX_MEDIA_ROOT`, add that path to the unit's `Rea
 `/etc/systemd/system/freeswitch-listener.service` and `/etc/systemd/system/tallpbx-queue.service`,
 then run `systemctl daemon-reload && systemctl restart freeswitch-listener tallpbx-queue`.
 
+### Firewall & Network Security (nftables)
+
+TallPBX protects the operating system and telephony engine using native Linux kernel packet filtering (`nftables`) paired with real-time multi-vector intrusion defense in `app-modules/security`.
+
+#### 1. Standard Network Ports
+The installer configures baseline firewall rules to permit necessary PBX services while dropping malicious scanning and unwanted traffic:
+
+| Service | Port / Protocol | Direction | Description |
+| :--- | :--- | :--- | :--- |
+| **SSH** | `22/tcp` | Inbound | Remote server management (can be restricted to trusted subnets) |
+| **HTTP** | `80/tcp` | Inbound | Web panel redirect & Let's Encrypt ACME verification |
+| **HTTPS** | `443/tcp` | Inbound | Secure web panel & WebSocket traffic |
+| **SIP Internal** | `5060/udp,tcp` | Inbound | Softphones, desk phones, and internal registrations |
+| **SIP TLS** | `5061/tcp` | Inbound | Encrypted SIP signaling |
+| **SIP External** | `5080/udp,tcp` | Inbound | Upstream SIP carriers, gateways, and PSTN trunks |
+| **RTP Media** | `16384-32768/udp` | Inbound | Voice & video RTP audio streams |
+| **Reverb WebSockets**| `8080/tcp` | Loopback | Internal real-time event broadcasting daemon |
+
+#### 2. Privilege Separation & Bounded Sudoers Helper Pattern
+TallPBX enforces strict least-privilege boundaries to eliminate command injection (CWE-78) and root privilege escalation:
+- **Unprivileged Web User**: All PHP-FPM and web requests execute strictly under `www-data`. Direct execution of system binaries like `/usr/sbin/nft` under `sudo` is forbidden.
+- **Dedicated Root Helper**: Privileged firewall modifications are isolated within `/usr/local/bin/tallpbx-security` (`mode 0750 root:www-data`).
+- **Bounded Sudoers Drop-In**: `/etc/sudoers.d/tallpbx-security` grants `www-data` permission to invoke *only* `/usr/local/bin/tallpbx-security`. Wildcard sudo access (`ALL=(ALL) NOPASSWD: ALL`) is never used.
+- **Strict Parameter Whitelisting**: The helper script validates every input parameter against strict regular expressions (`^[0-9a-fA-F:.]+$`) before executing any action, preventing command chaining or jailbreaking.
+
+#### 3. Real-Time Multi-Vector Threat Defense
+- **SIP Auth Scanning**: Real-time FreeSWITCH ESL events (`sofia::failed_auth`) detect credential brute-forcing instantly and ban malicious IPs in sub-seconds directly in the kernel table `@banned_ips`.
+- **Web Login Protection**: Failed web login attempts (`Illuminate\Auth\Events\Failed`) are rate-limited in Redis and trigger automatic temporary bans.
+- **Dynamic Kernel Sets**: Banned IPs are stored directly in nftables kernel timeout sets, dropping attacking packets before they consume web server or PBX CPU cycles.
+
+#### 4. Lockout Prevention & Emergency Administration
+- **Zero-Lockout Protection**: TallPBX checks the administrator's remote IP address and session before applying restrictive default `DROP` policies. Whitelisted IPs and administrative subnets can never be banned.
+- **Terminal Management & Unbanning**: If an administrator or trusted device is blocked or needs emergency access, manage the firewall directly from the host CLI:
+  ```bash
+  # Check active firewall status, kernel sets, and banned attackers
+  php artisan security:status
+
+  # Immediately unban an IP address
+  php artisan security:unban <IP_ADDRESS>
+
+  # Or invoke the bounded helper directly
+  sudo /usr/local/bin/tallpbx-security unban <IP_ADDRESS>
+
+  # Emergency fallback: temporarily flush all rules if locked out
+  sudo nft flush ruleset
+  ```
 
 ## 6. FreeSWITCH Installation Choice
 

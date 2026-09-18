@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Zero-lockout protection service (`LockoutGuardService`) evaluating administrator session reachability before applying restrictive firewall policies, complete with 1-click rescue whitelisting.
   - Artisan management CLI commands: `security:apply` (atomic firewall ruleset application with lockout check), `security:status` (active engine and ban overview), and `security:unban <ip>` (instant cross-layer unbanning).
   - Declarative event listener and console command registration support (`listeners()`, `consoleCommands()`) in the base `ModuleServiceProvider`.
+- **User & Administrator Security Documentation**: Comprehensive guides and parity analysis added to `README.md`, `INSTALL.md`, and `docs/parity-comparison.md` detailing the native Linux kernel `nftables` firewall, multi-vector intrusion prevention across SIP, Web, and SSH, zero-lockout protection, and the hardened Bounded Sudoers host command execution architecture.
 
 ### Upgrade Notes
 - Requires running database migrations: `php artisan migrate`.
