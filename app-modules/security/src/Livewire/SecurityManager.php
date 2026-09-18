@@ -13,6 +13,7 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
+use Modules\Security\Events\FirewallRulesetUpdated;
 use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
@@ -574,6 +575,9 @@ class SecurityManager extends Component
 
         $this->pendingChangesCount = 0;
         SecuritySetting::updateOrCreate(['key' => 'pending_changes_count'], ['value' => '0']);
+
+        // Broadcast real-time ruleset update over Laravel Reverb
+        FirewallRulesetUpdated::dispatch('ui');
 
         return true;
     }

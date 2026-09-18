@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
+use Modules\Security\Events\SecurityIncidentLogged;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -63,6 +64,9 @@ class SecurityIncidentService implements SecurityIncidentServiceInterface
             if ($attempts === 1) {
                 Redis::expire($redisKey, $findTime);
             }
+
+            // Broadcast real-time incident alert to connected security command centers
+            SecurityIncidentLogged::dispatch($ip, $vector, $attempts);
 
             if ($attempts >= $maxRetry) {
                 Redis::del($redisKey);

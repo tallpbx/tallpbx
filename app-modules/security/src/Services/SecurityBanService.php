@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
+use Modules\Security\Events\SecurityBanUpdated;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
@@ -124,6 +125,9 @@ class SecurityBanService implements SecurityBanServiceInterface
         // 5. Reset Redis sliding-window attempt counters for this IP
         $this->flushRedisAttempts($ip);
 
+        // 6. Broadcast real-time WebSocket alert over Laravel Reverb
+        SecurityBanUpdated::dispatch($ip, 'ban');
+
         return $ban;
     }
 
@@ -145,18 +149,22 @@ class SecurityBanService implements SecurityBanServiceInterface
             ->where('is_active', true)
             ->get();
 
-        $now = now();
-        foreach ($activeBans as $ban) {
-            $ban->update([
-                'is_active' => false,
-                'unbanned_at' => $now,
-                'unbanned_by_admin_id' => $adminId,
-            ]);
+        if ($activeBans->isEmpty()) {
+            return false;
         }
 
-        // 2. Record in enterprise security audit log
+        // Mark bans as inactive
+        SecurityBan::where('ip_address', $ip)
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'unbanned_at' => now(),
+                'unbanned_by_admin_id' => $adminId,
+            ]);
+
+        // 2. Record audit log
         SecurityAuditLog::record(
-            action: 'unban_executed',
+            action: 'ban_removed',
             ipAddress: $ip,
             description: "Unbanned IP {$ip}",
             details: [
@@ -177,6 +185,9 @@ class SecurityBanService implements SecurityBanServiceInterface
 
         // 4. Reset Redis attempt counters for this IP
         $this->flushRedisAttempts($ip);
+
+        // 5. Broadcast real-time WebSocket alert over Laravel Reverb
+        SecurityBanUpdated::dispatch($ip, 'unban');
 
         return true;
     }
