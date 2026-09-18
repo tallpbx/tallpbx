@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Host IP ban management service (`SecurityBanService`) and executor (`SecurityExecutor`) coordinating active/historical bans in MariaDB and Linux kernel `nftables` sets.
   - Enterprise security audit logging (`SecurityAuditLog`) automatically recording ban and unban operations with administrator attribution.
   - Bounded root execution helper (`scripts/resources/tallpbx-security`) and sudoers configuration (`scripts/resources/tallpbx-security.sudoers`) enforcing strict parameter regex validation and atomic kernel ruleset compilation.
+  - Native Linux `nftables` configuration compiler (`SecurityConfigGenerator`) generating atomic rulesets, kernel interval sets for IPs and CIDRs, and dynamic timeout-backed bans.
+  - Zero-lockout protection service (`LockoutGuardService`) evaluating administrator session reachability before applying restrictive firewall policies, complete with 1-click rescue whitelisting.
   - Declarative event listener registration support in the base `ModuleServiceProvider`.
 
 ### Upgrade Notes
