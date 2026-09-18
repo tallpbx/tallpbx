@@ -13,10 +13,10 @@ The diagram below illustrates this path from input to processing:
 ```mermaid
 flowchart TD
     %% Styling Classes
-    classDef drop fill:#4d1111,stroke:#f85149,stroke-width:2px,color:#ff7b72
-    classDef allow fill:#113822,stroke:#3fb950,stroke-width:2px,color:#7ee787
-    classDef spine fill:#161b22,stroke:#58a6ff,stroke-width:2px,color:#c9d1d9
-    classDef svc fill:#1f242c,stroke:#d29922,stroke-width:2px,color:#f0e6c8
+    classDef drop fill:#fde8e8,stroke:#e05252,stroke-width:2px,color:#7a1010
+    classDef allow fill:#e8f5ec,stroke:#3fb950,stroke-width:2px,color:#1a6b32
+    classDef spine fill:#eef0f3,stroke:#5b8fd9,stroke-width:2px,color:#1c2a40
+    classDef svc fill:#fef9ec,stroke:#d29922,stroke-width:2px,color:#5a3e08
 
     %% Root Ingress Trunk (Centered)
     A["🌐 Incoming Network Packet<br/>(Internet / LAN)"]:::spine --> B["🔌 Physical Network Card<br/>(eth0 / ens3 / lo)"]:::spine
