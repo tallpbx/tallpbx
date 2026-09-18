@@ -10,12 +10,6 @@
             </div>
             <p class="text-sm text-base-content/70 mt-1">{{ __('admin.security_description') }}</p>
         </div>
-        <div class="flex items-center gap-2">
-            <button wire:click="openSettingsDrawer" type="button" class="btn btn-neutral btn-sm gap-2">
-                <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
-                <span>{{ __('admin.security_settings') }}</span>
-            </button>
-        </div>
     </div>
 
     {{-- Feedback Notifications --}}
@@ -251,10 +245,16 @@
                         </div>
                         <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_banned_attackers_desc') }}</p>
                     </div>
-                    <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1 self-start sm:self-auto">
-                        <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
-                        <span>{{ __('admin.security_block_manually') }}</span>
-                    </button>
+                    <div class="flex items-center gap-2 self-start sm:self-auto">
+                        <button wire:click="openSettingsDrawer" type="button" class="btn btn-outline btn-sm gap-1">
+                            <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
+                            <span>{{ __('admin.security_protection_settings') }}</span>
+                        </button>
+                        <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1">
+                            <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
+                            <span>{{ __('admin.security_block_manually') }}</span>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Threat Table --}}

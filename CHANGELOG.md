@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - Unreleased
 
 ### Changed
+- **Protection Settings Relocated to Blocked Attackers Header**:
+  - Moved the **Attack Protection Settings** button from the top page header directly into the **Blocked Attackers** section header alongside "Block IP Manually", grouping intrusion detection thresholds (`max_retry`, `find_time`, `ban_time`) and attack vector toggles (SIP, Web, SSH) directly with the live threat management workbench.
 - **Pipeline-Aligned 3-Deck IP Architecture & Standardized Blacklist/Whitelist Terminology**:
   - Replaced the tab-switched IP management deck with three sequential full-width workbench cards arranged in the exact order traffic is evaluated in the Linux `nftables` packet filtering pipeline:
     1. **Blacklist IPs (Always Dropped)**: Stage 1 permanent kernel drop rules with a Split-Panel layout (Quick-Add Form and Stage 1 advisory helper on left, search filter and scrollable table on right).
