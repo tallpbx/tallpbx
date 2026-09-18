@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0] - Unreleased
 
 ### Changed
+- **Blacklist IP Precedence Clarification**:
+  - Updated the Blacklist section description and advisory helper in `lang/en/admin.php` to explicitly state that Blacklist drop rules take precedence over the whitelist in addition to general traffic.
 - **Security Menu Placement Before PBX**:
   - Positioned the **Security** navigation link directly before the **PBX** section in the main sidebar menu (order 39), grouping core server administration, monitoring, and security together before telephony domains.
 - **Security Center Table Typography & Text Size Standardization**:
