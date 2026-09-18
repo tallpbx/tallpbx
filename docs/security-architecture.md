@@ -46,12 +46,12 @@ flowchart TD
 
     %% Deep Telephony Inspection
     I --> N{"FreeSWITCH Telephony Security<br/>(Rate Limits & ACL)"}
-    N -->|Failed SIP Password| O["🚨 Log SIP Auth Failure<br/>(Triggers Reverb Ban)"]
+    N -->|Failed SIP Password| O["🚨 Log SIP Auth Failure<br/>(Triggers Kernel Ban & Live UI Alert)"]
     N -->|Trusted Trunk / Valid Extension| P["📱 Call Connected & Rings Phone"]
 
     %% Web Security Inspection
     K --> Q{"Web Authentication Guard"}
-    Q -->|Failed Admin Login| R["🚨 Log Web Auth Failure<br/>(Triggers Reverb Ban)"]
+    Q -->|Failed Admin Login| R["🚨 Log Web Auth Failure<br/>(Triggers Kernel Ban & Live UI Alert)"]
     Q -->|Valid Credentials| S["🖥️ Access Control Panel"]
 ```
 
