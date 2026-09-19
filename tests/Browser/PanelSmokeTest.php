@@ -29,6 +29,8 @@ use Database\Seeders\SecurityServiceSeeder;
 use Laravel\Dusk\Browser;
 use Modules\Extensions\Models\Extension;
 use Modules\FeatureCodes\Models\FeatureCode;
+use Modules\Security\Models\SecurityBan;
+use Modules\Security\Models\SecurityIpList;
 use Tests\Browser\Pages\LoginPage;
 
 beforeEach(function () {
@@ -591,6 +593,48 @@ it('renders the monitoring dashboard with metrics', function () {
 it('renders the security manager dashboard', function () {
     $this->seed(SecurityServiceSeeder::class);
 
+    // Seed representative threat and trust entries so the documentation
+    // screenshot shows populated Blacklist, Blocked Attackers and
+    // Whitelist sections; updateOrCreate keeps re-runs idempotent.
+    SecurityIpList::updateOrCreate(
+        ['type' => 'blacklist', 'ip_address' => '198.51.100.23'],
+        ['description' => 'Credential stuffing source'],
+    );
+    SecurityIpList::updateOrCreate(
+        ['type' => 'blacklist', 'ip_address' => '203.0.113.0/24'],
+        ['description' => 'Scraping botnet range'],
+    );
+    SecurityIpList::updateOrCreate(
+        ['type' => 'whitelist', 'ip_address' => '192.0.2.10'],
+        ['description' => 'Monitoring server'],
+    );
+    SecurityIpList::updateOrCreate(
+        ['type' => 'whitelist', 'ip_address' => '198.51.100.5'],
+        ['description' => 'Office VPN gateway'],
+    );
+    SecurityBan::updateOrCreate(
+        ['ip_address' => '203.0.113.66'],
+        [
+            'vector' => 'sip_auth',
+            'reason' => 'Repeated failed SIP registrations',
+            'attempt_count' => 12,
+            'banned_at' => now()->subMinutes(15),
+            'expires_at' => now()->addMinutes(45),
+            'is_active' => true,
+        ],
+    );
+    SecurityBan::updateOrCreate(
+        ['ip_address' => '198.51.100.88'],
+        [
+            'vector' => 'web_auth',
+            'reason' => 'Repeated failed panel logins',
+            'attempt_count' => 8,
+            'banned_at' => now()->subMinutes(5),
+            'expires_at' => now()->addHours(2),
+            'is_active' => true,
+        ],
+    );
+
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
             ->resize(1920, 2400)
@@ -602,6 +646,9 @@ it('renders the security manager dashboard', function () {
             ->assertSee('Blacklist IPs')
             ->assertSee('Whitelist IPs')
             ->assertSee('Blocked Attackers')
+            ->assertSee('198.51.100.23')
+            ->assertSee('192.0.2.10')
+            ->assertSee('203.0.113.66')
             ->assertSee('Pre-Filters', true)
             ->assertSee('Standard Services', true)
             ->assertSee('Default Inbound Policy', true)

@@ -520,9 +520,9 @@
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
                             </td>
                             <td>
-                                {{-- Fixed-width tracks keep the rule name, kernel badge and info icon in dedicated columns so all six pre-filter rows line up vertically. --}}
+                                {{-- Fixed-width tracks (the name track fits the longest rule name in every supported language) keep the rule name, kernel badge and info icon in dedicated columns so all six pre-filter rows line up vertically. --}}
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-72 shrink-0">{{ __('admin.security_rule_loopback') }}</span>
+                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_rule_loopback') }}</span>
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">iif "lo"</span></span>
                                     <x-tooltip :tip="__('admin.security_loopback_tooltip')" align="start" position="right">
                                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
@@ -551,7 +551,7 @@
                             </td>
                             <td>
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-72 shrink-0">{{ __('admin.security_permanent_blacklist') }}</span>
+                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_permanent_blacklist') }}</span>
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@blacklist_ips</span></span>
                                 </div>
                             </td>
@@ -581,7 +581,7 @@
                             </td>
                             <td>
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-72 shrink-0">{{ __('admin.security_active_attackers') }}</span>
+                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_active_attackers') }}</span>
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@banned_ips</span></span>
                                 </div>
                             </td>
@@ -611,7 +611,7 @@
                             </td>
                             <td>
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-72 shrink-0">{{ __('admin.security_rule_conntrack') }}</span>
+                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_rule_conntrack') }}</span>
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">ct state established,related</span></span>
                                     <x-tooltip :tip="__('admin.security_conntrack_tooltip')" align="start" position="right">
                                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
@@ -640,7 +640,7 @@
                             </td>
                             <td>
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-72 shrink-0">{{ __('admin.security_rule_invalid_packets') }}</span>
+                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_rule_invalid_packets') }}</span>
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">ct state invalid</span></span>
                                     <x-tooltip :tip="__('admin.security_invalid_tooltip')" align="start" position="right">
                                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
@@ -669,7 +669,7 @@
                             </td>
                             <td>
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-72 shrink-0">{{ __('admin.security_trusted_whitelist') }}</span>
+                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_trusted_whitelist') }}</span>
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@whitelist_ips</span></span>
                                 </div>
                             </td>
