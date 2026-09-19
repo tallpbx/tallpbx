@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-19
+
 ### Changed
 - **Security Command Center Firewall Table Decluttering**: Removed the Stage 1–5 badges and the Priority column from the Firewall Rules & Port Access table. The table's four sections are now identified by plain names only — **Pre-Filters** (collapsible, with its rule count), **Standard Services**, **Custom Rules**, and **Default Inbound Policy** — individual rows no longer carry per-row stage tags, and the custom-rule reorder arrows moved into the Actions column. The redundant "Standard PBX Ports" quick-add dropdown was removed, since the same ports are already managed in the Standard Services section (with per-service factory-reset buttons). The redundant status badges on the Blacklist IPs, Blocked Attackers, and Whitelist IPs cards were removed (their card titles already state the behavior), keeping only the simplified "Instant Drop" and "Complete Bypass" helper headings, and all remaining "stage" wording was removed across English, Spanish, and French. No action is required for existing installations.
 - **Pre-Filter Row Alignment**: The Pre-Filters rows in the Firewall Rules & Port Access table now use fixed-width columns — with the rule-name track sized to fit the longest rule name in every supported language — for the rule name, the kernel-rule badge (for example `iif "lo"`), and the info icon, so all six rows line up in straight vertical columns instead of the badges drifting with each rule label's length. No action is required for existing installations.
