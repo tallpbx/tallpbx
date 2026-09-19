@@ -487,7 +487,7 @@
                         <tr class="bg-base-200/40 text-base-content/70">
                             <th class="w-14 text-center">{{ __('client.status') }}</th>
                             <th>{{ __('admin.security_rule_name') }}</th>
-                            <th>{{ __('admin.security_service_port') }}</th>
+                            <th class="min-w-[16rem]">{{ __('admin.security_service_port') }}</th>
                             <th>{{ __('admin.security_source_ip') }}</th>
                             <th>{{ __('admin.security_action') }}</th>
                             <th class="text-right">{{ __('admin.actions') }}</th>
@@ -729,11 +729,11 @@
                                             <span class="font-mono text-sm font-semibold text-base-content">echo-request</span>
                                             <span class="text-sm text-base-content/60">/ICMP</span>
                                             @if ($service->rate_limit)
-                                                <span class="badge badge-neutral badge-xs font-mono ml-1">{{ $service->rate_limit }}/s limit (burst {{ $service->burst ?? $service->rate_limit }})</span>
+                                                <span class="font-mono text-xs text-base-content/60 ml-1">{{ $service->rate_limit }}/s limit (burst {{ $service->burst ?? $service->rate_limit }})</span>
                                             @else
-                                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_rate_limit_unlimited') }}</span>
+                                                <span class="font-mono text-xs text-base-content/60 ml-1">{{ __('admin.security_rate_limit_unlimited') }}</span>
                                             @endif
-                                            <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                                            <span class="font-mono text-xs text-base-content/60 ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
                                         </div>
                                     @else
                                         <div class="flex items-center gap-1.5">
@@ -794,8 +794,8 @@
                                 <td>
                                     @if ($rule->service)
                                         <div class="flex items-center gap-1.5">
-                                            <span class="badge badge-neutral badge-sm">{{ $rule->service->name }}</span>
-                                            <span class="font-mono text-sm text-base-content/70">{{ $rule->service->port_range }}/{{ strtoupper($rule->service->protocol) }}</span>
+                                            <span class="font-medium text-base-content">{{ $rule->service->name }}</span>
+                                            <span class="font-mono text-sm text-base-content/70 whitespace-nowrap">{{ $rule->service->port_range }}/{{ strtoupper($rule->service->protocol) }}</span>
                                         </div>
                                     @else
                                         <span class="font-mono text-sm">{{ $rule->custom_port }}/{{ strtoupper((string) $rule->custom_protocol) }}</span>

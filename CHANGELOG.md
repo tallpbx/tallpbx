@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Service / Port Column Squeeze**: When the Pre-Filters section was expanded, the "Service / Port" column of the Firewall Rules & Port Access table could be squeezed narrow enough that a service-name chip (for example "ICMP Ping Diagnostics") wrapped inside its fixed-height pill and the text spilled over it. The column's chips are now plain text — the service name in regular weight and the rate-limit/dual-stack annotations in muted small text — so content wraps gracefully instead of overflowing a fixed-height pill, and the column's minimum width is reduced to 16rem. No action is required for existing installations.
+
 ## [1.1.1] - 2026-09-19
 
 ### Changed
