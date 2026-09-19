@@ -7,6 +7,15 @@ PORT="8001"
 DUSK_CHROMEDRIVER_PORT="${DUSK_CHROMEDRIVER_PORT:-9515}"
 DUSK_DRIVER_URL="${DUSK_DRIVER_URL:-http://localhost:${DUSK_CHROMEDRIVER_PORT}}"
 
+# Important: while browser tests run, `php artisan dusk` temporarily swaps the
+# application's `.env` with `.env.dusk`. Do not use the web panel during a run —
+# an administrator login would operate on the disposable Dusk database and can
+# make tests fail. See INSTALL.md, section "Browser Testing (Dusk)".
+#
+# Documentation screenshots (docs/images) are captured only when
+# DUSK_CAPTURE_DOCS=1 is set; normal runs never rewrite them, and opted-in runs
+# copy only the images whose captures actually changed.
+
 # Run all commands from the application root so Artisan finds the Dusk
 # environment file and the browser always targets the temporary server.
 cd "$ROOT_DIR"

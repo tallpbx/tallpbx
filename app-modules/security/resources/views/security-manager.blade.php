@@ -136,7 +136,6 @@
                         <div class="flex items-center gap-2">
                             <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_blacklist_ips') }}</h2>
                             <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
-                            <span class="badge badge-error badge-xs font-mono font-bold">{{ __('admin.security_stage_1_badge') }}</span>
                             <x-tooltip :tip="__('admin.security_blacklist_desc')" align="start" position="right">
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
@@ -176,7 +175,7 @@
                         <div class="p-3 bg-base-200/40 rounded-box border border-base-200/80 text-xs text-base-content/70 space-y-1">
                             <div class="font-semibold flex items-center gap-1.5 text-error">
                                 <x-heroicon-o-shield-exclamation class="w-4 h-4 shrink-0" />
-                                <span>{{ __('admin.security_stage_1_badge') }}: Instant Drop</span>
+                                <span>{{ __('admin.security_instant_drop') }}</span>
                             </div>
                             <p class="leading-relaxed">{{ __('admin.security_blacklist_helper') }}</p>
                         </div>
@@ -238,7 +237,6 @@
                         <div class="flex items-center gap-2">
                             <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
                             <span class="badge badge-neutral badge-sm font-mono">{{ $activeBans->count() }}</span>
-                            <span class="badge badge-error badge-xs font-mono font-bold">{{ __('admin.security_active_threats_badge') }}</span>
                             <x-tooltip :tip="__('admin.security_threats_desc')" align="start" position="right">
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
@@ -342,7 +340,6 @@
                         <div class="flex items-center gap-2">
                             <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_whitelist_ips') }}</h2>
                             <span class="badge badge-neutral badge-sm font-mono">{{ $whitelistCount }}</span>
-                            <span class="badge badge-success badge-xs font-mono font-bold">{{ __('admin.security_stage_2_badge') }}</span>
                             <x-tooltip :tip="__('admin.security_whitelist_desc')" align="start" position="right">
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
@@ -403,7 +400,7 @@
                         <div class="p-3 bg-base-200/40 rounded-box border border-base-200/80 text-xs text-base-content/70 space-y-1">
                             <div class="font-semibold flex items-center gap-1.5 text-success">
                                 <x-heroicon-o-check-badge class="w-4 h-4 shrink-0" />
-                                <span>{{ __('admin.security_stage_2_badge') }}: Complete Bypass</span>
+                                <span>{{ __('admin.security_complete_bypass') }}</span>
                             </div>
                             <p class="leading-relaxed">{{ __('admin.security_whitelist_helper') }}</p>
                         </div>
@@ -468,7 +465,6 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_firewall_rules') }}</h2>
-                        <span class="badge badge-primary badge-xs font-mono">{{ __('admin.security_port_rules_badge') }}</span>
                         <x-tooltip :tip="__('admin.security_firewall_rules_tooltip')" align="start" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
@@ -476,25 +472,6 @@
                     <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_firewall_rules_desc') }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    {{-- Standard PBX Ports Quick Dropdown --}}
-                    <div class="dropdown dropdown-end">
-                        <div tabindex="0" role="button" class="btn btn-outline btn-sm gap-1">
-                            <x-heroicon-o-sparkles class="w-4 h-4 text-primary" />
-                            <span>{{ __('admin.security_quick_add_service') }}</span>
-                            <x-heroicon-o-chevron-down class="w-3 h-3 ml-1" />
-                        </div>
-                        <ul tabindex="0" class="dropdown-content z-20 menu p-2 shadow bg-base-100 rounded-box w-64 border border-base-200 mt-1">
-                            @foreach ($catalogServices as $service)
-                                <li>
-                                    <button wire:click="addServiceFromCatalog({{ $service->id }})" type="button" class="flex justify-between items-center text-xs">
-                                        <span class="font-medium">{{ $service->name }}</span>
-                                        <span class="font-mono text-base-content/60">{{ $service->port_range }}</span>
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-
                     {{-- Add Custom Rule --}}
                     <button wire:click="openCustomRuleModal" type="button" class="btn btn-neutral btn-sm gap-1">
                         <x-heroicon-o-plus class="w-4 h-4" />
@@ -508,7 +485,6 @@
                 <table class="table">
                     <thead>
                         <tr class="bg-base-200/40 text-base-content/70">
-                            <th class="w-20">{{ __('admin.security_rule_priority') }}</th>
                             <th class="w-14 text-center">{{ __('client.status') }}</th>
                             <th>{{ __('admin.security_rule_name') }}</th>
                             <th>{{ __('admin.security_service_port') }}</th>
@@ -518,15 +494,14 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200">
-                        {{-- SYSTEM, STAGE 1 & 2: Ingress IP Pre-Filters & System Invariants Collapsible Header --}}
+                        {{-- Ingress Pre-Filters Collapsible Header --}}
                         <tr class="bg-base-200/40 text-xs font-semibold text-base-content/80 cursor-pointer hover:bg-base-200/70 transition-colors select-none"
                             @click="showSystemPreFilters = !showSystemPreFilters"
                             title="{{ __('admin.security_toggle_invariants_tooltip') }}">
-                            <td colspan="7" class="py-2.5 px-3">
+                            <td colspan="6" class="py-2.5 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
-                                        <span class="badge badge-neutral badge-sm font-mono font-bold">SYSTEM + STAGES 1 & 2</span>
-                                        <span class="uppercase tracking-wider text-xs font-bold">{{ __('admin.security_system_invariants_prefilters') }}</span>
+                                        <span class="uppercase tracking-wider text-xs">{{ __('admin.security_system_invariants_prefilters') }}</span>
                                         <span class="badge badge-ghost badge-sm text-xs font-normal">
                                             {{ __('admin.security_invariants_rules_count', ['count' => 6]) }}
                                         </span>
@@ -541,9 +516,6 @@
 
                         {{-- Base Invariant: Unconditional Loopback Interface --}}
                         <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
                             </td>
@@ -573,9 +545,6 @@
 
                         {{-- Stage 1: Permanent Blacklist --}}
                         <tr class="hover" x-show="showSystemPreFilters" x-cloak>
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-error badge-sm font-mono font-semibold">STAGE 1</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error" title="Active"></span>
                             </td>
@@ -606,9 +575,6 @@
 
                         {{-- Stage 1: Active Intrusion Bans --}}
                         <tr class="hover" x-show="showSystemPreFilters" x-cloak>
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-error badge-sm font-mono font-semibold">STAGE 1</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error {{ $bannedCount > 0 ? 'animate-pulse' : '' }}" title="Active"></span>
                             </td>
@@ -639,9 +605,6 @@
 
                         {{-- Base Invariant: Stateful Connection Tracking (Return Fastpath) --}}
                         <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
                             </td>
@@ -671,9 +634,6 @@
 
                         {{-- Base Invariant: Invalid Packets Defense --}}
                         <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-neutral badge-sm font-mono font-semibold">{{ __('admin.security_system_badge') }}</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error" title="Active"></span>
                             </td>
@@ -703,9 +663,6 @@
 
                         {{-- Stage 2: Trusted Whitelist --}}
                         <tr class="hover" x-show="showSystemPreFilters" x-cloak>
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-success badge-sm font-mono font-semibold">STAGE 2</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
                             </td>
@@ -734,12 +691,11 @@
                             </td>
                         </tr>
 
-                        {{-- STAGE 3: Core PBX Telephony & Management Services Header --}}
+                        {{-- Standard Services Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="7" class="py-2 px-3">
+                            <td colspan="6" class="py-2 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
-                                        <span class="badge badge-neutral badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_3_badge') }}</span>
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_core_services_title') }}</span>
                                     </div>
                                     <span class="text-xs font-normal text-base-content/60">{{ __('admin.security_core_services_note') }}</span>
@@ -750,9 +706,6 @@
                         {{-- Core PBX Services Rows --}}
                         @foreach ($catalogServices as $service)
                             <tr class="hover {{ ! $service->enabled ? 'opacity-50' : '' }}">
-                                <td class="whitespace-nowrap">
-                                    <span class="badge badge-neutral badge-sm font-mono font-semibold">STAGE 3</span>
-                                </td>
                                 <td class="text-center">
                                     <input wire:click="toggleSystemService({{ $service->id }})" type="checkbox"
                                            class="toggle toggle-success toggle-sm"
@@ -811,13 +764,12 @@
                             </tr>
                         @endforeach
 
-                        {{-- STAGE 4: Custom Sequential Rules Header --}}
+                        {{-- Custom Rules Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="7" class="py-2 px-3">
+                            <td colspan="6" class="py-2 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
-                                        <span class="badge badge-primary badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_4_badge') }}</span>
-                                        <span class="uppercase tracking-wider text-xs">{{ __('admin.security_firewall_rules') }}</span>
+                                        <span class="uppercase tracking-wider text-xs">{{ __('admin.security_custom_rules_title') }}</span>
                                     </div>
                                     <span class="text-xs font-normal text-base-content/60">{{ __('admin.security_pipeline_step4_desc') }}</span>
                                 </div>
@@ -827,21 +779,6 @@
                         {{-- Custom Sequential Rules Rows --}}
                         @forelse ($firewallRules as $rule)
                             <tr class="hover {{ ! $rule->enabled ? 'opacity-50' : '' }}">
-                                {{-- Priority & Up/Down Arrows --}}
-                                <td class="whitespace-nowrap">
-                                    <div class="flex items-center gap-1 font-mono text-sm">
-                                        <div class="flex flex-col">
-                                            <button wire:click="moveRuleUp({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
-                                                <x-heroicon-s-chevron-up class="w-3 h-3" />
-                                            </button>
-                                            <button wire:click="moveRuleDown({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
-                                                <x-heroicon-s-chevron-down class="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                        <span>{{ $rule->sequence }}</span>
-                                    </div>
-                                </td>
-
                                 {{-- Status Toggle --}}
                                 <td class="text-center">
                                     <input wire:click="toggleRule({{ $rule->id }})" type="checkbox"
@@ -882,19 +819,30 @@
                                     @endif
                                 </td>
 
-                                {{-- Actions --}}
+                                {{-- Reorder Arrows & Row Actions --}}
                                 <td class="text-right whitespace-nowrap">
-                                    <button wire:click="openCustomRuleModal({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </button>
-                                    <button wire:click="deleteRule({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs text-error">
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    {{-- items-center keeps the stacked arrow pair vertically centered against the single-row action icons --}}
+                                    <div class="inline-flex items-center gap-1">
+                                        <span class="flex flex-col">
+                                            <button wire:click="moveRuleUp({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
+                                                <x-heroicon-s-chevron-up class="w-3 h-3" />
+                                            </button>
+                                            <button wire:click="moveRuleDown({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
+                                                <x-heroicon-s-chevron-down class="w-3 h-3" />
+                                            </button>
+                                        </span>
+                                        <button wire:click="openCustomRuleModal({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs">
+                                            <x-heroicon-o-pencil class="w-4 h-4" />
+                                        </button>
+                                        <button wire:click="deleteRule({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs text-error">
+                                            <x-heroicon-o-trash class="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-4 text-base-content/60">
+                                <td colspan="6" class="text-center py-4 text-base-content/60">
                                     <div class="flex items-center justify-center gap-2">
                                         <x-heroicon-o-shield-check class="w-4 h-4 text-success" />
                                         <span class="text-sm text-base-content/70">{{ __('admin.security_no_rules_help') }}</span>
@@ -903,22 +851,19 @@
                             </tr>
                         @endforelse
 
-                        {{-- STAGE 5: Default Inbound Fallback Policy --}}
+                        {{-- Default Inbound Policy Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="7" class="py-2 px-3">
+                            <td colspan="6" class="py-2 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
-                                        <span class="badge badge-neutral badge-outline badge-sm font-mono font-bold">{{ __('admin.security_stage_5_badge') }}</span>
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_default_policy') }}</span>
                                     </div>
                                     <span class="text-xs font-normal text-base-content/60">{{ __('admin.security_pipeline_step5_desc') }}</span>
                                 </div>
                             </td>
                         </tr>
+                        {{-- Default Inbound Fallback Policy Row --}}
                         <tr class="hover">
-                            <td class="whitespace-nowrap">
-                                <span class="badge badge-neutral badge-sm font-mono font-semibold">STAGE 5</span>
-                            </td>
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-base-content/40" title="Active"></span>
                             </td>

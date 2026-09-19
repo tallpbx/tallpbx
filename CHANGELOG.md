@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Security Command Center Firewall Table Decluttering**: Removed the Stage 1–5 badges and the Priority column from the Firewall Rules & Port Access table. The table's four sections are now identified by plain names only — **Pre-Filters** (collapsible, with its rule count), **Standard Services**, **Custom Rules**, and **Default Inbound Policy** — individual rows no longer carry per-row stage tags, and the custom-rule reorder arrows moved into the Actions column. The redundant "Standard PBX Ports" quick-add dropdown was removed, since the same ports are already managed in the Standard Services section (with per-service factory-reset buttons). The redundant status badges on the Blacklist IPs, Blocked Attackers, and Whitelist IPs cards were removed (their card titles already state the behavior), keeping only the simplified "Instant Drop" and "Complete Bypass" helper headings, and all remaining "stage" wording was removed across English, Spanish, and French. No action is required for existing installations.
+
 ### Fixed
 - **SQLite-Compatible Security ICMP Migration**: The Security module's ICMP support migration (`2026_09_18_000008`) used a MariaDB-only `ALTER TABLE ... MODIFY COLUMN` statement, which stopped database migrations — and therefore the entire automated test suite — from running on SQLite. The migration now uses Laravel's portable schema builder, producing an identical column definition on MariaDB while allowing SQLite-backed environments and automated tests to migrate cleanly. No action is required for existing MariaDB installations, which have already applied this migration.
 - **Standard PBX Service Catalog Test Expectations**: Updated the security catalog test to expect the 8 standard services seeded since 1.1.0; the `ICMP Ping Diagnostics` service added by the ICMP feature had not been reflected in the expected count.

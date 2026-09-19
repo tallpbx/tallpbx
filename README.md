@@ -320,7 +320,8 @@ php artisan app:test --smoke
 # Default — all feature tests, parallel by default (~65s)
 php artisan app:test
 
-# Full — features + Dusk browser tests (~150s, requires Chromium)
+# Full — features + Dusk browser tests (~150s, requires Chromium; do not use the
+# web panel in another tab while they run — see INSTALL.md, "Browser Testing (Dusk)")
 php artisan app:test --full
 
 # Filter a specific test file

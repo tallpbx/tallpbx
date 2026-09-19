@@ -349,6 +349,32 @@ The installer gives browser tests their own `tallpbx_dusk` database and login.
 That login cannot access the real `tallpbx` database, so browser testing cannot
 reset normal PBX data.
 
+> **Do not use the web panel while browser tests are running.** When
+> `php artisan dusk` starts, it temporarily swaps the application's `.env` file
+> with `.env.dusk` and restores it when the run finishes (even after a failure).
+> If you sign in — or any browser request reaches the panel — during that
+> window, the request runs with the Dusk environment instead of your normal one:
+>
+> - Your login session and any changes belong to the disposable `tallpbx_dusk`
+>   database, not your live data; the session can appear to "not stick" and
+>   signing in may look broken.
+> - Your activity shares sessions and Redis counters with the running tests,
+>   which makes Dusk tests fail or behave unpredictably.
+> - Failed login attempts are still counted by the intrusion-detection system.
+>
+> Wait for the run to complete before signing in. The firewall side is
+> safeguarded as well: privileged kernel firewall actions are disabled
+> automatically while the Dusk environment is active, so a concurrent login can
+> never change your live firewall rules.
+
+Documentation screenshots in `docs/images/` are not touched by normal runs. To
+recapture them after changing the interface, run the suite with the capture
+flag and commit only the images that actually changed:
+
+```bash
+DUSK_CAPTURE_DOCS=1 bash scripts/dusk.sh
+```
+
 ### Service Management
 
 TallPBX relies on background systemd services for call events, queue workers, scheduled tasks, real-time WebSockets, and Redis. Use these commands to check or restart them:

@@ -24,6 +24,8 @@ use App\Models\Admin;
 use App\Models\Group;
 use App\Models\Permission;
 use App\Models\Tenant;
+use App\Services\TenantManager;
+use Database\Seeders\SecurityServiceSeeder;
 use Laravel\Dusk\Browser;
 use Modules\Extensions\Models\Extension;
 use Modules\FeatureCodes\Models\FeatureCode;
@@ -241,7 +243,7 @@ it('renders the feature codes list page', function () {
 
 it('expands description from single line text box into text area on hover when long', function () {
     $tenant = Tenant::first() ?? Tenant::factory()->create();
-    $tenantManager = app(\App\Services\TenantManager::class);
+    $tenantManager = app(TenantManager::class);
     $tenantManager->setTenantId((string) $tenant->id);
 
     FeatureCode::withoutGlobalScope('tenant')->where('name', 'Custom Long Route')->delete();
@@ -587,7 +589,7 @@ it('renders the monitoring dashboard with metrics', function () {
 });
 
 it('renders the security manager dashboard', function () {
-    $this->seed(\Database\Seeders\SecurityServiceSeeder::class);
+    $this->seed(SecurityServiceSeeder::class);
 
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
@@ -600,30 +602,41 @@ it('renders the security manager dashboard', function () {
             ->assertSee('Blacklist IPs')
             ->assertSee('Whitelist IPs')
             ->assertSee('Blocked Attackers')
-            ->assertSee('SYSTEM + STAGES 1 & 2')
-            ->assertSee('STAGE 3')
-            ->assertSee('STAGE 5')
+            ->assertSee('Pre-Filters', true)
+            ->assertSee('Standard Services', true)
+            ->assertSee('Default Inbound Policy', true)
             ->assertSee('ICMP Ping Diagnostics')
             ->assertSee('SIP Signaling');
 
-        // Measure document height in clean collapsed state
-        $measuredHeight = (int) ($browser->script('return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);')[0] ?? 2400);
-        $browser->resize(1920, max(2400, $measuredHeight + 120))
-            ->pause(500)
-            ->screenshot('security-dashboard-full');
-
-        // Click to expand the collapsible System + Stage 1 & 2 pre-filter section
+        // Expand the collapsible Pre-Filters section first so the documentation
+        // screenshot shows the full kernel pipeline instead of the hidden preview.
         $browser->click('tr[title*="expand or collapse"]')
             ->pause(500)
             ->assertSee('Loopback Interface')
             ->assertSee('Stateful Connection Tracking');
 
-        // Measure document height in expanded state and capture screenshot
+        // Measure document height in expanded state
         $expandedHeight = (int) ($browser->script('return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight);')[0] ?? 2900);
         $browser->resize(1920, max(2900, $expandedHeight + 120))
-            ->pause(300)
-            ->screenshot('security-dashboard-expanded');
+            ->pause(300);
+
+        // Documentation screenshot is refreshed on demand only (see INSTALL.md).
+        if (getenv('DUSK_CAPTURE_DOCS') === '1') {
+            $browser->screenshot('security-dashboard-full');
+        }
     });
+
+    // Refresh only the documentation image whose capture actually changed.
+    if (getenv('DUSK_CAPTURE_DOCS') === '1') {
+        $img = 'security-dashboard-full.png';
+        $src = base_path("tests/Browser/screenshots/{$img}");
+        $dest = base_path("docs/images/{$img}");
+
+        if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
+            copy($src, $dest);
+            fwrite(STDOUT, "Updated documentation image: docs/images/{$img}".PHP_EOL);
+        }
+    }
 });
 
 /*

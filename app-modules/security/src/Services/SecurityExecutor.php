@@ -89,8 +89,11 @@ class SecurityExecutor implements SecurityExecutorInterface
         // is installed — or where tests run as root — a test run would otherwise
         // rewrite /etc/tallpbx and load test fixtures into the live kernel
         // firewall. Security tests bind a fake SecurityExecutorInterface
-        // whenever they exercise these code paths.
-        if (app()->runningUnitTests() || app()->environment('dusk')) {
+        // whenever they exercise these code paths. The DUSK_TESTING flag also
+        // covers requests served while `php artisan dusk` has temporarily
+        // swapped the Dusk environment in, so a concurrent admin session can
+        // never trigger a privileged firewall change mid-test-run.
+        if (app()->runningUnitTests() || app()->environment('dusk') || config('app.dusk_testing')) {
             Log::warning('Blocked privileged security helper execution during a test run', [
                 'arguments' => $arguments,
             ]);

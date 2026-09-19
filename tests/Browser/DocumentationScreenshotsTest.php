@@ -29,6 +29,12 @@ class DocumentationScreenshotsTest extends DuskTestCase
     {
         parent::setUp();
 
+        // Documentation screenshots are refreshed on demand only: normal Dusk
+        // runs must never rewrite the tracked images under docs/images.
+        if (getenv('DUSK_CAPTURE_DOCS') !== '1') {
+            $this->markTestSkipped('Set DUSK_CAPTURE_DOCS=1 to refresh documentation screenshots.');
+        }
+
         $this->admin = Admin::firstOrCreate(
             ['email' => 'admin@tallpbx.org'],
             [
@@ -202,7 +208,7 @@ class DocumentationScreenshotsTest extends DuskTestCase
         );
     }
 
-    public function testCaptureDocumentationScreenshots(): void
+    public function test_capture_documentation_screenshots(): void
     {
         $this->browse(function (Browser $browser) {
             $browser->resize(1440, 900);
@@ -315,8 +321,12 @@ class DocumentationScreenshotsTest extends DuskTestCase
         foreach ($images as $img) {
             $src = base_path("tests/Browser/screenshots/{$img}");
             $dest = base_path("docs/images/{$img}");
-            if (file_exists($src)) {
+
+            // Copy only captures whose content actually changed, so unchanged
+            // pages never produce documentation image churn.
+            if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
                 copy($src, $dest);
+                fwrite(STDOUT, "Updated documentation image: docs/images/{$img}".PHP_EOL);
             }
         }
     }
