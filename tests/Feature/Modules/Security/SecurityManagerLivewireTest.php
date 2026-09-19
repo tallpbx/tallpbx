@@ -6,6 +6,8 @@ namespace Tests\Feature\Modules\Security;
 
 use App\Models\Admin;
 use App\Models\Group;
+use Database\Seeders\AdminSeeder;
+use Database\Seeders\SecurityServiceSeeder;
 use Livewire\Livewire;
 use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
@@ -15,6 +17,7 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Services\SecurityConfigGenerator;
 
 /**
  * Feature tests for the SecurityManager unified Livewire component.
@@ -22,16 +25,30 @@ use Modules\Security\Models\SecuritySetting;
  * Tests the single-screen security command center, including IP management,
  * live threat defense, rule sequencing, PBX port catalog, settings drawer, and lockout guard.
  */
-
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');
-    $this->seed(\Database\Seeders\AdminSeeder::class);
+    $this->seed(AdminSeeder::class);
     $this->superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
     $this->admin->groups()->attach($this->superAdminGroup->id);
 
     // Seed standard services
-    $this->seed(\Database\Seeders\SecurityServiceSeeder::class);
+    $this->seed(SecurityServiceSeeder::class);
+
+    // Keep privileged host operations out of the test suite: the firewall apply
+    // flow must never execute the real bounded helper or write the pending
+    // ruleset into /etc/tallpbx on the machine running the tests.
+    $executor = Mockery::mock(SecurityExecutorInterface::class);
+    $executor->shouldReceive('ban')->andReturn(true);
+    $executor->shouldReceive('unban')->andReturn(true);
+    $executor->shouldReceive('apply')->andReturn(true);
+    $executor->shouldReceive('status')->andReturn('');
+    $this->app->instance(SecurityExecutorInterface::class, $executor);
+
+    $generator = Mockery::mock(SecurityConfigGenerator::class);
+    $generator->shouldReceive('writePending')->andReturn(sys_get_temp_dir().'/tallpbx-test-firewall.nft.pending');
+    $generator->shouldReceive('validateSyntax')->andReturn(true);
+    $this->app->instance(SecurityConfigGenerator::class, $generator);
 });
 
 it('mounts and renders the full security command center with plain-English labels', function (): void {
@@ -391,4 +408,3 @@ it('manages blacklist and whitelist simultaneously in sequential pipeline cards'
     expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '198.51.100.25')->exists())->toBeTrue()
         ->and(SecurityIpList::where('type', 'whitelist')->where('ip_address', '192.0.2.10')->exists())->toBeTrue();
 });
-

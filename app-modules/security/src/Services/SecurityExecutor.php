@@ -84,6 +84,20 @@ class SecurityExecutor implements SecurityExecutorInterface
      */
     protected function runCommand(array $arguments): bool
     {
+        // Safety: never execute the privileged helper from an automated test run
+        // (Pest feature tests or Dusk browser tests). On a host where the helper
+        // is installed — or where tests run as root — a test run would otherwise
+        // rewrite /etc/tallpbx and load test fixtures into the live kernel
+        // firewall. Security tests bind a fake SecurityExecutorInterface
+        // whenever they exercise these code paths.
+        if (app()->runningUnitTests() || app()->environment('dusk')) {
+            Log::warning('Blocked privileged security helper execution during a test run', [
+                'arguments' => $arguments,
+            ]);
+
+            return false;
+        }
+
         if (! file_exists($this->helperPath)) {
             Log::warning("Security helper script not found at {$this->helperPath}");
 

@@ -10,6 +10,7 @@ use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Services\SecurityConfigGenerator;
 
 /**
  * Feature tests for Security console commands (security:apply, security:status, security:unban).
@@ -19,13 +20,21 @@ use Modules\Security\Services\LockoutGuardService;
  */
 beforeEach(function (): void {
     $this->seed(SecurityServiceSeeder::class);
-});
 
-afterEach(function (): void {
-    $pendingFile = '/etc/tallpbx/firewall.nft.pending';
-    if (file_exists($pendingFile)) {
-        @unlink($pendingFile);
-    }
+    // Keep privileged host operations out of the test suite: the CLI tests must
+    // never write the pending ruleset into /etc/tallpbx or execute the real
+    // bounded helper on the machine running the tests.
+    $generator = Mockery::mock(SecurityConfigGenerator::class);
+    $generator->shouldReceive('writePending')->andReturn(sys_get_temp_dir().'/tallpbx-test-firewall.nft.pending');
+    $generator->shouldReceive('validateSyntax')->andReturn(true);
+    $this->app->instance(SecurityConfigGenerator::class, $generator);
+
+    $executor = Mockery::mock(SecurityExecutorInterface::class);
+    $executor->shouldReceive('ban')->andReturn(true);
+    $executor->shouldReceive('unban')->andReturn(true);
+    $executor->shouldReceive('apply')->andReturn(true);
+    $executor->shouldReceive('status')->andReturn('');
+    $this->app->instance(SecurityExecutorInterface::class, $executor);
 });
 
 it('executes security:apply successfully and records audit log', function (): void {

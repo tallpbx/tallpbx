@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **SQLite-Compatible Security ICMP Migration**: The Security module's ICMP support migration (`2026_09_18_000008`) used a MariaDB-only `ALTER TABLE ... MODIFY COLUMN` statement, which stopped database migrations — and therefore the entire automated test suite — from running on SQLite. The migration now uses Laravel's portable schema builder, producing an identical column definition on MariaDB while allowing SQLite-backed environments and automated tests to migrate cleanly. No action is required for existing MariaDB installations, which have already applied this migration.
 - **Standard PBX Service Catalog Test Expectations**: Updated the security catalog test to expect the 8 standard services seeded since 1.1.0; the `ICMP Ping Diagnostics` service added by the ICMP feature had not been reflected in the expected count.
+- **Test Suite Could Modify the Live Host Firewall**: Running the Security module's automated tests on a host where the bounded helper is installed (or as the `root` user) could execute real privileged firewall commands — rewriting `/etc/tallpbx` and loading test fixtures into the live kernel ruleset. The tests now use a stubbed executor and an isolated ruleset directory, and `SecurityExecutor` refuses to run privileged operations during automated test runs, so running the test suite can never alter host firewall state again.
 
 ## [1.1.0] - 2026-09-18
 

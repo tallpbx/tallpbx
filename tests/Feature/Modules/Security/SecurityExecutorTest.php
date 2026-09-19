@@ -12,6 +12,9 @@ use Symfony\Component\Process\Process;
  *
  * Verifies process construction, argument mapping, graceful error handling,
  * and strict bash input validation (IP format, seconds, pending file checks).
+ *
+ * Script executions redirect the helper to an isolated temporary configuration
+ * directory so the suite never reads or rewrites live host firewall state.
  */
 it('builds expected command arguments for ban action', function (): void {
     $executor = new SecurityExecutor('/usr/local/sbin/tallpbx-security');
@@ -125,14 +128,24 @@ it('validates shell script rejects invalid IP in unban command', function (): vo
 
 it('validates shell script apply fails when pending file is missing', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
-    $pendingFile = '/etc/tallpbx/firewall.nft.pending';
-    if (file_exists($pendingFile)) {
-        @unlink($pendingFile);
+
+    // Run the helper against a throwaway directory: the real default
+    // (/etc/tallpbx) belongs to the live host and must never be read,
+    // rewritten, or cleaned up by tests.
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_exec_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(1)
+            ->and($process->getErrorOutput())->toContain('Pending firewall configuration file not found');
+    } finally {
+        @rmdir($isolatedDir);
     }
-
-    $process = new Process(['bash', $scriptPath, 'apply']);
-    $process->run();
-
-    expect($process->getExitCode())->toBe(1)
-        ->and($process->getErrorOutput())->toContain('Pending firewall configuration file not found');
 });
