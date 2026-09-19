@@ -413,6 +413,16 @@ protected function menuItems(): array
   - Always execute preflight safety checks (e.g. `LockoutGuardService::assertSafe()`) and atomic syntax checks (e.g. `nft -c`) before loading configuration into the kernel or FreeSWITCH.
   - If a preflight check fails, reject the change immediately, notify the user with a descriptive toast alert (`$this->showError(...)`), and keep active running configuration untouched.
 
+## UI Feedback & Alerts (Three Standard Patterns)
+
+User-facing messages use three purpose-built patterns — choose the one that matches the context, never hand-roll alert markup, and never replace one pattern project-wide as a "standardization": each page and flow deliberately uses the pattern that fits it. Full guidance lives in the `tallpbx-custom` skill ("UI Alert & Feedback Patterns").
+
+- **Inline page alert (Pattern 1)** — `<x-inline-alert>` fed by `$operationalMessage`/`$operationalMessageType`: in-flow action results on pages without modal flows, plus persistent conditions (e.g. "FreeSWITCH not connected" banners, the lockout warning).
+- **In-dialog error state (Pattern 2)** — `x-confirmation-modal :error="…"`: server-side re-check failures (typed-confirmation mismatch, concurrent-edit guards) shown inside the open dialog.
+- **Fixed toast (Pattern 3)** — `<x-operational-toast>`: transient feedback (including cross-redirect session flashes) in the top-right layer above dialogs, with a × that dismisses without a page refresh. When an action fails while a modal is open, close the modal (mirroring the success path) so the page and the toast are both visible.
+
+All three are fed by `App\Support\Concerns\HasOperationalFeedback` (inherited via `BaseListComponent`/`BaseEditComponent`).
+
 ## FreeSWITCH Telephony Integration
 - Do not write static XML configuration files to disk. Instead, serve dynamic dialplans, directories, configurations, and phrases using FreeSWITCH's `mod_xml_curl` through the application's XML Handler API (`/api/v1/xml-handler`).
 - Store media payloads such as call recordings, uploaded recordings, voicemails, and fax files as files. Database tables should store file paths and metadata only; do not introduce base64/blob media storage for these payloads.

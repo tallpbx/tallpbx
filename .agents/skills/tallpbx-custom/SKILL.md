@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: the installer and resource scripts, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, or changelog maintenance and release tagging conventions."
+description: "Invoke when working on TallPBX-specific patterns: the installer and resource scripts, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts)."
 license: MIT
 metadata:
   author: tallpbx
@@ -257,6 +257,43 @@ server request).
 - **Immediate Subsystem Synchronization**: When an administrator toggles a rule, updates sensitivity, adds an IP, or reorders priorities, persist to the DB and apply to the kernel (`nftables`) or FreeSWITCH immediately.
 - **Atomic Preflight Safety**: Always run `LockoutGuardService::assertSafe()` and preflight syntax checks (`nft -c`) before applying. On failure, notify via toast alert and preserve active configuration.
 
+## UI Alert & Feedback Patterns (Three Standard Patterns)
+
+The panel standardizes user-facing messages on three purpose-built patterns. Pick the one that matches the context — never hand-roll alert markup, and never replace one pattern project-wide as a "standardization": each page and flow deliberately uses the pattern that fits it. All three are fed by the same trait (`App\Support\Concerns\HasOperationalFeedback`, inherited via `BaseListComponent` / `BaseEditComponent`; ad-hoc Livewire components must `use` it themselves).
+
+### Pattern 1 — Inline page alert (`<x-inline-alert>`)
+
+In-flow alert rendered at the top of the page content (DaisyUI `alert alert-{type}`, icon, `role="alert"`, no close button), fed by `$operationalMessage` / `$operationalMessageType`.
+
+**Use it when:** the feedback flow involves no modal, an in-flow message reads naturally for the page, or the alert describes a **persistent condition** rather than an action result (for example the "FreeSWITCH not connected" banners and the lockout warning — they use the same component with a fixed `type`).
+
+```blade
+@if ($operationalMessage !== null)
+    <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>
+@endif
+```
+
+### Pattern 2 — In-dialog error state (`x-confirmation-modal :error`)
+
+The confirmation dialog swaps its entire content for an error view (red icon, the message in an inline alert, a Close button) when the `:error` prop is set.
+
+**Use it when:** a failure must be shown **inside an open dialog** because it belongs to the dialog's context — typically server-side re-check failures such as typed-confirmation mismatches or concurrent-edit guards, where the flow cannot continue.
+
+### Pattern 3 — Fixed toast (`<x-operational-toast>`)
+
+DaisyUI toast layer fixed to the top-right at `z-[9999]` — above any open dialog and independent of page scroll. Renders `role="alert"`, includes a × button that clears the message server-side via `HasOperationalFeedback::dismissFeedback()` (no page refresh needed), and also renders cross-redirect session flashes (`status` / `error`) through the same box.
+
+**Use it when:** feedback must be visible regardless of modal state or scroll position — especially any flow where a failed action **closes its modal** (mirroring the success path) so the page and the toast are both visible, and on pages where the toast already is the established feedback channel (Security Command Center).
+
+```blade
+<x-operational-toast :message="$operationalMessage" :type="$operationalMessageType" />
+```
+
+### Notes
+
+- Messages persist until the next action replaces them, the × is clicked, or `dismissFeedback()` runs — there is no auto-hide timer because DaisyUI ships CSS only.
+- Both Pattern 1 and Pattern 3 render `role="alert"` for accessibility.
+
 ## DaisyUI 5 CSS Compilation Behavior
 
 DaisyUI 5 registers utility classes (tooltip, btn, badge, etc.) via Tailwind v4's
@@ -442,6 +479,7 @@ database name.
 | Pitfall | Fix |
 |---|---|
 | `tooltip-right` not working | Add to `tooltip-safelist.blade.php` + `npm run build` |
+| Feedback alerts hand-rolled per page | Use the shared components — see "UI Alert & Feedback Patterns" (inline vs in-dialog vs toast) |
 | Tooltip cut off at page top | Use `align="start"` with `position="right"` |
 | Radio button `wire:model` doesn't fire | Add `@click` on parent label with `$wire.property = value` |
 | `wire:navigate` resets scroll on short pages | Add `wire:navigate:scroll` to `<main>` element |
