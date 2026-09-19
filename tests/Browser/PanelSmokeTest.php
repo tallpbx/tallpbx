@@ -31,6 +31,8 @@ use Modules\Extensions\Models\Extension;
 use Modules\FeatureCodes\Models\FeatureCode;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
+use Modules\Security\Models\SecurityRule;
+use Modules\Security\Models\SecurityService;
 use Tests\Browser\Pages\LoginPage;
 
 beforeEach(function () {
@@ -635,6 +637,46 @@ it('renders the security manager dashboard', function () {
         ],
     );
 
+    // Seed demo custom firewall rules covering the three row styles so the
+    // Custom Rules section renders populated (with its reorder controls) in
+    // the screenshot instead of the empty-state message.
+    SecurityRule::updateOrCreate(
+        ['description' => 'Carrier SIP trunk'],
+        [
+            'sequence' => 10,
+            'source_ip' => 'any',
+            'service_id' => SecurityService::where('name', 'SIP Signaling')->value('id'),
+            'custom_port' => null,
+            'custom_protocol' => null,
+            'action' => 'accept',
+            'enabled' => true,
+        ],
+    );
+    SecurityRule::updateOrCreate(
+        ['description' => 'Admin SSH from bastion'],
+        [
+            'sequence' => 20,
+            'source_ip' => '192.0.2.50',
+            'service_id' => null,
+            'custom_port' => '2022',
+            'custom_protocol' => 'tcp',
+            'action' => 'accept',
+            'enabled' => true,
+        ],
+    );
+    SecurityRule::updateOrCreate(
+        ['description' => 'Block RDP scanners'],
+        [
+            'sequence' => 30,
+            'source_ip' => 'any',
+            'service_id' => null,
+            'custom_port' => '3389',
+            'custom_protocol' => 'tcp',
+            'action' => 'drop',
+            'enabled' => true,
+        ],
+    );
+
     $this->browse(function (Browser $browser) {
         $browser->loginAs($this->admin, 'admin')
             ->resize(1920, 2400)
@@ -649,6 +691,9 @@ it('renders the security manager dashboard', function () {
             ->assertSee('198.51.100.23')
             ->assertSee('192.0.2.10')
             ->assertSee('203.0.113.66')
+            ->assertSee('Carrier SIP trunk')
+            ->assertSee('Admin SSH from bastion')
+            ->assertSee('Block RDP scanners')
             ->assertSee('Pre-Filters', true)
             ->assertSee('Standard Services', true)
             ->assertSee('Default Inbound Policy', true)
