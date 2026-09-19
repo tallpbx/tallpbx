@@ -36,6 +36,8 @@ php artisan dusk
 php artisan route:list --name=<feature-name>
 ```
 
+**CI enforcement**: `.github/workflows/tests.yml` runs the full Pest suite (in-memory SQLite plus a Redis service, on PHP 8.5) for every push to `main`/release branches and every pull request. Treat it as the authoritative execution of step 2 and configure branch protection so a failing run cannot be merged.
+
 **For new modules specifically**, also verify:
 - `module.json` exists and `php artisan module:sync --only-local` succeeds
 - Permissions are in the database: check with `php artisan tinker --execute 'echo Permission::where("name","your.permission")->exists() ? "YES" : "NO";'`
