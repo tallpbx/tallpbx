@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Standard PBX Service Catalog Test Expectations**: Updated the security catalog test to expect the 8 standard services seeded since 1.1.0; the `ICMP Ping Diagnostics` service added by the ICMP feature had not been reflected in the expected count.
 - **Test Suite Could Modify the Live Host Firewall**: Running the Security module's automated tests on a host where the bounded helper is installed (or as the `root` user) could execute real privileged firewall commands — rewriting `/etc/tallpbx` and loading test fixtures into the live kernel ruleset. The tests now use a stubbed executor and an isolated ruleset directory, and `SecurityExecutor` refuses to run privileged operations during automated test runs, so running the test suite can never alter host firewall state again.
 
+### Security
+- **Authenticated Real-Time Alert Channel**: Security Command Center alerts (intruder activity, bans, and firewall changes) are now broadcast on a private, permission-checked WebSocket channel. Only signed-in panel users holding the `security.view` permission can subscribe over Laravel Echo/Reverb; unauthenticated clients are rejected by the channel authorization endpoint. No action is required for existing installations.
+
 ## [1.1.0] - 2026-09-18
 
 ### Changed

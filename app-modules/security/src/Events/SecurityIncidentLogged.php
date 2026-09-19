@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Security\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -36,12 +36,12 @@ class SecurityIncidentLogged implements ShouldBroadcastNow
     /**
      * Get the channels the event should broadcast on.
      *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
+     * @return array<int, PrivateChannel>
      */
     public function broadcastOn(): array
     {
         return [
-            new Channel('security.alerts'),
+            new PrivateChannel('security.alerts'),
         ];
     }
 

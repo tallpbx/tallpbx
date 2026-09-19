@@ -255,10 +255,13 @@ class SecurityManager extends Component
     /**
      * Real-time push-event listener and status updater.
      */
+    // Subscribe to the private security alerts channel over Laravel Echo.
+    // routes/channels.php only authorizes panel users with the security.view
+    // permission, so public WebSocket clients never receive these alerts.
     #[On('refresh-security')]
-    #[On('echo:security.alerts,.SecurityBanUpdated')]
-    #[On('echo:security.alerts,.SecurityIncidentLogged')]
-    #[On('echo:security.alerts,.FirewallRulesetUpdated')]
+    #[On('echo-private:security.alerts,.SecurityBanUpdated')]
+    #[On('echo-private:security.alerts,.SecurityIncidentLogged')]
+    #[On('echo-private:security.alerts,.FirewallRulesetUpdated')]
     public function refreshStatus(?LockoutGuardService $lockoutGuard = null): void
     {
         $lockoutGuard ??= app(LockoutGuardService::class);
