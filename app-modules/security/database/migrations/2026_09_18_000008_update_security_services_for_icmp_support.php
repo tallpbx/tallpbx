@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -20,9 +19,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement("ALTER TABLE security_services MODIFY COLUMN protocol VARCHAR(20) NOT NULL DEFAULT 'both'");
-
         Schema::table('security_services', function (Blueprint $table): void {
+            // Widen the 'protocol' column from ENUM('tcp','udp','both') to a free
+            // VARCHAR(20) so that custom rules can also use 'icmp'.
+            // The schema builder is used instead of a raw MariaDB "MODIFY COLUMN"
+            // statement so the migration also runs on SQLite, which is the driver
+            // the automated test suite uses. On MariaDB the resulting column is
+            // identical (VARCHAR(20) NOT NULL DEFAULT 'both').
+            $table->string('protocol', 20)->default('both')->change();
+
             if (! Schema::hasColumn('security_services', 'rate_limit')) {
                 $table->unsignedInteger('rate_limit')->nullable()->after('source_ip')->comment('Rate limit in packets/sec (null for unlimited)');
             }
@@ -46,6 +51,10 @@ return new class extends Migration
             }
         });
 
-        DB::statement("ALTER TABLE security_services MODIFY COLUMN protocol ENUM('tcp', 'udp', 'both') NOT NULL DEFAULT 'both'");
+        // Restore the original ENUM('tcp','udp','both') definition of the column.
+        // Using the schema builder keeps this step working on both MariaDB and SQLite.
+        Schema::table('security_services', function (Blueprint $table): void {
+            $table->enum('protocol', ['tcp', 'udp', 'both'])->default('both')->change();
+        });
     }
 };

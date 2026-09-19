@@ -25,7 +25,12 @@ beforeEach(function (): void {
 });
 
 it('seeds standard PBX services into security_services', function (): void {
-    expect(SecurityService::count())->toBe(7);
+    expect(SecurityService::count())->toBe(8);
+
+    $icmp = SecurityService::where('name', 'ICMP Ping Diagnostics')->first();
+    expect($icmp)->not->toBeNull()
+        ->and($icmp->protocol)->toBe('icmp')
+        ->and($icmp->is_system)->toBeTrue();
 
     $sip = SecurityService::where('name', 'SIP Signaling')->first();
     expect($sip)->not->toBeNull()
@@ -63,7 +68,7 @@ it('seeds default security settings into security_settings', function (): void {
 
 it('supports SecurityService model scopes and relations', function (): void {
     // System service scope
-    expect(SecurityService::system()->count())->toBe(7)
+    expect(SecurityService::system()->count())->toBe(8)
         ->and(SecurityService::custom()->count())->toBe(0);
 
     // Create a custom service

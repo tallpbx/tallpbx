@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **SQLite-Compatible Security ICMP Migration**: The Security module's ICMP support migration (`2026_09_18_000008`) used a MariaDB-only `ALTER TABLE ... MODIFY COLUMN` statement, which stopped database migrations — and therefore the entire automated test suite — from running on SQLite. The migration now uses Laravel's portable schema builder, producing an identical column definition on MariaDB while allowing SQLite-backed environments and automated tests to migrate cleanly. No action is required for existing MariaDB installations, which have already applied this migration.
+- **Standard PBX Service Catalog Test Expectations**: Updated the security catalog test to expect the 8 standard services seeded since 1.1.0; the `ICMP Ping Diagnostics` service added by the ICMP feature had not been reflected in the expected count.
+
 ## [1.1.0] - 2026-09-18
 
 ### Changed
