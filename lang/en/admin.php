@@ -1331,6 +1331,8 @@ return [
     'security_promoted_whitelist' => 'IP unblocked and added to Whitelist.',
     'security_promoted_blacklist' => 'IP added to permanent Blacklist.',
     'security_manual_ban_success' => 'IP address blocked successfully.',
+    'security_cannot_ban_whitelisted' => 'The IP address :ip is whitelisted and cannot be banned. Remove it from the Whitelist section first if it needs to be blocked.',
+    'security_cannot_blacklist_whitelisted' => 'The IP address :ip is whitelisted and cannot be blacklisted. Remove it from the Whitelist section first if it needs to be blocked.',
     'vector_sip' => 'Phone (SIP)',
     'vector_web' => 'Web Login',
     'vector_ssh' => 'Server (SSH)',

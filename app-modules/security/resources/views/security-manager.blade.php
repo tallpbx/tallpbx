@@ -12,20 +12,8 @@
         </div>
     </div>
 
-    {{-- Feedback Notifications --}}
-    @if ($operationalMessage)
-        <div class="alert alert-{{ $operationalMessageType === 'error' ? 'error' : ($operationalMessageType === 'warning' ? 'warning' : 'success') }} shadow-sm">
-            <span>{{ $operationalMessage }}</span>
-        </div>
-    @elseif (session('status'))
-        <div class="alert alert-success shadow-sm">
-            <span>{{ session('status') }}</span>
-        </div>
-    @elseif (session('error'))
-        <div class="alert alert-error shadow-sm">
-            <span>{{ session('error') }}</span>
-        </div>
-    @endif
+    {{-- Transient feedback toast (shared standard component — see tallpbx-custom skill) --}}
+    <x-operational-toast :message="$operationalMessage" :type="$operationalMessageType" />
 
     {{-- Lockout Warning Banner (if unprotected under drop policy) --}}
     @if (! $isCurrentIpWhitelisted && $firewallDefaultPolicy === 'drop')

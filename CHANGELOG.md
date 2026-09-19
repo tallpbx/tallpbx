@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Service / Port Column Squeeze**: When the Pre-Filters section was expanded, the "Service / Port" column of the Firewall Rules & Port Access table could be squeezed narrow enough that a service-name chip (for example "ICMP Ping Diagnostics") wrapped inside its fixed-height pill and the text spilled over it. The column's chips are now plain text — the service name in regular weight and the rate-limit/dual-stack annotations in muted small text — so content wraps gracefully instead of overflowing a fixed-height pill, and the column's minimum width is reduced to 16rem. No action is required for existing installations.
+- **Blocking a Whitelisted IP from the Security UI**: Attempting to ban a whitelisted IP address from the manual ban dialog raised a raw exception error page instead of a proper error alert. The dialog now closes on refusal — exactly like a successful ban — and the error appears as a red alert in the fixed top-right toast layer, dismissible with a close button. The same protection was extended to the dialog's "Permanent" option and the Blacklist add form, which previously allowed silently blacklisting a whitelisted address — since the kernel evaluates the blacklist before the whitelist bypass, that would have defeated the whitelist protection and could lock out the administrator. The new messages are available in English, Spanish, and French. No action is required for existing installations.
 
 ## [1.1.1] - 2026-09-19
 

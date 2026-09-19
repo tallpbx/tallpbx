@@ -1229,6 +1229,8 @@ return [
     'security_promoted_whitelist' => 'IP desbloqueada y añadida a la Lista Blanca.',
     'security_promoted_blacklist' => 'IP añadida a la Lista Negra permanente.',
     'security_manual_ban_success' => 'Dirección IP bloqueada con éxito.',
+    'security_cannot_ban_whitelisted' => 'La dirección IP :ip está en la lista blanca y no se puede bloquear. Elimínela de la sección Lista Blanca si realmente debe bloquearse.',
+    'security_cannot_blacklist_whitelisted' => 'La dirección IP :ip está en la lista blanca y no se puede añadir a la lista negra. Elimínela de la sección Lista Blanca si realmente debe bloquearse.',
     'vector_sip' => 'Teléfono (SIP)',
     'vector_web' => 'Inicio de Sesión Web',
     'vector_ssh' => 'Servidor (SSH)',

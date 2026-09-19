@@ -295,6 +295,16 @@ class SecurityManager extends Component
 
         $ip = trim($this->newBlacklistIp);
 
+        // Whitelisted addresses are immune to blocking, and the kernel drop
+        // rules evaluate before the whitelist bypass, so blacklisting a
+        // trusted address would silently defeat its protection (and can lock
+        // out the administrator's own session). Refuse with an inline error.
+        if ($lockoutGuard->isWhitelisted($ip)) {
+            $this->addError('newBlacklistIp', (string) __('admin.security_cannot_blacklist_whitelisted', ['ip' => $ip]));
+
+            return;
+        }
+
         if (SecurityIpList::where('type', 'blacklist')->where('ip_address', $ip)->exists()) {
             $this->addError('newBlacklistIp', 'This IP address is already present in the blacklist.');
 
@@ -461,9 +471,14 @@ class SecurityManager extends Component
 
     /**
      * Execute a manual ban against a specific IP address.
+     *
+     * Whitelisted addresses are immune to every blocking action, so attempts
+     * to ban one are reported as a friendly alert instead of a raw exception.
      */
-    public function manualBan(SecurityBanServiceInterface $banService): void
+    public function manualBan(SecurityBanServiceInterface $banService, ?LockoutGuardService $lockoutGuard = null): void
     {
+        $lockoutGuard ??= app(LockoutGuardService::class);
+
         $this->validate([
             'manualBanIp' => [
                 'required',
@@ -477,13 +492,35 @@ class SecurityManager extends Component
         $ip = trim($this->manualBanIp);
         $reason = $this->manualBanReason ? trim($this->manualBanReason) : 'Manual administrative ban';
 
+        // The permanent option writes straight to the blacklist — which the
+        // kernel evaluates before the whitelist bypass — so whitelisted
+        // addresses must be refused here as well as in the transient ban path.
+        if ($lockoutGuard->isWhitelisted($ip)) {
+            // Mirror the success path: close the dialog immediately and report
+            // the refusal as a red alert in the top-right toast layer.
+            $this->showManualBanModal = false;
+            $this->notifyError((string) __('admin.security_cannot_ban_whitelisted', ['ip' => $ip]));
+
+            return;
+        }
+
         if ($this->manualBanDuration === -1) {
             SecurityIpList::updateOrCreate(
                 ['type' => 'blacklist', 'ip_address' => $ip],
                 ['description' => $reason]
             );
         } else {
-            $banService->ban($ip, 'manual', $reason, $this->manualBanDuration);
+            try {
+                $banService->ban($ip, 'manual', $reason, $this->manualBanDuration);
+            } catch (\InvalidArgumentException) {
+                // The ban service guard is authoritative and can reject the
+                // address even after the pre-check; close the dialog and show
+                // the same red toast instead of an unhandled exception page.
+                $this->showManualBanModal = false;
+                $this->notifyError((string) __('admin.security_cannot_ban_whitelisted', ['ip' => $ip]));
+
+                return;
+            }
         }
 
         $this->autoApplyFirewallRuleset();

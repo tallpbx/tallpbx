@@ -1228,6 +1228,8 @@ return [
     'security_promoted_whitelist' => 'IP débloquée et ajoutée à la Liste Blanche.',
     'security_promoted_blacklist' => 'IP ajoutée à la Liste Noire permanente.',
     'security_manual_ban_success' => 'Adresse IP bloquée avec succès.',
+    'security_cannot_ban_whitelisted' => 'L\'adresse IP :ip est en liste blanche et ne peut pas être bloquée. Retirez-la d\'abord de la section Liste Blanche si elle doit vraiment être bloquée.',
+    'security_cannot_blacklist_whitelisted' => 'L\'adresse IP :ip est en liste blanche et ne peut pas être ajoutée à la liste noire. Retirez-la d\'abord de la section Liste Blanche si elle doit vraiment être bloquée.',
     'vector_sip' => 'Téléphone (SIP)',
     'vector_web' => 'Connexion Web',
     'vector_ssh' => 'Serveur (SSH)',

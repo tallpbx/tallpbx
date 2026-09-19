@@ -59,6 +59,18 @@ trait HasOperationalFeedback
         $this->showOperationalMessage($feedback['type'], $feedback['message']);
     }
 
+    /**
+     * Dismiss the current feedback toast and forget flashed status or error
+     * messages so the message does not reappear after the next re-render.
+     *
+     * Invoked by the shared <x-operational-toast> close button.
+     */
+    public function dismissFeedback(): void
+    {
+        $this->clearOperationalMessage();
+        session()->forget(['status', 'error']);
+    }
+
     /** Clear the current page-level feedback message. */
     protected function clearOperationalMessage(): void
     {

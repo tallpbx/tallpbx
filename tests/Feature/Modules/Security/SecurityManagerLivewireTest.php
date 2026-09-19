@@ -173,6 +173,89 @@ it('applies a manual IP ban through the modal', function (): void {
     expect(SecurityBan::where('ip_address', '198.51.100.222')->where('is_active', true)->exists())->toBeTrue();
 });
 
+it('shows a DaisyUI alert instead of throwing when manually banning a whitelisted IP', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.199',
+        'description' => 'Protected test address',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openManualBanModal')
+        ->set('manualBanIp', '203.0.113.199')
+        ->set('manualBanDuration', 3600)
+        ->set('manualBanReason', 'Attempted ban of protected IP')
+        ->call('manualBan')
+        ->assertSet('operationalMessageType', 'error')
+        ->assertSee('is whitelisted and cannot be banned')
+        ->assertSee('role="alert"', false)
+        ->assertSet('showManualBanModal', false);
+
+    expect(SecurityBan::where('ip_address', '203.0.113.199')->exists())->toBeFalse();
+});
+
+it('refuses the permanent manual ban option for a whitelisted IP without blacklisting it', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.198',
+        'description' => 'Protected test address',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openManualBanModal')
+        ->set('manualBanIp', '203.0.113.198')
+        ->set('manualBanDuration', -1)
+        ->call('manualBan')
+        ->assertSet('operationalMessageType', 'error')
+        ->assertSee('is whitelisted and cannot be banned')
+        ->assertSet('showManualBanModal', false);
+
+    expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '203.0.113.198')->exists())->toBeFalse();
+});
+
+it('shows an inline error when adding a whitelisted IP to the blacklist', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.197',
+        'description' => 'Protected test address',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('newBlacklistIp', '203.0.113.197')
+        ->set('newBlacklistDescription', 'Attempted block of protected IP')
+        ->call('addBlacklistIp')
+        ->assertHasErrors('newBlacklistIp')
+        ->assertSee('is whitelisted and cannot be blacklisted');
+
+    expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '203.0.113.197')->exists())->toBeFalse();
+});
+
+it('shows a dismiss button on the feedback toast that clears the message', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.196',
+        'description' => 'Protected test address',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openManualBanModal')
+        ->set('manualBanIp', '203.0.113.196')
+        ->set('manualBanDuration', 3600)
+        ->call('manualBan')
+        ->assertSee('dismissFeedback', false)
+        ->call('dismissFeedback')
+        ->assertSet('operationalMessage', null)
+        ->assertSet('operationalMessageType', null)
+        ->assertDontSee('toast-top', false)
+        ->assertDontSee('is whitelisted and cannot be banned');
+
+    expect(session('error'))->toBeNull();
+});
+
 it('reorders sequential firewall rules up and down', function (): void {
     $rule1 = SecurityRule::create([
         'sequence' => 10,
