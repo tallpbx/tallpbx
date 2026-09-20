@@ -5,7 +5,8 @@
             <div class="flex items-center gap-2">
                 <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.security_title') }}</h1>
                 <x-tooltip :tip="__('admin.security_description')" align="start" position="right">
-                    <x-heroicon-o-shield-check class="w-6 h-6 text-primary cursor-help opacity-70 hover:opacity-100" />
+                    {{-- Info icon marks this as hover tooltip text; size and style match the page-title info icon used across the UI, and the shield stays reserved for the nav menu. --}}
+                    <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
                 </x-tooltip>
             </div>
         </div>
@@ -728,7 +729,7 @@
                                         <span>{{ $service->name }}</span>
                                         @if ($service->description)
                                             <x-tooltip :tip="$service->description" align="start" position="right">
-                                                <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/50 cursor-help" />
+                                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                                             </x-tooltip>
                                         @endif
                                     </div>
