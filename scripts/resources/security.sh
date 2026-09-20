@@ -20,6 +20,10 @@
 #    the database if the Laravel application is present.
 # 6. Enables and starts the 'nftables' systemd service and generates an initial
 #    safe baseline ruleset ensuring SSH, Web, SIP, and RTP traffic remain open.
+# 7. Grants the PHP-FPM web worker scoped write access to '/etc/tallpbx' through
+#    a systemd drop-in ('ReadWritePaths'), because the distribution PHP-FPM unit
+#    runs with 'ProtectSystem=full' (which mounts '/etc' read-only inside the
+#    service) and would otherwise break firewall saves from the web panel.
 #
 # Safe to re-run:
 # - All package, file, and directory operations are idempotent.
@@ -133,3 +137,43 @@ verbose "Enabling and starting nftables systemd service"
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable nftables 2>/dev/null || true
 systemctl restart nftables 2>/dev/null || true
+
+# ------------------------------------------------------------------------------
+# 7. Grant PHP-FPM web workers scoped write access to /etc/tallpbx
+# ------------------------------------------------------------------------------
+# Debian/Ubuntu PHP-FPM units run with systemd's 'ProtectSystem=full' hardening,
+# which mounts the whole of '/etc' READ-ONLY inside the PHP-FPM service. That
+# hardening silently defeats step 2 above: web requests cannot stage the pending
+# ruleset in '/etc/tallpbx' (failing with "Read-only file system"), and the
+# bounded helper's promotion of the validated ruleset fails the same way.
+#
+# The drop-in below adds one scoped exception: 'ReadWritePaths=/etc/tallpbx'
+# re-opens exactly that directory — and nothing else in '/etc' — for the
+# PHP-FPM service, restoring the write access the web panel is designed to have
+# while keeping every other ProtectSystem guarantee intact.
+#
+# Safe to re-run: the drop-in is overwritten with identical content, and
+# PHP-FPM is only restarted when its service exists on this host.
+verbose "Granting PHP-FPM scoped write access to /etc/tallpbx"
+FPM_SERVICE="php${php_version}-fpm"
+FPM_DROPIN_DIR="/etc/systemd/system/${FPM_SERVICE}.service.d"
+install -d -m 0755 "$FPM_DROPIN_DIR"
+cat << 'EOF' > "${FPM_DROPIN_DIR}/tallpbx-security.conf"
+# Added by the TallPBX installer: allow the PHP-FPM web worker to stage pending
+# firewall rulesets in /etc/tallpbx. The stock PHP-FPM unit runs with
+# ProtectSystem=full, which mounts /etc read-only inside the service; this
+# ReadWritePaths line re-opens only the TallPBX firewall configuration
+# directory and nothing else.
+[Service]
+ReadWritePaths=/etc/tallpbx
+EOF
+chmod 0644 "${FPM_DROPIN_DIR}/tallpbx-security.conf"
+
+# Reload systemd so the drop-in is registered, then restart PHP-FPM (when
+# present) so running web workers join a namespace with the new write access.
+# A restart is required because systemd applies these protections when a
+# service starts.
+systemctl daemon-reload 2>/dev/null || true
+if systemctl list-unit-files "${FPM_SERVICE}.service" >/dev/null 2>&1; then
+    systemctl try-restart "$FPM_SERVICE" 2>/dev/null || true
+fi

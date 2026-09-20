@@ -158,3 +158,34 @@ it('writes pending configuration and validates syntax with host nft utility', fu
     @unlink($pendingFile);
     @rmdir($tempDir);
 });
+
+it('refuses to compile a ruleset when a ban contains an invalid address', function (): void {
+    SecurityBan::create([
+        'ip_address' => '344.34.34.34',
+        'vector' => 'manual',
+        'reason' => 'Legacy invalid ban',
+        'attempt_count' => 1,
+        'banned_at' => Carbon::now(),
+        'expires_at' => Carbon::now()->addHour(),
+        'is_active' => true,
+    ]);
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, "ban '344.34.34.34'");
+});
+
+it('refuses to compile a ruleset when IPv6 or malformed entries exist in the IPv4 sets', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '2001:569:fcd9:900:e95c:2439:5a28:86b',
+        'description' => 'Legacy IPv6 entry',
+    ]);
+    SecurityIpList::create([
+        'type' => 'blacklist',
+        'ip_address' => '10.0.0.0/99',
+        'description' => 'Legacy invalid CIDR',
+    ]);
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, "whitelist entry '2001:569:fcd9:900:e95c:2439:5a28:86b'");
+});

@@ -119,11 +119,25 @@ it('validates shell script rejects invalid seconds in ban command', function ():
 it('validates shell script rejects invalid IP in unban command', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
-    $process = new Process(['bash', $scriptPath, 'unban', 'malicious;ip']);
-    $process->run();
+    // Octet/CIDR bounds and malformed IPv6 must be refused before any kernel
+    // operation runs (exit code 2 = validation failure). The unban action is
+    // used because its kernel calls are read-only or fully ignored, so an
+    // unexpected validation pass can never mutate host firewall state.
+    $invalidIps = [
+        'malicious;ip',
+        '344.34.34.34',
+        '10.0.0.0/99',
+        '1:::2',
+        '2001:db8::/999',
+    ];
 
-    expect($process->getExitCode())->toBe(2)
-        ->and($process->getErrorOutput())->toContain('ERROR: Invalid IP address');
+    foreach ($invalidIps as $ip) {
+        $process = new Process(['bash', $scriptPath, 'unban', $ip]);
+        $process->run();
+
+        expect($process->getExitCode())->toBe(2)
+            ->and($process->getErrorOutput())->toContain('ERROR: Invalid IP address');
+    }
 });
 
 it('validates shell script apply fails when pending file is missing', function (): void {
@@ -146,6 +160,57 @@ it('validates shell script apply fails when pending file is missing', function (
         expect($process->getExitCode())->toBe(1)
             ->and($process->getErrorOutput())->toContain('Pending firewall configuration file not found');
     } finally {
+        @rmdir($isolatedDir);
+    }
+});
+
+it('validates shell script validate fails when pending file is missing', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // Same isolation contract as the apply test above: never touch /etc/tallpbx.
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_exec_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'validate'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(1)
+            ->and($process->getErrorOutput())->toContain('Pending firewall configuration file not found');
+    } finally {
+        @rmdir($isolatedDir);
+    }
+});
+
+it('validates shell script validate checks pending ruleset syntax without touching the kernel', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_exec_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    // A minimal syntactically valid ruleset — 'validate' runs 'nft -c' in
+    // check-only mode, so the kernel firewall must never be modified.
+    file_put_contents(
+        $isolatedDir.'/firewall.nft.pending',
+        "#!/usr/sbin/nft -f\n\ntable inet tallpbx_validate_probe {\n}\n"
+    );
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'validate'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toContain('SUCCESS: Pending ruleset syntax is valid');
+    } finally {
+        @unlink($isolatedDir.'/firewall.nft.pending');
         @rmdir($isolatedDir);
     }
 });

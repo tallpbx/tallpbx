@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Security\Services;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
@@ -68,6 +69,10 @@ class SecurityConfigGenerator
         }
 
         $activeBans = SecurityBan::active()->get();
+
+        // Refuse to compile entries the IPv4 kernel sets cannot represent:
+        // one invalid element would make the whole ruleset uncompilable.
+        $this->assertCompilableEntries($blacklistIps, $whitelistIps, $activeBans);
 
         $lines = [];
         $lines[] = '#!/usr/sbin/nft -f';
@@ -296,7 +301,69 @@ class SecurityConfigGenerator
     }
 
     /**
+     * Assert that every IP list entry and active ban can be compiled into the
+     * IPv4 nftables sets, refusing generation with a precise error that names
+     * the offending entries instead of producing an invalid ruleset that the
+     * kernel preflight would later reject without explanation.
+     *
+     * @param  array<int, string>  $blacklistIps
+     * @param  array<int, string>  $whitelistIps
+     * @param  Collection<int, SecurityBan>  $activeBans
+     */
+    private function assertCompilableEntries(array $blacklistIps, array $whitelistIps, $activeBans): void
+    {
+        $invalid = [];
+
+        foreach (['blacklist' => $blacklistIps, 'whitelist' => $whitelistIps] as $listName => $entries) {
+            foreach ($entries as $entry) {
+                if (! $this->isValidIpv4OrCidr($entry)) {
+                    $invalid[] = "{$listName} entry '{$entry}'";
+                }
+            }
+        }
+
+        foreach ($activeBans as $ban) {
+            if (filter_var(trim((string) $ban->ip_address), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+                $invalid[] = "ban '{$ban->ip_address}'";
+            }
+        }
+
+        if ($invalid !== []) {
+            throw new \RuntimeException(
+                'Cannot compile the firewall ruleset — these entries are not valid IPv4 addresses (IPv6 is not supported yet): '
+                .implode(', ', $invalid)
+                .'. Correct or remove them in the Security Center and try again.'
+            );
+        }
+    }
+
+    /**
+     * Determine whether a value is a valid IPv4 address, optionally with a CIDR prefix of 0-32.
+     */
+    private function isValidIpv4OrCidr(string $value): bool
+    {
+        $value = trim($value);
+
+        if (substr_count($value, '/') > 1) {
+            return false;
+        }
+
+        [$address, $prefix] = array_pad(explode('/', $value, 2), 2, null);
+
+        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            return false;
+        }
+
+        return $prefix === null || (ctype_digit($prefix) && (int) $prefix <= 32);
+    }
+
+    /**
      * Validate ruleset syntax using the host nft utility ('nft -c -f').
+     *
+     * Privileged processes (root CLI/cron) invoke the nft utility directly.
+     * PHP-FPM web workers cannot: nftables requires CAP_NET_ADMIN even for
+     * check-only runs, so the preflight is delegated to the bounded root
+     * helper — which validates the same pending file this class writes.
      *
      * @param  string  $filePath  Path to the configuration file to check
      */
@@ -306,7 +373,16 @@ class SecurityConfigGenerator
             return false;
         }
 
-        $process = new Process(['/usr/sbin/nft', '-c', '-f', $filePath]);
+        // The helper's 'validate' action accepts no path arguments and checks
+        // only the canonical pending file, so delegation is used exclusively
+        // when the worker is unprivileged AND the target is that exact file.
+        $isPrivileged = ! function_exists('posix_geteuid') || posix_geteuid() === 0;
+        if ($isPrivileged || $filePath !== $this->pendingFile) {
+            $process = new Process(['/usr/sbin/nft', '-c', '-f', $filePath]);
+        } else {
+            $process = new Process(['sudo', '-n', '/usr/local/sbin/tallpbx-security', 'validate']);
+        }
+
         $process->run();
 
         if (! $process->isSuccessful()) {
