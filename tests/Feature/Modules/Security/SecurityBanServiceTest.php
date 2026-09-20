@@ -204,25 +204,28 @@ it('refuses to ban an IP covered by a whitelisted CIDR subnet', function (): voi
     ))->toThrow(\InvalidArgumentException::class, 'Cannot ban whitelisted IP address: 10.50.12.34');
 });
 
-it('refuses to ban invalid or IPv6 addresses while the kernel pipeline is IPv4-only', function (): void {
+it('accepts IPv6 bans while still refusing malformed addresses', function (): void {
     $banService = new SecurityBanService;
 
-    // Octets above 255 can never be enforced and used to corrupt generated rulesets.
+    // IPv6 bans are fully supported by the dual-stack kernel pipeline.
+    $ban = $banService->ban(
+        ip: '2001:db8::42',
+        vector: 'manual',
+        reason: 'IPv6 brute force test',
+        durationSeconds: 3600,
+    );
+
+    expect($ban->ip_address)->toBe('2001:db8::42')
+        ->and($ban->is_active)->toBeTrue();
+
+    // Malformed addresses (invalid octets, broken IPv6) are refused outright.
     expect(fn () => $banService->ban(
         ip: '344.34.34.34',
         vector: 'manual',
         reason: 'Invalid octet test',
-    ))->toThrow(\InvalidArgumentException::class, 'Unsupported ban address');
+    ))->toThrow(\InvalidArgumentException::class, 'Invalid ban address');
 
-    // IPv6 bans are deferred until dual-stack kernel support ships.
-    expect(fn () => $banService->ban(
-        ip: '2001:569:fcd9:900:e95c:2439:5a28:86b',
-        vector: 'manual',
-        reason: 'IPv6 interim refusal test',
-    ))->toThrow(\InvalidArgumentException::class, 'Unsupported ban address');
-
-    expect(SecurityBan::where('ip_address', '344.34.34.34')->exists())->toBeFalse()
-        ->and(SecurityBan::where('ip_address', '2001:569:fcd9:900:e95c:2439:5a28:86b')->exists())->toBeFalse();
+    expect(SecurityBan::where('ip_address', '344.34.34.34')->exists())->toBeFalse();
 });
 
 it('creates a permanent ban when durationSeconds is null or 0', function (): void {

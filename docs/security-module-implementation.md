@@ -76,8 +76,7 @@ While technical specifications, backend services, and developer documentation us
 |  |  Search: [ Search IP or note... ]                            |  |  +---------------------------------------------------------------------+  |  |
 |  |  +--------------------------------------------------------+  |  |                                                                           |  |
 |  |  | IP or Network     Description / Note      Action       |  |  |  ℹ Attackers who guess passwords are automatically blocked here and will   |  |
-|  |  | 127.0.0.1/32      This Server (Internal)  [System]     |  |  |    unblock automatically when their time is up.                           |  |
-|  |  | 198.51.100.22/32  Your Computer (Safe)    [Protected]  |  |  |                                                                           |  |
+|  |  | 198.51.100.22/32  Your Computer (Safe)    [Protected]  |  |  |    unblock automatically when their time is up.                           |  |
 |  |  | 192.168.1.0/24    Office Network          [ 🗑 Remove ] |  |  |  Recent Security Activity:                                              |  |
 |  |  | 64.2.142.0/24     Carrier Phone Trunk     [ 🗑 Remove ] |  |  |  • 1:34 PM - Blocked 185.220.101.5 (5 failed phone passwords in 12s)       |  |
 |  |  +--------------------------------------------------------+  |  |  • 1:20 PM - Unblocked 198.51.100.45 by Administrator (Manual Rescue)    |  |
@@ -442,9 +441,22 @@ table inet tallpbx_filter {
         elements = { 45.142.120.0/24, 185.220.101.5 }
     }
 
+    # IPv6 mirror of the blacklist set
+    set blacklist_ips6 {
+        type ipv6_addr
+        flags interval
+        elements = { 2001:db8:bad::/48 }
+    }
+
     # 2. Dynamic Auto-Banned Set (with automatic kernel timeouts)
     set banned_ips {
         type ipv4_addr
+        flags timeout
+    }
+
+    # IPv6 mirror of the dynamic auto-banned set
+    set banned_ips6 {
+        type ipv6_addr
         flags timeout
     }
 
@@ -452,28 +464,43 @@ table inet tallpbx_filter {
     set whitelist_ips {
         type ipv4_addr
         flags interval
-        elements = { 127.0.0.1, 192.168.1.0/24, 198.51.100.10 }
+        elements = { 192.168.1.0/24, 198.51.100.10 }
+    }
+
+    # IPv6 mirror of the whitelist set
+    set whitelist_ips6 {
+        type ipv6_addr
+        flags interval
+        elements = { 2001:569:fcd9:900:e95c:2439:5a28:86b }
     }
 
     chain input {
         type filter hook input priority -10; policy drop;
 
-        # STEP 1: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY
+        # STEP 1: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY (IPv4 + IPv6)
         ip saddr @blacklist_ips drop
+        ip6 saddr @blacklist_ips6 drop
 
-        # STEP 2: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS
+        # STEP 2: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS (IPv4 + IPv6)
         ip saddr @banned_ips drop
+        ip6 saddr @banned_ips6 drop
 
         # STEP 3: BASE INVARIANTS: LOOPBACK & ESTABLISHED CONNECTIONS
         iif "lo" accept
         ct state established,related accept
         ct state invalid drop
 
-        # STEP 4: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY
+        # STEP 4: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY (IPv4 + IPv6)
         ip saddr @whitelist_ips accept
+        ip6 saddr @whitelist_ips6 accept
 
-        # STEP 5: ICMP (Ping)
+        # STEP 5: ICMP (Ping) — configurable policy for both families
         ip protocol icmp icmp type echo-request accept
+        ip6 nexthdr ipv6-icmp icmpv6 type echo-request accept
+
+        # Essential IPv6 connectivity invariant (never severed): path-MTU
+        # discovery, MLD multicast maintenance, and Neighbor Discovery only
+        ip6 nexthdr ipv6-icmp icmpv6 type { packet-too-big, mld-listener-query, mld-listener-report, mld-listener-done, mld2-listener-report, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect } accept
 
         # STEP 6: CORE PBX TELEPHONY PORTS
         # SIP Signaling

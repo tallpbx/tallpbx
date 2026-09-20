@@ -59,6 +59,19 @@ it('considers IP safe when covered by a whitelisted CIDR subnet', function (): v
         ->and($guard->isWhitelisted('192.168.10.77'))->toBeTrue();
 });
 
+it('considers an IPv6 administrator safe when covered by a whitelisted IPv6 address', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '2001:db8::7',
+        'description' => 'IPv6 admin uplink',
+    ]);
+
+    $guard = new LockoutGuardService;
+
+    expect($guard->isIpSafe('2001:db8::7', 'drop'))->toBeTrue()
+        ->and($guard->isWhitelisted('2001:db8::7'))->toBeTrue();
+});
+
 it('detects unsafe IP when setting policy to drop without whitelist or rule', function (): void {
     $guard = new LockoutGuardService;
 

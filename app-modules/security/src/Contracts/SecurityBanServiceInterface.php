@@ -18,7 +18,7 @@ interface SecurityBanServiceInterface
     /**
      * Apply a ban to an IP address.
      *
-     * @param  string  $ip  IPv4 address to ban (IPv6 is refused until dual-stack support ships)
+     * @param  string  $ip  IPv4 or IPv6 address to ban
      * @param  string  $vector  Attack vector: 'web_auth', 'sip_auth', 'ssh', or 'manual'
      * @param  string  $reason  Human-readable explanation of why the host was banned
      * @param  int|null  $durationSeconds  Duration in seconds, or NULL for a permanent ban

@@ -140,6 +140,29 @@ it('validates shell script rejects invalid IP in unban command', function (): vo
     }
 });
 
+it('routes bans and unbans for each address family to the matching kernel set', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // Run the helper with the shell trace enabled (-x) so the test can assert
+    // which kernel set the command targets. The unban action's kernel calls
+    // are read-only or fully ignored, so nothing can mutate host state.
+
+    // IPv6 addresses must target the dedicated banned_ips6 set.
+    $v6 = new Process(['bash', '-x', $scriptPath, 'unban', '2001:db8::1']);
+    $v6->run();
+
+    expect($v6->getExitCode())->toBe(0)
+        ->and($v6->getErrorOutput())->toContain("banned_ips6 '{' 2001:db8::1");
+
+    // IPv4 addresses keep targeting the original banned_ips set.
+    $v4 = new Process(['bash', '-x', $scriptPath, 'unban', '203.0.113.9']);
+    $v4->run();
+
+    expect($v4->getExitCode())->toBe(0)
+        ->and($v4->getErrorOutput())->toContain("banned_ips '{' 203.0.113.9")
+        ->and($v4->getErrorOutput())->not->toContain('banned_ips6');
+});
+
 it('validates shell script apply fails when pending file is missing', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 

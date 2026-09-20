@@ -13,7 +13,8 @@
 # - Atomic ruleset updates: Pending firewall rulesets are validated with 'nft -c'
 #   BEFORE being applied, preventing accidental firewall lockouts or syntax errors.
 # - Zero-Daemon Kernel Banning: Intruder IP bans are added directly to the nftables
-#   dynamic set '@banned_ips' with kernel-level automatic timeouts.
+#   dynamic sets '@banned_ips' (IPv4) and '@banned_ips6' (IPv6) with
+#   kernel-level automatic timeouts.
 # ==============================================================================
 set -euo pipefail
 
@@ -47,6 +48,17 @@ validate_ip() {
     else
         echo "ERROR: Invalid IP address or CIDR format: '$ip'" >&2
         exit 2
+    fi
+}
+
+# Helper function to pick the kernel ban set that matches the address family
+# of the given IP. nftables sets are typed per family, so IPv4 bans live in
+# 'banned_ips' and IPv6 bans live in the mirrored 'banned_ips6' set.
+ban_set_for_ip() {
+    if [[ "$1" =~ $IPV4_REGEX ]]; then
+        echo "banned_ips"
+    else
+        echo "banned_ips6"
     fi
 }
 
@@ -99,6 +111,9 @@ case "$ACTION" in
             exit 3
         fi
 
+        # Family-matched kernel set (banned_ips for IPv4, banned_ips6 for IPv6)
+        BAN_SET="$(ban_set_for_ip "$IP")"
+
         # Ensure table exists in kernel before adding element; restore active ruleset if needed
         if ! /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
             if [ -f "$FIREWALL_ACTIVE" ]; then
@@ -108,10 +123,10 @@ case "$ACTION" in
 
         # If seconds is 0, ban permanently (no timeout), otherwise apply kernel timeout
         if [ "$SECS" -eq 0 ]; then
-            /usr/sbin/nft add element inet tallpbx_filter banned_ips { "$IP" }
+            /usr/sbin/nft add element inet tallpbx_filter "$BAN_SET" { "$IP" }
             echo "SUCCESS: Banned $IP permanently"
         else
-            /usr/sbin/nft add element inet tallpbx_filter banned_ips { "$IP" timeout "${SECS}s" }
+            /usr/sbin/nft add element inet tallpbx_filter "$BAN_SET" { "$IP" timeout "${SECS}s" }
             echo "SUCCESS: Banned $IP for $SECS seconds"
         fi
         ;;
@@ -122,6 +137,9 @@ case "$ACTION" in
         # Validate the IP address parameter
         validate_ip "$IP"
 
+        # Family-matched kernel set (banned_ips for IPv4, banned_ips6 for IPv6)
+        UNBAN_SET="$(ban_set_for_ip "$IP")"
+
         # Ensure table exists in kernel before deleting element
         if ! /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
             if [ -f "$FIREWALL_ACTIVE" ]; then
@@ -130,7 +148,7 @@ case "$ACTION" in
         fi
 
         # Remove the IP element from the kernel dynamic set; ignore if element was not present
-        /usr/sbin/nft delete element inet tallpbx_filter banned_ips { "$IP" } 2>/dev/null || true
+        /usr/sbin/nft delete element inet tallpbx_filter "$UNBAN_SET" { "$IP" } 2>/dev/null || true
         echo "SUCCESS: Unbanned $IP"
         ;;
 

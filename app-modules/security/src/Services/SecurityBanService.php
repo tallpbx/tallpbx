@@ -13,6 +13,7 @@ use Modules\Security\Events\SecurityBanUpdated;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
+use Modules\Security\Support\AddressFamily;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 /**
@@ -45,30 +46,27 @@ class SecurityBanService implements SecurityBanServiceInterface
      * logs an audit trail event, instructs the kernel to drop packets from the IP,
      * and flushes the Redis sliding-window attempt counter.
      *
-     * @param  string  $ip  IPv4 address to ban (IPv6 is refused until dual-stack support ships)
+     * @param  string  $ip  IPv4 or IPv6 address to ban
      * @param  string  $vector  Attack vector: 'web_auth', 'sip_auth', 'ssh', or 'manual'
      * @param  string  $reason  Human-readable explanation of why the host was banned
      * @param  int|null  $durationSeconds  Duration in seconds, or NULL for a permanent ban
      *
-     * @throws \InvalidArgumentException If the IP address is whitelisted or not a supported IPv4 address
+     * @throws \InvalidArgumentException If the IP address is whitelisted or not a valid address
      */
     public function ban(string $ip, string $vector, string $reason, ?int $durationSeconds = null): SecurityBan
     {
         $ip = trim($ip);
 
-        // 0. Refuse addresses the kernel pipeline cannot enforce. The firewall
-        // currently manages IPv4 only: an IPv6 ban record could never be
-        // dropped at the kernel and would make the generated ruleset
-        // uncompilable, so both IPv6 and malformed addresses are rejected here
-        // (defense-in-depth behind the UI validation). Dual-stack support is
-        // scoped in docs/ipv6-dual-stack-implementation-plan.md.
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-            Log::warning("Refusing to ban unsupported (non-IPv4) address: {$ip}", [
+        // 0. Refuse malformed addresses outright (defense-in-depth behind the
+        // UI validation). IPv4 and IPv6 are both fully supported by the
+        // dual-stack kernel pipeline; only genuine garbage is rejected here.
+        if (! AddressFamily::isValidAddress($ip)) {
+            Log::warning("Refusing to ban invalid address: {$ip}", [
                 'vector' => $vector,
                 'reason' => $reason,
             ]);
 
-            throw new \InvalidArgumentException("Unsupported ban address (the firewall engine currently enforces IPv4 only): {$ip}");
+            throw new \InvalidArgumentException("Invalid ban address (expected a valid IPv4 or IPv6 address): {$ip}");
         }
 
         // 1. Guard against banning whitelisted addresses

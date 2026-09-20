@@ -25,17 +25,17 @@ flowchart TD
     %% Pre-Filter Decisions: Drops on Left, Passes on Right, Center Spine
     C --> D{"Step 1: Loopback Interface?<br/>(iif 'lo')"}:::spine
     D -->|YES: Local IPC| PASS0["✅ ALLOW UNCONDITIONALLY<br/>(Protected Localhost)"]:::allow
-    D -->|NO: External| E{"Step 2: Permanent Blacklist?<br/>(@blacklist_ips)"}:::spine
+    D -->|NO: External| E{"Step 2: Permanent Blacklist?<br/>(@blacklist_ips / @blacklist_ips6)"}:::spine
 
     E -->|YES: Blacklisted| DROP1["❌ DROP IMMEDIATELY<br/>(Zero CPU / Discard)"]:::drop
-    E -->|NO: Safe| F{"Step 3: Active Banned Attacker?<br/>(@banned_ips)"}:::spine
+    E -->|NO: Safe| F{"Step 3: Active Banned Attacker?<br/>(@banned_ips / @banned_ips6)"}:::spine
 
     F -->|YES: Timed Ban| DROP2["❌ DROP IMMEDIATELY<br/>(Kernel Auto-Timeout)"]:::drop
     F -->|NO: Safe| G{"Step 4: Established or Invalid?<br/>(ct state)"}:::spine
 
     G -->|Invalid Packet| DROP_INV["❌ DROP PACKET<br/>(Malformed / Out-of-Window)"]:::drop
     G -->|Established / Related| PASS1["✅ ALLOW DIRECTLY<br/>(Fast-path Conntrack)"]:::allow
-    G -->|New Connection| H{"Step 5: Trusted Whitelist?<br/>(@whitelist_ips)"}:::spine
+    G -->|New Connection| H{"Step 5: Trusted Whitelist?<br/>(@whitelist_ips / @whitelist_ips6)"}:::spine
 
     H -->|YES: Admin / Office| PASS2["✅ ALLOW UNCONDITIONALLY<br/>(Bypass Port Checks)"]:::allow
     H -->|NO: Untrusted| I{"Step 6: Diagnostic Ping?<br/>(ICMP / ICMPv6)"}:::spine
@@ -107,7 +107,7 @@ sequenceDiagram
     Note over Redis: Threshold Reached (e.g. 5 failures in 10 min)
     App->>DB: Record ban in security_bans & security_audit_logs
     App->>Kernel: /usr/local/sbin/tallpbx-security ban 198.51.100.22 86400
-    Note over Kernel: Insert into @banned_ips with 24h hardware timeout
+    Note over Kernel: Insert into @banned_ips / @banned_ips6 with 24h hardware timeout
     App->>Reverb: Broadcast SecurityBanUpdated (ShouldBroadcastNow)
     Reverb-->>UI: Push WebSocket message to channel 'security.alerts'
     Note over UI: Livewire component reactively re-renders table without page reload
@@ -232,7 +232,7 @@ php artisan security:status
 ```bash
 php artisan security:unban 198.51.100.22
 ```
-*Removes the IP from the MariaDB `security_bans` table, clears the failure count in Redis, removes the IP from the kernel `@banned_ips` set, and broadcasts a real-time event to all open browser sessions.*
+*Removes the IP from the MariaDB `security_bans` table, clears the failure count in Redis, removes the IP from the kernel `@banned_ips`/`@banned_ips6` set, and broadcasts a real-time event to all open browser sessions.*
 
 #### Recompile & Apply Active Ruleset
 ```bash

@@ -21,6 +21,7 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Rules\ValidFirewallAddress;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -343,25 +344,14 @@ class SecurityManager extends Component
      */
     public function addBlacklistIp(LockoutGuardService $lockoutGuard): void
     {
-        // IPv6 input gets a dedicated hint until dual-stack kernel support
-        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
-        if (str_contains(trim($this->newBlacklistIp), ':')) {
-            // Replace any lingering message so the IPv6 hint is what the field shows.
-            $this->resetValidation('newBlacklistIp');
-            $this->addError('newBlacklistIp', (string) __('admin.security_ipv6_not_supported'));
-
-            return;
-        }
-
         $this->validate([
             'newBlacklistIp' => [
                 'required',
-                'string',
-                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\/(?:3[0-2]|[12]?\d))?$/',
+                // Both IPv4 and IPv6 entries (with optional CIDR) are validated
+                // by the shared rule, which also rejects malformed values.
+                new ValidFirewallAddress((string) __('admin.security_ip_format_invalid')),
             ],
             'newBlacklistDescription' => ['nullable', 'string', 'max:255'],
-        ], [
-            'newBlacklistIp.regex' => __('admin.security_ip_format_invalid'),
         ]);
 
         $ip = trim($this->newBlacklistIp);
@@ -402,25 +392,14 @@ class SecurityManager extends Component
      */
     public function addWhitelistIp(LockoutGuardService $lockoutGuard): void
     {
-        // IPv6 input gets a dedicated hint until dual-stack kernel support
-        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
-        if (str_contains(trim($this->newWhitelistIp), ':')) {
-            // Replace any lingering message so the IPv6 hint is what the field shows.
-            $this->resetValidation('newWhitelistIp');
-            $this->addError('newWhitelistIp', (string) __('admin.security_ipv6_not_supported'));
-
-            return;
-        }
-
         $this->validate([
             'newWhitelistIp' => [
                 'required',
-                'string',
-                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\/(?:3[0-2]|[12]?\d))?$/',
+                // Both IPv4 and IPv6 entries (with optional CIDR) are validated
+                // by the shared rule, which also rejects malformed values.
+                new ValidFirewallAddress((string) __('admin.security_ip_format_invalid')),
             ],
             'newWhitelistDescription' => ['nullable', 'string', 'max:255'],
-        ], [
-            'newWhitelistIp.regex' => __('admin.security_ip_format_invalid'),
         ]);
 
         $ip = trim($this->newWhitelistIp);
@@ -451,25 +430,14 @@ class SecurityManager extends Component
      */
     public function addIp(LockoutGuardService $lockoutGuard): void
     {
-        // IPv6 input gets a dedicated hint until dual-stack kernel support
-        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
-        if (str_contains(trim($this->newIp), ':')) {
-            // Replace any lingering message so the IPv6 hint is what the field shows.
-            $this->resetValidation('newIp');
-            $this->addError('newIp', (string) __('admin.security_ipv6_not_supported'));
-
-            return;
-        }
-
         $this->validate([
             'newIp' => [
                 'required',
-                'string',
-                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\/(?:3[0-2]|[12]?\d))?$/',
+                // Both IPv4 and IPv6 entries (with optional CIDR) are validated
+                // by the shared rule, which also rejects malformed values.
+                new ValidFirewallAddress((string) __('admin.security_ip_format_invalid')),
             ],
             'newIpDescription' => ['nullable', 'string', 'max:255'],
-        ], [
-            'newIp.regex' => __('admin.security_ip_format_invalid'),
         ]);
 
         $ip = trim($this->newIp);
@@ -587,26 +555,15 @@ class SecurityManager extends Component
     {
         $lockoutGuard ??= app(LockoutGuardService::class);
 
-        // IPv6 input gets a dedicated hint until dual-stack kernel support
-        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
-        if (str_contains(trim($this->manualBanIp), ':')) {
-            // Replace any lingering message so the IPv6 hint is what the field shows.
-            $this->resetValidation('manualBanIp');
-            $this->addError('manualBanIp', (string) __('admin.security_ipv6_not_supported'));
-
-            return;
-        }
-
         $this->validate([
             'manualBanIp' => [
                 'required',
-                'string',
-                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)$/',
+                // Kernel ban sets hold single addresses only, so CIDR ranges
+                // are rejected; both address families are fully supported.
+                new ValidFirewallAddress((string) __('admin.security_ban_ip_format_invalid'), allowCidr: false),
             ],
             'manualBanDuration' => ['required', 'integer'],
             'manualBanReason' => ['nullable', 'string', 'max:255'],
-        ], [
-            'manualBanIp.regex' => __('admin.security_ban_ip_format_invalid'),
         ]);
 
         $ip = trim($this->manualBanIp);

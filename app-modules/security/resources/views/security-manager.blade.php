@@ -1044,7 +1044,7 @@
                 <form wire:submit="manualBan" class="space-y-4 mt-4">
                     <div class="form-control">
                         <label class="label"><span class="label-text font-medium">{{ __('admin.security_attacker_ip') }}</span></label>
-                        <input wire:model="manualBanIp" type="text" placeholder="e.g. 198.51.100.42"
+                        <input wire:model="manualBanIp" type="text" placeholder="e.g. 198.51.100.42 or 2001:db8::1"
                                class="input input-bordered input-sm font-mono @error('manualBanIp') input-error @enderror" />
                         @error('manualBanIp') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
                     </div>

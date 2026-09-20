@@ -1,6 +1,6 @@
 # IPv6 Dual-Stack Firewall Support — Implementation Plan (Scope)
 
-**Status:** Scoped, not started. The validation gap described in §1 is already fixed — IPv6 input is currently refused with a clear message so unusable entries can no longer brick firewall saves.
+**Status:** Implemented (pending live verification on the target host). The validation gap in §1 is fixed and the model gap is closed: IPv6 lists, bans, and helper routing are live in the codebase with test coverage. This document will be removed once verified in production, per the documentation lifecycle.
 
 ## 1. Why This Exists
 
@@ -62,7 +62,7 @@ Used by the Livewire forms, `SecurityBanService`, and mirrored by the helper's b
   set whitelist_ips6 { type ipv6_addr; flags interval; ... }
   ```
 
-- Split MariaDB rows by family when compiling elements; mirror the `127.0.0.1` invariant with a guaranteed `::1` whitelist element.
+- Split MariaDB rows by family when compiling elements; loopback for both families stays protected by the STEP 1 `iif "lo"` interface rule (no injected whitelist elements — the kernel sets mirror the database exactly).
 - Add IPv6 rules at the **same pipeline positions** as their IPv4 twins:
 
   ```
@@ -92,7 +92,7 @@ Used by the Livewire forms, `SecurityBanService`, and mirrored by the helper's b
 
 ### 4.6 Tests
 
-- **Generator:** dual-set compilation; family split of mixed DB rows (incl. CIDR in v6 sets); `::1` invariant; rule-order parity with the IPv4 pipeline.
+- **Generator:** dual-set compilation; family split of mixed DB rows (incl. CIDR in v6 sets); `iif "lo"` loopback invariant; rule-order parity with the IPv4 pipeline.
 - **Helper:** `ban` / `unban` add/remove elements from `@banned_ips6` (isolated `TALLPBX_FIREWALL_CONF_DIR`); strict-regex rejection matrix (already shipped).
 - **Service:** IPv6 ban/unban lifecycle; Redis key handling.
 - **Livewire:** v6 + CIDR accepted; invalid forms rejected with clear messages.
@@ -106,14 +106,14 @@ Used by the Livewire forms, `SecurityBanService`, and mirrored by the helper's b
 3. Revert `docs/security-architecture.md` and UI copy references to the interim restriction.
 4. CHANGELOG entry under `[Unreleased]` when implemented; no installer changes expected.
 
-## 6. Open Decisions
+## 6. Decisions Taken
 
-- **Auto-ban scope for IPv6 attackers:** enable symmetric v6 banning by default (recommended), or gate it behind a setting until validated in the field?
-- **Placeholder wording** for the shared IP/CIDR fields across the three locales (example-based, e.g. "203.0.113.50 or 2001:db8::1").
-- **Out-of-band review** of FreeSWITCH IPv6 SIP readiness separately from this firewall scope.
+- **Auto-ban scope for IPv6 attackers:** symmetric IPv6 banning is enabled by default, matching IPv4 behavior.
+- **Placeholder and message wording:** example-based ("203.0.113.50 or 2001:db8::1"), updated in English, Spanish, and French.
+- **FreeSWITCH IPv6 SIP readiness:** remains a separate out-of-band review; this plan covers the host firewall only.
 
 ## 7. Risks
 
 - **Family mixing** in a set must remain impossible: one stray element of the wrong family invalidates the entire ruleset (this exact failure mode caused the incident). Mitigation: strict classification at every boundary (UI, service, generator split) plus compile tests.
 - **Interim guard removal ordering:** the guard must only be removed in the same release that ships generator + helper support, otherwise regressions reappear.
-- **Lockout edge:** an IPv6-only-connected administrator under `drop` needs the v6 whitelist accept rule to be live before the guard is satisfied — covered by the lockout guard's existing family awareness and the `::1`/`whitelist_ips6` design above.
+- **Lockout edge:** an IPv6-only-connected administrator under `drop` needs the v6 whitelist accept rule to be live before the guard is satisfied — covered by the lockout guard's existing family awareness and the `iif "lo"`/`whitelist_ips6` rules above.

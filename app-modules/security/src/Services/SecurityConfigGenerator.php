@@ -11,6 +11,7 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Support\AddressFamily;
 use Symfony\Component\Process\Process;
 
 /**
@@ -59,20 +60,43 @@ class SecurityConfigGenerator
             $defaultPolicy = 'drop';
         }
 
-        // 1. Compile IP sets
+        // 1. Compile IP sets, kept split per address family because nftables
+        //    sets are typed (ipv4_addr vs ipv6_addr) and mixing families in a
+        //    single set would make the whole ruleset uncompilable.
         $blacklistIps = SecurityIpList::blacklist()->pluck('ip_address')->all();
         $whitelistIps = SecurityIpList::whitelist()->pluck('ip_address')->all();
 
-        // Ensure 127.0.0.1 is always present in the whitelist set
-        if (! in_array('127.0.0.1', $whitelistIps, true)) {
-            array_unshift($whitelistIps, '127.0.0.1');
-        }
-
         $activeBans = SecurityBan::active()->get();
 
-        // Refuse to compile entries the IPv4 kernel sets cannot represent:
+        // Refuse to compile entries the kernel sets cannot represent:
         // one invalid element would make the whole ruleset uncompilable.
         $this->assertCompilableEntries($blacklistIps, $whitelistIps, $activeBans);
+
+        // Split every entry into its address family. Loopback trust in both
+        // families is guaranteed by the STEP 1 interface rule
+        // (`iif "lo" accept`), not by an injected whitelist element, so the
+        // kernel sets mirror the database exactly.
+        $blacklistV4 = $this->entriesForFamily($blacklistIps, 'ipv4');
+        $blacklistV6 = $this->entriesForFamily($blacklistIps, 'ipv6');
+        $whitelistV4 = $this->entriesForFamily($whitelistIps, 'ipv4');
+        $whitelistV6 = $this->entriesForFamily($whitelistIps, 'ipv6');
+
+        // Split active bans per family into ready-to-emit elements with their
+        // remaining kernel timeout seconds.
+        $banElementsV4 = [];
+        $banElementsV6 = [];
+        foreach ($activeBans as $ban) {
+            $seconds = $ban->timeRemaining();
+            $element = ($seconds === null || $seconds <= 0)
+                ? (string) $ban->ip_address
+                : "{$ban->ip_address} timeout {$seconds}s";
+
+            if (AddressFamily::classify((string) $ban->ip_address) === 'ipv6') {
+                $banElementsV6[] = $element;
+            } else {
+                $banElementsV4[] = $element;
+            }
+        }
 
         $lines = [];
         $lines[] = '#!/usr/sbin/nft -f';
@@ -82,46 +106,75 @@ class SecurityConfigGenerator
         $lines[] = '';
         $lines[] = 'table inet tallpbx_filter {';
 
-        // 1. Blacklist Set
+        // 1. Blacklist Set (IPv4)
         $lines[] = '    # 1. Permanent Blacklist Set (Kernel interval tree for IPs & CIDRs)';
         $lines[] = '    set blacklist_ips {';
         $lines[] = '        type ipv4_addr';
         $lines[] = '        flags interval';
-        if (! empty($blacklistIps)) {
-            $elementsStr = implode(', ', $blacklistIps);
+        if ($blacklistV4 !== []) {
+            $elementsStr = implode(', ', $blacklistV4);
             $lines[] = "        elements = { {$elementsStr} }";
         }
         $lines[] = '    }';
         $lines[] = '';
 
-        // 2. Dynamic Auto-Banned Set
+        // 2. Dynamic Auto-Banned Set (IPv4)
         $lines[] = '    # 2. Dynamic Auto-Banned Set (with automatic kernel timeouts)';
         $lines[] = '    set banned_ips {';
         $lines[] = '        type ipv4_addr';
         $lines[] = '        flags timeout';
-        if ($activeBans->isNotEmpty()) {
-            $banElements = [];
-            foreach ($activeBans as $ban) {
-                $seconds = $ban->timeRemaining();
-                if ($seconds === null || $seconds <= 0) {
-                    $banElements[] = $ban->ip_address;
-                } else {
-                    $banElements[] = "{$ban->ip_address} timeout {$seconds}s";
-                }
-            }
-            $elementsStr = implode(', ', $banElements);
+        if ($banElementsV4 !== []) {
+            $elementsStr = implode(', ', $banElementsV4);
             $lines[] = "        elements = { {$elementsStr} }";
         }
         $lines[] = '    }';
         $lines[] = '';
 
-        // 3. Whitelist Set
+        // 3. Whitelist Set (IPv4)
         $lines[] = '    # 3. Permanent Whitelist Set (Immune to drops & bans)';
         $lines[] = '    set whitelist_ips {';
         $lines[] = '        type ipv4_addr';
         $lines[] = '        flags interval';
-        $elementsStr = implode(', ', $whitelistIps);
-        $lines[] = "        elements = { {$elementsStr} }";
+        if ($whitelistV4 !== []) {
+            $elementsStr = implode(', ', $whitelistV4);
+            $lines[] = "        elements = { {$elementsStr} }";
+        }
+        $lines[] = '    }';
+        $lines[] = '';
+
+        // 4. Blacklist Set (IPv6, mirrors set blacklist_ips)
+        $lines[] = '    # 4. IPv6 Permanent Blacklist Set (mirrors set blacklist_ips)';
+        $lines[] = '    set blacklist_ips6 {';
+        $lines[] = '        type ipv6_addr';
+        $lines[] = '        flags interval';
+        if ($blacklistV6 !== []) {
+            $elementsStr = implode(', ', $blacklistV6);
+            $lines[] = "        elements = { {$elementsStr} }";
+        }
+        $lines[] = '    }';
+        $lines[] = '';
+
+        // 5. Dynamic Auto-Banned Set (IPv6, mirrors set banned_ips)
+        $lines[] = '    # 5. IPv6 Dynamic Auto-Banned Set (mirrors set banned_ips)';
+        $lines[] = '    set banned_ips6 {';
+        $lines[] = '        type ipv6_addr';
+        $lines[] = '        flags timeout';
+        if ($banElementsV6 !== []) {
+            $elementsStr = implode(', ', $banElementsV6);
+            $lines[] = "        elements = { {$elementsStr} }";
+        }
+        $lines[] = '    }';
+        $lines[] = '';
+
+        // 6. Whitelist Set (IPv6, mirrors set whitelist_ips)
+        $lines[] = '    # 6. IPv6 Permanent Whitelist Set (mirrors set whitelist_ips)';
+        $lines[] = '    set whitelist_ips6 {';
+        $lines[] = '        type ipv6_addr';
+        $lines[] = '        flags interval';
+        if ($whitelistV6 !== []) {
+            $elementsStr = implode(', ', $whitelistV6);
+            $lines[] = "        elements = { {$elementsStr} }";
+        }
         $lines[] = '    }';
         $lines[] = '';
 
@@ -143,14 +196,16 @@ class SecurityConfigGenerator
             $lines[] = '        iif "lo" accept';
             $lines[] = '';
 
-            // STEP 2: Drop blacklisted networks & IPs immediately
+            // STEP 2: Drop blacklisted networks & IPs immediately (both families)
             $lines[] = '        # STEP 2: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY';
             $lines[] = '        ip saddr @blacklist_ips drop';
+            $lines[] = '        ip6 saddr @blacklist_ips6 drop';
             $lines[] = '';
 
-            // STEP 3: Drop temporarily banned brute-force attackers
+            // STEP 3: Drop temporarily banned brute-force attackers (both families)
             $lines[] = '        # STEP 3: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS';
             $lines[] = '        ip saddr @banned_ips drop';
+            $lines[] = '        ip6 saddr @banned_ips6 drop';
             $lines[] = '';
 
             // STEP 4: Base invariants: established connections & invalid packet defense
@@ -159,18 +214,35 @@ class SecurityConfigGenerator
             $lines[] = '        ct state invalid drop';
             $lines[] = '';
 
-            // STEP 5: Accept whitelisted / trusted IPs unconditionally
+            // STEP 5: Accept whitelisted / trusted IPs unconditionally (both families)
             $lines[] = '        # STEP 5: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
             $lines[] = '        ip saddr @whitelist_ips accept';
+            $lines[] = '        ip6 saddr @whitelist_ips6 accept';
             $lines[] = '';
 
             // STEP 6: ICMP Ping Diagnostics (Core System Service)
             $icmpService = SecurityService::system()->where('protocol', 'icmp')->first();
             $icmpEnabled = $icmpService ? (bool) $icmpService->enabled : true;
             $icmpSource = trim((string) ($icmpService?->source_ip ?? 'any'));
-            $icmpPrefix = '';
-            if ($icmpSource !== '' && $icmpSource !== 'any' && $icmpSource !== '0.0.0.0/0') {
-                $icmpPrefix = "ip saddr {$icmpSource} ";
+
+            // The ping source restriction applies to the address family of the
+            // value entered; the other family stays unrestricted. The 0.0.0.0/0
+            // and ::/0 ranges count as "any" for their family, and malformed
+            // values refuse compilation instead of silently dropping the
+            // restriction.
+            $icmpPrefixV4 = '';
+            $icmpPrefixV6 = '';
+            if ($icmpSource !== '' && $icmpSource !== 'any' && $icmpSource !== '0.0.0.0/0' && $icmpSource !== '::/0') {
+                $icmpFamily = AddressFamily::classify($icmpSource);
+                if ($icmpFamily === 'ipv4') {
+                    $icmpPrefixV4 = "ip saddr {$icmpSource} ";
+                } elseif ($icmpFamily === 'ipv6') {
+                    $icmpPrefixV6 = "ip6 saddr {$icmpSource} ";
+                } else {
+                    throw new \RuntimeException(
+                        "ICMP Ping Diagnostics source network '{$icmpSource}' is not a valid IPv4 or IPv6 address or CIDR range. Correct it in the Security Center and try again."
+                    );
+                }
             }
 
             if ($icmpEnabled) {
@@ -183,13 +255,18 @@ class SecurityConfigGenerator
                 }
 
                 $lines[] = '        # STEP 6: ICMP PING DIAGNOSTICS';
-                $lines[] = "        {$icmpPrefix}ip protocol icmp icmp type echo-request {$limitClause}accept";
-                $lines[] = "        {$icmpPrefix}ip6 nexthdr ipv6-icmp icmpv6 type echo-request {$limitClause}accept";
+                $lines[] = "        {$icmpPrefixV4}ip protocol icmp icmp type echo-request {$limitClause}accept";
+                $lines[] = "        {$icmpPrefixV6}ip6 nexthdr ipv6-icmp icmpv6 type echo-request {$limitClause}accept";
             } else {
                 $lines[] = '        # STEP 6: ICMP PING DISABLED (STEALTH MODE)';
             }
-            // Essential IPv6 neighbor discovery & router solicitation invariant is ALWAYS preserved
-            $lines[] = '        ip6 nexthdr ipv6-icmp accept';
+            // Essential IPv6 connectivity invariant: path-MTU discovery
+            // (packet-too-big), multicast listener maintenance (MLD), and
+            // Neighbor Discovery all ride on ICMPv6 and must never be severed.
+            // Echo requests are deliberately excluded so the ping policy above
+            // governs IPv6 diagnostics symmetrically with IPv4 (rate limit,
+            // stealth mode, and source restrictions all apply).
+            $lines[] = '        ip6 nexthdr ipv6-icmp icmpv6 type { packet-too-big, mld-listener-query, mld-listener-report, mld-listener-done, mld2-listener-report, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect } accept';
             $lines[] = '';
 
             // Step 7: System PBX services from port catalog (excluding icmp which is handled above in step 6)
@@ -316,21 +393,21 @@ class SecurityConfigGenerator
 
         foreach (['blacklist' => $blacklistIps, 'whitelist' => $whitelistIps] as $listName => $entries) {
             foreach ($entries as $entry) {
-                if (! $this->isValidIpv4OrCidr($entry)) {
+                if (! AddressFamily::isValidAddressOrCidr($entry)) {
                     $invalid[] = "{$listName} entry '{$entry}'";
                 }
             }
         }
 
         foreach ($activeBans as $ban) {
-            if (filter_var(trim((string) $ban->ip_address), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+            if (! AddressFamily::isValidAddress((string) $ban->ip_address)) {
                 $invalid[] = "ban '{$ban->ip_address}'";
             }
         }
 
         if ($invalid !== []) {
             throw new \RuntimeException(
-                'Cannot compile the firewall ruleset — these entries are not valid IPv4 addresses (IPv6 is not supported yet): '
+                'Cannot compile the firewall ruleset — these entries are not valid IPv4 or IPv6 addresses: '
                 .implode(', ', $invalid)
                 .'. Correct or remove them in the Security Center and try again.'
             );
@@ -338,23 +415,18 @@ class SecurityConfigGenerator
     }
 
     /**
-     * Determine whether a value is a valid IPv4 address, optionally with a CIDR prefix of 0-32.
+     * Collect the entries of a list that belong to the given address family.
+     *
+     * @param  array<int, string>  $entries  Address/CIDR entries from the database
+     * @param  string  $family  'ipv4' or 'ipv6'
+     * @return array<int, string>
      */
-    private function isValidIpv4OrCidr(string $value): bool
+    private function entriesForFamily(array $entries, string $family): array
     {
-        $value = trim($value);
-
-        if (substr_count($value, '/') > 1) {
-            return false;
-        }
-
-        [$address, $prefix] = array_pad(explode('/', $value, 2), 2, null);
-
-        if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-            return false;
-        }
-
-        return $prefix === null || (ctype_digit($prefix) && (int) $prefix <= 32);
+        return array_values(array_filter(
+            $entries,
+            fn (string $entry): bool => AddressFamily::classify($entry) === $family
+        ));
     }
 
     /**

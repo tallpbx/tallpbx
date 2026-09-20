@@ -234,29 +234,41 @@ it('shows an inline error when adding a whitelisted IP to the blacklist', functi
     expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '203.0.113.197')->exists())->toBeFalse();
 });
 
-it('rejects invalid IPv4 octets and IPv6 addresses in the IP list forms', function (): void {
+it('accepts IPv6 entries and rejects malformed addresses in the IP list forms', function (): void {
     $component = Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class);
 
-    // Octets above 255 must fail strict IPv4 validation (this used to be accepted).
+    // Full IPv6 support: addresses and CIDR ranges are accepted.
+    $component->set('newWhitelistIp', '2001:569:fcd9:900:e95c:2439:5a28:86b')
+        ->call('addWhitelistIp')
+        ->assertHasNoErrors();
+
+    $component->set('newBlacklistIp', '2001:db8:bad::/48')
+        ->call('addBlacklistIp')
+        ->assertHasNoErrors();
+
+    expect(SecurityIpList::where('ip_address', '2001:569:fcd9:900:e95c:2439:5a28:86b')->exists())->toBeTrue()
+        ->and(SecurityIpList::where('ip_address', '2001:db8:bad::/48')->exists())->toBeTrue();
+
+    // Malformed values of both address families still fail validation.
     $component->set('newWhitelistIp', '344.34.34.34')
         ->call('addWhitelistIp')
         ->assertHasErrors('newWhitelistIp');
 
-    // CIDR prefixes above /32 must be refused as well.
     $component->set('newBlacklistIp', '10.0.0.0/99')
         ->call('addBlacklistIp')
         ->assertHasErrors('newBlacklistIp');
 
-    // IPv6 addresses get a dedicated hint until dual-stack kernel support ships.
-    $component->set('newWhitelistIp', '2001:569:fcd9:900:e95c:2439:5a28:86b')
+    $component->set('newWhitelistIp', '1:::2')
         ->call('addWhitelistIp')
-        ->assertHasErrors('newWhitelistIp')
-        ->assertSee('IPv6 addresses are not supported by the firewall engine yet');
+        ->assertHasErrors('newWhitelistIp');
+
+    $component->set('newWhitelistIp', '2001:db8::/999')
+        ->call('addWhitelistIp')
+        ->assertHasErrors('newWhitelistIp');
 
     expect(SecurityIpList::where('ip_address', '344.34.34.34')->exists())->toBeFalse()
-        ->and(SecurityIpList::where('ip_address', '10.0.0.0/99')->exists())->toBeFalse()
-        ->and(SecurityIpList::where('ip_address', '2001:569:fcd9:900:e95c:2439:5a28:86b')->exists())->toBeFalse();
+        ->and(SecurityIpList::where('ip_address', '10.0.0.0/99')->exists())->toBeFalse();
 });
 
 it('shows a dismiss button on the feedback toast that clears the message', function (): void {
@@ -282,24 +294,25 @@ it('shows a dismiss button on the feedback toast that clears the message', funct
     expect(session('error'))->toBeNull();
 });
 
-it('rejects invalid octets and IPv6 addresses in the manual ban dialog', function (): void {
+it('accepts IPv6 bans and rejects malformed addresses in the manual ban dialog', function (): void {
     $component = Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
         ->call('openManualBanModal')
-        ->set('manualBanIp', '344.34.34.34')
         ->set('manualBanDuration', 3600)
+        // Malformed input must leave the dialog open so the field can be corrected.
+        ->set('manualBanIp', '344.34.34.34')
         ->call('manualBan')
+        ->assertSet('showManualBanModal', true)
         ->assertHasErrors('manualBanIp');
 
-    $component->set('manualBanIp', '2001:569:fcd9:900:e95c:2439:5a28:86b')
+    // A valid IPv6 address is banned successfully and closes the dialog.
+    $component->set('manualBanIp', '2001:db8::99')
         ->call('manualBan')
-        // A refused address must leave the dialog open so the field can be corrected.
-        ->assertSet('showManualBanModal', true)
-        ->assertHasErrors('manualBanIp')
-        ->assertSee('IPv6 addresses are not supported by the firewall engine yet');
+        ->assertSet('showManualBanModal', false)
+        ->assertSet('operationalMessageType', 'success');
 
     expect(SecurityBan::where('ip_address', '344.34.34.34')->exists())->toBeFalse()
-        ->and(SecurityBan::where('ip_address', '2001:569:fcd9:900:e95c:2439:5a28:86b')->exists())->toBeFalse();
+        ->and(SecurityBan::where('ip_address', '2001:db8::99')->exists())->toBeTrue();
 });
 
 it('reorders sequential firewall rules up and down', function (): void {
