@@ -484,6 +484,17 @@ php artisan optimize
 For a short-lived local development system without Redis, use file-based cache
 and sessions instead, then rebuild Laravel's configuration.
 
+> [!NOTE]
+> **Intrusion Detection & Redis Decoupling:**
+> TallPBX's in-process intrusion detection engine (`SecurityIncidentService`) maintains per-IP sliding-window failure counters directly in Redis memory, completely independent of the application's configured `CACHE_STORE`. Setting `CACHE_STORE=file` for general caching will **not** disable security incident tracking.
+> 
+> If Redis is not installed or the `redis-server` service is temporarily stopped:
+> - The PBX and web interface fail open gracefully without throwing 500 errors (incident tracking errors are caught and logged to `storage/logs/laravel.log`).
+> - Dynamic sliding-window bans pause since attempt counters cannot be stored in memory.
+> - The Linux kernel `nftables` firewall, permanent blacklists, whitelists, and manual UI bans remain 100% operational.
+> 
+> For production telephony servers, running `redis-server` is strongly recommended so dynamic attack mitigation is active.
+
 ### FreeSWITCH Session Rate
 
 Fresh installs set FreeSWITCH's core `sessions-per-second` default to `60`:

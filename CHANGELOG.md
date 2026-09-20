@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.2] - 2026-09-20
 
 ### Added
+- **Redis Outage & Decoupled Cache Store Architecture Documentation**: Documented the architectural relationship between Redis, application cache drivers (`CACHE_STORE`), and real-time attack protection in `docs/security-architecture.md` and `INSTALL.md`:
+  - Clarified that `SecurityIncidentService` connects directly to Redis via `Illuminate\Support\Facades\Redis`, operating completely independent of `.env` cache store configurations (e.g. `CACHE_STORE=file`).
+  - Documented graceful degradation and fail-open behavior when Redis is stopped or uninstalled: failure tracking exceptions are caught and logged without disrupting calls or panel sessions, while kernel firewalling (`nftables`), whitelists, blacklists, and manual administrator bans remain 100% active.
 - **Automated Kernel Ban Reconciliation & Safe Boot Recovery (Phase 3)**: The Security module now automatically reconciles Linux nftables dynamic ban sets (`@banned_ips`, `@banned_ips6`) with active MariaDB bans and restores missing filtering tables:
   - **Dynamic Ban Set Inspection**: The bounded root helper `/usr/local/sbin/tallpbx-security` provides a read-only `bans` action emitting native `nft -j` JSON output, parsed into typed structures by `SecurityExecutor::bans()`.
   - **Safe Ban-Set Reconciler**: `FirewallBanReconciler` diffs active database bans against live kernel elements. Missing bans are restored with remaining TTL, extraneous or expired kernel elements are pruned, and timeout skews exceeding 5 minutes are corrected. Strict safety rails enforce a 30-second minimum TTL threshold (preventing expiration race conditions) and a 50-action batch limit per run (preventing flap loops).

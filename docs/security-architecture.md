@@ -118,6 +118,29 @@ sequenceDiagram
     end
 ```
 
+### 3.1 Redis Role, Decoupled Cache Store, and Failure Modes
+
+#### Direct Redis Decoupling from `CACHE_STORE`
+TallPBX's in-process intrusion detection engine (`SecurityIncidentService`) communicates directly with Redis via Laravel's `Illuminate\Support\Facades\Redis` facade (`Redis::incr()`, `Redis::expire()`, and `Redis::del()`). It does **not** rely on Laravel's general cache store (`Illuminate\Support\Facades\Cache`).
+
+As a result:
+- **`CACHE_STORE` Independence**: Configuring `CACHE_STORE=file` (or `database`, `array`) in `/var/www/tallpbx/.env` changes only general framework caching (such as view or query caches). It does **not** disable or alter intrusion tracking. Sliding-window counters continue to execute directly against Redis as long as the Redis server is reachable.
+- **Zero Database Load**: Failure streaks never touch MariaDB until the ban threshold is crossed, eliminating database lock contention during high-volume distributed authentication attacks.
+
+#### What Happens When Redis is Unavailable or Uninstalled?
+If a server does not have Redis installed, or if the `redis-server` service is stopped or unreachable, TallPBX implements graceful degradation:
+
+1. **Fail-Open Application Safety (No 500 Errors)**:
+   All Redis operations in `SecurityIncidentService::recordFailure()` are wrapped in resilient `try/catch (\Throwable $e)` blocks. Any connection refusal, network timeout, or missing PHP Redis extension logs an error to `storage/logs/laravel.log` and exits cleanly. Core PBX functionality—including FreeSWITCH SIP authentication handlers, XML dialplan lookups, incoming/outgoing calls, and administrative web panel sessions—continues to operate with zero interruption.
+2. **Dynamic Sliding-Window Bans Pause**:
+   Because real-time failure counters cannot be stored or incremented in memory, automatic dynamic bans triggered by crossing the failed-attempt threshold (`max_retry` within `find_time`) will not fire while Redis is offline.
+3. **Static Kernel Firewall & Access Lists Remain 100% Active**:
+   The underlying Linux kernel `nftables` firewall ruleset (`tallpbx_filter`), Pre-Filters (loopback trust, stateful connection tracking, invalid packet drop), the permanent **Blacklist** (Stage 1 drop), the trusted **Whitelist** (Stage 2 bypass), and Standard Service port protections are completely independent of Redis. They reside in kernel memory and MariaDB, providing uninterrupted perimeter defense.
+4. **Manual Administrator Bans Remain Fully Functional**:
+   Manual bans issued via the Security Command Center UI or the Artisan CLI (`php artisan security:ban <IP>`) write directly to MariaDB and execute the bounded root helper `/usr/local/sbin/tallpbx-security` to insert the IP directly into kernel sets (`@banned_ips` / `@banned_ips6`). Manual bans and permanent blacklists work normally even when Redis is down.
+5. **Instant Recovery**:
+   When Redis is restored (`systemctl start redis-server`), incident counters and automated sliding-window bans resume immediately without requiring a service reload, server reboot, or cache rebuild.
+
 ---
 
 ## 4. Security Command Center Interface
