@@ -828,7 +828,7 @@ class SecurityManager extends Component
         }
 
         $service->update([
-            'port_range' => trim($this->systemServicePortRange),
+            'port_range' => str_replace(':', '-', trim($this->systemServicePortRange)),
             'protocol' => $this->systemServiceProtocol,
             'source_ip' => trim($this->systemServiceSourceIp),
             'rate_limit' => $rateLimit,
@@ -953,7 +953,7 @@ class SecurityManager extends Component
             'description' => trim($this->ruleDescription),
             'source_ip' => trim($this->ruleSourceIp),
             'service_id' => $this->ruleServiceId ?: null,
-            'custom_port' => $this->ruleServiceId ? null : trim($this->ruleCustomPort),
+            'custom_port' => $this->ruleServiceId ? null : str_replace(':', '-', trim($this->ruleCustomPort)),
             'custom_protocol' => $this->ruleServiceId ? null : $this->ruleCustomProtocol,
             'action' => $this->ruleAction,
             'enabled' => $this->ruleEnabled,

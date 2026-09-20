@@ -52,7 +52,7 @@ class SecurityService extends Model
         ],
         'RTP Voice/Video Media' => [
             'protocol' => 'udp',
-            'port_range' => '16384:32768',
+            'port_range' => '16384-32768',
             'source_ip' => 'any',
             'description' => 'Audio and video media packet streams',
         ],

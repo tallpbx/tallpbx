@@ -41,7 +41,7 @@ it('seeds standard PBX services into security_services', function (): void {
     $rtp = SecurityService::where('name', 'RTP Voice/Video Media')->first();
     expect($rtp)->not->toBeNull()
         ->and($rtp->protocol)->toBe('udp')
-        ->and($rtp->port_range)->toBe('16384:32768')
+        ->and($rtp->port_range)->toBe('16384-32768')
         ->and($rtp->is_system)->toBeTrue();
 
     $web = SecurityService::where('name', 'Web Admin Portal')->first();
@@ -232,4 +232,30 @@ it('records security audit logs with admin association and details casting', fun
         ->and($log->ip_address)->toBe('185.220.101.5')
         ->and($log->admin->id)->toBe($admin->id)
         ->and($log->details)->toBe(['reason' => 'Legitimate customer IP resolved']);
+});
+
+it('standardizes colon port ranges to hyphens', function (): void {
+    $service = SecurityService::create([
+        'name' => 'Legacy Service',
+        'description' => 'Legacy port range with colon',
+        'protocol' => 'udp',
+        'port_range' => '20000:30000',
+        'is_system' => false,
+    ]);
+
+    $rule = SecurityRule::create([
+        'sequence' => 999,
+        'description' => 'Legacy Rule',
+        'source_ip' => 'any',
+        'custom_port' => '10000:15000',
+        'custom_protocol' => 'tcp',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    $migration = require __DIR__.'/../../../../app-modules/security/database/migrations/2026_09_20_000009_standardize_security_port_ranges_to_hyphens.php';
+    $migration->up();
+
+    expect($service->fresh()->port_range)->toBe('20000-30000')
+        ->and($rule->fresh()->custom_port)->toBe('10000-15000');
 });

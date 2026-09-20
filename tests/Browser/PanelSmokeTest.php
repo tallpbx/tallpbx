@@ -607,12 +607,20 @@ it('renders the security manager dashboard', function () {
         ['description' => 'Scraping botnet range'],
     );
     SecurityIpList::updateOrCreate(
+        ['type' => 'blacklist', 'ip_address' => '2001:db8:bad::/48'],
+        ['description' => 'Malicious scanner prefix'],
+    );
+    SecurityIpList::updateOrCreate(
         ['type' => 'whitelist', 'ip_address' => '192.0.2.10'],
         ['description' => 'Monitoring server'],
     );
     SecurityIpList::updateOrCreate(
         ['type' => 'whitelist', 'ip_address' => '198.51.100.5'],
         ['description' => 'Office VPN gateway'],
+    );
+    SecurityIpList::updateOrCreate(
+        ['type' => 'whitelist', 'ip_address' => '2001:db8:cafe::/64'],
+        ['description' => 'Branch office WAN'],
     );
     SecurityBan::updateOrCreate(
         ['ip_address' => '203.0.113.66'],
@@ -636,8 +644,19 @@ it('renders the security manager dashboard', function () {
             'is_active' => true,
         ],
     );
+    SecurityBan::updateOrCreate(
+        ['ip_address' => '2001:db8:1234::88'],
+        [
+            'vector' => 'ssh',
+            'reason' => 'Repeated failed SSH probes',
+            'attempt_count' => 5,
+            'banned_at' => now()->subMinutes(8),
+            'expires_at' => now()->addHours(1),
+            'is_active' => true,
+        ],
+    );
 
-    // Seed demo custom firewall rules covering the three row styles so the
+    // Seed demo custom firewall rules covering the row styles so the
     // Custom Rules section renders populated (with its reorder controls) in
     // the screenshot instead of the empty-state message.
     SecurityRule::updateOrCreate(
@@ -660,6 +679,18 @@ it('renders the security manager dashboard', function () {
             'service_id' => null,
             'custom_port' => '2022',
             'custom_protocol' => 'tcp',
+            'action' => 'accept',
+            'enabled' => true,
+        ],
+    );
+    SecurityRule::updateOrCreate(
+        ['description' => 'Office PBX audio media'],
+        [
+            'sequence' => 25,
+            'source_ip' => '192.0.2.0/24',
+            'service_id' => null,
+            'custom_port' => '10000-20000',
+            'custom_protocol' => 'udp',
             'action' => 'accept',
             'enabled' => true,
         ],
@@ -689,10 +720,14 @@ it('renders the security manager dashboard', function () {
             ->assertSee('Whitelist')
             ->assertSee('Blocked Attackers')
             ->assertSee('198.51.100.23')
+            ->assertSee('2001:db8:bad::/48')
             ->assertSee('192.0.2.10')
+            ->assertSee('2001:db8:cafe::/64')
             ->assertSee('203.0.113.66')
+            ->assertSee('2001:db8:1234::88')
             ->assertSee('Carrier SIP trunk')
             ->assertSee('Admin SSH from bastion')
+            ->assertSee('Office PBX audio media')
             ->assertSee('Block RDP scanners')
             ->assertSee('Pre-Filters', true)
             ->assertSee('Standard Services', true)
@@ -703,7 +738,8 @@ it('renders the security manager dashboard', function () {
         // Expand the collapsible Pre-Filters section first so the documentation
         // screenshot shows the full kernel pipeline instead of the hidden preview.
         $browser->click('tr[title*="expand or collapse"]')
-            ->pause(500)
+            ->pause(600)
+            ->waitForText('Loopback Interface', 5)
             ->assertSee('Loopback Interface')
             ->assertSee('Stateful Connection Tracking');
 

@@ -66,6 +66,8 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Whitelist IPs')
         ->assertSee('Firewall Rules')
         ->assertSee('Standard Services')
+        ->assertSee('Protocol')
+        ->assertSee('Port')
         ->assertSee('Rules are checked in order from top to bottom')
         ->assertDontSee('wire:click="refreshStatus"', false)
         ->assertDontSee('wire:click="applyFirewallChanges"', false)
@@ -401,6 +403,31 @@ it('creates and updates a custom firewall rule', function (): void {
     expect($rule)->not->toBeNull()
         ->and($rule->custom_port)->toBe('8443')
         ->and($rule->source_ip)->toBe('10.50.0.0/16');
+});
+
+it('normalizes colon port ranges to hyphen when saving custom rules and system services', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openCustomRuleModal')
+        ->set('ruleDescription', 'Colon Port Range Rule')
+        ->set('ruleSourceIp', '10.50.0.0/16')
+        ->set('ruleCustomPort', '10000:20000')
+        ->set('ruleCustomProtocol', 'tcp')
+        ->set('ruleAction', 'accept')
+        ->call('saveCustomRule');
+
+    $rule = SecurityRule::where('description', 'Colon Port Range Rule')->first();
+    expect($rule)->not->toBeNull()
+        ->and($rule->custom_port)->toBe('10000-20000');
+
+    $service = SecurityService::where('name', 'SIP Signaling')->first();
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openEditSystemServiceModal', $service->id)
+        ->set('systemServicePortRange', '5060:5070')
+        ->call('saveSystemService');
+
+    expect($service->fresh()->port_range)->toBe('5060-5070');
 });
 
 it('saves attack protection sensitivity settings through the drawer', function (): void {

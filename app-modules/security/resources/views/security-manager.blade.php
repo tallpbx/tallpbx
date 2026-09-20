@@ -188,7 +188,7 @@
 
                 {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
                 <div class="flex flex-col lg:flex-row gap-6 items-start">
-                    {{-- Left Column: Quick-Add Form & Kernel Rule Helper (Fixed Ergonomic Width) --}}
+                    {{-- Left Column: Quick-Add Form (Fixed Ergonomic Width) --}}
                     <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
                         <form wire:submit="addBlacklistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
                             <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
@@ -213,14 +213,6 @@
                                 </button>
                             </div>
                         </form>
-
-                        <div class="p-3 bg-base-200/40 rounded-box border border-base-200/80 text-xs text-base-content/70 space-y-1">
-                            <div class="font-semibold flex items-center gap-1.5 text-error">
-                                <x-heroicon-o-shield-exclamation class="w-4 h-4 shrink-0" />
-                                <span>{{ __('admin.security_instant_drop') }}</span>
-                            </div>
-                            <p class="leading-relaxed">{{ __('admin.security_blacklist_helper') }}</p>
-                        </div>
                     </div>
 
                     {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
@@ -390,7 +382,7 @@
 
                 {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
                 <div class="flex flex-col lg:flex-row gap-6 items-start">
-                    {{-- Left Column: Quick-Add Form, Self-Whitelisting & Rule Helper (Fixed Ergonomic Width) --}}
+                    {{-- Left Column: Quick-Add Form & Self-Whitelisting (Fixed Ergonomic Width) --}}
                     <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
                         <form wire:submit="addWhitelistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
                             <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
@@ -436,14 +428,6 @@
                                 <span>Your current IP (<span class="font-mono font-bold">{{ $adminIp }}</span>) is whitelisted.</span>
                             </div>
                         @endif
-
-                        <div class="p-3 bg-base-200/40 rounded-box border border-base-200/80 text-xs text-base-content/70 space-y-1">
-                            <div class="font-semibold flex items-center gap-1.5 text-success">
-                                <x-heroicon-o-check-badge class="w-4 h-4 shrink-0" />
-                                <span>{{ __('admin.security_complete_bypass') }}</span>
-                            </div>
-                            <p class="leading-relaxed">{{ __('admin.security_whitelist_helper') }}</p>
-                        </div>
                     </div>
 
                     {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
@@ -527,7 +511,8 @@
                         <tr class="bg-base-200/40 text-base-content/70">
                             <th class="w-14 text-center">{{ __('client.status') }}</th>
                             <th>{{ __('admin.security_rule_name') }}</th>
-                            <th class="min-w-[16rem]">{{ __('admin.security_service_port') }}</th>
+                            <th class="w-24">{{ __('admin.security_protocol') }}</th>
+                            <th>{{ __('admin.security_port') }}</th>
                             <th>{{ __('admin.security_source_ip') }}</th>
                             <th>{{ __('admin.security_action') }}</th>
                             <th class="text-right">{{ __('admin.actions') }}</th>
@@ -538,7 +523,7 @@
                         <tr class="bg-base-200/40 text-xs font-semibold text-base-content/80 cursor-pointer hover:bg-base-200/70 transition-colors select-none"
                             @click="showSystemPreFilters = !showSystemPreFilters"
                             title="{{ __('admin.security_toggle_invariants_tooltip') }}">
-                            <td colspan="6" class="py-2.5 px-3">
+                            <td colspan="7" class="py-2.5 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_system_invariants_prefilters') }}</span>
@@ -569,8 +554,11 @@
                                     </x-tooltip>
                                 </div>
                             </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
+                            </td>
                             <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports_protocols') }}
+                                {{ __('admin.security_all_ports') }}
                             </td>
                             <td>
                                 <span class="font-mono text-sm text-base-content/70">127.0.0.1/8, ::1</span>
@@ -595,8 +583,11 @@
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@blacklist_ips</span></span>
                                 </div>
                             </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
+                            </td>
                             <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports_protocols') }}
+                                {{ __('admin.security_all_ports') }}
                             </td>
                             <td>
                                 <span class="font-mono text-sm {{ $blacklistCount > 0 ? 'text-error font-semibold' : 'text-base-content/60' }}">
@@ -625,8 +616,11 @@
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@banned_ips</span></span>
                                 </div>
                             </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
+                            </td>
                             <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports_protocols') }}
+                                {{ __('admin.security_all_ports') }}
                             </td>
                             <td>
                                 <span class="font-mono text-sm {{ $bannedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60' }}">
@@ -658,8 +652,11 @@
                                     </x-tooltip>
                                 </div>
                             </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
+                            </td>
                             <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports_protocols') }}
+                                {{ __('admin.security_all_ports') }}
                             </td>
                             <td>
                                 <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
@@ -687,8 +684,11 @@
                                     </x-tooltip>
                                 </div>
                             </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
+                            </td>
                             <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports_protocols') }}
+                                {{ __('admin.security_all_ports') }}
                             </td>
                             <td>
                                 <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
@@ -713,8 +713,11 @@
                                     <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@whitelist_ips</span></span>
                                 </div>
                             </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
+                            </td>
                             <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports_protocols') }}
+                                {{ __('admin.security_all_ports') }}
                             </td>
                             <td>
                                 <span class="font-mono text-sm {{ $whitelistCount > 0 ? 'text-success font-semibold' : 'text-base-content/60' }}">
@@ -734,7 +737,7 @@
 
                         {{-- Standard Services Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="6" class="py-2 px-3">
+                            <td colspan="7" class="py-2 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_core_services_title') }}</span>
@@ -763,11 +766,13 @@
                                         @endif
                                     </div>
                                 </td>
+                                <td class="font-mono text-sm font-semibold text-base-content/80">
+                                    {{ $service->protocol === 'both' ? 'TCP/UDP' : strtoupper($service->protocol) }}
+                                </td>
                                 <td>
                                     @if ($service->protocol === 'icmp')
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <span class="font-mono text-sm font-semibold text-base-content">echo-request</span>
-                                            <span class="text-sm text-base-content/60">/ICMP</span>
                                             @if ($service->rate_limit)
                                                 <span class="font-mono text-xs text-base-content/60 ml-1">{{ $service->rate_limit }}/s limit (burst {{ $service->burst ?? $service->rate_limit }})</span>
                                             @else
@@ -776,10 +781,7 @@
                                             <span class="font-mono text-xs text-base-content/60 ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
                                         </div>
                                     @else
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="font-mono text-sm font-semibold text-base-content">{{ $service->port_range }}</span>
-                                            <span class="text-sm text-base-content/60">/{{ strtoupper($service->protocol) }}</span>
-                                        </div>
+                                        <span class="font-mono text-sm font-semibold text-base-content">{{ $service->port_range }}</span>
                                     @endif
                                 </td>
                                 <td>
@@ -797,9 +799,8 @@
                                     @endif
                                 </td>
                                 <td class="text-right whitespace-nowrap">
-                                    <button wire:click="openEditSystemServiceModal({{ $service->id }})" type="button" class="btn btn-ghost btn-xs text-primary gap-1" title="{{ __('admin.security_edit_service') }}">
+                                    <button wire:click="openEditSystemServiceModal({{ $service->id }})" type="button" class="btn btn-ghost btn-xs text-primary" title="{{ __('admin.security_edit_service') }}">
                                         <x-heroicon-o-pencil-square class="w-4 h-4" />
-                                        <span class="hidden sm:inline">{{ __('client.edit') }}</span>
                                     </button>
                                 </td>
                             </tr>
@@ -807,7 +808,7 @@
 
                         {{-- Custom Rules Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="6" class="py-2 px-3">
+                            <td colspan="7" class="py-2 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_custom_rules_title') }}</span>
@@ -828,17 +829,31 @@
                                 </td>
 
                                 {{-- Rule Name / Description --}}
-                                <td class="font-medium text-base-content">{{ $rule->description }}</td>
+                                <td class="font-medium text-base-content">
+                                    <div>{{ $rule->description }}</div>
+                                    @if ($rule->service)
+                                        <div class="text-xs text-base-content/60">{{ $rule->service->name }}</div>
+                                    @endif
+                                </td>
 
-                                {{-- Service / Port --}}
+                                {{-- Protocol --}}
+                                <td class="font-mono text-sm font-semibold text-base-content/80">
+                                    @if ($rule->service)
+                                        {{ $rule->service->protocol === 'both' ? 'TCP/UDP' : strtoupper($rule->service->protocol) }}
+                                    @else
+                                        {{ match (strtolower((string) $rule->custom_protocol)) {
+                                            'all' => 'ALL',
+                                            default => strtoupper((string) $rule->custom_protocol),
+                                        } }}
+                                    @endif
+                                </td>
+
+                                {{-- Port --}}
                                 <td>
                                     @if ($rule->service)
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="font-medium text-base-content">{{ $rule->service->name }}</span>
-                                            <span class="font-mono text-sm text-base-content/70 whitespace-nowrap">{{ $rule->service->port_range }}/{{ strtoupper($rule->service->protocol) }}</span>
-                                        </div>
+                                        <span class="font-mono text-sm text-base-content/70 whitespace-nowrap">{{ $rule->service->port_range }}</span>
                                     @else
-                                        <span class="font-mono text-sm">{{ $rule->custom_port }}/{{ strtoupper((string) $rule->custom_protocol) }}</span>
+                                        <span class="font-mono text-sm">{{ $rule->custom_port ?? '—' }}</span>
                                     @endif
                                 </td>
 
@@ -873,7 +888,7 @@
                                             </button>
                                         </span>
                                         <button wire:click="openCustomRuleModal({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs">
-                                            <x-heroicon-o-pencil class="w-4 h-4" />
+                                            <x-heroicon-o-pencil-square class="w-4 h-4" />
                                         </button>
                                         <button wire:click="deleteRule({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs text-error">
                                             <x-heroicon-o-trash class="w-4 h-4" />
@@ -883,7 +898,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center py-4 text-base-content/60">
+                                <td colspan="7" class="text-center py-4 text-base-content/60">
                                     <div class="flex items-center justify-center gap-2">
                                         <x-heroicon-o-shield-check class="w-4 h-4 text-success" />
                                         <span class="text-sm text-base-content/70">{{ __('admin.security_no_rules_help') }}</span>
@@ -894,7 +909,7 @@
 
                         {{-- Default Inbound Policy Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                            <td colspan="6" class="py-2 px-3">
+                            <td colspan="7" class="py-2 px-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-2">
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_default_policy') }}</span>
@@ -913,6 +928,9 @@
                                     <span>{{ __('admin.security_default_policy') }}</span>
                                     <span class="badge badge-ghost badge-sm">{{ __('admin.security_unmatched_traffic') }}</span>
                                 </div>
+                            </td>
+                            <td class="text-sm font-mono text-base-content/70">
+                                ALL
                             </td>
                             <td class="text-sm text-base-content/60">
                                 {{ __('admin.security_all_remaining_traffic') }}
@@ -1277,6 +1295,7 @@
                                 </x-tooltip>
                             </label>
                             <input wire:model="systemServicePortRange" type="text"
+                                   placeholder="e.g. 5060, 10000-20000"
                                    class="input input-bordered input-sm font-mono @error('systemServicePortRange') input-error @enderror" />
                             @error('systemServicePortRange') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
                         </div>

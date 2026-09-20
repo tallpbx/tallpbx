@@ -13,7 +13,7 @@ use Modules\Security\Models\SecuritySetting;
  *
  * Populates the PBX Port Catalog with standard services:
  *   - SIP Signaling (5060, 5061, 5080)
- *   - RTP Voice/Video Media (16384:32768)
+ *   - RTP Voice/Video Media (16384-32768)
  *   - Web Admin Portal (80, 443)
  *   - SSH Console (22)
  *   - FreeSWITCH ESL (8021)
@@ -55,7 +55,7 @@ class SecurityServiceSeeder extends Seeder
                 'name' => 'RTP Voice/Video Media',
                 'description' => 'Audio and video media packet streams',
                 'protocol' => 'udp',
-                'port_range' => '16384:32768',
+                'port_range' => '16384-32768',
                 'is_system' => true,
                 'enabled' => true,
                 'source_ip' => 'any',

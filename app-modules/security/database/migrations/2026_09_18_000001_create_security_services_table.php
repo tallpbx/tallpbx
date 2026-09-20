@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('name', 100)->unique();
             $table->string('description', 255)->nullable();
             $table->enum('protocol', ['tcp', 'udp', 'both'])->default('both');
-            $table->string('port_range', 100)->comment('Single port, comma-separated list, or range e.g. 16384:32768');
+            $table->string('port_range', 100)->comment('Single port, comma-separated list, or range e.g. 16384-32768');
             $table->boolean('is_system')->default(false)->comment('Whether this is a core PBX system service');
             $table->timestamps();
         });
