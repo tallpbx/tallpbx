@@ -81,8 +81,8 @@ case "$ACTION" in
 
         # Step 3: Promote the pending file to the active configuration file atomically
         mv "$FIREWALL_PENDING" "$FIREWALL_ACTIVE"
-        chown root:www-data "$FIREWALL_ACTIVE"
-        chmod 0640 "$FIREWALL_ACTIVE"
+        chown root:www-data "$FIREWALL_ACTIVE" 2>/dev/null || true
+        chmod 0640 "$FIREWALL_ACTIVE" 2>/dev/null || true
 
         # Step 4: Load the validated configuration into the Linux kernel atomically
         "$NFT_BIN" -f "$FIREWALL_ACTIVE"
@@ -186,8 +186,17 @@ case "$ACTION" in
         fi
         ;;
 
+    bans)
+        # Emit kernel dynamic ban sets in structured JSON format
+        if "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
+            "$NFT_BIN" -j list sets inet tallpbx_filter 2>/dev/null || echo '{"nftables":[]}'
+        else
+            echo '{"nftables":[]}'
+        fi
+        ;;
+
     *)
-        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|status}" >&2
+        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|status|bans}" >&2
         exit 1
         ;;
 esac

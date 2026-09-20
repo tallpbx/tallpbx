@@ -274,7 +274,7 @@ class ApplicationFilePermissions
      */
     private function ensureFullRepairCanRun(): void
     {
-        if (function_exists('posix_geteuid') && posix_geteuid() !== 0) {
+        if ($this->rootPath === null && function_exists('posix_geteuid') && posix_geteuid() !== 0) {
             throw new RuntimeException('A full permission repair must run as root.');
         }
     }

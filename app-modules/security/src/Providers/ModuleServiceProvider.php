@@ -8,6 +8,7 @@ use App\Events\FreeSwitch\CustomEvent;
 use App\Events\FreeSwitch\SofiaFailedAuth;
 use Illuminate\Auth\Events\Failed;
 use Modules\Security\Console\Commands\SecurityApplyCommand;
+use Modules\Security\Console\Commands\SecurityReconcileCommand;
 use Modules\Security\Console\Commands\SecurityStatusCommand;
 use Modules\Security\Console\Commands\SecurityUnbanCommand;
 use Modules\Security\Console\Commands\SecurityVerifyCommand;
@@ -126,6 +127,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     {
         return [
             SecurityApplyCommand::class,
+            SecurityReconcileCommand::class,
             SecurityStatusCommand::class,
             SecurityUnbanCommand::class,
             SecurityVerifyCommand::class,

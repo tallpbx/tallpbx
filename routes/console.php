@@ -67,3 +67,7 @@ Schedule::command('broadcast:reconcile-outcomes')
 Schedule::command('security:verify')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+Schedule::command('security:reconcile')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();

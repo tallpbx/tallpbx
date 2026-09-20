@@ -36,4 +36,11 @@ interface SecurityExecutorInterface
      * Query the active kernel nftables ruleset status.
      */
     public function status(): string;
+
+    /**
+     * Query active dynamic kernel ban sets in structured format.
+     *
+     * @return array<string, array{ip: string, timeout: int, expires: int, family: string}> Keyed by IP address
+     */
+    public function bans(): array;
 }

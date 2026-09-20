@@ -222,11 +222,21 @@ it('validates shell script validate checks pending ruleset syntax without touchi
         "#!/usr/sbin/nft -f\n\ntable inet tallpbx_validate_probe {\n}\n"
     );
 
+    $stubNft = $isolatedDir.'/stub-nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\nexit 0\n"
+    );
+    chmod($stubNft, 0755);
+
     try {
         $process = new Process(
             ['bash', $scriptPath, 'validate'],
             null,
-            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
         );
         $process->run();
 
@@ -346,6 +356,151 @@ it('deletes existing sidecar and warns when live policy does not match declared 
         @unlink($isolatedDir.'/firewall.nft.pending');
         @unlink($isolatedDir.'/firewall.nft.applied');
         @unlink($stubNft);
+        @rmdir($isolatedDir);
+    }
+});
+
+it('emits kernel ban sets in structured json via helper bans action', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_bans_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    $jsonFixture = json_encode([
+        'nftables' => [
+            [
+                'set' => [
+                    'family' => 'inet',
+                    'name' => 'banned_ips',
+                    'table' => 'tallpbx_filter',
+                    'type' => 'ipv4_addr',
+                    'elem' => [
+                        ['elem' => ['val' => '198.51.100.42', 'timeout' => 3600, 'expires' => 3200]],
+                    ],
+                ],
+            ],
+            [
+                'set' => [
+                    'family' => 'inet',
+                    'name' => 'banned_ips6',
+                    'table' => 'tallpbx_filter',
+                    'type' => 'ipv6_addr',
+                    'elem' => [
+                        ['elem' => ['val' => '2001:db8::42', 'timeout' => 7200, 'expires' => 7100]],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $stubNft = $isolatedDir.'/stub-nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "if [ \"\$1\" = \"list\" ] && [ \"\$2\" = \"table\" ]; then\n".
+        "    exit 0\n".
+        "fi\n".
+        "if [ \"\$1\" = \"-j\" ] && [ \"\$2\" = \"list\" ] && [ \"\$3\" = \"sets\" ]; then\n".
+        "    echo '{$jsonFixture}'\n".
+        "    exit 0\n".
+        "fi\n".
+        "exit 1\n"
+    );
+    chmod($stubNft, 0755);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'bans'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+        $decoded = json_decode($process->getOutput(), true);
+        expect($decoded)->toHaveKey('nftables')
+            ->and($decoded['nftables'])->toHaveCount(2);
+    } finally {
+        @unlink($stubNft);
+        @rmdir($isolatedDir);
+    }
+});
+
+it('parses structured kernel bans in SecurityExecutor::bans()', function (): void {
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_executor_bans_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    $jsonFixture = json_encode([
+        'nftables' => [
+            [
+                'set' => [
+                    'family' => 'inet',
+                    'name' => 'banned_ips',
+                    'table' => 'tallpbx_filter',
+                    'type' => 'ipv4_addr',
+                    'elem' => [
+                        ['elem' => ['val' => '198.51.100.42', 'timeout' => 3600, 'expires' => 3200]],
+                        ['elem' => ['val' => '203.0.113.99', 'timeout' => 86400, 'expires' => 86000]],
+                    ],
+                ],
+            ],
+            [
+                'set' => [
+                    'family' => 'inet',
+                    'name' => 'banned_ips6',
+                    'table' => 'tallpbx_filter',
+                    'type' => 'ipv6_addr',
+                    'elem' => [
+                        ['elem' => ['val' => '2001:db8::42', 'timeout' => 7200, 'expires' => 7100]],
+                    ],
+                ],
+            ],
+            [
+                'set' => [
+                    'family' => 'inet',
+                    'name' => 'whitelist_ips',
+                    'table' => 'tallpbx_filter',
+                    'type' => 'ipv4_addr',
+                    'elem' => ['192.168.1.1'],
+                ],
+            ],
+        ],
+    ]);
+
+    $stubHelper = $isolatedDir.'/stub-helper';
+    file_put_contents(
+        $stubHelper,
+        "#!/bin/bash\n".
+        "if [ \"\$1\" = \"bans\" ]; then\n".
+        "    echo '{$jsonFixture}'\n".
+        "    exit 0\n".
+        "fi\n".
+        "exit 1\n"
+    );
+    chmod($stubHelper, 0755);
+
+    try {
+        $executor = new SecurityExecutor($stubHelper);
+        $bans = $executor->bans();
+
+        expect($bans)->toHaveCount(3)
+            ->and($bans)->toHaveKeys(['198.51.100.42', '203.0.113.99', '2001:db8::42'])
+            ->and($bans['198.51.100.42'])->toBe([
+                'ip' => '198.51.100.42',
+                'timeout' => 3600,
+                'expires' => 3200,
+                'family' => 'ipv4',
+            ])
+            ->and($bans['2001:db8::42'])->toBe([
+                'ip' => '2001:db8::42',
+                'timeout' => 7200,
+                'expires' => 7100,
+                'family' => 'ipv6',
+            ]);
+    } finally {
+        @unlink($stubHelper);
         @rmdir($isolatedDir);
     }
 });

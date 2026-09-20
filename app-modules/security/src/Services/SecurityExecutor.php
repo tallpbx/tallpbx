@@ -78,6 +78,79 @@ class SecurityExecutor implements SecurityExecutorInterface
     }
 
     /**
+     * Query active dynamic kernel ban sets in structured format.
+     *
+     * @return array<string, array{ip: string, timeout: int, expires: int, family: string}> Keyed by IP address
+     */
+    public function bans(): array
+    {
+        if (! file_exists($this->helperPath)) {
+            return [];
+        }
+
+        $process = $this->createProcess(['bans']);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            return [];
+        }
+
+        $output = trim($process->getOutput());
+        if ($output === '') {
+            return [];
+        }
+
+        try {
+            $data = json_decode($output, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        $result = [];
+        $objects = $data['nftables'] ?? [];
+
+        foreach ($objects as $obj) {
+            if (! isset($obj['set'])) {
+                continue;
+            }
+
+            $set = $obj['set'];
+            $setName = $set['name'] ?? '';
+            if (! in_array($setName, ['banned_ips', 'banned_ips6'], true)) {
+                continue;
+            }
+
+            $family = ($setName === 'banned_ips6' || ($set['type'] ?? '') === 'ipv6_addr') ? 'ipv6' : 'ipv4';
+            $elements = $set['elem'] ?? [];
+
+            foreach ($elements as $elemObj) {
+                if (isset($elemObj['elem']) && is_array($elemObj['elem'])) {
+                    $val = (string) ($elemObj['elem']['val'] ?? '');
+                    $timeout = (int) ($elemObj['elem']['timeout'] ?? 0);
+                    $expires = (int) ($elemObj['elem']['expires'] ?? 0);
+                } elseif (is_string($elemObj)) {
+                    $val = $elemObj;
+                    $timeout = 0;
+                    $expires = 0;
+                } else {
+                    continue;
+                }
+
+                if ($val !== '') {
+                    $result[$val] = [
+                        'ip' => $val,
+                        'timeout' => $timeout,
+                        'expires' => $expires,
+                        'family' => $family,
+                    ];
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Execute a helper command and return true if successful.
      *
      * @param  array<int, string>  $arguments  Command arguments to pass to the helper
@@ -130,8 +203,10 @@ class SecurityExecutor implements SecurityExecutorInterface
      */
     public function createProcess(array $arguments): Process
     {
-        // If current process is already root, invoke directly; otherwise invoke with sudo -n
-        $prefix = (function_exists('posix_geteuid') && posix_geteuid() === 0)
+        // In production, the root-owned helper requires sudo -n for non-root users.
+        // Test stub helpers in custom paths are invoked directly by the running user.
+        $isSystemHelper = str_starts_with($this->helperPath, '/usr/local/sbin/');
+        $prefix = (! $isSystemHelper || (function_exists('posix_geteuid') && posix_geteuid() === 0))
             ? [$this->helperPath]
             : ['sudo', '-n', $this->helperPath];
 
