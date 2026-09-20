@@ -96,7 +96,7 @@ class ModulesList extends Component
     {
         $module = Module::findOrFail($moduleId);
 
-        $this->resetErrorBag('uninstallConfirmation');
+        $this->resetValidation('uninstallConfirmation');
         $this->pendingUninstallModuleId = $module->id;
         $this->uninstallConfirmation = '';
         $this->uninstallPreview = $this->moduleLifecycle->previewUninstall($module);
@@ -110,7 +110,7 @@ class ModulesList extends Component
         $this->pendingUninstallModuleId = null;
         $this->uninstallConfirmation = '';
         $this->uninstallPreview = [];
-        $this->resetErrorBag('uninstallConfirmation');
+        $this->resetValidation('uninstallConfirmation');
     }
 
     /**
