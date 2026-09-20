@@ -23,7 +23,8 @@ use Modules\Security\Services\SecurityConfigGenerator;
  * Feature tests for the SecurityManager unified Livewire component.
  *
  * Tests the single-screen security command center, including IP management,
- * live threat defense, rule sequencing, PBX port catalog, settings drawer, and lockout guard.
+ * live threat defense, rule sequencing, PBX port catalog, settings drawer,
+ * default inbound policy form, and lockout guard.
  */
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');
@@ -61,7 +62,7 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Blocked Attackers')
         ->assertSee('Blacklist IPs')
         ->assertSee('Whitelist IPs')
-        ->assertSee('Firewall Rules & Port Access')
+        ->assertSee('Firewall Rules')
         ->assertSee('Standard Services')
         ->assertSee('Rules are checked in order from top to bottom')
         ->assertDontSee('wire:click="refreshStatus"', false)
@@ -233,6 +234,31 @@ it('shows an inline error when adding a whitelisted IP to the blacklist', functi
     expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '203.0.113.197')->exists())->toBeFalse();
 });
 
+it('rejects invalid IPv4 octets and IPv6 addresses in the IP list forms', function (): void {
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class);
+
+    // Octets above 255 must fail strict IPv4 validation (this used to be accepted).
+    $component->set('newWhitelistIp', '344.34.34.34')
+        ->call('addWhitelistIp')
+        ->assertHasErrors('newWhitelistIp');
+
+    // CIDR prefixes above /32 must be refused as well.
+    $component->set('newBlacklistIp', '10.0.0.0/99')
+        ->call('addBlacklistIp')
+        ->assertHasErrors('newBlacklistIp');
+
+    // IPv6 addresses get a dedicated hint until dual-stack kernel support ships.
+    $component->set('newWhitelistIp', '2001:569:fcd9:900:e95c:2439:5a28:86b')
+        ->call('addWhitelistIp')
+        ->assertHasErrors('newWhitelistIp')
+        ->assertSee('IPv6 addresses are not supported by the firewall engine yet');
+
+    expect(SecurityIpList::where('ip_address', '344.34.34.34')->exists())->toBeFalse()
+        ->and(SecurityIpList::where('ip_address', '10.0.0.0/99')->exists())->toBeFalse()
+        ->and(SecurityIpList::where('ip_address', '2001:569:fcd9:900:e95c:2439:5a28:86b')->exists())->toBeFalse();
+});
+
 it('shows a dismiss button on the feedback toast that clears the message', function (): void {
     SecurityIpList::create([
         'type' => 'whitelist',
@@ -254,6 +280,26 @@ it('shows a dismiss button on the feedback toast that clears the message', funct
         ->assertDontSee('is whitelisted and cannot be banned');
 
     expect(session('error'))->toBeNull();
+});
+
+it('rejects invalid octets and IPv6 addresses in the manual ban dialog', function (): void {
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openManualBanModal')
+        ->set('manualBanIp', '344.34.34.34')
+        ->set('manualBanDuration', 3600)
+        ->call('manualBan')
+        ->assertHasErrors('manualBanIp');
+
+    $component->set('manualBanIp', '2001:569:fcd9:900:e95c:2439:5a28:86b')
+        ->call('manualBan')
+        // A refused address must leave the dialog open so the field can be corrected.
+        ->assertSet('showManualBanModal', true)
+        ->assertHasErrors('manualBanIp')
+        ->assertSee('IPv6 addresses are not supported by the firewall engine yet');
+
+    expect(SecurityBan::where('ip_address', '344.34.34.34')->exists())->toBeFalse()
+        ->and(SecurityBan::where('ip_address', '2001:569:fcd9:900:e95c:2439:5a28:86b')->exists())->toBeFalse();
 });
 
 it('reorders sequential firewall rules up and down', function (): void {
@@ -351,7 +397,8 @@ it('saves attack protection sensitivity settings through the drawer', function (
         ->set('findTime', 300)
         ->set('banTime', 7200)
         ->set('protectSsh', false)
-        ->set('firewallDefaultPolicy', 'drop')
+        // Attempting to set the policy through the drawer must have no effect.
+        ->set('firewallDefaultPolicy', 'accept')
         ->call('saveSettings')
         ->assertSet('showSettingsDrawer', false);
 
@@ -359,8 +406,178 @@ it('saves attack protection sensitivity settings through the drawer', function (
         ->and(SecuritySetting::get('find_time'))->toBe('300')
         ->and(SecuritySetting::get('ban_time'))->toBe('7200')
         ->and(SecuritySetting::getBoolean('protect_ssh'))->toBeFalse()
-        ->and(SecuritySetting::get('firewallDefaultPolicy'))->toBeNull() // key is firewall_default_policy
+        // The drawer no longer persists the policy: the property was set to
+        // 'accept' above, yet the seeded 'drop' value must remain untouched.
         ->and(SecuritySetting::get('firewall_default_policy'))->toBe('drop');
+});
+
+it('saves the default inbound policy through its dedicated Configure form', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openDefaultPolicyForm')
+        ->assertSet('showDefaultPolicyModal', true)
+        ->set('firewallDefaultPolicy', 'accept')
+        ->call('saveDefaultPolicy')
+        ->assertSet('showDefaultPolicyModal', false);
+
+    expect(SecuritySetting::get('firewall_default_policy'))->toBe('accept');
+});
+
+it('reloads the persisted policy when the dedicated Configure form opens', function (): void {
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('firewallDefaultPolicy', 'drop');
+
+    // Simulate the persisted policy changing elsewhere after the initial load.
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'accept']);
+
+    $component->call('openDefaultPolicyForm')
+        ->assertSet('showDefaultPolicyModal', true)
+        ->assertSet('firewallDefaultPolicy', 'accept');
+});
+
+it('reverts the persisted default inbound policy when the firewall apply fails', function (): void {
+    // Force the privileged helper step to report failure.
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('apply')->once()->andReturnFalse();
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openDefaultPolicyForm')
+        ->set('firewallDefaultPolicy', 'accept')
+        ->call('saveDefaultPolicy')
+        ->assertSet('showDefaultPolicyModal', false)
+        // The UI must snap back to the value the live kernel still runs...
+        ->assertSet('firewallDefaultPolicy', 'drop')
+        ->assertSet('operationalMessageType', 'error');
+
+    // ...and the refused change must not stay persisted either.
+    expect(SecuritySetting::get('firewall_default_policy'))->toBe('drop');
+});
+
+it('reports the firewall apply failure when saving drawer settings instead of masking it', function (): void {
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('apply')->once()->andReturnFalse();
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openSettingsDrawer')
+        ->set('maxRetry', 7)
+        ->call('saveSettings')
+        ->assertSet('showSettingsDrawer', false)
+        // The drawer must not overwrite the apply failure with a success toast.
+        ->assertSet('operationalMessageType', 'error');
+
+    // Sensitivity thresholds are database-side settings and still persist.
+    expect(SecuritySetting::get('max_retry'))->toBe('7');
+});
+
+it('shows a firewall drift banner when the live kernel policy differs from the saved policy', function (): void {
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'accept']);
+
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn(
+        "table inet tallpbx_filter {\n\tchain input {\n\t\ttype filter hook input priority filter - 10; policy drop;\n\t}\n}"
+    );
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', 'drop')
+        ->assertSee('Firewall Out of Sync')
+        ->assertSee('Re-apply Ruleset');
+});
+
+it('does not show the drift banner when the live kernel policy matches the saved policy', function (): void {
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn(
+        "table inet tallpbx_filter {\n\tchain input {\n\t\ttype filter hook input priority filter - 10; policy drop;\n\t}\n}"
+    );
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', 'drop')
+        ->assertDontSee('Firewall Out of Sync');
+});
+
+it('shows the not-loaded warning when the kernel has no TallPBX firewall table', function (): void {
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn("table inet other_filter {\n}");
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', 'absent')
+        ->assertSee('not currently loaded in the Linux kernel');
+});
+
+it('keeps the drift banner silent when the live policy cannot be read', function (): void {
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn('');
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', null)
+        ->assertDontSee('Firewall Out of Sync');
+});
+
+it('clears the drift banner after a successful re-apply', function (): void {
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'accept']);
+
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn(
+        "table inet tallpbx_filter {\n\tchain input {\n\t\ttype filter hook input priority filter - 10; policy drop;\n\t}\n}"
+    );
+    $executorMock->shouldReceive('apply')->once()->andReturnTrue();
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSee('Firewall Out of Sync')
+        ->call('applyFirewallChanges')
+        ->assertSet('liveFirewallPolicy', 'accept')
+        ->assertDontSee('Firewall Out of Sync');
+});
+
+it('reports the apply failure instead of a success message when adding a whitelist entry', function (): void {
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn('');
+    $executorMock->shouldReceive('apply')->once()->andReturnFalse();
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('newWhitelistIp', '203.0.113.210')
+        ->set('newWhitelistDescription', 'Honest apply test')
+        ->call('addWhitelistIp')
+        // The kernel refused the apply, so no success message may be shown.
+        ->assertSet('operationalMessageType', 'error');
+});
+
+it('reports the apply failure instead of a success message when toggling a rule', function (): void {
+    $rule = SecurityRule::create([
+        'sequence' => 30,
+        'description' => 'Honest toggle rule',
+        'source_ip' => 'any',
+        'custom_port' => '9443',
+        'custom_protocol' => 'tcp',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn('');
+    $executorMock->shouldReceive('apply')->once()->andReturnFalse();
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('toggleRule', $rule->id)
+        ->assertSet('operationalMessageType', 'error');
 });
 
 it('applies firewall changes atomically via executor when lockout safe', function (): void {
@@ -400,8 +617,8 @@ it('renders the unified firewall rules table with pipeline stages and core PBX s
         ->assertSee('@banned_ips')
         ->assertSee('Whitelist IPs')
         ->assertSee('@whitelist_ips')
-        ->assertSee('Always Dropped')
-        ->assertSee('Always Allowed')
+        ->assertSee('Blacklist')
+        ->assertSee('Whitelist')
         ->assertSee('Custom Rules')
         ->assertSee('Standard Services')
         ->assertSee('Default Inbound Policy')

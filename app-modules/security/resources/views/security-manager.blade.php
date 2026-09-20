@@ -8,7 +8,6 @@
                     <x-heroicon-o-shield-check class="w-6 h-6 text-primary cursor-help opacity-70 hover:opacity-100" />
                 </x-tooltip>
             </div>
-            <p class="text-sm text-base-content/70 mt-1">{{ __('admin.security_description') }}</p>
         </div>
     </div>
 
@@ -28,6 +27,32 @@
             <button wire:click="whitelistCurrentIp" type="button" class="btn btn-warning btn-sm whitespace-nowrap">
                 <x-heroicon-o-shield-check class="w-4 h-4" />
                 {{ __('admin.security_protect_my_ip') }}
+            </button>
+        </div>
+    @endif
+
+    {{-- Firewall Drift Banner (the live kernel policy differs from the saved policy) --}}
+    @if ($liveFirewallPolicy !== null && $liveFirewallPolicy !== $firewallDefaultPolicy)
+        <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <x-heroicon-o-arrow-path class="w-6 h-6 text-warning flex-shrink-0" />
+                <div>
+                    <div class="font-semibold">{{ __('admin.security_drift_warning_title') }}</div>
+                    <div class="text-xs opacity-90">
+                        @if ($liveFirewallPolicy === 'absent')
+                            {{ __('admin.security_drift_not_loaded_body') }}
+                        @else
+                            {{ __('admin.security_drift_warning_body', [
+                                'live' => $liveFirewallPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
+                                'saved' => $firewallDefaultPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
+                            ]) }}
+                        @endif
+                    </div>
+                </div>
+            </div>
+            <button wire:click="applyFirewallChanges" type="button" class="btn btn-warning btn-sm whitespace-nowrap">
+                <x-heroicon-o-arrow-path class="w-4 h-4" />
+                {{ __('admin.security_drift_reapply') }}
             </button>
         </div>
     @endif
@@ -116,7 +141,7 @@
 
     {{-- Sequential Pipeline Stages 1 & 2: Blacklist, Attackers, and Whitelist --}}
     <div class="space-y-6">
-        {{-- Card 1: Blacklist IPs (Stage 1 Permanent Kernel Drop) --}}
+        {{-- Card 1: Blacklist (Stage 1 Permanent Kernel Drop) --}}
         <div id="blacklist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
             <div class="card-body p-4 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
@@ -128,7 +153,6 @@
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
                         </div>
-                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_blacklist_desc') }}</p>
                     </div>
                 </div>
 
@@ -229,7 +253,6 @@
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
                         </div>
-                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_banned_attackers_desc') }}</p>
                     </div>
                     <div class="flex items-center gap-2 self-start sm:self-auto">
                         <button wire:click="openSettingsDrawer" type="button" class="btn btn-outline btn-sm gap-1">
@@ -320,7 +343,7 @@
             </div>
         </div>
 
-        {{-- Card 3: Whitelist IPs (Stage 2 Allowed Bypass) --}}
+        {{-- Card 3: Whitelist (Stage 2 Allowed Bypass) --}}
         <div id="whitelist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
             <div class="card-body p-4 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
@@ -332,7 +355,6 @@
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
                         </div>
-                        <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_whitelist_desc') }}</p>
                     </div>
                 </div>
 
@@ -446,7 +468,7 @@
         </div>
     </div>
 
-    {{-- Zone 4: Sequential Firewall Rules & Port Access (Lower Deck) --}}
+    {{-- Zone 4: Sequential Firewall Rules (Lower Deck) --}}
     <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body p-4 space-y-4">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -876,7 +898,7 @@
                                 @endif
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <button wire:click="openSettingsDrawer" type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/70">
+                                <button wire:click="openDefaultPolicyForm" type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/70">
                                     <x-heroicon-o-cog-6-tooth class="w-3.5 h-3.5" />
                                     <span>{{ __('admin.security_configure') }}</span>
                                 </button>
@@ -918,17 +940,6 @@
                 </div>
 
                 <div class="space-y-4">
-                    {{-- Default Firewall Policy --}}
-                    <div class="form-control">
-                        <label class="label justify-start gap-2">
-                            <span class="label-text font-medium">{{ __('admin.security_firewall_status') }} (Default Policy)</span>
-                        </label>
-                        <select wire:model="firewallDefaultPolicy" class="select select-bordered select-sm w-full">
-                            <option value="drop">{{ __('admin.security_policy_drop') }} (Drop)</option>
-                            <option value="accept">{{ __('admin.security_policy_accept') }} (Accept)</option>
-                        </select>
-                    </div>
-
                     {{-- Max Retries --}}
                     <div class="form-control">
                         <label class="label justify-start gap-2">
@@ -994,6 +1005,36 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal: Default Inbound Policy --}}
+    @if ($showDefaultPolicyModal)
+        <div class="modal modal-open">
+            <div class="modal-box max-w-sm">
+                <h3 class="font-bold text-lg text-base-content">{{ __('admin.security_default_policy') }}</h3>
+                <form wire:submit="saveDefaultPolicy" class="space-y-4 mt-4">
+                    <div class="form-control">
+                        <label class="label justify-start gap-2">
+                            <span class="label-text font-medium">{{ __('admin.security_firewall_status') }} (Default Policy)</span>
+                        </label>
+                        <select wire:model="firewallDefaultPolicy" class="select select-bordered select-sm w-full">
+                            <option value="drop">{{ __('admin.security_policy_drop') }} (Drop)</option>
+                            <option value="accept">{{ __('admin.security_policy_accept') }} (Accept)</option>
+                        </select>
+                        @error('firewallDefaultPolicy') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div class="modal-action">
+                        <button wire:click="closeDefaultPolicyForm" type="button" class="btn btn-outline btn-sm">
+                            {{ __('client.cancel') }}
+                        </button>
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            {{ __('client.save') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 
     {{-- Modal: Manual Ban --}}
     @if ($showManualBanModal)

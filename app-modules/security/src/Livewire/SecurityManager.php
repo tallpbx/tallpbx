@@ -186,6 +186,11 @@ class SecurityManager extends Component
     public bool $showSettingsDrawer = false;
 
     /**
+     * Visibility state for the dedicated Default Inbound Policy form.
+     */
+    public bool $showDefaultPolicyModal = false;
+
+    /**
      * Intrusion protection sensitivity thresholds.
      */
     public int $maxRetry = 5;
@@ -202,6 +207,13 @@ class SecurityManager extends Component
 
     public string $firewallDefaultPolicy = 'drop';
 
+    /**
+     * Observed default inbound policy reported by the live Linux kernel:
+     * 'drop' or 'accept' when readable, 'absent' when the TallPBX firewall
+     * table is not loaded, or NULL when the kernel state cannot be read.
+     */
+    public ?string $liveFirewallPolicy = null;
+
     public bool $firewallEnabled = true;
 
     public bool $attackProtectionEnabled = true;
@@ -214,6 +226,7 @@ class SecurityManager extends Component
         $this->adminIp = request()->ip() ?? '127.0.0.1';
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
+        $this->refreshLiveFirewallPolicy();
     }
 
     /**
@@ -222,6 +235,44 @@ class SecurityManager extends Component
     public function checkAdminIpStatus(LockoutGuardService $lockoutGuard): void
     {
         $this->isCurrentIpWhitelisted = $lockoutGuard->isWhitelisted($this->adminIp);
+    }
+
+    /**
+     * Refresh the observed kernel firewall policy so the UI can flag drift
+     * between the saved configuration and what nftables is actually running.
+     * Unreadable state leaves the indicator silent instead of warning falsely.
+     */
+    private function refreshLiveFirewallPolicy(): void
+    {
+        try {
+            $output = app(SecurityExecutorInterface::class)->status();
+        } catch (\Throwable) {
+            // The status helper is unavailable on this host (for example a
+            // development machine): keep the observed state unknown.
+            $this->liveFirewallPolicy = null;
+
+            return;
+        }
+
+        if (trim($output) === '') {
+            $this->liveFirewallPolicy = null;
+
+            return;
+        }
+
+        // The helper falls back to the full ruleset listing when the TallPBX
+        // table is missing entirely, which means the firewall is not loaded.
+        if (! str_contains($output, 'table inet tallpbx_filter')) {
+            $this->liveFirewallPolicy = 'absent';
+
+            return;
+        }
+
+        $this->liveFirewallPolicy = preg_match(
+            '/type\s+filter\s+hook\s+input[^;]*;\s*policy\s+(drop|accept)\s*;/',
+            $output,
+            $matches
+        ) === 1 ? $matches[1] : null;
     }
 
     /**
@@ -248,8 +299,11 @@ class SecurityManager extends Component
     {
         $lockoutGuard->whitelistIp($this->adminIp, 'Auto-whitelisted administrator session');
         $this->isCurrentIpWhitelisted = true;
-        $this->autoApplyFirewallRuleset($lockoutGuard);
-        $this->notifySuccess((string) __('admin.security_ip_protected_success'));
+
+        // Report success only when the kernel actually accepted the ruleset.
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_ip_protected_success'));
+        }
     }
 
     /**
@@ -267,6 +321,11 @@ class SecurityManager extends Component
         $lockoutGuard ??= app(LockoutGuardService::class);
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
+
+        // Livewire maps one handler per event name, so the observed-kernel
+        // refresh rides along here to keep the drift banner current on every
+        // pushed update without polling.
+        $this->refreshLiveFirewallPolicy();
     }
 
     /**
@@ -284,13 +343,25 @@ class SecurityManager extends Component
      */
     public function addBlacklistIp(LockoutGuardService $lockoutGuard): void
     {
+        // IPv6 input gets a dedicated hint until dual-stack kernel support
+        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
+        if (str_contains(trim($this->newBlacklistIp), ':')) {
+            // Replace any lingering message so the IPv6 hint is what the field shows.
+            $this->resetValidation('newBlacklistIp');
+            $this->addError('newBlacklistIp', (string) __('admin.security_ipv6_not_supported'));
+
+            return;
+        }
+
         $this->validate([
             'newBlacklistIp' => [
                 'required',
                 'string',
-                'regex:/^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?|([0-9a-fA-F:]+)(\/[0-9]+)?)$/',
+                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\/(?:3[0-2]|[12]?\d))?$/',
             ],
             'newBlacklistDescription' => ['nullable', 'string', 'max:255'],
+        ], [
+            'newBlacklistIp.regex' => __('admin.security_ip_format_invalid'),
         ]);
 
         $ip = trim($this->newBlacklistIp);
@@ -320,8 +391,10 @@ class SecurityManager extends Component
         $this->newBlacklistIp = '';
         $this->newBlacklistDescription = '';
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->autoApplyFirewallRuleset($lockoutGuard);
-        $this->notifySuccess((string) __('admin.security_ip_added'));
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_ip_added'));
+        }
     }
 
     /**
@@ -329,13 +402,25 @@ class SecurityManager extends Component
      */
     public function addWhitelistIp(LockoutGuardService $lockoutGuard): void
     {
+        // IPv6 input gets a dedicated hint until dual-stack kernel support
+        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
+        if (str_contains(trim($this->newWhitelistIp), ':')) {
+            // Replace any lingering message so the IPv6 hint is what the field shows.
+            $this->resetValidation('newWhitelistIp');
+            $this->addError('newWhitelistIp', (string) __('admin.security_ipv6_not_supported'));
+
+            return;
+        }
+
         $this->validate([
             'newWhitelistIp' => [
                 'required',
                 'string',
-                'regex:/^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?|([0-9a-fA-F:]+)(\/[0-9]+)?)$/',
+                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\/(?:3[0-2]|[12]?\d))?$/',
             ],
             'newWhitelistDescription' => ['nullable', 'string', 'max:255'],
+        ], [
+            'newWhitelistIp.regex' => __('admin.security_ip_format_invalid'),
         ]);
 
         $ip = trim($this->newWhitelistIp);
@@ -355,8 +440,10 @@ class SecurityManager extends Component
         $this->newWhitelistIp = '';
         $this->newWhitelistDescription = '';
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->autoApplyFirewallRuleset($lockoutGuard);
-        $this->notifySuccess((string) __('admin.security_ip_added'));
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_ip_added'));
+        }
     }
 
     /**
@@ -364,13 +451,25 @@ class SecurityManager extends Component
      */
     public function addIp(LockoutGuardService $lockoutGuard): void
     {
+        // IPv6 input gets a dedicated hint until dual-stack kernel support
+        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
+        if (str_contains(trim($this->newIp), ':')) {
+            // Replace any lingering message so the IPv6 hint is what the field shows.
+            $this->resetValidation('newIp');
+            $this->addError('newIp', (string) __('admin.security_ipv6_not_supported'));
+
+            return;
+        }
+
         $this->validate([
             'newIp' => [
                 'required',
                 'string',
-                'regex:/^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?|([0-9a-fA-F:]+)(\/[0-9]+)?)$/',
+                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\/(?:3[0-2]|[12]?\d))?$/',
             ],
             'newIpDescription' => ['nullable', 'string', 'max:255'],
+        ], [
+            'newIp.regex' => __('admin.security_ip_format_invalid'),
         ]);
 
         $ip = trim($this->newIp);
@@ -391,8 +490,10 @@ class SecurityManager extends Component
         $this->newIp = '';
         $this->newIpDescription = '';
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->autoApplyFirewallRuleset($lockoutGuard);
-        $this->notifySuccess((string) __('admin.security_ip_added'));
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_ip_added'));
+        }
     }
 
     /**
@@ -404,8 +505,10 @@ class SecurityManager extends Component
         $entry->delete();
 
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->autoApplyFirewallRuleset($lockoutGuard);
-        $this->notifySuccess((string) __('admin.security_ip_deleted'));
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_ip_deleted'));
+        }
     }
 
     /**
@@ -415,8 +518,10 @@ class SecurityManager extends Component
     {
         $adminId = Auth::guard('admin')->id();
         $banService->unban($ip, is_int($adminId) ? $adminId : null);
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_unbanned_success'));
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_unbanned_success'));
+        }
     }
 
     /**
@@ -435,8 +540,10 @@ class SecurityManager extends Component
         }
 
         $this->checkAdminIpStatus($lockoutGuard);
-        $this->autoApplyFirewallRuleset($lockoutGuard);
-        $this->notifySuccess((string) __('admin.security_promoted_whitelist'));
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_promoted_whitelist'));
+        }
     }
 
     /**
@@ -454,8 +561,9 @@ class SecurityManager extends Component
             );
         }
 
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_promoted_blacklist'));
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_promoted_blacklist'));
+        }
     }
 
     /**
@@ -479,14 +587,26 @@ class SecurityManager extends Component
     {
         $lockoutGuard ??= app(LockoutGuardService::class);
 
+        // IPv6 input gets a dedicated hint until dual-stack kernel support
+        // ships (scoped in docs/ipv6-dual-stack-implementation-plan.md).
+        if (str_contains(trim($this->manualBanIp), ':')) {
+            // Replace any lingering message so the IPv6 hint is what the field shows.
+            $this->resetValidation('manualBanIp');
+            $this->addError('manualBanIp', (string) __('admin.security_ipv6_not_supported'));
+
+            return;
+        }
+
         $this->validate([
             'manualBanIp' => [
                 'required',
                 'string',
-                'regex:/^(([0-9]{1,3}\.){3}[0-9]{1,3}|[0-9a-fA-F:]+)$/',
+                'regex:/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)$/',
             ],
             'manualBanDuration' => ['required', 'integer'],
             'manualBanReason' => ['nullable', 'string', 'max:255'],
+        ], [
+            'manualBanIp.regex' => __('admin.security_ban_ip_format_invalid'),
         ]);
 
         $ip = trim($this->manualBanIp);
@@ -523,9 +643,12 @@ class SecurityManager extends Component
             }
         }
 
-        $this->autoApplyFirewallRuleset();
         $this->showManualBanModal = false;
-        $this->notifySuccess((string) __('admin.security_manual_ban_success'));
+
+        // Report the ban as saved only once the kernel accepted the ruleset.
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_manual_ban_success'));
+        }
     }
 
     /**
@@ -547,8 +670,9 @@ class SecurityManager extends Component
                 $previous->save();
             });
 
-            $this->autoApplyFirewallRuleset();
-            $this->notifySuccess((string) __('admin.security_rule_reordered'));
+            if ($this->autoApplyFirewallRuleset()) {
+                $this->notifySuccess((string) __('admin.security_rule_reordered'));
+            }
         }
     }
 
@@ -571,8 +695,9 @@ class SecurityManager extends Component
                 $next->save();
             });
 
-            $this->autoApplyFirewallRuleset();
-            $this->notifySuccess((string) __('admin.security_rule_reordered'));
+            if ($this->autoApplyFirewallRuleset()) {
+                $this->notifySuccess((string) __('admin.security_rule_reordered'));
+            }
         }
     }
 
@@ -585,8 +710,9 @@ class SecurityManager extends Component
         $rule->enabled = ! $rule->enabled;
         $rule->save();
 
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_rule_updated'));
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_rule_updated'));
+        }
     }
 
     /**
@@ -597,8 +723,9 @@ class SecurityManager extends Component
         $rule = SecurityRule::findOrFail($ruleId);
         $rule->delete();
 
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_rule_deleted'));
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_rule_deleted'));
+        }
     }
 
     /**
@@ -618,8 +745,9 @@ class SecurityManager extends Component
             'enabled' => true,
         ]);
 
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_rule_created'));
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_rule_created'));
+        }
     }
 
     /**
@@ -716,8 +844,10 @@ class SecurityManager extends Component
         ]);
 
         $this->showSystemServiceModal = false;
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_service_updated'));
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_service_updated'));
+        }
     }
 
     /**
@@ -743,8 +873,9 @@ class SecurityManager extends Component
         $service->enabled = ! $service->enabled;
         $service->save();
 
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_service_updated'));
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_service_updated'));
+        }
     }
 
     /**
@@ -775,8 +906,9 @@ class SecurityManager extends Component
                 $this->systemServiceEnabled = true;
             }
 
-            $this->autoApplyFirewallRuleset();
-            $this->notifySuccess((string) __('admin.security_service_reset_success'));
+            if ($this->autoApplyFirewallRuleset()) {
+                $this->notifySuccess((string) __('admin.security_service_reset_success'));
+            }
         }
     }
 
@@ -844,8 +976,10 @@ class SecurityManager extends Component
         }
 
         $this->showRuleModal = false;
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_rule_created'));
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_rule_created'));
+        }
     }
 
     /**
@@ -909,6 +1043,10 @@ class SecurityManager extends Component
         // Broadcast real-time ruleset update over Laravel Reverb
         FirewallRulesetUpdated::dispatch('ui');
 
+        // The kernel now runs the freshly applied ruleset; keep the drift
+        // indicator truthful without a privileged re-read.
+        $this->liveFirewallPolicy = $this->firewallDefaultPolicy;
+
         return true;
     }
 
@@ -944,6 +1082,57 @@ class SecurityManager extends Component
     }
 
     /**
+     * Open the dedicated Default Inbound Policy form.
+     */
+    public function openDefaultPolicyForm(): void
+    {
+        // Reload only the persisted policy so the form always starts from the
+        // saved state without discarding unsaved edits from other forms.
+        $this->firewallDefaultPolicy = SecuritySetting::get('firewall_default_policy', 'drop') ?? 'drop';
+        $this->showDefaultPolicyModal = true;
+    }
+
+    /**
+     * Close the Default Inbound Policy form without saving.
+     */
+    public function closeDefaultPolicyForm(): void
+    {
+        $this->showDefaultPolicyModal = false;
+    }
+
+    /**
+     * Save the default inbound firewall policy and apply it immediately.
+     */
+    public function saveDefaultPolicy(): void
+    {
+        $this->validate([
+            'firewallDefaultPolicy' => ['required', 'in:drop,accept'],
+        ]);
+
+        // Remember the persisted policy so a refused apply can be rolled back.
+        $previousPolicy = SecuritySetting::get('firewall_default_policy', 'drop') ?? 'drop';
+
+        SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => $this->firewallDefaultPolicy]);
+
+        // Mirror the manual ban flow: close the dialog first, then report the
+        // outcome in the top-right toast layer above the page.
+        $this->showDefaultPolicyModal = false;
+
+        if (! $this->autoApplyFirewallRuleset()) {
+            // The kernel rejected the change (lockout guard, syntax preflight,
+            // or helper failure) and the active ruleset is untouched. Restore
+            // the previous value so the UI never reports a policy the live
+            // firewall is not actually running.
+            SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => $previousPolicy]);
+            $this->firewallDefaultPolicy = $previousPolicy;
+
+            return;
+        }
+
+        $this->notifySuccess((string) __('admin.security_settings_saved'));
+    }
+
+    /**
      * Save attack protection sensitivity settings and toggles.
      */
     public function saveSettings(): void
@@ -952,7 +1141,6 @@ class SecurityManager extends Component
             'maxRetry' => ['required', 'integer', 'min:1', 'max:100'],
             'findTime' => ['required', 'integer', 'min:10', 'max:86400'],
             'banTime' => ['required', 'integer', 'min:60', 'max:31536000'],
-            'firewallDefaultPolicy' => ['required', 'in:drop,accept'],
         ]);
 
         SecuritySetting::updateOrCreate(['key' => 'max_retry'], ['value' => (string) $this->maxRetry]);
@@ -961,13 +1149,17 @@ class SecurityManager extends Component
         SecuritySetting::updateOrCreate(['key' => 'protect_sip'], ['value' => $this->protectSip ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'protect_web'], ['value' => $this->protectWeb ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'protect_ssh'], ['value' => $this->protectSsh ? '1' : '0']);
-        SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => $this->firewallDefaultPolicy]);
         SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => $this->firewallEnabled ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'attack_protection_enabled'], ['value' => $this->attackProtectionEnabled ? '1' : '0']);
 
         $this->showSettingsDrawer = false;
-        $this->autoApplyFirewallRuleset();
-        $this->notifySuccess((string) __('admin.security_settings_saved'));
+
+        // Only claim success when the firewall ruleset was actually applied:
+        // autoApplyFirewallRuleset() already reports failures, and an
+        // unconditional success message here would mask that error.
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_settings_saved'));
+        }
     }
 
     /**
