@@ -89,6 +89,8 @@ flowchart TD
 
 TallPBX does **not** rely on slow log-scraping utilities like Fail2ban. Intrusion prevention occurs in-process with real-time sliding windows in Redis, immediate Linux kernel banning, and instant WebSocket broadcasting over **Laravel Reverb**:
 
+> **What "sliding window" means here:** the engine never counts failed attempts forever. Every failure increments a small per-IP counter inside Redis — stored separately for each attack vector (SIP, web, and SSH) — and the counter automatically expires one **Detection Window** after the first failure of the streak (*"Time window in which failed attempts are counted"* — 10 minutes by default, adjustable in Attack Protection Settings). Only failures falling inside the window add up toward the **Max Allowed Failed Attempts** threshold; reaching it bans the IP and clears the counter so the next window starts empty. Redis keeps this accounting in memory and expires stale counters on its own, so per-login protection adds no database writes and no cleanup jobs.
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -127,10 +129,10 @@ The **Security Command Center** provides a single, unified view of the complete 
 ### Key Interface Components
 1. **Status & Threat Overview**: Real-time indicators for `nftables` firewall state, intrusion detection engine status, active ban counters, and administrator zero-lockout protection.
 2. **Pipeline-Aligned IP Workbenches**: Arranged in the exact sequential order traffic is evaluated:
-   - **Blacklist IPs (Always Dropped)**: Permanent drop list with preflight guidance and search filtering.
+   - **Blacklist**: Permanent drop list with preflight guidance and search filtering.
    - **Blocked Attackers**: Active intrusion bans with vector badges (`SIP`, `Web`, `SSH`), automated hardware timeout countdowns, and protection sensitivity settings.
-   - **Whitelist IPs (Always Allowed)**: Permanent bypass list with 1-click self-protection for administrator IPs.
-3. **Unified Firewall Rules & Port Access Table**: Shows the complete, living Linux kernel packet filtering pipeline:
+   - **Whitelist**: Permanent bypass list with 1-click self-protection for administrator IPs.
+3. **Unified Firewall Rules Table**: Shows the complete, living Linux kernel packet filtering pipeline:
    - **Built-in Rules & Pre-Filters (Collapsible)**: A one-click collapsible header row consolidating the 6 sequential built-in rules and pre-filters: unconditional loopback access (`lo`), permanent blacklist IP drops, active intruder bans, stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and trusted whitelist IP bypass.
    - **Stage 3 Standard Services**: Standard services evaluated top-to-bottom starting with **ICMP Ping Diagnostics** (configurable source network, toggleable, and customizable rate limit/burst allowance with dual-stack IPv4/IPv6 protection), followed by SIP Signaling, RTP Media, Web UI, SSH, FreeSWITCH ESL, Reverb WebSockets, and WebRTC.
    - **Stage 4 Custom Rules**: Sequential port rules with priority reordering.
@@ -190,6 +192,8 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, and
    - The systemd boot loader `/etc/nftables.conf` includes `/etc/tallpbx/firewall.nft`.
    - When the Linux server reboots, systemd's `nftables.service` executes `/etc/nftables.conf` before networking starts, instantly restoring all rules, trusted IPs, and temporary attacker bans with their remaining expiration times intact.
 
+> **Live sync guarantee:** the Security Center reports an apply as successful only after the kernel accepted the ruleset, and it compares the live kernel policy against the saved policy on every page load and pushed event — showing a **Firewall Out of Sync** banner with a one-click re-apply button whenever the two differ (or when the ruleset is not loaded at all). The interface therefore cannot silently display a configuration the kernel is not running.
+
 3. **Zero-Lockout Protection**
    - Before any restrictive policy or rule change is applied, [LockoutGuardService](file:///var/www/tallpbx/app-modules/security/src/Services/LockoutGuardService.php) checks the current administrator's active connection IP against the proposed ruleset.
    - If a proposed change would disconnect or lock out the active administrator, the change is rejected immediately with a descriptive warning, protecting administrators from accidental lockouts.
@@ -244,6 +248,8 @@ php artisan security:apply
 
 TallPBX installs a dedicated, root-owned helper script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`) with a matching sudoers entry (`/etc/sudoers.d/tallpbx-security`). This script enforces strict parameter regex validation before executing kernel operations:
 
+> **PHP-FPM systemd hardening:** the stock Debian/Ubuntu PHP-FPM unit runs with `ProtectSystem=full`, which mounts `/etc` read-only inside the PHP-FPM service. The installer therefore adds a scoped drop-in (`/etc/systemd/system/php<version>-fpm.service.d/tallpbx-security.conf`) with `ReadWritePaths=/etc/tallpbx`, so web workers can stage pending rulesets in exactly that directory — and nothing else in `/etc` — and restarts PHP-FPM. Because the `nft` utility requires `CAP_NET_ADMIN` even for check-only runs, the web application routes its syntax preflight through the helper's `validate` action.
+
 #### View Active Kernel Table
 ```bash
 sudo /usr/local/sbin/tallpbx-security status
@@ -265,6 +271,12 @@ sudo /usr/local/sbin/tallpbx-security ban 198.51.100.22 0
 ```bash
 sudo /usr/local/sbin/tallpbx-security unban 198.51.100.22
 ```
+
+#### Validate Pending Ruleset (Check-Only)
+```bash
+sudo /usr/local/sbin/tallpbx-security validate
+```
+*Runs `nft -c -f` against the pending ruleset without touching the live kernel firewall — used by the web panel, which cannot run `nft` directly.*
 
 #### Validate & Apply Pending Ruleset
 ```bash

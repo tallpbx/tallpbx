@@ -38,7 +38,7 @@ While technical specifications, backend services, and developer documentation us
 | **Ingress Threat Sentinel** | **Automatic Attack Protection** | Protects phone extensions and logins from password guessing. |
 | **Dynamic Set Kernel Auto-Bans** | **Currently Blocked Attackers** | Clear list of IP addresses temporarily blocked for wrong passwords. |
 | **Global IP Access (Whitelist / Blacklist)** | **Trusted & Blocked IP Addresses** | Two simple lists: "Trusted" (always allowed) and "Blocked" (never allowed). |
-| **Sequential Firewall Rules** | **Firewall Rules & Port Access** | Simple rules controlling which networks can reach specific ports. |
+| **Sequential Firewall Rules** | **Firewall Rules** | Simple rules controlling which networks can reach specific ports. |
 | **PBX Service Baseline / Port Catalog** | **Standard Phone System Ports** | Standard PBX ports (Calls, Audio, Web, Server) that work out of the box. |
 | **Intrusion Sensitivity Tuning (Drawer)** | **Attack Protection Settings** | Easy sliders for allowed attempts, time window, and block duration. |
 | **Vector: `sip_auth`** | **Phone Passwords (SIP)** | Someone tried incorrect phone extension passwords. |
@@ -170,9 +170,9 @@ While technical specifications, backend services, and developer documentation us
     - **`[ Block Permanently ]`**: Adds the IP to the permanent Blocked List with 1 click.
 - **`[+ Block IP Manually]`**: Opens a simple popup where an administrator can enter an IP address, choose how many hours to block it, and add an optional note.
 
-#### Zone 4: Firewall Rules & Port Access (Lower Panel)
-- **User-Facing Title**: **"Firewall Rules & Port Access"**
-- **Default Inbound Policy Dropdown**: *"When no rule matches: [ Block Inbound Traffic (Recommended) ▼ ]"*.
+#### Zone 4: Firewall Rules (Lower Panel)
+- **User-Facing Title**: **"Firewall Rules"**
+- **Default Inbound Policy**: The fallback action when no rule matches — *"Block Inbound Traffic (Recommended)"* or *"Allow All"* — is set through a dedicated form opened by the **`[ ⚙ Configure ]`** button on its row in the rules table; saving applies the change immediately and reports the outcome in the top-right notification.
 - **Standard Phone System Ports (Quick-Overview)**:
   - Displays checkmarked badges confirming standard phone services are operational:
     `[✓ Phone Calls (SIP 5060,5080)]`  `[✓ Call Audio (RTP 16384-32768)]`  `[✓ Web Portal (80,443)]`  `[✓ Server Access (SSH 22)]`
@@ -217,7 +217,7 @@ While technical specifications, backend services, and developer documentation us
 4. The carrier network is immediately trusted and accepted across all phone system ports.
 
 #### Workflow C: Restricting Web Portal to Office Network (15 Seconds)
-1. Administrator scrolls down to **Firewall Rules & Port Access**.
+1. Administrator scrolls down to **Firewall Rules**.
 2. Clicks **`[+ Add New Rule ]`**.
 3. Selects Service: `Web Portal (80/443)`, Allowed From: `10.10.0.0/16` (Office VPN network), Action: `ALLOW`.
 4. Sets the default policy to `Block Inbound Traffic`.
