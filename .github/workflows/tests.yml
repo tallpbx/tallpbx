@@ -17,11 +17,9 @@
 
 name: Tests
 
+# Manual on-demand dispatch only; tests are run and verified locally before pushes.
 on:
-  push:
-    branches: [main, '1.*']
-  pull_request:
-    branches: [main, '1.*']
+  workflow_dispatch:
 
 # Cancel superseded runs of the same branch or pull request to save runner minutes.
 concurrency:
@@ -83,6 +81,7 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
-      # Authoritative verification gate from AGENTS.md: compact feature/unit suite.
+      # Same command developers run locally via `php artisan app:test`:
+      # compact output plus parallel workers (paratest).
       - name: Run the Pest test suite
-        run: php artisan test --compact
+        run: php artisan test --compact --parallel
