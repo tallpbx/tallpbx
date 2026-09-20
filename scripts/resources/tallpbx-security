@@ -40,6 +40,11 @@ FIREWALL_CONF_DIR="${TALLPBX_FIREWALL_CONF_DIR:-/etc/tallpbx}"
 FIREWALL_PENDING="${FIREWALL_CONF_DIR}/firewall.nft.pending"
 FIREWALL_ACTIVE="${FIREWALL_CONF_DIR}/firewall.nft"
 
+# Path to the nftables binary. Defaults to system binary. Automated tests point
+# TALLPBX_NFT_BIN at a stub binary in a temporary directory. Sudo's env_reset
+# prevents this environment variable from affecting production invocations.
+NFT_BIN="${TALLPBX_NFT_BIN:-/usr/sbin/nft}"
+
 # Helper function to validate IP addresses
 validate_ip() {
     local ip="$1"
@@ -72,7 +77,7 @@ case "$ACTION" in
 
         # Step 2: Validate the syntax of the pending ruleset before touching the live firewall.
         # If there are any syntax errors, 'nft -c' will fail here and exit, keeping the active firewall intact.
-        /usr/sbin/nft -c -f "$FIREWALL_PENDING"
+        "$NFT_BIN" -c -f "$FIREWALL_PENDING"
 
         # Step 3: Promote the pending file to the active configuration file atomically
         mv "$FIREWALL_PENDING" "$FIREWALL_ACTIVE"
@@ -80,8 +85,28 @@ case "$ACTION" in
         chmod 0640 "$FIREWALL_ACTIVE"
 
         # Step 4: Load the validated configuration into the Linux kernel atomically
-        /usr/sbin/nft -f "$FIREWALL_ACTIVE"
-        echo "SUCCESS: Ruleset applied atomically"
+        "$NFT_BIN" -f "$FIREWALL_ACTIVE"
+
+        # Step 5: Post-apply verification and authoritative sidecar creation
+        DECLARED_POLICY="$(sed -n 's/^# tallpbx-policy:[[:space:]]*\([a-z]*\).*/\1/p' "$FIREWALL_ACTIVE")"
+        RULESET_DIGEST="$(sed -n 's/^# tallpbx-digest:[[:space:]]*\(sha256:[0-9a-f]\{64\}\).*/\1/p' "$FIREWALL_ACTIVE")"
+        LIVE_CHAIN="$("$NFT_BIN" list chain inet tallpbx_filter input 2>/dev/null || true)"
+        LIVE_POLICY="$(printf '%s\n' "$LIVE_CHAIN" | sed -n 's/.*hook input[^;]*; policy \([a-z]*\);.*/\1/p')"
+
+        SIDECAR="${FIREWALL_CONF_DIR}/firewall.nft.applied"
+        if [ -n "$DECLARED_POLICY" ] && [ -n "$RULESET_DIGEST" ] && [ "$LIVE_POLICY" = "$DECLARED_POLICY" ]; then
+            SIDECAR_TMP="${SIDECAR}.tmp.$$"
+            printf 'digest=%s\npolicy=%s\napplied_at=%s\n' \
+                "$RULESET_DIGEST" "$DECLARED_POLICY" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$SIDECAR_TMP"
+            chown root:www-data "$SIDECAR_TMP" 2>/dev/null || true
+            chmod 0640 "$SIDECAR_TMP" 2>/dev/null || true
+            mv -f "$SIDECAR_TMP" "$SIDECAR"
+            echo "SUCCESS: Ruleset applied atomically and verified against the live kernel"
+        else
+            # Invalidate any existing stale sidecar so the verifier reports unverified rather than stale success
+            rm -f "$SIDECAR"
+            echo "WARNING: Ruleset applied, but the live kernel policy could not be verified - sync sidecar invalidated" >&2
+        fi
         ;;
 
     validate)
@@ -94,7 +119,7 @@ case "$ACTION" in
         # Run the kernel's own parser in check-only mode. 'nft -c' validates the
         # complete ruleset syntax WITHOUT applying it, so the live kernel
         # firewall is never modified by this action.
-        /usr/sbin/nft -c -f "$FIREWALL_PENDING"
+        "$NFT_BIN" -c -f "$FIREWALL_PENDING"
         echo "SUCCESS: Pending ruleset syntax is valid"
         ;;
 
@@ -115,18 +140,18 @@ case "$ACTION" in
         BAN_SET="$(ban_set_for_ip "$IP")"
 
         # Ensure table exists in kernel before adding element; restore active ruleset if needed
-        if ! /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
+        if ! "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
             if [ -f "$FIREWALL_ACTIVE" ]; then
-                /usr/sbin/nft -f "$FIREWALL_ACTIVE" 2>/dev/null || true
+                "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
             fi
         fi
 
         # If seconds is 0, ban permanently (no timeout), otherwise apply kernel timeout
         if [ "$SECS" -eq 0 ]; then
-            /usr/sbin/nft add element inet tallpbx_filter "$BAN_SET" { "$IP" }
+            "$NFT_BIN" add element inet tallpbx_filter "$BAN_SET" { "$IP" }
             echo "SUCCESS: Banned $IP permanently"
         else
-            /usr/sbin/nft add element inet tallpbx_filter "$BAN_SET" { "$IP" timeout "${SECS}s" }
+            "$NFT_BIN" add element inet tallpbx_filter "$BAN_SET" { "$IP" timeout "${SECS}s" }
             echo "SUCCESS: Banned $IP for $SECS seconds"
         fi
         ;;
@@ -141,23 +166,23 @@ case "$ACTION" in
         UNBAN_SET="$(ban_set_for_ip "$IP")"
 
         # Ensure table exists in kernel before deleting element
-        if ! /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
+        if ! "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
             if [ -f "$FIREWALL_ACTIVE" ]; then
-                /usr/sbin/nft -f "$FIREWALL_ACTIVE" 2>/dev/null || true
+                "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
             fi
         fi
 
         # Remove the IP element from the kernel dynamic set; ignore if element was not present
-        /usr/sbin/nft delete element inet tallpbx_filter "$UNBAN_SET" { "$IP" } 2>/dev/null || true
+        "$NFT_BIN" delete element inet tallpbx_filter "$UNBAN_SET" { "$IP" } 2>/dev/null || true
         echo "SUCCESS: Unbanned $IP"
         ;;
 
     status)
         # Display the active nftables ruleset or table status
-        if /usr/sbin/nft list table inet tallpbx_filter &>/dev/null; then
-            /usr/sbin/nft list table inet tallpbx_filter
+        if "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
+            "$NFT_BIN" list table inet tallpbx_filter
         else
-            /usr/sbin/nft list ruleset
+            "$NFT_BIN" list ruleset
         fi
         ;;
 

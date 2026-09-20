@@ -337,3 +337,90 @@ it('emits a valid ruleset with empty whitelist sets when no entries exist', func
         @rmdir($tempDir);
     }
 });
+
+it('emits provenance markers and canonical digest in the generated ruleset', function (): void {
+    $generator = new SecurityConfigGenerator;
+    $nft = $generator->generate();
+
+    expect($nft)->toMatch('/^# tallpbx-policy: (drop|accept)$/m')
+        ->and($nft)->toMatch('/^# tallpbx-digest: sha256:[0-9a-f]{64}$/m');
+
+    $digest = $generator->canonicalDigest();
+    expect($digest)->toMatch('/^sha256:[0-9a-f]{64}$/')
+        ->and($nft)->toContain("# tallpbx-digest: {$digest}");
+});
+
+it('keeps canonical digest stable when dynamic attacker bans are added or decay', function (): void {
+    $generator = new SecurityConfigGenerator;
+    $baselineDigest = $generator->canonicalDigest();
+
+    // Adding an active dynamic attacker ban should NOT alter the canonical ruleset digest
+    // because dynamic bans are manipulated out-of-band in kernel RAM.
+    $ban = SecurityBan::create([
+        'ip_address' => '198.51.100.77',
+        'vector' => 'sip_auth',
+        'reason' => 'Dynamic ban stability test',
+        'attempt_count' => 5,
+        'banned_at' => Carbon::now(),
+        'expires_at' => Carbon::now()->addSeconds(3600),
+        'is_active' => true,
+    ]);
+
+    expect($generator->canonicalDigest())->toBe($baselineDigest);
+
+    // Decaying the countdown timer should also NOT alter the canonical digest
+    $ban->update([
+        'expires_at' => Carbon::now()->addSeconds(60),
+    ]);
+
+    expect($generator->canonicalDigest())->toBe($baselineDigest);
+});
+
+it('changes canonical digest when permanent whitelist, blacklist, rules, services, or policy change', function (): void {
+    $generator = new SecurityConfigGenerator;
+    $baselineDigest = $generator->canonicalDigest();
+
+    // 1. Permanent whitelist change
+    $whitelistEntry = SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '192.0.2.100',
+        'description' => 'Test whitelist',
+    ]);
+    $digestAfterWhitelist = $generator->canonicalDigest();
+    expect($digestAfterWhitelist)->not->toBe($baselineDigest);
+    $whitelistEntry->delete();
+    expect($generator->canonicalDigest())->toBe($baselineDigest);
+
+    // 2. Permanent blacklist change
+    $blacklistEntry = SecurityIpList::create([
+        'type' => 'blacklist',
+        'ip_address' => '198.51.100.0/24',
+        'description' => 'Test blacklist',
+    ]);
+    $digestAfterBlacklist = $generator->canonicalDigest();
+    expect($digestAfterBlacklist)->not->toBe($baselineDigest);
+    $blacklistEntry->delete();
+    expect($generator->canonicalDigest())->toBe($baselineDigest);
+
+    // 3. Custom rule change
+    $rule = SecurityRule::create([
+        'sequence' => 99,
+        'description' => 'Custom test rule',
+        'action' => 'drop',
+        'source_ip' => 'any',
+        'custom_protocol' => 'tcp',
+        'custom_port' => '9999',
+        'is_active' => true,
+    ]);
+    $digestAfterRule = $generator->canonicalDigest();
+    expect($digestAfterRule)->not->toBe($baselineDigest);
+    $rule->delete();
+    expect($generator->canonicalDigest())->toBe($baselineDigest);
+
+    // 4. Default policy change
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'accept']);
+    $digestAfterPolicy = $generator->canonicalDigest();
+    expect($digestAfterPolicy)->not->toBe($baselineDigest);
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'drop']);
+    expect($generator->canonicalDigest())->toBe($baselineDigest);
+});

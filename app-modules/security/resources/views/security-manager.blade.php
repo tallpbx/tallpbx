@@ -32,8 +32,8 @@
         </div>
     @endif
 
-    {{-- Firewall Drift Banner (the live kernel policy differs from the saved policy) --}}
-    @if ($liveFirewallPolicy !== null && $liveFirewallPolicy !== $firewallDefaultPolicy)
+    {{-- Firewall Drift Banner (the live kernel policy differs from the saved policy or ruleset content has drifted) --}}
+    @if (($liveFirewallPolicy !== null && $liveFirewallPolicy !== $firewallDefaultPolicy) || $firewallSyncState === 'drift')
         <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
                 <x-heroicon-o-arrow-path class="w-6 h-6 text-warning flex-shrink-0" />
@@ -42,11 +42,13 @@
                     <div class="text-xs opacity-90">
                         @if ($liveFirewallPolicy === 'absent')
                             {{ __('admin.security_drift_not_loaded_body') }}
-                        @else
+                        @elseif ($liveFirewallPolicy !== null && $liveFirewallPolicy !== $firewallDefaultPolicy)
                             {{ __('admin.security_drift_warning_body', [
                                 'live' => $liveFirewallPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
                                 'saved' => $firewallDefaultPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
                             ]) }}
+                        @else
+                            {{ __('admin.security_drift_content_body') }}
                         @endif
                     </div>
                 </div>
@@ -74,10 +76,37 @@
                         <span class="badge badge-neutral badge-sm">{{ __('admin.security_firewall_disabled') }}</span>
                     @endif
                 </div>
-                <div class="mt-2 text-lg font-semibold text-base-content">nftables</div>
-                <p class="text-xs text-base-content/60">
-                    {{ $firewallDefaultPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept') }}
-                </p>
+                <div class="mt-2 flex items-center justify-between">
+                    <div class="text-lg font-semibold text-base-content">nftables</div>
+                    @if ($firewallSyncState === 'verified')
+                        <span class="badge badge-success badge-xs gap-1" title="{{ $firewallSyncAppliedAt ? __('admin.security_sync_applied_at', ['time' => $firewallSyncAppliedAt]) : '' }}">
+                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-success-content"></span>
+                            {{ __('admin.security_sync_verified') }}
+                        </span>
+                    @elseif ($firewallSyncState === 'drift')
+                        <span class="badge badge-warning badge-xs gap-1">
+                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-warning-content"></span>
+                            {{ __('admin.security_sync_drift') }}
+                        </span>
+                    @elseif ($firewallSyncState === 'unknown')
+                        <span class="badge badge-ghost badge-xs gap-1 text-base-content/60">
+                            {{ __('admin.security_sync_unverified') }}
+                        </span>
+                    @endif
+                </div>
+                <div class="flex items-center justify-between text-xs text-base-content/60 mt-0.5">
+                    <span>{{ $firewallDefaultPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept') }}</span>
+                    @if ($firewallSyncAppliedAt)
+                        @php
+                            try {
+                                $syncDisplayTime = \Illuminate\Support\Carbon::parse($firewallSyncAppliedAt)->diffForHumans();
+                            } catch (\Throwable) {
+                                $syncDisplayTime = $firewallSyncAppliedAt;
+                            }
+                        @endphp
+                        <span class="text-[10px] opacity-75 font-mono">{{ $syncDisplayTime }}</span>
+                    @endif
+                </div>
             </div>
         </div>
 

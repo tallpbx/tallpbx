@@ -63,8 +63,8 @@ class SecurityConfigGenerator
         // 1. Compile IP sets, kept split per address family because nftables
         //    sets are typed (ipv4_addr vs ipv6_addr) and mixing families in a
         //    single set would make the whole ruleset uncompilable.
-        $blacklistIps = SecurityIpList::blacklist()->pluck('ip_address')->all();
-        $whitelistIps = SecurityIpList::whitelist()->pluck('ip_address')->all();
+        $blacklistIps = SecurityIpList::blacklist()->orderBy('ip_address')->pluck('ip_address')->all();
+        $whitelistIps = SecurityIpList::whitelist()->orderBy('ip_address')->pluck('ip_address')->all();
 
         $activeBans = SecurityBan::active()->get();
 
@@ -332,7 +332,100 @@ class SecurityConfigGenerator
         $lines[] = '}';
         $lines[] = '';
 
+        // Compute deterministic canonical ruleset digest (excluding dynamic bans)
+        // and insert machine-readable provenance comment markers after the shebang.
+        $canonical = $this->canonicalForm(implode("\n", $lines));
+        $digest = 'sha256:'.hash('sha256', $canonical);
+
+        array_splice($lines, 1, 0, [
+            '# tallpbx-policy: '.$chainPolicy,
+            '# tallpbx-digest: '.$digest,
+        ]);
+
         return implode("\n", $lines);
+    }
+
+    /**
+     * Compute the deterministic canonical SHA-256 digest of the desired ruleset.
+     *
+     * Extracts the `# tallpbx-digest:` marker generated from canonical ruleset content,
+     * which normalizes whitespace and permanent sets while decoupling dynamic attacker bans.
+     */
+    public function canonicalDigest(): string
+    {
+        $ruleset = $this->generate();
+
+        if (preg_match('/^# tallpbx-digest:\s*(sha256:[0-9a-f]{64})$/m', $ruleset, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return 'sha256:'.hash('sha256', $this->canonicalForm($ruleset));
+    }
+
+    /**
+     * Convert ruleset text into its normalized canonical representation.
+     *
+     * 1. Strips blank lines and comment lines (including tallpbx-* markers).
+     * 2. Excludes dynamic attacker ban set elements (banned_ips, banned_ips6) to
+     *    prevent false-drift flapping when intrusion bans are added or decay in RAM.
+     * 3. Normalizes and sorts elements inside permanent sets alphabetically.
+     * 4. Trims leading and trailing whitespace on each line.
+     *
+     * @param  string  $content  Raw nftables ruleset text
+     */
+    public function canonicalForm(string $content): string
+    {
+        $lines = explode("\n", $content);
+        $canonicalLines = [];
+        $currentSet = null;
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            // Skip empty lines and comment lines (including provenance markers)
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+
+            // Track current set definition
+            if (preg_match('/^\s*set\s+([a-zA-Z0-9_]+)\s*\{/', $line, $matches) === 1) {
+                $currentSet = $matches[1];
+            } elseif ($currentSet !== null && preg_match('/^\s*\}\s*$/', $line) === 1) {
+                $currentSet = null;
+            }
+
+            // Exclude dynamic attacker bans from the ruleset digest:
+            // bans are manipulated directly in RAM via `tallpbx-security ban/unban`.
+            if (($currentSet === 'banned_ips' || $currentSet === 'banned_ips6') &&
+                str_contains($trimmed, 'elements =')
+            ) {
+                continue;
+            }
+
+            // Normalize and sort elements in permanent sets
+            if (preg_match('/^elements\s*=\s*\{\s*(.*?)\s*\}$/', $trimmed, $matches) === 1) {
+                $elements = array_filter(
+                    array_map('trim', explode(',', $matches[1])),
+                    fn (string $item): bool => $item !== ''
+                );
+
+                // Strip any decaying timeout suffix if present
+                $elements = array_map(
+                    fn (string $item): string => (string) preg_replace('/\s+timeout\s+[0-9]+s$/', '', $item),
+                    $elements
+                );
+
+                sort($elements, SORT_STRING);
+                $canonicalLines[] = 'elements = { '.implode(', ', $elements).' }';
+
+                continue;
+            }
+
+            // Normalize internal whitespace on remaining lines
+            $canonicalLines[] = (string) preg_replace('/\s+/', ' ', $trimmed);
+        }
+
+        return implode("\n", $canonicalLines);
     }
 
     /**

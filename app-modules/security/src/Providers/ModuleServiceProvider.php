@@ -10,6 +10,7 @@ use Illuminate\Auth\Events\Failed;
 use Modules\Security\Console\Commands\SecurityApplyCommand;
 use Modules\Security\Console\Commands\SecurityStatusCommand;
 use Modules\Security\Console\Commands\SecurityUnbanCommand;
+use Modules\Security\Console\Commands\SecurityVerifyCommand;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
@@ -127,6 +128,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             SecurityApplyCommand::class,
             SecurityStatusCommand::class,
             SecurityUnbanCommand::class,
+            SecurityVerifyCommand::class,
         ];
     }
 }

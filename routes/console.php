@@ -63,3 +63,7 @@ Schedule::command('media:reconcile --retry-failed --delete-orphans')
 Schedule::command('broadcast:reconcile-outcomes')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+Schedule::command('security:verify')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();

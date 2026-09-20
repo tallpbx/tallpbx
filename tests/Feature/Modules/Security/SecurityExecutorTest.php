@@ -237,3 +237,115 @@ it('validates shell script validate checks pending ruleset syntax without touchi
         @rmdir($isolatedDir);
     }
 });
+
+it('applies ruleset atomically, verifies live kernel, and creates sidecar when policy matches', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_apply_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    // Create a stub nft binary that mimics nft behavior in tests:
+    // -c and -f exit 0.
+    // 'list chain' outputs a mock input chain with 'policy drop;'
+    $stubNft = $isolatedDir.'/stub-nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "if [ \"\$1\" = \"list\" ] && [ \"\$2\" = \"chain\" ]; then\n".
+        "    echo 'type filter hook input priority -10; policy drop;'\n".
+        "fi\n".
+        "exit 0\n"
+    );
+    chmod($stubNft, 0755);
+
+    $digest = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    file_put_contents(
+        $isolatedDir.'/firewall.nft.pending',
+        "#!/usr/sbin/nft -f\n".
+        "# tallpbx-policy: drop\n".
+        "# tallpbx-digest: {$digest}\n".
+        "table inet tallpbx_filter {}\n"
+    );
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toContain('SUCCESS: Ruleset applied atomically and verified against the live kernel');
+
+        $sidecar = $isolatedDir.'/firewall.nft.applied';
+        expect(file_exists($sidecar))->toBeTrue();
+
+        $sidecarContent = (string) file_get_contents($sidecar);
+        expect($sidecarContent)->toContain("digest={$digest}")
+            ->and($sidecarContent)->toContain('policy=drop')
+            ->and($sidecarContent)->toMatch('/applied_at=[0-9]{4}-[0-9]{2}-[0-9]{2}T/');
+    } finally {
+        @unlink($isolatedDir.'/firewall.nft');
+        @unlink($isolatedDir.'/firewall.nft.pending');
+        @unlink($isolatedDir.'/firewall.nft.applied');
+        @unlink($stubNft);
+        @rmdir($isolatedDir);
+    }
+});
+
+it('deletes existing sidecar and warns when live policy does not match declared policy', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_mismatch_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    // Mock nft reports policy accept while ruleset declares policy drop
+    $stubNft = $isolatedDir.'/stub-nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "if [ \"\$1\" = \"list\" ] && [ \"\$2\" = \"chain\" ]; then\n".
+        "    echo 'type filter hook input priority -10; policy accept;'\n".
+        "fi\n".
+        "exit 0\n"
+    );
+    chmod($stubNft, 0755);
+
+    // Pre-create an old sidecar to verify it gets invalidated on failure
+    file_put_contents($isolatedDir.'/firewall.nft.applied', "digest=old\npolicy=accept\napplied_at=yesterday\n");
+
+    $digest = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    file_put_contents(
+        $isolatedDir.'/firewall.nft.pending',
+        "#!/usr/sbin/nft -f\n".
+        "# tallpbx-policy: drop\n".
+        "# tallpbx-digest: {$digest}\n".
+        "table inet tallpbx_filter {}\n"
+    );
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getErrorOutput())->toContain('WARNING: Ruleset applied, but the live kernel policy could not be verified - sync sidecar invalidated');
+
+        // The stale sidecar must have been removed
+        expect(file_exists($isolatedDir.'/firewall.nft.applied'))->toBeFalse();
+    } finally {
+        @unlink($isolatedDir.'/firewall.nft');
+        @unlink($isolatedDir.'/firewall.nft.pending');
+        @unlink($isolatedDir.'/firewall.nft.applied');
+        @unlink($stubNft);
+        @rmdir($isolatedDir);
+    }
+});

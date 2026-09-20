@@ -17,7 +17,9 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Services\FirewallSyncVerifier;
 use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Support\FirewallSyncStatus;
 
 /**
  * Feature tests for the SecurityManager unified Livewire component.
@@ -554,6 +556,62 @@ it('clears the drift banner after a successful re-apply', function (): void {
         ->call('applyFirewallChanges')
         ->assertSet('liveFirewallPolicy', 'accept')
         ->assertDontSee('Firewall Out of Sync');
+});
+
+it('displays verified badge when firewall sync is verified', function (): void {
+    $verifierMock = Mockery::mock(FirewallSyncVerifier::class);
+    $verifierMock->shouldReceive('verify')->andReturn(
+        new FirewallSyncStatus(
+            state: 'verified',
+            issues: [],
+            desiredDigest: 'abc123',
+            appliedDigest: 'abc123',
+            appliedPolicy: 'drop',
+            appliedAt: '2026-09-20T12:00:00Z',
+        )
+    );
+    app()->instance(FirewallSyncVerifier::class, $verifierMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('firewallSyncState', 'verified')
+        ->assertSet('firewallSyncAppliedAt', '2026-09-20T12:00:00Z')
+        ->assertSee('Verified')
+        ->assertDontSee('Firewall Out of Sync');
+});
+
+it('displays drift banner with content message when FirewallSyncVerifier reports ruleset drift', function (): void {
+    $verifierMock = Mockery::mock(FirewallSyncVerifier::class);
+    $verifierMock->shouldReceive('verify')->andReturn(
+        new FirewallSyncStatus(
+            state: 'drift',
+            issues: ['Applied ruleset digest does not match current desired configuration.'],
+            desiredDigest: 'abc123',
+            appliedDigest: 'def456',
+            appliedPolicy: 'drop',
+            appliedAt: '2026-09-20T12:00:00Z',
+        )
+    );
+    app()->instance(FirewallSyncVerifier::class, $verifierMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('firewallSyncState', 'drift')
+        ->assertSee('Firewall Out of Sync')
+        ->assertSee(__('admin.security_drift_content_body'));
+});
+
+it('displays unverified badge when firewall sync status is unknown', function (): void {
+    $verifierMock = Mockery::mock(FirewallSyncVerifier::class);
+    $verifierMock->shouldReceive('verify')->andReturn(
+        FirewallSyncStatus::unknown(['No verified apply record found.'])
+    );
+    app()->instance(FirewallSyncVerifier::class, $verifierMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('firewallSyncState', 'unknown')
+        ->assertSee('Unverified');
 });
 
 it('reports the apply failure instead of a success message when adding a whitelist entry', function (): void {

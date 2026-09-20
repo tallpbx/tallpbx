@@ -22,6 +22,7 @@ use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Rules\ValidFirewallAddress;
+use Modules\Security\Services\FirewallSyncVerifier;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 use Symfony\Component\HttpFoundation\IpUtils;
@@ -215,6 +216,22 @@ class SecurityManager extends Component
      */
     public ?string $liveFirewallPolicy = null;
 
+    /**
+     * Cryptographic and kernel firewall synchronization state:
+     * 'verified', 'drift', or 'unknown'.
+     */
+    public ?string $firewallSyncState = null;
+
+    /**
+     * Timestamp when the active firewall ruleset was applied to the host, if recorded.
+     */
+    public ?string $firewallSyncAppliedAt = null;
+
+    /**
+     * Primary reason or first detected issue if the firewall is out of sync or unknown.
+     */
+    public ?string $firewallSyncReason = null;
+
     public bool $firewallEnabled = true;
 
     public bool $attackProtectionEnabled = true;
@@ -228,6 +245,7 @@ class SecurityManager extends Component
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
         $this->refreshLiveFirewallPolicy();
+        $this->refreshFirewallSyncState();
     }
 
     /**
@@ -274,6 +292,23 @@ class SecurityManager extends Component
             $output,
             $matches
         ) === 1 ? $matches[1] : null;
+    }
+
+    /**
+     * Refresh the cryptographic and kernel synchronization state of the firewall.
+     */
+    private function refreshFirewallSyncState(): void
+    {
+        try {
+            $status = app(FirewallSyncVerifier::class)->verify();
+            $this->firewallSyncState = $status->state;
+            $this->firewallSyncAppliedAt = $status->appliedAt;
+            $this->firewallSyncReason = $status->issues[0] ?? null;
+        } catch (\Throwable) {
+            $this->firewallSyncState = 'unknown';
+            $this->firewallSyncAppliedAt = null;
+            $this->firewallSyncReason = null;
+        }
     }
 
     /**
@@ -327,6 +362,7 @@ class SecurityManager extends Component
         // refresh rides along here to keep the drift banner current on every
         // pushed update without polling.
         $this->refreshLiveFirewallPolicy();
+        $this->refreshFirewallSyncState();
     }
 
     /**
@@ -1003,6 +1039,9 @@ class SecurityManager extends Component
         // The kernel now runs the freshly applied ruleset; keep the drift
         // indicator truthful without a privileged re-read.
         $this->liveFirewallPolicy = $this->firewallDefaultPolicy;
+        $this->firewallSyncState = 'verified';
+        $this->firewallSyncAppliedAt = now()->toIso8601String();
+        $this->firewallSyncReason = null;
 
         return true;
     }
