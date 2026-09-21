@@ -101,6 +101,8 @@ it('allows authenticated user to access portal pages', function () {
         'inbound-routes.index', 'outbound-routes.index',
     ];
 
+    grantTenantUserPermissions($this->tenant, ['inbound-routes.view', 'outbound-routes.view'], $this->user);
+
     actingAs($this->user)->withSession(['selected_tenant_id' => (string) $this->tenant->id]);
 
     foreach ($routes as $route) {

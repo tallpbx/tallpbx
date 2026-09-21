@@ -188,6 +188,8 @@ it('tenant scope prevents cross-tenant data leaks via counts', function () {
 });
 
 it('initializes tenant context on every shared panel route', function (): void {
+    grantTenantUserPermissions($this->tenantB, ['inbound-routes.view'], $this->user);
+
     actingAs($this->user)
         ->withSession(['selected_tenant_id' => (string) $this->tenantB->id])
         ->get(route('panel.inbound-routes.index'))

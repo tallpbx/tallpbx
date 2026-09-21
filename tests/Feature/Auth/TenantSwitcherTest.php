@@ -105,6 +105,8 @@ it('initializes the impersonated users tenant context when both guards are activ
         'name' => 'Beta Route',
     ]);
 
+    grantTenantUserPermissions($this->tenantB, ['inbound-routes.view'], $this->user);
+
     actingAs($admin, 'admin');
     actingAs($this->user, 'web')
         ->withSession([

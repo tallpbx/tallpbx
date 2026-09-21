@@ -56,6 +56,10 @@ class ConferencesEdit extends BaseEditComponent
             $this->pin = $conference->pin ?? '';
             $this->maxMembers = $conference->max_members;
             $this->enabled = $conference->enabled;
+        } else {
+            if (! $this->isAdminGuard()) {
+                $this->tenantId = $this->resolveTenantId();
+            }
         }
     }
 
@@ -73,6 +77,7 @@ class ConferencesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 
         $data = [
@@ -86,6 +91,7 @@ class ConferencesEdit extends BaseEditComponent
 
         if ($this->conferenceId !== null) {
             $conference = Conference::withoutGlobalScope('tenant')->findOrFail($this->conferenceId);
+            $this->assertCanAccessTenantRecord($conference);
             $this->conferenceService->update($conference, $data);
         } else {
             $this->conferenceService->create($data);

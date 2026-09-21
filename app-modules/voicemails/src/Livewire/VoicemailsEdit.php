@@ -79,6 +79,10 @@ class VoicemailsEdit extends BaseEditComponent
             $this->forwardToEmail = $voicemail->forward_to_email;
             $this->deleteAfterEmail = $voicemail->delete_after_email;
             $this->enabled = $voicemail->enabled;
+        } else {
+            if (! $this->isAdminGuard()) {
+                $this->tenantId = $this->resolveTenantId();
+            }
         }
     }
 
@@ -89,6 +93,7 @@ class VoicemailsEdit extends BaseEditComponent
 
     public function save(): void
     {
+        $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 
         $existingVoicemail = $this->voicemailUuid !== null
@@ -110,6 +115,7 @@ class VoicemailsEdit extends BaseEditComponent
         ];
 
         if ($existingVoicemail !== null) {
+            $this->assertCanAccessTenantRecord($existingVoicemail);
             $voicemail = $this->voicemailService->update($existingVoicemail, $data);
         } else {
             $voicemail = $this->voicemailService->create($data);

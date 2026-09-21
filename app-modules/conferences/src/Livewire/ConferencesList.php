@@ -47,7 +47,11 @@ class ConferencesList extends BaseListComponent
      */
     private function loadConferences(): void
     {
-        $this->conferences = Conference::withoutGlobalScope('tenant')
+        $query = $this->isAdminGuard()
+            ? Conference::withoutGlobalScope('tenant')
+            : Conference::query();
+
+        $this->conferences = $query
             ->with('tenant')
             ->orderBy('name')
             ->get();

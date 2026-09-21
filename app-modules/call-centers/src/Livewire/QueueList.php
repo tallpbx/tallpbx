@@ -36,7 +36,11 @@ class QueueList extends BaseListComponent
     /** Fetch all call-center queues ordered by name. */
     private function load(): void
     {
-        $this->queues = Queue::withoutGlobalScope('tenant')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? Queue::withoutGlobalScope('tenant')
+            : Queue::query();
+
+        $this->queues = $query->orderBy('name')->get();
     }
 
     /** Delete the confirmed queue and refresh the list. */

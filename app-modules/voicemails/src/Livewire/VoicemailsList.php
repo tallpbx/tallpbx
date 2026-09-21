@@ -47,7 +47,11 @@ class VoicemailsList extends BaseListComponent
      */
     private function loadVoicemails(): void
     {
-        $this->voicemails = Voicemail::withoutGlobalScope('tenant')->orderBy('voicemail_id')->get();
+        $query = $this->isAdminGuard()
+            ? Voicemail::withoutGlobalScope('tenant')
+            : Voicemail::query();
+
+        $this->voicemails = $query->orderBy('voicemail_id')->get();
     }
 
     /**
@@ -59,6 +63,8 @@ class VoicemailsList extends BaseListComponent
 
         try {
             $this->voicemailService->delete($voicemail);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            throw $exception;
         } catch (RuntimeException $exception) {
             $this->deleteError = $exception->getMessage();
 
