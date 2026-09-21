@@ -76,6 +76,10 @@ class RingGroupsEdit extends BaseEditComponent
                     'position' => $ext->position,
                 ];
             }
+        } else {
+            if (! $this->isAdminGuard()) {
+                $this->tenantId = $this->resolveTenantId();
+            }
         }
     }
 
@@ -118,6 +122,7 @@ class RingGroupsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 
         $data = [
@@ -131,6 +136,7 @@ class RingGroupsEdit extends BaseEditComponent
 
         if ($this->ringGroupId !== null) {
             $group = RingGroup::withoutGlobalScope('tenant')->findOrFail($this->ringGroupId);
+            $this->assertCanAccessTenantRecord($group);
             $this->ringGroupService->update($group, $data, $this->extensions);
         } else {
             $this->ringGroupService->create($data, $this->extensions);

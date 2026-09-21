@@ -63,12 +63,25 @@ class ExtensionsBulkCreate extends BaseEditComponent
     }
 
     /**
+     * Required abilities for Livewire action gating.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            'save' => [['extensions.create']],
+        ];
+    }
+
+    /**
      * Create the requested extension range.
      *
      * @throws ValidationException
      */
     public function save(): void
     {
+        $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 
         $numbers = $this->extensionNumbers();
