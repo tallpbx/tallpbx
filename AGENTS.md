@@ -36,7 +36,7 @@ php artisan dusk
 php artisan route:list --name=<feature-name>
 ```
 
-**CI enforcement**: `.github/workflows/tests.yml` runs the full Pest suite (in-memory SQLite plus a Redis service, on PHP 8.5) for every push to `main`/release branches and every pull request. Treat it as the authoritative execution of step 2 and configure branch protection so a failing run cannot be merged.
+**CI availability**: `.github/workflows/tests.yml` provides an on-demand Pest suite (in-memory SQLite plus a Redis service, on PHP 8.5) triggered via `workflow_dispatch`. Tests are run locally before every push as the primary verification gate (steps 1–4 above). Use the CI workflow for environment-parity checks or when verifying changes on a runner that mirrors the production PHP toolchain.
 
 **For new modules specifically**, also verify:
 - `module.json` exists and `php artisan module:sync --only-local` succeeds
