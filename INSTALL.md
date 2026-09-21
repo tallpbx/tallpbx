@@ -233,7 +233,7 @@ Boost. It is not needed to make calls, manage users, or run the PBX.
 
 For development servers, the recommended minimum hardware requirements are
 **4 CPUs or vCPUs, 40GB storage, 4GB RAM, and 2GB swap** to accommodate running
-automated test suites (over 2,000 unit/feature tests and Dusk browser tests)
+automated test suites (over 2,290 unit/feature tests and Dusk browser tests)
 and compiling frontend assets with Vite.
 
 For a normal PBX server, choose **No** when asked about development tooling, or

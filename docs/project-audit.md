@@ -137,23 +137,16 @@ TallPBX is a well-architected, multi-tenant PBX management platform built on the
 | Feature (cross-cutting) | ~23 |
 | Unit tests | 4 directories |
 | Browser (Dusk) tests | 7 |
-| **Modules with only 1 test file** | **38 out of 48** |
+| **Modules with 5-pillar test suites** | **14 out of 48** (Security, FileStores, Backups, CallBroadcast, plus top-10 PBX/routing modules) |
+| **Modules with only 1 test file** | **28 out of 48** |
 
 ### Key Gaps
 
-1. **38 of 48 module test directories contain only 1 test file** — likely just a smoke/render test. Critical modules like `extensions`, `sip-trunks`, `inbound-routes`, `dialplans`, and `call-centers` have minimal coverage.
+1. **Top-10 PBX and routing modules now have standardized 5-pillar test suites**: `sip-trunks`, `gateways`, `inbound-routes`, `outbound-routes`, `extensions`, `dialplans`, `ring-groups`, `call-centers`, `conferences`, and `voicemails` each have dedicated test suites covering Service CRUD, Livewire List, Livewire Edit, Tenant Isolation, and Permission gating (2,296 total tests). The remaining 28 lower-risk modules retain standard render/smoke tests.
 
-2. **No module has CRUD integration tests** beyond the Security, FileStores, Backups, and CallBroadcast modules. Most modules lack tests for create, update, delete, and tenant isolation operations.
+2. **Browser (Dusk) tests are minimal** — 7 files. For a complex UI-heavy application, this is light.
 
-3. **Browser (Dusk) tests are minimal** — only 7 files. For a complex UI-heavy application, this is very light.
-
-4. **CI pipeline is manual-dispatch only** (`workflow_dispatch`). The changelog notes this was changed from automatic in v1.1.2. This means push/PR CI enforcement is effectively disabled — a significant regression from the stated policy in AGENTS.md.
-
-### Recommendations
-
-- Prioritize CRUD test coverage for high-risk modules: `extensions`, `sip-trunks`, `sip-profiles`, `inbound-routes`, `outbound-routes`, `dialplans`, `ring-groups`, `call-centers`
-- Re-enable automatic CI triggers (at minimum for PRs to `main` and release branches)
-- Add tenant isolation tests for every module that handles tenant-scoped data
+3. **CI pipeline is manual-dispatch only** (`workflow_dispatch`). The changelog notes this was changed from automatic in v1.1.2. Local test execution via `app:test` is the primary gate.
 
 ---
 
@@ -235,6 +228,6 @@ There are 15–16 translation keys present in English but missing in Spanish and
 
 1. ~~**CI triggers**~~: Resolved — `AGENTS.md` updated to reflect the intentional local-first testing workflow with on-demand CI dispatch.
 
-2. **🟠 Medium**: Create CRUD + tenant isolation test suites for the top-10 highest-risk modules (extensions, SIP trunks, inbound/outbound routes, dialplans, ring groups, call centers, conferences, voicemails, gateways).
+2. ~~**CRUD + tenant isolation test suites**~~: Resolved — Implemented standardized 5-pillar test suites (Service CRUD, Livewire List, Livewire Edit, Tenant Isolation, Permissions) across all top-10 highest-risk modules (`sip-trunks`, `gateways`, `inbound-routes`, `outbound-routes`, `extensions`, `dialplans`, `ring-groups`, `call-centers`, `conferences`, `voicemails`), adding 303 tests and bringing total Pest test count to 2,296.
 
 3. **🟡 Low**: Extract shared `resolveViewName()` to a trait, sync translation files, clean up `helpers.php` and console command aliases, sync `.env.example`.

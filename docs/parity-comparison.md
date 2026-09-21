@@ -22,7 +22,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **User Interface & Layout** | **Dual Layouts**: Collapsible mini-rail sidebar (`w-16` / `w-64`) & horizontal topbar dropdowns with per-user persistence | Fixed top navbar (legacy procedural HTML) | Fixed top navbar (classic FreePBX theme) |
 | **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Multi-Vector Defense** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Delayed log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
-| **Automated Testing** | **1,993 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **2,296 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 | Metric / Feature Category | TallPBX | FusionPBX Equivalent | FreePBX Equivalent | Parity Assessment |
@@ -134,7 +134,7 @@ This document provides a detailed feature-by-feature and architectural compariso
    - Built on **Laravel 13**, **Livewire 4**, and **Tailwind CSS v4** with clean architectural boundaries (`App\Support\ModuleServiceProvider`, `BaseListComponent`, `BaseEditComponent`).
    - FusionPBX and FreePBX are 15–20 year-old procedural PHP codebases with deeply nested global state, direct SQL string concatenation, and minimal test coverage.
 2. **Quality & Test Automation**:
-   - **1,993 automated Pest tests** and **44 Dusk browser tests** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
+   - **2,296 automated Pest tests** and **44 Dusk browser tests** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
 3. **Multi-Tenant Security Model**:
    - Multi-tenant defense-in-depth:
      - `TenantMutationGuard` enforces data boundary checks on model lifecycle events.
