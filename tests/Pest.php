@@ -100,3 +100,43 @@ function tenantUser(Tenant $tenant): User
 
     return $user;
 }
+
+/**
+ * Create a tenant user, attach it to the tenant, set tenant context, and grant permissions via a tenant group.
+ *
+ * @param  Tenant  $tenant  The tenant context
+ * @param  array<int, string>  $permissions  Permissions to grant (excluding admin.*)
+ * @param  User|null  $user  Optional existing user
+ */
+function grantTenantUserPermissions(Tenant $tenant, array $permissions = [], ?User $user = null): User
+{
+    $user ??= User::factory()->create(['enabled' => true]);
+
+    if (! $user->tenants()->where('tenants.id', $tenant->id)->exists()) {
+        $user->tenants()->attach($tenant->id, ['role' => 'member', 'primary' => true]);
+    }
+
+    app(TenantManager::class)->setTenantId((string) $tenant->id);
+
+    if (! empty($permissions)) {
+        $group = Group::factory()->forTenant($tenant->id)->create([
+            'name' => 'Test Tenant Group ' . \Illuminate\Support\Str::random(6),
+        ]);
+
+        foreach ($permissions as $name) {
+            $module = explode('.', $name)[0] ?? 'test';
+            $perm = Permission::firstOrCreate(
+                ['name' => $name],
+                [
+                    'module' => $module,
+                    'description' => fake()->sentence(),
+                ]
+            );
+            $group->permissions()->attach($perm);
+        }
+
+        $user->groups()->syncWithoutDetaching([$group->id]);
+    }
+
+    return $user;
+}

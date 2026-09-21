@@ -91,6 +91,48 @@ it('opens the shared confirmation modal before deleting a SIP trunk', function (
         ->assertSee('Delete SIP Trunk?');
 });
 
+it('updates a SIP trunk', function () {
+    $trunk = SipTrunk::factory()->create([
+        'tenant_id' => $this->tenant->id,
+        'name' => 'Original Name',
+        'host' => 'original.com',
+        'port' => 5060,
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SipTrunksEdit::class, ['trunkId' => $trunk->id])
+        ->set('name', 'Updated Name')
+        ->set('host', 'updated.com')
+        ->set('port', 5080)
+        ->call('save')
+        ->assertRedirect(route('panel.sip-trunks.index'));
+
+    $fresh = $trunk->fresh();
+    expect($fresh->name)->toBe('Updated Name')
+        ->and($fresh->host)->toBe('updated.com')
+        ->and($fresh->port)->toBe(5080);
+});
+
+it('validates port number boundaries', function () {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SipTrunksEdit::class)
+        ->set('tenantId', $this->tenant->id)
+        ->set('name', 'Test Trunk')
+        ->set('host', 'sip.test.com')
+        ->set('port', 0)
+        ->call('save')
+        ->assertHasErrors(['port' => 'min']);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SipTrunksEdit::class)
+        ->set('tenantId', $this->tenant->id)
+        ->set('name', 'Test Trunk')
+        ->set('host', 'sip.test.com')
+        ->set('port', 70000)
+        ->call('save')
+        ->assertHasErrors(['port' => 'max']);
+});
+
 it('shows empty state when no trunks exist', function () {
     Livewire::actingAs($this->admin, 'admin')
         ->test(SipTrunksList::class)

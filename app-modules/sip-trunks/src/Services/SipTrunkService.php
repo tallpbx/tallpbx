@@ -43,7 +43,7 @@ class SipTrunkService implements SipTrunkServiceInterface
     public function update(SipTrunk $trunk, array $data): SipTrunk
     {
         return DB::transaction(function () use ($trunk, $data): SipTrunk {
-            $trunk->withoutGlobalScope('tenant')->update($data);
+            $trunk->update($data);
 
             return $trunk->fresh();
         });
@@ -51,6 +51,6 @@ class SipTrunkService implements SipTrunkServiceInterface
 
     public function delete(SipTrunk $trunk): void
     {
-        DB::transaction(fn () => $trunk->withoutGlobalScope('tenant')->delete());
+        DB::transaction(fn () => $trunk->delete());
     }
 }

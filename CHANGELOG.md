@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CRUD & Tenant Isolation Test Suites (Phase 1)**: Added comprehensive 5-pillar test suites for `sip-trunks`, `gateways`, `inbound-routes`, and `outbound-routes` covering service CRUD operations, multi-tenant list scoping, cross-tenant edit IDOR defenses, `TenantMutationGuard` creation/mutation enforcement, and Livewire action permissions (138 tests, 341 assertions). Added `grantTenantUserPermissions()` test helper to `tests/Pest.php`.
+
+### Fixed
+- **SipTrunkService Mutation Guard Compliance**: Updated `SipTrunkService` update and delete operations to invoke Eloquent model methods directly rather than query builder operations, ensuring model lifecycle hooks and `TenantMutationGuard` cross-tenant safety rules fire on tenant mutations.
+- **Inbound & Outbound Route Index Permission Gating**: Added missing `admin.can:inbound-routes.view` and `admin.can:outbound-routes.view` middleware to index route definitions in `app-modules/inbound-routes/routes/web.php` and `app-modules/outbound-routes/routes/web.php`.
+
 ## [1.1.2] - 2026-09-20
 
 ### Added
