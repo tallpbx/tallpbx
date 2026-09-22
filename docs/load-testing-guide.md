@@ -281,7 +281,7 @@ results for VirtualBox and then the datacenter ladder.
 
 | ID | Environment | Specification | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 3.8 GiB RAM, 2.0 GiB swap, Debian 13 | Complete (July 15–16, 2026); fresh install planned for the campaign |
+| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 4096 MiB RAM, 2.0 GiB swap, Debian 13 | Complete (July 15–16, 2026); fresh install planned for the campaign |
 | B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete (July 17–18, 2026); revalidated August 31, 2026 |
 | B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
 | B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
@@ -292,7 +292,7 @@ results for VirtualBox and then the datacenter ladder.
 
 | ID | PBX under test | SIPp load generator | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server (4 vCPU / 4 GiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: correctness (July 16, 2026) and capacity ladder (July 17–18, 2026) |
+| A1 | VirtualBox test server (4 vCPU / 4096 MiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: correctness (July 16, 2026) and capacity ladder (July 17–18, 2026) |
 | B1 | Shared-CPU Datacenter VPS 1 vCPU / 967 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: correctness only (July 17, 2026) |
 | B3 | Shared-CPU Datacenter VPS 2 vCPU / 1973 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: capacity runs (July 18, 2026) |
 | C1 | Dedicated-CPU Datacenter VPS 2 vCPU / 8 GiB | D — second datacenter server in the same datacenter | Planned |
@@ -443,7 +443,7 @@ results sections with the new measurements in place.
 
 | Role | Host | Notes |
 | --- | --- | --- |
-| PBX server | `192.168.1.76` (test server) | Debian 13. Runs Laravel, Nginx/PHP-FPM, MariaDB, Redis, and FreeSWITCH. The historical validation ran on a VirtualBox VM with 4 vCPU, 3.8 GiB RAM, and 2.0 GiB swap. |
+| PBX server | `192.168.1.76` (test server) | Debian 13. Runs Laravel, Nginx/PHP-FPM, MariaDB, Redis, and FreeSWITCH. The historical validation ran on a VirtualBox VM with 4 vCPU, 4096 MiB RAM, and 2.0 GiB swap. |
 | SIPp load generator | `192.168.1.65` | WSL2 on a Windows 11 workstation, reached from the PBX server over SSH port `2222`. Later runs also used a separate Debian host as the generator and WireGuard peer. |
 | Datacenter PBX under test | `x.x.x.218` | Public VPS used for the 1c/1g, 1c/2g, and 2c/2g stages through WireGuard. |
 | SIP signaling | PBX `5060` | FreeSWITCH internal Sofia profile. |
