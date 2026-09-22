@@ -1026,6 +1026,38 @@ FreeSWITCH playback can advance normally in this synthetic setup. Expected
 result for each check: `Successful call` is `1` and `Failed call` is `0`,
 with the call answered and ended by the expected side.
 
+### Additional Tests To Add To The Campaign
+
+Four tests are specified here but are not yet first-class runner modes.
+They close the gaps the source documents themselves call out.
+
+1. **Concurrent-call capacity test.** This guide lists "how many calls can
+   remain active at the same time?" as a capacity question, but no current
+   scenario measures it: the calls-per-second ladders hold calls only
+   seconds and score setup speed. Ramp simultaneous calls with a longer
+   hold time (for example 60–120 seconds each) until the success rate or
+   setup time degrades, then record peak simultaneous calls, peak
+   FreeSWITCH channels, CPU and memory, and confirm zero stuck channels
+   after teardown. Run it on each Phase 2 pair after the signaling ladder.
+2. **RTP-enabled media capacity test.** The signaling capacity runs carry
+   no continuous audio. Add a media scenario that plays real RTP (pcap
+   playback) for a fixed duration at increasing concurrency, and record
+   packet loss, jitter, and the highest concurrent-call level that still
+   meets the audio-quality bar. Do not use RTP echo for this test; echo
+   proves media flow and negotiation, not capacity.
+3. **Media-flow re-validation per profile.** The recording check failed on
+   the 1 vCPU / 1 GiB profile because of a dialplan bug, and the 1 vCPU /
+   2 GiB and 2 vCPU / 2 GiB profiles never re-ran media checks afterward.
+   Run `MEDIA_FLOW=1` with fresh seed data on every Phase 2 pair,
+   including the VirtualBox pair, and record each scenario's pass/fail in
+   the stage tables.
+4. **Recording regression check.** No test currently asserts that `*732`
+   produces a usable recording end to end. Add a step that places a call
+   to `*732`, holds for at least 10 seconds, hangs up, and then verifies
+   the PBX did not answer with `480` and that the recording file exists
+   and is non-empty. Fold this into the media runner so it runs with every
+   `MEDIA_FLOW=1` invocation.
+
 ## Results: Single-Server Bottleneck Tests (Phase 1)
 
 ### How Results Are Recorded
@@ -1043,6 +1075,8 @@ for review; the planned runs with the new test data replace them.
   PHP-FPM configuration, and generator host across controlled rows. Label a
   configuration experiment with a suffix such as `-php-fpm-tuned` or
   `-fsnotice`; never overwrite a controlled result with a tuned result.
+- Keep both test hosts free of unrelated work during a run: no unrelated
+  upgrades, backups, SIP traffic, or administrative jobs.
 - If a smaller profile hits a stop condition, record the skipped tier as
   `Not run — <reason>` instead of forcing the test to continue.
 - Name artifacts with the hardware profile, tier, and repetition, for
@@ -1545,6 +1579,9 @@ measured yet. When both servers are provisioned:
    checks after teardown.
 3. Repeat the FreeSWITCH log-level and PHP-FPM experiments on the pair so
    the tuning guidance reflects the new hardware.
+4. Run the additional campaign tests listed in Test 2: the concurrent-call
+   ladder, the RTP-enabled media capacity test, media-flow re-validation,
+   and the recording regression check.
 
 ## Hardware Sizing Guidance For Administrators
 
@@ -1639,6 +1676,46 @@ count`, `show registrations count`, XML handler HTTP status and latency
 through `curl`, MariaDB status through `mysqladmin status`, and a host
 CPU/run-queue snapshot through `vmstat`. Also keep the SIPp screen output
 and any SIPp CSV/stat files from the generator host.
+
+### PHP-FPM Review And Tuning
+
+Check active worker settings before and after changing PHP-FPM:
+
+```bash
+php-fpm8.5 -tt 2>&1 | grep -E 'pm\.max_children|pm\.start_servers|pm\.min_spare_servers|pm\.max_spare_servers|pm\.max_requests'
+tail -n 50 /var/log/php8.5-fpm.log
+```
+
+The warning below means XML handler requests are queueing behind PHP-FPM
+workers:
+
+```text
+server reached pm.max_children setting
+```
+
+The standard install recommendation for a 4 GB combined PBX/application
+server is:
+
+```ini
+pm = static
+pm.max_children = 12
+```
+
+For a lightly or moderately used 1-vCPU/1-GB server, leaving Debian's
+default `dynamic` pool with `pm.max_children = 5` is also a valid operating
+choice; capacity tuning is optional when the default profile meets the
+installation's latency and call-volume needs. Test static worker settings
+as a separately labelled optimization instead of implying that the default
+configuration is unsuitable.
+
+Keep `pm.max_requests` at the PHP-FPM default of `0` for controlled
+hardware comparisons. Set a nonzero recycling interval only if sustained
+monitoring shows that worker memory grows over time, and record that change
+as a separate tuning variable.
+
+The measured PHP-FPM comparisons (default against static 4/5/6 at 1 vCPU /
+1 GiB and static 6/8/10/12 at 2 vCPU / 2 GiB) are in the results sections.
+See `INSTALL.md` for small/standard/larger server sizing guidance.
 
 ## Troubleshooting
 
