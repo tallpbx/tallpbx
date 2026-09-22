@@ -164,28 +164,31 @@ The command downloads a small bootstrap script and runs it. The bootstrap
 prepares the TallPBX source code in `/var/www/tallpbx`, then starts the main
 installer, which asks the setup questions below and installs everything.
 
-Re-running the same command later safely updates an existing installation's
-source code and runs the installer again; it keeps all data. Without `--ref`,
-the working copy follows `main`; repeat your `--ref` choice on every run to
-stay on a release branch or tag.
-
-With no flags, the interactive installer asks whether to include demo data and
-development tooling. Choose `No` for demo data on a production install; this
-creates the shared Default tenant without sample tenants, users, or extensions.
-The installer separately asks how to create the first administrator. Options
-placed after the extra `-s --` are passed through to the bootstrap and the
-installer. Without `--ref`, the latest `main` branch is installed; the first
-example pins the stable `1.1` release branch instead:
+Options placed after `-s --` are passed to the bootstrap and the installer:
 
 ```bash
+# Pin the stable 1.1 release branch instead of the default main:
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --ref 1.1
+
+# Skip the demo-data question (recommended for production):
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --no-demo
+
+# Install without demo data or development tooling (recommended for production):
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
 ```
 
-A headless run must supply the FreeSWITCH installation method and an
-administrator setup mode as environment values, for example the browser
-activation code:
+Re-running the command safely updates TallPBX and keeps all data. Use the
+same `--ref` value every time: without it, the re-run switches the working
+copy to `main`.
+
+A headless run cannot answer the installer's questions, so it must supply two
+environment values. `FSPBX_FREESWITCH_INSTALL_METHOD` chooses how FreeSWITCH
+is installed (`packages` or `source`). A second value,
+`FSPBX_INITIAL_ADMIN_MODE`, chooses how the first administrator is created:
+`activation-code` prints a one-time code for the `/panel/setup` page,
+`trusted-network` lets the first visitor create the account, and `installer`
+creates it during installation from pre-seeded credentials (see "First
+Administrator Setup" below). The example uses the browser activation code:
 
 ```bash
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | FSPBX_FREESWITCH_INSTALL_METHOD=packages FSPBX_INITIAL_ADMIN_MODE=activation-code bash
@@ -440,8 +443,8 @@ database records. It reuses saved passwords and choices, keeps the existing
 application key, and applies only missing database updates.
 
 You can also re-run the one-line command from Section 5: it safely updates the
-working copy in `/var/www/tallpbx` and then runs this installer again. Repeat
-your `--ref` choice on every run; without it the working copy follows `main`.
+working copy in `/var/www/tallpbx` and then runs this installer again. Use the
+same `--ref` value every time.
 
 On a re-run, the installer:
 
