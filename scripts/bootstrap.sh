@@ -175,8 +175,16 @@ prepare_working_copy () {
                 fi
             else
                 # A different branch or a tag: switch the clean working copy
-                # over. Tags are immutable, so re-running with the same tag
-                # changes nothing.
+                # over — but only when no committed work would be left behind.
+                # Commits that exist on no remote branch deserve the same
+                # protection as uncommitted changes.
+                if [ "$(git -C "$application_root" rev-list --count HEAD --not --remotes=origin)" != "0" ]; then
+                    echo "Refusing to update: $application_root has local commits that are not on any remote branch. Save them first (see 'If Git Will Not Pull the Update' in INSTALL.md)." >&2
+                    exit 1
+                fi
+
+                # Tags are immutable, so re-running with the same tag changes
+                # nothing.
                 git -C "$application_root" fetch --tags origin
                 git -C "$application_root" checkout "$requested_ref"
             fi

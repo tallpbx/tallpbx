@@ -120,6 +120,44 @@ it('refuses to update a working copy that carries local changes', function (): v
     }
 });
 
+it('refuses to switch refs when local commits exist on no remote branch', function (): void {
+    $repository = sys_get_temp_dir().'/pbx-bootstrap-orphan-'.bin2hex(random_bytes(8));
+    mkdir($repository, 0700);
+
+    $run = static function (array $command): void {
+        $process = new Process($command);
+        $process->run();
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+    };
+
+    try {
+        // Build a working copy on branch 1.1 with a local commit and an origin
+        // remote that was never fetched, so the commit exists on no remote ref.
+        $run(['git', 'init', '-q', '-b', '1.1', $repository]);
+        $run(['git', '-C', $repository, 'config', 'user.email', 'tests@tallpbx.local']);
+        $run(['git', '-C', $repository, 'config', 'user.name', 'TallPBX Tests']);
+        file_put_contents($repository.'/tracked.txt', "initial\n");
+        $run(['git', '-C', $repository, 'add', 'tracked.txt']);
+        $run(['git', '-C', $repository, 'commit', '-q', '-m', 'initial']);
+        $run(['git', '-C', $repository, 'remote', 'add', 'origin', 'https://example.invalid/tallpbx.git']);
+
+        file_put_contents($repository.'/tracked.txt', "second\n");
+        $run(['git', '-C', $repository, 'commit', '-q', '-am', 'local work']);
+
+        $bootstrap = escapeshellarg(base_path('scripts/bootstrap.sh'));
+        $process = new Process(['bash', '-c',
+            'FSPBX_BOOTSTRAP_LIB_ONLY=true; source '.$bootstrap.'; '
+            .'application_root='.escapeshellarg($repository).'; requested_ref=main; prepare_working_copy',
+        ], base_path());
+        $process->run();
+
+        expect($process->getExitCode())->toBe(1)
+            ->and($process->getErrorOutput())->toContain('not on any remote branch');
+    } finally {
+        File::deleteDirectory($repository);
+    }
+});
+
 it('refuses to touch a folder that is not a git working copy', function (): void {
     $root = sys_get_temp_dir().'/pbx-bootstrap-blocked-'.bin2hex(random_bytes(8));
     mkdir($root, 0700);
