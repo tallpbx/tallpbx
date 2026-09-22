@@ -32,8 +32,9 @@ operator can reproduce the exact lab setup, runs, and checks.
 
 The order is intentional and matches how the work is done:
 
-1. What the two tests measure, how to read the numbers, and the hardware
-   progression (what gets tested, in which order).
+1. What the two tests measure, how to read the numbers, the hardware
+   progression, and the campaign plan (what gets tested, in which order,
+   and who orchestrates it).
 2. Lab setup, seed data, and how to run each test.
 3. Results, following the hardware progression: single-server bottleneck
    tests for VirtualBox and the datacenter ladder, then server-to-server
@@ -268,35 +269,39 @@ that same order:
    the same shape; for datacenter testing it means two datacenter virtual
    servers.
 
-Either phase may be executed first in practice; the VirtualBox pair is the
-usual starting point. The document always presents single-server results for
+The campaign executes the VirtualBox work first: the single-server tests,
+then the server-to-server pair, before any datacenter stage. The "Campaign
+Plan" section below defines the setups, roles, execution order, and gates;
+the fresh-install procedure lives in "Fresh Install Validation (Install
+Script Test)". This document always presents single-server results for
 VirtualBox and then the datacenter ladder first, followed by server-to-server
 results for VirtualBox and then the datacenter ladder.
 
 **Phase 1 — single-server bottleneck testing (requests per second):**
 
-| Order | Environment | Specification | Status |
+| ID | Environment | Specification | Status |
 | --- | --- | --- | --- |
-| 1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 3.8 GiB RAM, 2.0 GiB swap, Debian 13 | Complete (July 15–16, 2026) |
-| 2 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete (July 17–18, 2026); revalidated August 31, 2026 |
-| 3 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
-| 4 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
-| 5 | Dedicated-CPU Datacenter VPS | 2 vCPU, 8 GiB RAM | Planned |
-| 6 | Dedicated-CPU Datacenter VPS | 4 vCPU, 8 GiB RAM | Planned |
+| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 3.8 GiB RAM, 2.0 GiB swap, Debian 13 | Complete (July 15–16, 2026); fresh install planned for the campaign |
+| B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete (July 17–18, 2026); revalidated August 31, 2026 |
+| B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
+| B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
+| C1 | Dedicated-CPU Datacenter VPS | 2 vCPU, 8 GiB RAM | Planned |
+| C2 | Dedicated-CPU Datacenter VPS | 4 vCPU, 8 GiB RAM | Planned |
 
 **Phase 2 — server-to-server call testing (calls per second):**
 
-| Order | PBX under test | SIPp load generator | Status |
+| ID | PBX under test | SIPp load generator | Status |
 | --- | --- | --- | --- |
-| 1 | VirtualBox test server (4 vCPU / 4 GiB / 2 GiB swap) | Second VirtualBox server on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: correctness (July 16, 2026) and capacity ladder (July 17–18, 2026) |
-| 2 | Shared-CPU Datacenter VPS 1 vCPU / 967 MiB | Second datacenter virtual server; historical runs used the local test server through WireGuard | Complete: correctness only (July 17, 2026) |
-| 3 | Shared-CPU Datacenter VPS 2 vCPU / 1973 MiB | Second datacenter virtual server; historical runs used the local test server through WireGuard | Complete: capacity runs (July 18, 2026) |
-| 4 | Dedicated-CPU Datacenter VPS 2 vCPU / 8 GiB | Second dedicated-CPU virtual server in the same datacenter | Planned |
-| 5 | Dedicated-CPU Datacenter VPS 4 vCPU / 8 GiB | Second dedicated-CPU virtual server in the same datacenter | Planned |
+| A1 | VirtualBox test server (4 vCPU / 4 GiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: correctness (July 16, 2026) and capacity ladder (July 17–18, 2026) |
+| B1 | Shared-CPU Datacenter VPS 1 vCPU / 967 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: correctness only (July 17, 2026) |
+| B3 | Shared-CPU Datacenter VPS 2 vCPU / 1973 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: capacity runs (July 18, 2026) |
+| C1 | Dedicated-CPU Datacenter VPS 2 vCPU / 8 GiB | D — second datacenter server in the same datacenter | Planned |
+| C2 | Dedicated-CPU Datacenter VPS 4 vCPU / 8 GiB | D — second datacenter server in the same datacenter | Planned |
 
 Server-to-server topology:
 
-- VirtualBox testing runs two virtual Linux servers on the same hardware;
+- VirtualBox testing runs two virtual Linux servers on the same hardware
+  (A1 as the PBX under test, A2 as the orchestration and source server);
   that hardware runs the Windows 11 operating system.
 - Datacenter testing runs the two virtual servers in the same datacenter.
 - The PBX target virtual server runs on a shared-CPU plan for the 1 vCPU and
@@ -316,6 +321,121 @@ Notes for both phases:
   pure CPU/RAM comparison between the two environments.
 - After each resize, reboot and confirm the new values with `lscpu`,
   `free -h`, and `swapon --show` before running the staged tiers.
+
+## Campaign Plan
+
+The campaign executes the VirtualBox work first (single-server tests, then
+the server-to-server pair) before any datacenter stage, and every run uses
+new test data created from scratch. This section defines the campaign
+setups, roles, and order; the fresh-install procedure is in "Fresh Install
+Validation (Install Script Test)" in Test Lab Setup.
+
+### Campaign Setups
+
+| ID | Role | Notes |
+| --- | --- | --- |
+| A1 | PBX under test | Freshly installed VirtualBox server; specifications and status in the Phase 1 table. |
+| A2 | Orchestration and SIPp source server | `192.168.1.76`; prepares freshly installed servers over SSH, seeds test data, builds authentication CSVs, and acts as the caller side for the VirtualBox pair. |
+| B1–B3 | PBX targets | Shared-CPU datacenter VPS; specifications and status in the Phase 1 table. |
+| C1–C2 | PBX targets | Dedicated-CPU datacenter VPS; specifications and status in the Phase 1 table. |
+| D | SIPp load generator | Second datacenter server used for the datacenter pairs. |
+
+### Orchestration Server (A2, `192.168.1.76`)
+
+The orchestration server coordinates the campaign:
+
+- SSH into each freshly installed server after the installer has been run
+  manually there, and prepare it for testing: seed the new test data,
+  verify the runtime state, and run the preflight checks.
+- Copy the seed CSVs back from each PBX and build the SIPp authentication
+  CSVs.
+- Act as the SIPp source server (caller side) for the VirtualBox pair.
+- Start runs, collect artifacts, and record results.
+
+For the VirtualBox pair, both virtual Linux servers run on the same Windows
+11 hardware: A1 is the PBX under test and A2 is the caller side.
+
+### Execution Order
+
+1. Install A1 from scratch by running `scripts/install.sh` manually on the
+   new VM, then complete the fresh-install validation checklist from the
+   orchestration server over SSH.
+2. Create the new test data (seed on A1) and copy the CSVs back to the
+   orchestration server.
+3. **VirtualBox single-server tests** — the XML requests/sec ladder on A1,
+   generated from the orchestration server.
+4. **VirtualBox server-to-server tests** — the pair between A1 (PBX under
+   test) and A2 as the SIPp source.
+5. Datacenter shared-CPU single-server ladder — B1, then B2, then B3.
+6. Datacenter dedicated-CPU single-server ladder — C1, then C2.
+7. Datacenter server-to-server pairs — B1 pair (correctness), B3 pair
+   (capacity), then C1 and C2 pairs (full matrix).
+8. Refresh the results tables in this guide with the new measurements, and
+   record installer findings in the changelog.
+
+Do not start datacenter work until the VirtualBox single-server and
+server-to-server results are recorded. Do not run any test on A1 until the
+fresh-install validation checklist passes.
+
+### Per-Setup Test Matrix
+
+| Stage | Setup | Tests | Experiments |
+| --- | --- | --- | --- |
+| 1 | A1 (VirtualBox single-server) | XML tiers: `25 x 1` warm-up, `100 x 5`, `500 x 10`, `500 x 25`, optional `1,000 x 25`; three repetitions; PBX sampler running | None |
+| 2 | VirtualBox pair (A1 + A2) | Correctness: basic runner, `MEDIA_FLOW=1`, `EXTENDED=1`; then the calls/sec ladder; then the additional campaign tests (concurrent-call capacity, RTP media capacity, media-flow re-validation including the recording regression) | FreeSWITCH log level (`debug` vs `notice`); PHP-FPM profile |
+| 3 | B1, B2, B3 (shared-CPU single-server) | XML tiers, three repetitions each | PHP-FPM static worker sweep on B3 |
+| 4 | C1, C2 (dedicated-CPU single-server) | XML tiers, three repetitions each | PHP-FPM worker sweep per profile |
+| 5 | Datacenter pairs (B1, B3, C1, C2) | B1 pair: correctness only. B3, C1, and C2 pairs: correctness, then the calls/sec ladder, then the additional campaign tests | FreeSWITCH log level and PHP-FPM per pair |
+
+The concurrent-call ladder and the RTP media capacity test need new SIPp
+scenarios; see the open items below.
+
+### New Test Data
+
+All runs use a new synthetic tenant created from scratch: a new tenant name,
+SIP realm/domain, extension range, password, and CSV file names. Do not
+reuse the historical `load-test-beta` values. Keep the chosen values
+consistent across the PBX and the generator for the whole campaign and
+record them with the campaign notes. Seed commands are in "Seed Data"; the
+generator-side CSV copy and authentication column are described in Test 2
+and the recovery runbook.
+
+### Gates And Stop Conditions
+
+- The fresh-install validation checklist must pass fully before any test on
+  A1.
+- XML stages: advance a tier only when the previous tier had zero failed
+  responses; stop escalating per the stop conditions in "Per-Run Record,
+  Staged Tiers, And Stop Conditions".
+- Pair stages: correctness (basic, media, extended) passes before the
+  capacity ladder; each capacity tier must end with zero stuck channels
+  after teardown; a tier fails when the success rate or setup time degrades
+  beyond the recorded thresholds.
+- Record medians of at least three repetitions per comparison tier (see
+  "How Results Are Recorded").
+
+### Recording And Artifacts
+
+Follow "How Results Are Recorded", "Per-Run Record, Staged Tiers, And Stop
+Conditions", and "Artifacts". Keep every XML JSON report, sampler log, SIPp
+artifact directory, and the installer logs with the campaign artifacts.
+When the campaign completes, replace the historical reference tables in the
+results sections with the new measurements in place.
+
+### Open Items
+
+- Choose the new test-data values (tenant, realm, extension range,
+  password, CSV names).
+- Implement the two new SIPp scenarios (concurrent-call hold ladder and
+  RTP media capacity) plus the recording assertion for the media runner,
+  per "Additional Tests To Add To The Campaign" in Test 2.
+- Choose the datacenter provider and region for B1–B3 and C1–C2; record
+  instance identity, CPU class, and disk type.
+- Configure SSH access from A2 to A1 and the datacenter servers (keys and
+  ports), and record the SSH endpoints with the campaign notes.
+- Decide the exact VM networking mode for the VirtualBox pair (bridged or
+  host-only) and record it, so results stay comparable across re-runs.
+- Capture idle round-trip latency before every remote run.
 
 ## Test Lab Setup
 
@@ -537,6 +657,54 @@ per-call Redis-backed actions are opt-in through
 `FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED`. On existing installs, run
 `scripts/resources/freeswitch.sh --configure-only` after `.env` contains
 `FREESWITCH_XML_HANDLER_TOKEN`, then restart or reload FreeSWITCH.
+
+### Fresh Install Validation (Install Script Test)
+
+The campaign installs the VirtualBox PBX (A1) from scratch to validate
+`scripts/install.sh` end to end, since the installer has not been exercised
+on a clean machine recently. The installer is re-runnable and never deletes
+existing data, so it is run twice: once on the clean machine and again to
+confirm idempotency. Usage: `./install.sh` prompts for demo data and
+development packages; use `./install.sh --no-demo` on a test server (add
+`--no-development` unless development tooling is needed there).
+
+1. Start from a clean Debian 13 VM matching the A1 specification in the
+   Phase 1 table, with the repository checked out under the documented
+   path.
+2. Take a VM snapshot.
+3. Run the installer manually per `INSTALL.md`, recording total duration
+   and any warnings in the campaign log. The orchestration server (A2) then
+   connects over SSH for the remaining checks.
+4. Verify the install:
+   - [ ] Services active: nginx, php8.5-fpm, mariadb, redis-server, and
+     freeswitch; the queue, reverb, and scheduler units are installed and
+     enabled.
+   - [ ] `php artisan optimize:clear` and `php artisan optimize` exit
+     cleanly.
+   - [ ] `php artisan permissions:repair --scope=full` completes without
+     errors (the installer runs this automatically).
+   - [ ] `php artisan module:sync --only-local` succeeds.
+   - [ ] FreeSWITCH runtime state matches "Required PBX Runtime State"
+     above: the profiles are RUNNING, UDP `5060` is listening, the module
+     load lines are present, and `xml_curl.conf.xml` is written with the
+     token.
+   - [ ] `redis-cli ping` answers, and `.env` uses the Redis stores
+     (`CACHE_STORE=redis`, `SESSION_DRIVER=redis`,
+     `SESSION_CONNECTION=cache`).
+   - [ ] `.env` has `FREESWITCH_XML_HANDLER_TOKEN` set and
+     `FREESWITCH_XML_HANDLER_AUTH=true`.
+   - [ ] `php artisan app:test --smoke` passes.
+   - [ ] Optional: `php artisan app:test --full` passes when development
+     tooling and Dusk are installed; follow the Dusk isolation rules if it
+     is run.
+5. Re-run the installer once more and confirm it completes cleanly without
+   deleting data and with all services still healthy.
+6. Snapshot the validated state and attach the install log to the campaign
+   artifacts.
+
+Any installer problem found here is a deliverable of the campaign: record
+it, fix it, and re-validate before proceeding, because every later server
+uses the same installer.
 
 ### FreeSWITCH Session-Rate Limit
 
