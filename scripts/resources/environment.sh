@@ -187,3 +187,48 @@ resolve_signalwire_token () {
 
     printf '%s\n' "$saved_token"
 }
+
+# Report whether this host has a default IPv6 route. The result drives the
+# installer's IPv4 preference fix:
+#   present - the kernel routes IPv6 traffic somewhere; leave the system alone
+#   absent  - there is no default IPv6 route; PHP would keep trying dead IPv6
+#             addresses first when downloading files
+#   unknown - the check could not run (for example the ip command is missing),
+#             so callers must leave the system alone
+ipv6_default_route_state () {
+    if ! command -v ip >/dev/null 2>&1; then
+        printf 'unknown\n'
+        return
+    fi
+
+    if [ -n "$(ip -6 route show default 2>/dev/null)" ]; then
+        printf 'present\n'
+    else
+        printf 'absent\n'
+    fi
+}
+
+# Make the system prefer IPv4 addresses when a hostname offers both IPv4 and
+# IPv6. This activates the IPv4 precedence line in the name-resolution policy
+# file (/etc/gai.conf by default). Running it again changes nothing. Tests can
+# point FSPBX_GAI_CONF at a temporary file.
+ensure_ipv4_precedence () {
+    local gai_file="${FSPBX_GAI_CONF:-/etc/gai.conf}"
+    local precedence_rule='precedence ::ffff:0:0/96  100'
+
+    # Already active: nothing to do.
+    if grep -Eq '^[[:space:]]*precedence[[:space:]]+::ffff:0:0/96[[:space:]]+100[[:space:]]*$' "$gai_file" 2>/dev/null; then
+        return
+    fi
+
+    if [ -f "$gai_file" ]; then
+        # Debian ships the rule commented out; activate that exact line.
+        sed -i -E 's|^#[[:space:]]*precedence[[:space:]]+::ffff:0:0/96[[:space:]]+100[[:space:]]*$|precedence ::ffff:0:0/96  100|' "$gai_file"
+    fi
+
+    # Either the file did not exist or it carried no precedence line: append
+    # the rule so the IPv4 preference is definitely in place.
+    if ! grep -Eq '^[[:space:]]*precedence[[:space:]]+::ffff:0:0/96[[:space:]]+100[[:space:]]*$' "$gai_file" 2>/dev/null; then
+        printf '%s\n' "$precedence_rule" >> "$gai_file"
+    fi
+}

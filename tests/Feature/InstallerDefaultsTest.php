@@ -707,3 +707,130 @@ it('installs the queue worker and scheduler units so jobs and sweeps run', funct
         ->and($queueUnit)->toContain('/var/lib/tallpbx/restore-requests')
         ->and($schedulerUnit)->toContain('schedule:work');
 });
+
+it('detects the IPv6 default route state used by the installer', function (): void {
+    $stubDirectory = sys_get_temp_dir().'/pbx-ip-stub-'.bin2hex(random_bytes(8));
+    mkdir($stubDirectory, 0700);
+
+    // The stub replaces the real "ip" command: it prints whatever the test
+    // writes into its ip-output file, so route states can be simulated.
+    file_put_contents(
+        $stubDirectory.'/ip',
+        "#!/bin/bash\ncat \"{$stubDirectory}/ip-output\" 2>/dev/null || true\n"
+    );
+    chmod($stubDirectory.'/ip', 0755);
+
+    $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
+    $stubPath = escapeshellarg($stubDirectory);
+
+    try {
+        // A host with a default IPv6 route.
+        file_put_contents($stubDirectory.'/ip-output', "default via fe80::1 dev eth0 proto ra\n");
+        $process = new Process(['bash', '-c', 'PATH='.$stubPath.':"$PATH"; source '.$helperPath.'; ipv6_default_route_state'], base_path());
+        $process->run();
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and(trim($process->getOutput()))->toBe('present');
+
+        // A host with a global address but no default IPv6 route.
+        file_put_contents($stubDirectory.'/ip-output', '');
+        $process = new Process(['bash', '-c', 'PATH='.$stubPath.':"$PATH"; source '.$helperPath.'; ipv6_default_route_state'], base_path());
+        $process->run();
+        expect(trim($process->getOutput()))->toBe('absent');
+
+        // A host without the ip command reports an unknown state.
+        $process = new Process(['bash', '-c', 'PATH=/nonexistent; source '.$helperPath.'; ipv6_default_route_state'], base_path());
+        $process->run();
+        expect(trim($process->getOutput()))->toBe('unknown');
+    } finally {
+        unlink($stubDirectory.'/ip-output');
+        unlink($stubDirectory.'/ip');
+        rmdir($stubDirectory);
+    }
+});
+
+it('activates the IPv4 precedence rule idempotently', function (): void {
+    $gaiPath = tempnam(sys_get_temp_dir(), 'pbx-gai-');
+    file_put_contents($gaiPath, "# header\n#precedence ::ffff:0:0/96  100\n# tail\n");
+
+    $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
+    $gaiArgument = escapeshellarg($gaiPath);
+    $command = <<<BASH
+source {$helperPath}
+export FSPBX_GAI_CONF={$gaiArgument}
+ensure_ipv4_precedence
+ensure_ipv4_precedence
+grep -q '^precedence ::ffff:0:0/96  100$' {$gaiArgument}
+test "\$(grep -c -E '^[[:space:]]*precedence[[:space:]]+::ffff:0:0/96[[:space:]]+100[[:space:]]*$' {$gaiArgument})" = 1
+! grep -q '^#precedence ::ffff:0:0/96  100$' {$gaiArgument}
+BASH;
+
+    try {
+        $process = new Process(['bash', '-c', $command], base_path());
+        $process->run();
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+    } finally {
+        unlink($gaiPath);
+    }
+});
+
+it('creates the policy file when the IPv4 precedence rule is missing', function (): void {
+    $gaiPath = sys_get_temp_dir().'/pbx-gai-create-'.bin2hex(random_bytes(8)).'.conf';
+
+    $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
+    $gaiArgument = escapeshellarg($gaiPath);
+    $command = 'source '.$helperPath.' && export FSPBX_GAI_CONF='.$gaiArgument.' && ensure_ipv4_precedence';
+
+    try {
+        $process = new Process(['bash', '-c', $command], base_path());
+        $process->run();
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and(file_get_contents($gaiPath))->toBe("precedence ::ffff:0:0/96  100\n");
+    } finally {
+        if (file_exists($gaiPath)) {
+            unlink($gaiPath);
+        }
+    }
+});
+
+it('leaves an already-active IPv4 precedence rule untouched', function (): void {
+    $gaiPath = tempnam(sys_get_temp_dir(), 'pbx-gai-active-');
+    $original = "precedence ::ffff:0:0/96  100\n# tail-marker\n";
+    file_put_contents($gaiPath, $original);
+
+    $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
+    $gaiArgument = escapeshellarg($gaiPath);
+    $command = 'source '.$helperPath.' && export FSPBX_GAI_CONF='.$gaiArgument.' && ensure_ipv4_precedence';
+
+    try {
+        $process = new Process(['bash', '-c', $command], base_path());
+        $process->run();
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and(file_get_contents($gaiPath))->toBe($original);
+    } finally {
+        unlink($gaiPath);
+    }
+});
+
+it('checks the IPv6 route before the first package download step', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+    $environment = (string) file_get_contents(base_path('scripts/resources/environment.sh'));
+    $routeCheckPosition = strpos($installer, 'case "$(ipv6_default_route_state)" in');
+    $nodeSourcePosition = strpos($installer, 'curl -fsSL "https://deb.nodesource.com');
+    $tallStackPosition = strpos($installer, 'run_step "TALL Stack (Laravel, Livewire, Tailwind, DaisyUI)"');
+    $install = (string) file_get_contents(base_path('INSTALL.md'));
+
+    expect($environment)->toContain('ipv6_default_route_state ()')
+        ->and($environment)->toContain('ensure_ipv4_precedence ()')
+        ->and($installer)->toContain('case "$(ipv6_default_route_state)" in')
+        ->and($installer)->toContain('ensure_ipv4_precedence')
+        ->and($routeCheckPosition)->not->toBeFalse()
+        ->and($nodeSourcePosition)->not->toBeFalse()
+        ->and($tallStackPosition)->not->toBeFalse()
+        ->and($routeCheckPosition)->toBeLessThan($nodeSourcePosition)
+        ->and($routeCheckPosition)->toBeLessThan($tallStackPosition)
+        ->and($install)->toContain('activating the IPv4 precedence rule in `/etc/gai.conf`')
+        ->and($install)->not->toContain("sed -i 's/^#\\s*precedence");
+});

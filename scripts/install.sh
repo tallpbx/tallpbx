@@ -529,6 +529,22 @@ apt_get_with_lock_wait install -y \
     net-tools \
     unzip
 
+# Some VPS providers hand out a global IPv6 address without a default IPv6
+# route. PHP then tries the IPv6 address first when it downloads files (for
+# example the Composer installer), waits for the connection to time out, and
+# the installer fails. When that condition is detected, ask the system's
+# name-resolution policy to prefer IPv4 addresses. Hosts with a working IPv6
+# default route are left exactly as they are.
+case "$(ipv6_default_route_state)" in
+    absent)
+        ensure_ipv4_precedence
+        verbose "No IPv6 default route found; configured the system to prefer IPv4 so downloads do not time out."
+        ;;
+    unknown)
+        warning "Could not inspect IPv6 routes; skipping the IPv4 preference check."
+        ;;
+esac
+
 # The application clone is a fixed, installer-managed deployment path. Trust it
 # system-wide so administrators can use Git even when runtime files are owned
 # by www-data. Git cannot read repository-local configuration before this trust

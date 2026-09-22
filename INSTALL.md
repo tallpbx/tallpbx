@@ -97,7 +97,7 @@ swapon --show
 free -h
 ```
 
-### Prefer IPv4 When the Host Has No IPv6 Default Route
+### IPv4 Preference on Hosts Without an IPv6 Default Route
 
 Some VPS providers assign a global IPv6 address without a default IPv6 route.
 PHP then tries IPv6 first when it downloads files from dual-stack hosts such as
@@ -108,31 +108,19 @@ fails at the "Installing Composer" step with:
 PHP Warning: copy(https://getcomposer.org/installer): Failed to open stream: Connection timed out
 ```
 
-Check whether the host is affected:
+The installer now detects this situation automatically and asks the whole
+system to prefer IPv4 by activating the IPv4 precedence rule in `/etc/gai.conf`.
+Hosts with a working IPv6 default route, or hosts where the rule is already
+active, are left untouched.
+
+To confirm the rule after an install:
 
 ```bash
-ip -6 route show | grep default
-curl -6 -sS --max-time 10 -o /dev/null https://getcomposer.org/installer
+grep precedence /etc/gai.conf   # the ::ffff:0:0/96 line should be active
 ```
 
-If the first command prints nothing and the second times out while a plain
-`curl` download succeeds, tell every PHP process on the host to prefer IPv4 by
-uncommenting the IPv4 precedence rule in the system name-resolution policy:
-
-```bash
-sed -i 's/^#\s*precedence ::ffff:0:0\/96  100$/precedence ::ffff:0:0\/96  100/' /etc/gai.conf
-```
-
-Verify that IPv4 now resolves first and the installer download succeeds:
-
-```bash
-getent ahosts getcomposer.org | head -1   # should show an IPv4 address
-php -r 'copy("https://getcomposer.org/installer", "/tmp/composer-setup.php"); echo filesize("/tmp/composer-setup.php"), PHP_EOL;'
-```
-
-This host-level fix is required before the installer can finish: Composer
-itself uses PHP streams, so every Packagist download would time out the same
-way without it.
+To undo the preference manually, put a `#` back in front of the
+`precedence ::ffff:0:0/96  100` line (or remove the line).
 
 ## 4. Configure a Static IP Address (Optional)
 
