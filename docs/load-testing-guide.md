@@ -281,7 +281,8 @@ results for VirtualBox and then the datacenter ladder.
 | 2 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete (July 17–18, 2026); revalidated August 31, 2026 |
 | 3 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
 | 4 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
-| 5 | Dedicated-CPU Datacenter VPS | 4 vCPU, 8 GiB RAM | Planned |
+| 5 | Dedicated-CPU Datacenter VPS | 2 vCPU, 8 GiB RAM | Planned |
+| 6 | Dedicated-CPU Datacenter VPS | 4 vCPU, 8 GiB RAM | Planned |
 
 **Phase 2 — server-to-server call testing (calls per second):**
 
@@ -290,7 +291,8 @@ results for VirtualBox and then the datacenter ladder.
 | 1 | VirtualBox test server (4 vCPU / 4 GiB / 2 GiB swap) | Second VirtualBox server on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: correctness (July 16, 2026) and capacity ladder (July 17–18, 2026) |
 | 2 | Shared-CPU Datacenter VPS 1 vCPU / 967 MiB | Second datacenter virtual server; historical runs used the local test server through WireGuard | Complete: correctness only (July 17, 2026) |
 | 3 | Shared-CPU Datacenter VPS 2 vCPU / 1973 MiB | Second datacenter virtual server; historical runs used the local test server through WireGuard | Complete: capacity runs (July 18, 2026) |
-| 4 | Dedicated-CPU Datacenter VPS 4 vCPU / 8 GiB | Second dedicated-CPU virtual server in the same datacenter | Planned |
+| 4 | Dedicated-CPU Datacenter VPS 2 vCPU / 8 GiB | Second dedicated-CPU virtual server in the same datacenter | Planned |
+| 5 | Dedicated-CPU Datacenter VPS 4 vCPU / 8 GiB | Second dedicated-CPU virtual server in the same datacenter | Planned |
 
 Server-to-server topology:
 
@@ -298,7 +300,8 @@ Server-to-server topology:
   that hardware runs the Windows 11 operating system.
 - Datacenter testing runs the two virtual servers in the same datacenter.
 - The PBX target virtual server runs on a shared-CPU plan for the 1 vCPU and
-  2 vCPU tests and on a dedicated-CPU server for the 4 vCPU tests.
+  2 vCPU tests with up to 2 GiB RAM and on a dedicated-CPU server for the
+  8 GiB profiles (2 vCPU and 4 vCPU).
 
 Notes for both phases:
 
@@ -1220,10 +1223,10 @@ introduced occasional slowest-response spikes (858–957 ms) compared with
 the static-6 baseline (331–414 ms). Static 6 remained the active and
 recommended 2-GB profile.
 
-### Planned Larger Profiles (Phase 1, Stage 5)
+### Planned Larger Profiles (Phase 1, Stages 5–6)
 
-The dedicated-CPU 4 vCPU / 8 GiB profile has not been measured yet. When a
-server is provisioned, repeat the same procedure:
+The dedicated-CPU 2 vCPU / 8 GiB and 4 vCPU / 8 GiB profiles have not been
+measured yet. When a server is provisioned, repeat the same procedure:
 
 1. Seed with the same `load-test-beta` tenant and extension count.
 2. Run the `25 x 1` warm-up, then `100 x 5`, `500 x 10` (safety step for
@@ -1529,10 +1532,10 @@ WireGuard status/config snippets, FreeSWITCH and Sofia status, PHP-FPM
 configuration, Redis/cache checks, application commit/config summaries, and
 the SIPp artifact directories for the post-cache remote runs.
 
-### Planned Larger Datacenter Pairs (Phase 2, Stage 4)
+### Planned Larger Datacenter Pairs (Phase 2, Stages 4–5)
 
-The dedicated-CPU 4 vCPU / 8 GiB pair has not been measured yet. When both
-servers are provisioned:
+The dedicated-CPU 2 vCPU / 8 GiB and 4 vCPU / 8 GiB pairs have not been
+measured yet. When both servers are provisioned:
 
 1. Confirm correctness first: basic runner plus `MEDIA_FLOW=1` and
    `EXTENDED=1` with the new test data.
