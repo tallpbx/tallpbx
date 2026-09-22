@@ -16,13 +16,30 @@ The public landing page is localized (`/en`, `/es`, `/fr`) and provides direct s
 ### Dark Theme
 ![TallPBX Landing Page — Dark Theme](images/landing-dark.png)
 
+### Theme Comparison: Light vs. Dark Themes in TallPBX
+
+TallPBX is engineered for versatile operational environments ranging from daylight corporate offices to 24/7 dark-room network operations centers (NOCs):
+
+| Dimension | Light Theme | Dark Theme | System Theme (Auto-Detection) |
+| :--- | :--- | :--- | :--- |
+| **Visual Palette** | High-contrast DaisyUI `light` tokens with crisp slate text on clean white/light-gray backgrounds | Deep slate and charcoal `dark` surfaces with subdued border contrasts and vibrant accent highlights | Dynamically mirrors OS-level `prefers-color-scheme` via `window.matchMedia` |
+| **Primary Use Case** | Well-lit office environments, configuration audits, and administrative reporting | 24/7 NOC monitoring, telecom server rooms, night-shift dispatch consoles, and multi-monitor setups | Laptops and mobile workstations transitioning between daylight and evening hours |
+| **Optical Ergonomics** | Maximum text sharpness and reading speed under natural sunlight or overhead fluorescent lighting | Substantially reduced glare, minimal blue-light eye strain, and lower power draw on OLED displays | Automatic diurnal adjustment without requiring manual intervention |
+| **Persistence Model** | Saved instantly to browser `localStorage` & asynchronously synced to `users` / `admins` database profile | Saved instantly to browser `localStorage` & asynchronously synced to `users` / `admins` database profile | Dynamically recomputed on OS change; preference key preserved across sessions |
+| **FOUC Prevention** | Synchronous inline script in document `<head>` evaluates theme before paint — zero white/dark flash | Synchronous inline script in document `<head>` evaluates theme before paint — zero white/dark flash | Seamless initial paint matching system preference prior to Livewire hydration |
+
+#### Parity Comparison with Traditional PBX Systems (FusionPBX & FreePBX)
+- **FusionPBX**: Relies on monolithic procedural PHP templates linked to static CSS stylesheets. Changing visual appearance requires server-side template file modification or installing external CSS skins; it provides no client-side runtime switcher, no native dark mode, and no OS preference synchronization.
+- **FreePBX®**: Built on a legacy procedural framework with a static, hardcoded light theme. Operators working in dark rooms or dispatch centers cannot switch to dark mode without unsupported browser extensions or custom stylesheet overrides.
+- **TallPBX Advantage**: TallPBX provides built-in, 1-click theme switching across both public guest pages (`/`, `/login`) and the authenticated unified control panel (`/panel/`). Users can toggle their preference from any view, enjoying instantaneous zero-flicker client caching and cross-device database synchronization.
+
 ---
 
 ## 2. Unified Control Panel & Layout Modes
 
 TallPBX uses a single unified panel architecture (`/panel/`) for both system administrators and tenant users, with menu visibility governed by granular permissions. 
 
-Users can customize their navigation layout via the display settings menu. Preferences are instantly dispatched to Alpine.js and saved to the database.
+Users can customize their navigation layout and color theme (Light, Dark, System) via the unified display settings menu in the header. Preferences are instantly dispatched to Alpine.js, rendered with zero flicker, and saved to the database.
 
 ### Mode A: Full Sidebar Navigation (`w-64`)
 The default desktop layout provides an expansive sidebar organized by functional PBX domains (Accounts, Connectivity, Call Routing, PBX Features, Media, Operations, and Administration) with preserved scroll position across navigation.
@@ -79,7 +96,7 @@ Users can toggle their preferred language instantly via the topbar language drop
 The **Security Command Center** provides system administrators with real-time visibility into the Linux kernel `nftables` host firewall, automated intrusion detection, and sequential packet filtering pipelines.
 
 * **Reactive Live Updates**: Connected directly to Laravel Reverb WebSockets — active threat counters, ban expirations, and rule changes update instantaneously across sessions without manual page refreshes.
-* **Pipeline-Aligned IP Workbenches**: Dedicated tables for Permanent Blacklists, Temporarily Blocked Attackers (with 1-click unban and threshold controls), and Whitelist IPs with administrator self-protection.
+* **Dedicated IP Management Sections**: Dedicated cards for the Permanent Blacklist, Temporarily Blocked Attackers (with 1-click unban and threshold controls), and Whitelist IPs with administrator self-protection.
 * **Living Kernel Ruleset**: Displays base system invariants and pre-filters in an interactive collapsible section (unconditional loopback access, blacklist IP drops, active banned attacker drops, stateful connection tracking, invalid packet defense, and whitelist bypass) alongside configurable core PBX services (starting with ICMP ping diagnostics with rate limiting) and custom sequential rules.
 * **Zero-Lockout Protection**: Automatic preflight safety testing prevents administrators from inadvertently dropping or blocking their own connection IP.
 

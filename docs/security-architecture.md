@@ -135,7 +135,7 @@ If a server does not have Redis installed, or if the `redis-server` service is s
 2. **Dynamic Sliding-Window Bans Pause**:
    Because real-time failure counters cannot be stored or incremented in memory, automatic dynamic bans triggered by crossing the failed-attempt threshold (`max_retry` within `find_time`) will not fire while Redis is offline.
 3. **Static Kernel Firewall & Access Lists Remain 100% Active**:
-   The underlying Linux kernel `nftables` firewall ruleset (`tallpbx_filter`), Pre-Filters (loopback trust, stateful connection tracking, invalid packet drop), the permanent **Blacklist** (Stage 1 drop), the trusted **Whitelist** (Stage 2 bypass), and Standard Service port protections are completely independent of Redis. They reside in kernel memory and MariaDB, providing uninterrupted perimeter defense.
+   The underlying Linux kernel `nftables` firewall ruleset (`tallpbx_filter`), Pre-Filters (loopback trust, stateful connection tracking, invalid packet drop), the permanent **Blacklist** (blocks forbidden IPs), the trusted **Whitelist** (allows trusted office networks), and Standard Service port protections are completely independent of Redis. They reside in kernel memory and MariaDB, providing uninterrupted perimeter defense.
 4. **Manual Administrator Bans Remain Fully Functional**:
    Manual bans issued via the Security Command Center UI or the Artisan CLI (`php artisan security:ban <IP>`) write directly to MariaDB and execute the bounded root helper `/usr/local/sbin/tallpbx-security` to insert the IP directly into kernel sets (`@banned_ips` / `@banned_ips6`). Manual bans and permanent blacklists work normally even when Redis is down.
 5. **Instant Recovery**:
@@ -150,16 +150,16 @@ The **Security Command Center** provides a single, unified view of the complete 
 ![TallPBX Security Command Center](images/security-dashboard-full.png)
 
 ### Key Interface Components
-1. **Status & Threat Overview**: Real-time indicators for `nftables` firewall state, intrusion detection engine status, active ban counters, and administrator zero-lockout protection.
-2. **Pipeline-Aligned IP Workbenches**: Arranged in the exact sequential order traffic is evaluated:
-   - **Blacklist**: Permanent drop list with preflight guidance and search filtering.
-   - **Blocked Attackers**: Active intrusion bans with vector badges (`SIP`, `Web`, `SSH`), automated hardware timeout countdowns, and protection sensitivity settings.
-   - **Whitelist**: Permanent bypass list with 1-click self-protection for administrator IPs.
-3. **Unified Firewall Rules Table**: Shows the complete, living Linux kernel packet filtering pipeline:
-   - **Built-in Rules & Pre-Filters (Collapsible)**: A one-click collapsible header row consolidating the 6 sequential built-in rules and pre-filters: unconditional loopback access (`lo`), permanent blacklist IP drops, active intruder bans, stateful connection tracking (`ct state established,related`), invalid packet defense (`ct state invalid`), and trusted whitelist IP bypass.
-   - **Stage 3 Standard Services**: Standard services evaluated top-to-bottom starting with **ICMP Ping Diagnostics** (configurable source network, toggleable, and customizable rate limit/burst allowance with dual-stack IPv4/IPv6 protection), followed by SIP Signaling, RTP Media, Web UI, SSH, FreeSWITCH ESL, Reverb WebSockets, and WebRTC.
-   - **Stage 4 Custom Rules**: Sequential port rules with priority reordering.
-   - **Stage 5 Default Policy**: Inbound fallback policy (`drop` or `accept`).
+1. **Status & Threat Overview**: Real-time indicators showing firewall state, intrusion detection status, active ban counters, and administrator zero-lockout protection.
+2. **Dedicated IP Management Sections**: Arranged in the exact order network traffic is evaluated:
+   - **Blacklist**: Permanent block list for known malicious IP addresses and subnets, with search filtering and a quick-add form.
+   - **Blocked Attackers**: Active intrusion bans with threat badges (`SIP`, `Web`, `SSH`), automated countdown timers, and protection sensitivity settings.
+   - **Whitelist**: Trusted bypass list for office and remote networks with 1-click self-protection for administrator IPs.
+3. **Unified Firewall Rules Table**: Shows the complete, active Linux kernel packet filtering rules in one place:
+   - **Built-in Rules & Pre-Filters (Collapsible)**: A one-click collapsible header row consolidating essential system safeguards: unconditional local loopback access (`lo`), permanent blacklist drops, active intruder bans, stateful connection tracking (allowing responses to outgoing requests), invalid packet defense, and trusted whitelist IP bypass.
+   - **Standard Services**: Everyday telephony and management services evaluated top-to-bottom starting with **ICMP Ping Diagnostics** (configurable source network, toggle switch, and adjustable rate limit with IPv4 and IPv6 protection), followed by SIP Signaling, RTP Audio Media, Web UI, SSH, FreeSWITCH ESL, Reverb WebSockets, and WebRTC.
+   - **Custom Rules**: Custom port and network rules with priority reordering (Up/Down buttons).
+   - **Default Inbound Policy**: The fallback decision for any incoming traffic that does not match an earlier rule (`Block` or `Allow`).
 
 ---
 
@@ -215,7 +215,17 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, and
    - The systemd boot loader `/etc/nftables.conf` includes `/etc/tallpbx/firewall.nft`.
    - When the Linux server reboots, systemd's `nftables.service` executes `/etc/nftables.conf` before networking starts, instantly restoring all rules, trusted IPs, and temporary attacker bans with their remaining expiration times intact.
 
-> **Live sync guarantee:** The Security Center couples **live kernel state inspection** with **authoritative content provenance** (Phase 2). The bounded root helper atomically records a post-apply sidecar (`/etc/tallpbx/firewall.nft.applied`) containing the ruleset digest, declared policy, and timestamp only after confirming the live kernel accepted the ruleset. The application evaluates a canonical digest of the desired configuration against the sidecar record, surfacing a **Firewall Out of Sync** banner and a sync status indicator whenever rules, policies, or IP lists differ, or when the kernel packet filtering table is absent. Dynamic attacker bans are synchronized in RAM and reconciled separately (Phase 3) so high-frequency bans do not flap the ruleset digest. The interface therefore cannot silently display a configuration the kernel is not actively running.
+> [!NOTE]
+> **What "Atomic" (All-or-Nothing) Means:**
+> In computer administration, an **atomic** operation is an "all-or-nothing" action. It either completes 100% successfully or makes no changes at all—it can never stop halfway through in a broken, half-applied state.
+> 
+> For the firewall, this means whenever you modify a rule:
+> 1. TallPBX pre-tests the proposed ruleset in the background to ensure the syntax is valid.
+> 2. It checks that your own connection IP will not be locked out.
+> 3. If all checks pass, the Linux kernel replaces the old ruleset with the new ruleset in a single, instantaneous swap.
+> 4. If any error is found, the update is completely aborted, and your existing firewall protection continues running smoothly without interruption. You are never left with broken or half-applied rules.
+
+> **Live Synchronization & Drift Guarantee:** The Security Command Center continually verifies that what you see in the web panel matches what the Linux kernel is actually running. Whenever rules are applied, a status verification file (`/etc/tallpbx/firewall.nft.applied`) records a unique fingerprint of the active rules and timestamp. If someone modifies the firewall outside of TallPBX, or if a reboot causes the firewall table to be missing, the panel immediately displays an amber **Firewall Out of Sync** banner and offers a one-click button to synchronize and restore the correct rules. Temporary attacker bans are managed separately in memory so regular attacks don't trigger false out-of-sync warnings. This ensures the control panel will never mislead you into thinking a rule is active when the server isn't actually running it.
 
 3. **Zero-Lockout Protection**
    - Before any restrictive policy or rule change is applied, [LockoutGuardService](file:///var/www/tallpbx/app-modules/security/src/Services/LockoutGuardService.php) checks the current administrator's active connection IP against the proposed ruleset.
@@ -223,10 +233,10 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, and
 
 ---
 
-## 8. Real-Time Responsiveness: No Polling, Zero Staging
+## 8. Real-Time Responsiveness: Automatic Application Without Extra Steps
 
-* **No Manual Refresh Buttons**: The Security Command Center connects directly to **Laravel Reverb WebSockets** via **Laravel Echo**. When an attacker is banned, unbanned, or a rule is updated, status cards and threat tables update reactively within milliseconds.
-* **Instant Auto-Application**: Administrators do not have to perform awkward multi-step "stage changes, then click Save & Apply" flows. Modifying an IP list, toggling a firewall rule, or adding a port catalog service immediately validates syntax atomically and applies to the running Linux kernel in real time.
+* **No Manual Refresh Buttons**: The Security Command Center connects directly to **Laravel Reverb WebSockets** via **Laravel Echo**. When an attacker is banned, unbanned, or a rule is updated, status cards and threat tables update reactively within milliseconds without needing to refresh the page.
+* **Instant Auto-Application**: You don't have to navigate confusing multi-step workflows or remember to click a separate "Save & Apply" button. Modifying an IP list, toggling a service rule, or changing settings immediately validates the configuration and applies it to the running Linux kernel in real time via an all-or-nothing (atomic) update.
 
 ---
 
@@ -261,7 +271,7 @@ php artisan security:unban 198.51.100.22
 ```bash
 php artisan security:apply
 ```
-*Compiles the ruleset from MariaDB into `/etc/tallpbx/firewall.nft`, validates syntax with `nft -c`, tests zero-lockout safety against your connection IP, and atomically loads the new ruleset into the kernel.*
+*Compiles the ruleset from MariaDB into `/etc/tallpbx/firewall.nft`, validates syntax with `nft -c`, tests zero-lockout safety against your connection IP, and safely applies the new ruleset to the kernel in a single all-or-nothing operation.*
 
 *(To bypass lockout protection when working on a local serial console, pass the `--force` flag: `php artisan security:apply --force`)*
 
@@ -271,7 +281,7 @@ php artisan security:apply
 
 TallPBX installs a dedicated, root-owned helper script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`) with a matching sudoers entry (`/etc/sudoers.d/tallpbx-security`). This script enforces strict parameter regex validation before executing kernel operations:
 
-> **PHP-FPM systemd hardening:** the stock Debian/Ubuntu PHP-FPM unit runs with `ProtectSystem=full`, which mounts `/etc` read-only inside the PHP-FPM service. The installer therefore adds a scoped drop-in (`/etc/systemd/system/php<version>-fpm.service.d/tallpbx-security.conf`) with `ReadWritePaths=/etc/tallpbx`, so web workers can stage pending rulesets in exactly that directory — and nothing else in `/etc` — and restarts PHP-FPM. Because the `nft` utility requires `CAP_NET_ADMIN` even for check-only runs, the web application routes its syntax preflight through the helper's `validate` action.
+> **PHP-FPM systemd hardening:** The stock Debian/Ubuntu PHP-FPM service runs with `ProtectSystem=full`, which mounts `/etc` read-only inside the PHP-FPM service. The installer therefore adds a scoped drop-in (`/etc/systemd/system/php<version>-fpm.service.d/tallpbx-security.conf`) with `ReadWritePaths=/etc/tallpbx`, so web workers can safely write and test pending ruleset files in exactly that directory — and nowhere else in `/etc` — before restarting PHP-FPM. Because the `nft` utility requires `CAP_NET_ADMIN` even for check-only runs, the web application routes its syntax preflight through the helper's `validate` action.
 
 #### View Active Kernel Table
 ```bash
@@ -375,15 +385,15 @@ The table below outlines how common security tasks are performed across the Web 
 
 | Security Task | Web Management UI | TallPBX Artisan / Helper CLI | Direct `nftables` CLI Command | Persistence Scope |
 | :--- | :--- | :--- | :--- | :--- |
-| **View Active Banned Attackers** | Security Dashboard &rarr; **Active Threats** table | `php artisan security:status` | `sudo nft list set inet tallpbx_filter banned_ips` | Live Kernel RAM |
-| **Unban an IP Address** | Click **Unban** button in Active Threats table | `php artisan security:unban <IP>` | `sudo nft delete element inet tallpbx_filter banned_ips { <IP> }` | UI/Artisan: Removed from DB, Redis & Kernel<br/>Direct nft: Kernel RAM until reload |
-| **Manually Ban an IP** | Security Dashboard &rarr; **Ban IP** modal | `sudo /usr/local/sbin/tallpbx-security ban <IP> <SECS>` | `sudo nft add element inet tallpbx_filter banned_ips { <IP> timeout <SECS>s }` | UI: Stored in DB + Kernel (Reboot persistent)<br/>CLI Helper/Direct nft: Kernel RAM until expiration or reload |
-| **Add Whitelist IP** | IP Lists tab &rarr; Click **Add IP** &rarr; Select Whitelist | Add record in MariaDB & run `php artisan security:apply` | `sudo nft add element inet tallpbx_filter whitelist_ips { <IP> }` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Kernel RAM until reload |
-| **Remove Whitelist IP** | IP Lists tab &rarr; Click **Delete** | Delete record in MariaDB & run `php artisan security:apply` | `sudo nft delete element inet tallpbx_filter whitelist_ips { <IP> }` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Kernel RAM until reload |
-| **Add Blacklist Subnet** | IP Lists tab &rarr; Click **Add IP** &rarr; Select Blacklist | Add record in MariaDB & run `php artisan security:apply` | `sudo nft add element inet tallpbx_filter blacklist_ips { <CIDR> }` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Kernel RAM until reload |
-| **View Active Firewall Rules** | Firewall Rules tab | `sudo /usr/local/sbin/tallpbx-security status` | `sudo nft list table inet tallpbx_filter` | Live Kernel Ruleset |
-| **Toggle a Service Port (e.g. SSH)** | Firewall Rules tab &rarr; Click **Enabled** switch | Update rule in MariaDB & run `php artisan security:apply` | Edit chain rules directly in `/etc/tallpbx/firewall.nft` and run `nft -f` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Saved in `/etc/tallpbx/firewall.nft` |
+| **View Active Banned Attackers** | Security Command Center &rarr; **Blocked Attackers** section | `php artisan security:status` | `sudo nft list set inet tallpbx_filter banned_ips` | Live Kernel RAM |
+| **Unban an IP Address** | Click **Unban** button in Blocked Attackers table | `php artisan security:unban <IP>` | `sudo nft delete element inet tallpbx_filter banned_ips { <IP> }` | UI/Artisan: Removed from DB, Redis & Kernel<br/>Direct nft: Kernel RAM until reload |
+| **Manually Ban an IP** | Security Command Center &rarr; Click **Block Manually** button | `sudo /usr/local/sbin/tallpbx-security ban <IP> <SECS>` | `sudo nft add element inet tallpbx_filter banned_ips { <IP> timeout <SECS>s }` | UI: Stored in DB + Kernel (Reboot persistent)<br/>CLI Helper/Direct nft: Kernel RAM until expiration or reload |
+| **Add Whitelist IP** | In the **Whitelist** section, enter the IP &rarr; Click **Add** | Add record in MariaDB & run `php artisan security:apply` | `sudo nft add element inet tallpbx_filter whitelist_ips { <IP> }` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Kernel RAM until reload |
+| **Remove Whitelist IP** | In the **Whitelist** section, click the trash can icon | Delete record in MariaDB & run `php artisan security:apply` | `sudo nft delete element inet tallpbx_filter whitelist_ips { <IP> }` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Kernel RAM until reload |
+| **Add Blacklist Subnet** | In the **Blacklist** section, enter the CIDR &rarr; Click **Add** | Add record in MariaDB & run `php artisan security:apply` | `sudo nft add element inet tallpbx_filter blacklist_ips { <CIDR> }` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Kernel RAM until reload |
+| **View Active Firewall Rules** | In the **Firewall Rules** section | `sudo /usr/local/sbin/tallpbx-security status` | `sudo nft list table inet tallpbx_filter` | Live Kernel Ruleset |
+| **Toggle a Service Port (e.g. SSH)** | In the **Firewall Rules** section &rarr; Toggle the service switch | Update rule in MariaDB & run `php artisan security:apply` | Edit chain rules directly in `/etc/tallpbx/firewall.nft` and run `nft -f` | UI/Artisan: Permanent (DB + File)<br/>Direct nft: Saved in `/etc/tallpbx/firewall.nft` |
 | **Recompile & Apply Ruleset** | Automatic upon any UI change | `php artisan security:apply` | `sudo nft -f /etc/tallpbx/firewall.nft` | Compiled from DB to `/etc/tallpbx/firewall.nft` & Kernel |
 | **Dry-Run Syntax Test** | Automated via Preflight Validator | Tested automatically during `security:apply` | `sudo nft -c -f /etc/tallpbx/firewall.nft` | Syntax check only (No kernel changes) |
-| **Flush All Intruder Bans** | Active Threats table &rarr; Select All &rarr; **Unban** | Clear via database or loop `security:unban` | `sudo nft flush set inet tallpbx_filter banned_ips` | UI: Cleared from DB, Redis & Kernel<br/>Direct nft: Kernel RAM cleared immediately |
+| **Remove All Intruder Bans** | Blocked Attackers table &rarr; Click **Unban** on entries | Clear via database or loop `security:unban` | `sudo nft flush set inet tallpbx_filter banned_ips` | UI: Cleared from DB, Redis & Kernel<br/>Direct nft: Kernel RAM cleared immediately |
 

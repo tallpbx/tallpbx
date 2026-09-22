@@ -184,7 +184,7 @@ Now that basic signaling and audio are verified:
 
 | Symptom | Probable Cause | Resolution |
 |---|---|---|
-| **Registration Timeout / Could not connect** | Firewall blocking SIP signaling on UDP port 5060. | Ensure firewall allows traffic: `sudo ufw allow 5060/udp`. Check that server IP is reachable via `ping <server-ip>`. |
+| **Registration Timeout / Could not connect** | Firewall blocking SIP signaling on UDP port 5060. | Ensure SIP Signaling is enabled under **Security → Firewall Rules** (`/panel/security`), or verify the client IP is whitelisted. Check that server IP is reachable via `ping <server-ip>`. |
 | **403 Forbidden / Bad Credentials** | Extension number or password mismatch. | Verify the username is only the extension digits (`1001`), and re-enter the password in softphone settings. |
-| **Call connects, but no sound is heard** | RTP media UDP ports blocked or asymmetric NAT. | FreeSWITCH uses RTP ports `16384-32768` (UDP). Ensure these ports are open in the server firewall: `sudo ufw allow 16384:32768/udp`. |
+| **Call connects, but no sound is heard** | RTP media UDP ports blocked or asymmetric NAT. | FreeSWITCH uses RTP ports `16384-32768` (UDP). Ensure the **RTP Media** service is enabled under **Security → Firewall Rules** (`/panel/security`). |
 | **Call rejected with "User not found" or "No Route"** | Extension or dialplan context misconfiguration. | Verify the tenant has baseline dialplans provisioned under **PBX → Dialplans**. |

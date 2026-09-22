@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Standardized 5-Pillar Test Suites Across Top-10 Modules (Phases 1–3)**: Implemented comprehensive 5-pillar test suites across all 10 highest-risk PBX, routing, and telephony modules (`sip-trunks`, `gateways`, `inbound-routes`, `outbound-routes`, `extensions`, `dialplans`, `ring-groups`, `call-centers`, `conferences`, `voicemails`). Standardized coverage includes Service CRUD operations and FreeSWITCH XML generation, Livewire List and Edit component workflows, multi-tenant list scoping, cross-tenant edit IDOR defenses (`assertCanAccessTenantRecord`), `TenantMutationGuard` creation/mutation enforcement, and Livewire action permissions (327 tests, 854 assertions). Added `grantTenantUserPermissions()` test helper to `tests/Pest.php`.
 
+### Changed
+- **Switchable Light & Dark Theme Documentation & Parity Comparisons**: Enhanced documentation across `README.md`, `docs/parity-comparison.md`, and `docs/ui-tour.md` detailing the switchable Light, Dark, and System theme architecture:
+  - Documented zero-flicker client hydration via synchronous `localStorage` reading in document `<head>` prior to render (eliminating FOUC) and asynchronous database persistence to user/admin profiles.
+  - Added architectural and ergonomic comparisons against FusionPBX and FreePBX, contrasting TallPBX's instant runtime theme toggles with legacy monolithic stylesheets and static light-only interfaces to support 24/7 Network Operations Centers (NOCs) and dispatchers working low-light shifts.
+- **Security Architecture & Documentation Stale Content Audit**: Audited repository documentation to eliminate stale content and simplify technical terminology:
+  - Replaced obsolete "stages" and "pipeline-aligned workbenches" designations across `docs/security-architecture.md` and `docs/ui-tour.md` with clear descriptions of active UI cards (Blacklist, Blocked Attackers, Whitelist, and Firewall Rules).
+  - Added plain-language explanations of "atomic" (all-or-nothing) operations in `docs/security-architecture.md`, `README.md`, and `docs/parity-comparison.md`.
+  - Replaced outdated `ufw` firewall troubleshooting commands in `docs/pbx-hello-world.md` with native TallPBX Security Command Center (`/panel/security`) and `nftables` instructions.
+  - Corrected the CLI vs. Web comparison matrix in `docs/security-architecture.md` to reflect the modern unified single-page interface rather than obsolete tabs and modal wizards.
+
 ### Fixed
 - **Multi-Tenant Scoping and Access Enforcement in Edit Forms**: Auto-resolved tenant context for non-admin users during mount and save, and added explicit `assertCanAccessTenantRecord()` verification before updating existing records in `QueueEdit`, `ConferencesEdit`, `VoicemailsEdit`, and `RingGroupsEdit`.
 - **Multi-Tenant Query Scoping in List Components**: Scoped list queries to the active tenant for tenant users in `QueueList`, `ConferencesList`, and `VoicemailsList` while allowing administrators to view records across all tenants.

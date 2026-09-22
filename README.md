@@ -35,7 +35,7 @@ TallPBX delivers feature and function parity with established open-source PBX pl
 | **Multi-Tenancy** | **Native Multi-Tenant** (Isolated contexts, domains, data) | **Native Multi-Tenant** (Domain-based) | **Single-Tenant Core** (Multi-tenant requires commercial PBXact) |
 | **User Impersonation** | **1-Click Native Impersonation** (Instant tenant user perspective, persistent recovery banner & audit trail) | Limited (Domain switching only, no direct user session impersonation) | None (Separate UCP logins, no multi-tenant user impersonation) |
 | **Multi-Language Support** | **Native Multi-Lingual** (English, Spanish, French with instant topbar switcher, locale routing & user preference) | Partial / Community arrays (`app_languages.php`) | Partial gettext / PO files (often incomplete, English-centric) |
-| **User Interface & Layout** | **Dual Layouts**: Collapsible mini-rail sidebar (`w-16` / `w-64`) & horizontal topbar dropdowns with per-user persistence | Fixed top navbar (legacy procedural HTML) | Fixed top navbar (classic FreePBX theme) |
+| **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme, no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no dark mode) |
 | **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Multi-Vector Defense** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
 | **Automated Testing** | **2,296 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
@@ -242,7 +242,7 @@ TallPBX includes a first-party Security module (`app-modules/security`) that rep
 
 ### 1. Linux Kernel Firewall (nftables)
 - **High-Performance Kernel Sets**: Fast in-kernel lookups with `@whitelist_ips`, `@blacklist_ips`, and `@banned_ips` (supporting dynamic kernel timeouts).
-- **Atomic Preflight Verification**: Proposed firewall rules are compiled to `/etc/tallpbx/firewall.nft.pending` and verified atomically using `nft -c -f` before replacing the active ruleset, preventing syntax corruption or broken rules from taking down host networking.
+- **All-or-Nothing (Atomic) Preflight Verification**: Proposed firewall rules are compiled to `/etc/tallpbx/firewall.nft.pending` and verified using `nft -c -f` before replacing the active ruleset, preventing syntax errors or broken rules from taking down host networking.
 - **Critical Protocol Safeguards**: IPv6 Neighbor Discovery (`ip6 nexthdr icmpv6 accept`) and standard ICMP echo requests are explicitly allowed so DNS resolution and network diagnostics never stall.
 
 ### 2. Multi-Vector Real-Time Intrusion Prevention
@@ -268,7 +268,7 @@ Administrators can inspect and manage security directly from the terminal:
 # Check firewall status, active kernel sets, and banned attackers
 php artisan security:status
 
-# Atomically recompile and apply pending firewall rules
+# Safely recompile and apply pending firewall rules (all-or-nothing)
 php artisan security:apply
 
 # Unban an IP address and remove it from the kernel
@@ -297,10 +297,12 @@ Generated files in `bootstrap/cache` and `public/build` must be readable by PHP-
 bash scripts/fix-generated-permissions.sh
 ```
 
-### Panel Navigation & Layout Modes
+### Panel Navigation, Layout Modes & Switchable Themes
 
-The unified control panel provides flexible navigation layouts designed to maximize screen real estate for wide data tables (CDRs, routing rules, active calls, extensions):
+The unified control panel provides flexible navigation layouts and color themes designed to maximize screen real estate for wide data tables (CDRs, routing rules, active calls, extensions) and optimize operator ergonomics:
 
+- **Switchable Color Themes (Light, Dark, System):** Instant runtime switching between Light mode, Dark mode, and automatic System preference detection (`prefers-color-scheme`). Preferences are cached synchronously in browser `localStorage` and executed by an inline `<head>` script prior to HTML render, guaranteeing zero flash-of-unstyled-theme (FOUC), while being persisted asynchronously to the user's profile in the database.
+- **Ergonomics & Parity Comparison:** FusionPBX and FreePBX lock operators into legacy, fixed light-mode interfaces that lack runtime theme toggling and dark mode support, causing high glare during overnight operations. TallPBX provides native dark theme support tailored for 24/7 Network Operations Centers (NOCs), telecom control rooms, and dispatch environments to reduce eye strain, alongside a high-contrast light theme for daytime office environments.
 - **Collapsible Sidebar (Mini "Icon Rail"):** On desktop, users can collapse the vertical sidebar from its standard expanded width (`256px`) down to a compact `64px` icon rail with centered icons, hover tooltips, and flyout popover submenus for grouped PBX categories. A toggle button is pinned at the bottom of the sidebar (`[«]` / `[»]`) and accessible via the desktop header toggle.
 - **Horizontal Header Navigation:** Users can switch to a full-width top-bar layout with standard dropdown menus (`menu menu-horizontal`), familiar to operators migrating from FusionPBX or classic PBX systems.
 - **Display Preferences:** A unified **Display Settings** dropdown in the header allows users to switch between Sidebar and Top Navigation, adjust sidebar size, and toggle themes (Light, Dark, System). Preferences are saved immediately to `localStorage` for zero-flicker rendering and synced to the user profile in the database.
