@@ -121,9 +121,9 @@ installer, which asks a few setup questions and installs everything.
 
 Re-running the command is safe — the installer can run repeatedly without
 affecting existing data, and it updates TallPBX in place. See
-[Running the Installer Again](#running-the-installer-again) for details. Use
-the same `--ref` value every time: without it, the re-run switches the working
-copy to `main`.
+[Upgrading TallPBX](#upgrading-tallpbx) for details.
+Use the same `--ref` value every time: without it, the re-run switches the
+working copy to `main`.
 
 To customize the installation, add options after `-s --`:
 
@@ -158,6 +158,40 @@ The installer asks how to create the first administrator:
 
 Re-runs never replace an existing administrator. There is no default
 administrator password.
+
+#### Changing or Resetting the Administrator Password
+
+If you forgot your password or need to change it from the Linux command line:
+
+**Using Artisan (recommended):**
+
+Run the password command interactively (it will prompt for the email and new password):
+
+```bash
+cd /var/www/tallpbx
+php artisan admin:password
+```
+
+Or provide the email and new password directly:
+
+```bash
+cd /var/www/tallpbx
+php artisan admin:password admin@example.com --password="YourNewPassword"
+```
+
+**Directly via MariaDB (if Laravel cannot boot):**
+
+If Laravel's bootstrap cannot run (for example, due to a broken cache or syntax error), update the password directly in MariaDB using PHP's built-in password hashing:
+
+```bash
+mariadb tallpbx -e "UPDATE admins SET password = '$(php -r 'echo password_hash("YourNewPassword", PASSWORD_BCRYPT);')' WHERE email = 'admin@example.com';"
+```
+
+> [!TIP]
+> If you do not remember the administrator's email address, run:
+> ```bash
+> mariadb tallpbx -e "SELECT id, name, email FROM admins;"
+> ```
 
 ### Demo Data and Development Tooling
 
@@ -335,17 +369,54 @@ bash letsencrypt.sh --domain pbx.example.com --staging     # test, no rate limit
 ```
 
 Nginx must be running, and the internet must be able to reach port 80. The
-script switches Nginx to HTTPS; certificates renew automatically.
+script switches Nginx to HTTPS.
 
 ### Wildcard Certificate (Cloudflare DNS)
 
+A wildcard certificate (`*.example.com`) secures your base domain and all
+possible subdomains under a single certificate.
+
+**When to use a wildcard certificate:**
+- **Multi-Tenant Hosting**: If you host multiple tenants using subdomains
+  (e.g., `tenant1.pbx.example.com` and `tenant2.pbx.example.com`), a wildcard
+  certificate covers all current and future subdomains automatically without
+  requesting a new certificate for each tenant.
+- **Port 80 Inaccessible**: Standard single-domain certificates require inbound
+  HTTP access on port 80 for Let's Encrypt verification. If your server is behind
+  a restrictive firewall, NAT, or carrier CGNAT where port 80 cannot be opened,
+  the wildcard script uses the DNS-01 challenge via Cloudflare's API instead —
+  verifying domain ownership entirely through DNS records.
+
 ```bash
-bash cloudflare-dns.sh                                # save the API token first
+cd /var/www/tallpbx/scripts/resources
+
+# 1. Save and verify your Cloudflare API token:
+bash cloudflare-dns.sh
+
+# 2. Issue the wildcard certificate:
 bash letsencrypt.sh --wildcard --domain pbx.example.com
 ```
 
 The Cloudflare token needs `Zone:Zone:Read` and `Zone:DNS:Edit` permissions
 (create one at https://dash.cloudflare.com/profile/api-tokens).
+
+### Automatic Certificate Renewal
+
+Certificates issued through Let's Encrypt renew automatically:
+
+- **Frequency**: The `certbot.timer` systemd background service runs twice daily.
+- **Renewal window**: Certbot checks all installed certificates and only renews those within **30 days of expiration** (Let's Encrypt certificates are valid for 90 days). If a certificate is not yet due for renewal, no action is taken.
+- **Web server reload**: Upon successful renewal, Nginx reloads automatically so the updated certificate takes effect immediately without downtime.
+
+To check the timer status or test renewal:
+
+```bash
+# Verify the renewal timer is running:
+systemctl status certbot.timer
+
+# Test renewal without affecting live certificates:
+certbot renew --dry-run
+```
 
 ### Other Certificates
 
@@ -361,9 +432,48 @@ For a certificate from another provider, place `fullchain.pem` and
 > cannot be easily reversed. If an upgrade fails, restoring the backup is the
 > safest recovery path.
 
-The simplest update is to re-run the one-line command from Section 5: it
-updates the working copy and re-runs the installer, keeping your
-data. To update manually, take a backup first, then from `/var/www/tallpbx`:
+### Updating from the Web Panel (Recommended)
+
+The recommended way to update TallPBX is directly from the web interface:
+
+1. Sign in to the web panel as an administrator.
+2. In the sidebar, navigate to **Git Update** (`/panel/git-update`).
+3. The page displays your current branch, version, and any incoming commits
+   available from the repository.
+4. Click **Update Now**, type `UPDATE` in the safety confirmation dialog, and
+   proceed.
+
+TallPBX executes the update pipeline automatically: pulling the latest code,
+installing dependencies, applying database migrations, syncing modules,
+rebuilding frontend assets, clearing stale caches, and repairing file permissions.
+
+---
+
+### Manual Updating from the Linux CLI
+
+If you prefer to update from the terminal, need to automate updates via scripts,
+or cannot access the web panel, use one of the manual CLI methods below.
+
+#### Method 1: Using the Bootstrap Script (Terminal One-Liner)
+
+Re-run the one-line installer command — it pulls the latest code, applies
+database migrations, and preserves all your existing configuration, accounts,
+and recordings:
+
+```bash
+# Update on the default main branch:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
+
+# Or update on a specific release branch (such as 1.1):
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --ref 1.1
+```
+
+Use the same `--ref` value you used during initial installation so the working
+copy stays on your chosen release branch.
+
+#### Method 2: Step-by-Step Manual Update
+
+To update manually step by step, take a backup first, then run from `/var/www/tallpbx`:
 
 ```bash
 # 1. Pull the latest code from the branch you installed

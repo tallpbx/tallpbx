@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved `scripts/bootstrap.sh` non-root error messaging with exact command examples.
   - Streamlined `scripts/resources/tall.sh` by removing redundant `.env` database writes and consolidating multiple `systemctl daemon-reload` calls into a single invocation after all units are copied.
   - Added visual comparison tables for hardware requirements and FreeSWITCH install choices, plus GitHub alert callouts (`[!TIP]`, `[!IMPORTANT]`, `[!CAUTION]`), and an install-time troubleshooting section in `INSTALL.md`.
+  - Added CLI commands to `INSTALL.md` for resetting administrator credentials via Artisan (`php artisan admin:password`) and directly via MariaDB for emergency recovery.
+  - Documented automatic Let's Encrypt certificate renewal mechanics (`certbot.timer`, 30-day window, twice-daily checks) and explained wildcard certificate use cases (multi-tenant hosting, firewall bypass).
+  - Documented web panel UI updating (`/panel/git-update`) as the recommended upgrade procedure, framing terminal commands as manual alternatives.
   - Added post-installation troubleshooting to `docs/operations.md` for 502 web errors, file permission drift, FreeSWITCH startup/registration issues, and Redis restoration.
 
 ### Fixed
