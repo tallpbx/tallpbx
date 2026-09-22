@@ -11,7 +11,7 @@ small **bootstrap script** that makes installation a single command — the same
 experience FreePBX and FusionPBX provide:
 
 ```bash
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/1.1/scripts/bootstrap.sh | bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
 ```
 
 The bootstrap prepares `/var/www/tallpbx`, then hands the terminal to the
@@ -36,7 +36,7 @@ that INSTALL.md currently asks administrators to perform by hand.
 | Decision | Choice | Rationale |
 | --- | --- | --- |
 | Experience | One command, interactive | The installer's questionnaire (demo data, development tooling, FreeSWITCH method, administrator setup) still runs in the same terminal. |
-| Default source | Release branch `1.1` | Production users get the maintained release series, matching the upgrade instructions. `--ref` pins a tag or branch when reproducibility matters. |
+| Default source | `main` | Maintainer decision (September 22, 2026): the one-line installer delivers the latest installer from `main`; `--ref` pins a release branch or tag (for example `1.1` or `v1.1.2`) when reproducibility matters. |
 | Integrity | HTTPS pipe as the primary path, plus a documented verified alternative | Matches the FreePBX/FusionPBX simplicity; the hardened path (SHA-256 check against a checksum published in GitHub release notes) covers security-minded production installs. Amends the unpublished-release precondition in `bootstrap.sh.example`. |
 | Architecture | Separate bootstrap script | Keeps "launch me" and "install the PBX" as two small, independently testable scripts, exactly as the template described. |
 
@@ -50,7 +50,7 @@ every function and non-obvious step.
 
 ### Inputs
 
-- `--ref <branch-or-tag>` — overrides the default ref `1.1`.
+- `--ref <branch-or-tag>` — overrides the default ref `main`.
 - `--no-demo` and `--no-development` — passed through to `install.sh`.
 - `--help` — usage text.
 - Any other argument: reject with a usage message and exit code 1, matching
@@ -209,7 +209,7 @@ assertions plus `Process`-based behavioral tests). Targeted runs use
 Content assertions:
 
 - `scripts/bootstrap.sh` exists; `scripts/bootstrap.sh.example` no longer does.
-- Root check, default ref `1.1`, `--ref` validation, `git ls-remote --exit-code`,
+- Root check, default ref `main`, `--ref` validation, `git ls-remote --exit-code`,
   `git merge --ff-only`, `git status --porcelain` refusal, non-Git refusal
   message, `</dev/tty` hand-off, `exec bash` with passthrough flags, usage
   rejection of unknown arguments, library-only test seam.
@@ -258,8 +258,7 @@ place. Nothing is committed without the maintainer's approval.
 - The GitHub repository stays public and `raw.githubusercontent.com` reachable
   from target servers.
 - The documented URL points into the same branch it installs, so the URL only
-  works once this change has landed on that branch (1.1 after the release
-  sync; main immediately after merge).
+  works once this change has landed on that branch (`main`).
 - Target servers are freshly installed Debian 13, run the bootstrap as root,
   and have network access to GitHub, the SignalWire package repository (for the
   packages FreeSWITCH method), and Packagist.
