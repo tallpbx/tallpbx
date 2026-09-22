@@ -169,7 +169,7 @@ the operator to pre-seed `/etc/pbx/installer.env` (`FSPBX_ADMIN_USERNAME`,
 ### INSTALL.md
 
 - Section 5 becomes three short layers: **One-line installation (recommended)**
-  with the `wget -O- … | bash` command, `curl` alternative, flag passthrough
+  with the `wget -O- … | bash` command, flag passthrough
   examples (`… | bash -s -- --no-demo --no-development`), and the headless
   example; **Verified installation (optional)** — download to a file, verify
   with `sha256sum -c` against the checksum published in the GitHub release

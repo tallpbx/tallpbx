@@ -162,12 +162,7 @@ wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstra
 
 The command downloads a small bootstrap script and runs it. The bootstrap
 prepares the TallPBX source code in `/var/www/tallpbx`, then starts the main
-installer, which asks the setup questions below and installs everything. With
-`curl` instead of `wget`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
-```
+installer, which asks the setup questions below and installs everything.
 
 Re-running the same command later safely updates an existing installation's
 source code and runs the installer again; it keeps all data. Without `--ref`,

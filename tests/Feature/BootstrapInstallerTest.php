@@ -181,7 +181,7 @@ it('presents the one-line install as the primary method', function (): void {
     $install = (string) file_get_contents(base_path('INSTALL.md'));
 
     expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash')
-        ->and($install)->toContain('curl -fsSL https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash')
+        ->and($install)->not->toContain('curl -fsSL')
         ->and($install)->toContain('sha256sum --check')
         ->and($install)->toContain('sha256sum --check &&')
         ->and($install)->toContain('--ref "${release_tag}"')
