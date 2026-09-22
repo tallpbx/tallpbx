@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Standardized 5-Pillar Test Suites Across Top-10 Modules (Phases 1–3)**: Implemented comprehensive 5-pillar test suites across all 10 highest-risk PBX, routing, and telephony modules (`sip-trunks`, `gateways`, `inbound-routes`, `outbound-routes`, `extensions`, `dialplans`, `ring-groups`, `call-centers`, `conferences`, `voicemails`). Standardized coverage includes Service CRUD operations and FreeSWITCH XML generation, Livewire List and Edit component workflows, multi-tenant list scoping, cross-tenant edit IDOR defenses (`assertCanAccessTenantRecord`), `TenantMutationGuard` creation/mutation enforcement, and Livewire action permissions (327 tests, 854 assertions). Added `grantTenantUserPermissions()` test helper to `tests/Pest.php`.
+- **One-Line Bootstrap Installer**: TallPBX can now be installed with a single command (`wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash`), which prepares the source code in `/var/www/tallpbx` and starts the standard installer. The latest `main` branch is installed by default; `--ref` pins a release branch or tag such as `1.1`. Re-running the command safely updates an existing working copy before re-running the installer. Replaces the inactive `scripts/bootstrap.sh.example` reference template.
+- **Automatic IPv4 Preference When the Host Has No IPv6 Default Route**: The installer now detects hosts that advertise IPv6 without a working default route and activates the IPv4 precedence rule in `/etc/gai.conf` automatically, preventing Composer download timeouts that previously required the manual fix documented in INSTALL.md.
 
 ### Changed
 - **Switchable Light & Dark Theme Documentation & Parity Comparisons**: Enhanced documentation across `README.md`, `docs/parity-comparison.md`, and `docs/ui-tour.md` detailing the switchable Light, Dark, and System theme architecture:
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced outdated `ufw` firewall troubleshooting commands in `docs/pbx-hello-world.md` with native TallPBX Security Command Center (`/panel/security`) and `nftables` instructions.
   - Corrected the CLI vs. Web comparison matrix in `docs/security-architecture.md` to reflect the modern unified single-page interface rather than obsolete tabs and modal wizards.
   - Removed redundant "Ingress" and "Egress" labels from packet flow section headings, and rewrote the sliding-window detection explanation in plain English.
+- **Installation Guide Now Leads With the One-Line Command**: INSTALL.md presents the bootstrap command as the primary install method, documents an optional SHA-256 verified installation path, and keeps the manual clone-and-run procedure as a fallback. The former roadmap note about a future bootstrap installer was removed.
 
 ### Fixed
 - **Multi-Tenant Scoping and Access Enforcement in Edit Forms**: Auto-resolved tenant context for non-admin users during mount and save, and added explicit `assertCanAccessTenantRecord()` verification before updating existing records in `QueueEdit`, `ConferencesEdit`, `VoicemailsEdit`, and `RingGroupsEdit`.
@@ -28,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ExtensionsBulkCreate Permission & Multi-Tenant Hardening**: Enforced explicit Livewire action permission gating requiring `extensions.create` for `save` operations on `ExtensionsBulkCreate`, and auto-resolved tenant context for tenant users prior to validation.
 - **SipTrunkService Mutation Guard Compliance**: Updated `SipTrunkService` update and delete operations to invoke Eloquent model methods directly rather than query builder operations, ensuring model lifecycle hooks and `TenantMutationGuard` cross-tenant safety rules fire on tenant mutations.
 - **Inbound & Outbound Route Index Permission Gating**: Added missing `admin.can:inbound-routes.view` and `admin.can:outbound-routes.view` middleware to index route definitions in `app-modules/inbound-routes/routes/web.php` and `app-modules/outbound-routes/routes/web.php`.
+- **Headless Installer Credential Hang**: Non-interactive installer runs in "create administrator during installation" mode without saved credentials now stop with clear guidance instead of waiting forever at the password prompt.
 
 ## [1.1.2] - 2026-09-20
 

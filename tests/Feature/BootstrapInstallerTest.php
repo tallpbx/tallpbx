@@ -17,7 +17,7 @@ it('keeps the bootstrap safe for piped one-line installs', function (): void {
 
     expect($bootstrap)->toContain('set -euo pipefail')
         ->and($bootstrap)->toContain('The TallPBX bootstrap must run as root')
-        ->and($bootstrap)->toContain('requested_ref="1.1"')
+        ->and($bootstrap)->toContain('requested_ref="main"')
         ->and($bootstrap)->toContain('requested_ref="$2"')
         ->and($bootstrap)->toContain('git ls-remote --exit-code')
         ->and($bootstrap)->toContain('git -C "$application_root" merge --ff-only')
@@ -137,4 +137,16 @@ it('refuses to touch a folder that is not a git working copy', function (): void
         ->and($root.'/important.txt')->toBeFile();
 
     File::deleteDirectory($root);
+});
+
+it('presents the one-line install as the primary method', function (): void {
+    $install = (string) file_get_contents(base_path('INSTALL.md'));
+
+    expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash')
+        ->and($install)->toContain('curl -fsSL https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash')
+        ->and($install)->toContain('sha256sum --check')
+        ->and($install)->toContain('bash -s -- --ref 1.1')
+        ->and($install)->not->toContain('bootstrap.sh.example')
+        ->and($install)->not->toContain('(Roadmap)')
+        ->and($install)->not->toContain('bash ./scripts/install.sh --no-demo');
 });

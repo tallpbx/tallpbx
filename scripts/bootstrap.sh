@@ -4,7 +4,7 @@
 # ==============================================================================
 # This small launcher makes a full TallPBX installation a single command:
 #
-#   wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/1.1/scripts/bootstrap.sh | bash
+#   wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
 #
 # It prepares the TallPBX source code at /var/www/tallpbx and then starts the
 # main installer (scripts/install.sh), which asks the normal setup questions
@@ -12,7 +12,7 @@
 # source code safely and runs the installer again.
 #
 # Options:
-#   --ref <branch-or-tag>   Install a specific branch or tag (default: 1.1).
+#   --ref <branch-or-tag>   Install a specific branch or tag (default: main).
 #   --no-demo               Do not ask the installer to add demo data.
 #   --no-development        Do not install development tooling.
 #   --help                  Show this help text.
@@ -29,8 +29,8 @@ set -euo pipefail
 repository_url="https://github.com/tallpbx/tallpbx.git"
 application_root="/var/www/tallpbx"
 
-# The branch installed for normal users. --ref replaces it.
-requested_ref="1.1"
+# The branch installed by default for normal users. --ref replaces it.
+requested_ref="main"
 
 # Options that are forwarded to the main installer unchanged.
 installer_flags=()
@@ -40,10 +40,10 @@ usage () {
     cat <<'USAGE'
 Install TallPBX with one command:
 
-  wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/1.1/scripts/bootstrap.sh | bash
+  wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
 
 Options:
-  --ref <branch-or-tag>   Install a specific branch or tag (default: 1.1).
+  --ref <branch-or-tag>   Install a specific branch or tag (default: main).
   --no-demo               Do not ask the installer to add demo data.
   --no-development        Do not install development tooling.
   --help                  Show this help text.

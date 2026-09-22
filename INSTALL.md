@@ -154,43 +154,68 @@ ip addr show enp0s3
 
 ## 5. Run the Install Script
 
-Clone the repository and run the automated install script:
+Install TallPBX with a single command:
+
+```bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
+```
+
+The command downloads a small bootstrap script and runs it. The bootstrap
+prepares the TallPBX source code in `/var/www/tallpbx`, then starts the main
+installer, which asks the setup questions below and installs everything. With
+`curl` instead of `wget`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
+```
+
+Re-running the same command later safely updates an existing installation's
+source code and runs the installer again; it keeps all data.
+
+With no flags, the interactive installer asks whether to include demo data and
+development tooling. Choose `No` for demo data on a production install; this
+creates the shared Default tenant without sample tenants, users, or extensions.
+The installer separately asks how to create the first administrator. Options
+placed after the extra `-s --` are passed through to the bootstrap and the
+installer. Without `--ref`, the latest `main` branch is installed; the first
+example pins the stable `1.1` release branch instead:
+
+```bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --ref 1.1
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --no-demo
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
+```
+
+A headless run must supply the FreeSWITCH installation method and an
+administrator setup mode as environment values, for example the browser
+activation code:
+
+```bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | FSPBX_FREESWITCH_INSTALL_METHOD=packages FSPBX_INITIAL_ADMIN_MODE=activation-code bash
+```
+
+To create the administrator during installation instead, pre-seed
+`/etc/pbx/installer.env` with `FSPBX_ADMIN_USERNAME` and `FSPBX_ADMIN_PASSWORD`
+before running the same command.
+
+### Verified Installation (Optional)
+
+For production servers, verify the bootstrap before running it. Every release's
+GitHub release notes publish the SHA-256 checksum of `scripts/bootstrap.sh`:
+
+```bash
+wget -O /tmp/tallpbx-bootstrap.sh https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh
+echo "<checksum-from-the-release-notes>  /tmp/tallpbx-bootstrap.sh" | sha256sum --check --status && bash /tmp/tallpbx-bootstrap.sh
+```
+
+### Manual Installation
+
+To prepare the source code yourself (for example from a mirror):
 
 ```bash
 apt-get install -y git && mkdir -p /var/www && cd /var/www && git clone https://github.com/tallpbx/tallpbx.git
 cd /var/www/tallpbx && bash ./scripts/install.sh
 ```
-
-With no flags, the interactive installer asks whether to include demo data and
-development tooling. Choose `No` for demo data on a production install; this
-creates the shared Default tenant without sample tenants, users, or extensions.
-The installer separately asks how to create the first administrator. For
-unattended automation, use one or both of these commands:
-
-```bash
-bash ./scripts/install.sh              # ask both questions
-bash ./scripts/install.sh --no-demo    # do not ask to add demo data
-bash ./scripts/install.sh --no-development # do not install development tooling
-bash ./scripts/install.sh --no-demo --no-development
-```
-
-A headless run that cannot answer the FreeSWITCH installation-method prompt
-must supply the method as an environment value:
-
-```bash
-FSPBX_FREESWITCH_INSTALL_METHOD=packages bash ./scripts/install.sh --no-demo --no-development
-```
-
-### Automated Bootstrap Installer (Roadmap)
-
-Currently, TallPBX is installed directly by cloning the public Git repository
-as shown above.
-
-A future release milestone may provide a standalone bootstrap installer script
-(`curl | bash`), accompanied by published release packages and SHA-256
-checksum verification. The file
-[`scripts/bootstrap.sh.example`](scripts/bootstrap.sh.example) serves as an
-inactive reference template for that planned workflow.
 
 ### Installer Questionnaire
 
@@ -410,6 +435,9 @@ It is safe to run the installer again after an interrupted install or an
 ordinary software update. It keeps existing call data, users, settings, and
 database records. It reuses saved passwords and choices, keeps the existing
 application key, and applies only missing database updates.
+
+You can also re-run the one-line command from Section 5: it safely updates the
+working copy in `/var/www/tallpbx` and then runs this installer again.
 
 On a re-run, the installer:
 

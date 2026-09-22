@@ -76,6 +76,7 @@ php artisan route:list --name=<feature-name>
 - Tags (`v1.0.0`, `v1.1.0`, `v1.0.1`) are reserved strictly for official, finished production releases.
 - Use branch heads and commit SHAs for intermediate work and references.
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
+- Publish the SHA-256 checksum of `scripts/bootstrap.sh` in the GitHub release notes for each release so administrators can use the verified installation path documented in `INSTALL.md`.
 
 ## Application File Permissions
 - `ApplicationFilePermissions` is the authoritative PHP permission service. It exposes `generated`, `runtime`, and `full` scopes through `php artisan permissions:repair --scope=<scope>`. Full repair keeps deployed source owned by `root:www-data` (directories `755`, ordinary files `644`), Composer dependencies owned by `root:www-data` (directories `2775`, files `664`, preserving executable `vendor/bin` entry points), dependency lockfiles `root:www-data` with mode `664`, `.env` `root:www-data` with mode `640`, and `storage/` and `bootstrap/cache/` writable by `www-data` (directories `2775`, files `664`). The setgid directory mode ensures newly created runtime and vendor files keep the `www-data` group.
