@@ -37,7 +37,7 @@ it('installs net-tools as a core Debian dependency', function (): void {
 it('explains that Enter generates the database password', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 
-    expect($installer)->toContain('Press Enter to generate a secure random password.')
+    expect($installer)->toContain('Generate a random password (recommended)')
         ->and($installer)->toContain('Enter 1 or 2 [1]: ');
 });
 
@@ -65,9 +65,9 @@ it('requires an interactive FreeSWITCH installation method choice and persists i
     $mariaDbPosition = strpos($installer, 'run_step "MariaDB" resources/mariadb.sh');
     $freeSwitchPosition = strpos($installer, 'run_step "FreeSWITCH" resources/freeswitch.sh');
 
-    expect($installer)->toContain('Choose how to install FreeSWITCH:')
-        ->and($installer)->toContain('Source: no SignalWire Personal Access Token is required, but compilation takes longer and software updates require recompilation.')
-        ->and($installer)->toContain('Packages: a SignalWire Personal Access Token is required, but installation and updates are faster and easier.')
+    expect($installer)->toContain('How should FreeSWITCH be installed?')
+        ->and($installer)->toContain('no token needed, but slower to install and update')
+        ->and($installer)->toContain('faster install, easy updates (needs a free SignalWire token)')
         ->and($installer)->toContain('FSPBX_FREESWITCH_INSTALL_METHOD')
         ->and($installer)->toContain('FSPBX_FREESWITCH_INSTALLED_METHOD')
         ->and($installer)->toContain('prompt_freeswitch_install_method')
@@ -436,8 +436,10 @@ it('resolves a saved SignalWire token before asking for a new one', function ():
 it('deploys the cloned FreeSwitchPBX application before installing dependencies', function (): void {
     $script = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
     $deploymentPosition = strpos($script, 'Installing FreeSwitchPBX application source');
-    $databasePosition = strpos($script, 'set_env_value .env DB_DATABASE');
+    $envCopyPosition = strpos($script, 'cp .env.example .env');
     $composerPosition = strpos($script, 'composer install --no-interaction --prefer-dist');
+    $databasePosition = strpos($script, 'set_env_value .env DB_DATABASE');
+    $migratePosition = strpos($script, 'php artisan migrate --force');
 
     expect($script)->toContain('app/Support/ModuleServiceProvider.php')
         ->and($script)->toContain('git clone "$source_root" "$application_root"')
@@ -446,10 +448,13 @@ it('deploys the cloned FreeSwitchPBX application before installing dependencies'
         ->and($script)->not->toContain('git -C "$source_root" archive HEAD')
         ->and($script)->not->toContain('composer create-project')
         ->and($deploymentPosition)->not->toBeFalse()
-        ->and($databasePosition)->not->toBeFalse()
+        ->and($envCopyPosition)->not->toBeFalse()
         ->and($composerPosition)->not->toBeFalse()
-        ->and($deploymentPosition)->toBeLessThan($databasePosition)
-        ->and($databasePosition)->toBeLessThan($composerPosition);
+        ->and($databasePosition)->not->toBeFalse()
+        ->and($migratePosition)->not->toBeFalse()
+        ->and($deploymentPosition)->toBeLessThan($envCopyPosition)
+        ->and($envCopyPosition)->toBeLessThan($composerPosition)
+        ->and($databasePosition)->toBeLessThan($migratePosition);
 });
 
 it('preserves encryption and storage link state on installer re-runs', function (): void {
@@ -575,7 +580,7 @@ it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML cu
         ->and($envExample)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000')
         ->and($envExample)->toContain('FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false')
         ->and($envExample)->toContain('PBX_DEFAULT_SIP_PASSWORD=')
-        ->and($installer)->toContain('Confirm FreeSWITCH is running')
+        ->and($installer)->toContain("FreeSWITCH:   fs_cli -x 'status'")
         ->and($installer)->not->toContain('Configure FreeSWITCH integration');
 });
 

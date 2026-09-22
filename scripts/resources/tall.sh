@@ -86,23 +86,15 @@ fi
 
 cd "$application_root"
 
-# Configure database credentials before Composer or Artisan boots Laravel.
-# Laravel's .env.example comments these values as "# DB_*", so use the
-# idempotent writer to activate them without creating duplicates on re-runs.
-verbose "Configuring database environment"
-
 # Start from Laravel's example configuration only on a new application. An
 # existing .env holds installation-specific secrets and is never replaced.
 if [ ! -f .env ]; then
     cp .env.example .env
 fi
 
-set_env_value .env DB_CONNECTION mysql
-set_env_value .env DB_HOST "$database_host"
-set_env_value .env DB_PORT 3306
-set_env_value .env DB_DATABASE "$database_name"
-set_env_value .env DB_USERNAME "$database_username"
-set_env_value .env DB_PASSWORD "$database_password"
+# Write installer mode and method into .env early so the values are available
+# if Composer or Artisan boots Laravel before the full configure step below.
+# Database credentials are written once in the "Configure environment" section.
 set_env_value .env FSPBX_DEMO_MODE "${FSPBX_DEMO_MODE:-false}"
 set_env_value .env FSPBX_DEVELOPMENT_MODE "${FSPBX_DEVELOPMENT_MODE:-false}"
 set_env_value .env FSPBX_FREESWITCH_INSTALL_METHOD "${FSPBX_FREESWITCH_INSTALL_METHOD}"
@@ -314,7 +306,6 @@ php artisan permissions:repair --scope=full
 if [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore ] && [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore.service ]; then
     install -m 0700 /var/www/tallpbx/scripts/resources/tallpbx-restore /usr/local/sbin/tallpbx-restore
     install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore.service /etc/systemd/system/tallpbx-restore@.service
-    systemctl daemon-reload
 fi
 
 # Install the dispatcher that watches approved restore requests. Its directory
@@ -325,43 +316,37 @@ if [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch ]; then
     install -m 0700 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch /usr/local/sbin/tallpbx-restore-dispatch
     install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch.service /etc/systemd/system/
     install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch.path /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable --now tallpbx-restore-dispatch.path
 fi
 
-# Install and enable the FreeSWITCH ESL event listener systemd service.
-# This long-running process subscribes to FreeSWITCH events (call state,
-# registrations, etc.) and dispatches them as Laravel events.
+# Install systemd service units for the background workers that TallPBX needs.
+# All unit files are copied first, then systemd is reloaded once, and finally
+# each service is enabled and started. This avoids redundant daemon-reload calls.
 if [ -f /var/www/tallpbx/scripts/freeswitch-listener.service ]; then
     cp /var/www/tallpbx/scripts/freeswitch-listener.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable freeswitch-listener 2>/dev/null || true
-    systemctl restart freeswitch-listener 2>/dev/null || true
 fi
-
-# Queue jobs (archive transfers, notifications) and the scheduled reconcile
-# sweeps only run when their systemd units are installed and enabled.
 if [ -f /var/www/tallpbx/scripts/tallpbx-queue.service ]; then
     cp /var/www/tallpbx/scripts/tallpbx-queue.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable tallpbx-queue 2>/dev/null || true
-    systemctl restart tallpbx-queue 2>/dev/null || true
 fi
-
 if [ -f /var/www/tallpbx/scripts/tallpbx-scheduler.service ]; then
     cp /var/www/tallpbx/scripts/tallpbx-scheduler.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable tallpbx-scheduler 2>/dev/null || true
-    systemctl restart tallpbx-scheduler 2>/dev/null || true
 fi
-
-# Real-time WebSocket server (Laravel Reverb) for push notifications and
-# reactive dashboard updates. Installing and starting this service provides
-# instant UI updates without background polling.
 if [ -f /var/www/tallpbx/scripts/tallpbx-reverb.service ]; then
     cp /var/www/tallpbx/scripts/tallpbx-reverb.service /etc/systemd/system/
-    systemctl daemon-reload
-    systemctl enable tallpbx-reverb 2>/dev/null || true
-    systemctl restart tallpbx-reverb 2>/dev/null || true
 fi
+
+# Reload systemd once after all unit files are installed, then enable and start
+# each service. The single daemon-reload avoids repeated reloads.
+systemctl daemon-reload
+
+if [ -f /etc/systemd/system/tallpbx-restore-dispatch.path ]; then
+    systemctl enable --now tallpbx-restore-dispatch.path
+fi
+systemctl enable freeswitch-listener 2>/dev/null || true
+systemctl restart freeswitch-listener 2>/dev/null || true
+systemctl enable tallpbx-queue 2>/dev/null || true
+systemctl restart tallpbx-queue 2>/dev/null || true
+systemctl enable tallpbx-scheduler 2>/dev/null || true
+systemctl restart tallpbx-scheduler 2>/dev/null || true
+systemctl enable tallpbx-reverb 2>/dev/null || true
+systemctl restart tallpbx-reverb 2>/dev/null || true
 

@@ -4,26 +4,24 @@ This guide explains how to set up TallPBX on a new Debian 13 server. The main
 install is one command; the sections after it cover optional configuration,
 maintenance, and tuning.
 
-TallPBX is a web-managed phone system that runs on your own server: phones,
-extensions, call routing, voicemail, recordings, and related PBX features,
-powered by FreeSWITCH. It does not include a telephone carrier connection; add
-a SIP trunk or gateway later for public phone network calling.
-
-After the basic install you have a working web panel and the Default tenant,
-ready for your own phones, users, extensions, and trunks. You can also add
-demo data, which creates sample tenants and callable extensions for evaluation.
+TallPBX is a web-managed phone system that runs on your own server. After
+installing, you'll have a working web panel ready for phones, extensions, call
+routing, voicemail, and recordings — all manageable from your browser.
 
 ## 1. Create the Virtual Machine
 
 - **OS Type**: Linux, Debian 13 (64-bit)
 - **Hardware Requirements**:
-  - **Minimum (Production)**:
-    - CPU: 1 vCPU minimum (2+ vCPUs recommended for active PBX workloads)
-    - Storage: 25 GB minimum (40 GB+ recommended for local call recordings and voicemail storage)
-    - RAM: 1 GB minimum
-    - Swap: 2 GB swap minimum
-  - **Recommended (Development)**: 4 vCPUs, 40 GB storage, 4 GB RAM, 2 GB swap
-    *(needed to compile frontend assets and run the test suites).*
+
+| | Minimum (Production) | Recommended (Development) |
+|---|---|---|
+| CPU | 1 vCPU (2+ recommended) | 4 vCPUs |
+| Storage | 25 GB (40 GB+ for recordings) | 40 GB |
+| RAM | 1 GB | 4 GB |
+| Swap | 2 GB | 2 GB |
+
+Development specs are higher because building frontend assets and running
+tests need more CPU and memory.
 
 ## 2. Attach the Installer
 
@@ -54,8 +52,7 @@ Check the current swap:
 swapon --show
 ```
 
-If less than 2 GB is active, create a 2 GB swapfile (`MiB` is the binary unit
-Linux memory tools use, so `count=2048` gives a little over 2 GB):
+If less than 2 GB is active, create a 2 GB swapfile:
 
 ```bash
 swapoff /swapfile
@@ -84,31 +81,6 @@ Verify that the swapfile is active:
 swapon --show
 free -h
 ```
-
-### IPv4 Preference on Hosts Without an IPv6 Default Route
-
-Some VPS providers assign a global IPv6 address without a default IPv6 route.
-PHP then tries IPv6 first when it downloads files from dual-stack hosts such as
-`getcomposer.org`, waits for the connection to time out, and the installer
-fails at the "Installing Composer" step with:
-
-```text
-PHP Warning: copy(https://getcomposer.org/installer): Failed to open stream: Connection timed out
-```
-
-The installer now detects this situation automatically and asks the whole
-system to prefer IPv4 by activating the IPv4 precedence rule in `/etc/gai.conf`.
-Hosts with a working IPv6 default route, or hosts where the rule is already
-active, are left untouched.
-
-To confirm the rule after an install:
-
-```bash
-grep precedence /etc/gai.conf   # the ::ffff:0:0/96 line should be active
-```
-
-To undo the preference manually, put a `#` back in front of the
-`precedence ::ffff:0:0/96  100` line (or remove the line).
 
 ## 4. Configure a Static IP Address (Optional)
 
@@ -147,12 +119,13 @@ The command downloads a small bootstrap script and runs it. The bootstrap
 prepares the TallPBX source code in `/var/www/tallpbx`, then starts the main
 installer, which asks a few setup questions and installs everything.
 
-Re-running the command is always safe: the installer is idempotent, meaning it
-can be run repeatedly without affecting existing data, and it updates TallPBX
-in place. Use the same `--ref` value every time: without it, the re-run
-switches the working copy to `main`.
+Re-running the command is safe — the installer can run repeatedly without
+affecting existing data, and it updates TallPBX in place. See
+[Running the Installer Again](#running-the-installer-again) for details. Use
+the same `--ref` value every time: without it, the re-run switches the working
+copy to `main`.
 
-Options placed after `-s --` are passed to the bootstrap and the installer:
+To customize the installation, add options after `-s --`:
 
 ```bash
 # Pin the stable 1.1 release branch instead of the default main:
@@ -168,6 +141,10 @@ wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstra
 ### First Administrator Setup
 
 The installer asks how to create the first administrator:
+
+> [!TIP]
+> **Option 1 is recommended for most users.** It's the simplest path — you'll
+> have a working admin account as soon as the installer finishes.
 
 1. **Create during installation (default)** — enter the administrator email and
    password at the prompt; TallPBX creates the account before finishing.
@@ -311,6 +288,13 @@ The installer asks whether to install FreeSWITCH from packages or from source
 code, and remembers the choice. Switching later removes the old FreeSWITCH
 program first; your database and recordings are untouched.
 
+| | Packages (recommended) | Source build |
+|---|---|---|
+| Speed | Fast (pre-built binaries) | Slow (compiles on your server) |
+| Updates | `apt upgrade` | Rebuild from source |
+| Token required | Yes (free SignalWire PAT) | No |
+| Best for | Most servers | Custom FreeSWITCH development |
+
 **Package install (recommended for most servers).** Faster to install and
 update, and installs the modules TallPBX needs for phones, voicemail,
 recordings, queues, music, and dynamic configuration. It requires a free
@@ -334,6 +318,11 @@ whether to rebuild the source installation.
 
 Helper scripts cover free Let's Encrypt certificates and Cloudflare DNS. Run
 them after the main install, once a public domain name points at the server.
+
+> [!IMPORTANT]
+> Before requesting a certificate, make sure your domain name's DNS A record
+> points to this server's public IP address. Let's Encrypt verifies ownership
+> by connecting to your server over the internet on port 80.
 
 ### Let's Encrypt (Single Domain)
 
@@ -367,8 +356,13 @@ For a certificate from another provider, place `fullchain.pem` and
 
 ## Upgrading TallPBX
 
+> [!CAUTION]
+> Always take a full backup before upgrading. Database updates move forward and
+> cannot be easily reversed. If an upgrade fails, restoring the backup is the
+> safest recovery path.
+
 The simplest update is to re-run the one-line command from Section 5: it
-updates the working copy and re-runs the idempotent installer, keeping your
+updates the working copy and re-runs the installer, keeping your
 data. To update manually, take a backup first, then from `/var/www/tallpbx`:
 
 ```bash
@@ -413,3 +407,41 @@ git stash pop
 
 If the final command reports a conflict, resolve it before continuing. The
 saved change remains available as a Git stash until it is applied successfully.
+
+## Troubleshooting
+
+### Installer Fails at "Installing Composer"
+
+Some VPS providers assign a global IPv6 address without a default IPv6 route.
+PHP tries IPv6 first when downloading files, the connection times out, and
+the installer fails with:
+
+```text
+PHP Warning: copy(https://getcomposer.org/installer): Failed to open stream: Connection timed out
+```
+
+The installer detects this automatically and configures the system to prefer
+IPv4 by activating the IPv4 precedence rule in `/etc/gai.conf`. If the
+detection did not run (for example, on a manual Composer install), activate
+the rule yourself:
+
+```bash
+# Uncomment or add this line in /etc/gai.conf:
+precedence ::ffff:0:0/96  100
+```
+
+To undo the preference later, comment out or remove that line.
+
+### SignalWire Token Rejected
+
+If the FreeSWITCH package step fails with an authentication error, the saved
+token may have expired or been revoked. Re-run the installer — it will ask for
+a new token. You can also update the token directly:
+
+```bash
+nano /etc/pbx/installer.env   # update the SWITCH_TOKEN line
+```
+
+### Git Conflicts During Upgrade
+
+See [If Git Will Not Pull the Update](#if-git-will-not-pull-the-update) above.

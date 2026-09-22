@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Corrected the CLI vs. Web comparison matrix in `docs/security-architecture.md` to reflect the modern unified single-page interface rather than obsolete tabs and modal wizards.
   - Removed redundant "Ingress" and "Egress" labels from packet flow section headings, and rewrote the sliding-window detection explanation in plain English.
 - **Installation Guide Simplified Around the One-Line Command**: INSTALL.md presents the bootstrap command as the primary install method, then was greatly condensed: the manual-installation, headless-run, and installer-questionnaire sections plus the VM platform line were removed, the service-management table and health-check/test commands moved to `docs/operations.md` with a pointer from the guide, and the maintenance and tuning sections were shortened. The former roadmap note about a future bootstrap installer was removed.
+- **Installer Streamlining & User-Friendliness Polish**: Improved the installation experience across terminal scripts and documentation:
+  - Added numbered step indicators (`[1/6] --- Step Name ---`) and total elapsed execution time to `scripts/install.sh`.
+  - Upgraded the installation completion banner to a clean bordered card highlighting the web panel URL, status verification commands, demo credentials, and actionable next steps.
+  - Simplified interactive prompts for database password generation and FreeSWITCH install method with clear plain-language recommendations.
+  - Improved `scripts/bootstrap.sh` non-root error messaging with exact command examples.
+  - Streamlined `scripts/resources/tall.sh` by removing redundant `.env` database writes and consolidating multiple `systemctl daemon-reload` calls into a single invocation after all units are copied.
+  - Added visual comparison tables for hardware requirements and FreeSWITCH install choices, plus GitHub alert callouts (`[!TIP]`, `[!IMPORTANT]`, `[!CAUTION]`), and an install-time troubleshooting section in `INSTALL.md`.
+  - Added post-installation troubleshooting to `docs/operations.md` for 502 web errors, file permission drift, FreeSWITCH startup/registration issues, and Redis restoration.
 
 ### Fixed
 - **Multi-Tenant Scoping and Access Enforcement in Edit Forms**: Auto-resolved tenant context for non-admin users during mount and save, and added explicit `assertCanAccessTenantRecord()` verification before updating existing records in `QueueEdit`, `ConferencesEdit`, `VoicemailsEdit`, and `RingGroupsEdit`.

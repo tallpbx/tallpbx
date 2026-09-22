@@ -19,6 +19,9 @@
 # Don't show apt prompts during install (use all defaults)
 export DEBIAN_FRONTEND=noninteractive
 
+# Track how long the installation takes so the summary can show elapsed time.
+INSTALL_START_SECONDS=$SECONDS
+
 # --- Parse flags ---
 # Production defaults are the safe baseline for unattended installs. Interactive
 # installs may opt into demo tenants, users, and extensions at the prompt below.
@@ -114,11 +117,12 @@ prompt_freeswitch_install_method () {
     local choice
 
     echo ""
-    verbose "Choose how to install FreeSWITCH:"
-    echo "  1) Packages (SignalWire)"
-    echo "     Packages: a SignalWire Personal Access Token is required, but installation and updates are faster and easier."
-    echo "  2) Source (build from GitHub)"
-    echo "     Source: no SignalWire Personal Access Token is required, but compilation takes longer and software updates require recompilation."
+    verbose "How should FreeSWITCH be installed?"
+    echo ""
+    echo "  1) Packages — faster install, easy updates (needs a free SignalWire token)"
+    echo "  2) Source  — no token needed, but slower to install and update"
+    echo ""
+    echo "  Most servers should use packages (option 1)."
     echo ""
 
     while true; do
@@ -272,10 +276,12 @@ if [ -n "$saved_database_password" ]; then
     verbose "Reusing the existing database password"
 else
     echo ""
-    verbose "Database password setup"
-    echo "  1) Generate a random password"
-    echo "  2) Enter a password manually"
-    echo "  Press Enter to generate a secure random password."
+    verbose "Database password"
+    echo "  The installer can generate a strong random password (recommended),"
+    echo "  or you can choose your own."
+    echo ""
+    echo "  1) Generate a random password (recommended)"
+    echo "  2) Enter my own password"
     echo ""
     read -rp "Enter 1 or 2 [1]: " password_choice
 
@@ -487,15 +493,21 @@ fi
 # unsuccessfully and can always be re-run after the reported issue is fixed.
 FAILED_STEPS=()
 
+# Total number of major installer steps, used for the progress counter.
+INSTALLER_TOTAL_STEPS=6
+INSTALLER_CURRENT_STEP=0
+
 # Run an installer step and track whether it succeeded or failed.
-# If a step's script is missing or can't run, we log the failure
-# and move on to the next step.
+# Shows a [1/6] progress counter so the operator can see how far along the
+# install is.
 run_step () {
     local step_name="$1"
     local step_script="$2"
 
+    INSTALLER_CURRENT_STEP=$((INSTALLER_CURRENT_STEP + 1))
+
     echo ""
-    verbose "--- $step_name ---"
+    verbose "[$INSTALLER_CURRENT_STEP/$INSTALLER_TOTAL_STEPS] --- $step_name ---"
 
     # Resource scripts are part of the checked-out source. Invoke them through
     # Bash so an installer rerun does not change their tracked file modes.
@@ -671,8 +683,11 @@ if ! configure_initial_administrator; then
 fi
 
 # --- Summary ---
+elapsed=$(( SECONDS - INSTALL_START_SECONDS ))
+elapsed_minutes=$(( elapsed / 60 ))
+elapsed_seconds=$(( elapsed % 60 ))
+
 echo ""
-verbose "========================"
 
 if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
     error "Installation finished with ${#FAILED_STEPS[@]} failed step(s):"
@@ -685,18 +700,27 @@ if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
     warning "Fix the reported issue and re-run the installer; completed steps are designed to be safe to repeat."
     exit 1
 else
-    verbose "Installation complete!"
-    verbose "======================="
+    echo ""
+    verbose "╔══════════════════════════════════════════════════════════╗"
+    verbose "║            TallPBX Installation Complete!                ║"
+    verbose "╠══════════════════════════════════════════════════════════╣"
+    echo ""
+    verbose "  Web Panel:    http://$(hostname -I | awk '{print $1}')/panel/login"
+    verbose "  FreeSWITCH:   fs_cli -x 'status'"
+    verbose "  Log file:     $LOG_FILE"
     echo ""
     if [ "$DEMO_MODE" = true ]; then
-        verbose "  Demo data: 2 tenants (TallPBX, Acme Corp), 4 extensions"
-        verbose "            4 users (1 shared across both tenants)"
+        verbose "  Demo data:    2 tenants (TallPBX, Acme Corp), 4 extensions"
+        verbose "                4 users (1 shared across both tenants)"
+        echo ""
     fi
+    verbose "  Next steps:"
+    verbose "    • Sign in and configure your first extensions"
+    verbose "    • Add a SIP trunk for external calling"
+    verbose "    • Set up HTTPS: see INSTALL.md Section 7"
+    verbose "    • Configure email: Panel → Email Connector"
     echo ""
-    verbose "Next steps:"
-    verbose "  1. Log in at http://$(hostname -I | awk '{print $1}')/panel/login"
-    verbose "  2. Confirm FreeSWITCH is running: fs_cli -x 'status'"
+    verbose "  Completed in ${elapsed_minutes}m ${elapsed_seconds}s"
+    echo ""
+    verbose "╚══════════════════════════════════════════════════════════╝"
 fi
-
-echo ""
-verbose "Full log saved to: $LOG_FILE"

@@ -54,7 +54,9 @@ USAGE
 # database content needs root, exactly like the manual install instructions.
 require_root () {
     if [ "$EUID" -ne 0 ]; then
-        echo "The TallPBX bootstrap must run as root (log in as root, or use sudo)." >&2
+        echo "The TallPBX bootstrap must run as root. Try one of:" >&2
+        echo "  • Log in as root and run the command again" >&2
+        echo "  • Prefix the command with: sudo bash -c 'wget -O- ... | bash'" >&2
         exit 1
     fi
 }

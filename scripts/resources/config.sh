@@ -23,12 +23,16 @@ db_version=11.8                              # MariaDB version the installer con
 
 # FreeSWITCH Settings
 switch_branch=stable                         # FreeSWITCH Git branch when source installation is selected
-switch_source=false                          # Older direct-script source-install fallback; main installer asks instead
-switch_package=true                          # Older direct-script package-install fallback; main installer asks instead
-switch_version=1.11                          # FreeSWITCH version hint used by legacy configuration
 switch_tls=true                              # Keep TLS support enabled for FreeSWITCH
 switch_token=                                # Optional SignalWire token; otherwise the preflight asks once
                                              # Get a token from https://signalwire.com
+
+# LEGACY — DO NOT EDIT. These are kept for backward compatibility with older
+# direct-script invocations. The main installer's preflight questionnaire
+# controls the FreeSWITCH installation method instead.
+switch_source=false                          # Older direct-script source-install fallback
+switch_package=true                          # Older direct-script package-install fallback
+switch_version=1.11                          # FreeSWITCH version hint used by legacy configuration
 
 # Browser Testing (Optional)
 # Install Chromium for Laravel Dusk browser tests:
