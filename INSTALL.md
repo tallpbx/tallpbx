@@ -170,7 +170,9 @@ curl -fsSL https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootst
 ```
 
 Re-running the same command later safely updates an existing installation's
-source code and runs the installer again; it keeps all data.
+source code and runs the installer again; it keeps all data. Without `--ref`,
+the working copy follows `main`; repeat your `--ref` choice on every run to
+stay on a release branch or tag.
 
 With no flags, the interactive installer asks whether to include demo data and
 development tooling. Choose `No` for demo data on a production install; this
@@ -200,13 +202,19 @@ before running the same command.
 
 ### Verified Installation (Optional)
 
-For production servers, verify the bootstrap before running it. Every release's
-GitHub release notes publish the SHA-256 checksum of `scripts/bootstrap.sh`:
+For production servers, install a release and verify the bootstrap before
+running it. The GitHub release notes for every release publish the SHA-256
+checksum of `scripts/bootstrap.sh` at that release tag:
 
 ```bash
-wget -O /tmp/tallpbx-bootstrap.sh https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh
-echo "<checksum-from-the-release-notes>  /tmp/tallpbx-bootstrap.sh" | sha256sum --check --status && bash /tmp/tallpbx-bootstrap.sh
+release_tag="v1.1.2"   # the release you are installing
+wget -O /tmp/tallpbx-bootstrap.sh "https://raw.githubusercontent.com/tallpbx/tallpbx/${release_tag}/scripts/bootstrap.sh"
+echo "<checksum-from-the-release-notes>  /tmp/tallpbx-bootstrap.sh" | sha256sum --check && bash /tmp/tallpbx-bootstrap.sh --ref "${release_tag}"
 ```
+
+The checksum must come from the same release tag used in the download URL and
+in `--ref`. When the checksum does not match, the check fails visibly and the
+install does not start.
 
 ### Manual Installation
 
@@ -437,7 +445,8 @@ database records. It reuses saved passwords and choices, keeps the existing
 application key, and applies only missing database updates.
 
 You can also re-run the one-line command from Section 5: it safely updates the
-working copy in `/var/www/tallpbx` and then runs this installer again.
+working copy in `/var/www/tallpbx` and then runs this installer again. Repeat
+your `--ref` choice on every run; without it the working copy follows `main`.
 
 On a re-run, the installer:
 
