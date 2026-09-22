@@ -440,6 +440,15 @@ if [ "$FSPBX_INITIAL_ADMIN_MODE" = installer ] \
     admin_password=$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_ADMIN_PASSWORD)
 
     if [ -z "$admin_username" ] || [ -z "$admin_password" ]; then
+        # A run without a terminal cannot answer the questions below; the
+        # password loop would wait at end-of-input forever. Stop with clear
+        # guidance instead of hanging.
+        if [ ! -t 0 ]; then
+            error "A non-interactive install cannot ask for administrator credentials."
+            error "Pre-seed /etc/pbx/installer.env with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD, or choose FSPBX_INITIAL_ADMIN_MODE=activation-code."
+            exit 1
+        fi
+
         echo ""
         verbose "Administrator account details"
         verbose "Default email: $default_admin_username"

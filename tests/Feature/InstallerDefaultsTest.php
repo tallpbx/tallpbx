@@ -834,3 +834,14 @@ it('checks the IPv6 route before the first package download step', function (): 
         ->and($install)->toContain('activating the IPv4 precedence rule in `/etc/gai.conf`')
         ->and($install)->not->toContain("sed -i 's/^#\\s*precedence");
 });
+
+it('stops headless installs before prompting for administrator credentials', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+    $guardPosition = strpos($installer, 'A non-interactive install cannot ask for administrator credentials.');
+    $promptPosition = strpos($installer, 'read -rsp "Admin password: "');
+
+    expect($guardPosition)->not->toBeFalse()
+        ->and($promptPosition)->not->toBeFalse()
+        ->and($installer)->toContain('Pre-seed /etc/pbx/installer.env with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD')
+        ->and($guardPosition)->toBeLessThan($promptPosition);
+});
