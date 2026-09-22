@@ -184,12 +184,35 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->not->toContain('curl -fsSL')
         ->and($install)->not->toContain('sha256sum')
         ->and($install)->not->toContain('Verified Installation')
+        ->and($install)->toContain('the installer is idempotent')
         ->and($install)->toContain('same `--ref` value every time')
-        ->and($install)->toContain('chooses how the first administrator is created')
+        ->and($install)->not->toContain('VMware or VirtualBox')
+        ->and($install)->not->toContain('Manual Installation')
+        ->and($install)->not->toContain('A headless run')
+        ->and($install)->not->toContain('Installer Questionnaire')
+        ->and($install)->not->toContain('sets up PHP 8.5')
+        ->and($install)->toContain('in-memory storage')
+        ->and($install)->not->toContain('temporary storage')
+        ->and($install)->not->toContain('Bridged or Host-Only')
+        ->and($install)->toContain('docs/operations.md')
+        ->and($install)->not->toContain('systemctl status <name>')
+        ->and($install)->not->toContain('app:test')
         ->and($install)->toContain('Options placed after `-s --` are passed to the bootstrap and the installer')
         ->and($install)->toContain('# Pin the stable 1.1 release branch instead of the default main:')
         ->and($install)->toContain('bash -s -- --ref 1.1')
         ->and($install)->not->toContain('bootstrap.sh.example')
         ->and($install)->not->toContain('(Roadmap)')
         ->and($install)->not->toContain('bash ./scripts/install.sh --no-demo');
+});
+
+it('documents service management in the operations guide', function (): void {
+    $operations = (string) file_get_contents(base_path('docs/operations.md'));
+
+    expect($operations)->toContain('## Service Management')
+        ->and($operations)->toContain('systemctl status <name>')
+        ->and($operations)->toContain('tallpbx-queue')
+        ->and($operations)->toContain('In-memory storage')
+        ->and($operations)->toContain('php artisan app:test --smoke')
+        ->and($operations)->toContain('php artisan app:test --full')
+        ->and($operations)->toContain('php artisan app:test --sequential');
 });

@@ -168,11 +168,14 @@ the operator to pre-seed `/etc/pbx/installer.env` (`FSPBX_ADMIN_USERNAME`,
 
 ### INSTALL.md
 
-- Section 5 becomes two short layers: **One-line installation (recommended)**
-  with the `wget -O- … | bash` command, flag passthrough
-  examples (`… | bash -s -- --no-demo --no-development`), and the headless
-  example; **Manual installation** — today's clone commands, kept for parity
-  and for servers that clone from a mirror.
+- Section 5 became a single short path: the `wget -O- … | bash` command,
+  flag passthrough examples (`… | bash -s -- --no-demo --no-development`), the
+  idempotent re-run note, administrator setup, and compact maintenance
+  sections. A later simplification pass (September 22, 2026) removed the
+  manual-installation, headless, and installer-questionnaire sections, the VM
+  platform line, and condensed the remaining operational guidance; the
+  service-management table and the health-check/test commands moved to
+  `docs/operations.md` with a pointer left in the guide.
 - The "Automated Bootstrap Installer (Roadmap)" subsection is deleted, replaced
   by the real behavior above.
 - The "Prefer IPv4 When the Host Has No IPv6 Default Route" procedure becomes a
@@ -230,7 +233,10 @@ Ordering assertions in `install.sh`:
 Documentation assertions:
 
 - INSTALL.md contains the one-liner URL and no longer references
-  `bootstrap.sh.example` or a checksum-verification procedure.
+  `bootstrap.sh.example`, a checksum-verification procedure, the
+  manual-installation or headless instructions, the installer-questionnaire
+  section, the service-management table or health-check/test guidance (now in
+  `docs/operations.md`), or the VM platform line.
 
 Definition of done: the new and existing installer test suites pass
 (`--filter`), `php artisan optimize:clear` runs clean, `vendor/bin/pint --dirty
