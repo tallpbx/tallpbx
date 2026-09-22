@@ -198,22 +198,6 @@ To create the administrator during installation instead, pre-seed
 `/etc/pbx/installer.env` with `FSPBX_ADMIN_USERNAME` and `FSPBX_ADMIN_PASSWORD`
 before running the same command.
 
-### Verified Installation (Optional)
-
-For production servers, install a release and verify the bootstrap before
-running it. The GitHub release notes for every release publish the SHA-256
-checksum of `scripts/bootstrap.sh` at that release tag:
-
-```bash
-release_tag="v1.1.2"   # the release you are installing
-wget -O /tmp/tallpbx-bootstrap.sh "https://raw.githubusercontent.com/tallpbx/tallpbx/${release_tag}/scripts/bootstrap.sh"
-echo "<checksum-from-the-release-notes>  /tmp/tallpbx-bootstrap.sh" | sha256sum --check && bash /tmp/tallpbx-bootstrap.sh --ref "${release_tag}"
-```
-
-The checksum must come from the same release tag used in the download URL and
-in `--ref`. When the checksum does not match, the check fails visibly and the
-install does not start.
-
 ### Manual Installation
 
 To prepare the source code yourself (for example from a mirror):

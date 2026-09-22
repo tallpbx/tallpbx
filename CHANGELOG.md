@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaced outdated `ufw` firewall troubleshooting commands in `docs/pbx-hello-world.md` with native TallPBX Security Command Center (`/panel/security`) and `nftables` instructions.
   - Corrected the CLI vs. Web comparison matrix in `docs/security-architecture.md` to reflect the modern unified single-page interface rather than obsolete tabs and modal wizards.
   - Removed redundant "Ingress" and "Egress" labels from packet flow section headings, and rewrote the sliding-window detection explanation in plain English.
-- **Installation Guide Now Leads With the One-Line Command**: INSTALL.md presents the bootstrap command as the primary install method, documents an optional SHA-256 verified installation path, and keeps the manual clone-and-run procedure as a fallback. The former roadmap note about a future bootstrap installer was removed.
+- **Installation Guide Now Leads With the One-Line Command**: INSTALL.md presents the bootstrap command as the primary install method and keeps the manual clone-and-run procedure as a fallback. The former roadmap note about a future bootstrap installer was removed.
 
 ### Fixed
 - **Multi-Tenant Scoping and Access Enforcement in Edit Forms**: Auto-resolved tenant context for non-admin users during mount and save, and added explicit `assertCanAccessTenantRecord()` verification before updating existing records in `QueueEdit`, `ConferencesEdit`, `VoicemailsEdit`, and `RingGroupsEdit`.

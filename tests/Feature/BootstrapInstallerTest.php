@@ -182,9 +182,8 @@ it('presents the one-line install as the primary method', function (): void {
 
     expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash')
         ->and($install)->not->toContain('curl -fsSL')
-        ->and($install)->toContain('sha256sum --check')
-        ->and($install)->toContain('sha256sum --check &&')
-        ->and($install)->toContain('--ref "${release_tag}"')
+        ->and($install)->not->toContain('sha256sum')
+        ->and($install)->not->toContain('Verified Installation')
         ->and($install)->toContain('same `--ref` value every time')
         ->and($install)->toContain('chooses how the first administrator is created')
         ->and($install)->toContain('Options placed after `-s --` are passed to the bootstrap and the installer')

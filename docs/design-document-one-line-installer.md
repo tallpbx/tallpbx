@@ -37,7 +37,7 @@ that INSTALL.md currently asks administrators to perform by hand.
 | --- | --- | --- |
 | Experience | One command, interactive | The installer's questionnaire (demo data, development tooling, FreeSWITCH method, administrator setup) still runs in the same terminal. |
 | Default source | `main` | Maintainer decision (September 22, 2026): the one-line installer delivers the latest installer from `main`; `--ref` pins a release branch or tag (for example `1.1` or `v1.1.2`) when reproducibility matters. |
-| Integrity | HTTPS pipe as the primary path, plus a documented verified alternative | Matches the FreePBX/FusionPBX simplicity; the hardened path (SHA-256 check against a checksum published in GitHub release notes) covers security-minded production installs. Amends the unpublished-release precondition in `bootstrap.sh.example`. |
+| Integrity | HTTPS pipe only | Matches the FreePBX/FusionPBX simplicity; integrity rests on TLS and GitHub account security. The opt-in verified path was removed on September 22, 2026 because a same-channel checksum added little beyond TLS. Amends the unpublished-release precondition in `bootstrap.sh.example`. |
 | Architecture | Separate bootstrap script | Keeps "launch me" and "install the PBX" as two small, independently testable scripts, exactly as the template described. |
 
 ## Component 1: New `scripts/bootstrap.sh`
@@ -168,13 +168,11 @@ the operator to pre-seed `/etc/pbx/installer.env` (`FSPBX_ADMIN_USERNAME`,
 
 ### INSTALL.md
 
-- Section 5 becomes three short layers: **One-line installation (recommended)**
+- Section 5 becomes two short layers: **One-line installation (recommended)**
   with the `wget -O- … | bash` command, flag passthrough
   examples (`… | bash -s -- --no-demo --no-development`), and the headless
-  example; **Verified installation (optional)** — download to a file, verify
-  with `sha256sum -c` against the checksum published in the GitHub release
-  notes, then run; **Manual installation** — today's clone commands, kept for
-  parity and for servers that clone from a mirror.
+  example; **Manual installation** — today's clone commands, kept for parity
+  and for servers that clone from a mirror.
 - The "Automated Bootstrap Installer (Roadmap)" subsection is deleted, replaced
   by the real behavior above.
 - The "Prefer IPv4 When the Host Has No IPv6 Default Route" procedure becomes a
@@ -186,9 +184,8 @@ the operator to pre-seed `/etc/pbx/installer.env` (`FSPBX_ADMIN_USERNAME`,
 
 ### AGENTS.md
 
-The release process section gains one line: publish the SHA-256 of
-`scripts/bootstrap.sh` in the GitHub release notes so the verified installation
-path works.
+No release-process change; the checksum-publication line was removed together
+with the verified installation path on September 22, 2026.
 
 ### CHANGELOG.md (`[Unreleased]`)
 
@@ -232,8 +229,8 @@ Ordering assertions in `install.sh`:
 
 Documentation assertions:
 
-- INSTALL.md contains the one-liner URL and the `sha256sum` verified path, and
-  no longer references `bootstrap.sh.example`.
+- INSTALL.md contains the one-liner URL and no longer references
+  `bootstrap.sh.example` or a checksum-verification procedure.
 
 Definition of done: the new and existing installer test suites pass
 (`--filter`), `php artisan optimize:clear` runs clean, `vendor/bin/pint --dirty
@@ -242,9 +239,8 @@ place. Nothing is committed without the maintainer's approval.
 
 ## Security Considerations
 
-- The primary path relies on HTTPS and GitHub account security, matching the
-  references; the verified path adds an independent SHA-256 check for
-  production installs.
+- Integrity relies on HTTPS and GitHub account security, matching the
+  references; no checksum-verification procedure is documented.
 - The bootstrap downloads only from the hardcoded repository URL and clamps the
   ref to a safe character set, so a hostile ref cannot inject Git options.
 - No destructive Git operations: dirty or diverged working copies are refused
@@ -266,8 +262,7 @@ place. Nothing is committed without the maintainer's approval.
 ## Non-Goals
 
 - No custom install domain (no `get.tallpbx.com`); plain GitHub URLs only.
-- No automated release-asset publishing; the verified path stays a documented
-  manual procedure with the checksum published in release notes.
+- No automated release-asset publishing or checksum-based verification.
 - No changes to the installer questionnaire semantics, module behavior, or the
   manual upgrade path.
 - No OS hard-gating in the bootstrap.
