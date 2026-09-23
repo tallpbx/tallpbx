@@ -193,6 +193,80 @@ prompt_initial_admin_mode () {
     done
 }
 
+# Prompt for additional FreeSWITCH sound prompt languages (Spanish, French)
+# and select which language FreeSWITCH will use as its system default.
+prompt_sound_languages () {
+    local current_languages="${1:-en}"
+    local current_default="${2:-en}"
+    local install_additional=""
+    local choices=""
+    local default_choice=""
+    local default_additional_prompt="N"
+
+    if [[ "$current_languages" == *"es"* ]] || [[ "$current_languages" == *"fr"* ]]; then
+        default_additional_prompt="y"
+    fi
+
+    echo ""
+    verbose "FreeSWITCH sound prompt languages"
+    echo "  US English (Callie) is installed by default."
+    echo ""
+    read -rp "Install additional sound prompt languages (Spanish, French)? [y/N] " install_additional
+    install_additional="${install_additional:-$default_additional_prompt}"
+
+    case "${install_additional,,}" in
+        y|yes)
+            echo ""
+            echo "Which sound prompt languages should be installed?"
+            echo "  1) Spanish (es)"
+            echo "  2) French (fr)"
+            echo "  3) Spanish and French (es, fr)"
+            echo ""
+            read -rp "Select languages [1-3, default 3]: " choices
+            choices="${choices:-3}"
+
+            case "$choices" in
+                1|es)
+                    FSPBX_SOUND_LANGUAGES="en,es"
+                    ;;
+                2|fr)
+                    FSPBX_SOUND_LANGUAGES="en,fr"
+                    ;;
+                3|all|es,fr|fr,es|*)
+                    FSPBX_SOUND_LANGUAGES="en,es,fr"
+                    ;;
+            esac
+
+            echo ""
+            echo "Which language should FreeSWITCH use as its default sound prompt language?"
+            echo "  1) English (en) [default]"
+            if [[ "$FSPBX_SOUND_LANGUAGES" == *"es"* ]]; then
+                echo "  2) Spanish (es)"
+            fi
+            if [[ "$FSPBX_SOUND_LANGUAGES" == *"fr"* ]]; then
+                echo "  3) French (fr)"
+            fi
+            echo ""
+            read -rp "Default sound prompt language [1]: " default_choice
+            case "${default_choice,,}" in
+                2|es|spanish)
+                    FSPBX_DEFAULT_SOUND_LANGUAGE="es"
+                    ;;
+                3|fr|french)
+                    FSPBX_DEFAULT_SOUND_LANGUAGE="fr"
+                    ;;
+                *)
+                    FSPBX_DEFAULT_SOUND_LANGUAGE="en"
+                    ;;
+            esac
+            ;;
+        *)
+            FSPBX_SOUND_LANGUAGES="en"
+            FSPBX_DEFAULT_SOUND_LANGUAGE="en"
+            ;;
+    esac
+}
+
 # Preserve the previously selected demo mode on installer re-runs. Explicit
 # flags override it, while interactive prompts use it as the default.
 if [ "$DEMO_MODE_EXPLICIT" = false ]; then
@@ -396,6 +470,39 @@ if [ "$FREESWITCH_INSTALL_METHOD" = source ] \
 
     export FSPBX_RECOMPILE_SOURCE="$recompile_source"
 fi
+
+# Sound prompt language selection. English Callie is installed by default;
+# operators may optionally install Spanish (Mario) and French (June), and choose
+# which language FreeSWITCH will use as its system default.
+saved_sound_languages=$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES)
+saved_default_sound_lang=$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_DEFAULT_SOUND_LANGUAGE)
+requested_sound_languages="${FSPBX_SOUND_LANGUAGES:-}"
+requested_default_sound_lang="${FSPBX_DEFAULT_SOUND_LANGUAGE:-}"
+
+if [ -n "$saved_sound_languages" ]; then
+    FSPBX_SOUND_LANGUAGES="$saved_sound_languages"
+elif [ -n "$requested_sound_languages" ]; then
+    FSPBX_SOUND_LANGUAGES="$requested_sound_languages"
+else
+    FSPBX_SOUND_LANGUAGES="en"
+fi
+
+if [ -n "$saved_default_sound_lang" ]; then
+    FSPBX_DEFAULT_SOUND_LANGUAGE="$saved_default_sound_lang"
+elif [ -n "$requested_default_sound_lang" ]; then
+    FSPBX_DEFAULT_SOUND_LANGUAGE="$requested_default_sound_lang"
+else
+    FSPBX_DEFAULT_SOUND_LANGUAGE="en"
+fi
+
+if [ -t 0 ]; then
+    prompt_sound_languages "$FSPBX_SOUND_LANGUAGES" "$FSPBX_DEFAULT_SOUND_LANGUAGE"
+fi
+
+set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES "$FSPBX_SOUND_LANGUAGES"
+set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_DEFAULT_SOUND_LANGUAGE "$FSPBX_DEFAULT_SOUND_LANGUAGE"
+export FSPBX_SOUND_LANGUAGES
+export FSPBX_DEFAULT_SOUND_LANGUAGE
 
 # Gather the initial administrator mode before execution starts.
 # When an administrator has already been created, setup is marked complete.

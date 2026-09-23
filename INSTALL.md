@@ -202,16 +202,33 @@ and sign in with your administrator account. Development tooling also switches
 TallPBX to Laravel's local development mode; without it, production mode is
 used automatically.
 
-### Outgoing Mail (Email Connector)
+### FreeSWITCH Sound Prompt Languages
 
-To enable password resets, voicemail notifications, backup reports, and system
-alerts, sign in to the panel and open **Email Connector**. Standard
-username/password SMTP (including Gmail App Passwords) and OAuth 2.0 (Google,
-Microsoft 365, or a custom provider) are supported.
+The installer offers to install additional sound prompt languages. US English
+(Callie) is installed by default; you can also choose to install Spanish (Mario)
+and French (June).
 
-See `docs/operations.md` for service management (restarting FreeSWITCH, the
-queue worker, Redis, and the other background services), health checks, and
-test commands.
+The installer will also prompt for which language FreeSWITCH should use as its
+system-wide default sound prompt language. You can change this at any time
+after installation with `php artisan pbx:sounds:default <language>` or through
+`vars.xml`; see [docs/operations.md](docs/operations.md#freeswitch-sound-prompt-languages) for details.
+
+### Post-Installation Next Steps
+
+Once the installation finishes, complete these initial setup steps:
+
+1. **Access the Web Panel**: Open the panel address printed by the installer in
+   your browser (e.g., `http://<your-server-ip>/panel`) and log in with your
+   administrator account.
+2. **Configure HTTPS**: Secure your web connection with Let's Encrypt or your
+   own SSL certificate (see [Section 7: HTTPS Certificates](#7-https-certificates-optional)).
+3. **Configure Outgoing Mail (Email Connector)**: In the web panel, navigate to
+   **Email Connector** to set up SMTP or OAuth 2.0 (Google Workspace or Microsoft
+   365) so password resets, voicemail notifications, and system alerts are
+   delivered. See [docs/operations.md](docs/operations.md#outgoing-mail--notifications-email-connector)
+   for connector details and queue worker monitoring.
+4. **Connect Carriers & Trunks**: Add SIP gateways under **PBX > Gateways** for
+   outbound calling and configure inbound DIDs under **PBX > Inbound Routes**.
 
 ### Running the Installer Again
 

@@ -900,3 +900,30 @@ it('prompts interactively for initial admin mode until setup is completed', func
         ->and($installer)->toContain('prompt_initial_admin_mode "$FSPBX_INITIAL_ADMIN_MODE"');
 });
 
+it('supports interactive and headless configuration of FreeSWITCH sound prompt languages', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+    $freeSwitchScript = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+    $installDoc = (string) file_get_contents(base_path('INSTALL.md'));
+    $operationsDoc = (string) file_get_contents(base_path('docs/operations.md'));
+
+    expect($installer)->toContain('prompt_sound_languages ()')
+        ->and($installer)->toContain('FSPBX_SOUND_LANGUAGES')
+        ->and($installer)->toContain('FSPBX_DEFAULT_SOUND_LANGUAGE')
+        ->and($installer)->toContain('prompt_sound_languages "$FSPBX_SOUND_LANGUAGES" "$FSPBX_DEFAULT_SOUND_LANGUAGE"')
+        ->and($freeSwitchScript)->toContain('configure_freeswitch_sound_defaults')
+        ->and($freeSwitchScript)->toContain('freeswitch-sounds-es-ar-mario')
+        ->and($freeSwitchScript)->toContain('freeswitch-sounds-fr-ca-june')
+        ->and($freeSwitchScript)->toContain('freeswitch-mod-say-es')
+        ->and($freeSwitchScript)->toContain('freeswitch-mod-say-fr')
+        ->and($freeSwitchScript)->toContain('default_language=')
+        ->and($freeSwitchScript)->toContain('sound_prefix=')
+        ->and($installDoc)->toContain('### FreeSWITCH Sound Prompt Languages')
+        ->and($installDoc)->toContain('### Post-Installation Next Steps')
+        ->and($installDoc)->toContain('php artisan pbx:sounds:default')
+        ->and($operationsDoc)->toContain('## FreeSWITCH Sound Prompt Languages')
+        ->and($operationsDoc)->toContain('## Outgoing Mail & Notifications (Email Connector)')
+        ->and($operationsDoc)->toContain('php artisan pbx:sounds:list')
+        ->and($operationsDoc)->toContain('php artisan pbx:sounds:install');
+});
+
+

@@ -126,3 +126,142 @@ After restoring Redis, clear stale cache:
 cd /var/www/tallpbx
 php artisan optimize:clear && php artisan optimize
 ```
+
+## Outgoing Mail & Notifications (Email Connector)
+
+TallPBX delivers all transactional emails (password resets, voicemail-to-email
+notifications, backup summaries, and security alerts) asynchronously through
+background queues.
+
+### 1. Setting Up the Connector
+Sign in to the web panel and navigate to **Email Connector**:
+- **Standard SMTP**: Works with any standard mail server, including Postmark,
+  SendGrid, Amazon SES, or Mailgun.
+- **Gmail / Google Workspace**: Supports both standard App Passwords (via SMTP)
+  and secure OAuth 2.0.
+- **Microsoft 365**: Supports OAuth 2.0 with Microsoft Graph or modern SMTP
+  authentication.
+
+Use the in-panel **Send Test Email** button after saving credentials to verify
+connectivity.
+
+### 2. Queue Worker Service
+Outgoing emails are dispatched to the `tallpbx-queue` systemd service so web
+requests remain fast. Ensure the service is active:
+
+```bash
+systemctl status tallpbx-queue
+```
+
+If emails fail to send or queue up, inspect failed jobs with Artisan:
+
+```bash
+cd /var/www/tallpbx
+php artisan queue:failed            # view failed mail jobs and error traces
+php artisan queue:retry all         # retry failed jobs after fixing credentials
+```
+
+---
+
+## FreeSWITCH Sound Prompt Languages
+
+FreeSWITCH uses two components for voice prompts and system announcements:
+1. **Audio files**: Recorded prompts stored in `/usr/share/freeswitch/sounds/{lang}/{dialect}/{voice}/`.
+2. **Grammar "Say" modules**: Modules like `mod_say_en`, `mod_say_es`, and `mod_say_fr` that pronounce numbers, dates, times, currency, and voicemail message counts.
+
+### 1. Managing Languages with Artisan (Recommended)
+
+TallPBX includes built-in Artisan commands that manage sound packages and modules automatically, whether FreeSWITCH was installed from packages or compiled from source.
+
+#### View Installed and Available Languages
+```bash
+cd /var/www/tallpbx
+php artisan pbx:sounds:list
+```
+
+#### Install an Additional Language
+```bash
+# Install Spanish (Mario voice)
+php artisan pbx:sounds:install es
+
+# Install French (June voice) and set it as the default immediately
+php artisan pbx:sounds:install fr --default
+```
+
+#### Change the Default Sound Prompt Language
+```bash
+php artisan pbx:sounds:default es
+```
+This updates the preprocessor directives in `/etc/freeswitch/vars.xml` and reloads FreeSWITCH XML in real time without dropping active calls.
+
+---
+
+### 2. Manual Package Installation (APT-Based FreeSWITCH)
+
+For servers installed using the default package method, you can also manage sound packages directly through APT:
+
+```bash
+# 1. Install sound files and grammar module for Spanish
+apt-get install -y freeswitch-sounds-es-ar-mario freeswitch-mod-say-es
+
+# 2. Or for French
+apt-get install -y freeswitch-sounds-fr-ca-june freeswitch-mod-say-fr
+
+# 3. Enable the grammar module in /etc/freeswitch/autoload_configs/modules.conf.xml
+# Add <load module="mod_say_es"/> under the say modules section
+
+# 4. Load the module into the running FreeSWITCH instance
+fs_cli -x "load mod_say_es"
+
+# 5. Change the default prompt language in /etc/freeswitch/vars.xml
+# Update:
+#   <X-PRE-PROCESS cmd="set" data="default_language=es"/>
+#   <X-PRE-PROCESS cmd="set" data="default_dialect=ar"/>
+#   <X-PRE-PROCESS cmd="set" data="default_voice=mario"/>
+#   <X-PRE-PROCESS cmd="set" data="sound_prefix=$${sounds_dir}/es/ar/mario"/>
+
+# 6. Apply the configuration change
+fs_cli -x "reloadxml"
+```
+
+---
+
+### 3. Manual Source Installation (Compiled FreeSWITCH)
+
+For servers where FreeSWITCH was compiled from source:
+
+#### Step A: Compile the Say Module (if not built during initial setup)
+The FreeSWITCH installer script enables `mod_say_es` and `mod_say_fr` during the initial source build. If your build does not have them, compile from the source directory:
+```bash
+cd /usr/src/freeswitch
+make mod_say_es-install
+make mod_say_fr-install
+```
+
+#### Step B: Download and Extract Sound Archives
+FreeSWITCH hosts official sound archives at `https://files.freeswitch.org/releases/sounds/`:
+```bash
+# Spanish Mario (8 kHz and 16 kHz)
+mkdir -p /usr/share/freeswitch/sounds/es/ar/mario
+curl -sSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-es-ar-mario-8000-1.0.51.tar.gz \
+  | tar -xz -C /usr/share/freeswitch/sounds/es/ar/mario
+curl -sSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-es-ar-mario-16000-1.0.51.tar.gz \
+  | tar -xz -C /usr/share/freeswitch/sounds/es/ar/mario
+chown -R freeswitch:freeswitch /usr/share/freeswitch/sounds/es
+
+# French June (8 kHz and 16 kHz)
+mkdir -p /usr/share/freeswitch/sounds/fr/ca/june
+curl -sSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-fr-ca-june-8000-1.0.51.tar.gz \
+  | tar -xz -C /usr/share/freeswitch/sounds/fr/ca/june
+curl -sSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-fr-ca-june-16000-1.0.51.tar.gz \
+  | tar -xz -C /usr/share/freeswitch/sounds/fr/ca/june
+chown -R freeswitch:freeswitch /usr/share/freeswitch/sounds/fr
+```
+
+#### Step C: Enable Module and Switch Default
+```bash
+fs_cli -x "load mod_say_es"
+# Edit /etc/freeswitch/vars.xml to set default_language=es and sound_prefix
+fs_cli -x "reloadxml"
+```
+

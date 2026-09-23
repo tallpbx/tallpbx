@@ -128,6 +128,50 @@ configure_freeswitch_switch_defaults() {
     verbose "FreeSWITCH sessions-per-second set to ${sessions_per_second}"
 }
 
+# Set the default FreeSWITCH sound prompt language in vars.xml.
+configure_freeswitch_sound_defaults() {
+    local conf_dir=""
+    local vars_xml=""
+    local default_lang="${FSPBX_DEFAULT_SOUND_LANGUAGE:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_DEFAULT_SOUND_LANGUAGE)}"
+    default_lang="${default_lang:-en}"
+
+    conf_dir="$(freeswitch_conf_dir)"
+    vars_xml="${conf_dir}/vars.xml"
+
+    if [ ! -f "$vars_xml" ]; then
+        return 0
+    fi
+
+    local dialect="us"
+    local voice="callie"
+    local sound_path="en/us/callie"
+
+    case "$default_lang" in
+        es)
+            dialect="ar"
+            voice="mario"
+            sound_path="es/ar/mario"
+            ;;
+        fr)
+            dialect="ca"
+            voice="june"
+            sound_path="fr/ca/june"
+            ;;
+        *)
+            dialect="us"
+            voice="callie"
+            sound_path="en/us/callie"
+            ;;
+    esac
+
+    verbose "Setting default FreeSWITCH sound prompt language to $default_lang ($voice)"
+
+    sed -i 's#<X-PRE-PROCESS cmd="set" data="default_language=[^"]*"/>#<X-PRE-PROCESS cmd="set" data="default_language='"$default_lang"'"/>#' "$vars_xml" 2>/dev/null || true
+    sed -i 's#<X-PRE-PROCESS cmd="set" data="default_dialect=[^"]*"/>#<X-PRE-PROCESS cmd="set" data="default_dialect='"$dialect"'"/>#' "$vars_xml" 2>/dev/null || true
+    sed -i 's#<X-PRE-PROCESS cmd="set" data="default_voice=[^"]*"/>#<X-PRE-PROCESS cmd="set" data="default_voice='"$voice"'"/>#' "$vars_xml" 2>/dev/null || true
+    sed -i 's#<X-PRE-PROCESS cmd="set" data="sound_prefix=[^"]*"/>#<X-PRE-PROCESS cmd="set" data="sound_prefix=$${sounds_dir}/'"$sound_path"'"/>#' "$vars_xml" 2>/dev/null || true
+}
+
 # Install the FreeSWITCH hiredis module, including a small compatibility repair
 # for package versions whose required hiredis library is no longer in apt.
 install_freeswitch_hiredis_package() {
@@ -361,6 +405,7 @@ if [ "${1:-}" = "--configure-only" ]; then
     configure_tallpbx_media_root
     configure_freeswitch_systemd_dependencies
     configure_freeswitch_switch_defaults
+    configure_freeswitch_sound_defaults
     configure_dynamic_xml
     systemctl daemon-reload 2>/dev/null || true
     exit 0
@@ -375,7 +420,8 @@ uninstall_freeswitch_packages() {
         freeswitch-mod-local-stream freeswitch-mod-opus freeswitch-mod-png \
         freeswitch-mod-rtc freeswitch-mod-sndfile freeswitch-mod-sofia \
         freeswitch-mod-signalwire freeswitch-mod-verto freeswitch-mod-xml-curl \
-        freeswitch-sounds-en-us-callie
+        freeswitch-sounds-en-us-callie freeswitch-sounds-es-ar-mario freeswitch-sounds-fr-ca-june \
+        freeswitch-mod-say-es freeswitch-mod-say-fr 2>/dev/null || true
     rm -f /etc/apt/auth.conf.d/freeswitch.conf /etc/apt/sources.list.d/freeswitch.list \
         /usr/share/keyrings/signalwire-freeswitch-repo.gpg
 }
@@ -487,7 +533,8 @@ enable_tallpbx_source_modules() {
     # entries are intentionally the FreeSWITCH source-tree module paths.
     for module in applications/mod_callcenter applications/mod_dptools applications/mod_voicemail \
         applications/mod_hiredis endpoints/mod_sofia formats/mod_av \
-        formats/mod_local_stream formats/mod_sndfile xml_int/mod_xml_curl; do
+        formats/mod_local_stream formats/mod_sndfile xml_int/mod_xml_curl \
+        say/mod_say_es say/mod_say_fr; do
         sed -i "s|^#${module}|${module}|" "$modules_file"
     done
 }
@@ -609,6 +656,27 @@ if [ "$freeswitch_install_method" = "source" ]; then
     make -j "$(nproc)"
     make install
     make cd-sounds-install cd-moh-install
+
+    sound_languages="${FSPBX_SOUND_LANGUAGES:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES)}"
+    sound_languages="${sound_languages:-en}"
+
+    if [[ "$sound_languages" == *"es"* ]]; then
+        verbose "Downloading Spanish sound prompts for source build"
+        mkdir -p /usr/share/freeswitch/sounds/es/ar/mario
+        curl -fsSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-es-ar-mario-8000-1.0.51.tar.gz 2>/dev/null \
+            | tar -xz -C /usr/share/freeswitch/sounds/es/ar/mario 2>/dev/null || true
+        chown -R freeswitch:freeswitch /usr/share/freeswitch/sounds/es 2>/dev/null || true
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Languages -->"
+    fi
+
+    if [[ "$sound_languages" == *"fr"* ]]; then
+        verbose "Downloading French sound prompts for source build"
+        mkdir -p /usr/share/freeswitch/sounds/fr/ca/june
+        curl -fsSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-fr-ca-june-8000-1.0.51.tar.gz 2>/dev/null \
+            | tar -xz -C /usr/share/freeswitch/sounds/fr/ca/june 2>/dev/null || true
+        chown -R freeswitch:freeswitch /usr/share/freeswitch/sounds/fr 2>/dev/null || true
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Languages -->"
+    fi
 
     install_freeswitch_source_service
 
@@ -734,6 +802,21 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
 
     install_freeswitch_hiredis_package
 
+    sound_languages="${FSPBX_SOUND_LANGUAGES:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES)}"
+    sound_languages="${sound_languages:-en}"
+
+    if [[ "$sound_languages" == *"es"* ]]; then
+        verbose "Installing Spanish sound prompts and grammar module"
+        apt_get_optional_with_lock_wait install -y freeswitch-sounds-es-ar-mario freeswitch-mod-say-es || true
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Languages -->"
+    fi
+
+    if [[ "$sound_languages" == *"fr"* ]]; then
+        verbose "Installing French sound prompts and grammar module"
+        apt_get_optional_with_lock_wait install -y freeswitch-sounds-fr-ca-june freeswitch-mod-say-fr || true
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Languages -->"
+    fi
+
     # Music-on-hold is a separate package that may not be available in all repos.
     # If it's not found, we skip it instead of failing the whole install.
     if apt_get_optional_with_lock_wait install -y freeswitch-sounds-music; then
@@ -775,6 +858,7 @@ if [ -f /lib/systemd/system/freeswitch.service ]; then
 fi
 
 configure_freeswitch_switch_defaults
+configure_freeswitch_sound_defaults
 configure_dynamic_xml
 set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALLED_METHOD "$freeswitch_install_method"
 
