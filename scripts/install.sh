@@ -276,7 +276,7 @@ prompt_sound_languages () {
     echo ""
     verbose "Voice prompts and system greetings"
     echo "  Voice prompts are spoken recordings for voicemail, call menus, and system messages."
-    echo "  Standard US English is always installed. You can optionally add other languages:"
+    echo "  Standard English is always installed. You can optionally add other languages:"
     echo ""
     echo "  1) English only (Callie, recommended)"
     echo "  2) English + Spanish (Mario)"

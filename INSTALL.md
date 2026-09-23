@@ -204,7 +204,7 @@ used automatically.
 
 ### FreeSWITCH Sound Prompt Languages
 
-The installer offers to install additional sound prompt languages. US English
+The installer offers to install additional sound prompt languages. English
 (Callie) is installed by default; you can also choose to install Spanish (Mario)
 and French (June).
 
