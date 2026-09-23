@@ -192,10 +192,10 @@ mariadb tallpbx -e "UPDATE admins SET password = '$(php -r 'echo password_hash("
 
 ### Demo Data and Development Tooling
 
-The installer asks about two optional extras. Demo data adds sample tenants,
-users, and callable extensions for evaluation. Development tooling adds test
-and coding utilities and is only for servers where TallPBX itself will be
-developed — choose **Option 1 (Production)** for a normal PBX server.
+The installer asks about two initial setup choices. For data, choose **Option 1 (Clean)**
+for an empty system ready for production, or **Option 2 (Demo)** to include sample
+extensions and call flows for testing. For system role, choose **Option 1 (Production)**
+for a standard phone system, or **Option 2 (Development)** if you are developing TallPBX itself.
 
 When it finishes, the installer prints the panel address. Open it in a browser
 and sign in with your administrator account. Development tooling also switches

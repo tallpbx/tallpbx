@@ -82,23 +82,20 @@ prompt_demo_mode () {
     fi
 
     echo ""
-    verbose "Sample demonstration data"
-    echo "  Sample demo data includes example extensions, ring groups, and call flows"
-    echo "  so you can explore and test the phone system without manual configuration."
-    echo ""
-    echo "  1) Clean install — no demo data (recommended for production)"
-    echo "  2) Include sample demo data (great for testing and evaluation)"
+    verbose "Clean or demo data?"
+    echo "  1) Clean — start with an empty system (recommended for production)"
+    echo "  2) Demo  — preloaded with sample extensions and call flows"
     echo ""
 
     while true; do
-        read -rp "Demo data [${default_number}]: " choice
+        read -rp "Clean or demo [${default_number}]: " choice
 
         case "${choice,,}" in
-            1|no|n|production|prod)
+            1|clean|no|n|production|prod)
                 DEMO_MODE=false
                 return
                 ;;
-            2|yes|y|demo)
+            2|demo|yes|y)
                 DEMO_MODE=true
                 return
                 ;;
@@ -111,14 +108,14 @@ prompt_demo_mode () {
                 return
                 ;;
             *)
-                warning "Please enter 1 or 2."
+                warning "Please enter 1 or 2 (or clean/demo)."
                 ;;
         esac
     done
 }
 
-# Select whether to install development tooling and packages.
-# Defaults to production optimized (option 1) on fresh installs.
+# Select whether to install for production or development.
+# Defaults to production (option 1) on fresh installs.
 prompt_development_mode () {
     local current_mode="${1:-false}"
     local default_number="1"
@@ -129,22 +126,20 @@ prompt_development_mode () {
     fi
 
     echo ""
-    verbose "System role and tooling"
-    echo "  Select whether this server is for normal phone system use or software development:"
-    echo ""
-    echo "  1) Standard phone system (recommended for normal use and production)"
-    echo "  2) Developer mode (adds code testing tools and debugging utilities)"
+    verbose "Production or development?"
+    echo "  1) Production  — standard phone system (recommended)"
+    echo "  2) Development — testing tools and debug utilities"
     echo ""
 
     while true; do
-        read -rp "Development tooling [${default_number}]: " choice
+        read -rp "Production or development [${default_number}]: " choice
 
         case "${choice,,}" in
-            1|no|n|production|prod)
+            1|production|prod|no|n)
                 DEVELOPMENT_MODE=false
                 return
                 ;;
-            2|yes|y|dev|development)
+            2|development|dev|yes|y)
                 DEVELOPMENT_MODE=true
                 return
                 ;;
@@ -157,7 +152,7 @@ prompt_development_mode () {
                 return
                 ;;
             *)
-                warning "Please enter 1 or 2."
+                warning "Please enter 1 or 2 (or production/development)."
                 ;;
         esac
     done

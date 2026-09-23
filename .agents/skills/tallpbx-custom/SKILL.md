@@ -29,9 +29,9 @@ Use this section whenever changing `scripts/install.sh` or a script under
   Always format questionnaire items with:
   1. A clear section header (`verbose "<Title>"`)
   2. A 1–2 sentence plain-English explanation of why this choice matters, avoiding developer or telephony jargon.
-  3. Cleanly indented numbered options: `  1) Description (recommended)`
-  4. Prompt line: `<Field Label> [1]: `
-  5. Case handling that accepts numbers (`1`, `2`) as well as descriptive words (`production`, `demo`, `yes`, `no`) without failing.
+  3. Cleanly indented numbered options starting with the anchor keywords: `  1) Clean — ... (recommended)`
+  4. Prompt line using the opening keywords directly: `<Keyword 1> or <Keyword 2> [1]: ` (e.g., `Clean or demo [1]: `, `Production or development [1]: `)
+  5. Case handling that accepts numbers (`1`, `2`) as well as descriptive words (`clean`, `demo`, `production`, `development`, `yes`, `no`) without failing.
 - Resource scripts launched by the main installer must read exported `FSPBX_*`
   values and must not prompt. A resource script may retain an interactive
   fallback only for a documented direct standalone invocation.
