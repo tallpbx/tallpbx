@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: the installer and resource scripts, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts)."
+description: "Invoke when working on TallPBX-specific patterns: the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts)."
 license: MIT
 metadata:
   author: tallpbx
@@ -23,6 +23,15 @@ Use this section whenever changing `scripts/install.sh` or a script under
   execution. Collect and validate all applicable choices and secrets before
   package, database, service, or application changes begin. Persist accepted
   values in the root-only installer state file so a failed run can resume.
+- Standardize all interactive multiple-choice questionnaire prompts to the concise format:
+  `<Field Label> [<default_number>]: `
+  Option 1 must always be the recommended, production-safe baseline. Empty input (`Enter`) takes this default.
+  Always format questionnaire items with:
+  1. A clear section header (`verbose "<Title>"`)
+  2. A 1–2 sentence plain-English explanation of why this choice matters, avoiding developer or telephony jargon.
+  3. Cleanly indented numbered options: `  1) Description (recommended)`
+  4. Prompt line: `<Field Label> [1]: `
+  5. Case handling that accepts numbers (`1`, `2`) as well as descriptive words (`production`, `demo`, `yes`, `no`) without failing.
 - Resource scripts launched by the main installer must read exported `FSPBX_*`
   values and must not prompt. A resource script may retain an interactive
   fallback only for a documented direct standalone invocation.
@@ -32,6 +41,23 @@ Use this section whenever changing `scripts/install.sh` or a script under
 - Validate shell syntax with `bash -n` for every changed shell script. Test a
   safe non-mutating path whenever one exists; do not invoke package, database,
   or service-changing paths merely to test parsing.
+
+## Target Audience & Plain-Language Standards
+
+TallPBX is built for administrators who **may or may not be technical** telephony or Linux experts. Whether someone is an office manager, general IT technician, or telephony specialist, all user-facing interactions must feel welcoming, polished, and immediately understandable.
+
+### Core Principles
+1. **Descriptive Without Being Wordy**: Explain what a setting or option does and why it matters in 1–2 plain-English sentences. Avoid multi-paragraph terminal walls of text.
+2. **Avoid Telephony & Developer Jargon**:
+   - Instead of "grammar say modules", say "spoken voice recordings for voicemail, call menus, and system greetings".
+   - Instead of "database seeding with demo fixtures", say "include sample demo data (extensions, call flows) to explore the system".
+   - Instead of "dev dependencies, testing tools, and AI agent guidelines", say "developer tools and debugging utilities".
+   - When telephony concepts are required (e.g., SIP trunks, DID, IVR, Ring Groups), accompany them with a short, real-world explanation in the UI tooltip or prompt text.
+3. **Always Highlight the Recommended Default**:
+   - In CLI and installer prompts: Option 1 is always the safe, recommended default for production deployments. Pressing Enter must safely select Option 1.
+   - In web UI forms: Sensible production baselines must be pre-populated, with clear helper text indicating recommended settings.
+4. **Actionable Guidance & Error Messages**:
+   - Explain what happened in human terms and immediately provide the recovery step (for example, providing the free registration link `https://signalwire.com` when a SignalWire token is requested).
 
 ## Privileged Host Command Architecture (Bounded Sudoers Pattern)
 

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Administrative Target Audience & Plain-Language Copy Standards**:
+  - Established project-wide guidance in `AGENTS.md` and `.agents/skills/tallpbx-custom/SKILL.md` requiring all user-facing copy — including installer prompts, Artisan commands, web UI labels, form helper text, tooltips, validation messages, and documentation — to be descriptive, friendly, and accessible for administrators who may not be technical telephony or Linux experts.
+  - Codified the standardized interactive prompt architecture (`<Field Label> [<default_number>]: `) with Option 1 always designating the recommended production baseline.
 - **FreeSWITCH Alternate Sound Prompt Languages & Management Commands**:
   - Added an interactive preflight sound prompt language questionnaire to `scripts/install.sh`, allowing operators to install additional language sound packs (Spanish Mario, French June) alongside default US English Callie, and select the system-wide default prompt language.
   - Implemented `FreeSwitchSoundManager` and dedicated Artisan commands `pbx:sounds:list`, `pbx:sounds:install {language} [--default]`, and `pbx:sounds:default {language}` to inspect, install, and switch FreeSWITCH default prompt languages on running systems.

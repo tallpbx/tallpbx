@@ -70,40 +70,94 @@ echo ""
 verbose "TallPBX Installer"
 verbose "========================"
 
-# Ask an interactive operator for a boolean installer choice while treating the
-# current value as the default. Empty input therefore preserves an existing
-# installation instead of changing its mode during an idempotent re-run.
-prompt_boolean_choice () {
-    local output_variable="$1"
-    local label="$2"
-    local current_value="$3"
+# Select whether to install demo data (sample tenant, extensions, ring groups).
+# Defaults to production clean (option 1) on fresh installs.
+prompt_demo_mode () {
+    local current_mode="${1:-false}"
+    local default_number="1"
     local choice
-    local default_hint
 
-    if [ "$current_value" = true ]; then
-        default_hint='Y/n'
-    else
-        default_hint='y/N'
+    if [ "$current_mode" = true ]; then
+        default_number="2"
     fi
 
+    echo ""
+    verbose "Sample demonstration data"
+    echo "  Sample demo data includes example extensions, ring groups, and call flows"
+    echo "  so you can explore and test the phone system without manual configuration."
+    echo ""
+    echo "  1) Clean install — no demo data (recommended for production)"
+    echo "  2) Include sample demo data (great for testing and evaluation)"
+    echo ""
+
     while true; do
-        read -rp "$label [$default_hint] " choice
+        read -rp "Demo data [${default_number}]: " choice
 
         case "${choice,,}" in
-            y|yes)
-                printf -v "$output_variable" '%s' true
+            1|no|n|production|prod)
+                DEMO_MODE=false
                 return
                 ;;
-            n|no)
-                printf -v "$output_variable" '%s' false
+            2|yes|y|demo)
+                DEMO_MODE=true
                 return
                 ;;
             '')
-                printf -v "$output_variable" '%s' "$current_value"
+                if [ "$default_number" = "2" ]; then
+                    DEMO_MODE=true
+                else
+                    DEMO_MODE=false
+                fi
                 return
                 ;;
             *)
-                warning "Please enter y or n."
+                warning "Please enter 1 or 2."
+                ;;
+        esac
+    done
+}
+
+# Select whether to install development tooling and packages.
+# Defaults to production optimized (option 1) on fresh installs.
+prompt_development_mode () {
+    local current_mode="${1:-false}"
+    local default_number="1"
+    local choice
+
+    if [ "$current_mode" = true ]; then
+        default_number="2"
+    fi
+
+    echo ""
+    verbose "System role and tooling"
+    echo "  Select whether this server is for normal phone system use or software development:"
+    echo ""
+    echo "  1) Standard phone system (recommended for normal use and production)"
+    echo "  2) Developer mode (adds code testing tools and debugging utilities)"
+    echo ""
+
+    while true; do
+        read -rp "Development tooling [${default_number}]: " choice
+
+        case "${choice,,}" in
+            1|no|n|production|prod)
+                DEVELOPMENT_MODE=false
+                return
+                ;;
+            2|yes|y|dev|development)
+                DEVELOPMENT_MODE=true
+                return
+                ;;
+            '')
+                if [ "$default_number" = "2" ]; then
+                    DEVELOPMENT_MODE=true
+                else
+                    DEVELOPMENT_MODE=false
+                fi
+                return
+                ;;
+            *)
+                warning "Please enter 1 or 2."
                 ;;
         esac
     done
@@ -208,78 +262,108 @@ prompt_initial_admin_mode () {
     done
 }
 
-# Prompt for additional FreeSWITCH sound prompt languages (Spanish, French)
+# Prompt for FreeSWITCH sound prompt languages (English only vs additional languages)
 # and select which language FreeSWITCH will use as its system default.
 prompt_sound_languages () {
     local current_languages="${1:-en}"
     local current_default="${2:-en}"
-    local install_additional=""
-    local choices=""
-    local default_choice=""
-    local default_additional_prompt="N"
+    local default_number="1"
+    local choice
+    local default_choice
 
-    if [[ "$current_languages" == *"es"* ]] || [[ "$current_languages" == *"fr"* ]]; then
-        default_additional_prompt="y"
+    if [[ "$current_languages" == *"es"* ]] && [[ "$current_languages" == *"fr"* ]]; then
+        default_number="4"
+    elif [[ "$current_languages" == *"es"* ]]; then
+        default_number="2"
+    elif [[ "$current_languages" == *"fr"* ]]; then
+        default_number="3"
     fi
 
     echo ""
-    verbose "FreeSWITCH sound prompt languages"
-    echo "  US English (Callie) is installed by default."
+    verbose "Voice prompts and system greetings"
+    echo "  Voice prompts are spoken recordings for voicemail, call menus, and system messages."
+    echo "  Standard US English is always installed. You can optionally add other languages:"
     echo ""
-    read -rp "Install additional sound prompt languages (Spanish, French)? [y/N] " install_additional
-    install_additional="${install_additional:-$default_additional_prompt}"
+    echo "  1) English only (Callie, recommended)"
+    echo "  2) English + Spanish (Mario)"
+    echo "  3) English + French (June)"
+    echo "  4) All languages (English, Spanish, and French)"
+    echo ""
 
-    case "${install_additional,,}" in
-        y|yes)
-            echo ""
-            echo "Which sound prompt languages should be installed?"
-            echo "  1) Spanish (es)"
-            echo "  2) French (fr)"
-            echo "  3) Spanish and French (es, fr)"
-            echo ""
-            read -rp "Languages to install [3]: " choices
-            choices="${choices:-3}"
+    while true; do
+        read -rp "Sound prompt languages [${default_number}]: " choice
+        choice="${choice:-$default_number}"
 
-            case "$choices" in
-                1|es)
-                    FSPBX_SOUND_LANGUAGES="en,es"
-                    ;;
-                2|fr)
-                    FSPBX_SOUND_LANGUAGES="en,fr"
-                    ;;
-                3|all|es,fr|fr,es|*)
-                    FSPBX_SOUND_LANGUAGES="en,es,fr"
-                    ;;
-            esac
+        case "${choice,,}" in
+            1|en|english)
+                FSPBX_SOUND_LANGUAGES="en"
+                FSPBX_DEFAULT_SOUND_LANGUAGE="en"
+                return
+                ;;
+            2|es|spanish)
+                FSPBX_SOUND_LANGUAGES="en,es"
+                break
+                ;;
+            3|fr|french)
+                FSPBX_SOUND_LANGUAGES="en,fr"
+                break
+                ;;
+            4|all|es,fr|fr,es|3)
+                FSPBX_SOUND_LANGUAGES="en,es,fr"
+                break
+                ;;
+            *)
+                warning "Please enter 1, 2, 3, or 4."
+                ;;
+        esac
+    done
 
-            echo ""
-            echo "Which language should FreeSWITCH use as its default sound prompt language?"
-            echo "  1) English (en) [default]"
-            if [[ "$FSPBX_SOUND_LANGUAGES" == *"es"* ]]; then
-                echo "  2) Spanish (es)"
-            fi
-            if [[ "$FSPBX_SOUND_LANGUAGES" == *"fr"* ]]; then
-                echo "  3) French (fr)"
-            fi
-            echo ""
-            read -rp "Default sound language [1]: " default_choice
-            case "${default_choice,,}" in
-                2|es|spanish)
+    echo ""
+    echo "Which language should FreeSWITCH use as its default sound prompt language?"
+    echo "  1) English (en)"
+    if [[ "$FSPBX_SOUND_LANGUAGES" == *"es"* ]]; then
+        echo "  2) Spanish (es)"
+    fi
+    if [[ "$FSPBX_SOUND_LANGUAGES" == *"fr"* ]]; then
+        echo "  3) French (fr)"
+    fi
+    echo ""
+
+    local default_lang_num="1"
+    if [ "$current_default" = "es" ]; then
+        default_lang_num="2"
+    elif [ "$current_default" = "fr" ]; then
+        default_lang_num="3"
+    fi
+
+    while true; do
+        read -rp "Default sound language [${default_lang_num}]: " default_choice
+        default_choice="${default_choice:-$default_lang_num}"
+
+        case "${default_choice,,}" in
+            1|en|english)
+                FSPBX_DEFAULT_SOUND_LANGUAGE="en"
+                return
+                ;;
+            2|es|spanish)
+                if [[ "$FSPBX_SOUND_LANGUAGES" == *"es"* ]]; then
                     FSPBX_DEFAULT_SOUND_LANGUAGE="es"
-                    ;;
-                3|fr|french)
+                    return
+                fi
+                warning "Spanish was not selected for installation."
+                ;;
+            3|fr|french)
+                if [[ "$FSPBX_SOUND_LANGUAGES" == *"fr"* ]]; then
                     FSPBX_DEFAULT_SOUND_LANGUAGE="fr"
-                    ;;
-                *)
-                    FSPBX_DEFAULT_SOUND_LANGUAGE="en"
-                    ;;
-            esac
-            ;;
-        *)
-            FSPBX_SOUND_LANGUAGES="en"
-            FSPBX_DEFAULT_SOUND_LANGUAGE="en"
-            ;;
-    esac
+                    return
+                fi
+                warning "French was not selected for installation."
+                ;;
+            *)
+                warning "Please enter a valid choice."
+                ;;
+        esac
+    done
 }
 
 # Preserve the previously selected demo mode on installer re-runs. Explicit
@@ -292,7 +376,7 @@ if [ "$DEMO_MODE_EXPLICIT" = false ]; then
 fi
 
 if [ "$INSTALLER_OPTIONS_EXPLICIT" = false ] && [ -t 0 ]; then
-    prompt_boolean_choice DEMO_MODE "Install demo data?" "$DEMO_MODE"
+    prompt_demo_mode "$DEMO_MODE"
 fi
 
 export FSPBX_DEMO_MODE="$DEMO_MODE"
@@ -316,7 +400,7 @@ fi
 # unattended installs remain production by default, while recorded installs do
 # not switch mode unless an explicit flag overrides them.
 if [ "$INSTALLER_OPTIONS_EXPLICIT" = false ] && [ -t 0 ]; then
-    prompt_boolean_choice DEVELOPMENT_MODE "Install development packages and tooling?" "$DEVELOPMENT_MODE"
+    prompt_development_mode "$DEVELOPMENT_MODE"
 fi
 
 export FSPBX_DEVELOPMENT_MODE="$DEVELOPMENT_MODE"
@@ -452,7 +536,9 @@ if [ "$FREESWITCH_INSTALL_METHOD" = packages ]; then
 
     if [ -z "$switch_token" ]; then
         echo ""
-        warning "A SignalWire Personal Access Token is required for packages."
+        warning "A SignalWire Personal Access Token is required for FreeSWITCH packages."
+        echo "  If you don't have a token, you can get one free at: https://signalwire.com"
+        echo ""
         read -rsp "Enter your Personal Access Token: " switch_token
         echo ""
 
@@ -477,9 +563,17 @@ if [ "$FREESWITCH_INSTALL_METHOD" = source ] \
     recompile_source=false
 
     if [ -t 0 ]; then
-        read -rp "Recompile FreeSWITCH from source? [y/N] " recompile_choice
+        echo ""
+        verbose "FreeSWITCH source build"
+        echo "  An existing FreeSWITCH source build was detected on this server."
+        echo ""
+        echo "  1) Keep existing FreeSWITCH build (recommended)"
+        echo "  2) Recompile FreeSWITCH from source"
+        echo ""
+        read -rp "FreeSWITCH source build [1]: " recompile_choice
         case "${recompile_choice,,}" in
-            y|yes) recompile_source=true ;;
+            2|y|yes|recompile) recompile_source=true ;;
+            *) recompile_source=false ;;
         esac
     fi
 
