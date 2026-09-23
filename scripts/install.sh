@@ -109,11 +109,11 @@ prompt_boolean_choice () {
     done
 }
 
-# Select the FreeSWITCH delivery method every interactive run. A fresh install
-# deliberately has no default: choosing packages would otherwise hide the PAT
-# requirement and make source installation difficult to discover.
+# Select the FreeSWITCH delivery method every interactive run. Defaults to
+# packages if Enter is pressed without typing a choice.
 prompt_freeswitch_install_method () {
     local current_method="$1"
+    local default_method="${current_method:-packages}"
     local choice
 
     echo ""
@@ -126,11 +126,7 @@ prompt_freeswitch_install_method () {
     echo ""
 
     while true; do
-        if [ -n "$current_method" ]; then
-            read -rp "Install method [${current_method}]: " choice
-        else
-            read -rp "Install method [packages/source]: " choice
-        fi
+        read -rp "Install method [${default_method}]: " choice
 
         case "${choice,,}" in
             1|package|packages)
@@ -142,14 +138,11 @@ prompt_freeswitch_install_method () {
                 return
                 ;;
             '')
-                if [ -n "$current_method" ]; then
-                    FREESWITCH_INSTALL_METHOD="$current_method"
-                    return
-                fi
-                warning "Choose packages or source."
+                FREESWITCH_INSTALL_METHOD="$default_method"
+                return
                 ;;
             *)
-                warning "Please enter packages or source."
+                warning "Choose 1 (packages) or 2 (source)."
                 ;;
         esac
     done
