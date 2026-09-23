@@ -25,11 +25,11 @@ tests need more CPU and memory.
 
 ## 2. Attach the Installer
 
-Download the Debian 13 amd64 netinst ISO and attach it as the VM's optical drive.
+Use a Debian 13 amd64 image or netinst ISO.
 
 ## 3. Install Debian 13
 
-Boot the VM and proceed through the Debian installer UI:
+If installing from ISO, proceed through the Debian installer UI:
 
 1. Select language, location, and keyboard layout
 2. Configure network (DHCP is fine for initial install)
