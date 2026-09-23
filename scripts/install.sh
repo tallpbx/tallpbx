@@ -114,7 +114,12 @@ prompt_boolean_choice () {
 prompt_freeswitch_install_method () {
     local current_method="$1"
     local default_method="${current_method:-packages}"
+    local hint="Packages/source"
     local choice
+
+    if [ "$default_method" = "source" ]; then
+        hint="packages/Source"
+    fi
 
     echo ""
     verbose "How should FreeSWITCH be installed?"
@@ -126,7 +131,7 @@ prompt_freeswitch_install_method () {
     echo ""
 
     while true; do
-        read -rp "Install method [${default_method}]: " choice
+        read -rp "Install method [${hint}]: " choice
 
         case "${choice,,}" in
             1|package|packages)
@@ -142,7 +147,7 @@ prompt_freeswitch_install_method () {
                 return
                 ;;
             *)
-                warning "Choose 1 (packages) or 2 (source)."
+                warning "Choose packages or source (or enter 1 or 2)."
                 ;;
         esac
     done
