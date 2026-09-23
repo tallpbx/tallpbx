@@ -85,7 +85,9 @@ If you need a static IP address, edit the network interfaces file:
 nano /etc/network/interfaces
 ```
 
-Replace the DHCP line for your interface with:
+Replace the DHCP line for your interface with your static configuration
+(the IP address and gateway below are examples — use the values for your
+particular network):
 
 ```
 iface enp0s3 inet static
