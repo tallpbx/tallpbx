@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/email-connector",
+    "name": "tallpbx/module-email-connector",
     "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
     "version": "1.0.0",
     "type": "tallpbx-module",

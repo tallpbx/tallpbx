@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/call-blocks",
+    "name": "tallpbx/module-call-blocks",
     "type": "tallpbx-module",
     "description": "Call blocking rule management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

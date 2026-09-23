@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/access-controls",
+    "name": "tallpbx/module-access-controls",
     "type": "tallpbx-module",
     "description": "Network ACL management with CIDR and IP allow/deny rules for FreeSwitchPBX.",
     "license": "Apache-2.0",

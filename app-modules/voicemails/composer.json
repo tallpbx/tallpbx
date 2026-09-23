@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/voicemails",
+    "name": "tallpbx/module-voicemails",
     "type": "tallpbx-module",
     "description": "Voicemail mailboxes module for TallPBX",
     "license": "Apache-2.0",

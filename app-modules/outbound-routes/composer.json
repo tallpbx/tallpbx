@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/outbound-routes",
+    "name": "tallpbx/module-outbound-routes",
     "type": "tallpbx-module",
     "description": "Outbound call routing module for FreeSwitchPBX.",
     "license": "Apache-2.0",

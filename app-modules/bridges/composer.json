@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/bridges",
+    "name": "tallpbx/module-bridges",
     "type": "tallpbx-module",
     "version": "1.0.0",
     "description": "Manage call bridge (conference) destinations.",

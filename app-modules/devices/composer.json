@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/devices",
+    "name": "tallpbx/module-devices",
     "type": "tallpbx-module",
     "description": "Hardware device inventory and template module for FreeSwitchPBX.",
     "license": "Apache-2.0",

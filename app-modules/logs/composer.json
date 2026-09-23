@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/logs",
+    "name": "tallpbx/module-logs",
     "type": "tallpbx-module",
     "description": "Log Viewer module for FreeSwitchPBX — tail and filter application log files.",
     "license": "Apache-2.0",

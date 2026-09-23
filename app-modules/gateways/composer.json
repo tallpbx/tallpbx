@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/gateways",
+    "name": "tallpbx/module-gateways",
     "type": "tallpbx-module",
     "description": "SIP gateway and trunk management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

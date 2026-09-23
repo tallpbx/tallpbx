@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/pin-numbers",
+    "name": "tallpbx/module-pin-numbers",
     "type": "tallpbx-module",
     "description": "Manage PIN numbers for restricted dialing.",
     "license": "Apache-2.0",

@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/extensions",
+    "name": "tallpbx/module-extensions",
     "type": "tallpbx-module",
     "description": "Phone extension management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

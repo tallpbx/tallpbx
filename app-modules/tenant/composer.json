@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/tenant",
+    "name": "tallpbx/module-tenant",
     "type": "tallpbx-module",
     "description": "Tenant-facing portal shell for FreeSwitchPBX.",
     "license": "Apache-2.0",

@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic IPv4 Preference When the Host Has No IPv6 Default Route**: The installer now detects hosts that advertise IPv6 without a working default route and activates the IPv4 precedence rule in `/etc/gai.conf` automatically, preventing Composer download timeouts that previously required a manual fix.
 
 ### Changed
+- **Standardized Module Composer Package Names**:
+  - Unified all 59 internal modules under the canonical `tallpbx/module-*` package naming scheme across their respective `composer.json` files and root `composer.json`.
+  - Renamed the 25 legacy un-prefixed core modules (`tallpbx/<name>` to `tallpbx/module-<name>`), establishing complete naming consistency across the entire modular architecture and aligning with the `php artisan make:module` generator convention.
+  - Synchronized `composer.lock` and updated path repository test assertions in `tests/Feature/ModuleAutoloadTest.php`.
 - **Standardized Installer Interactive Prompt Formatting**:
   - Unified all 8 multiple-choice interactive prompts in `scripts/install.sh` to a consistent, intuitive `<Keyword 1> or <Keyword 2> [<default_number>]: ` (or `<Key phrase> [<default_number>]: `) convention (`Clean or demo [1]: `, `Production or development [1]: `, `Packages or source [1]: `, `Setup method [1]: `, `Voice prompt languages [1]: `, `Default language [1]: `, `Random or custom [1]: `, and `Keep or recompile [1]: `), ensuring opening option words match the prompt verbatim for instant at-a-glance clarity without requiring administrators to read dense paragraphs.
   - Added support for typed keyword aliases (`clean`, `demo`, `production`, `development`, `packages`, `source`, `setup`, `activation`, `trusted`, `random`, `custom`, `keep`, `recompile`) alongside standard numerical inputs while preserving unattended/headless environment variable workflows.

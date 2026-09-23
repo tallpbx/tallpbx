@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/ring-groups",
+    "name": "tallpbx/module-ring-groups",
     "type": "tallpbx-module",
     "description": "Manage ring groups with multiple extensions for simultaneous or sequential call distribution.",
     "license": "Apache-2.0",

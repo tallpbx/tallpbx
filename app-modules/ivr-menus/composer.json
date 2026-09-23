@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/ivr-menus",
+    "name": "tallpbx/module-ivr-menus",
     "type": "tallpbx-module",
     "description": "IVR menu builder and audio prompt management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

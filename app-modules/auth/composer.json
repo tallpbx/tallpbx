@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/auth",
+    "name": "tallpbx/module-auth",
     "type": "tallpbx-module",
     "description": "Tenant authentication pages for FreeSwitchPBX.",
     "license": "Apache-2.0",

@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/destinations",
+    "name": "tallpbx/module-destinations",
     "type": "tallpbx-module",
     "description": "Call destination management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/music-on-hold",
+    "name": "tallpbx/module-music-on-hold",
     "type": "tallpbx-module",
     "description": "Manage music on hold audio files and settings.",
     "license": "Apache-2.0",

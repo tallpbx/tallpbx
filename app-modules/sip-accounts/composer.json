@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/sip-accounts",
+    "name": "tallpbx/module-sip-accounts",
     "type": "tallpbx-module",
     "description": "SIP authentication account management for FreeSwitchPBX.",
     "license": "Apache-2.0",

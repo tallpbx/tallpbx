@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/feature-codes",
+    "name": "tallpbx/module-feature-codes",
     "type": "tallpbx-module",
     "description": "FreeSWITCH feature code (star code) management module.",
     "license": "Apache-2.0",

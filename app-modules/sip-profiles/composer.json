@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/sip-profiles",
+    "name": "tallpbx/module-sip-profiles",
     "type": "tallpbx-module",
     "description": "SIP profile configuration module for FreeSwitchPBX.",
     "license": "Apache-2.0",

@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/call-forwards",
+    "name": "tallpbx/module-call-forwards",
     "type": "tallpbx-module",
     "description": "Per-extension call forwarding management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

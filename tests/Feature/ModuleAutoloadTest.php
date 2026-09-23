@@ -60,7 +60,7 @@ test('the backups module is installed through its Composer path repository', fun
     expect($composer['repositories'])->toContain([
         'type' => 'path',
         'url' => 'app-modules/backups',
-    ])->and($composer['require'])->toHaveKey('tallpbx/backups', '@dev');
+    ])->and($composer['require'])->toHaveKey('tallpbx/module-backups', '@dev');
 });
 
 test('all module directories resolve to the expected namespace prefix', function (string $dir, string $expectedNs) {

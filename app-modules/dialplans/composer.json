@@ -1,5 +1,5 @@
 {
-    "name": "tallpbx/dialplans",
+    "name": "tallpbx/module-dialplans",
     "type": "tallpbx-module",
     "description": "Dialplan rule and dialplan detail management module for FreeSwitchPBX.",
     "license": "Apache-2.0",

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "03c975eccfc96f6fb884cf0a5f3fc6dc",
+    "content-hash": "8037d1a3a1a16465f8cbf6c278a167e3",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -7810,12 +7810,12 @@
             "time": "2026-09-03T16:02:27+00:00"
         },
         {
-            "name": "tallpbx/access-controls",
+            "name": "tallpbx/module-access-controls",
             "version": "1.0.0",
             "dist": {
                 "type": "path",
                 "url": "app-modules/access-controls",
-                "reference": "637f04db4f273c4e9d054b295434dc76b88405c9"
+                "reference": "79f9b0397115b8211e0c5d5a8ede08bf37e94d53"
             },
             "require": {
                 "laravel/framework": ">=13.0",
@@ -7838,530 +7838,6 @@
                 "Apache-2.0"
             ],
             "description": "Network ACL management with CIDR and IP allow/deny rules for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/auth",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/auth",
-                "reference": "772c529091947ea722df17a28b93e49bf9b7b1eb"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Auth\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Auth\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Tenant authentication pages for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/backups",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/backups",
-                "reference": "be666a3a40bf52493ea7ab3acafd447276c94f6d"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Backups\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "classmap": [
-                    "src/"
-                ]
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Database, file, media, and configuration backup with Laravel UI, scheduling, retention, compression, and restore.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/bridges",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/bridges",
-                "reference": "eb28437f2dd877dc6be2b76c095be12edf409701"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Bridges\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Bridges\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Manage call bridge (conference) destinations.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/call-blocks",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/call-blocks",
-                "reference": "6e6ac5e99699d53655743c2f31a403cea4e3000b"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\CallBlocks\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\CallBlocks\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Call blocking rule management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/call-forwards",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/call-forwards",
-                "reference": "6723aa067cad59dca047dbd87e4ac944bbb80720"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\CallForwards\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\CallForwards\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Per-extension call forwarding management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/destinations",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/destinations",
-                "reference": "41389fec8424c0f1807b80abe1e10f2fb45d2f64"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Destinations\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Destinations\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Call destination management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/devices",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/devices",
-                "reference": "54c563b54fa95efcc0b2c6d6cae7932dcbeb436a"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Devices\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Devices\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Hardware device inventory and template module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/dialplans",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/dialplans",
-                "reference": "2a6fe835c8e7059c6bebdaa5bce07dba825dd363"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Dialplans\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Dialplans\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Dialplan rule and dialplan detail management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/email-connector",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/email-connector",
-                "reference": "817f0c867a9d22f6ed33cd4285def389e1c36a31"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\EmailConnector\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\EmailConnector\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/extensions",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/extensions",
-                "reference": "54e0c3a9fe493a6176b314225f036252eee3ba64"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Extensions\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Extensions\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Phone extension management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/feature-codes",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/feature-codes",
-                "reference": "96cadf3f8e94af36aee0eda8499e14d741ff0c1e"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\FeatureCodes\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\FeatureCodes\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "FreeSWITCH feature code (star code) management module.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/file-stores",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/file-stores",
-                "reference": "35378d5388b92457d0ccd0b73f33516892188450"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "league/flysystem-aws-s3-v3": "^3.0",
-                "league/flysystem-ftp": "^3.0",
-                "league/flysystem-sftp-v3": "^3.0",
-                "php": ">=8.3",
-                "spatie/flysystem-dropbox": "^3.0"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\FileStores\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\FileStores\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Reusable destination profiles for TallPBX file storage.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/gateways",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/gateways",
-                "reference": "0bff8d6255144ddfd435847f41e685ad22a8acc5"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Gateways\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Gateways\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "SIP gateway and trunk management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/inbound-routes",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/inbound-routes",
-                "reference": "6df61ca401e1337036cf42f6f2030a6c87377e07"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\InboundRoutes\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\InboundRoutes\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Inbound call routing module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/ivr-menus",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/ivr-menus",
-                "reference": "8fbf12512e47421bfd26a570b5125695aaf654fd"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\IvrMenus\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\IvrMenus\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "IVR menu builder and audio prompt management module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/logs",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/logs",
-                "reference": "774a6f4acddc653bdc7bee607170a96abca4a41d"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Logs\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Logs\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Log Viewer module for FreeSwitchPBX — tail and filter application log files.",
             "transport-options": {
                 "relative": true
             }
@@ -8467,6 +7943,134 @@
                 }
             },
             "description": "Core administration module for TallPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-auth",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/auth",
+                "reference": "0d4fed95959a5157e9383f03298722a8ddc9c9d7"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Auth\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Auth\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Tenant authentication pages for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-backups",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/backups",
+                "reference": "3d685b61fe1f17976229092812a8c0dcc3e57cad"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Backups\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Database, file, media, and configuration backup with Laravel UI, scheduling, retention, compression, and restore.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-bridges",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/bridges",
+                "reference": "3210d54d4429ae6610ec1d65aa737ef3cc7d6a18"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Bridges\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Bridges\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Manage call bridge (conference) destinations.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-call-blocks",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/call-blocks",
+                "reference": "9cc655c7a53859779b3239315eb1eb5912234519"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\CallBlocks\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\CallBlocks\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Call blocking rule management module for FreeSwitchPBX.",
             "transport-options": {
                 "relative": true
             }
@@ -8624,6 +8228,39 @@
             }
         },
         {
+            "name": "tallpbx/module-call-forwards",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/call-forwards",
+                "reference": "96f33db2a4fe882263790e28ff54374afa62ecf1"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\CallForwards\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\CallForwards\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Per-extension call forwarding management module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/module-call-recordings",
             "version": "1.0.0",
             "dist": {
@@ -8776,6 +8413,72 @@
             }
         },
         {
+            "name": "tallpbx/module-destinations",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/destinations",
+                "reference": "3905d284249f4d5af5efb379fc08099483dac262"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Destinations\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Destinations\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Call destination management module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-devices",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/devices",
+                "reference": "1005e06a6a6fb5610d2449ad2ea4a19d3ffe7b9a"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Devices\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Devices\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Hardware device inventory and template module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/module-dialplan-tools",
             "version": "1.0.0",
             "dist": {
@@ -8809,6 +8512,68 @@
                 }
             ],
             "description": "Dialplan tools module for FreeSwitchPBX",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-dialplans",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/dialplans",
+                "reference": "f4b2fc25fc61d4e119181123c1cfbcec213ba4dd"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Dialplans\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Dialplans\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Dialplan rule and dialplan detail management module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-email-connector",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/email-connector",
+                "reference": "e28bf7d7aa0f7ae0992640af4334f4f9ec120a0f"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\EmailConnector\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\EmailConnector\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
             "transport-options": {
                 "relative": true
             }
@@ -9004,6 +8769,39 @@
             }
         },
         {
+            "name": "tallpbx/module-extensions",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/extensions",
+                "reference": "0d88597a69aed6fcd33ecc06678680db2b87ecae"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Extensions\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Extensions\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Phone extension management module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/module-fax",
             "version": "1.0.0",
             "dist": {
@@ -9037,6 +8835,76 @@
                 }
             ],
             "description": "Fax module for FreeSwitchPBX",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-feature-codes",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/feature-codes",
+                "reference": "ec3314a1325c29db13c9a9b5d0817bc8045b0555"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\FeatureCodes\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\FeatureCodes\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "FreeSWITCH feature code (star code) management module.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-file-stores",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/file-stores",
+                "reference": "81d5d32ca7f9ea1343c0efe2877a0df549023132"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "league/flysystem-aws-s3-v3": "^3.0",
+                "league/flysystem-ftp": "^3.0",
+                "league/flysystem-sftp-v3": "^3.0",
+                "php": ">=8.3",
+                "spatie/flysystem-dropbox": "^3.0"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\FileStores\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\FileStores\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Reusable destination profiles for TallPBX file storage.",
             "transport-options": {
                 "relative": true
             }
@@ -9080,6 +8948,39 @@
             }
         },
         {
+            "name": "tallpbx/module-gateways",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/gateways",
+                "reference": "9e5828e2898da181f907c54e7ce515e127f02479"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Gateways\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Gateways\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "SIP gateway and trunk management module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/module-hot-desking",
             "version": "1.0.0",
             "dist": {
@@ -9110,6 +9011,138 @@
                 "Apache-2.0"
             ],
             "description": "Hot desking device and extension mobility module for TallPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-inbound-routes",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/inbound-routes",
+                "reference": "290ecf8b7ee013b6003c255fb18b39a583385723"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\InboundRoutes\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\InboundRoutes\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Inbound call routing module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-ivr-menus",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/ivr-menus",
+                "reference": "2c91dc1f0ceef0a4724f37812e66598899a913e4"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\IvrMenus\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\IvrMenus\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "IVR menu builder and audio prompt management module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-logs",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/logs",
+                "reference": "a5c82021385653cba8eb2515b503900f44c5ea32"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Logs\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Logs\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Log Viewer module for FreeSwitchPBX — tail and filter application log files.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-music-on-hold",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/music-on-hold",
+                "reference": "4e7b065b21bb1f5ae6d68d649d37721b47176909"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\MusicOnHold\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\MusicOnHold\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Manage music on hold audio files and settings.",
             "transport-options": {
                 "relative": true
             }
@@ -9186,6 +9219,72 @@
                 }
             ],
             "description": "Operator panel module for FreeSwitchPBX",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-outbound-routes",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/outbound-routes",
+                "reference": "24adcc361fcebf77eb6db98c53c8345a17577bb7"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\OutboundRoutes\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\OutboundRoutes\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Outbound call routing module for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-pin-numbers",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/pin-numbers",
+                "reference": "1cea5aba38afe5f3f2865abb291e7b23a27d808f"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\PinNumbers\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\PinNumbers\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Manage PIN numbers for restricted dialing.",
             "transport-options": {
                 "relative": true
             }
@@ -9305,6 +9404,39 @@
             }
         },
         {
+            "name": "tallpbx/module-ring-groups",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/ring-groups",
+                "reference": "7c6f6cb4ba2c68695c0d19729657d5bbd57ff151"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\RingGroups\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\RingGroups\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Manage ring groups with multiple extensions for simultaneous or sequential call distribution.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/module-security",
             "version": "1.0.0",
             "dist": {
@@ -9338,6 +9470,72 @@
                 }
             ],
             "description": "Native security module for TallPBX providing host firewall, trusted IP lists, and automatic intrusion protection",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-sip-accounts",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/sip-accounts",
+                "reference": "b3cda9a3ba1af9f54f12539b637cdb77d9b64939"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\SipAccounts\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\SipAccounts\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "SIP authentication account management for FreeSwitchPBX.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-sip-profiles",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/sip-profiles",
+                "reference": "f15c728348735053a14f6756d93a51b88261c0f0"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\SipProfiles\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\SipProfiles\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "SIP profile configuration module for FreeSwitchPBX.",
             "transport-options": {
                 "relative": true
             }
@@ -9452,6 +9650,39 @@
                 }
             ],
             "description": "Speech module for FreeSwitchPBX",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "tallpbx/module-tenant",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/tenant",
+                "reference": "f72529822abaeda25f0794ae9ff8c8193b515a63"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Tenant\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Tenant\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Tenant-facing portal shell for FreeSwitchPBX.",
             "transport-options": {
                 "relative": true
             }
@@ -9609,6 +9840,39 @@
             }
         },
         {
+            "name": "tallpbx/module-voicemails",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "app-modules/voicemails",
+                "reference": "3829b1dfed03a138905e10545e3e2daa5b9941f0"
+            },
+            "require": {
+                "laravel/framework": ">=13.0",
+                "php": ">=8.3"
+            },
+            "type": "tallpbx-module",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Modules\\Voicemails\\Providers\\ModuleServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Voicemails\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Voicemail mailboxes module for TallPBX",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
             "name": "tallpbx/module-xml-cdr",
             "version": "1.0.0",
             "dist": {
@@ -9642,270 +9906,6 @@
                 }
             ],
             "description": "XML CDR module for FreeSwitchPBX",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/music-on-hold",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/music-on-hold",
-                "reference": "94527a3a68fb139aa19cff193d5cf94d0a8adfcb"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\MusicOnHold\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\MusicOnHold\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Manage music on hold audio files and settings.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/outbound-routes",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/outbound-routes",
-                "reference": "04df92e1136acb4a19efc30832b79f19c016939c"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\OutboundRoutes\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\OutboundRoutes\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Outbound call routing module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/pin-numbers",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/pin-numbers",
-                "reference": "6dccb430c5de139f2b959b74dcba39534ac48145"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\PinNumbers\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\PinNumbers\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Manage PIN numbers for restricted dialing.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/ring-groups",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/ring-groups",
-                "reference": "ec0079193cae5c489a985953074ef442dd9cce2f"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\RingGroups\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\RingGroups\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Manage ring groups with multiple extensions for simultaneous or sequential call distribution.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/sip-accounts",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/sip-accounts",
-                "reference": "85b27e9b55c1eebd36a1ec8b2a01a5857bc0f414"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\SipAccounts\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\SipAccounts\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "SIP authentication account management for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/sip-profiles",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/sip-profiles",
-                "reference": "a6e8543e9997a60088ff216810ccab011852a851"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\SipProfiles\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\SipProfiles\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "SIP profile configuration module for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/tenant",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/tenant",
-                "reference": "74591fc186a8c3118dd1654b4f97b80772a0b793"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Tenant\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Tenant\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Tenant-facing portal shell for FreeSwitchPBX.",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "tallpbx/voicemails",
-            "version": "1.0.0",
-            "dist": {
-                "type": "path",
-                "url": "app-modules/voicemails",
-                "reference": "4ab29c6d738b494ce56416f381346ac1ef008732"
-            },
-            "require": {
-                "laravel/framework": ">=13.0",
-                "php": ">=8.3"
-            },
-            "type": "tallpbx-module",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Modules\\Voicemails\\Providers\\ModuleServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Modules\\Voicemails\\": "src/"
-                }
-            },
-            "license": [
-                "Apache-2.0"
-            ],
-            "description": "Voicemail mailboxes module for TallPBX",
             "transport-options": {
                 "relative": true
             }
@@ -14196,9 +14196,9 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "tallpbx/backups": 20,
-        "tallpbx/email-connector": 20,
-        "tallpbx/file-stores": 20
+        "tallpbx/module-backups": 20,
+        "tallpbx/module-email-connector": 20,
+        "tallpbx/module-file-stores": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
