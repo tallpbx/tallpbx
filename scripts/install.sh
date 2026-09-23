@@ -114,11 +114,11 @@ prompt_boolean_choice () {
 prompt_freeswitch_install_method () {
     local current_method="$1"
     local default_method="${current_method:-packages}"
-    local hint="Packages/source"
+    local default_number="1"
     local choice
 
     if [ "$default_method" = "source" ]; then
-        hint="packages/Source"
+        default_number="2"
     fi
 
     echo ""
@@ -131,7 +131,7 @@ prompt_freeswitch_install_method () {
     echo ""
 
     while true; do
-        read -rp "Install method [${hint}]: " choice
+        read -rp "Install method [${default_number}]: " choice
 
         case "${choice,,}" in
             1|package|packages)
@@ -158,7 +158,14 @@ prompt_freeswitch_install_method () {
 # creation; they do not delay database, PBX, or service installation.
 prompt_initial_admin_mode () {
     local current_mode="$1"
+    local default_number="1"
     local choice
+
+    case "$current_mode" in
+        activation-code) default_number="2" ;;
+        trusted-network) default_number="3" ;;
+        *) default_number="1" ;;
+    esac
 
     echo ""
     verbose "Initial administrator setup"
@@ -171,10 +178,10 @@ prompt_initial_admin_mode () {
     echo ""
 
     while true; do
-        read -rp "Choose 1, 2, or 3 [${current_mode:-installer}]: " choice
+        read -rp "Administrator setup [${default_number}]: " choice
 
         case "${choice,,}" in
-            1|installer|'')
+            1|installer)
                 FSPBX_INITIAL_ADMIN_MODE=installer
                 return
                 ;;
@@ -184,6 +191,14 @@ prompt_initial_admin_mode () {
                 ;;
             3|trusted-network|trusted)
                 FSPBX_INITIAL_ADMIN_MODE=trusted-network
+                return
+                ;;
+            '')
+                case "$default_number" in
+                    2) FSPBX_INITIAL_ADMIN_MODE=activation-code ;;
+                    3) FSPBX_INITIAL_ADMIN_MODE=trusted-network ;;
+                    *) FSPBX_INITIAL_ADMIN_MODE=installer ;;
+                esac
                 return
                 ;;
             *)
@@ -222,7 +237,7 @@ prompt_sound_languages () {
             echo "  2) French (fr)"
             echo "  3) Spanish and French (es, fr)"
             echo ""
-            read -rp "Select languages [1-3, default 3]: " choices
+            read -rp "Languages to install [3]: " choices
             choices="${choices:-3}"
 
             case "$choices" in
@@ -247,7 +262,7 @@ prompt_sound_languages () {
                 echo "  3) French (fr)"
             fi
             echo ""
-            read -rp "Default sound prompt language [1]: " default_choice
+            read -rp "Default sound language [1]: " default_choice
             case "${default_choice,,}" in
                 2|es|spanish)
                     FSPBX_DEFAULT_SOUND_LANGUAGE="es"
@@ -355,7 +370,7 @@ else
     echo "  1) Generate a random password (recommended)"
     echo "  2) Enter my own password"
     echo ""
-    read -rp "Enter 1 or 2 [1]: " password_choice
+    read -rp "Database password [1]: " password_choice
 
     if [ "$password_choice" = "2" ]; then
         while true; do

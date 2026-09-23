@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Automatic IPv4 Preference When the Host Has No IPv6 Default Route**: The installer now detects hosts that advertise IPv6 without a working default route and activates the IPv4 precedence rule in `/etc/gai.conf` automatically, preventing Composer download timeouts that previously required a manual fix.
 
 ### Changed
+- **Standardized Installer Interactive Prompt Formatting**:
+  - Unified all multiple-choice interactive prompts in `scripts/install.sh` to a consistent, concise `<Field Label> [<default_number>]: ` convention (e.g., `Install method [1]: `, `Administrator setup [1]: `, `Database password [1]: `, `Languages to install [3]: `, and `Default sound language [1]: `).
+  - Maintained full backward compatibility for text aliases and headless environment variables while aligning terminal prompt displays across all setup stages.
 - **Documentation Restructuring for Outgoing Mail & Post-Installation Workflow**: Replaced the misplaced Outgoing Mail subsection in `INSTALL.md` with a clean 4-point Post-Installation Next Steps checklist (Panel Login, HTTPS, Outgoing Mail, and Carriers/Trunks), and moved in-depth operational guidance for SMTP, Google Workspace OAuth 2.0, Microsoft 365 OAuth 2.0, and the `tallpbx-queue` background worker to `docs/operations.md`.
 - **Switchable Light & Dark Theme Documentation & Parity Comparisons**: Enhanced documentation across `README.md`, `docs/parity-comparison.md`, and `docs/ui-tour.md` detailing the switchable Light, Dark, and System theme architecture:
   - Documented zero-flicker client hydration via synchronous `localStorage` reading in document `<head>` prior to render (eliminating FOUC) and asynchronous database persistence to user/admin profiles.

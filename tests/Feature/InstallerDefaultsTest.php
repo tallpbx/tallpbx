@@ -38,7 +38,7 @@ it('explains that Enter generates the database password', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 
     expect($installer)->toContain('Generate a random password (recommended)')
-        ->and($installer)->toContain('Enter 1 or 2 [1]: ');
+        ->and($installer)->toContain('Database password [1]: ');
 });
 
 it('waits for APT locks in every resource script that changes packages', function (): void {
@@ -375,7 +375,7 @@ it('securely persists and reuses the installer database password', function (): 
 it('resolves a saved database password before asking for a new one', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
     $resolvePosition = strpos($installer, 'resolve_database_password');
-    $promptPosition = strpos($installer, 'read -rp "Enter 1 or 2 [1]: " password_choice');
+    $promptPosition = strpos($installer, 'read -rp "Database password [1]: " password_choice');
 
     expect($installer)->toContain('PBX_INSTALLER_STATE_FILE')
         ->and($installer)->not->toContain('sed -i "s/^database_password=random$')
