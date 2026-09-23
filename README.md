@@ -161,15 +161,6 @@ php artisan module:clear
 php artisan module:list
 ```
 
-Plural aliases are also available for operator preference and compatibility:
-
-```bash
-php artisan modules:sync
-php artisan modules:cache
-php artisan modules:clear
-php artisan modules:list
-```
-
 Composer is responsible for PHP autoloading and Laravel package discovery. The module cache stores TallPBX module metadata, not a separate PHP autoloader.
 
 ## Telephony Integration (mod_xml_curl)
