@@ -171,21 +171,29 @@ get_apt_auth_password () {
 resolve_signalwire_token () {
     local configured_token="$1"
     local state_file="$2"
-    local apt_auth_file="$3"
+    local apt_auth_file="${3:-}"
     local saved_token
+    local candidate_token=""
+
+    # Strip surrounding whitespace and quotes from the configured token
+    configured_token=$(printf '%s' "$configured_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
 
     if [ -n "$configured_token" ]; then
         printf '%s\n' "$configured_token"
         return
     fi
 
-    saved_token=$(get_env_value "$state_file" SWITCH_TOKEN)
-
-    if [ -z "$saved_token" ]; then
-        saved_token=$(get_apt_auth_password "$apt_auth_file")
+    if [ -n "$state_file" ] && [ -f "$state_file" ]; then
+        saved_token=$(get_env_value "$state_file" SWITCH_TOKEN)
+        candidate_token=$(printf '%s' "$saved_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
     fi
 
-    printf '%s\n' "$saved_token"
+    if [ -z "$candidate_token" ] && [ -n "$apt_auth_file" ] && [ -f "$apt_auth_file" ]; then
+        saved_token=$(get_apt_auth_password "$apt_auth_file")
+        candidate_token=$(printf '%s' "$saved_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
+    fi
+
+    printf '%s\n' "$candidate_token"
 }
 
 # Report whether this host has a default IPv6 route. The result drives the

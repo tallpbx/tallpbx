@@ -358,12 +358,16 @@ if [ "$FREESWITCH_INSTALL_METHOD" = packages ]; then
         "$INSTALLER_STATE_FILE" \
         /etc/apt/auth.conf.d/freeswitch.conf)
 
+    # Sanitize token: trim whitespace and surrounding quotes
+    switch_token=$(printf '%s' "$switch_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
+
     if [ -z "$switch_token" ]; then
         echo ""
         warning "A SignalWire Personal Access Token is required for packages."
         read -rsp "Enter your Personal Access Token: " switch_token
         echo ""
 
+        switch_token=$(printf '%s' "$switch_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
         if [ -z "$switch_token" ]; then
             error "A token is required to install FreeSWITCH packages."
             exit 1
@@ -393,16 +397,15 @@ if [ "$FREESWITCH_INSTALL_METHOD" = source ] \
     export FSPBX_RECOMPILE_SOURCE="$recompile_source"
 fi
 
-# Gather the initial administrator mode before execution starts. Re-runs reuse
-# the recorded choice so an unfinished installation cannot silently switch its
-# security model. A new non-interactive install may supply the mode as an
-# environment value; interactive new installs keep installer mode as default.
+# Gather the initial administrator mode before execution starts.
+# When an administrator has already been created, setup is marked complete.
+# Otherwise, interactive installs always prompt the operator with the active or
+# default mode, while non-interactive installs require an explicit or saved mode.
 saved_initial_admin_mode=$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_INITIAL_ADMIN_MODE)
 requested_initial_admin_mode="${FSPBX_INITIAL_ADMIN_MODE:-}"
 case "$saved_initial_admin_mode" in
     installer|activation-code|trusted-network)
         FSPBX_INITIAL_ADMIN_MODE="$saved_initial_admin_mode"
-        verbose "Reusing initial administrator setup mode: $FSPBX_INITIAL_ADMIN_MODE"
         ;;
     *)
         case "$requested_initial_admin_mode" in
@@ -416,17 +419,11 @@ case "$saved_initial_admin_mode" in
         ;;
 esac
 
-if [ "$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_ADMIN_INITIALIZED)" != true ] \
-    && [ -t 0 ] \
-    && [ -z "$saved_initial_admin_mode" ] \
-    && [ -z "$requested_initial_admin_mode" ]; then
+if [ "$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_ADMIN_INITIALIZED)" = true ]; then
+    verbose "Administrator setup already completed"
+elif [ -t 0 ]; then
     prompt_initial_admin_mode "$FSPBX_INITIAL_ADMIN_MODE"
-fi
-
-if [ "$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_ADMIN_INITIALIZED)" != true ] \
-    && [ ! -t 0 ] \
-    && [ -z "$saved_initial_admin_mode" ] \
-    && [ -z "$requested_initial_admin_mode" ]; then
+elif [ -z "$saved_initial_admin_mode" ] && [ -z "$requested_initial_admin_mode" ]; then
     error "A non-interactive install must set FSPBX_INITIAL_ADMIN_MODE to installer, activation-code, or trusted-network."
     exit 1
 fi
@@ -546,7 +543,8 @@ apt_get_with_lock_wait install -y \
     ca-certificates \
     gnupg2 \
     net-tools \
-    unzip
+    unzip \
+    sudo
 
 # Some VPS providers hand out a global IPv6 address without a default IPv6
 # route. PHP then tries the IPv6 address first when it downloads files (for

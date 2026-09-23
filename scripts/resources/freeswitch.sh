@@ -339,6 +339,7 @@ configure_dynamic_xml() {
     gateway_url="${app_url%/}${xml_path}?token=${xml_token}"
 
     verbose "Configuring FreeSWITCH mod_xml_curl"
+    mkdir -p "${conf_dir}/autoload_configs"
     cat > "$xml_curl_conf" <<XML
 <configuration name="xml_curl.conf" description="cURL XML Gateway">
   <bindings>
@@ -635,6 +636,8 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
         "$INSTALLER_STATE_FILE" \
         /etc/apt/auth.conf.d/freeswitch.conf)
 
+    switch_token=$(printf '%s' "$switch_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
+
     # Only a direct interactive run may ask here. The main installer always
     # supplies the token during its preflight questionnaire.
     if [ -z "$switch_token" ]; then
@@ -649,6 +652,7 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
         echo ""
         read -rsp "$(verbose 'Enter your Personal Access Token: ')" switch_token
         echo ""
+        switch_token=$(printf '%s' "$switch_token" | sed -e 's/^[[:space:]"'"'"']*//' -e 's/[[:space:]"'"'"']*$//')
         if [ -z "$switch_token" ]; then
             error "A token is required to install FreeSWITCH packages. Aborting."
             exit 1

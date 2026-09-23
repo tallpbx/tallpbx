@@ -48,8 +48,8 @@ cd "$(dirname "$0")"
 # Nftables is the modern Linux kernel packet classification and firewall framework,
 # replacing legacy iptables. It provides zero-daemon automatic kernel timeouts for
 # IP banning and atomic ruleset replacement.
-verbose "Installing nftables package"
-apt_get_with_lock_wait install -y nftables
+verbose "Installing nftables and sudo packages"
+apt_get_with_lock_wait install -y nftables sudo
 
 # ------------------------------------------------------------------------------
 # 2. Setup configuration directory for firewall rulesets
@@ -80,6 +80,7 @@ install -m 0750 -o root -g www-data ./tallpbx-security /usr/local/sbin/tallpbx-s
 # This sudoers file grants 'www-data' passwordless sudo access strictly and only
 # to '/usr/local/sbin/tallpbx-security'. No wildcards or shell escapes are permitted.
 verbose "Installing sudoers rule for security helper"
+install -d -m 0750 -o root -g root /etc/sudoers.d
 install -m 0440 -o root -g root ./tallpbx-security.sudoers /etc/sudoers.d/tallpbx-security
 
 # Verify sudoers syntax before proceeding to prevent administrative lockout

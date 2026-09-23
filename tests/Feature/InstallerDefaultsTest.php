@@ -850,3 +850,53 @@ it('stops headless installs before prompting for administrator credentials', fun
         ->and($installer)->toContain('Pre-seed /etc/pbx/installer.env with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD')
         ->and($guardPosition)->toBeLessThan($promptPosition);
 });
+
+it('sanitizes SignalWire tokens and treats empty or quoted tokens as unset', function (): void {
+    $temporaryDirectory = sys_get_temp_dir().'/pbx-token-sanitize-'.bin2hex(random_bytes(8));
+    $statePath = $temporaryDirectory.'/installer.env';
+    mkdir($temporaryDirectory, 0700);
+
+    $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
+    $stateArgument = escapeshellarg($statePath);
+
+    file_put_contents($statePath, "SWITCH_TOKEN=\"\"\n");
+
+    $command = implode(' && ', [
+        'source '.$helperPath,
+        "test -z \"\$(resolve_signalwire_token '' {$stateArgument} /does/not/exist)\"",
+        "test -z \"\$(resolve_signalwire_token '\"\"' {$stateArgument} /does/not/exist)\"",
+        "test -z \"\$(resolve_signalwire_token '   ' {$stateArgument} /does/not/exist)\"",
+    ]);
+
+    try {
+        $process = new Process(['bash', '-c', $command], base_path());
+        $process->run();
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+    } finally {
+        if (file_exists($statePath)) {
+            unlink($statePath);
+        }
+        rmdir($temporaryDirectory);
+    }
+});
+
+it('ensures sudo and sudoers directory are installed for host security helper', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+    $securityScript = (string) file_get_contents(base_path('scripts/resources/security.sh'));
+    $freeSwitchScript = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    expect($installer)->toContain('sudo')
+        ->and($securityScript)->toContain('apt_get_with_lock_wait install -y nftables sudo')
+        ->and($securityScript)->toContain('install -d -m 0750 -o root -g root /etc/sudoers.d')
+        ->and($freeSwitchScript)->toContain('mkdir -p "${conf_dir}/autoload_configs"');
+});
+
+it('prompts interactively for initial admin mode until setup is completed', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+
+    expect($installer)->toContain('if [ "$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_ADMIN_INITIALIZED)" = true ]; then')
+        ->and($installer)->toContain('verbose "Administrator setup already completed"')
+        ->and($installer)->toContain('elif [ -t 0 ]; then')
+        ->and($installer)->toContain('prompt_initial_admin_mode "$FSPBX_INITIAL_ADMIN_MODE"');
+});
+

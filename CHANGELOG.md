@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added post-installation troubleshooting to `docs/operations.md` for 502 web errors, file permission drift, FreeSWITCH startup/registration issues, and Redis restoration.
 
 ### Fixed
+- **Installer Token Validation, Initial Administrator Prompting, and Host Dependencies**:
+  - Sanitized SignalWire Personal Access Token resolution by stripping whitespace and quotes, ensuring that empty, whitespace, or empty-quoted tokens in the environment, state file, or apt auth file are treated as unset so operators are properly prompted instead of erroneously claiming to reuse a token.
+  - Fixed initial administrator mode selection in `scripts/install.sh` to always prompt interactively until administrator setup is marked completed, rather than bypassing the prompt on re-runs when a mode had been previously written to the installer state file.
+  - Added `sudo` to core dependencies and ensured `/etc/sudoers.d` directory exists before installing `/etc/sudoers.d/tallpbx-security` in `scripts/resources/security.sh` on minimal Linux distributions.
+  - Ensured FreeSWITCH configuration directory `autoload_configs` exists before writing `xml_curl.conf.xml` in `scripts/resources/freeswitch.sh`.
 - **Multi-Tenant Scoping and Access Enforcement in Edit Forms**: Auto-resolved tenant context for non-admin users during mount and save, and added explicit `assertCanAccessTenantRecord()` verification before updating existing records in `QueueEdit`, `ConferencesEdit`, `VoicemailsEdit`, and `RingGroupsEdit`.
 - **Multi-Tenant Query Scoping in List Components**: Scoped list queries to the active tenant for tenant users in `QueueList`, `ConferencesList`, and `VoicemailsList` while allowing administrators to view records across all tenants.
 - **VoicemailsList Deletion Error Handling**: Re-threw `HttpException` before catching general `RuntimeException` in `VoicemailsList::deleteVoicemail()`, ensuring `TenantMutationGuard` 403 cross-tenant access denial propagates correctly instead of being swallowed.
