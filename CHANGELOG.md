@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-23
+
 ### Added
 - **Explicit Password Requirements & Guidance in UI Forms**:
   - Explicitly displayed password requirements and confirmation guidance up front across all user and administrator forms, preventing users from having to encounter unexpected validation errors upon form submission.
@@ -58,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added post-installation troubleshooting to `docs/operations.md` for 502 web errors, file permission drift, FreeSWITCH startup/registration issues, and Redis restoration.
 
 ### Fixed
+- **FreeSWITCH Module Configuration and Package Resolution in Installer**:
+  - Fixed variable scoping and section marker in `scripts/resources/freeswitch.sh` so `mod_say_es` and `mod_say_fr` are properly enabled under `<!-- Say -->` in `modules.conf.xml` during both package and source installations, and loaded dynamically at runtime.
+  - Automatically enabled installed language say grammar modules in `modules.conf.xml` during `configure_freeswitch_sound_defaults()` whenever matching sound folders are present.
+  - Pre-created the `freeswitch` system user and group before package installation in `scripts/resources/freeswitch.sh`, preventing Debian package unpack failures where systemd triggers unit actions before the service user exists.
+  - Replaced the obsolete `freeswitch-sounds-music` package installation with `freeswitch-music-default` verification, preventing package not found errors and unnecessary package removal churn.
+  - Fixed unsandboxed apt download warning by granting `0755` permissions on the temporary working directory during `freeswitch-mod-hiredis` compatibility package build.
+  - Added clean newline separation before database password reuse, token reuse, and system upgrade messages in `scripts/install.sh`, preventing output from appending to interactive prompts in log files.
 - **Installer Token Validation, Initial Administrator Prompting, and Host Dependencies**:
   - Sanitized SignalWire Personal Access Token resolution by stripping whitespace and quotes, ensuring that empty, whitespace, or empty-quoted tokens in the environment, state file, or apt auth file are treated as unset so operators are properly prompted instead of erroneously claiming to reuse a token.
   - Fixed initial administrator mode selection in `scripts/install.sh` to always prompt interactively until administrator setup is marked completed, rather than bypassing the prompt on re-runs when a mode had been previously written to the installer state file.

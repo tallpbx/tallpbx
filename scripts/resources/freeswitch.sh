@@ -98,6 +98,14 @@ load_required_freeswitch_modules() {
     fs_cli -x 'load mod_voicemail' >/dev/null 2>&1 || true
     fs_cli -x 'reload mod_callcenter' >/dev/null 2>&1 || fs_cli -x 'load mod_callcenter' >/dev/null 2>&1 || true
     fs_cli -x 'load mod_local_stream' >/dev/null 2>&1 || true
+
+    # Load language-specific say grammar modules if their binaries are present on disk
+    if [ -f /usr/lib/freeswitch/mod/mod_say_es.so ] || [ -f /usr/local/freeswitch/mod/mod_say_es.so ]; then
+        fs_cli -x 'load mod_say_es' >/dev/null 2>&1 || true
+    fi
+    if [ -f /usr/lib/freeswitch/mod/mod_say_fr.so ] || [ -f /usr/local/freeswitch/mod/mod_say_fr.so ]; then
+        fs_cli -x 'load mod_say_fr' >/dev/null 2>&1 || true
+    fi
 }
 
 # Set the safe call-session rate used by a new TallPBX server and apply it to a
@@ -137,6 +145,18 @@ configure_freeswitch_sound_defaults() {
 
     conf_dir="$(freeswitch_conf_dir)"
     vars_xml="${conf_dir}/vars.xml"
+    local modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
+
+    # Ensure mod_say modules matching installed sound directories are enabled in modules.conf.xml
+    if [ -f "$modules_conf" ]; then
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_en" "<!-- Say -->"
+        if [ -d /usr/share/freeswitch/sounds/es ] || [ -d /usr/local/freeswitch/sounds/es ]; then
+            ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Say -->"
+        fi
+        if [ -d /usr/share/freeswitch/sounds/fr ] || [ -d /usr/local/freeswitch/sounds/fr ]; then
+            ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Say -->"
+        fi
+    fi
 
     if [ ! -f "$vars_xml" ]; then
         return 0
@@ -201,6 +221,8 @@ install_freeswitch_hiredis_package() {
     fi
 
     tmp_dir="$(mktemp -d)"
+    # Allow the unprivileged _apt user to access the directory during apt download
+    chmod 755 "$tmp_dir"
     (
         set -e
         cd "$tmp_dir"
@@ -659,6 +681,8 @@ if [ "$freeswitch_install_method" = "source" ]; then
 
     sound_languages="${FSPBX_SOUND_LANGUAGES:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES)}"
     sound_languages="${sound_languages:-en}"
+    conf_dir="$(freeswitch_conf_dir)"
+    modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
 
     if [[ "$sound_languages" == *"es"* ]]; then
         verbose "Downloading Spanish sound prompts for source build"
@@ -666,7 +690,7 @@ if [ "$freeswitch_install_method" = "source" ]; then
         curl -fsSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-es-ar-mario-8000-1.0.51.tar.gz 2>/dev/null \
             | tar -xz -C /usr/share/freeswitch/sounds/es/ar/mario 2>/dev/null || true
         chown -R freeswitch:freeswitch /usr/share/freeswitch/sounds/es 2>/dev/null || true
-        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Languages -->"
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Say -->"
     fi
 
     if [[ "$sound_languages" == *"fr"* ]]; then
@@ -675,7 +699,7 @@ if [ "$freeswitch_install_method" = "source" ]; then
         curl -fsSL https://files.freeswitch.org/releases/sounds/freeswitch-sounds-fr-ca-june-8000-1.0.51.tar.gz 2>/dev/null \
             | tar -xz -C /usr/share/freeswitch/sounds/fr/ca/june 2>/dev/null || true
         chown -R freeswitch:freeswitch /usr/share/freeswitch/sounds/fr 2>/dev/null || true
-        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Languages -->"
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Say -->"
     fi
 
     install_freeswitch_source_service
@@ -780,6 +804,14 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
 
     apt_get_with_lock_wait update
 
+    # Ensure system user and group exist before package installation triggers systemd unit actions.
+    # Debian packaging starts the freeswitch service during unpack, which executes chown against
+    # the freeswitch user; pre-creating the user and group prevents initial service start failure.
+    getent group freeswitch >/dev/null 2>&1 || groupadd --system freeswitch
+    getent passwd freeswitch >/dev/null 2>&1 || useradd --system --gid freeswitch \
+        --home-dir /var/lib/freeswitch --shell /usr/sbin/nologin \
+        --comment "FreeSWITCH telephony daemon" freeswitch
+
     # Install FreeSWITCH, common modules used by the default vanilla
     # configuration, mod_xml_curl for dynamic app-provided XML, and
     # the US English sound files.
@@ -804,34 +836,26 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
 
     sound_languages="${FSPBX_SOUND_LANGUAGES:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES)}"
     sound_languages="${sound_languages:-en}"
+    conf_dir="$(freeswitch_conf_dir)"
+    modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
 
     if [[ "$sound_languages" == *"es"* ]]; then
         verbose "Installing Spanish sound prompts and grammar module"
         apt_get_optional_with_lock_wait install -y freeswitch-sounds-es-ar-mario freeswitch-mod-say-es || true
-        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Languages -->"
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_es" "<!-- Say -->"
     fi
 
     if [[ "$sound_languages" == *"fr"* ]]; then
         verbose "Installing French sound prompts and grammar module"
         apt_get_optional_with_lock_wait install -y freeswitch-sounds-fr-ca-june freeswitch-mod-say-fr || true
-        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Languages -->"
+        ensure_freeswitch_module_enabled "$modules_conf" "mod_say_fr" "<!-- Say -->"
     fi
 
-    # Music-on-hold is a separate package that may not be available in all repos.
-    # If it's not found, we skip it instead of failing the whole install.
-    if apt_get_optional_with_lock_wait install -y freeswitch-sounds-music; then
-        verbose "Preserving music-on-hold"
-        # The music package includes default hold music. We save it,
-        # remove the package (to free up disk), then copy the music back.
-        mkdir -p /usr/share/freeswitch/sounds/temp
-        mv /usr/share/freeswitch/sounds/music/*000 /usr/share/freeswitch/sounds/temp 2>/dev/null || true
-        mv /usr/share/freeswitch/sounds/music/default/*000 /usr/share/freeswitch/sounds/temp 2>/dev/null || true
-        apt_get_with_lock_wait remove -y freeswitch-sounds-music
-        mkdir -p /usr/share/freeswitch/sounds/music/default
-        mv /usr/share/freeswitch/sounds/temp/* /usr/share/freeswitch/sounds/music/default/ 2>/dev/null || true
-        rm -rf /usr/share/freeswitch/sounds/temp
-    else
-        warning "freeswitch-sounds-music not available in this repo; music-on-hold will not be installed"
+    # Music-on-hold audio files are installed via freeswitch-music-default (a dependency
+    # of freeswitch-meta-vanilla into /usr/share/freeswitch/sounds/music). If not already
+    # present on disk, ensure the package is installed.
+    if [ ! -d /usr/share/freeswitch/sounds/music/8000 ]; then
+        apt_get_optional_with_lock_wait install -y freeswitch-music-default || true
     fi
 
     verbose "FreeSWITCH package install complete"

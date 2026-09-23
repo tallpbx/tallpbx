@@ -439,6 +439,7 @@ saved_database_password=$(resolve_database_password \
 
 if [ -n "$saved_database_password" ]; then
     database_password="$saved_database_password"
+    echo ""
     verbose "Reusing the existing database password"
 else
     echo ""
@@ -542,6 +543,7 @@ if [ "$FREESWITCH_INSTALL_METHOD" = packages ]; then
             exit 1
         fi
     else
+        echo ""
         verbose "Reusing the existing SignalWire Personal Access Token"
     fi
 
@@ -738,6 +740,7 @@ sed -i '/cdrom:/d' /etc/apt/sources.list
 
 # Update all system packages to the latest versions. Use separate, checked
 # commands so a failed upgrade cannot be hidden by an && list.
+echo ""
 verbose "Updating system packages"
 apt_get_with_lock_wait update
 apt_get_with_lock_wait upgrade -y
