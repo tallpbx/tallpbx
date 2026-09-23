@@ -37,8 +37,8 @@ it('installs net-tools as a core Debian dependency', function (): void {
 it('explains that Enter generates the database password', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 
-    expect($installer)->toContain('Generate a random password (recommended)')
-        ->and($installer)->toContain('Database password [1]: ');
+    expect($installer)->toContain('1) Random — generate a strong random password (recommended)')
+        ->and($installer)->toContain('Random or custom [1]: ');
 });
 
 it('waits for APT locks in every resource script that changes packages', function (): void {
@@ -71,6 +71,8 @@ it('requires an interactive FreeSWITCH installation method choice and persists i
         ->and($installer)->toContain('FSPBX_FREESWITCH_INSTALL_METHOD')
         ->and($installer)->toContain('FSPBX_FREESWITCH_INSTALLED_METHOD')
         ->and($installer)->toContain('prompt_freeswitch_install_method')
+        ->and($installer)->toContain('Packages or source [${default_number}]: ')
+        ->and($installer)->toContain('Keep or recompile [1]: ')
         ->and($installer)->toContain('set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALL_METHOD')
         ->and($tallScript)->toContain('set_env_value .env FSPBX_FREESWITCH_INSTALL_METHOD "${FSPBX_FREESWITCH_INSTALL_METHOD}"')
         ->and($freeSwitchScript)->toContain('Recompile FreeSWITCH from source? [y/N]')
@@ -168,9 +170,10 @@ it('collects the selected initial administrator setup mode during preflight', fu
     $summaryPosition = strpos($installer, '# --- Summary ---');
 
     expect($installer)->toContain('Initial administrator setup')
-        ->and($installer)->toContain('Create administrator during installation (default)')
-        ->and($installer)->toContain('Create administrator in the web browser with a one-time activation code')
-        ->and($installer)->toContain('Create administrator in the web browser without an activation code — trusted network only')
+        ->and($installer)->toContain('1) Setup now       — enter email and password now (recommended)')
+        ->and($installer)->toContain('2) Activation code — set up in web browser with a one-time code')
+        ->and($installer)->toContain('3) Trusted network — set up in web browser from local network without a code')
+        ->and($installer)->toContain('Setup method [${default_number}]: ')
         ->and($installer)->toContain('FSPBX_INITIAL_ADMIN_MODE')
         ->and($installer)->toContain('requested_initial_admin_mode="${FSPBX_INITIAL_ADMIN_MODE:-}"')
         ->and($installer)->toContain('FSPBX_ADMIN_PASSWORD')
@@ -376,7 +379,7 @@ it('securely persists and reuses the installer database password', function (): 
 it('resolves a saved database password before asking for a new one', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
     $resolvePosition = strpos($installer, 'resolve_database_password');
-    $promptPosition = strpos($installer, 'read -rp "Database password [1]: " password_choice');
+    $promptPosition = strpos($installer, 'read -rp "Random or custom [1]: " password_choice');
 
     expect($installer)->toContain('PBX_INSTALLER_STATE_FILE')
         ->and($installer)->not->toContain('sed -i "s/^database_password=random$')
@@ -911,8 +914,8 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
         ->and($installer)->toContain('FSPBX_SOUND_LANGUAGES')
         ->and($installer)->toContain('FSPBX_DEFAULT_SOUND_LANGUAGE')
         ->and($installer)->toContain('prompt_sound_languages "$FSPBX_SOUND_LANGUAGES" "$FSPBX_DEFAULT_SOUND_LANGUAGE"')
-        ->and($installer)->toContain('Sound prompt languages [${default_number}]: ')
-        ->and($installer)->toContain('Default sound language [${default_lang_num}]: ')
+        ->and($installer)->toContain('Voice prompt languages [${default_number}]: ')
+        ->and($installer)->toContain('Default language [${default_lang_num}]: ')
         ->and($freeSwitchScript)->toContain('configure_freeswitch_sound_defaults')
         ->and($freeSwitchScript)->toContain('freeswitch-sounds-es-ar-mario')
         ->and($freeSwitchScript)->toContain('freeswitch-sounds-fr-ca-june')

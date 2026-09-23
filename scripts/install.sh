@@ -180,7 +180,7 @@ prompt_freeswitch_install_method () {
     echo ""
 
     while true; do
-        read -rp "Install method [${default_number}]: " choice
+        read -rp "Packages or source [${default_number}]: " choice
 
         case "${choice,,}" in
             1|package|packages)
@@ -218,27 +218,26 @@ prompt_initial_admin_mode () {
 
     echo ""
     verbose "Initial administrator setup"
-    echo "  1) Create administrator during installation (default)"
-    echo "     Enter the administrator email and password now. TallPBX creates the account before installation finishes."
-    echo "  2) Create administrator in the web browser with a one-time activation code"
-    echo "     TallPBX shows an activation code after installation. Enter it at /panel/setup to choose the administrator email and password."
-    echo "  3) Create administrator in the web browser without an activation code — trusted network only"
-    echo "     The first person who opens /panel/setup can create the administrator. Use this only on a private, trusted network."
+    echo "  Choose how to set up your primary login account:"
+    echo ""
+    echo "  1) Setup now       — enter email and password now (recommended)"
+    echo "  2) Activation code — set up in web browser with a one-time code"
+    echo "  3) Trusted network — set up in web browser from local network without a code"
     echo ""
 
     while true; do
-        read -rp "Administrator setup [${default_number}]: " choice
+        read -rp "Setup method [${default_number}]: " choice
 
         case "${choice,,}" in
-            1|installer)
+            1|setup|installer|now)
                 FSPBX_INITIAL_ADMIN_MODE=installer
                 return
                 ;;
-            2|activation-code|activation)
+            2|activation-code|activation|code)
                 FSPBX_INITIAL_ADMIN_MODE=activation-code
                 return
                 ;;
-            3|trusted-network|trusted)
+            3|trusted-network|trusted|network)
                 FSPBX_INITIAL_ADMIN_MODE=trusted-network
                 return
                 ;;
@@ -251,7 +250,7 @@ prompt_initial_admin_mode () {
                 return
                 ;;
             *)
-                warning "Please enter 1, 2, or 3."
+                warning "Please enter 1, 2, or 3 (or setup/activation/trusted)."
                 ;;
         esac
     done
@@ -286,11 +285,11 @@ prompt_sound_languages () {
     echo ""
 
     while true; do
-        read -rp "Sound prompt languages [${default_number}]: " choice
+        read -rp "Voice prompt languages [${default_number}]: " choice
         choice="${choice:-$default_number}"
 
         case "${choice,,}" in
-            1|en|english)
+            1|en|english|only)
                 FSPBX_SOUND_LANGUAGES="en"
                 FSPBX_DEFAULT_SOUND_LANGUAGE="en"
                 return
@@ -314,7 +313,8 @@ prompt_sound_languages () {
     done
 
     echo ""
-    echo "Which language should FreeSWITCH use as its default sound prompt language?"
+    verbose "Default voice prompt language"
+    echo "  Select the primary language callers hear for voicemail and call menus:"
     echo "  1) English (en)"
     if [[ "$FSPBX_SOUND_LANGUAGES" == *"es"* ]]; then
         echo "  2) Spanish (es)"
@@ -332,7 +332,7 @@ prompt_sound_languages () {
     fi
 
     while true; do
-        read -rp "Default sound language [${default_lang_num}]: " default_choice
+        read -rp "Default language [${default_lang_num}]: " default_choice
         default_choice="${default_choice:-$default_lang_num}"
 
         case "${default_choice,,}" in
@@ -443,15 +443,14 @@ if [ -n "$saved_database_password" ]; then
 else
     echo ""
     verbose "Database password"
-    echo "  The installer can generate a strong random password (recommended),"
-    echo "  or you can choose your own."
+    echo "  The system needs a secure database password to store phone settings:"
     echo ""
-    echo "  1) Generate a random password (recommended)"
-    echo "  2) Enter my own password"
+    echo "  1) Random — generate a strong random password (recommended)"
+    echo "  2) Custom — enter your own password"
     echo ""
-    read -rp "Database password [1]: " password_choice
+    read -rp "Random or custom [1]: " password_choice
 
-    if [ "$password_choice" = "2" ]; then
+    if [ "$password_choice" = "2" ] || [ "${password_choice,,}" = "custom" ]; then
         while true; do
             read -rsp "Enter database password: " database_password
             echo ""
@@ -560,14 +559,14 @@ if [ "$FREESWITCH_INSTALL_METHOD" = source ] \
     if [ -t 0 ]; then
         echo ""
         verbose "FreeSWITCH source build"
-        echo "  An existing FreeSWITCH source build was detected on this server."
+        echo "  An existing FreeSWITCH source build was detected on this server:"
         echo ""
-        echo "  1) Keep existing FreeSWITCH build (recommended)"
-        echo "  2) Recompile FreeSWITCH from source"
+        echo "  1) Keep      — keep existing FreeSWITCH build (recommended)"
+        echo "  2) Recompile — recompile FreeSWITCH from source code"
         echo ""
-        read -rp "FreeSWITCH source build [1]: " recompile_choice
+        read -rp "Keep or recompile [1]: " recompile_choice
         case "${recompile_choice,,}" in
-            2|y|yes|recompile) recompile_source=true ;;
+            2|recompile|y|yes) recompile_source=true ;;
             *) recompile_source=false ;;
         esac
     fi
