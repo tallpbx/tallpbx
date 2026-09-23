@@ -31,18 +31,13 @@ Use a Debian 13 amd64 image or netinst ISO.
 
 If installing from ISO, proceed through the Debian installer UI:
 
-1. Select language, location, and keyboard layout
-2. Configure network (DHCP is fine for initial install)
-3. Set hostname and domain
-4. Set root password
-5. Create a standard user account
-6. Partition disk (guided - use entire disk is simplest)
-7. **Software selection**: check only:
+1. **Partition disk**: Guided - use entire disk is simplest. Creating a swap partition is optional if you prefer that instead of a swapfile.
+2. **Software selection**: Check only:
    - SSH server
    - Standard system utilities
-8. Install GRUB boot loader to the master boot record
+3. **Install GRUB boot loader** to the master boot record.
 
-After installation completes, the VM will reboot. Log in as root.
+After installation completes, reboot and log in as root.
 
 ### Configure a Swapfile (When Total Swap Is Below 2 GB)
 
