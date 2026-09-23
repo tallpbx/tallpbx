@@ -20,8 +20,10 @@ it('renders the reset password form', function () {
     Livewire::test(ResetPassword::class, ['token' => $token, 'email' => $user->email])
         ->assertOk()
         ->assertSee('Reset Password')
-        ->assertSee('email')
-        ->assertSee('password');
+        ->assertSee('Minimum 8 characters')
+        ->assertSee('Must be at least 8 characters.')
+        ->assertSee('Must match password')
+        ->assertSee('Re-enter password to confirm.');
 });
 
 it('resets the password with valid token', function () {

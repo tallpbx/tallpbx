@@ -28,7 +28,11 @@ it('mounts in create mode with default Super Administrators group', function ():
         ->assertSet('name', '')
         ->assertSet('email', '')
         ->assertSet('enabled', true)
-        ->assertSet('selectedGroupIds', [$this->superGroup->id]);
+        ->assertSet('selectedGroupIds', [$this->superGroup->id])
+        ->assertSee('Minimum 8 characters')
+        ->assertSee('Must be at least 8 characters.')
+        ->assertSee('Must match password')
+        ->assertSee('Re-enter password to confirm.');
 });
 
 it('creates a new administrator with assigned groups', function (): void {
@@ -64,7 +68,10 @@ it('mounts in edit mode with existing admin data', function (): void {
         ->assertSet('adminId', $targetAdmin->id)
         ->assertSet('name', 'Target Admin')
         ->assertSet('email', 'target@example.com')
-        ->assertSet('enabled', false);
+        ->assertSet('enabled', false)
+        ->assertSee('Leave blank to keep current password, or enter at least 8 characters to set a new one.')
+        ->assertSee('Must match password')
+        ->assertSee('Re-enter password to confirm.');
 });
 
 it('updates an existing administrator without requiring password', function (): void {

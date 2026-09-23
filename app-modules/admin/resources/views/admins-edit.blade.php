@@ -28,19 +28,22 @@
                 {{-- Password --}}
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1" for="password">
-                        <span class="label-text font-medium">{{ __('admin.password') }}</span>
-                        @if ($adminId)
-                            <span class="label-text-alt text-base-content/60">{{ __('admin.admin_password_help') }}</span>
-                        @endif
+                        <span class="label-text font-medium">{{ $adminId ? __('admin.new_password') : __('admin.password') }}</span>
+                        <span class="label-text-alt text-base-content/60">{{ $adminId ? __('admin.admin_password_help') : __('admin.password_requirements_min') }}</span>
                     </label>
-                    <input type="password" id="password" wire:model="password" autocomplete="new-password" class="input input-bordered w-full @error('password') input-error @enderror" {{ $adminId ? '' : 'required' }} />
+                    <input type="password" id="password" wire:model="password" autocomplete="new-password" class="input input-bordered w-full @error('password') input-error @enderror" placeholder="{{ $adminId ? __('admin.admin_password_help') : __('admin.password_requirements_min') }}" {{ $adminId ? '' : 'required' }} />
+                    <p class="text-xs text-base-content/60 mt-1">{{ $adminId ? __('admin.admin_password_edit_hint') : __('admin.admin_password_create_hint') }}</p>
                     @error('password') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
                 </div>
 
                 {{-- Password Confirmation --}}
                 <div class="form-control w-full">
-                    <label class="label justify-start gap-2 pb-1" for="password_confirmation"><span class="label-text font-medium">{{ __('admin.confirm_new_password') }}</span></label>
-                    <input type="password" id="password_confirmation" wire:model="password_confirmation" autocomplete="new-password" class="input input-bordered w-full" {{ $adminId ? '' : 'required' }} />
+                    <label class="label justify-start gap-2 pb-1" for="password_confirmation">
+                        <span class="label-text font-medium">{{ $adminId ? __('admin.confirm_new_password') : __('admin.confirm_password') }}</span>
+                        <span class="label-text-alt text-base-content/60">{{ __('admin.confirm_password_help') }}</span>
+                    </label>
+                    <input type="password" id="password_confirmation" wire:model="password_confirmation" autocomplete="new-password" class="input input-bordered w-full" placeholder="{{ __('admin.confirm_password') }}" {{ $adminId ? '' : 'required' }} />
+                    <p class="text-xs text-base-content/60 mt-1">{{ __('admin.confirm_password_hint') }}</p>
                 </div>
 
                 {{-- Enabled Toggle --}}

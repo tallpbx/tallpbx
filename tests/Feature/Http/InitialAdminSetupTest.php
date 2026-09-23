@@ -16,7 +16,11 @@ beforeEach(function (): void {
 it('lets a trusted-network installation create its first administrator in the browser', function (): void {
     get(route('panel.initial-admin.setup'))
         ->assertOk()
-        ->assertSee('Create the first administrator');
+        ->assertSee('Create the first administrator')
+        ->assertSee('Minimum 8 characters')
+        ->assertSee('Must be at least 8 characters.')
+        ->assertSee('Must match password')
+        ->assertSee('Re-enter password to confirm.');
 
     post(route('panel.initial-admin.store'), [
         'email' => 'admin@example.test',

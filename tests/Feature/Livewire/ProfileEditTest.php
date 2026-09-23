@@ -27,6 +27,10 @@ it('mounts with the authenticated admin details', function (): void {
         ->assertSee('My Profile')
         ->assertSee('Profile Information')
         ->assertSee('Change Password')
+        ->assertSee('Minimum 8 characters')
+        ->assertSee('Must be at least 8 characters and different from your current password.')
+        ->assertSee('Must match password')
+        ->assertSee('Re-enter password to confirm.')
         ->assertSee('Save')
         ->assertDontSee('admin.save');
 });

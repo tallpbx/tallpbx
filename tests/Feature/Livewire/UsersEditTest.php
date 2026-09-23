@@ -28,7 +28,9 @@ it('renders the create form', function () {
         ->assertSet('name', '')
         ->assertSet('email', '')
         ->assertSet('selectedTenantIds', [])
-        ->assertSet('selectedGroupIds', []);
+        ->assertSet('selectedGroupIds', [])
+        ->assertSee('Minimum 8 characters')
+        ->assertSee('Must be at least 8 characters.');
 });
 
 it('renders the edit form with existing user data', function () {
@@ -48,7 +50,8 @@ it('renders the edit form with existing user data', function () {
         ->assertSet('name', 'John Doe')
         ->assertSet('email', 'john@example.com')
         ->assertSet('selectedTenantIds', [$tenant->id])
-        ->assertSet('selectedGroupIds', [$group->id]);
+        ->assertSet('selectedGroupIds', [$group->id])
+        ->assertSee('Leave blank to keep current password, or enter at least 8 characters to set a new one.');
 });
 
 it('renders the edit form when visited through the panel route', function () {

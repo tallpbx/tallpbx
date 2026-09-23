@@ -20,17 +20,25 @@
 
                 {{-- Password --}}
                 <div class="form-control mt-4">
-                    <label for="password" class="label"><span class="label-text">New Password</span></label>
+                    <label for="password" class="label justify-start gap-2 pb-1">
+                        <span class="label-text">{{ __('client.new_password') }}</span>
+                        <span class="label-text-alt text-base-content/60">{{ __('client.password_requirements_min') }}</span>
+                    </label>
                     <input type="password" id="password" wire:model="password"
-                           class="input input-bordered w-full" placeholder="Min 8 characters" required />
+                           class="input input-bordered w-full @error('password') input-error @enderror" placeholder="{{ __('client.password_requirements_min') }}" required />
+                    <p class="text-xs text-base-content/60 mt-1">{{ __('client.password_requirements_hint') }}</p>
                     @error('password') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
                 </div>
 
                 {{-- Confirm Password --}}
                 <div class="form-control mt-4">
-                    <label for="password_confirmation" class="label"><span class="label-text">Confirm Password</span></label>
+                    <label for="password_confirmation" class="label justify-start gap-2 pb-1">
+                        <span class="label-text">{{ __('client.confirm_password') }}</span>
+                        <span class="label-text-alt text-base-content/60">{{ __('client.confirm_password_help') }}</span>
+                    </label>
                     <input type="password" id="password_confirmation" wire:model="password_confirmation"
-                           class="input input-bordered w-full" placeholder="Confirm password" required />
+                           class="input input-bordered w-full" placeholder="{{ __('client.confirm_password') }}" required />
+                    <p class="text-xs text-base-content/60 mt-1">{{ __('client.confirm_password_hint') }}</p>
                 </div>
 
                 <button type="submit" class="btn btn-primary w-full mt-6">{{ __('client.reset_password') }}</button>

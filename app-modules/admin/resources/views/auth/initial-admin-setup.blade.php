@@ -35,14 +35,25 @@
                     </div>
                 @endif
                 <div class="mb-4">
-                    <label class="label" for="password"><span class="label-text">Password</span></label>
+                    <label class="label justify-start gap-2 pb-1" for="password">
+                        <span class="label-text font-medium">Password</span>
+                        <span class="label-text-alt text-base-content/60">Minimum 8 characters</span>
+                    </label>
                     <input type="password" name="password" id="password" required autocomplete="new-password"
-                        class="input input-bordered w-full" />
+                        placeholder="Minimum 8 characters"
+                        class="input input-bordered w-full @error('password') input-error @enderror" />
+                    <p class="text-xs text-base-content/60 mt-1">Must be at least 8 characters.</p>
+                    @error('password') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
                 </div>
                 <div class="mb-6">
-                    <label class="label" for="password_confirmation"><span class="label-text">Confirm password</span></label>
+                    <label class="label justify-start gap-2 pb-1" for="password_confirmation">
+                        <span class="label-text font-medium">Confirm password</span>
+                        <span class="label-text-alt text-base-content/60">Must match password</span>
+                    </label>
                     <input type="password" name="password_confirmation" id="password_confirmation" required autocomplete="new-password"
+                        placeholder="Confirm password"
                         class="input input-bordered w-full" />
+                    <p class="text-xs text-base-content/60 mt-1">Re-enter password to confirm.</p>
                 </div>
                 <button type="submit" class="btn btn-primary w-full">Create administrator</button>
             </form>

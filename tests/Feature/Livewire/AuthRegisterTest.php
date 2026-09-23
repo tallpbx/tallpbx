@@ -10,9 +10,10 @@ it('renders the register form', function () {
     Livewire::test(Register::class)
         ->assertOk()
         ->assertSee('Create Account')
-        ->assertSee('name')
-        ->assertSee('email')
-        ->assertSee('password');
+        ->assertSee('Minimum 8 characters')
+        ->assertSee('Must be at least 8 characters.')
+        ->assertSee('Must match password')
+        ->assertSee('Re-enter password to confirm.');
 });
 
 it('registers a new user', function () {

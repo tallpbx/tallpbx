@@ -59,14 +59,22 @@
                 </div>
 
                 <div class="form-control w-full max-w-md">
-                    <label class="label justify-start gap-2 pb-1" for="newPassword"><span class="label-text font-medium">{{ __('admin.new_password') }}</span></label>
-                    <input type="password" id="newPassword" wire:model="newPassword" autocomplete="new-password" class="input input-bordered w-full @error('newPassword') input-error @enderror" required />
+                    <label class="label justify-start gap-2 pb-1" for="newPassword">
+                        <span class="label-text font-medium">{{ __('admin.new_password') }}</span>
+                        <span class="label-text-alt text-base-content/60">{{ __('admin.password_requirements_min') }}</span>
+                    </label>
+                    <input type="password" id="newPassword" wire:model="newPassword" autocomplete="new-password" placeholder="{{ __('admin.password_requirements_min') }}" class="input input-bordered w-full @error('newPassword') input-error @enderror" required />
+                    <p class="text-xs text-base-content/60 mt-1">{{ __('admin.profile_new_password_hint') }}</p>
                     @error('newPassword') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
                 </div>
 
                 <div class="form-control w-full max-w-md">
-                    <label class="label justify-start gap-2 pb-1" for="newPassword_confirmation"><span class="label-text font-medium">{{ __('admin.confirm_new_password') }}</span></label>
-                    <input type="password" id="newPassword_confirmation" wire:model="newPassword_confirmation" autocomplete="new-password" class="input input-bordered w-full" required />
+                    <label class="label justify-start gap-2 pb-1" for="newPassword_confirmation">
+                        <span class="label-text font-medium">{{ __('admin.confirm_new_password') }}</span>
+                        <span class="label-text-alt text-base-content/60">{{ __('admin.confirm_password_help') }}</span>
+                    </label>
+                    <input type="password" id="newPassword_confirmation" wire:model="newPassword_confirmation" autocomplete="new-password" placeholder="{{ __('admin.confirm_new_password') }}" class="input input-bordered w-full" required />
+                    <p class="text-xs text-base-content/60 mt-1">{{ __('admin.confirm_password_hint') }}</p>
                 </div>
 
                 <div class="pt-2">

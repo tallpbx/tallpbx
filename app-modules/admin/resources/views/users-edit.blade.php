@@ -35,13 +35,19 @@
             <div class="form-control w-full mt-4">
                 <label for="password" class="label justify-start gap-2 pb-1">
                     <span class="label-text font-medium">
-                        {{ $this->isEdit ? 'New Password (leave blank to keep current)' : 'Password' }}
+                        {{ $this->isEdit ? 'New Password' : 'Password' }}
+                    </span>
+                    <span class="label-text-alt text-base-content/60">
+                        {{ $this->isEdit ? 'Leave blank to keep current' : 'Minimum 8 characters' }}
                     </span>
                 </label>
                 <input type="password" id="password" wire:model="password"
                        autocomplete="new-password"
-                       class="input input-bordered w-full"
-                       placeholder="{{ $this->isEdit ? 'Leave blank to keep current' : 'Min 8 characters' }}" />
+                       class="input input-bordered w-full @error('password') input-error @enderror"
+                       placeholder="{{ $this->isEdit ? 'Leave blank to keep current password' : 'Minimum 8 characters' }}" />
+                <p class="text-xs text-base-content/60 mt-1">
+                    {{ $this->isEdit ? 'Leave blank to keep current password, or enter at least 8 characters to set a new one.' : 'Must be at least 8 characters.' }}
+                </p>
                 @error('password')
                     <span class="label-text-alt text-error">{{ $message }}</span>
                 @enderror

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Explicit Password Requirements & Guidance in UI Forms**:
+  - Explicitly displayed password requirements and confirmation guidance up front across all user and administrator forms, preventing users from having to encounter unexpected validation errors upon form submission.
+  - Added "Minimum 8 characters" label badges (`label-text-alt`) and persistent helper copy ("Must be at least 8 characters.") on Administrator Create/Edit (`admins-edit`), User Create/Edit (`users-edit`), First Administrator Setup (`initial-admin-setup`), Profile Password Change (`profile-edit`), and Tenant User Register and Reset Password (`register`, `reset-password`).
+  - Added "Leave blank to keep current password, or enter at least 8 characters to set a new one." guidance when editing administrators or users.
+  - Added "Must match password" label badges and "Re-enter password to confirm." helper copy to password confirmation fields.
+  - Added translated keys for all guidance strings across English (`lang/en/`), Spanish (`lang/es/`), and French (`lang/fr/`).
 - **Administrative Target Audience & Plain-Language Copy Standards**:
   - Established project-wide guidance in `AGENTS.md` and `.agents/skills/tallpbx-custom/SKILL.md` requiring all user-facing copy — including installer prompts, Artisan commands, web UI labels, form helper text, tooltips, validation messages, and documentation — to be descriptive, friendly, and accessible for administrators who may not be technical telephony or Linux experts.
   - Codified the standardized interactive prompt architecture (`<Field Label> [<default_number>]: `) with Option 1 always designating the recommended production baseline.
