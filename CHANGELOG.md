@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Documentation Split: Operational Testing Guide vs. Empirical Benchmark Results**:
+  - Extracted all empirical benchmark measurements, latency curves, multi-run repetition tables (`r1–r3`), 5-tier cache hit-rate sweeps, capacity ladders, and hardware sizing matrices from `docs/load-testing-guide.md` into a dedicated companion document: `docs/load-testing-results.md`.
+  - Focused `docs/load-testing-guide.md` purely on operational testing procedures, prerequisites, lab topology, seeding commands, test runner parameters, and troubleshooting runbooks, retaining an executive sizing matrix with direct links to `docs/load-testing-results.md`.
+  - Updated cross-references across `README.md`, `docs/operations.md`, and `AGENTS.md`.
+- **Load Testing Readability & Terminology Overhaul**:
+  - Clarified that Environment A1 and A2 are isolated, disposable VirtualBox test virtual machines on the local host used exclusively as an experimental test bench, and not live office or production PBX servers.
+  - Eliminated confusing nested "Phase" terminology by reserving "Phase 1" and "Phase 2" strictly for the two top-level testing methodologies (dynamic XML vs. end-to-end SIPp) and adopting clear `Environment <ID>` designations for hardware tiers (e.g. `Environment A1`, `Environment B1`, `Environments A1 + A2`).
+  - Added a dedicated "How to Read These Benchmark Tables" glossary defining `<Total Requests> x <Concurrency>` notation, repetitions and median reporting, the purpose of `25 x 1` warm-up runs, and the difference between `mixed` and `cache-hit` scenarios.
+  - Added an explanatory note in the 5-tier cache sweep explaining why Row 5 ("Pure Memory Cache-Hit Ceiling") measures pure memory throughput with 0 database queries compared to Row 3 ("Production Baseline") despite identical request counts.
+  - Consolidated raw repetition rows (`r1`, `r2`, `r3`) across datacenter environments (B1, B2, B3) into clean summary tables matching Environment A1, preserving detailed per-repetition runs in collapsible detail blocks.
+
 ## [1.1.4] - 2026-09-23
 
 ### Added

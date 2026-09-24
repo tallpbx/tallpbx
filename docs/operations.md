@@ -73,7 +73,7 @@ To benchmark telephony lookup latency, verify Redis hit rates, and ensure PHP-FP
    ```bash
    PBX_HOST=<ip> LOAD_GENERATOR_IP=<ip> bash scripts/pbx-sipp-validate.sh
    ```
-   See [docs/load-testing-guide.md](load-testing-guide.md) for full instructions, topology, and benchmark results.
+   See [docs/load-testing-guide.md](load-testing-guide.md) for full instructions and topology, and [docs/load-testing-results.md](load-testing-results.md) for benchmark measurements and hardware sizing.
 
 ## Troubleshooting
 

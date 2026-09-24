@@ -376,7 +376,7 @@ Useful tiers:
 | Practical repeat check | 500 | 10-25 | Expose PHP-FPM, DB, Redis, and contributor problems that may return on small/medium workloads. |
 | Optional stability | 1,000 | 25 | Use after meaningful code/config changes to confirm a longer burst stays stable. |
 
-The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The current `192.168.1.76` beta host is a Windows-hosted VM, so use these runs for relative comparison checks rather than capacity claims. Run heavier capacity tiers only on representative VPS/datacenter hardware. The detailed operating guide, including VM hardware specs and benchmark results, is in `docs/load-testing-guide.md`.
+The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The current `192.168.1.76` beta host is a Windows-hosted VM, so use these runs for relative comparison checks rather than capacity claims. Run heavier capacity tiers only on representative VPS/datacenter hardware. The detailed operational guide is in `docs/load-testing-guide.md`, and authoritative benchmark measurements and hardware sizing tables are in `docs/load-testing-results.md`.
 
 Report terms: `req/sec` is completed XML handler responses per second. `p50` is the median response time. `p95` and `p99` mean 95% and 99% of responses finished at or below that latency. `max` is the slowest single response in the run.
 
@@ -394,7 +394,7 @@ The SIPp runner registers seeded users, starts an auto-answer registered endpoin
 - Add `MEDIA_FLOW=1` for live media RTP echo validation of recording (`*732`), music-on-hold (`load_test_moh`), and IVR announcements (`load_test_announcement`).
 - Add `EXTENDED=1` to run all 8 extended telephony parity scenarios: ring groups (`2400`), voicemail (`2003`), conferences (`2500`), loopback call forwarding (`2001` -> `2000`), time conditions (`2401`), follow-me (`2002`), emergency (`911`), and call blocking.
 
-Expected basic SIPp result: the script exits `0`, `summary.md` shows all scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
+Expected basic SIPp result: the script exits `0`, `summary.md` shows all scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`, and empirical benchmark measurements are in `docs/load-testing-results.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
 
 ### PHP-FPM Load-Test Tuning
 
