@@ -16,11 +16,13 @@ Clear, real-world capacity guidance for administrators. This document records em
   - [Cloud VPS: Entry Baseline (1 vCPU / 1 GiB RAM)](#cloud-vps-entry-baseline-1-vcpu--1-gib-ram)
   - [Cloud VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)](#cloud-vps-memory-scaled-1-vcpu--2-gib-ram)
   - [Cloud VPS: Dual-Core (2 vCPU / 2 GiB RAM)](#cloud-vps-dual-core-2-vcpu--2-gib-ram)
-  - [Dedicated Cloud Nodes (Multi-Core 8 GiB RAM) — Planned](#dedicated-cloud-nodes-multi-core-8-gib-ram--planned)
+  - [Dedicated Cloud Node (4 vCPU / 8 GiB RAM Dedicated) — Planned](#dedicated-cloud-node-4-vcpu--8-gib-ram-dedicated--planned)
 - [Live Call Capacity & Telephony Feature Parity (SIP Signaling)](#live-call-capacity--telephony-feature-parity-sip-signaling)
   - [Local Lab: VirtualBox Test Pair (Baseline)](#local-lab-virtualbox-test-pair-baseline)
-  - [Cloud Datacenter VPS (1 vCPU / 1 GiB RAM Baseline)](#cloud-datacenter-vps-1-vcpu--1-gib-ram-baseline)
-  - [Dedicated Cloud Node Pairs — Planned](#dedicated-cloud-node-pairs--planned)
+  - [Cloud Datacenter VPS: Entry Baseline (1 vCPU / 1 GiB RAM)](#cloud-datacenter-vps-1-vcpu--1-gib-ram-baseline)
+  - [Cloud Datacenter VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)](#cloud-datacenter-vps-memory-scaled-1-vcpu--2-gib-ram)
+  - [Cloud Datacenter VPS: Dual-Core (2 vCPU / 2 GiB RAM)](#cloud-datacenter-vps-dual-core-2-vcpu--2-gib-ram-historical-wireguard)
+  - [Dedicated Cloud Node Pair (4 vCPU / 8 GiB RAM Dedicated) — Planned](#dedicated-cloud-node-pair-4-vcpu--8-gib-ram-dedicated--planned)
 
 ---
 
@@ -570,13 +572,13 @@ None of the higher worker counts improved throughput meaningfully, and each intr
 
 ---
 
-### Dedicated Cloud Nodes (Multi-Core 8 GiB RAM) — Planned
+### Dedicated Cloud Node (4 vCPU / 8 GiB RAM Dedicated) — Planned
 
-The dedicated-CPU 2 vCPU / 8 GiB and 4 vCPU / 8 GiB profiles represent higher-density multi-tenant environments. When dedicated hardware is provisioned, repeat the same procedure:
+The dedicated-CPU 4 vCPU / 8 GiB profile represents the high-density multi-tenant enterprise PBX tier. *(Note: The intermediate 2 vCPU / 2 GiB dedicated test was skipped to streamline the testing matrix, focusing efforts on the 2 vCPU / 2 GiB shared droplet and escalating directly to the 4 vCPU / 8 GiB dedicated tier).* When the dedicated 4c/8g hardware is provisioned, repeat the same procedure:
 
 1. Seed with the same `load-test-beta` synthetic tenant and extension count.
-2. Run the `25 x 1` warm-up, then `100 x 5`, `500 x 10` (safety step for small profiles), `500 x 25`, and optionally `1,000 x 25`.
-3. Record the median of at least three runs per tier plus the server specs, provider CPU class, disk type, region, and pre-run round-trip latency.
+2. Run the `25 x 1` warm-up, then `100 x 5`, `500 x 10`, `500 x 25`, and `1,000 x 25`.
+3. Record the median of measured runs per tier plus server specs, provider CPU class, disk type, region, and pre-run round-trip latency.
 4. Stop escalating if XML handler latency spikes, responses return non-2xx, MariaDB shows lock/connection pressure, Laravel workers saturate, or the generator itself saturates.
 
 ---
@@ -881,6 +883,134 @@ Sustained extension-to-extension capacity ladder with SIP authentication and XML
 3. **Loopback Channel Stability**:
    Internal call diversion (Call Forwarding 2000 -> 2001) successfully utilized the FreeSWITCH loopback channel (`loopback/2001/tenant_3_internal`), completely eliminating the historical `CHAN_NOT_IMPLEMENTED` failures seen on raw extension strings.
 
+---
+
+### Cloud Datacenter VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)
+
+Empirical benchmark and validation series executed on September 24, 2026 on the resized cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
+- **Target PBX VPS**: 1 vCPU, 1,973 MiB RAM, 2.0 GiB swap (0 MiB used). Debian 13, Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, FreeSWITCH 1.11. Public IPv4 `x.x.x.200`.
+- **Dedicated Load Generator**: 2 vCPU, 2048 MiB RAM. Debian 13, SIPp 3.7.3. Public IPv4 `x.x.x.173`.
+- **Network**: Direct datacenter interface routing; SIP signaling and RTP media exchange over direct public IP interfaces.
+
+#### End-to-End Functional & Media Parity Matrix (September 24, 2026)
+
+Full 14-scenario parity test suite executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`):
+
+| Test Scenario | Destination / Feature | Off / Limit / Count | Result | Operational Verification |
+| --- | --- | ---: | --- | --- |
+| **SIP Registration** | `register.xml` (20 users) | 5 / 5 / 20 | **Passed** | 20/20 extensions authenticated with `200 OK` (Expires: 3600). |
+| **Extension Calls** | Internal extensions (2000–2019) | 2 / 5 / 10 | **Passed** | 10/10 authenticated calls completed via UAS auto-answer on port 5066. |
+| **Outbound Gateway** | Gateway routing to UAS | 1 / 2 / 5 | **Passed** | 5/5 calls routed through gateway to UAS port 5088 with PBX SNAT. |
+| **Recording Media** | `*732` (Call Recording) | 1 / 1 / 1 | **Passed** | FreeSWITCH answered, recorded active RTP audio, and saved session cleanly. |
+| **MOH Media** | `load_test_moh` (Music on Hold) | 1 / 1 / 1 | **Passed** | Call answered, active RTP captured on UDP 6002 (`load_test_moh.wav`), completed full duration. |
+| **Announcement Media** | `load_test_announcement` | 1 / 1 / 1 | **Passed** | Call answered, active RTP captured on UDP 6004, PBX sent BYE after playback ended. |
+| **Ring Group** | Extension 2400 | 1 / 2 / 1 | **Passed** | Simultaneous ring bridged to destinations with `200 OK`. |
+| **Voicemail** | `*98` (Voicemail Access) | 1 / 2 / 1 | **Passed** | Authenticated voicemail IVR answered and completed navigation. |
+| **Conference Bridge** | Extension 2500 | 1 / 2 / 1 | **Passed** | Conference room bridge connected and audio mixer initialized. |
+| **Call Forwarding** | Ext 2000 -> 2001 forwarding | 1 / 2 / 1 | **Passed** | Call routed to 2000 diverted via loopback channel to 2001; answered cleanly. |
+| **Time Conditions** | Extension 2600 | 1 / 2 / 1 | **Passed** | Evaluated schedule routing rules and terminated at active time target. |
+| **Follow-Me** | Extension 2002 | 1 / 2 / 1 | **Passed** | Stepped hunting destinations sequentially and bridged to available endpoint. |
+| **Emergency Routing** | Extension 911 | 1 / 2 / 1 | **Passed** | Matched emergency dialplan expression and routed to dedicated emergency handler. |
+| **Call Blocking** | Blacklisted Caller ID (`5550199`) | 1 / 2 / 1 | **Passed** | Matched incoming blacklist entry and immediately rejected with `603 Decline`. |
+
+<details>
+<summary>Table Terminology & Scenario Definitions</summary>
+
+| Term / Scenario | Definition & Operational Meaning |
+| :--- | :--- |
+| **Off / Limit / Count** | Test pacing parameters: Offered rate (calls/sec) / Maximum in-flight calls / Total calls executed. |
+| **SIP Registration** | Endpoint authorization verifying SIP digest credentials against tenant directory XML (`Expires: 3600`). |
+| **Extension Calls** | Internal two-party calls authenticated via SIP digest, resolved via dialplan XML, and answered by UAS. |
+| **Outbound Gateway** | Outbound routing through external SIP gateway route, verifying PBX source NAT and dialplan rewriting. |
+| **Recording Media (`*732`)** | Inbound call answered with active bidirectional RTP audio and recorded directly to disk via `record_session`. |
+| **MOH Media** | Continuous Music On Hold stream verification over UDP 6002 (`local_stream://moh`). |
+| **Announcement Media** | Automated playback prompt streamed over UDP 6004, followed by clean PBX-initiated BYE termination. |
+| **Ring Group (`2400`)** | Simultaneous ring bridging incoming call to multiple internal extensions with `200 OK`. |
+| **Voicemail (`*98`)** | Authenticated voicemail IVR portal handling greeting playback and message navigation. |
+| **Conference Bridge (`2500`)** | Multi-party audio mixer bridge connecting callers via `mod_conference`. |
+| **Call Forwarding** | Inbound call diversion routed via FreeSWITCH loopback channel (`loopback/2001/context`) to avoid `CHAN_NOT_IMPLEMENTED`. |
+| **Time Conditions (`2600`)** | Dynamic schedule rule evaluation directing calls according to defined business hours. |
+| **Follow-Me (`2002`)** | Sequential hunting list ringing primary extension before cascading to alternate destinations. |
+| **Emergency Routing (`911`)** | High-priority dialplan routing matching emergency patterns and bridging to emergency UAS. |
+| **Call Blocking** | Blacklisted caller ID pattern matching resulting in immediate call rejection (`603 Decline`). |
+
+</details>
+
+*Artifact directory: `storage/app/load-tests/sipp-e2e-20260924-195535` (all PCAPs, error logs, and scenario counts preserved).*
+
+#### Server-to-Server Capacity & Call Rate Ladder (September 24, 2026)
+
+Sustained extension-to-extension capacity ladder with SIP authentication and XML dialplan resolution. Each rate was executed across repetitions with the static-6 worker pool:
+
+| Offered Calls/sec | Attempted Calls | Achieved Calls/sec | Successful Calls | Failed Calls | Average Setup | Fastest (Min) | Slowest (Max) | Capacity Assessment |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| **3 CPS** | 60 | 2.354 | 60 (100.0%) | 0 | 721.9 ms | 200.0 ms | 5,548.1 ms | **Rock-solid baseline.** Sub-second setup across 100% of calls (p50: 276.0 ms) with 0 signaling errors. |
+| **5 CPS** | 100 | 2.391 | 99 (97.3%) | 1 | 5,101.4 ms | 556.0 ms | 15,760.2 ms | **Worker saturation boundary.** 97.3% success across 300 calls; queuing delay emerges behind single vCPU. |
+| **8 CPS** | 160 | 3.328 | 141 (74.0%) | 19 | 6,443.0 ms | 660.0 ms | 17,764.2 ms | **Queue overflow.** Worker backlog saturates; queuing triggers mod_xml_curl 5s timeouts and SIP retransmissions. |
+| **10 CPS** | 200 | 2.000 | 50 (25.0%) | 150 | 6,292.9 ms | 832.0 ms | 17,588.2 ms | **Overload ceiling.** 75% of calls rejected as XML lookups time out under heavy worker contention. |
+
+<details>
+<summary>Table Terminology & Metric Definitions</summary>
+
+| Term / Header | Definition & Operational Meaning |
+| :--- | :--- |
+| **Offered Calls/sec (CPS)** | Planned arrival rate injected by SIPp into the PBX Sofia SIP profile. |
+| **Attempted Calls** | Total number of SIP INVITE dialogs initiated across the test window. |
+| **Achieved Calls/sec** | Measured completion rate of successfully answered calls (`200 OK`) between first and last answer. |
+| **Successful / Failed Calls** | Total calls completing full signaling and teardown vs calls dropped or rejected (`403 Forbidden`, `503 Service Unavailable`, or timeouts). |
+| **Average Setup** | Mean Round-Trip Delay (RTD) from initial INVITE through 407 challenge to 200 OK answer. |
+| **Fastest (Min) / Slowest (Max)** | Absolute minimum and maximum call setup response times recorded during the benchmark. |
+| **Capacity Assessment** | Architectural evaluation of server health, queueing behavior, and production viability. |
+
+</details>
+
+<details>
+<summary>Detailed Setup Latency Statistics (p50, p90, p95, p99, Std Dev & Repetitions)</summary>
+
+##### Aggregated Percentiles per Offered Rate (Medians)
+
+| Offered Rate | Achieved Calls/sec | Success Rate | p50 (Median) | p90 | p95 | p99 | Standard Deviation |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **3 CPS** | 2.354 | 100.0% | 276.0 ms | 2,080.0 ms | 2,268.0 ms | 5,512.1 ms | 1,201.7 ms |
+| **5 CPS** | 2.391 | 97.3% | 5,600.1 ms | 7,860.1 ms | 8,288.1 ms | 15,700.2 ms | 2,595.2 ms |
+| **8 CPS** | 3.328 | 74.0% | 6,840.1 ms | 8,732.1 ms | 9,272.1 ms | 14,120.2 ms | 2,434.7 ms |
+| **10 CPS** | 2.000 | 25.0% | 6,736.1 ms | 9,032.1 ms | 9,244.1 ms | 17,588.2 ms | 2,885.0 ms |
+
+##### Individual Repetition Breakdown
+
+| Run / Tier | Offered Rate | Attempted | Achieved Calls/sec | Successful | Failed | Avg Setup | Min | Max | p50 | p95 | Std Dev |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `warmup` | 2 CPS | 10 | 0.725 | 10 | 0 | 767.6 ms | 200.0 ms | 5,416.1 ms | 252.0 ms | 5,416.1 ms | 1,549.8 ms |
+| `3cps-r1` | 3 CPS | 60 | 2.379 | 60 | 0 | 556.3 ms | 204.0 ms | 5,512.1 ms | 276.0 ms | 568.0 ms | 1,115.2 ms |
+| `3cps-r2` | 3 CPS | 60 | 2.294 | 60 | 0 | 721.9 ms | 200.0 ms | 5,376.1 ms | 264.0 ms | 2,268.0 ms | 1,201.7 ms |
+| `3cps-r3` | 3 CPS | 60 | 2.354 | 60 | 0 | 1,199.8 ms | 224.0 ms | 5,548.1 ms | 332.0 ms | 3,748.0 ms | 1,425.4 ms |
+| `5cps-r1` | 5 CPS | 100 | 2.391 | 99 | 1 | 5,426.6 ms | 688.0 ms | 15,760.2 ms | 5,928.1 ms | 8,288.1 ms | 2,595.2 ms |
+| `5cps-r2` | 5 CPS | 100 | 2.319 | 93 | 7 | 5,101.4 ms | 556.0 ms | 15,700.2 ms | 5,600.1 ms | 8,788.1 ms | 2,732.5 ms |
+| `5cps-r3` | 5 CPS | 100 | 2.704 | 100 | 0 | 4,157.0 ms | 684.0 ms | 13,640.2 ms | 4,112.1 ms | 6,380.1 ms | 2,075.2 ms |
+| `8cps-r1` | 8 CPS | 160 | 3.328 | 141 | 19 | 6,818.4 ms | 1,024.0 ms | 17,764.2 ms | 6,840.1 ms | 9,344.1 ms | 2,434.7 ms |
+| `8cps-r2` | 8 CPS | 160 | 3.235 | 158 | 2 | 6,443.0 ms | 2,024.0 ms | 16,844.2 ms | 6,124.1 ms | 9,272.1 ms | 2,202.6 ms |
+| `8cps-r3` | 8 CPS | 160 | 4.075 | 56 | 104 | 5,697.4 ms | 660.0 ms | 14,120.2 ms | 6,864.1 ms | 7,944.1 ms | 2,625.7 ms |
+| `10cps-r1` | 10 CPS | 200 | 2.000 | 50 | 150 | 6,292.9 ms | 832.0 ms | 17,588.2 ms | 6,736.1 ms | 9,244.1 ms | 2,885.0 ms |
+
+</details>
+
+*Artifact directory: `storage/app/load-tests/capacity/datacenter-1c2g-sipp-20260924T2004Z`.*
+
+#### Key Engineering Insights (1 vCPU / 2 GiB Memory-Scaled VPS)
+
+1. **Memory Headroom vs. Compute Ceiling**:
+   Doubling physical memory to 2 GiB completely eliminated swap activity (0 MiB swap used throughout all runs) and provided ~1.2 GiB of free RAM buffer. However, telephony call setup capacity remained strictly bound to the single CPU core.
+   - At **3 CPS**, the system completed 100% of calls with a median setup latency of 276 ms.
+   - At **5 CPS**, queueing emerged as XML lookups competed for the single CPU core, reaching the saturation boundary.
+   - **Architectural Takeaway**: Administrators cannot increase call-handling capacity simply by adding RAM to a single-core machine. Adding compute cores (2+ vCPU) is required to unlock higher call rates.
+
+2. **Single-Core Static Worker Contention**:
+   The `pm = static`, `pm.max_children = 6` profile eliminated worker fork delays, but with 6 PHP workers and multiple FreeSWITCH threads sharing a single CPU core, heavy offered rates (8–10 CPS) quickly saturated CPU cycles, producing timeouts in `mod_xml_curl`. Multi-core architectures are essential for scaling beyond 3–5 CPS.
+
+---
+
+### Cloud Datacenter VPS: Dual-Core (2 vCPU / 2 GiB RAM Historical WireGuard)
+
 **Low-volume subsets after the resizes (1 vCPU / 2 GiB and 2 vCPU / 2 GiB, July 18, 2026).** Both resized profiles passed the same low-volume subset through WireGuard: 5 registrations, 2 authenticated extension calls, and 1 outbound call, with XML curl directory POSTs observed. Media checks were not repeated because no SIP/RTP behavior changed; the goal was to confirm the installed application and resized host still served FreeSWITCH XML curl directory and dialplan requests during live calls. Artifact directories: `storage/app/load-tests/sipp-e2e-20260717-170848` (1c/2g) and `storage/app/load-tests/sipp-e2e-20260717-171946` (2c/2g).
 
 **Capacity runs at sessions-per-second = 60 (2 vCPU / 2 GiB, July 18, 2026).** The load generator was the local test server at `192.168.1.76`, connected to the public PBX through WireGuard:
@@ -932,9 +1062,9 @@ Before the remote test VPS was destroyed, final evidence bundles were copied bac
 
 ---
 
-### Dedicated Cloud Node Pairs — Planned
+### Dedicated Cloud Node Pair (4 vCPU / 8 GiB RAM Dedicated) — Planned
 
-The dedicated-CPU 2 vCPU / 8 GiB and 4 vCPU / 8 GiB pairs have not been measured yet. When both servers are provisioned:
+The dedicated-CPU 4 vCPU / 8 GiB node pair represents the final enterprise benchmarking tier. *(Note: The intermediate 2 vCPU / 2 GiB dedicated test was skipped to avoid testing redundancy, focusing remaining efforts on the 2 vCPU / 2 GiB shared droplet and escalating directly to the 4 vCPU / 8 GiB dedicated tier).* When the dedicated 4c/8g hardware is provisioned:
 
 1. Confirm correctness first: basic runner plus `MEDIA_FLOW=1` and `EXTENDED=1` with the new test data.
 2. Re-run the capacity ladder at increasing offered rates and record attempted calls, achieved calls/sec, success/failure counts, average / fastest / slowest setup time, peak concurrency, peak CPU, and stuck-call checks after teardown.

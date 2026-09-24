@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Cloud Datacenter 1 vCPU (1 GiB & 2 GiB RAM) Empirical Benchmarks**:
   - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on both minimal (1 vCPU / 1 GiB RAM) and memory-scaled (1 vCPU / 2 GiB RAM, `pm = static`, `pm.max_children = 6`) cloud VPS instances.
+  - Documented complete 14-scenario telephony feature parity (100% passed) and server-to-server SIP call capacity ladder (3, 5, 8, 10 CPS) on the memory-scaled 1 vCPU / 2 GiB cloud VPS.
   - Added progressive disclosure expandable appendices with complete percentile distributions (`p50`, `p90`, `p95`, `p99`, `std_dev`) and multi-run repetitions (`r1–r3`).
   - Added multi-interface comparison analyzing latency differences across public IPv4, private datacenter IPv4, and native dual-stack public IPv6.
-  - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput constant (~14–19 req/sec), confirming single-core CPU compute saturation.
+  - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput (~14–19 req/sec) and call setup capacity (3 CPS clean baseline, 5 CPS saturation boundary) constant, confirming single-core CPU compute saturation.
 
 ### Removed
 - **Environment B1 July–August 2026 Historical Archive**:
@@ -41,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added a dedicated "How to Read These Benchmark Tables" glossary defining `<Total Requests> x <Concurrency>` notation, repetitions and median reporting, the purpose of `25 x 1` warm-up runs, and the difference between `mixed` and `cache-hit` scenarios.
   - Added an explanatory note in the 5-tier cache sweep explaining why Row 5 ("Pure Memory Cache-Hit Ceiling") measures pure memory throughput with 0 database queries compared to Row 3 ("Production Baseline") despite identical request counts.
   - Consolidated raw repetition rows (`r1`, `r2`, `r3`) across datacenter benchmarks into clean summary tables, preserving detailed per-repetition runs in collapsible detail blocks.
+  - Streamlined the remaining benchmarking matrix by skipping the 2 vCPU / 2 GiB dedicated test to eliminate redundancy, focusing on the 2 vCPU / 2 GiB shared droplet and escalating directly to the 4 vCPU / 8 GiB dedicated tier.
 
 ## [1.1.4] - 2026-09-23
 
