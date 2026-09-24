@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added progressive disclosure expandable appendices with complete percentile distributions (`p50`, `p90`, `p95`, `p99`, `std_dev`) and multi-run repetitions (`r1–r3`).
   - Added multi-interface comparison analyzing latency differences across public IPv4, private datacenter IPv4, and native dual-stack public IPv6.
 
+### Removed
+- **Environment B1 July–August 2026 Historical Archive**:
+  - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
+
 ### Changed
 - **Project Positioning & Audience Duality ("Modern Simplicity / Enterprise Engineering")**:
   - Embedded the core philosophy ("Modern simplicity on the surface, enterprise-grade telecommunications engineering under the hood") into the project guidelines within `AGENTS.md` and `.agents/skills/tallpbx-custom/SKILL.md`.
