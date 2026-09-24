@@ -234,7 +234,93 @@ Artifacts: `storage/app/load-tests/vbox-20260923/` and `storage/app/load-tests/v
 
 ### Environment B1: Cloud Datacenter VPS Minimum Baseline (1 vCPU / 1 GiB RAM) — Stage 2
 
-Environment B1 is a minimal shared-CPU datacenter cloud VPS (1 vCPU, 967 MiB RAM, 2.0 GiB swap) tested over a WAN path (~35 ms round-trip latency) from orchestrator A2 over WireGuard. Controlled runs, all `mixed` scenario, zero failed responses. Every row in the raw repetition log is one run, named by repetition (`r1`, `r2`, `r3`).
+Environment B1 (`x.x.x.200`) is a cloud datacenter virtual private server running Debian GNU/Linux 13 (trixie) with 1 shared vCPU, 967 MiB RAM, and 2.0 GiB swap. It represents the entry-level production footprint for a minimal cloud PBX branch or small office.
+
+The September 24, 2026 benchmark series executed the full Phase 1 progression directly against the production Nginx and PHP 8.5-FPM stack (`pm = dynamic`, maximum 5 workers). Dialplan endpoints were fully authenticated using composite database indexes and Redis fragment caching against tenant `load-test-beta` (seeded with 20 extensions and dynamic call routing).
+
+> [!NOTE]
+> **Complete Empirical Telemetry**:
+> Unlike the earlier September 23 VirtualBox test run (which only recorded min, max, and avg), the September 24, 2026 datacenter benchmarks capture complete granular telemetry—including **p50 Median**, **p90**, **p95**, **p99**, and **Standard Deviation** alongside complete raw sample datasets. For everyday administrators, the primary headline tables present clear, plain-language summaries (**Average**, **Fastest**, and **Slowest**). Detailed percentile distributions and standard deviations are accessible in the expandable details sections.
+
+#### Single-Server XML Throughput Ladder (September 24, 2026)
+
+Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero failed XML responses:
+
+| Tier | Repetitions | Median Req/Sec | Average Latency | Fastest (Min) | Slowest (Max) | Notes / Observations |
+| :--- | :--- | ---: | ---: | ---: | ---: | :--- |
+| `25 x 1` | 1 (warm-up) | 14.876 | 65.4 ms | 51.5 ms | 113.5 ms | Clean initial warm-up; OPcache bytecode and Redis caches primed. |
+| `100 x 5` | 3 (r1–r3) | 15.605 | 288.6 ms | 166.5 ms | 489.5 ms | Repeatable baseline across 3 consecutive runs; all 5 in-flight requests served concurrently by 5 PHP-FPM workers. |
+| `500 x 25` | 3 (r1–r3) | 14.894 | 990.3 ms | 217.3 ms | 2,298.0 ms | Single-core worker saturation (`pm.max_children = 5`); tail latency queueing under burst concurrency. |
+| `1,000 x 25` | 1 (r1) | 15.967 | 922.5 ms | 201.3 ms | 2,188.7 ms | 1,000/1,000 completed with 0 errors; stable sustained burst ceiling. |
+
+<details>
+<summary>Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev & Repetitions)</summary>
+
+##### Granular Statistical Telemetry (Percentiles & Consistency)
+
+| Tier / Run | Req/Sec | Average | Fastest (Min) | Slowest (Max) | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `25 x 1` warm-up | 14.876 | 65.4 ms | 51.5 ms | 113.5 ms | 61.8 ms | 86.6 ms | 98.3 ms | 113.5 ms | 15.2 ms |
+| `100 x 5` r1 | 12.875 | 333.3 ms | 108.3 ms | 574.2 ms | 312.8 ms | 512.6 ms | 544.3 ms | 572.7 ms | 112.9 ms |
+| `100 x 5` r2 | 15.844 | 288.6 ms | 214.4 ms | 489.5 ms | 278.0 ms | 336.6 ms | 422.3 ms | 486.0 ms | 55.5 ms |
+| `100 x 5` r3 | 15.605 | 279.3 ms | 166.5 ms | 420.6 ms | 266.5 ms | 348.5 ms | 377.2 ms | 418.2 ms | 53.7 ms |
+| **`100 x 5` Median** | **15.605** | **288.6 ms** | **166.5 ms** | **489.5 ms** | **278.0 ms** | **348.5 ms** | **422.3 ms** | **486.0 ms** | **55.5 ms** |
+| `500 x 25` r1 | 15.425 | 940.7 ms | 201.5 ms | 2,087.0 ms | 919.0 ms | 1,573.3 ms | 1,783.2 ms | 1,976.6 ms | 481.5 ms |
+| `500 x 25` r2 | 14.550 | 1,009.4 ms | 237.6 ms | 2,383.1 ms | 974.7 ms | 1,626.7 ms | 1,757.8 ms | 2,104.0 ms | 497.2 ms |
+| `500 x 25` r3 | 14.894 | 990.3 ms | 217.3 ms | 2,298.0 ms | 935.9 ms | 1,606.4 ms | 1,753.8 ms | 2,145.2 ms | 498.4 ms |
+| **`500 x 25` Median** | **14.894** | **990.3 ms** | **217.3 ms** | **2,298.0 ms** | **935.9 ms** | **1,606.4 ms** | **1,757.8 ms** | **2,104.0 ms** | **497.2 ms** |
+| `1,000 x 25` r1 | 15.967 | 922.5 ms | 201.3 ms | 2,188.7 ms | 912.8 ms | 1,526.2 ms | 1,614.3 ms | 1,865.9 ms | 456.3 ms |
+
+</details>
+
+#### Cache Optimization and Hit Rate Sweep (September 24, 2026)
+
+The 5-run cache optimization sweep on the cloud datacenter PBX evaluated performance across cache policies from raw database execution to the pure memory hit ceiling:
+
+| Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Redis Hit Rate | Key Observation |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
+| 1. Uncached Cold Baseline (`TTL=0`) | `mixed` | `100 x 5` | 8.358 | 565.1 ms | 475.7 ms | 757.1 ms | 0.0% | Heavy MariaDB query execution; average latency of 565.1 ms. |
+| 2. Contributor Fragment Cache (`C=5, D=0`) | `mixed` | `100 x 5` | 14.020 | 291.8 ms | 153.5 ms | 673.4 ms | 46.8% | Reused static routing fragments; cut MariaDB table reads by nearly half. |
+| 3. Production Baseline (`D=5, C=5`) | `mixed` | `100 x 5` | 17.221 | 245.3 ms | 157.6 ms | 511.9 ms | 39.1% | Recommended production baseline; lowest average latency with 5s update convergence. |
+| 4. Extended Burst Call Center (`TTL=30`) | `mixed` | `100 x 5` | 17.196 | 257.8 ms | 171.2 ms | 562.2 ms | 42.2% | Sustained high throughput with extended Redis keyspace retention. |
+| 5. Pure Memory Cache-Hit Ceiling | `cache-hit` | `100 x 5` | 17.400 | 261.9 ms | 178.8 ms | 556.8 ms | 22.8% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling. |
+
+<details>
+<summary>Cache Sweep Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
+
+| Configuration | Requests/sec | Average | Fastest | Slowest | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1. Cold Baseline (`TTL=0`) | 8.358 | 565.1 ms | 475.7 ms | 757.1 ms | 556.8 ms | 613.4 ms | 645.9 ms | 741.9 ms | 45.4 ms |
+| 2. Contributor Only (`C=5, D=0`) | 14.020 | 291.8 ms | 153.5 ms | 673.4 ms | 284.4 ms | 401.5 ms | 566.2 ms | 633.0 ms | 108.2 ms |
+| 3. Production Baseline (`D=5, C=5`) | 17.221 | 245.3 ms | 157.6 ms | 511.9 ms | 239.1 ms | 289.2 ms | 349.6 ms | 501.5 ms | 57.4 ms |
+| 4. Extended Call Center (`TTL=30`) | 17.196 | 257.8 ms | 171.2 ms | 562.2 ms | 242.2 ms | 303.5 ms | 311.8 ms | 518.0 ms | 68.0 ms |
+| 5. Memory Cache Ceiling | 17.400 | 261.9 ms | 178.8 ms | 556.8 ms | 241.6 ms | 275.9 ms | 519.7 ms | 556.0 ms | 84.5 ms |
+
+</details>
+
+#### Network Interface Sanity Check Comparison (Public IPv4 vs Private IPv4 vs Public IPv6)
+
+As a sanity check, baseline `100 x 5` tests were executed across all three available network interfaces on Server 1:
+
+| Network Interface | Target Endpoint | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Median (`p50`) | 95th (`p95`) | Notes / Observations |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **Public IPv4** | `http://x.x.x.200/...` | 15.605 | 288.6 ms | 166.5 ms | 489.5 ms | 278.0 ms | 422.3 ms | Standard internet routing via public interface. |
+| **Private IPv4** | `http://10.124.0.2/...` | 18.440 | 233.0 ms | 168.4 ms | 492.3 ms | 220.4 ms | 284.3 ms | Datacenter private network; ~18% lower average latency. |
+| **Public IPv6** | `http://[2604:a880:...9b49:0]/...` | 17.548 | 254.6 ms | 186.8 ms | 490.3 ms | 242.2 ms | 406.0 ms | Native dual-stack IPv6 routing with minimal packet processing overhead. |
+
+> [!TIP]
+> **Network Interface Observation**:
+> Private IPv4 delivered approximately 18% lower average latency and higher throughput compared to the public IPv4 interface by bypassing external cloud provider routing hops and firewall state tables. Public IPv6 performed with near-parity to private IPv4, demonstrating efficient native IPv6 stack performance in Debian 13.
+
+Host telemetry during these runs: Linux 6.12 amd64, 1 vCPU, 967 MiB RAM (340 MiB available), swap utilization remained steady at 121 MiB with zero OOM events.
+
+Artifacts: `storage/app/load-tests/capacity/datacenter-1c-1g-20260924T1753Z/` and `storage/app/load-tests/cache-sweep-20260924-180008/`.
+
+---
+
+#### Historical Datacenter Reference Runs (July – August 2026 Archive)
+
+The following historical benchmarks were recorded during initial application development on earlier Debian/PHP revisions and are retained here for architectural comparison.
 
 Individual runs are designated by repetition (`r1`, `r2`, `r3`). Below is the consolidated summary comparing the Debian default dynamic pool (`pm = dynamic`, maximum 5 workers) against the tuned static pool (`pm = static`, 6 workers):
 

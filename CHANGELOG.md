@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Cloud Datacenter 1 vCPU / 1 GiB RAM Empirical Benchmarks (Environment B1)**:
+  - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on a minimal Debian 13 cloud VPS (1 vCPU, 967 MiB RAM, 2.0 GiB swap).
+  - Added progressive disclosure expandable appendices with complete percentile distributions (`p50`, `p90`, `p95`, `p99`, `std_dev`) and multi-run repetitions (`r1–r3`).
+  - Added multi-interface comparison analyzing latency differences across public IPv4, private datacenter IPv4, and native dual-stack public IPv6.
+
 ### Changed
 - **Project Positioning & Audience Duality ("Modern Simplicity / Enterprise Engineering")**:
   - Embedded the core philosophy ("Modern simplicity on the surface, enterprise-grade telecommunications engineering under the hood") into the project guidelines within `AGENTS.md` and `.agents/skills/tallpbx-custom/SKILL.md`.
