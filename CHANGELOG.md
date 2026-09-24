@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Extracted all empirical benchmark measurements, latency curves, multi-run repetition tables (`r1–r3`), 5-tier cache hit-rate sweeps, capacity ladders, and hardware sizing matrices from `docs/load-testing-guide.md` into a dedicated companion document: `docs/load-testing-results.md`.
   - Focused `docs/load-testing-guide.md` purely on operational testing procedures, prerequisites, lab topology, seeding commands, test runner parameters, and troubleshooting runbooks, retaining an executive sizing matrix with direct links to `docs/load-testing-results.md`.
   - Updated cross-references across `README.md`, `docs/operations.md`, and `AGENTS.md`.
+- **Simplified Latency Terminology & Raw Sample Retention (Average, Min, Max)**:
+  - Replaced statistical percentile terms (`p50`, `p95`, `p99`) across user-facing documentation, guides, sweep scripts, console summaries, and test assertions in favor of straightforward `average`, `min` (fastest), and `max` (slowest) metrics.
+  - Preserved complete individual latency measurements under `latency_ms.raw_samples` in generated JSON reports, retaining full statistical reproducibility and enabling on-demand calculation of percentiles (`p50`, `p95`, `p99`) via `PbxDialplanLoadTestCommand::percentile()` whenever needed.
+  - Updated `README.md` to recommend `--max-average-ms` and define metrics in plain language.
+  - Updated `scripts/run-cache-sweep.sh` and `docs/load-testing-guide.md` to report and parse `Avg (ms)` instead of `p50`.
+  - Updated `docs/load-testing-results.md` benchmark tables to standardize on `Average Latency`, `Fastest`, and `Slowest`.
+  - Updated test fixtures in `tests/Feature/PbxDialplanLoadTestCommandTest.php` and `tests/Feature/PbxCacheSweepScriptTest.php` to assert average latency and verify raw sample preservation.
 - **Load Testing Readability & Terminology Overhaul**:
   - Clarified that Environment A1 and A2 are isolated, disposable VirtualBox test virtual machines on the local host used exclusively as an experimental test bench, and not live office or production PBX servers.
   - Eliminated confusing nested "Phase" terminology by reserving "Phase 1" and "Phase 2" strictly for the two top-level testing methodologies (dynamic XML vs. end-to-end SIPp) and adopting clear `Environment <ID>` designations for hardware tiers (e.g. `Environment A1`, `Environment B1`, `Environments A1 + A2`).

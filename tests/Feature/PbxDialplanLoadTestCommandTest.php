@@ -80,13 +80,38 @@ it('load tests the dynamic dialplan XML handler endpoint', function () {
             'inbound' => 2,
             'outbound' => 2,
         ])
+        ->and(array_keys($report['latency_ms']))->toBe([
+            'sample_count',
+            'missing_count',
+            'average',
+            'min',
+            'max',
+            'raw_samples',
+        ])
+        ->and($report['latency_ms']['raw_samples'])->toBeArray()
+        ->and($report['latency_ms']['raw_samples'])->toHaveCount(6)
+        ->and($report['latency_ms']['raw_samples'][0])->toBe($report['latency_ms']['min'])
+        ->and(end($report['latency_ms']['raw_samples']))->toBe($report['latency_ms']['max'])
         ->and($report['latency_ms']['sample_count'] + $report['latency_ms']['missing_count'])->toBe(6)
         ->and($report['latency_ms']['average'])->toBeGreaterThanOrEqual(0)
         ->and($report['latency_ms']['min'])->toBeGreaterThanOrEqual(0)
         ->and($report['latency_ms']['max'])->toBeGreaterThanOrEqual(0)
+        ->and(array_keys($report['thresholds']))->toBe([
+            'max_failure_rate_percent',
+            'max_average_ms',
+        ])
         ->and($report['thresholds']['max_failure_rate_percent'])->toEqual(0.0)
         ->and($report['thresholds']['max_average_ms'])->toBeNull()
         ->and($report['threshold_results'])->toBe([]);
+});
+
+it('can calculate percentiles like p50, p95, and p99 from saved raw latency data when needed', function () {
+    $command = app(PbxDialplanLoadTestCommand::class);
+    $rawSamples = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0];
+
+    expect($command->percentile($rawSamples, 50))->toBe(50.0)
+        ->and($command->percentile($rawSamples, 95))->toBe(100.0)
+        ->and($command->percentile($rawSamples, 99))->toBe(100.0);
 });
 
 it('can repeat one dialplan request to measure cache-hit performance', function () {
@@ -208,16 +233,11 @@ it('fails when average latency exceeds its configured threshold', function () {
             'missing_count' => 0,
             'average' => 125.0,
             'min' => 75.0,
-            'p50' => 100.0,
-            'p95' => 150.0,
-            'p99' => 175.0,
             'max' => 200.0,
         ],
         [
             'max_failure_rate_percent' => 0.0,
             'max_average_ms' => 100.0,
-            'max_p95_ms' => null,
-            'max_p99_ms' => null,
         ],
     );
 

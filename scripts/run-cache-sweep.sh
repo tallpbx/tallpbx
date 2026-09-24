@@ -39,7 +39,7 @@ declare -a RUNS=(
   "5|memory-hit-ceiling|5|5|cache-hit|100|5"
 )
 
-printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Configuration" "D-TTL" "C-TTL" "Req/sec" "p50 (ms)" "Hit Rate"
+printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Configuration" "D-TTL" "C-TTL" "Req/sec" "Avg (ms)" "Hit Rate"
 printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "----" "--------------------" "--------" "--------" "----------" "----------" "----------"
 
 # Ensure cleanup on interrupt or exit so production .env is restored
@@ -90,15 +90,15 @@ for item in "${RUNS[@]}"; do
     RATE=$(awk "BEGIN {printf \"%.1f%%\", ($DH / $TOT) * 100}")
   fi
 
-  # Extract throughput and median latency from the generated report
+  # Extract throughput and average latency from the generated report
   RPS="N/A"
-  P50="N/A"
+  AVG="N/A"
   if [ -f "$REPORT" ]; then
     RPS=$(grep '"requests_per_second"' "$REPORT" | head -n 1 | awk -F': ' '{print $2}' | tr -d ',')
-    P50=$(grep '"p50"' "$REPORT" | head -n 1 | awk -F': ' '{print $2}' | tr -d ',')
+    AVG=$(grep '"average"' "$REPORT" | head -n 1 | awk -F': ' '{print $2}' | tr -d ',')
   fi
 
-  printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$RPS" "${P50}ms" "$RATE"
+  printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$RPS" "${AVG}ms" "$RATE"
 done
 
 echo "=========================================================="

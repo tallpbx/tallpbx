@@ -54,11 +54,11 @@ Based on the September 23, 2026 VirtualBox 5-tier cache sweeps and concurrency l
 
 TallPBX caches compiled dialplan XML responses, individual contributor fragments (extensions, IVRs, ring groups), and directory lookup data in Redis. Choose the profile matching your organization's calling patterns:
 
-| Deployment Role | Dialplan Cache TTL | Contributor Cache TTL | Directory Cache TTL | Observed Hit Rate | Latency (p50) | Operational Rationale |
+| Deployment Role | Dialplan Cache TTL | Contributor Cache TTL | Directory Cache TTL | Observed Hit Rate | Average Latency | Operational Rationale |
 | --- | --- | --- | --- | --- | ---: | --- |
-| **Standard Office (Recommended Baseline)** | `5` | `5` | `5` | ~41.2% | 235 ms | **Optimal production balance.** Absorbs rapid call bursts while guaranteeing that administrative changes in the web panel (adding extensions, changing call routing) propagate within 5 seconds without manual cache flushing. |
-| **High-Density Call Center / Gateway Trunks** | `30` | `30` | `30` | ~44.2%–99% | ~195 ms | **Maximum throughput.** Shields MariaDB from thousands of identical inbound routing queries per minute. Panel changes take up to 30 seconds to reflect, or require `php artisan optimize:clear`. |
-| **Development & Dialplan Debugging** | `0` | `0` | `0` | 0.0% | 398 ms | **Instant feedback.** Disables XML caching completely so every call executes live database queries and generates fresh XML immediately. |
+| **Standard Office (Recommended Baseline)** | `5` | `5` | `5` | ~41.2% | 261 ms | **Optimal production balance.** Absorbs rapid call bursts while guaranteeing that administrative changes in the web panel (adding extensions, changing call routing) propagate within 5 seconds without manual cache flushing. |
+| **High-Density Call Center / Gateway Trunks** | `30` | `30` | `30` | ~44.2%–99% | 263 ms | **Maximum throughput.** Shields MariaDB from thousands of identical inbound routing queries per minute. Panel changes take up to 30 seconds to reflect, or require `php artisan optimize:clear`. |
+| **Development & Dialplan Debugging** | `0` | `0` | `0` | 0.0% | 399 ms | **Instant feedback.** Disables XML caching completely so every call executes live database queries and generates fresh XML immediately. |
 
 To benchmark all 5 cache tiers on your server and calculate exact Redis keyspace hit rates:
 ```bash
@@ -160,19 +160,19 @@ Guest specifications for these runs: Debian GNU/Linux 13 (trixie), kernel `6.12.
 
 The 5-run cache optimization sweep on the VirtualBox PBX evaluated performance from raw database execution to 100% memory hit ceiling:
 
-| Run Configuration | Scenario | Target Requests | Requests/sec | Median p50 | Slowest | Redis Hit Rate | Key Observation |
-| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| 1. Uncached Cold Baseline (`TTL=0`) | `mixed` | `100 x 5` | 9.193 | 397.6 ms | 994 ms | 0.0% | Heavy MariaDB query execution; p95 latency at 782 ms. |
-| 2. Contributor Fragment Cache (`C=5, D=0`) | `mixed` | `100 x 5` | 12.431 | 297.3 ms | 698 ms | 46.6% | Reused static routing fragments; cut MariaDB table reads by ~80%. |
-| 3. Production Baseline (`D=5, C=5`) | `mixed` | `100 x 5` | 13.176 | 235.9 ms | 472 ms | 41.2% | Recommended production baseline; lowest p50 with 5s update convergence. |
-| 4. Extended Burst Call Center (`TTL=30`) | `mixed` | `100 x 5` | 14.110 | 237.5 ms | 542 ms | 44.2% | Highest throughput under sustained bursts; peak Redis hit efficiency. |
-| 5. Pure Memory Cache-Hit Ceiling | `cache-hit` | `100 x 5` | 13.932 | 195.7 ms | 387 ms | 29.3% | Zero MariaDB queries; p50 dropped below 200 ms (pure memory/serialization). |
+| Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest | Slowest | Redis Hit Rate | Key Observation |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| 1. Uncached Cold Baseline (`TTL=0`) | `mixed` | `100 x 5` | 9.193 | 398.9 ms | 220.1 ms | 994 ms | 0.0% | Heavy MariaDB query execution; average latency of 398.9 ms. |
+| 2. Contributor Fragment Cache (`C=5, D=0`) | `mixed` | `100 x 5` | 12.431 | 317.8 ms | 165.0 ms | 698 ms | 46.6% | Reused static routing fragments; cut MariaDB table reads by ~80%. |
+| 3. Production Baseline (`D=5, C=5`) | `mixed` | `100 x 5` | 13.176 | 260.9 ms | 126.2 ms | 472 ms | 41.2% | Recommended production baseline; optimal average latency with 5s update convergence. |
+| 4. Extended Burst Call Center (`TTL=30`) | `mixed` | `100 x 5` | 14.110 | 262.9 ms | 134.3 ms | 542 ms | 44.2% | Highest throughput under sustained bursts; peak Redis hit efficiency. |
+| 5. Pure Memory Cache-Hit Ceiling | `cache-hit` | `100 x 5` | 13.932 | 235.4 ms | 116.6 ms | 387 ms | 29.3% | Zero MariaDB queries; lowest average latency (pure memory/serialization). |
 
 > [!NOTE]
 > **Understanding Row 5 vs. Row 3 (Pure Memory Ceiling vs. Production Baseline)**:
 > Both Row 3 and Row 5 execute `100 x 5` requests, but they test fundamentally different code paths:
-> - **Row 3 (Production Baseline)** executes the **`mixed` scenario** across varied destinations (extensions, ring groups, and IVRs). While static dialplan fragments are cached in Redis, resolving different destinations still exercises routing logic and contributor lookups (achieving 41.2% cache hit rate, median p50 of 235.9 ms).
-> - **Row 5 (Pure Memory Cache-Hit Ceiling)** executes the **`cache-hit` scenario**, querying the exact same destination 100 times consecutively. After request 1 populates Redis, the remaining 99 requests are served directly from Redis memory with zero MariaDB queries. This drops median p50 latency below 200 ms (195.7 ms), demonstrating the pure serialization ceiling of PHP-FPM and Redis when database I/O is eliminated.
+> - **Row 3 (Production Baseline)** executes the **`mixed` scenario** across varied destinations (extensions, ring groups, and IVRs). While static dialplan fragments are cached in Redis, resolving different destinations still exercises routing logic and contributor lookups (achieving 41.2% cache hit rate, average latency of 260.9 ms).
+> - **Row 5 (Pure Memory Cache-Hit Ceiling)** executes the **`cache-hit` scenario**, querying the exact same destination 100 times consecutively. After request 1 populates Redis, the remaining 99 requests are served directly from Redis memory with zero MariaDB queries. This drops average latency to 235.4 ms (with fastest response at 116.6 ms), demonstrating the pure serialization ceiling of PHP-FPM and Redis when database I/O is eliminated.
 
 Artifacts: `storage/app/load-tests/vbox-20260923/` and `storage/app/load-tests/vbox-cache-sweep-20260923-123631/`.
 

@@ -34,8 +34,6 @@ use Modules\Extensions\Models\Extension;
     {--label= : Optional human-readable label stored in the JSON report}
     {--max-failure-rate=0 : Maximum failed-response percentage allowed before the command fails}
     {--max-average-ms= : Optional maximum average latency in milliseconds before the command fails}
-    {--max-p95-ms= : Optional maximum p95 latency in milliseconds before the command fails}
-    {--max-p99-ms= : Optional maximum p99 latency in milliseconds before the command fails}
     {--report=storage/app/load-tests/dialplan-report.json : JSON report output path}')]
 #[Description('Load test the Laravel-generated FreeSWITCH dialplan XML handler')]
 class PbxDialplanLoadTestCommand extends Command
@@ -76,8 +74,6 @@ class PbxDialplanLoadTestCommand extends Command
         $thresholds = [
             'max_failure_rate_percent' => $this->floatOption('max-failure-rate', minimum: 0, maximum: 100),
             'max_average_ms' => $this->nullableFloatOption('max-average-ms', minimum: 0),
-            'max_p95_ms' => $this->nullableFloatOption('max-p95-ms', minimum: 0),
-            'max_p99_ms' => $this->nullableFloatOption('max-p99-ms', minimum: 0),
         ];
         $reportPath = $this->stringOption('report');
 
@@ -282,10 +278,8 @@ class PbxDialplanLoadTestCommand extends Command
             'missing_count' => max(0, count($results) - count($latencies)),
             'average' => $latencies === [] ? null : round(array_sum($latencies) / count($latencies), 3),
             'min' => $latencies === [] ? null : min($latencies),
-            'p50' => $this->percentile($latencies, 50),
-            'p95' => $this->percentile($latencies, 95),
-            'p99' => $this->percentile($latencies, 99),
             'max' => $latencies === [] ? null : max($latencies),
+            'raw_samples' => $latencies,
         ];
         $thresholdResults = $this->thresholdResults($failureRate, $latencySummary, $thresholds);
 
@@ -355,8 +349,8 @@ class PbxDialplanLoadTestCommand extends Command
     /**
      * Build human-readable threshold failures for the report and exit code.
      *
-     * @param  array{sample_count: int, missing_count: int, average: float|null, min: float|null, p50: float|null, p95: float|null, p99: float|null, max: float|null}  $latencySummary
-     * @param  array{max_failure_rate_percent: float, max_average_ms: float|null, max_p95_ms: float|null, max_p99_ms: float|null}  $thresholds
+     * @param  array{sample_count: int, missing_count: int, average: float|null, min: float|null, max: float|null}  $latencySummary
+     * @param  array{max_failure_rate_percent: float, max_average_ms: float|null}  $thresholds
      * @return array<int, string>
      */
     private function thresholdResults(float $failureRate, array $latencySummary, array $thresholds): array
@@ -376,22 +370,6 @@ class PbxDialplanLoadTestCommand extends Command
                 $failures[] = "Average latency was unavailable, but a {$this->formatMetric($maximumAverage)} ms threshold was configured.";
             } elseif ($average > $maximumAverage) {
                 $failures[] = "Average latency {$this->formatMetric($average)} ms exceeded allowed {$this->formatMetric($maximumAverage)} ms.";
-            }
-        }
-
-        foreach (['p95' => 'max_p95_ms', 'p99' => 'max_p99_ms'] as $latencyKey => $thresholdKey) {
-            $threshold = $thresholds[$thresholdKey];
-
-            if ($threshold === null) {
-                continue;
-            }
-
-            $latency = $latencySummary[$latencyKey];
-
-            if ($latency === null) {
-                $failures[] = "{$latencyKey} latency was unavailable, but a {$this->formatMetric($threshold)} ms threshold was configured.";
-            } elseif ($latency > $threshold) {
-                $failures[] = "{$latencyKey} latency {$this->formatMetric($latency)} ms exceeded allowed {$this->formatMetric($threshold)} ms.";
             }
         }
 
@@ -460,12 +438,13 @@ class PbxDialplanLoadTestCommand extends Command
         return rtrim(rtrim(number_format($value, 3, '.', ''), '0'), '.');
     }
 
+
     /**
-     * Calculate a nearest-rank percentile for sorted latency values.
+     * Calculate a nearest-rank percentile for sorted latency values on demand.
      *
      * @param  array<int, float>  $sortedValues
      */
-    private function percentile(array $sortedValues, int $percentile): ?float
+    public function percentile(array $sortedValues, int $percentile): ?float
     {
         if ($sortedValues === []) {
             return null;

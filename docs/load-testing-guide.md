@@ -1197,7 +1197,7 @@ declare -a RUNS=(
   "5|memory-hit-ceiling|5|5|cache-hit|100|5"
 )
 
-printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Name" "D-TTL" "C-TTL" "Req/sec" "p50 (ms)" "Hit Rate"
+printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Name" "D-TTL" "C-TTL" "Req/sec" "Avg (ms)" "Hit Rate"
 printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "----" "--------------------" "--------" "--------" "----------" "----------" "----------"
 
 for item in "${RUNS[@]}"; do
@@ -1237,9 +1237,9 @@ for item in "${RUNS[@]}"; do
 
   # Parse JSON results
   RPS=$(grep '"requests_per_second"' "$REPORT" | awk -F': ' '{print $2}' | tr -d ',')
-  P50=$(grep '"p50"' "$REPORT" | awk -F': ' '{print $2}' | tr -d ',')
+  AVG=$(grep '"average"' "$REPORT" | awk -F': ' '{print $2}' | tr -d ',')
 
-  printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$RPS" "${P50}ms" "$RATE"
+  printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$RPS" "${AVG}ms" "$RATE"
 done
 
 # Restore recommended defaults

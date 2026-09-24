@@ -38,3 +38,11 @@ it('safely restores production cache defaults on exit', function (): void {
         ->and($script)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5')
         ->and($script)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5');
 });
+
+it('formats output with average latency instead of percentiles', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+
+    expect($script)->toContain('Avg (ms)')
+        ->and($script)->toContain('"average"')
+        ->and($script)->not->toContain('p50');
+});

@@ -359,7 +359,7 @@ php artisan pbx:load-test:dialplan \
   --token="$FREESWITCH_XML_HANDLER_TOKEN" \
   --label="small-office-smoke" \
   --max-failure-rate=0 \
-  --max-p95-ms=1000 \
+  --max-average-ms=1000 \
   --report=storage/app/load-tests/dialplan-smoke.json
 ```
 
@@ -378,7 +378,7 @@ Useful tiers:
 
 The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The current `192.168.1.76` beta host is a Windows-hosted VM, so use these runs for relative comparison checks rather than capacity claims. Run heavier capacity tiers only on representative VPS/datacenter hardware. The detailed operational guide is in `docs/load-testing-guide.md`, and authoritative benchmark measurements and hardware sizing tables are in `docs/load-testing-results.md`.
 
-Report terms: `req/sec` is completed XML handler responses per second. `p50` is the median response time. `p95` and `p99` mean 95% and 99% of responses finished at or below that latency. `max` is the slowest single response in the run.
+Report terms: `req/sec` is completed XML handler responses per second. `average` is the mean response time across all requests. `min` is the fastest response, and `max` is the slowest single response in the run.
 
 For SIPp end-to-end validation, run the load generator from WSL2 or a separate Linux VM when possible:
 
@@ -429,7 +429,7 @@ To benchmark all 5 standard cache configurations and calculate Redis hit rates o
 bash scripts/run-cache-sweep.sh
 ```
 
-The script runs a standardized 5-tier sweep (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling), reporting requests/sec, p50 latency, and Redis keyspace hit rates, and automatically restores production defaults upon completion.
+The script runs a standardized 5-tier sweep (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling), reporting requests/sec, average latency, and Redis keyspace hit rates, and automatically restores production defaults upon completion.
 
 Check active Redis cache hit statistics at any time:
 
