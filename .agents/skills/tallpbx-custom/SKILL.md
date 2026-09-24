@@ -42,6 +42,25 @@ Use this section whenever changing `scripts/install.sh` or a script under
   safe non-mutating path whenever one exists; do not invoke package, database,
   or service-changing paths merely to test parsing.
 
+## Core Project Philosophy & Audience Duality
+
+> **"Modern simplicity on the surface, enterprise-grade telecommunications engineering under the hood."**
+
+TallPBX bridges two historically opposed worlds in business communications:
+1. **The Non-Technical Administrator & Office Manager**:
+   - Must never feel intimidated, confused, or overwhelmed.
+   - All user-facing interfaces, web panel forms, CLI prompts, tooltips, and headline documentation must use plain, descriptive language (e.g., "spoken greetings", "business hours", "average/fastest/slowest call setup") with clearly designated recommended defaults (Option 1).
+2. **The Telecom Architect, Developer & VoIP Veteran** (coming from FusionPBX or FreePBX®):
+   - Must immediately recognize the project's sophisticated foundation: FreeSWITCH 1.11, Sofia SIP engine, ESL event sockets, dynamic `mod_xml_curl` dialplan rendering, Redis keyspace caching, atomic kernel firewalling (`nftables`), and comprehensive test suites (Pest + Dusk).
+   - Detailed statistical percentiles (`p50`, `p90`, `p95`, `p99`, `std_dev`), SIPp scenario traces, and packet flow architectures must be preserved and easily accessible.
+
+### Concrete Rules for AI Agents:
+- **Layered (Progressive) Disclosure**: Never expose raw technical complexity on the surface. Present clean, intuitive headline summaries by default, placing advanced technical depth (percentiles, packet dumps, FreeSWITCH channel variables) inside collapsible `<details>` blocks or linked deep-dive guides.
+- **Context-Specific Adaptations (Avoid Repeating Canned Slogans)**: When communicating this duality across user-facing pages, adapt the phrasing naturally to the specific context rather than repeating an identical marketing line across multiple documents. (The exact phrase *"Modern simplicity on the surface, enterprise-grade telecommunications engineering under the hood."* is reserved exclusively for the Guest Landing Page).
+- **Friendly Without Being Condescending**: Explain *why* a setting matters in 1–2 plain-English sentences before asking for input.
+- **No Unexplained Jargon**: Never present raw abbreviations or internal mechanisms without clear context (e.g., explain that voice prompts are "spoken recordings for voicemail, call menus, and system greetings" rather than "say grammar modules").
+- **Uncompromised Under-the-Hood Rigor**: Never "dumb down" the backend telephony architecture to achieve simplicity; achieve simplicity through thoughtful UI design and smart defaults while keeping the underlying telecommunications engine uncompromised.
+
 ## Target Audience & Plain-Language Standards
 
 TallPBX is built for administrators who **may or may not be technical** telephony or Linux experts. Whether someone is an office manager, general IT technician, or telephony specialist, all user-facing interactions must feel welcoming, polished, and immediately understandable.

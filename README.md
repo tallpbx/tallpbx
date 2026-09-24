@@ -24,7 +24,7 @@ TallPBX is a community-first project, released under the [Apache 2.0 license](ht
 
 ## Parity with FusionPBX & FreePBX®
 
-TallPBX delivers feature and function parity with established open-source PBX platforms like FusionPBX and FreePBX®, rebuilt on a modern Laravel 13, Livewire 4, and Tailwind CSS architecture with comprehensive automated test coverage:
+Built to eliminate the steep learning curve and dated interfaces of legacy PBX platforms without compromising the raw carrier power of FreeSWITCH®, TallPBX delivers feature and function parity with established open-source systems on a modern Laravel 13, Livewire 4, and Tailwind CSS architecture with comprehensive automated test coverage:
 
 | Metric / Dimension | TallPBX | FusionPBX | FreePBX® |
 | :--- | :--- | :--- | :--- |

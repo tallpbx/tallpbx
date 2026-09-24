@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Project Positioning & Audience Duality ("Modern Simplicity / Enterprise Engineering")**:
+  - Embedded the core philosophy ("Modern simplicity on the surface, enterprise-grade telecommunications engineering under the hood") into the project guidelines within `AGENTS.md` and `.agents/skills/tallpbx-custom/SKILL.md`.
+  - Added the official tagline to the guest landing page (`resources/views/pages/home.blade.php`, `lang/en/home.php`, `lang/es/home.php`, `lang/fr/home.php`).
+  - Added tailored, context-specific introductions across `README.md` (Parity with FusionPBX & FreePBX®), `INSTALL.md` (guided setup for general IT staff), and `docs/load-testing-results.md` (clear capacity guidance for administrators).
 - **Documentation Split: Operational Testing Guide vs. Empirical Benchmark Results**:
   - Extracted all empirical benchmark measurements, latency curves, multi-run repetition tables (`r1–r3`), 5-tier cache hit-rate sweeps, capacity ladders, and hardware sizing matrices from `docs/load-testing-guide.md` into a dedicated companion document: `docs/load-testing-results.md`.
   - Focused `docs/load-testing-guide.md` purely on operational testing procedures, prerequisites, lab topology, seeding commands, test runner parameters, and troubleshooting runbooks, retaining an executive sizing matrix with direct links to `docs/load-testing-results.md`.

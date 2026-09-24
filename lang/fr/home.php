@@ -21,7 +21,7 @@ return [
 
     'hero' => [
         'title' => 'Plateforme de Téléphonie Moderne',
-        'subtitle' => 'Un plan de contrôle PBX moderne, conçu pour l\'administration multi-tenant, la génération dynamique de plans de numérotation et une expérience web claire pour les opérateurs.',
+        'subtitle' => 'Simplicité moderne en surface, ingénierie télécom d\'entreprise sous le capot.',
         'summary' => 'TALL signifie Tailwind CSS, Alpine.js, Laravel et Livewire, également connu sous le nom de stack TALL, ce qui aide la plateforme à rester rapide, réactive et facile à utiliser pour gérer les tâches PBX quotidiennes.',
         'modular_summary' => 'Son architecture modulaire garde chaque installation centrée sur les fonctions dont elle a besoin, simplifie la gestion des mises à jour et encourage les développeurs tiers à ajouter de nouvelles capacités PBX depuis leurs propres dépôts de confiance. TallPBX est un projet communautaire, publié sous licence Apache 2.0.',
         'cta_primary' => 'Commencer',

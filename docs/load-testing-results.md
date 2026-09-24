@@ -1,6 +1,6 @@
 # PBX SIP Load Testing & Benchmark Results
 
-Authoritative performance benchmark report and hardware capacity reference for TallPBX (September 23, 2026). This document records empirical results from the September 2026 VirtualBox test series and historical datacenter VPS benchmarks, and provides hardware sizing guidance for system administrators.
+Clear, real-world capacity guidance for administrators. This document records empirical results from the September 2026 VirtualBox test series and historical datacenter VPS benchmarks, and provides hardware sizing guidance for system administrators.
 
 > [!NOTE]
 > For the operational manual, lab topology setup, seeding instructions, and test runner options, see the companion **[SIP Load Testing Guide](load-testing-guide.md)**.

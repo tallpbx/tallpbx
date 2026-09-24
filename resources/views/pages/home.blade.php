@@ -96,7 +96,7 @@
                         </span>
                     </h1>
 
-                    <p class="text-lg text-base-content/60 max-w-xl leading-relaxed">
+                    <p class="text-lg font-medium text-base-content/80 max-w-xl leading-relaxed">
                         {{ __('home.hero.subtitle') }}
                     </p>
 

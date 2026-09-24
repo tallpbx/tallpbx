@@ -1,8 +1,6 @@
 # Installation Guide
-
-This guide explains how to set up TallPBX on a new Debian 13 server. The main
-install is one command; the sections after it cover optional configuration,
-maintenance, and tuning.
+ 
+A guided setup experience for general IT staff, pre-configured with production-hardened telephony defaults. This guide explains how to set up TallPBX on a new Debian 13 server. The main install is one command; the sections after it cover optional configuration, maintenance, and tuning.
 
 TallPBX is a web-managed phone system that runs on your own server. After
 installing, you'll have a working web panel ready for phones, extensions, call
