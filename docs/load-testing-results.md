@@ -394,15 +394,22 @@ Artifacts: `storage/app/load-tests/capacity/datacenter-1c-1g-20260924T1753Z/` an
 
 ### Cloud VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)
 
-The cloud test server was resized in place to 1 vCPU and 1973 MiB RAM, rebooted, and re-tested with the PHP-FPM static-6 profile, seed data, and WAN path to isolate the performance impact of doubling system memory while keeping CPU compute constant.
+The cloud test server was resized in place to 1 vCPU and 1,973 MiB RAM, rebooted, and configured with the production static worker pool (`pm = static`, `pm.max_children = 6`) according to the sizing policy for servers with ≥ 1,800 MB RAM. This benchmark series was executed on September 24, 2026 to measure the performance impact of doubling physical memory while keeping single-core CPU compute constant.
 
-Individual runs are designated by repetition (`r1`, `r2`, `r3`). Below is the consolidated summary:
+> [!NOTE]
+> **Key Finding: Memory Scaling vs. CPU Sizing**:
+> Doubling memory from 1 GiB to 2 GiB increased available system memory to ~1,211 MiB and completely eliminated swap usage (0 MiB swap used throughout all runs). However, dynamic XML dialplan throughput remained steady at ~13.7–14.5 req/sec (matching the 1 vCPU / 1 GiB baseline). This empirically confirms **Planning Rule #1**: dynamic XML generation is compute/serialization bound by CPU clock and core count, not memory.
 
-| Tier | Repetitions | Median Req/Sec | Average Latency | Fastest Latency | Slowest Latency | Notes / Observations |
+#### Single-Server XML Throughput Ladder (September 24, 2026)
+
+Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero failed XML responses:
+
+| Tier | Repetitions | Median Req/Sec | Average Latency | Fastest (Min) | Slowest (Max) | Notes / Observations |
 | :--- | :--- | ---: | ---: | ---: | ---: | :--- |
-| `100 x 5` | 3 (r1–r3) | 13.403 | 227 ms | 128 ms | 447 ms | Slower than 1c/1g baseline due to WAN jitter and CPU scheduling. |
-| `500 x 25` | 4 (r1–r4) | 18.445 | 1,172 ms | 135 ms | 1,671 ms | CPU-bound at 1 vCPU; extra RAM did not relieve burst queueing. |
-| `1,000 x 25` | 1 (r1) | 16.821 | 1,332 ms | 259 ms | 1,966 ms | Confirms single-core CPU saturation during heavy concurrency. |
+| `25 x 1` | 1 (warm-up) | 12.760 | 76.5 ms | 48.1 ms | 209.1 ms | Clean initial warm-up; OPcache bytecode and Redis caches primed. |
+| `100 x 5` | 3 (r1–r3) | 14.349 | 327.1 ms | 228.2 ms | 542.9 ms | Repeatable baseline across 3 consecutive runs; 6 static workers pre-forked in memory with zero fork delay. |
+| `500 x 25` | 3 (r1–r3) | 13.666 | 1,108.8 ms | 271.5 ms | 3,091.4 ms | Single-core worker saturation; queueing emerges under burst concurrency while memory remains 100% unconstrained. |
+| `1,000 x 25` | 1 (r1) | 13.759 | 1,098.9 ms | 265.5 ms | 2,610.8 ms | 1,000/1,000 completed with 0 errors; stable sustained burst ceiling without swap activity. |
 
 <details>
 <summary>Table Terminology & Metric Definitions</summary>
@@ -410,29 +417,100 @@ Individual runs are designated by repetition (`r1`, `r2`, `r3`). Below is the co
 | Term / Header | Definition & Operational Meaning |
 | :--- | :--- |
 | **Tier (`Requests x Concurrency`)** | The load volume profile (e.g. `500 x 25` = 500 total requests with 25 kept concurrently in-flight). |
-| **Median Req/Sec** | Central throughput across measured repetitions (documents rendered and delivered per second). |
-| **Average Latency** | Mean XML processing latency in milliseconds. |
-| **Static 6 (`pm = static`)** | Pre-forked PHP-FPM pool keeping 6 workers permanently resident in RAM. |
+| **Median Req/Sec** | Requests per second across measured repetitions. Measures how many complete XML dialplan documents the server generated and delivered per second. |
+| **Average Latency** | The mean time (in milliseconds) required to process and return an XML request across all samples in the tier. |
+| **Fastest (Min)** | The quickest response recorded in the tier (best-case cache/memory hit). |
+| **Slowest (Max)** | The slowest response recorded in the tier (tail latency, usually occurring on initial cache misses or worker queuing). |
+| **Static 6 (`pm = static`)** | Production-optimized PHP-FPM mode keeping 6 workers permanently pre-forked in RAM. |
 
 </details>
 
 <details>
-<summary>View Individual Repetition Measurements (r1–r4)</summary>
+<summary>Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev & Repetitions)</summary>
 
-| Run | Requests/sec | Average | Fastest | Slowest |
-| --- | ---: | ---: | ---: | ---: |
-| `100 x 5` r1 | 13.567 | 219 ms | 114 ms | 543 ms |
-| `100 x 5` r2 | 13.403 | 227 ms | 129 ms | 413 ms |
-| `100 x 5` r3 | 12.582 | 244 ms | 128 ms | 447 ms |
-| `500 x 25` r1 | 19.770 | 1,078 ms | 133 ms | 1,633 ms |
-| `500 x 25` r2 | 18.625 | 1,145 ms | 136 ms | 1,708 ms |
-| `500 x 25` r3 | 15.882 | 1,384 ms | 246 ms | 1,992 ms |
-| `500 x 25` warm r4 | 18.264 | 1,198 ms | 303 ms | 1,609 ms |
-| `1,000 x 25` r1 | 16.821 | 1,332 ms | 259 ms | 1,966 ms |
+##### Granular Statistical Telemetry (Percentiles & Consistency)
+
+| Tier / Run | Req/Sec | Average | Fastest (Min) | Slowest (Max) | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `25 x 1` warm-up | 12.760 | 76.5 ms | 48.1 ms | 209.1 ms | 75.0 ms | 99.6 ms | 107.3 ms | 209.1 ms | 33.5 ms |
+| `100 x 5` r1 | 14.349 | 328.1 ms | 222.7 ms | 557.4 ms | 320.1 ms | 383.8 ms | 453.4 ms | 557.1 ms | 68.5 ms |
+| `100 x 5` r2 | 14.297 | 327.0 ms | 231.0 ms | 524.5 ms | 326.5 ms | 390.8 ms | 420.1 ms | 520.9 ms | 63.2 ms |
+| `100 x 5` r3 | 14.491 | 327.1 ms | 228.2 ms | 542.9 ms | 312.2 ms | 377.0 ms | 383.8 ms | 540.5 ms | 61.3 ms |
+| **`100 x 5` Median** | **14.349** | **327.1 ms** | **228.2 ms** | **542.9 ms** | **320.1 ms** | **383.8 ms** | **420.1 ms** | **540.5 ms** | **63.2 ms** |
+| `500 x 25` r1 | 13.666 | 1,108.8 ms | 254.6 ms | 3,103.0 ms | 1,101.5 ms | 1,796.4 ms | 2,084.5 ms | 2,710.7 ms | 575.4 ms |
+| `500 x 25` r2 | 14.599 | 1,037.1 ms | 271.5 ms | 1,944.9 ms | 1,082.5 ms | 1,663.0 ms | 1,727.7 ms | 1,899.0 ms | 476.7 ms |
+| `500 x 25` r3 | 11.770 | 1,265.3 ms | 287.8 ms | 3,091.4 ms | 1,229.7 ms | 2,111.8 ms | 2,319.5 ms | 2,692.7 ms | 622.2 ms |
+| **`500 x 25` Median** | **13.666** | **1,108.8 ms** | **271.5 ms** | **3,091.4 ms** | **1,101.5 ms** | **1,796.4 ms** | **2,084.5 ms** | **2,710.7 ms** | **575.4 ms** |
+| `1,000 x 25` r1 | 13.759 | 1,098.9 ms | 265.5 ms | 2,610.8 ms | 1,124.9 ms | 1,733.9 ms | 1,937.0 ms | 2,397.3 ms | 526.8 ms |
 
 </details>
 
-All runs returned zero failures and zero slow queries. The server had about 1.38 GiB available memory after testing, used no swap, and logged no new PHP-FPM `pm.max_children` warnings. Despite the added memory, the burst tiers were slower than the 1-GB static-6 baseline. That is evidence the one-vCPU profile is CPU/scheduling-bound for these bursts; the next useful comparison is the 2-vCPU resize. WAN round-trip latency was approximately 35 ms.
+#### Cache Optimization and Hit Rate Sweep (September 24, 2026)
+
+The 5-run cache optimization sweep on the resized 2 GiB cloud VPS evaluated performance across cache policies with 6 static PHP-FPM workers:
+
+| Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Redis Hit Rate | Key Observation |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
+| **1. Uncached Database Baseline** | `mixed` | `100 x 5` | 9.873 | 487.3 ms | 362.7 ms | 666.4 ms | 0.0% | Heavy MariaDB query execution; average latency of 487.3 ms. |
+| **2. Contributor Cache Only** | `mixed` | `100 x 5` | 16.293 | 290.5 ms | 202.9 ms | 541.8 ms | 45.5% | Reused static routing fragments; cut MariaDB table reads by ~40%. |
+| **3. Production Baseline** | `mixed` | `100 x 5` | 19.692 | 235.2 ms | 169.3 ms | 483.2 ms | 39.6% | Recommended production baseline; peak throughput of 19.69 req/sec with 5s update convergence. |
+| **4. Extended Retention** | `mixed` | `100 x 5` | 19.116 | 244.5 ms | 176.0 ms | 487.6 ms | 39.8% | High throughput with 30s TTL retention window. |
+| **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 14.832 | 314.5 ms | 220.6 ms | 692.4 ms | 21.8% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling. |
+
+<details>
+<summary>Table Terminology, Configuration Keys & Metric Definitions</summary>
+
+| Term / Abbreviation | Full Name & `.env` Setting | Plain-Language Definition |
+| :--- | :--- | :--- |
+| **Contributor Cache (Contributor TTL / `C`)** | `DIALPLAN_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
+| **Dialplan Cache (Dialplan TTL / `D`)** | `DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
+| **TTL** | Time To Live | How many seconds a cached response remains valid in Redis before querying MariaDB again. `0` disables caching. |
+| **Target Requests (`100 x 5`)** | Offered Burst Profile | 100 total HTTP requests sent with 5 requests simultaneously in-flight at all times. |
+| **Redis Hit Rate** | Keyspace Efficiency (`INFO stats`) | Percentage of lookup keys found in fast Redis memory versus total lookups requested during the test run. |
+| **`mixed` Scenario** | Varied Endpoint Simulation | Simulates realistic office traffic across varied extensions, IVRs, and ring groups to test routing lookup logic. |
+| **`cache-hit` Scenario** | Identical Destination Simulation | Queries the exact same destination 100 times consecutively to measure theoretical maximum throughput with zero database I/O. |
+
+</details>
+
+<details>
+<summary>Cache Sweep Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
+
+| Configuration | Requests/sec | Average | Fastest | Slowest | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1. Uncached Database Baseline (TTL: 0s) | 9.873 | 487.3 ms | 362.7 ms | 666.4 ms | 481.1 ms | 560.0 ms | 579.4 ms | 660.1 ms | 57.8 ms |
+| 2. Contributor Cache Only (Contributor TTL: 5s, Dialplan TTL: 0s) | 16.293 | 290.5 ms | 202.9 ms | 541.8 ms | 269.3 ms | 340.1 ms | 505.5 ms | 539.0 ms | 79.9 ms |
+| 3. Production Baseline (Contributor TTL: 5s, Dialplan TTL: 5s) | 19.692 | 235.2 ms | 169.3 ms | 483.2 ms | 223.6 ms | 258.2 ms | 275.2 ms | 481.1 ms | 60.3 ms |
+| 4. Extended Retention (TTL: 30s) | 19.116 | 244.5 ms | 176.0 ms | 487.6 ms | 233.4 ms | 278.6 ms | 288.4 ms | 485.5 ms | 60.5 ms |
+| 5. Memory Cache Ceiling | 14.832 | 314.5 ms | 220.6 ms | 692.4 ms | 296.9 ms | 327.0 ms | 412.3 ms | 689.5 ms | 89.9 ms |
+
+</details>
+
+#### Network Interface Sanity Check Comparison (Public IPv4 vs Private IPv4 vs Public IPv6)
+
+As a sanity check on the resized server, baseline `100 x 5` tests were executed across all three available network interfaces:
+
+| Network Interface | Target Endpoint | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Median (`p50`) | 95th (`p95`) | Notes / Observations |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **Public IPv4** | `http://x.x.x.200/...` | 14.349 | 328.1 ms | 222.7 ms | 557.4 ms | 320.1 ms | 453.4 ms | Standard internet routing via public interface. |
+| **Private IPv4** | `http://10.124.0.2/...` | 12.732 | 355.1 ms | 238.7 ms | 690.2 ms | 326.1 ms | 488.7 ms | Datacenter private network interface routing. |
+| **Public IPv6** | `http://[2604:a880:...9b49:0]/...` | 11.983 | 389.7 ms | 254.8 ms | 761.7 ms | 354.1 ms | 661.6 ms | Native dual-stack IPv6 routing with 100% completion. |
+
+<details>
+<summary>Table Terminology & Network Definitions</summary>
+
+| Term / Header | Definition & Operational Context |
+| :--- | :--- |
+| **Public IPv4** | Traffic routed through the public internet and cloud provider border routers to the external IP. |
+| **Private IPv4** | Traffic routed strictly within the datacenter private subnet (`10.124.0.0/20`), bypassing public edge hops. |
+| **Public IPv6** | Native end-to-end IPv6 routing without Network Address Translation (NAT). |
+| **Median (`p50`)** | 50th percentile latency; half of all requests completed faster than this time. |
+| **95th (`p95`)** | 95th percentile latency; reflects peak tail latency excluding the most extreme 5% outliers. |
+
+</details>
+
+Host telemetry during these runs: Linux 6.12 amd64, 1 vCPU, 1,973 MiB RAM (1,211 MiB available), swap utilization remained at 0 MiB with zero OOM events.
+
+Artifacts: `storage/app/load-tests/capacity/datacenter-1c-2g-20260924T193809Z/` and `storage/app/load-tests/cache-sweep-20260924-194621/`.
 
 ---
 

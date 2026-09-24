@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Cloud Datacenter 1 vCPU / 1 GiB RAM Empirical Benchmarks (Environment B1)**:
-  - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on a minimal Debian 13 cloud VPS (1 vCPU, 967 MiB RAM, 2.0 GiB swap).
+- **Cloud Datacenter 1 vCPU (1 GiB & 2 GiB RAM) Empirical Benchmarks**:
+  - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on both minimal (1 vCPU / 1 GiB RAM) and memory-scaled (1 vCPU / 2 GiB RAM, `pm = static`, `pm.max_children = 6`) cloud VPS instances.
   - Added progressive disclosure expandable appendices with complete percentile distributions (`p50`, `p90`, `p95`, `p99`, `std_dev`) and multi-run repetitions (`r1–r3`).
   - Added multi-interface comparison analyzing latency differences across public IPv4, private datacenter IPv4, and native dual-stack public IPv6.
+  - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput constant (~14–19 req/sec), confirming single-core CPU compute saturation.
 
 ### Removed
 - **Environment B1 July–August 2026 Historical Archive**:
