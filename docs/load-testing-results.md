@@ -8,6 +8,9 @@ Clear, real-world capacity guidance for administrators. This document records em
 ## Contents
 
 - [Executive Summary & Hardware Sizing Matrix for Administrators](#executive-summary--hardware-sizing-matrix-for-administrators)
+  - [Empirical Datacenter Telephony Capacity Comparison (September 2026 Series)](#empirical-datacenter-telephony-capacity-comparison-september-2026-series)
+  - [Empirical Dialplan XML Handler Bottleneck Comparison](#empirical-dialplan-xml-handler-bottleneck-comparison)
+  - [Production Sizing & Configuration Matrix](#production-sizing--configuration-matrix)
 - [Production Recommendations: XML Caching & PHP-FPM Worker Tuning](#production-recommendations-xml-caching--php-fpm-worker-tuning)
 - [Planning Rules](#planning-rules)
 - [How Results Are Recorded & How to Read Benchmark Tables](#how-results-are-recorded--how-to-read-benchmark-tables)
@@ -28,9 +31,58 @@ Clear, real-world capacity guidance for administrators. This document records em
 
 ## Executive Summary & Hardware Sizing Matrix for Administrators
 
-Use the summary table below as a quick reference for choosing baseline hardware, configuring PHP-FPM pools, and setting Redis cache policies. These recommendations synthesize findings from both the VirtualBox test series and public datacenter benchmarks:
+### Empirical Datacenter Telephony Capacity Comparison (September 2026 Series)
+
+The table below summarizes empirical live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the September 2026 datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`DIALPLAN_CACHE_TTL=5`, `DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`, `DIRECTORY_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
+
+| Hardware Configuration | CPU Allocation | PHP-FPM Profile (`www.conf`) | Cache Policy (`.env`) | Sustained Call Setup Rate | Call Setup Latency (`p50` / `p95`) | Peak Call Capacity / Concurrency | Recommended Production Role |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic` (5 max) | Production (`TTL: 5s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 CPS saturation boundary) | Micro / Edge (1–10 extensions) |
+| **1 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 3 calls/sec | 276 ms / ~2.2s | 0 MiB swap; single-core compute bound | Small Branch (1–15 extensions) |
+| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 5–8 calls/sec | ~4.0s / ~9.5s | 10 CPS burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
+| **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Production (`TTL: 5s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 CPS burst ceiling (100% completion across 2,110 calls, 0 drops)** | **Mid-Market / Call Center (150–400+ extensions)** |
+
+---
+
+### Empirical Dialplan XML Handler Bottleneck Comparison
+
+The table below summarizes empirical XML throughput and latency across moderate burst (`100 x 5`), heavy concurrency (`500 x 25`), sustained burst ceilings (`1,000 x 25`), and caching extremes (uncached database execution vs. pure memory hits). Because each call requires 2–3 dynamic XML queries (directory auth, dialplan context, and destination location), XML handler throughput directly determines telephony call-setup throughput:
+
+> [!NOTE]
+> **Active PHP-FPM and Cache Benchmark Parameters**:
+> - **PHP-FPM Worker Pool Settings (`/etc/php/8.5/fpm/pool.d/www.conf`)**:
+>   - **1 vCPU / 1 GiB RAM**: `pm = dynamic`, `pm.max_children = 5`, `pm.start_servers = 2`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 3` (optimized to prevent out-of-memory kernel kills on 1 GiB).
+>   - **1 vCPU & 2 vCPU / 2 GiB RAM**: `pm = static`, `pm.max_children = 6` (pre-forked dedicated pool to eliminate dynamic process-spawning jitter).
+>   - **4 vCPU / 16 GiB RAM**: `pm = static`, `pm.max_children = 24` (enterprise pre-forked static pool providing 24 concurrent worker processes).
+> - **Cache Policy Profiles (`.env` with Redis 7.0 & OPcache enabled)**:
+>   - **Throughput & Concurrency Ladders (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`DIALPLAN_CACHE_TTL=5`, `DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`, `DIRECTORY_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
+>   - **Uncached MariaDB Baseline (`TTL: 0s`)**: **Caching Disabled** (`DIALPLAN_CACHE_TTL=0`, `DIALPLAN_CONTRIBUTOR_CACHE_TTL=0`, `DIRECTORY_CACHE_TTL=0`). Bypasses Redis to measure raw MariaDB SQL query execution and XML template compilation cost.
+>   - **Pure Memory Ceiling (`cache-hit`)**: **Memory Cache Hit** (`cache-hit` scenario with pre-warmed Redis memory, 0 database queries). Isolates the upper PHP-FPM / Redis memory serialization ceiling.
+
+| Hardware Configuration | CPU Allocation | PHP-FPM Configuration (`www.conf`) | Cache Settings (`.env`) | Moderate Burst (`100 x 5`) | High Burst (`500 x 25`) | Sustained Ceiling (`1,000 x 25`) | Peak Tail Latency (`Max`) | Uncached MariaDB (`100 x 5`) | Pure Memory Ceiling (`100 x 5`) |
+| :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic`<br>`max_children = 5` | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 15.6 req/sec (289 ms) | 14.9 req/sec (990 ms) | 16.0 req/sec (923 ms) | 2,298 ms | 8.4 req/sec (565 ms) | 17.4 req/sec (262 ms) |
+| **1 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static`<br>`max_children = 6` | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 14.3 req/sec (327 ms) | 13.7 req/sec (1,109 ms) | 13.8 req/sec (1,099 ms) | 3,091 ms | 9.9 req/sec (487 ms) | 14.8 req/sec (315 ms) |
+| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static`<br>`max_children = 6` | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 14.4 req/sec (288 ms) | 16.1 req/sec (923 ms) | 14.5 req/sec (1,013 ms) | 2,756 ms | 10.2 req/sec (421 ms) | 19.5 req/sec (219 ms) |
+| **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static`<br>`max_children = 24`** | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | **57.3 req/sec (77 ms)** | **65.0 req/sec (333 ms)** | **65.3 req/sec (327 ms)** | **448 ms** | **41.1 req/sec (108 ms)** | **72.5 req/sec (61 ms)** |
+
+<details>
+<summary>Key Bottleneck Observations & Architectural Takeaways</summary>
+
+1. **The Shared-Core Ceiling (~14–16 req/sec)**:
+   On 1-core and 2-core shared-CPU instances, dynamic XML generation hits a hard compute ceiling between 14 and 16 requests/second under burst concurrency (`500 x 25` and `1,000 x 25`). Because PHP-FPM workers compete with the Linux network stack and Sofia SIP threads for shared host CPU cycles, requests queue in Nginx/PHP-FPM buffers, pushing peak tail latencies past 2.2–3.0 seconds.
+2. **Dedicated CPU Throughput Leap (>4x Multiplier)**:
+   Moving to 4 dedicated vCPUs with 24 pre-forked static workers completely eliminates worker starvation. Sustained throughput leaps to **65.3 requests/second**, while peak tail latency drops by more than 80% (capped under 450 ms across 1,000 sustained queries).
+3. **Database vs. Cache Scaling**:
+   Uncached MariaDB query execution quadrupled from ~8–10 req/sec on shared instances to **41.1 req/sec** on dedicated hardware. With contributor and dialplan caching active, throughput climbs to **65–72 req/sec** with average response times under 70 ms.
+
+</details>
+
+---
 
 ### Production Sizing & Configuration Matrix
+
+Use the summary table below as a quick reference for choosing baseline hardware, configuring PHP-FPM pools, and setting Redis cache policies. These recommendations synthesize findings from both the VirtualBox test series and public datacenter benchmarks:
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | --- | --- | --- | --- | --- | ---: | ---: | --- |
