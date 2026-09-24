@@ -1083,7 +1083,9 @@ echo "Redis Hits: $DELTA_HITS | Misses: $DELTA_MISSES | Hit Rate: ${HIT_RATE}%"
 
 The mathematical formula:
 
-$$\text{Hit Rate (\%)} = \frac{\Delta \text{keyspace\_hits}}{\Delta \text{keyspace\_hits} + \Delta \text{keyspace\_misses}} \times 100$$
+```text
+Hit Rate (%) = (Delta keyspace_hits / (Delta keyspace_hits + Delta keyspace_misses)) * 100
+```
 
 ##### Method 2: Real-Time Command Inspection (`redis-cli monitor`)
 

@@ -41,8 +41,10 @@ Use the summary table below as a quick reference for choosing baseline hardware,
 > [!TIP]
 > **PHP-FPM Sizing Formula for Dedicated PBX Nodes**:
 > When running a dedicated node, compute `pm.max_children` as:
-> $$\text{max\_children} = \frac{\text{Total Available RAM} - \text{System \& Telephony Overhead (1.5 GiB)}}{\text{Average Worker RSS (\~65 MiB)}}$$
-> On a 4 GiB VM: $(4096 - 1536) / 65 \approx 39$ maximum theoretical ceiling. Setting `pm.max_children = 12` provides ample concurrency headroom for XML bursts while keeping worker memory usage capped under 800 MiB, leaving >2.5 GiB for FreeSWITCH RTP media, MariaDB buffers, and Redis caching.
+> ```text
+> pm.max_children = (Total Available RAM - System & Telephony Overhead [1.5 GiB]) / Average Worker RSS (~65 MiB)
+> ```
+> On a 4 GiB VM: `(4096 - 1536) / 65 ≈ 39` maximum theoretical ceiling. Setting `pm.max_children = 12` provides ample concurrency headroom for XML bursts while keeping worker memory usage capped under 800 MiB, leaving >2.5 GiB for FreeSWITCH RTP media, MariaDB buffers, and Redis caching.
 
 ---
 
@@ -74,11 +76,11 @@ redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
 
 FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. Unlike standard web visitors who browse asynchronously, a PBX call setup cannot tolerate worker wait states:
 
-- **Always Use Static Process Management (`pm = static`) on $\ge 2$ GiB RAM**: Dynamic process management (`pm = dynamic`) introduces process-fork latency when simultaneous calls burst in. In our benchmarks, dynamic mode with 5 workers saturated at concurrency 25, creating `server reached pm.max_children setting` warnings and 502 gateway timeouts. Static mode keeps all workers pre-forked in memory with zero instantiation latency.
+- **Always Use Static Process Management (`pm = static`) on ≥ 2 GiB RAM**: Dynamic process management (`pm = dynamic`) introduces process-fork latency when simultaneous calls burst in. In our benchmarks, dynamic mode with 5 workers saturated at concurrency 25, creating `server reached pm.max_children setting` warnings and 502 gateway timeouts. Static mode keeps all workers pre-forked in memory with zero instantiation latency.
 - **Installer Auto-Tuning**: Fresh installations automatically detect host RAM via `free -m` in `scripts/resources/php.sh` and set optimal worker pools:
-  - **$\ge 3500\text{ MB RAM}$ (4GB+ standard)**: `pm = static`, `pm.max_children = 12` (+15% throughput gain, zero timeouts, leaving 2.9 GiB free RAM).
-  - **$\ge 1800\text{ MB RAM}$ (2GB small)**: `pm = static`, `pm.max_children = 6`.
-  - **$< 1800\text{ MB RAM}$ (1GB minimal)**: `pm = dynamic`, `pm.max_children = 5` to conserve memory.
+  - **≥ 3,500 MB RAM (4GB+ standard)**: `pm = static`, `pm.max_children = 12` (+15% throughput gain, zero timeouts, leaving 2.9 GiB free RAM).
+  - **≥ 1,800 MB RAM (2GB small)**: `pm = static`, `pm.max_children = 6`.
+  - **< 1,800 MB RAM (1GB minimal)**: `pm = dynamic`, `pm.max_children = 5` to conserve memory.
 - **Monitoring & Saturation Detection**:
   ```bash
   tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
