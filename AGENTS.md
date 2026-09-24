@@ -468,7 +468,7 @@ All three are fed by `App\Support\Concerns\HasOperationalFeedback` (inherited vi
 # Smoke — critical-path only (~200 tests, ~20s)
 php artisan app:test --smoke
 
-# Default — all feature tests with --parallel (~2,296 tests, ~65s)
+# Default — all feature tests with --parallel (~2,337 tests, ~65s)
 php artisan app:test
 
 # Full — features + Dusk browser tests (~150s)

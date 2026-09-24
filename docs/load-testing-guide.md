@@ -430,7 +430,7 @@ For the VirtualBox pair, both virtual Linux servers run on the same Windows
 
 Do not start datacenter work until the VirtualBox single-server and
 server-to-server results are recorded. Do not run any test on A1 until the
-fresh-install validation checklist passes.
+fresh-install validation checklist passes. *(Note: Steps 1–4 and 8 were completed on September 23, 2026 for the VirtualBox environment. Datacenter stages B1–B3 and C1–C2 remain as historical references and planned future validation).*
 
 ### Per-Setup Test Matrix
 
@@ -1559,8 +1559,7 @@ They close the gaps the source documents themselves call out.
 
 ### How Results Are Recorded
 
-The tables in this section are historical July–August 2026 references kept
-for review; the planned runs with the new test data replace them.
+The tables in this section present the September 23, 2026 VirtualBox A1 test progression (single-server throughput ladder and 5-tier cache sweep), followed by the historical July–August 2026 datacenter reference runs.
 
 - Lead with requests per second, then average, fastest, and slowest latency.
   For some older runs the average and fastest are recomputed from the
@@ -1775,9 +1774,7 @@ Server-to-server runs always use two machines: the PBX under test and a SIPp
 load generator on the same network path. The historical VirtualBox pair used
 the WSL2 host at `192.168.1.65` as the generator. The historical datacenter
 runs used the local test server through WireGuard until the planned
-two-datacenter-server topology is in place. Every table in this section is a
-historical reference for review; the planned campaign re-runs the same
-structure with new test data.
+two-datacenter-server topology is in place. The tables below present the September 23, 2026 VirtualBox end-to-end verification (all 15/15 SIPp scenarios verified, covering basic calls, live media RTP echo, and extended telephony parity), followed by the historical July–August 2026 reference runs.
 
 Call-setup latency is measured from the caller's first `INVITE` to the
 destination's `200 OK`. "Achieved calls/sec" compares the first and last
