@@ -8,7 +8,7 @@
 
 **Tech Stack:** Bash 5 (Debian 13 target), Pest 4 with `Symfony\Component\Process` (matching existing installer tests), Git, `iproute2`.
 
-**Spec:** `docs/design-document-one-line-installer.md`
+**Spec:** One-line installer design (approved September 22, 2026, implemented in v1.1.3)
 
 ## Global Constraints
 

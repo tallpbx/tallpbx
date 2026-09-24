@@ -383,7 +383,7 @@ Report terms: `req/sec` is completed XML handler responses per second. `p50` is 
 For SIPp end-to-end validation, run the load generator from WSL2 or a separate Linux VM when possible:
 
 ```bash
-PBX_HOST=192.168.1.76 \
+PBX_HOST=PBX_HOST \
 LOAD_GENERATOR_IP=LOAD_GENERATOR_IP \
 FORCE_SEED=1 \
 scripts/pbx-sipp-validate.sh
@@ -391,9 +391,10 @@ scripts/pbx-sipp-validate.sh
 
 The SIPp runner registers seeded users, starts an auto-answer registered endpoint, starts an outbound-route UAS, places extension-to-extension and outbound-route calls, and writes artifacts under `storage/app/load-tests/sipp-e2e-*`.
 
-For optional live media validation of recording, music-on-hold, and announcement paths, add `MEDIA_FLOW=1`. This seeds synthetic media destinations and runs low-volume SIPp RTP echo calls; use it only after the basic SIPp call path is already passing.
+- Add `MEDIA_FLOW=1` for live media RTP echo validation of recording (`*732`), music-on-hold (`load_test_moh`), and IVR announcements (`load_test_announcement`).
+- Add `EXTENDED=1` to run all 8 extended telephony parity scenarios: ring groups (`2400`), voicemail (`2003`), conferences (`2500`), loopback call forwarding (`2001` -> `2000`), time conditions (`2401`), follow-me (`2002`), emergency (`911`), and call blocking.
 
-Expected basic SIPp result: the script exits `0`, `summary.md` shows all basic scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
+Expected basic SIPp result: the script exits `0`, `summary.md` shows all scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
 
 ### PHP-FPM Load-Test Tuning
 
@@ -413,6 +414,33 @@ pm.max_requests = 500
 ```
 
 In `static` mode, all workers are ready for FreeSWITCH XML handler bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored. Use `INSTALL.md` for small/standard/larger server sizing guidance. More workers are not automatically faster: tune PHP-FPM while watching CPU load, memory, MariaDB, and XML handler latency.
+
+### Telephony XML Cache Tuning & Hit Rate Sweep
+
+TallPBX uses a tiered in-memory caching architecture backed by Redis to keep dialplan lookups fast and protect MariaDB during high-frequency call bursts:
+
+1. **Full Dialplan XML Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5`)**: Stores the complete compiled XML response per tenant, context, and destination. Eliminates dialplan rebuilding for repeat calls within the TTL window.
+2. **Contributor Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`)**: Caches individual dialplan contributor query fragments (extensions, ring groups, call forwards, IVRs) across calls to different destinations.
+3. **Directory Cache (`FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5`)**: Caches SIP authentication and registration lookups.
+
+To benchmark all 5 standard cache configurations and calculate Redis hit rates on your hardware:
+
+```bash
+bash scripts/run-cache-sweep.sh
+```
+
+The script runs a standardized 5-tier sweep (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling), reporting requests/sec, p50 latency, and Redis keyspace hit rates, and automatically restores production defaults upon completion.
+
+Check active Redis cache hit statistics at any time:
+
+```bash
+redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
+```
+
+Recommended settings in `.env`:
+- **Standard Office**: `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5` (default: optimal balance between high burst throughput and quick 5-second propagation of panel changes).
+- **High-Density Call Center**: `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
+- **Development**: `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
 
 ## Tech Stack
 

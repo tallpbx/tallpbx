@@ -243,9 +243,14 @@ the old program first; that does not touch your database or recordings.
 
 ### Redis Cache And Session Storage
 
-Redis is TallPBX's in-memory storage for sessions, cache, and dynamic
-intrusion bans, and new installs configure it automatically. Keep
-`redis-server` running in production: if Redis is temporarily down the PBX
+Redis is TallPBX's in-memory storage for sessions, cache, dynamic intrusion bans,
+and FreeSWITCH XML handler caching. New installs configure it automatically.
+The telephony XML handler utilizes Redis to cache compiled dialplans, query contributors,
+and directory lookups (`FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5`,
+`FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`, and
+`FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5`), protecting MariaDB during call bursts.
+You can run `bash scripts/run-cache-sweep.sh` to benchmark cache hit rates across configurations.
+Keep `redis-server` running in production: if Redis is temporarily down the PBX
 keeps working, but dynamic login and ban counters pause until it returns — the
 kernel firewall and manual bans remain active. After changing cache or session
 values in `.env`, run `php artisan optimize:clear && php artisan optimize`.
@@ -259,20 +264,22 @@ enough CPU, memory, and network capacity.
 
 ### PHP-FPM Worker Sizing
 
-PHP-FPM serves the web panel. Debian's defaults suit small systems; adjust only
-when monitoring shows worker exhaustion or slow bursts:
+PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. During installation,
+the installer automatically detects host RAM and tunes `/etc/php/8.5/fpm/pool.d/www.conf`
+to static worker pools to eliminate process-fork latency during simultaneous call bursts:
 
-| Server size | Suggested `pm.max_children` | Notes |
-| --- | --- | --- |
-| Minimum, 1 GB RAM | Keep Debian defaults | Change only after monitoring. |
-| Small, 2 GB RAM | `6` | A reasonable starting point. |
-| Standard, 4 GB RAM | `12` | Recommended starting point. |
-| Larger, 8 GB RAM | `24` | Confirm memory is still available. |
-| High-volume | Measure first | Tune from real traffic data. |
+| Server size | Auto-configured `pm` | Sizing (`pm.max_children`) | Notes |
+| --- | --- | --- | --- |
+| Minimum, 1 GB RAM | `dynamic` | `5` | Conserves memory on small instances. |
+| Small, 2 GB RAM | `static` | `6` | Balanced for small office bursts. |
+| Standard, 4 GB RAM | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
+| Larger, 8 GB+ RAM | `static` | `24` | For higher concurrency call centers. |
+| High-volume | `static` | Measure first | Tune from real traffic benchmarks. |
 
-Set `pm = static` alongside the value and leave `pm.max_requests` at `0`.
-Always leave memory for FreeSWITCH, MariaDB, Redis, Nginx, recordings, and the
-operating system, and check `/var/log/php8.5-fpm.log` for worker-limit warnings.
+In `static` mode, all workers remain initialized and ready for FreeSWITCH XML handler
+bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored.
+Leave `pm.max_requests` at `0`. Always leave memory for FreeSWITCH, MariaDB, Redis,
+Nginx, recordings, and the operating system, and check `/var/log/php8.5-fpm.log` for worker-limit warnings.
 
 ### File Permissions
 

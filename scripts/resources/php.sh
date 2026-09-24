@@ -63,7 +63,55 @@ apt_get_with_lock_wait install -y --no-install-recommends \
 systemctl enable redis-server
 systemctl restart redis-server
 
+# Tune PHP-FPM worker pool sizing based on available physical memory.
+# By default, Debian packages configure PHP-FPM in dynamic mode with only 5 workers.
+# FreeSWITCH invokes HTTP XML handlers for call lookups (extensions, routes, voicemail).
+# During simultaneous call bursts, 5 workers can quickly become saturated, causing
+# 502/504 gateway timeouts and failed calls. Configuring static worker pools provides
+# instant worker availability without fork latency.
+#
+# Sizing logic based on physical RAM:
+# - Standard server (>= 3500 MB RAM): 12 static workers. Tested to handle 25+ calls/sec
+#   burst concurrency with zero timeouts, while leaving ~2.9GB RAM free for FreeSWITCH and MariaDB.
+# - Small server (>= 1800 MB RAM): 6 static workers. Balanced for 2GB instances.
+# - Minimal server (< 1800 MB RAM): 5 dynamic workers to preserve memory on 1GB instances.
+configure_php_fpm_pool() {
+    local pool_conf="/etc/php/$php_version/fpm/pool.d/www.conf"
+    if [ ! -f "$pool_conf" ]; then
+        return 0
+    fi
+
+    # Read total physical system RAM in megabytes
+    local total_ram_mb
+    total_ram_mb=$(free -m | awk '/^Mem:/{print $2}')
+    total_ram_mb="${total_ram_mb:-1024}"
+
+    local target_pm="static"
+    local target_max_children=12
+
+    if [ "$total_ram_mb" -ge 3500 ]; then
+        target_pm="static"
+        target_max_children=12
+        verbose "Configuring PHP-FPM with $target_max_children static workers (detected ${total_ram_mb}MB RAM, 4GB+ tier)"
+    elif [ "$total_ram_mb" -ge 1800 ]; then
+        target_pm="static"
+        target_max_children=6
+        verbose "Configuring PHP-FPM with $target_max_children static workers (detected ${total_ram_mb}MB RAM, 2GB tier)"
+    else
+        target_pm="dynamic"
+        target_max_children=5
+        verbose "Keeping PHP-FPM default dynamic workers (detected ${total_ram_mb}MB RAM, 1GB tier)"
+    fi
+
+    # Update process manager mode (pm = static or dynamic)
+    sed -i -E "s/^[; ]*pm\s*=\s*.*/pm = $target_pm/" "$pool_conf"
+    # Update maximum concurrent worker processes (pm.max_children)
+    sed -i -E "s/^[; ]*pm\.max_children\s*=\s*.*/pm.max_children = $target_max_children/" "$pool_conf"
+}
+
+configure_php_fpm_pool
+
 # Tell systemd about any newly installed service files, then restart PHP-FPM so
-# the web server can immediately use the installed PHP extensions.
+# the web server can immediately use the installed PHP extensions and tuned pool settings.
 systemctl daemon-reload
 systemctl restart "php$php_version-fpm"

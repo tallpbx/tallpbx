@@ -137,6 +137,10 @@ The XML test isolates one part of the call chain:
 Load generator -> Nginx/PHP-FPM -> Laravel -> MariaDB/Redis -> XML answer
 ```
 
+> [!NOTE]
+> **Why FreeSWITCH is not in this test chain**:
+> The XML test runner acts as a synthetic replacement for FreeSWITCH's `mod_xml_curl` module, sending HTTP requests directly to Nginx and Laravel (`/api/v1/xml-handler`). This intentionally isolates database query performance, PHP-FPM worker concurrency, and Redis caching without the interference of SIP signaling, Sofia profile mutexes, RTP media, or FreeSWITCH session rate limits. Use the end-to-end SIPp suite to test FreeSWITCH directly.
+
 A request identifies the FreeSWITCH section (`dialplan`), the tenant call
 context (such as `tenant_12_internal`), the caller's number, and the number
 being reached. Laravel looks up extensions, inbound routes, outbound routes,
@@ -332,7 +336,7 @@ results for VirtualBox and then the datacenter ladder.
 
 | ID | Environment | Specification | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 4096 MiB RAM, 2.0 GiB swap, Debian 13 | Complete (July 15–16, 2026); fresh install planned for the campaign |
+| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 4096 MiB RAM, 2.0 GiB swap, Debian 13 | Complete: fresh install validation, single-server ladder, and 5-tier cache sweep completed September 23, 2026 (historical baseline July 15–16, 2026) |
 | B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete (July 17–18, 2026); revalidated August 31, 2026 |
 | B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
 | B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
@@ -343,7 +347,7 @@ results for VirtualBox and then the datacenter ladder.
 
 | ID | PBX under test | SIPp load generator | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server (4 vCPU / 4096 MiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: correctness (July 16, 2026) and capacity ladder (July 17–18, 2026) |
+| A1 | VirtualBox test server (4 vCPU / 4096 MiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: 15/15 scenarios verified (basic, media flow, and extended parity) September 23, 2026; historical capacity ladder July 16–18, 2026 |
 | B1 | Shared-CPU Datacenter VPS 1 vCPU / 967 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: correctness only (July 17, 2026) |
 | B3 | Shared-CPU Datacenter VPS 2 vCPU / 1973 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: capacity runs (July 18, 2026) |
 | C1 | Dedicated-CPU Datacenter VPS 2 vCPU / 8 GiB | D — second datacenter server in the same datacenter | Planned |
@@ -2109,6 +2113,45 @@ synthesize findings from both the VirtualBox test series and public datacenter b
 > When running a dedicated node, compute `pm.max_children` as:
 > $$\text{max\_children} = \frac{\text{Total Available RAM} - \text{System \& Telephony Overhead (1.5 GiB)}}{\text{Average Worker RSS (\~65 MiB)}}$$
 > On a 4 GiB VM: $(4096 - 1536) / 65 \approx 39$ maximum theoretical ceiling. Setting `pm.max_children = 12` provides ample concurrency headroom for XML bursts while keeping worker memory usage capped under 800 MiB, leaving >2.5 GiB for FreeSWITCH RTP media, MariaDB buffers, and Redis caching.
+
+### Production Recommendations: XML Caching & PHP-FPM Worker Tuning
+
+Based on the September 23, 2026 VirtualBox 5-tier cache sweeps and concurrency ladder benchmarks, apply the following tuning policies for production deployments:
+
+#### 1. Telephony XML Cache Policy (`.env`)
+
+TallPBX caches compiled dialplan XML responses, individual contributor fragments (extensions, IVRs, ring groups), and directory lookup data in Redis. Choose the profile matching your organization's calling patterns:
+
+| Deployment Role | Dialplan Cache TTL | Contributor Cache TTL | Directory Cache TTL | Observed Hit Rate | Latency (p50) | Operational Rationale |
+| --- | --- | --- | --- | ---: | ---: | --- |
+| **Standard Office (Recommended Baseline)** | `5` | `5` | `5` | ~41.2% | 235 ms | **Optimal production balance.** Absorbs rapid call bursts while guaranteeing that administrative changes in the web panel (adding extensions, changing call routing) propagate within 5 seconds without manual cache flushing. |
+| **High-Density Call Center / Gateway Trunks** | `30` | `30` | `30` | ~44.2%–99% | ~195 ms | **Maximum throughput.** Shields MariaDB from thousands of identical inbound routing queries per minute. Panel changes take up to 30 seconds to reflect, or require `php artisan optimize:clear`. |
+| **Development & Dialplan Debugging** | `0` | `0` | `0` | 0.0% | 398 ms | **Instant feedback.** Disables XML caching completely so every call executes live database queries and generates fresh XML immediately. |
+
+To benchmark all 5 cache tiers on your server and calculate exact Redis keyspace hit rates:
+```bash
+bash scripts/run-cache-sweep.sh
+```
+
+Check active Redis cache efficiency at any time:
+```bash
+redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
+```
+
+#### 2. PHP-FPM Worker Pool Tuning (`/etc/php/8.5/fpm/pool.d/www.conf`)
+
+FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. Unlike standard web visitors who browse asynchronously, a PBX call setup cannot tolerate worker wait states:
+
+- **Always Use Static Process Management (`pm = static`) on $\ge 2$ GiB RAM**: Dynamic process management (`pm = dynamic`) introduces process-fork latency when simultaneous calls burst in. In our benchmarks, dynamic mode with 5 workers saturated at concurrency 25, creating `server reached pm.max_children setting` warnings and 502 gateway timeouts. Static mode keeps all workers pre-forked in memory with zero instantiation latency.
+- **Installer Auto-Tuning**: Fresh installations automatically detect host RAM via `free -m` in `scripts/resources/php.sh` and set optimal worker pools:
+  - **$\ge 3500\text{ MB RAM}$ (4GB+ standard)**: `pm = static`, `pm.max_children = 12` (+15% throughput gain, zero timeouts, leaving 2.9 GiB free RAM).
+  - **$\ge 1800\text{ MB RAM}$ (2GB small)**: `pm = static`, `pm.max_children = 6`.
+  - **$< 1800\text{ MB RAM}$ (1GB minimal)**: `pm = dynamic`, `pm.max_children = 5` to conserve memory.
+- **Monitoring & Saturation Detection**:
+  ```bash
+  tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
+  ```
+  If this error appears under peak calling periods, increase `pm.max_children` using the sizing formula above and restart PHP-FPM (`systemctl restart php8.5-fpm`).
 
 ### Planning Rules
 

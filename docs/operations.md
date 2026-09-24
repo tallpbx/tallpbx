@@ -44,22 +44,56 @@ and they stop if that safety rule is not in effect. TallPBX also blocks Laravel
 commands that would erase or rebuild the primary database; these safeguards do
 not prevent a person with MariaDB access from running destructive SQL manually.
 
+### Telephony Performance & Cache Verification
+
+To benchmark telephony lookup latency, verify Redis hit rates, and ensure PHP-FPM workers are not starved under call bursts:
+
+1. **Verify Redis Cache Hit Rate**:
+   Inspect active Redis keyspace hits and misses:
+   ```bash
+   redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
+   ```
+
+2. **Run XML Handler Cache Sweep**:
+   Benchmark all 5 standard cache configurations (cold baseline, contributor cache, default 5s burst, 30s call-center profile, and memory hit ceiling) and calculate hit rates on your hardware:
+   ```bash
+   bash scripts/run-cache-sweep.sh
+   ```
+   The runner automatically restores recommended production defaults (`TTL=5`) when finished.
+
+3. **Verify PHP-FPM Worker Pool**:
+   Confirm PHP-FPM is running in `static` mode and check for worker pool saturation warnings:
+   ```bash
+   grep -E 'pm =|pm.max_children' /etc/php/8.5/fpm/pool.d/www.conf
+   tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
+   ```
+
+4. **SIPp Telephony Validation**:
+   Validate SIP registrations, extensions, gateways, loopback call forwarding, and media flow:
+   ```bash
+   PBX_HOST=<ip> LOAD_GENERATOR_IP=<ip> bash scripts/pbx-sipp-validate.sh
+   ```
+   See [docs/load-testing-guide.md](load-testing-guide.md) for full instructions, topology, and benchmark results.
+
 ## Troubleshooting
 
 ### Web Panel Shows 502 or 504 Error
 
-PHP-FPM is not running or has crashed. Check its status and restart it:
+PHP-FPM is not running, has crashed, or worker processes are exhausted during call bursts. Check its status and restart it:
 
 ```bash
 systemctl status php8.5-fpm
 systemctl restart php8.5-fpm
 ```
 
-If it refuses to start, check the log for configuration errors:
+If it refuses to start or errors under load, check the log:
 
 ```bash
 journalctl -u php8.5-fpm --no-pager -n 50
+tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
 ```
+
+If you see `server reached pm.max_children setting`, the pool was saturated by concurrent HTTP XML handler requests. The installer auto-configures `pm = static` with `12` workers on 4GB systems (`6` on 2GB systems). If needed on high-traffic PBX servers, increase `pm.max_children` in `/etc/php/8.5/fpm/pool.d/www.conf` and restart PHP-FPM.
 
 ### "Permission denied" Errors in the Panel or Logs
 

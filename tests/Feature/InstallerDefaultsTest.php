@@ -932,4 +932,26 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
         ->and($operationsDoc)->toContain('php artisan pbx:sounds:install');
 });
 
+it('auto-configures PHP-FPM static worker pools based on host memory', function (): void {
+    $phpScript = (string) file_get_contents(base_path('scripts/resources/php.sh'));
+
+    expect($phpScript)->toContain('configure_php_fpm_pool')
+        ->and($phpScript)->toContain('total_ram_mb=$(free -m')
+        ->and($phpScript)->toContain('target_pm="static"')
+        ->and($phpScript)->toContain('target_max_children=12')
+        ->and($phpScript)->toContain('target_max_children=6')
+        ->and($phpScript)->toContain('target_pm="dynamic"')
+        ->and($phpScript)->toContain('pm = $target_pm')
+        ->and($phpScript)->toContain('pm.max_children = $target_max_children');
+});
+
+it('configures default XML handler cache TTLs in tall.sh', function (): void {
+    $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+
+    expect($tallScript)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5')
+        ->and($tallScript)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5')
+        ->and($tallScript)->toContain('FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5');
+});
+
+
 

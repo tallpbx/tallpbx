@@ -10,12 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.4] - 2026-09-23
 
 ### Added
+- **Automated Memory-Based PHP-FPM Pool Sizing**:
+  - Added `configure_php_fpm_pool()` in `scripts/resources/php.sh` to automatically detect host RAM and configure static PHP-FPM worker pools in `/etc/php/<version>/fpm/pool.d/www.conf` (12 static workers for 4GB+ RAM, 6 static workers for 2GB RAM, 5 dynamic workers for 1GB RAM) to eliminate worker starvation and HTTP 502/504 gateway timeouts under concurrent FreeSWITCH call bursts.
+  - Added automated test coverage in `tests/Feature/InstallerDefaultsTest.php` ensuring installer scripts configure static worker pools based on memory.
+  - Added test coverage in `tests/Feature/PbxCacheSweepScriptTest.php` verifying the `scripts/run-cache-sweep.sh` runner syntax, standard sweep tiers, Redis metrics, and exit cleanup traps.
+- **Default Telephony XML Cache TTLs**:
+  - Updated `scripts/resources/tall.sh` to explicitly write `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5`, `FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`, and `FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5` to `.env` during setup.
 - **SIP Load Testing & Multi-Host Reproducibility Suite**:
   - Added `scripts/run-cache-sweep.sh` to automate the 5-tier XML handler cache hit-rate sweep (cold baseline, contributor cache, 5s burst, 30s call-center, and memory hit ceiling) with automated production `.env` restoration.
   - Added dedicated `SIP Load Testing & Multi-Host Reproducibility Guidelines` in `AGENTS.md` and `docs/load-testing-guide.md` documenting critical lab operational controls: public IP obfuscation, mandatory parallel Pest execution (`--parallel`), SSH remote password escaping, cross-host CSV synchronization, load generator firewall ingress whitelisting (`nftables`), FreeSWITCH loopback channels for internal bridges, background UAS port collision cleanup, safe UAC port allocation, PHP-FPM static pool sizing, and registration expiry lease management.
   - Added unit test coverage for all 17 custom SIPp XML scenarios in `tests/Feature/PbxSippValidationScriptTest.php`.
 
 ### Changed
+- **Documentation Updates for Telephony Cache & Pool Tuning**:
+  - Updated `README.md` with a new `Telephony XML Cache Tuning & Hit Rate Sweep` section explaining the 3-tier caching architecture, the `scripts/run-cache-sweep.sh` tool, Redis keyspace metrics, and `.env` profile recommendations.
+  - Updated `INSTALL.md` with auto-configured PHP-FPM pool sizing details and XML handler caching in the Redis section.
+  - Updated `docs/operations.md` with a `Telephony Performance & Cache Verification` subsection including Redis hit rate checks, cache sweep benchmarks, PHP-FPM saturation diagnostics, and SIPp validation commands.
+  - Updated `docs/load-testing-guide.md` with a dedicated `Production Recommendations: XML Caching & PHP-FPM Worker Tuning` subsection, a clarifying note on why FreeSWITCH is bypassed in the XML test chain, and updated Phase 1 and Phase 2 status tables reflecting September 23, 2026 completion.
 - **Alphanumeric Default Password for PBX Load Testing**: Changed default password from `LoadTest1234!` to alphanumeric `LoadTest1234` across `PbxLoadTestSeedCommand`, `scripts/pbx-sipp-validate.sh`, `README.md`, and load testing documentation to prevent Bash history expansion and subshell stripping over SSH that caused `403 Forbidden` on SIP `REGISTER`.
 - **SIPp Registration Expiry & Refresh**: Increased SIP registration lease duration in `tools/sipp/register.xml` and `tools/sipp/register-uas-auto-answer.xml` from 300s to 3600s, and added a pre-extended re-registration step in `scripts/pbx-sipp-validate.sh` to prevent mid-run lease expiration during long multi-phase validation suites.
 - **SIPp Blocked Call ACK Handling**: Updated `tools/sipp/uac-call-block.xml` to immediately acknowledge `603 Decline` with an `ACK`, allowing SIPp and FreeSWITCH to cleanly complete blocked call transactions without retransmission delays.
@@ -23,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Superseded Load Testing Documents**: Removed `docs/call-simulation-load-testing.md` and `docs/sipp-server-to-server-validation.md` after consolidating all testing methodologies, commands, runbooks, metrics, and troubleshooting data into the unified, self-contained `docs/load-testing-guide.md`.
+- **Implemented One-Line Installer Design Document**: Removed `docs/design-document-one-line-installer.md` following the completed implementation, verification, and release of the one-line bootstrap installer in v1.1.3.
 
 ### Fixed
 - **Call Forward Dialplan Bridge Channel Failure**: Changed internal FreeSWITCH dialplan bridges in `CallForwardService.php` from direct raw extensions to loopback channels (`loopback/${safeDest}/${context}`), resolving `Cannot create outgoing channel ... cause: [CHAN_NOT_IMPLEMENTED]` during call forwarding.
