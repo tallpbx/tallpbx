@@ -34,11 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `docs/load-testing-results.md` benchmark tables to standardize on `Average Latency`, `Fastest`, and `Slowest`.
   - Updated test fixtures in `tests/Feature/PbxDialplanLoadTestCommandTest.php` and `tests/Feature/PbxCacheSweepScriptTest.php` to assert average latency and verify raw sample preservation.
 - **Load Testing Readability & Terminology Overhaul**:
-  - Clarified that Environment A1 and A2 are isolated, disposable VirtualBox test virtual machines on the local host used exclusively as an experimental test bench, and not live office or production PBX servers.
-  - Eliminated confusing nested "Phase" terminology by reserving "Phase 1" and "Phase 2" strictly for the two top-level testing methodologies (dynamic XML vs. end-to-end SIPp) and adopting clear `Environment <ID>` designations for hardware tiers (e.g. `Environment A1`, `Environment B1`, `Environments A1 + A2`).
+  - Eliminated abstract stage, phase, and lettered environment codes (`Environment A1/B1/B2/B3/C1/C2/D`, `Stage 1–6`, `Phase 1–2`) in favor of clear, domain-driven organization (`Local Lab: VirtualBox`, `Cloud VPS: Entry Baseline`, `Cloud VPS: Dual-Core`, etc.).
+  - Replaced cryptic cache sweep notation (`C=5, D=0`, `D=5, C=5`) with explicit plain-language descriptions (`Contributor TTL: 5s, Dialplan TTL: 0s`).
+  - Added expandable `<details><summary>` definitions tables under all benchmark and parity tables explaining metrics, headers, and `.env` cache settings in simple administrative terms.
   - Added a dedicated "How to Read These Benchmark Tables" glossary defining `<Total Requests> x <Concurrency>` notation, repetitions and median reporting, the purpose of `25 x 1` warm-up runs, and the difference between `mixed` and `cache-hit` scenarios.
   - Added an explanatory note in the 5-tier cache sweep explaining why Row 5 ("Pure Memory Cache-Hit Ceiling") measures pure memory throughput with 0 database queries compared to Row 3 ("Production Baseline") despite identical request counts.
-  - Consolidated raw repetition rows (`r1`, `r2`, `r3`) across datacenter environments (B1, B2, B3) into clean summary tables matching Environment A1, preserving detailed per-repetition runs in collapsible detail blocks.
+  - Consolidated raw repetition rows (`r1`, `r2`, `r3`) across datacenter benchmarks into clean summary tables, preserving detailed per-repetition runs in collapsible detail blocks.
 
 ## [1.1.4] - 2026-09-23
 
