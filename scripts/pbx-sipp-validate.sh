@@ -247,6 +247,8 @@ run_media_step() {
       -trace_msg \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5; then
     stop_media_capture "${capture_pid}"
   else
@@ -301,6 +303,8 @@ run_step register \
     -trace_err \
     -trace_counts \
     -trace_stat \
+    -trace_rtt \
+    -rtt_freq 1 \
     -fd 5
 
 extension_uas_pid="$(start_background extension-registered-uas \
@@ -311,6 +315,8 @@ extension_uas_pid="$(start_background extension-registered-uas \
     -trace_err \
     -trace_counts \
     -trace_stat \
+    -trace_rtt \
+    -rtt_freq 1 \
     -fd 5)"
 
 outbound_uas_pid="$(start_background outbound-gateway-uas \
@@ -321,6 +327,8 @@ outbound_uas_pid="$(start_background outbound-gateway-uas \
     -trace_err \
     -trace_counts \
     -trace_stat \
+    -trace_rtt \
+    -rtt_freq 1 \
     -fd 5)"
 
 sleep 5
@@ -337,6 +345,8 @@ run_step extension-calls \
     -trace_err \
     -trace_counts \
     -trace_stat \
+    -trace_rtt \
+    -rtt_freq 1 \
     -fd 5
 
 run_step outbound-calls \
@@ -351,6 +361,8 @@ run_step outbound-calls \
     -trace_err \
     -trace_counts \
     -trace_stat \
+    -trace_rtt \
+    -rtt_freq 1 \
     -fd 5
 
 if [[ "${MEDIA_FLOW}" == "1" ]]; then
@@ -383,6 +395,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   extension_uas_pid="$(start_background extension-registered-uas \
@@ -393,6 +407,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5)"
 
   outbound_uas_pid="$(start_background outbound-gateway-uas \
@@ -403,6 +419,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5)"
 
   sleep 3
@@ -419,6 +437,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step voicemail-calls \
@@ -433,6 +453,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step conference-calls \
@@ -447,6 +469,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step call-forward-calls \
@@ -461,6 +485,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step time-condition-calls \
@@ -475,6 +501,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step follow-me-calls \
@@ -489,6 +517,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step emergency-calls \
@@ -503,6 +533,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 
   run_step call-block-calls \
@@ -517,6 +549,8 @@ if [[ "${EXTENDED}" == "1" ]]; then
       -trace_err \
       -trace_counts \
       -trace_stat \
+      -trace_rtt \
+      -rtt_freq 1 \
       -fd 5
 fi
 
