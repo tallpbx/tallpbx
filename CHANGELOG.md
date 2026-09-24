@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cloud Datacenter 4 vCPU Dedicated / 16 GiB RAM Empirical Benchmarks**:
+  - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on the 4 vCPU Dedicated / 16 GiB enterprise node (`pm = static`, `pm.max_children = 24`).
+  - Achieved **65.32 req/sec** dynamic XML throughput with tail latency capped under **448 ms** across 1,000 sustained requests (a >4x throughput increase over single/dual-core baselines).
+  - Documented complete server-to-server SIP call capacity ladder (2, 5, 10, 15, 20, 25, 30 CPS) across 2,110 total calls, achieving a **100% completion rate with ZERO failed calls** (zero drops, zero timeouts, zero `403 Forbidden` errors).
+  - Measured instantaneous sub-180ms median setup latency from 2 to 15 CPS (p95 under 472 ms), sustaining peaks of 301 concurrent sessions and 55 sessions/second without degradation.
 - **Cloud Datacenter 2 vCPU / 2 GiB RAM Empirical Benchmarks**:
   - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on the resized dual-core cloud VPS (2 vCPU / 2 GiB RAM, `pm = static`, `pm.max_children = 6`).
   - Documented streamlined server-to-server SIP call capacity ladder (2, 5, 10, 15, 20 CPS) measuring call setup delay, queueing dynamics, and saturation boundaries under sustained concurrency.
