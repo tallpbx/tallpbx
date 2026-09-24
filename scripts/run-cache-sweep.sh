@@ -19,6 +19,7 @@ set -euo pipefail
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
 TENANT="${TENANT:-load-test-beta}"
 TOKEN="${FREESWITCH_XML_HANDLER_TOKEN:-}"
+NETWORK_INTERFACE="${NETWORK_INTERFACE:-public}"
 OUTPUT_DIR="storage/app/load-tests/cache-sweep-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$OUTPUT_DIR"
 
@@ -26,6 +27,7 @@ echo "=========================================================="
 echo " Starting TallPBX Cache Optimization & Hit Rate Sweep"
 echo " Target URL: $PBX_URL"
 echo " Tenant:     $TENANT"
+echo " Interface:  $NETWORK_INTERFACE"
 echo " Artifacts:  $OUTPUT_DIR"
 echo "=========================================================="
 
@@ -76,6 +78,7 @@ for item in "${RUNS[@]}"; do
     --requests="$reqs" \
     --concurrency="$conc" \
     --token="$TOKEN" \
+    --interface="$NETWORK_INTERFACE" \
     --label="cache-sweep-${name}" \
     --report="$REPORT" > /dev/null 2>&1 || true
 

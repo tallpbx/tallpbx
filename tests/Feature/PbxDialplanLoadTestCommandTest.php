@@ -86,6 +86,11 @@ it('load tests the dynamic dialplan XML handler endpoint', function () {
             'average',
             'min',
             'max',
+            'p50',
+            'p90',
+            'p95',
+            'p99',
+            'std_dev',
             'raw_samples',
         ])
         ->and($report['latency_ms']['raw_samples'])->toBeArray()
@@ -96,6 +101,11 @@ it('load tests the dynamic dialplan XML handler endpoint', function () {
         ->and($report['latency_ms']['average'])->toBeGreaterThanOrEqual(0)
         ->and($report['latency_ms']['min'])->toBeGreaterThanOrEqual(0)
         ->and($report['latency_ms']['max'])->toBeGreaterThanOrEqual(0)
+        ->and($report['latency_ms']['p50'])->toBeGreaterThanOrEqual(0)
+        ->and($report['latency_ms']['p90'])->toBeGreaterThanOrEqual(0)
+        ->and($report['latency_ms']['p95'])->toBeGreaterThanOrEqual(0)
+        ->and($report['latency_ms']['p99'])->toBeGreaterThanOrEqual(0)
+        ->and($report['latency_ms']['std_dev'])->toBeGreaterThanOrEqual(0)
         ->and(array_keys($report['thresholds']))->toBe([
             'max_failure_rate_percent',
             'max_average_ms',
@@ -105,13 +115,15 @@ it('load tests the dynamic dialplan XML handler endpoint', function () {
         ->and($report['threshold_results'])->toBe([]);
 });
 
-it('can calculate percentiles like p50, p95, and p99 from saved raw latency data when needed', function () {
+it('can calculate percentiles like p50, p90, p95, p99, and standard deviation from latency data', function () {
     $command = app(PbxDialplanLoadTestCommand::class);
     $rawSamples = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0];
 
     expect($command->percentile($rawSamples, 50))->toBe(50.0)
+        ->and($command->percentile($rawSamples, 90))->toBe(90.0)
         ->and($command->percentile($rawSamples, 95))->toBe(100.0)
-        ->and($command->percentile($rawSamples, 99))->toBe(100.0);
+        ->and($command->percentile($rawSamples, 99))->toBe(100.0)
+        ->and($command->standardDeviation($rawSamples))->toBe(30.277);
 });
 
 it('can repeat one dialplan request to measure cache-hit performance', function () {

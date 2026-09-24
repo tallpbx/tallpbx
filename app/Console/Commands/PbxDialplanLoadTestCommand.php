@@ -32,6 +32,7 @@ use Modules\Extensions\Models\Extension;
     {--timeout=10 : Per-request timeout in seconds}
     {--token= : Optional XML handler bearer token}
     {--label= : Optional human-readable label stored in the JSON report}
+    {--interface= : Optional network interface label (e.g. public or private)}
     {--max-failure-rate=0 : Maximum failed-response percentage allowed before the command fails}
     {--max-average-ms= : Optional maximum average latency in milliseconds before the command fails}
     {--report=storage/app/load-tests/dialplan-report.json : JSON report output path}')]
@@ -279,6 +280,11 @@ class PbxDialplanLoadTestCommand extends Command
             'average' => $latencies === [] ? null : round(array_sum($latencies) / count($latencies), 3),
             'min' => $latencies === [] ? null : min($latencies),
             'max' => $latencies === [] ? null : max($latencies),
+            'p50' => $this->percentile($latencies, 50),
+            'p90' => $this->percentile($latencies, 90),
+            'p95' => $this->percentile($latencies, 95),
+            'p99' => $this->percentile($latencies, 99),
+            'std_dev' => $this->standardDeviation($latencies),
             'raw_samples' => $latencies,
         ];
         $thresholdResults = $this->thresholdResults($failureRate, $latencySummary, $thresholds);
@@ -299,6 +305,7 @@ class PbxDialplanLoadTestCommand extends Command
                 'total_requests' => $requestCount,
                 'concurrency' => $concurrency,
                 'timeout_seconds' => $timeout,
+                'network_interface' => $this->nullableStringOption('interface'),
                 'scenario_counts' => $this->scenarioCounts($scenario, $requestCount),
             ],
             'environment' => $this->environmentSnapshot(),
@@ -393,7 +400,50 @@ class PbxDialplanLoadTestCommand extends Command
             'session_driver' => (string) config('session.driver'),
             'memory_limit' => (string) ini_get('memory_limit'),
             'cpu_cores' => $this->cpuCoreCount(),
+            'available_ram_mb' => $this->availableRamMb(),
+            'swap_used_mb' => $this->swapUsedMb(),
         ];
+    }
+
+    /**
+     * Resolve available physical RAM in megabytes if running on Linux.
+     */
+    private function availableRamMb(): ?int
+    {
+        if (! is_readable('/proc/meminfo')) {
+            return null;
+        }
+
+        $meminfo = @file_get_contents('/proc/meminfo');
+
+        if ($meminfo === false || ! preg_match('/MemAvailable:\s+(\d+)\s+kB/', $meminfo, $matches)) {
+            return null;
+        }
+
+        return (int) round(((int) $matches[1]) / 1024);
+    }
+
+    /**
+     * Resolve swap memory currently in use in megabytes if running on Linux.
+     */
+    private function swapUsedMb(): ?int
+    {
+        if (! is_readable('/proc/meminfo')) {
+            return null;
+        }
+
+        $meminfo = @file_get_contents('/proc/meminfo');
+
+        if ($meminfo === false
+            || ! preg_match('/SwapTotal:\s+(\d+)\s+kB/', $meminfo, $totalMatches)
+            || ! preg_match('/SwapFree:\s+(\d+)\s+kB/', $meminfo, $freeMatches)) {
+            return null;
+        }
+
+        $totalKb = (int) $totalMatches[1];
+        $freeKb = (int) $freeMatches[1];
+
+        return (int) round(($totalKb - $freeKb) / 1024);
     }
 
     /**
@@ -454,6 +504,25 @@ class PbxDialplanLoadTestCommand extends Command
         $index = max(0, min(count($sortedValues) - 1, $rank - 1));
 
         return $sortedValues[$index];
+    }
+
+    /**
+     * Calculate sample standard deviation for a list of latency samples.
+     *
+     * @param  array<int, float>  $values
+     */
+    public function standardDeviation(array $values): ?float
+    {
+        $count = count($values);
+
+        if ($count < 2) {
+            return null;
+        }
+
+        $mean = array_sum($values) / $count;
+        $sumSquaredDiffs = array_sum(array_map(fn (float $x): float => ($x - $mean) ** 2, $values));
+
+        return round(sqrt($sumSquaredDiffs / ($count - 1)), 3);
     }
 
     /**

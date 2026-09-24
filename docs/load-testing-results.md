@@ -148,6 +148,39 @@ Before reviewing the benchmark tables, understand the standard testing notation 
   - `mixed`: Simulates real-world PBX routing by generating requests across diverse destinations (internal extensions, inbound DIDs, ring groups, IVRs, and outbound patterns). This exercises the full dynamic XML dialplan generator, database lookups, and contributor fragment caching.
   - `cache-hit`: A synthetic ceiling benchmark where the runner queries the exact same destination repeatedly 100 times. Once the first request caches the dialplan, all subsequent requests hit Redis memory directly (0 database queries), establishing the theoretical maximum memory throughput of the PHP and Redis stack.
 
+#### Plain-Language Guide to Performance Metrics & Statistics
+
+To make benchmark reports accessible to everyone—from telephony engineers to non-technical PBX and office administrators—here is what each measured statistic means in plain terms:
+
+| Statistic | Plain-Language Meaning | Real-World PBX Example |
+| :--- | :--- | :--- |
+| **Fastest (Min)** | The absolute fastest response recorded during the entire test run. | A call lookup where the dialplan was already waiting in Redis memory and responded in **148 ms**. |
+| **Slowest (Max)** | The single slowest response recorded during the test run. | A call lookup that had to wait for a database disk read, PHP compilation, or an empty PHP-FPM worker, taking **1,180 ms**. |
+| **Average (`avg`)** | The total response time of all requests added together, divided by the total number of requests. | Measures the total server effort across the whole batch. **Note:** A single freak delay can pull the average up, making normal calls look slower than they were. |
+| **Median (`p50`)** | The exact middle response when all results are lined up in order from fastest to slowest. | Exactly half of the calls were faster and half were slower. Represents what an **everyday, typical user experienced**, completely unaffected by rare one-off spikes. |
+| **90th Percentile (`p90`)** | 90% of all requests were faster than this number. | The standard industry baseline for everyday Service Level Agreements (SLAs). |
+| **95th Percentile (`p95`)** | 95% of all requests were faster than this number. | Telephony SLA standard. Shows how fast the vast majority of calls are routed, even during busy office hours. |
+| **99th Percentile (`p99`)** | 99% of all requests were faster than this number. | **Tail Latency**: Represents the worst 1 out of every 100 calls. Highlights momentary buffer stalls, garbage collection, or worker pool queueing. |
+| **Consistency / Jitter (`std_dev`)** | Standard deviation measures how much response times fluctuate from call to call. | **Low number** = rock-solid, predictable call setups.<br>**High number** = erratic experience where some calls answer instantly and others stutter. |
+| **Throughput (Req/Sec)** | How many requests the PBX completed in one second. | Higher is better. Reflects the processing capacity of the server. |
+| **Cache Hit Rate (%)** | The percentage of routing queries served directly from high-speed Redis RAM without querying MariaDB. | A 40%–99% hit rate drastically reduces database CPU load and protects MariaDB from call spikes. |
+
+> [!TIP]
+> **Why compare Average vs. Median (`p50`)? An Intuitive Example**:
+> Imagine 5 calls hit the PBX with the following response times:
+> - Call 1: **100 ms**
+> - Call 2: **100 ms**
+> - Call 3: **100 ms**
+> - Call 4: **100 ms**
+> - Call 5: **5,000 ms** *(5 seconds, due to a cold disk spin-up or network hiccup)*
+>
+> If you look only at the **Average**, it reports **1,080 ms** (`5,400 / 5`), giving the false impression that *every* caller had to wait over a second!  
+> But the **Median (`p50`)** reports **100 ms** (`100, 100, [100], 100, 5000`), accurately revealing that 4 out of 5 users experienced an instant 100 ms connection.
+>
+> **The Takeaway**:
+> - When **Average is close to Median** (e.g. avg 265 ms vs p50 260 ms): Call setup is smooth, predictable, and uniform.
+> - When **Average is much higher than Median** (e.g. avg 500 ms vs p50 200 ms): Most calls are fast, but occasional queueing bottlenecks or disk reads are stalling a small fraction of callers.
+
 ---
 
 ## Results: Single-Server Dynamic Dialplan XML Tests (Phase 1)
@@ -157,6 +190,10 @@ Before reviewing the benchmark tables, understand the standard testing notation 
 Environment A1 (`192.168.1.71`) is an isolated, disposable VirtualBox virtual machine running Debian 13 on a local Windows 11 workstation. It was provisioned purely as an isolated test bench for benchmark execution alongside its sibling orchestrator VM A2 (`192.168.1.76`). Neither VM functions as an office PBX or live production server; they exist purely as a controlled, reproducible virtualization test bench.
 
 The September 23, 2026 test series executed the full progression against A1 from orchestrator A2. All test runs used authenticated XML endpoints with composite database indexes and Redis fragment caching active.
+
+> [!NOTE]
+> **Historical Baseline Metrics**:
+> The September 23, 2026 VirtualBox baseline tests were recorded before full percentile and per-request raw telemetry were integrated into the test runner. As a result, these historical baseline tables report **Average Latency**, **Fastest (Min)**, and **Slowest (Max)**. All subsequent cloud datacenter benchmarks capture complete granular telemetry (including **p50 Median**, **p90**, **p95**, **p99**, and **Standard Deviation**) alongside complete raw sample datasets.
 
 #### Single-Server XML Throughput Ladder
 

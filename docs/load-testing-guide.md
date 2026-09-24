@@ -910,9 +910,17 @@ The JSON report records:
 - target request count, concurrency, timeout, and scenario distribution;
 - total, successful, and failed responses with success/failure rates;
 - elapsed time and requests per second;
-- average, fastest, and slowest latency, plus timing sample counts;
+- average, fastest, slowest, median (p50), p90, p95, and p99 latency, plus complete raw timing sample counts;
 - HTTP status distribution, configured thresholds, pass/fail reasons, and
   sample failures.
+
+> [!TIP]
+> **Understanding Measured Latency Metrics in Plain Terms**:
+> - **Average (`avg`)**: Total elapsed time divided by request count; measures overall system work.
+> - **Fastest (`min`) & Slowest (`max`)**: The absolute best and worst response times observed in the run.
+> - **Median (`p50`)**: The middle response time (50% faster, 50% slower), showing typical user experience without outlier distortion.
+> - **Tail Latency (`p95` & `p99`)**: How the slowest 5% and 1% of calls behaved under burst queueing.
+> See the [Plain-Language Guide to Performance Metrics](load-testing-results.md#plain-language-guide-to-performance-metrics--statistics) in `load-testing-results.md` for complete definitions and real-world PBX examples.
 
 Threshold options make small and medium repeat checks fail fast when
 behavior changes unexpectedly:
