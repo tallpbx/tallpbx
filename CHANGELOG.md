@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Superseded Load Testing Documents**: Removed `docs/call-simulation-load-testing.md` and `docs/sipp-server-to-server-validation.md` after consolidating all testing methodologies, commands, runbooks, metrics, and troubleshooting data into the unified, self-contained `docs/load-testing-guide.md`.
-- **Implemented One-Line Installer Design Document**: Removed `docs/design-document-one-line-installer.md` following the completed implementation, verification, and release of the one-line bootstrap installer in v1.1.3.
+- **Completed One-Line Installer Design & Implementation Plan**: Removed `docs/design-document-one-line-installer.md` and `docs/one-line-installer-implementation-plan.md` following the completed implementation, verification, and release of the one-line bootstrap installer in v1.1.3.
 
 ### Fixed
 - **Call Forward Dialplan Bridge Channel Failure**: Changed internal FreeSWITCH dialplan bridges in `CallForwardService.php` from direct raw extensions to loopback channels (`loopback/${safeDest}/${context}`), resolving `Cannot create outgoing channel ... cause: [CHAN_NOT_IMPLEMENTED]` during call forwarding.
