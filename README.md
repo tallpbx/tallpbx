@@ -343,7 +343,7 @@ php artisan pbx:load-test:seed \
   --domain=load.test.local \
   --extensions=100 \
   --start=2000 \
-  --password='LoadTest1234!' \
+  --password='LoadTest1234' \
   --reset
 ```
 
@@ -376,7 +376,7 @@ Useful tiers:
 | Practical repeat check | 500 | 10-25 | Expose PHP-FPM, DB, Redis, and contributor problems that may return on small/medium workloads. |
 | Optional stability | 1,000 | 25 | Use after meaningful code/config changes to confirm a longer burst stays stable. |
 
-The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The current `192.168.1.76` beta host is a Windows-hosted VM, so use these runs for relative comparison checks rather than capacity claims. Run heavier capacity tiers only on representative VPS/datacenter hardware. The detailed operating guide, including the VM hardware specs used for the published practical results, is in `docs/call-simulation-load-testing.md`.
+The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The current `192.168.1.76` beta host is a Windows-hosted VM, so use these runs for relative comparison checks rather than capacity claims. Run heavier capacity tiers only on representative VPS/datacenter hardware. The detailed operating guide, including VM hardware specs and benchmark results, is in `docs/load-testing-guide.md`.
 
 Report terms: `req/sec` is completed XML handler responses per second. `p50` is the median response time. `p95` and `p99` mean 95% and 99% of responses finished at or below that latency. `max` is the slowest single response in the run.
 
@@ -393,7 +393,7 @@ The SIPp runner registers seeded users, starts an auto-answer registered endpoin
 
 For optional live media validation of recording, music-on-hold, and announcement paths, add `MEDIA_FLOW=1`. This seeds synthetic media destinations and runs low-volume SIPp RTP echo calls; use it only after the basic SIPp call path is already passing.
 
-Expected basic SIPp result: the script exits `0`, `summary.md` shows all basic scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The detailed server-to-server SIPp guide is in `docs/sipp-server-to-server-validation.md`. It explains the WSL2/separate-VM topology, manual commands, artifacts, expected results, and how to interpret failures.
+Expected basic SIPp result: the script exits `0`, `summary.md` shows all basic scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
 
 ### PHP-FPM Load-Test Tuning
 

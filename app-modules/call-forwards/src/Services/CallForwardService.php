@@ -76,10 +76,9 @@ class CallForwardService implements CallForwardServiceInterface, ContextWideDial
             $safeDest = htmlspecialchars($fw->destination, ENT_XML1 | ENT_QUOTES, 'UTF-8');
             $timeout = $fw->ring_timeout > 0 ? $fw->ring_timeout : 60;
 
-            // Re-enter the tenant dialplan so local extensions and external
-            // numbers both resolve through the normal routing rules; a bare
-            // destination number is not originatible.
-            $bridgeTarget = '{dialplan=XML,context=${context}}'.$safeDest;
+            // Re-enter the tenant dialplan through mod_loopback so local extensions
+            // and external numbers resolve through normal routing rules.
+            $bridgeTarget = 'loopback/'.$safeDest.'/${context}';
 
             $xml .= "      <extension name=\"forward_{$safeType}_{$safeName}\">\n";
 

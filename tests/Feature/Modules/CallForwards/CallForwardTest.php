@@ -40,7 +40,7 @@ it('renders the forward dialplan condition with the extension number', function 
     // both resolve (a bare number is not originatible).
     expect($xml)->not->toBeNull()
         ->and($xml)->toContain('expression="^2001$"')
-        ->and($xml)->toContain('<action application="bridge" data="{dialplan=XML,context=${context}}2000"/>');
+        ->and($xml)->toContain('<action application="bridge" data="loopback/2000/${context}"/>');
 });
 
 it('renders the call forwards list component', function () {

@@ -11,7 +11,7 @@ Call-ID: [call_id]
 CSeq: 1 REGISTER
 Contact: <sip:[field0]@[local_ip]:[local_port];transport=[transport]>
 Max-Forwards: 70
-Expires: 300
+Expires: 3600
 Content-Length: 0
 
     ]]>
@@ -31,7 +31,7 @@ CSeq: 2 REGISTER
 Contact: <sip:[field0]@[local_ip]:[local_port];transport=[transport]>
 [field5]
 Max-Forwards: 70
-Expires: 300
+Expires: 3600
 Content-Length: 0
 
     ]]>

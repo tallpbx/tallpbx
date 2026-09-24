@@ -42,7 +42,7 @@ use Modules\Voicemails\Models\Voicemail;
     {--domain=load.test.local : SIP realm/domain for the synthetic tenant}
     {--extensions=20 : Number of extensions and SIP accounts to create}
     {--start=2000 : First extension number in the generated range}
-    {--password=LoadTest1234! : Password assigned to every generated SIP account}
+    {--password=LoadTest1234 : Password assigned to every generated SIP account}
     {--sipp-host=127.0.0.1 : SIPp UAS host used by the simulated outbound gateway}
     {--sipp-port=5088 : SIPp UAS port used by the simulated outbound gateway}
     {--output=storage/app/load-tests/sipp-users.csv : CSV path written for SIPp injection}

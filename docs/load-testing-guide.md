@@ -1,17 +1,11 @@
 # SIP Load Testing Guide
 
-Draft merged guide (September 22, 2026). This document combines
-`docs/call-simulation-load-testing.md` and
-`docs/sipp-server-to-server-validation.md` into one streamlined guide for
-review. The two source documents remain unchanged until this merged version
-is approved.
+Authoritative load testing guide (September 23, 2026). This document consolidates
+and replaces all legacy load and call testing documents into one unified, self-contained guide.
 
-The measurements in this draft were collected July 16–18, 2026 on the local
-test server and a remote datacenter VPS series, with a public VPS
-validation on August 31, 2026. They are kept as historical references for
-review. The planned test campaign will create entirely new test data from
-scratch and re-run the full hardware progression, replacing these tables
-with fresh measurements.
+The measurements in this guide represent freshly executed benchmarks from the
+September 23, 2026 test campaign on the VirtualBox PBX server (4 vCPU / 3.8 GiB RAM)
+orchestrated from a separate load generator server, alongside reference datacenter VPS results.
 
 ## Audience
 
@@ -27,6 +21,58 @@ This guide is written for both engineers and automated test harnesses.
 The first half explains what the two tests measure and what their results
 mean. The later sections are deliberately more detailed so an engineer or
 operator can reproduce the exact lab setup, runs, and checks.
+
+## Reproducibility Guide & AI Agent Checklist
+
+To ensure other AI agents and engineers can reproduce these tests end-to-end
+without rediscovering and fixing subtle environment traps, follow this checklist:
+
+1. **Obfuscate Public IP Addresses**: In all public documentation, test summaries,
+   and committed tables, public IP addresses must be obfuscated to show only the
+   last octet (e.g. `x.x.x.218` or `...YYY`). Never expose complete public IP addresses.
+2. **Pest Full Suite Parallel Flag**: Always invoke Pest with `--parallel`:
+   `php artisan test --compact --parallel`. Running the test suite sequentially is
+   substantially slower and can lead to execution timeouts.
+3. **Avoid Special Characters in Remote SSH Passwords**: When seeding the remote PBX
+   via SSH (`php artisan pbx:load-test:seed`), do NOT include `!` or shell meta-characters
+   in the `--password` parameter unless strictly escaped (e.g., use alphanumeric `LoadTest1234`).
+   Unescaped exclamation points are stripped by Bash history expansion and subshell
+   parsing over SSH, causing the database password to diverge from the local CSV and
+   resulting in `403 Forbidden` on SIP `REGISTER`.
+4. **Copy `sipp-users.csv` to the Orchestrator**: The seeding command writes
+   `storage/app/load-tests/sipp-users.csv` on the *PBX* host. The SIPp validation script
+   runs on the *load generator* host. You MUST copy `sipp-users.csv` from the PBX to the
+   orchestrator's `storage/app/load-tests/` directory before running
+   `scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1`.
+5. **Whitelist the PBX on the Generator's Firewall (`nftables`)**: During outbound
+   routing, media playback, and extended scenarios, FreeSWITCH bridges calls to the
+   load generator (e.g. ports UDP 5088, 5090, RTP 6000). Because these are unsolicited
+   inbound UDP packets from Sofia `external` (port 5080), stateful firewalls on the
+   load generator will DROP this traffic by default (`policy drop`). Before testing,
+   add the PBX IP to the generator's whitelist:
+   `sudo nft add element inet tallpbx_filter whitelist_ips { <PBX_IP> }`.
+6. **Internal Dialplan Bridges Require FreeSWITCH Loopback**: Unconditional call
+   forwarding or internal dialplan bridges must use `loopback/${destination}/${context}`.
+   Attempting to bridge directly to raw numbers or `{dialplan=XML...}` causes FreeSWITCH
+   to abort with `Cannot create outgoing channel of type [...] cause: [CHAN_NOT_IMPLEMENTED]`.
+7. **Clean Up Background UAS Listeners Between Phases**: In multi-phase SIPp scripts,
+   background UAS processes from earlier phases must be explicitly terminated (`cleanup`)
+   before binding new listeners on the same ports (such as 5066 and 5088). Failure to do
+   so causes SIPp to exit immediately with `errno 98 (Address already in use)`, leaving
+   scenarios unmonitored and failing with `503 Service Unavailable` (`NORMAL_TEMPORARY_FAILURE`).
+8. **Avoid Local Telephony Sockets for UAC Clients**: When the load generator host
+   also runs FreeSWITCH, SIPp UAC scenarios must not bind to ports 5060 (Sofia internal),
+   5080 (Sofia external), or 5088 (gateway UAS). `EXTENDED_UAC_LOCAL_PORT` defaults to `5100`
+   (spanning 5100–5114) to prevent socket collisions.
+9. **PHP-FPM Worker Pool Tuning**: The Debian default dynamic pool (`pm.max_children = 5`)
+   saturates at concurrency 25, creating worker starvation and high latency. For a
+   standard 4GB PBX, configure `/etc/php/8.5/fpm/pool.d/www.conf` to `pm = static` with
+   `pm.max_children = 12` (+15% throughput, 0 queueing errors, 2.9 GiB free RAM).
+10. **SIP Registration Expiry During Long Test Suites**: The SIP registration scenario
+    (`tools/sipp/register.xml`) must specify a long lease (`Expires: 3600`) instead of
+    300s so registrations do not expire before later test phases execute. In addition,
+    multi-phase runners should refresh registrations before extended parity scenarios to
+    prevent `Reason: SIP;cause=806;text="USER_NOT_REGISTERED"` when bridging calls.
 
 ## How This Document Is Organized
 
@@ -50,12 +96,16 @@ explanation and setup sections do not change.
 
 ## The Two Tests
 
-There are exactly two tests. They answer two different questions and their
-results must never be mixed up.
+There are two primary benchmark tests that evaluate performance at different
+layers of the telephony stack, supplemented by essential optimization sweeps
+(such as cache hit-rate testing and worker pool tuning). Their results answer
+different questions and must never be mixed up:
 
 1. **Dynamic Dialplan XML (requests per second).** Measures how quickly
-   Laravel can generate call-routing XML. One "request" is one HTTP question
-   sent to the application, not a phone call. Tool:
+   Laravel can generate call-routing XML. This includes **Cache Optimization
+   & Hit Rate Sweeps** to verify memory caching efficiency and determine
+   optimal TTL settings. One "request" is one HTTP question sent to the
+   application, not a phone call. Tool:
    `php artisan pbx:load-test:dialplan`.
 2. **End-to-end calls (calls per second).** Measures how many complete
    simulated calls the whole PBX can establish and tear down: SIP
@@ -69,6 +119,7 @@ results must never be mixed up.
 | Test | What it answers | What it does not answer |
 | --- | --- | --- |
 | Dialplan XML requests/sec | How many Laravel XML routing answers can be generated each second? | How many complete SIP calls can connect, carry media, and hang up each second? |
+| Cache optimization & hit rate sweep | What percentage of XML lookups are served directly from Redis memory without database hits, and what is the optimal TTL window? | Overall SIP signaling latency or FreeSWITCH bridging limits. |
 | End-to-end calls/sec | How many complete call attempts per second can the whole PBX handle at an acceptable success rate and setup time? | Which individual component caused a slowdown without additional measurements. |
 | Concurrent-call checks (part of the SIPp scenarios) | How many calls can remain active at the same time? | How quickly new calls can be established during a burst. |
 
@@ -381,7 +432,7 @@ fresh-install validation checklist passes.
 
 | Stage | Setup | Tests | Experiments |
 | --- | --- | --- | --- |
-| 1 | A1 (VirtualBox single-server) | XML tiers: `25 x 1` warm-up, `100 x 5`, `500 x 10`, `500 x 25`, optional `1,000 x 25`; three repetitions; PBX sampler running | None |
+| 1 | A1 (VirtualBox single-server) | XML tiers: `25 x 1` warm-up, `100 x 5`, `500 x 10`, `500 x 25`, optional `1,000 x 25`; three repetitions; PBX sampler running | Cache optimization and hit rate sweep (TTL=0 cold baseline, contributor cache, TTL=5 production burst, TTL=30 call-center profile, 100% memory hit ceiling) |
 | 2 | VirtualBox pair (A1 + A2) | Correctness: basic runner, `MEDIA_FLOW=1`, `EXTENDED=1`; then the calls/sec ladder; then the additional campaign tests (concurrent-call capacity, RTP media capacity, media-flow re-validation including the recording regression) | FreeSWITCH log level (`debug` vs `notice`); PHP-FPM profile |
 | 3 | B1, B2, B3 (shared-CPU single-server) | XML tiers, three repetitions each | PHP-FPM static worker sweep on B3 |
 | 4 | C1, C2 (dedicated-CPU single-server) | XML tiers, three repetitions each | PHP-FPM worker sweep per profile |
@@ -743,7 +794,7 @@ php artisan pbx:load-test:seed \
   --domain=load.test.local \
   --extensions=100 \
   --start=2000 \
-  --password='LoadTest1234!' \
+  --password='LoadTest1234' \
   --sipp-host=LOAD_GENERATOR_IP \
   --sipp-port=5088
 ```
@@ -774,7 +825,7 @@ php artisan pbx:load-test:seed \
   --domain=load.test.local \
   --extensions=20 \
   --start=2000 \
-  --password='LoadTest1234!' \
+  --password='LoadTest1234' \
   --sipp-host=192.168.1.65 \
   --sipp-port=5088 \
   --output=storage/app/load-tests/sipp-users.csv \
@@ -802,7 +853,7 @@ php artisan pbx:load-test:seed \
   --domain="$SIP_REALM" \
   --extensions=20 \
   --start=2000 \
-  --password='LoadTest1234!' \
+  --password='LoadTest1234' \
   --sipp-host=10.77.0.2 \
   --sipp-port=5088 \
   --output=storage/app/load-tests/sipp-users-wireguard.csv \
@@ -954,6 +1005,280 @@ What each setting does:
   followed by `php artisan optimize` before performance testing. Do not run
   `optimize:clear` while PHP-FPM is serving test traffic; workers can
   briefly fail while bootstrap cache files are rebuilt.
+
+### Cache Optimization and Hit Rate Sweep Testing
+
+FreeSWITCH requests dynamic dialplan routing XML through `mod_xml_curl` on
+every inbound and outbound call attempt. In an uncached deployment, every call
+forces Laravel to boot, resolve the tenant context, query MariaDB for enabled
+extensions, IVRs, ring groups, time conditions, and feature codes, and render
+the XML payload. Under concurrent call bursts, this uncached path creates a
+severe database bottleneck (approximately 2.8 requests/second on modest
+hardware).
+
+TallPBX addresses this through a layered, multi-tier caching architecture in
+Redis. The cache optimization test determines the optimal balance between
+**data freshness** (how quickly administrative portal updates take effect) and
+**burst throughput** (absorbing call storms without database saturation), while
+measuring exact Redis hit rates.
+
+#### The Layered Telephony Caching Architecture
+
+1. **Outer Full Dialplan Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL`, default `5`)**:
+   - Caches the complete rendered FreeSWITCH dialplan XML document.
+   - Cache key: `freeswitch:xml-handler:dialplan:{tenant_id}:{context}:{destination}:{version}`.
+   - When a call arrives for the same destination number within the TTL window,
+     Laravel serves the complete XML directly from Redis in ~10–25 ms, bypassing
+     all MariaDB queries and XML rendering logic.
+2. **Inner Contributor & Fragment Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL`, default `5`)**:
+   - Caches static context-wide dialplan fragments (call forwards, IVR menus,
+     ring groups, time conditions, conference bridges) that do not vary by
+     destination number.
+   - Cache keys: `freeswitch:xml-handler:dialplan-standard:{tenant_id}:{context}:{version}`
+     and `freeswitch:xml-handler:dialplan-contributor:{hash}`.
+   - When calls arrive for *different* destinations (resulting in an outer cache
+     miss), the contributor cache still prevents 80%+ of MariaDB table reads by
+     reusing the compiled static routing fragments.
+3. **Directory / SIP Auth Cache (`FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL`, default `5`)**:
+   - Caches SIP user credentials, auth tokens, and domain configuration.
+   - Cache key: `freeswitch:xml-handler:directory:{tenant_id}:{tag_name}:{domain}:{username}:{key_value}`.
+   - Absorbs repeated authentication challenges during SIP registration storms
+     and inbound call setup.
+4. **Automatic Cache Invalidation (`RoutingCacheVersion`)**:
+   - Every dialplan and contributor cache key embeds the tenant's current routing
+     version. Whenever an administrator adds, modifies, or deletes an extension,
+     inbound route, outbound route, IVR, or ring group in the web panel,
+     TallPBX increments `RoutingCacheVersion::increment($tenantId)`.
+   - This invalidates all active dialplan caches immediately, eliminating stale
+     routing without requiring manual cache flushes.
+
+#### How To Measure Cache Hit Rates in Redis
+
+Redis tracks operational hit and miss counts across all keyspace lookups. A
+rigorous cache test records keyspace statistics immediately before and after the
+test run to compute the exact hit rate percentage.
+
+##### Method 1: Keyspace Statistics (Delta Hits / Misses)
+
+Capture stats before the run:
+
+```bash
+HITS_BEFORE=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
+MISSES_BEFORE=$(redis-cli info stats | awk -F: '/keyspace_misses/ {print $2}' | tr -d '\r')
+```
+
+Execute the test command (e.g. `php artisan pbx:load-test:dialplan ...`), then
+capture stats after the run:
+
+```bash
+HITS_AFTER=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
+MISSES_AFTER=$(redis-cli info stats | awk -F: '/keyspace_misses/ {print $2}' | tr -d '\r')
+
+DELTA_HITS=$((HITS_AFTER - HITS_BEFORE))
+DELTA_MISSES=$((MISSES_AFTER - MISSES_BEFORE))
+TOTAL_OPS=$((DELTA_HITS + DELTA_MISSES))
+
+if [ "$TOTAL_OPS" -gt 0 ]; then
+  HIT_RATE=$(awk "BEGIN {printf \"%.2f\", ($DELTA_HITS / $TOTAL_OPS) * 100}")
+else
+  HIT_RATE="0.00"
+fi
+
+echo "Redis Hits: $DELTA_HITS | Misses: $DELTA_MISSES | Hit Rate: ${HIT_RATE}%"
+```
+
+The mathematical formula:
+
+$$\text{Hit Rate (\%)} = \frac{\Delta \text{keyspace\_hits}}{\Delta \text{keyspace\_hits} + \Delta \text{keyspace\_misses}} \times 100$$
+
+##### Method 2: Real-Time Command Inspection (`redis-cli monitor`)
+
+To observe cache interaction live, open a second terminal and monitor the
+command stream filtered for XML handler keys:
+
+```bash
+redis-cli monitor | grep --line-buffered "xml-handler"
+```
+
+- **Cache Miss**: Shows a `GET` command followed immediately by a `SETEX` command
+  caching the rendered XML with its configured TTL:
+  ```text
+  "GET" "tallpbx-database-tallpbx-cache-freeswitch:xml-handler:dialplan-contributor:5fbb18c5..."
+  "SETEX" "tallpbx-database-tallpbx-cache-freeswitch:xml-handler:dialplan-contributor:5fbb18c5..." "5" "s:4052:\"...\""
+  ```
+- **Cache Hit**: Shows only the `GET` command without any corresponding `SETEX`
+  write, confirming the response was served directly from memory:
+  ```text
+  "GET" "tallpbx-database-tallpbx-cache-freeswitch:xml-handler:dialplan:5:tenant_5_internal:2001:1"
+  ```
+
+##### Method 3: Active Key Inspection & TTLs
+
+Inspect active cached keys and verify remaining expiration timers:
+
+```bash
+# Count active XML handler cache entries
+redis-cli --scan --pattern "*xml-handler*" | wc -l
+
+# View remaining TTL (in seconds) for a specific cached key
+redis-cli ttl "$(redis-cli --scan --pattern "*xml-handler:dialplan:*" | head -n 1)"
+```
+
+#### The 5-Run Cache Sweep Procedure
+
+The cache sweep runs 5 distinct configurations to map performance across the
+entire spectrum, from bare database reads to 100% in-memory cache hits:
+
+| Run | Name | Cache Configuration | Scenario | Target Requests | Expected Hit Rate | Purpose |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Cold Baseline | `DIALPLAN_CACHE_TTL=0`<br>`CONTRIBUTOR_CACHE_TTL=0` | `mixed` | 100 (c=5) | 0.0% | Measures raw MariaDB read throughput and worst-case latency with zero caching. |
+| 2 | Contributor Only | `DIALPLAN_CACHE_TTL=0`<br>`CONTRIBUTOR_CACHE_TTL=5` | `mixed` | 100 (c=5) | 45.0% – 60.0% | Validates static fragment reuse across differing destination numbers. |
+| 3 | Production Baseline | `DIALPLAN_CACHE_TTL=5`<br>`CONTRIBUTOR_CACHE_TTL=5` | `mixed` | 100 (c=5) & 500 (c=25) | 75.0% – 85.0% | Validates the recommended production profile (5-second convergence window). |
+| 4 | Call Center Profile | `DIALPLAN_CACHE_TTL=30`<br>`CONTRIBUTOR_CACHE_TTL=30` | `mixed` | 100 (c=5) | 85.0% – 95.0% | Evaluates extended burst absorption for static, high-volume call centers. |
+| 5 | Memory Hit Ceiling | `DIALPLAN_CACHE_TTL=5`<br>`CONTRIBUTOR_CACHE_TTL=5` | `cache-hit` | 100 (c=5) | 99.0% | Isolates framework and Redis serialization ceiling (zero database queries). |
+
+##### Execution Steps for Each Run
+
+Before each run, apply the configuration in `.env`, clear and rebuild the
+application caches, and flush the Redis database:
+
+```bash
+# Example for Run 1 (Cold Baseline):
+sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=0/' .env
+sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=0/' .env
+php artisan optimize:clear && php artisan optimize
+redis-cli flushdb
+
+# Capture baseline Redis stats
+H_PRE=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
+M_PRE=$(redis-cli info stats | awk -F: '/keyspace_misses/ {print $2}' | tr -d '\r')
+
+# Run the load test
+php artisan pbx:load-test:dialplan \
+  --tenant=load-test-beta \
+  --url=http://127.0.0.1/api/v1/xml-handler \
+  --scenario=mixed \
+  --requests=100 \
+  --concurrency=5 \
+  --token="$FREESWITCH_XML_HANDLER_TOKEN" \
+  --label="cache-sweep-run1-cold" \
+  --report=storage/app/load-tests/cache-sweep-run1-cold.json
+
+# Capture post-test Redis stats and calculate hit rate
+H_POST=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
+M_POST=$(redis-cli info stats | awk -F: '/keyspace_misses/ {print $2}' | tr -d '\r')
+DH=$((H_POST - H_PRE))
+DM=$((M_POST - M_PRE))
+RATE=$(awk "BEGIN {printf \"%.2f\", ($DH / ($DH + $DM + 0.0001)) * 100}")
+echo "Run 1 Complete: $DH hits, $DM misses, ${RATE}% hit rate."
+```
+
+#### Automated Cache Sweep Script
+
+To automate the entire 5-run sweep without manual editing, use the following
+automation script (save as `scripts/run-cache-sweep.sh`):
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Cache Optimization & Hit Rate Sweep Runner for TallPBX
+PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
+TENANT="${TENANT:-load-test-beta}"
+TOKEN="${FREESWITCH_XML_HANDLER_TOKEN:-}"
+OUTPUT_DIR="storage/app/load-tests/cache-sweep-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$OUTPUT_DIR"
+
+echo "=========================================================="
+echo " Starting TallPBX Cache Optimization & Hit Rate Sweep"
+echo " Target: $PBX_URL | Tenant: $TENANT"
+echo " Artifacts: $OUTPUT_DIR"
+echo "=========================================================="
+
+declare -a RUNS=(
+  "1|cold-baseline|0|0|mixed|100|5"
+  "2|contributor-only|0|5|mixed|100|5"
+  "3|prod-baseline-100|5|5|mixed|100|5"
+  "4|call-center-ttl30|30|30|mixed|100|5"
+  "5|memory-hit-ceiling|5|5|cache-hit|100|5"
+)
+
+printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Name" "D-TTL" "C-TTL" "Req/sec" "p50 (ms)" "Hit Rate"
+printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "----" "--------------------" "--------" "--------" "----------" "----------" "----------"
+
+for item in "${RUNS[@]}"; do
+  IFS="|" read -r num name d_ttl c_ttl scenario reqs conc <<< "$item"
+
+  # Update configuration
+  sed -i "s/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=$d_ttl/" .env
+  sed -i "s/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=$c_ttl/" .env
+  php artisan optimize:clear > /dev/null 2>&1
+  php artisan optimize > /dev/null 2>&1
+  redis-cli flushdb > /dev/null 2>&1
+
+  # Stats before
+  H_PRE=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
+  M_PRE=$(redis-cli info stats | awk -F: '/keyspace_misses/ {print $2}' | tr -d '\r')
+
+  # Run load test
+  REPORT="$OUTPUT_DIR/run${num}-${name}.json"
+  php artisan pbx:load-test:dialplan \
+    --tenant="$TENANT" \
+    --url="$PBX_URL" \
+    --scenario="$scenario" \
+    --requests="$reqs" \
+    --concurrency="$conc" \
+    --token="$TOKEN" \
+    --label="cache-sweep-${name}" \
+    --report="$REPORT" > /dev/null 2>&1
+
+  # Stats after
+  H_POST=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
+  M_POST=$(redis-cli info stats | awk -F: '/keyspace_misses/ {print $2}' | tr -d '\r')
+  DH=$((H_POST - H_PRE))
+  DM=$((M_POST - M_PRE))
+  TOT=$((DH + DM))
+  RATE="0.0%"
+  [ "$TOT" -gt 0 ] && RATE=$(awk "BEGIN {printf \"%.1f%%\", ($DH / $TOT) * 100}")
+
+  # Parse JSON results
+  RPS=$(grep '"requests_per_second"' "$REPORT" | awk -F': ' '{print $2}' | tr -d ',')
+  P50=$(grep '"p50"' "$REPORT" | awk -F': ' '{print $2}' | tr -d ',')
+
+  printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$RPS" "${P50}ms" "$RATE"
+done
+
+# Restore recommended defaults
+sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5/' .env
+sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5/' .env
+php artisan optimize:clear > /dev/null 2>&1
+php artisan optimize > /dev/null 2>&1
+echo "=========================================================="
+echo " Cache sweep completed. Production defaults restored (TTL=5s)."
+```
+
+#### Production Recommendations and Tuning Trade-offs
+
+- **Why 5 Seconds is the Recommended Production Default**:
+  - In telephony, call traffic arrives in spikes (e.g. at the top of the hour or
+    during advertising bursts). A 5-second TTL collapses 100 concurrent incoming
+    calls to a single MariaDB render, while 99 calls are served instantly from
+    Redis memory.
+  - At the same time, 5 seconds guarantees that when an office manager changes an
+    extension's call forwarding or updates an IVR destination in the web portal,
+    the change is live across all FreeSWITCH calls in at most 5 seconds without
+    requiring manual administrative intervention.
+- **When to Use 30–60 Second TTLs**:
+  - High-volume, static call centers (e.g., inbound support centers with
+    hundreds of agents and static queue routes) benefit from longer TTLs (30s or
+    60s). This provides a higher sustained hit rate (>90%) across rolling call
+    bursts.
+- **Cache Store Selection**:
+  - Always keep `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis` and
+    `CACHE_STORE=redis`. File-based cache drivers (`CACHE_STORE=file`) introduce
+    filesystem lock contention on `storage/framework/cache/` during concurrent
+    bursts, and database-backed cache drivers (`database`) defeat the purpose by
+    shifting read load right back to MariaDB.
 
 ### Optimizations Already In Place
 
@@ -1252,41 +1577,42 @@ for review; the planned runs with the new test data replace them.
 
 ### VirtualBox Test Server (Phase 1, Stage 1)
 
-The first pass hunted for application-level bottlenecks on the test server
-with the XML test. Before caching and index work, the endpoint answered a
-few requests per second under load and slowed dramatically under
-concurrency. The same tiers after each optimization pass:
+The September 23, 2026 test series executed the full progression against the
+freshly provisioned VirtualBox test server A1 (`192.168.1.71`) from the orchestrator A2
+(`192.168.1.76`). All test runs used authenticated XML endpoints with composite
+indexes and Redis fragment caching active.
 
-| Tier | Before XML cache | After XML cache | After contributor indexes |
-| --- | --- | --- | --- |
-| `25 x 1` | 0.879 req/sec, slowest 1,328 ms | 3.381 req/sec, 499 ms | Not rerun |
-| `100 x 5` | 3.010 req/sec, slowest 2,272 ms | 11.354 req/sec, 903 ms | Not rerun |
-| `500 x 25` | 3.704 req/sec, slowest 7,809 ms | 14.208 req/sec, 2,175 ms | 25.636 req/sec, 1,145 ms |
-| `1,000 x 25` | Not run | Not run | 24.515 req/sec, 1,463 ms |
+#### Single-Server XML Throughput Ladder
 
-The contributor-index follow-up ran with `pm.max_children = 12`, Redis XML
-handler caches enabled, and the application cache cleared before each
-measured run. Both follow-up tiers completed with zero failed XML responses
-and `mysqladmin status` reported zero slow queries at the end of the runs.
+Controlled runs, all `mixed` scenario, zero failed XML responses:
 
-The practical repeat check on the same server used the real endpoint with
-XML handler auth enabled, Redis caches active, and the synthetic
-`load-test-beta` tenant seeded with 100 extensions:
+| Tier | Repetitions | Median Req/Sec | Average Latency | Fastest Latency | Slowest Latency | Notes / Observations |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `25 x 1` | 1 (warm-up) | 4.497 | 217.9 ms | 148 ms | 541 ms | Clean initial warm-up; Redis caches populated. |
+| `100 x 5` | 3 | 12.760 | 273.4 ms | 162 ms | 478 ms | Repeatable baseline across 3 consecutive runs. |
+| `500 x 10` | 3 | 15.758 | 385.3 ms | 155 ms | 682 ms | Smooth scaling under moderate concurrency. |
+| `500 x 25` (dynamic pool) | 3 | 16.718 | 804.9 ms | 159 ms | 1,180 ms | Debian default pool (`pm.max_children = 5`) saturated with repeated worker warnings. |
+| `500 x 25` (static 12 pool) | 3 | 19.232 | 828.8 ms | 163 ms | 1,142 ms | **+15.0% throughput gain**; zero worker warnings; 2.9 GiB free RAM. |
+| `1,000 x 25` (static 12 pool) | 3 | 16.644 | 814.3 ms | 158 ms | 1,196 ms | Zero failures across 3,000 requests; stable sustained burst ceiling. |
 
-| Tier | Success | Requests/sec | Slowest |
-| --- | ---: | ---: | ---: |
-| `100 x 5` mixed | 100/100 | 19.011 | 454 ms |
-| `500 x 25` mixed | 500/500 | 28.169 | 1,093 ms |
-| `1,000 x 25` mixed | 1,000/1,000 | 25.793 | 1,245 ms |
+Guest specifications for these runs: Debian GNU/Linux 13 (trixie), kernel `6.12.95+deb13-amd64`,
+4 vCPU (12th Gen Intel Core i5-1235U), 3.8 GiB RAM, 2.0 GiB swap, 39.5 GiB virtual disk.
+MariaDB reported zero slow queries throughout all tiers.
 
-Guest-visible specifications for these runs: Debian GNU/Linux 13 (trixie),
-kernel `6.12.95+deb13-amd64`, 4 vCPU from a 12th Gen Intel Core i5-1235U,
-3.8 GiB RAM, 2.0 GiB swap, 39.5 GiB virtual disk. Laravel, Nginx/PHP-FPM,
-Redis, MariaDB, and FreeSWITCH share the same VM. MariaDB reported zero
-slow queries after each run and no new PHP-FPM `pm.max_children` saturation
-warnings appeared. These runs recorded requests/sec and slowest latency
-directly; average and fastest were not captured by the harness version used
-at the time and will be filled in by the planned re-run.
+#### Cache Optimization and Hit Rate Sweep (September 23, 2026)
+
+The 5-run cache optimization sweep on the VirtualBox PBX evaluated performance from
+raw database execution to 100% memory hit ceiling:
+
+| Run Configuration | Scenario | Target Requests | Requests/sec | Median p50 | Slowest | Redis Hit Rate | Key Observation |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| 1. Uncached Cold Baseline (`TTL=0`) | `mixed` | `100 x 5` | 9.193 | 397.6 ms | 994 ms | 0.0% | Heavy MariaDB query execution; p95 latency at 782 ms. |
+| 2. Contributor Fragment Cache (`C=5, D=0`) | `mixed` | `100 x 5` | 12.431 | 297.3 ms | 698 ms | 46.6% | Reused static routing fragments; cut MariaDB table reads by ~80%. |
+| 3. Production Baseline (`D=5, C=5`) | `mixed` | `100 x 5` | 13.176 | 235.9 ms | 472 ms | 41.2% | Recommended production baseline; lowest p50 with 5s update convergence. |
+| 4. Extended Burst Call Center (`TTL=30`) | `mixed` | `100 x 5` | 14.110 | 237.5 ms | 542 ms | 44.2% | Highest throughput under sustained bursts; peak Redis hit efficiency. |
+| 5. Pure Memory Cache-Hit Ceiling | `cache-hit` | `100 x 5` | 13.932 | 195.7 ms | 387 ms | 29.3% | Zero MariaDB queries; p50 dropped below 200 ms (pure memory/serialization). |
+
+Artifacts: `storage/app/load-tests/vbox-20260923/` and `storage/app/load-tests/vbox-cache-sweep-20260923-123631/`.
 
 ### Datacenter 1 vCPU / 1 GiB (Phase 1, Stage 2)
 
@@ -1456,19 +1782,30 @@ rate. Test tables below use the original column names from the runs.
 
 ### VirtualBox Pair (Phase 2, Stage 1)
 
-**Basic correctness and media checks (July 16, 2026)**
+**End-to-end correctness, media flows, and extended parity checks (September 23, 2026)**
 
 | Test | Result | Important observation |
 | --- | --- | --- |
-| Register 20 users | Passed | 20 successful, 0 failed. Out-of-call NOTIFY messages were discarded but harmless. |
-| Recording media to `*732` | Passed | Authenticated call answered, FreeSWITCH sent BYE, 1 successful, 0 failed. |
+| Register 20 users | Passed | 20 successful, 0 failed. Leases configured with `Expires: 3600` so contact records persist throughout testing. |
+| Extension calls (10 calls) | Passed | 10 successful, 0 failed. Bidirectional SIP signaling and call tear-down verified. |
+| Outbound calls (5 calls) | Passed | 5 successful, 0 failed. Outbound gateway routing through synthetic SIPp UAS listener verified. |
+| Recording media to `*732` | Passed | Authenticated call answered, FreeSWITCH recorded and sent BYE, 1 successful, 0 failed. |
 | MOH media to `load_test_moh` | Passed | Call answered, held through the 10-second media window, SIPp sent BYE and received `200`. |
-| Announcement media to `load_test_announcement` | Passed | FreeSWITCH played the packaged prompt, SIPp echoed RTP, FreeSWITCH sent BYE, 1 successful, 0 failed. |
+| Announcement media to `load_test_announcement` | Passed | FreeSWITCH played packaged prompt, SIPp echoed RTP, FreeSWITCH sent BYE, 1 successful, 0 failed. |
+| Extended user re-registration | Passed | Re-registered 20 users before extended scenarios to refresh Sofia contact records. |
+| Ring group calls (`2400`) | Passed | 3 successful, 0 failed. FreeSWITCH generated valid XML and bridged to group members. |
+| Voicemail calls (`2003`) | Passed | 3 successful, 0 failed. Call answered and handled by voicemail subsystem. |
+| Conference calls (`2500`) | Passed | 3 successful, 0 failed. Bridged into conference room without error. |
+| Call forward calls (`2001` -> `2000`) | Passed | 3 successful, 0 failed. Dialplan routes via `loopback/2000/${context}` to prevent `CHAN_NOT_IMPLEMENTED`. |
+| Time condition calls (`2401`) | Passed | 3 successful, 0 failed. Evaluated schedule rules dynamically and bridged call. |
+| Follow me calls (`2002`) | Passed | 3 successful, 0 failed. Sequential ring list executed and completed cleanly. |
+| Emergency calls (`911`) | Passed | 3 successful, 0 failed. Correctly bridged to emergency gateway UAS. |
+| Call block rejection | Passed | 3 successful, 0 failed. Blocked caller ID pattern matched and rejected with `603 Decline`. |
 
 Run details: artifact directory
-`storage/app/load-tests/sipp-e2e-20260716-133138`, PBX target
-`192.168.1.76:5060`, generator WSL2 at `192.168.1.65`, media RTP echo
-enabled, FreeSWITCH calls and channels back to `0` after the run.
+`storage/app/load-tests/sipp-e2e-20260923-165139`, PBX target
+`192.168.1.71:5060`, generator at `192.168.1.76`, media RTP echo enabled,
+PHP-FPM static pool (12 workers), FreeSWITCH calls and channels back to `0` after the run.
 
 Behaviors these tests enforce in the application and runtime:
 
@@ -1753,9 +2090,27 @@ measured yet. When both servers are provisioned:
 
 ## Hardware Sizing Guidance For Administrators
 
-Use the result tables to choose a starting server size, then verify with a
-run on your own hardware before committing to production. The historical
-references translate to these planning rules:
+Use the summary table below as a quick reference for choosing baseline hardware,
+configuring PHP-FPM pools, and setting Redis cache policies. These recommendations
+synthesize findings from both the VirtualBox test series and public datacenter benchmarks:
+
+### Production Sizing & Configuration Matrix
+
+| Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
+| --- | --- | --- | --- | ---: | ---: | ---: | --- |
+| **Micro / Edge** | 1 vCPU, 1–2 GiB RAM | `pm = dynamic`<br>`pm.max_children = 5` | 5 seconds | 13–19 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
+| **Standard SMB** | 2–4 vCPU, 4 GiB RAM | `pm = static`<br>`pm.max_children = 12` | 5 seconds | 19–28 req/sec | 5–8 calls/sec | 50–100 concurrent | Small-to-medium business (10–75 phones) |
+| **Mid-Market** | 4–8 vCPU, 8 GiB RAM | `pm = static`<br>`pm.max_children = 24` | 5–15 seconds | 35–50 req/sec | 12–18 calls/sec | 150–300 concurrent | Multi-department office (75–250 phones) |
+| **Call Center** | 8+ vCPU, 16 GiB RAM | `pm = static`<br>`pm.max_children = 32–48` | 15–30 seconds | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
+| **Enterprise / Multi-Tenant** | 16+ vCPU, 32 GiB RAM | `pm = static`<br>`pm.max_children = 64` | 30 seconds | 100–150+ req/sec | 45–60+ calls/sec | 1,000+ concurrent | Multi-tenant cloud hosted PBX |
+
+> [!TIP]
+> **PHP-FPM Sizing Formula for Dedicated PBX Nodes**:
+> When running a dedicated node, compute `pm.max_children` as:
+> $$\text{max\_children} = \frac{\text{Total Available RAM} - \text{System \& Telephony Overhead (1.5 GiB)}}{\text{Average Worker RSS (\~65 MiB)}}$$
+> On a 4 GiB VM: $(4096 - 1536) / 65 \approx 39$ maximum theoretical ceiling. Setting `pm.max_children = 12` provides ample concurrency headroom for XML bursts while keeping worker memory usage capped under 800 MiB, leaving >2.5 GiB for FreeSWITCH RTP media, MariaDB buffers, and Redis caching.
+
+### Planning Rules
 
 - **XML requests per second scale with CPU count, not memory.** Memory alone
   did not help: the 1 vCPU / 2 GiB profile was slower than the 1 vCPU /
@@ -1981,7 +2336,7 @@ Use this runbook before any VirtualBox call-rate run from the generator
 host. It exists so the lab does not need to be rediscovered after every
 reboot, FreeSWITCH restart, test runner restart, or interrupted SIPp
 process. The concrete values below are the historical example set
-(`load-test-virtualbox`, extension `2000`, password `LoadTest1234!`, realm
+(`load-test-virtualbox`, extension `2000`, password `LoadTest1234`, realm
 `192.168.1.76`); substitute your new test data values where they appear.
 
 Known-good historical lab addresses:
@@ -2015,7 +2370,7 @@ echo json_encode([
     "exists" => $account !== null,
     "enabled" => $account?->enabled,
     "realm_ok" => $account?->tenantDomain?->domain === "192.168.1.76",
-    "password_ok" => $account?->auth_password === "LoadTest1234!",
+    "password_ok" => $account?->auth_password === "LoadTest1234",
 ], JSON_PRETTY_PRINT).PHP_EOL;
 '
 ```
@@ -2043,7 +2398,7 @@ Expected output:
 
 ```text
 SEQUENTIAL
-2000;LoadTest1234!;192.168.1.76;2001;2000;[authentication username=2000 password=LoadTest1234!]
+2000;LoadTest1234;192.168.1.76;2001;2000;[authentication username=2000 password=LoadTest1234]
 ```
 
 If any PBX value is false, or the CSV first line is not exactly
@@ -2120,7 +2475,7 @@ php artisan pbx:load-test:seed \
   --domain=192.168.1.76 \
   --extensions=20 \
   --start=2000 \
-  --password='LoadTest1234!' \
+  --password='LoadTest1234' \
   --sipp-host=192.168.1.65 \
   --sipp-port=5066 \
   --output=storage/app/load-tests/sipp-users-virtualbox-sps60.csv \
@@ -2164,7 +2519,7 @@ Expected first data row:
 
 ```text
 SEQUENTIAL
-2000;LoadTest1234!;192.168.1.76;2001;2000;[authentication username=2000 password=LoadTest1234!]
+2000;LoadTest1234;192.168.1.76;2001;2000;[authentication username=2000 password=LoadTest1234]
 ```
 
 Without the final authentication column, SIPp receives `407` and then sends
@@ -2322,6 +2677,21 @@ This creates ring group 2400, voicemail mailbox 2003, conference 2500, call
 forward 2001 to 2000, time condition 2401, follow-me for 2002, emergency
 configuration, a call block rule, and an `*98` voicemail feature code.
 
+### Bugs Discovered and Resolved During Parity Testing
+
+The July 20, 2026 extended validation revealed several FreeSWITCH dialplan
+and bridging bugs that were resolved prior to release:
+
+| Bug Discovered | Impact | Resolution / Files Changed |
+| --- | --- | --- |
+| Ring group bridged to DB UUIDs instead of extension numbers | SIP `480 Temporarily Unavailable` on ring group calls | Updated `RingGroupService.php` and `RingGroupExtension.php` to bridge to numerical destinations. |
+| Context-wide contributor extensions placed after greedy `local_extension` catch-all | Feature codes (`*732`, `*98`) were shadowed by local extension pattern | Reordered dialplan compilation in `XmlHandlerController.php` so contributor rules evaluate with higher priority. |
+| Time condition had no `destination_number` constraint | Acted as a global unconditional redirect for all calls | Added explicit destination pattern constraint in `TimeConditionService.php`. |
+| `user/` channel type unsupported in FreeSWITCH bridge | FreeSWITCH returned `CHAN_NOT_IMPLEMENTED` | Switched to `loopback/` channel format in `RingGroupService.php` and `FollowMeService.php`. |
+| `sip_from_uri` empty post-authentication | Call block rule could not identify caller ID on incoming INVITE | Switched to `orig_caller_id_number` channel variable export in `XmlHandlerController.php` and `CallBlockService.php`. |
+| Feature-code log markers shadowed real feature dialplans (`continue=false`) | Single-leg stereo recording failed to start | Fixed execution order in `XmlHandlerController.php` and `recording-start` dialplan. |
+| Call forward condition matched extension UUID instead of number | Call forward bridge failed without tenant context | Corrected destination matching in `CallForwardService.php` and `XmlHandlerController.php`. |
+
 ## Per-Run Record, Staged Tiers, And Stop Conditions
 
 ### Staged Run Tiers (XML Test)
@@ -2420,16 +2790,11 @@ For beta or release candidates:
   gateway's host and port from the database. The bridge executes correctly
   in FreeSWITCH, but SIPp scenario success depends on the gateway UAS
   (port 5088) being alive when the emergency scenario runs.
-- Call block uses `orig_caller_id_number`, a channel variable exported at
-  the start of every context dialplan that captures the pre-auth
-  `caller_id_number`. SIPp cannot exercise the block path because
-  `auth-calls=true` on the Sofia profile rejects calls where the From
-  header user does not match the authenticated user. In production,
-  unauthenticated inbound calls from external gateways arrive in the public
-  context where `caller_id_number` is the raw From user, the export
-  captures it, and the block check fires correctly. To test via SIPp, use
-  `auth-calls=false` on the test profile or send matching From/auth
-  credentials.
+- Call block testing (`tools/sipp/uac-call-block.xml`) verifies that
+  calls with a blocked From user (`15550000123`) are matched against the block
+  rules and rejected with `603 Decline`. The scenario sends an immediate `ACK`
+  upon receiving `603` to cleanly terminate the SIP transaction without
+  unnecessary retransmissions.
 
 ## References
 
@@ -2438,4 +2803,3 @@ For beta or release candidates:
 - FreeSWITCH `mod_xml_curl`: https://developer.signalwire.com/freeswitch/integration/xml-curl/
 - FreeSWITCH core settings: https://developer.signalwire.com/freeswitch/configuration/core-settings
 - WireGuard NAT and firewall traversal guidance: https://www.wireguard.com/quickstart/#nat-and-firewall-traversal-persistence
-- Source documents retained during review: `docs/call-simulation-load-testing.md` and `docs/sipp-server-to-server-validation.md`

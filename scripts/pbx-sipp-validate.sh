@@ -9,7 +9,7 @@ TENANT="${TENANT:-load-test-beta}"
 DOMAIN="${DOMAIN:-load.test.local}"
 EXTENSIONS="${EXTENSIONS:-20}"
 START="${START:-2000}"
-PASSWORD="${PASSWORD:-LoadTest1234!}"
+PASSWORD="${PASSWORD:-LoadTest1234}"
 SIPP_UAS_PORT="${SIPP_UAS_PORT:-5088}"
 UAC_LOCAL_PORT="${UAC_LOCAL_PORT:-5064}"
 EXTENSION_UAS_LOCAL_PORT="${EXTENSION_UAS_LOCAL_PORT:-5066}"
@@ -38,7 +38,7 @@ MEDIA_MOH_DESTINATION="${MEDIA_MOH_DESTINATION:-load_test_moh}"
 MEDIA_ANNOUNCEMENT_DESTINATION="${MEDIA_ANNOUNCEMENT_DESTINATION:-load_test_announcement}"
 EXTENDED="${EXTENDED:-0}"
 EXTENDED_UAS_PORT="${EXTENDED_UAS_PORT:-5090}"
-EXTENDED_UAC_LOCAL_PORT="${EXTENDED_UAC_LOCAL_PORT:-5076}"
+EXTENDED_UAC_LOCAL_PORT="${EXTENDED_UAC_LOCAL_PORT:-5100}"
 EXTENDED_CALLS="${EXTENDED_CALLS:-3}"
 EXTENDED_CALL_RATE="${EXTENDED_CALL_RATE:-1}"
 EXTENDED_MAX_SIMULTANEOUS="${EXTENDED_MAX_SIMULTANEOUS:-1}"
@@ -278,6 +278,7 @@ start_background() {
   echo >> "${RUN_DIR}/${name}.command"
   (cd "${RUN_DIR}" && "$@") > "${RUN_DIR}/${name}.log" 2>&1 &
   local pid="$!"
+  sleep 1
   echo "- ${name}: started as pid ${pid}" >> "${RUN_DIR}/summary.md"
 
   if ! kill -0 "${pid}" >/dev/null 2>&1; then
@@ -365,9 +366,25 @@ if [[ "${EXTENDED}" == "1" ]]; then
   echo "" >> "${RUN_DIR}/summary.md"
   echo "### Extended Parity Audit Scenarios" >> "${RUN_DIR}/summary.md"
 
-  # The base UASes time out once the base phases end; the extended
-  # scenarios (ring groups, voicemail, conference, call-forward) need both
-  # the registered-extension UAS and the outbound gateway UAS alive.
+  # Ensure any previous background UAS listeners from earlier phases are terminated
+  # before re-binding to EXTENSION_UAS_LOCAL_PORT and SIPP_UAS_PORT.
+  cleanup
+  sleep 1
+
+  # Refresh registrations so extended tests have valid Sofia contact records.
+  run_step extended-register \
+    timeout "${REGISTER_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -sf "${REGISTER_SCENARIO}" \
+      -inf "${AUTH_CSV_ABSOLUTE}" \
+      -i "${LOAD_GENERATOR_IP}" \
+      -p "${REGISTER_LOCAL_PORT}" \
+      -r "${REGISTER_RATE}" \
+      -m "${REGISTER_COUNT}" \
+      -trace_err \
+      -trace_counts \
+      -trace_stat \
+      -fd 5
+
   extension_uas_pid="$(start_background extension-registered-uas \
     timeout 1200 sipp \
       -sf "${UAS_SCENARIO}" \

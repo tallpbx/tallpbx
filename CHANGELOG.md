@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-09-23
+
+### Added
+- **SIP Load Testing & Multi-Host Reproducibility Suite**:
+  - Added `scripts/run-cache-sweep.sh` to automate the 5-tier XML handler cache hit-rate sweep (cold baseline, contributor cache, 5s burst, 30s call-center, and memory hit ceiling) with automated production `.env` restoration.
+  - Added dedicated `SIP Load Testing & Multi-Host Reproducibility Guidelines` in `AGENTS.md` and `docs/load-testing-guide.md` documenting critical lab operational controls: public IP obfuscation, mandatory parallel Pest execution (`--parallel`), SSH remote password escaping, cross-host CSV synchronization, load generator firewall ingress whitelisting (`nftables`), FreeSWITCH loopback channels for internal bridges, background UAS port collision cleanup, safe UAC port allocation, PHP-FPM static pool sizing, and registration expiry lease management.
+  - Added unit test coverage for all 17 custom SIPp XML scenarios in `tests/Feature/PbxSippValidationScriptTest.php`.
+
+### Changed
+- **Alphanumeric Default Password for PBX Load Testing**: Changed default password from `LoadTest1234!` to alphanumeric `LoadTest1234` across `PbxLoadTestSeedCommand`, `scripts/pbx-sipp-validate.sh`, `README.md`, and load testing documentation to prevent Bash history expansion and subshell stripping over SSH that caused `403 Forbidden` on SIP `REGISTER`.
+- **SIPp Registration Expiry & Refresh**: Increased SIP registration lease duration in `tools/sipp/register.xml` and `tools/sipp/register-uas-auto-answer.xml` from 300s to 3600s, and added a pre-extended re-registration step in `scripts/pbx-sipp-validate.sh` to prevent mid-run lease expiration during long multi-phase validation suites.
+- **SIPp Blocked Call ACK Handling**: Updated `tools/sipp/uac-call-block.xml` to immediately acknowledge `603 Decline` with an `ACK`, allowing SIPp and FreeSWITCH to cleanly complete blocked call transactions without retransmission delays.
+- **Load Testing Documentation & Sizing Guidance**: Updated `docs/load-testing-guide.md` with fresh September 23, 2026 VirtualBox baseline measurements, single-server XML throughput metrics, 5-run cache sweep results, and an executive Production Sizing & Configuration Matrix with PHP-FPM static worker formulas.
+
+### Removed
+- **Superseded Load Testing Documents**: Removed `docs/call-simulation-load-testing.md` and `docs/sipp-server-to-server-validation.md` after consolidating all testing methodologies, commands, runbooks, metrics, and troubleshooting data into the unified, self-contained `docs/load-testing-guide.md`.
+
+### Fixed
+- **Call Forward Dialplan Bridge Channel Failure**: Changed internal FreeSWITCH dialplan bridges in `CallForwardService.php` from direct raw extensions to loopback channels (`loopback/${safeDest}/${context}`), resolving `Cannot create outgoing channel ... cause: [CHAN_NOT_IMPLEMENTED]` during call forwarding.
+- **SIPp Validation Port Collisions**: Resolved `errno 98 (Address already in use)` port collisions in `scripts/pbx-sipp-validate.sh` by cleanly terminating prior UAS listeners between validation phases, and shifted `EXTENDED_UAC_LOCAL_PORT` default from 5076 to 5100 to avoid conflicting with FreeSWITCH Sofia external (5080) and gateway UAS (5088) ports on multi-role hosts.
+
 ## [1.1.3] - 2026-09-23
 
 ### Added

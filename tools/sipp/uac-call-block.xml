@@ -92,8 +92,21 @@ a=rtpmap:8 PCMA/8000
     hangs up with CALL_REJECTED. Accept 403, 603, or 488.
   -->
   <recv response="100" optional="true"/>
-  <recv response="403" optional="true"/>
-  <recv response="603" optional="true"/>
-  <recv response="488" optional="true"/>
-  <recv response="480" optional="true"/>
+  <recv response="603"/>
+
+  <send>
+    <![CDATA[
+
+ACK sip:[field3]@[field2] SIP/2.0
+Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
+From: "Blocked Caller" <sip:15550000123@[field2]>;tag=[call_number]
+To: <sip:[field3]@[field2]>[peer_tag_param]
+Call-ID: [call_id]
+CSeq: 2 ACK
+Contact: <sip:15550000123@[local_ip]:[local_port];transport=[transport]>
+Max-Forwards: 70
+Content-Length: 0
+
+    ]]>
+  </send>
 </scenario>
