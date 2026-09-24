@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Cloud Datacenter 2 vCPU / 2 GiB RAM Empirical Benchmarks**:
+  - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on the resized dual-core cloud VPS (2 vCPU / 2 GiB RAM, `pm = static`, `pm.max_children = 6`).
+  - Documented streamlined server-to-server SIP call capacity ladder (2, 5, 10, 15, 20 CPS) measuring call setup delay, queueing dynamics, and saturation boundaries under sustained concurrency.
+  - Empirically demonstrated that adding a second compute core unlocked an 89% answer rate (178/200 answered calls) at 10 CPS under concurrency 50 (compared to 1-vCPU failure ceilings at 5–8 CPS), confirming multi-core concurrency scaling for telephony workloads.
 - **Cloud Datacenter 1 vCPU (1 GiB & 2 GiB RAM) Empirical Benchmarks**:
   - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on both minimal (1 vCPU / 1 GiB RAM) and memory-scaled (1 vCPU / 2 GiB RAM, `pm = static`, `pm.max_children = 6`) cloud VPS instances.
   - Documented complete 14-scenario telephony feature parity (100% passed) and server-to-server SIP call capacity ladder (3, 5, 8, 10 CPS) on the memory-scaled 1 vCPU / 2 GiB cloud VPS.
