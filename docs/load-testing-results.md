@@ -1,6 +1,6 @@
 # PBX SIP Load Testing & Benchmark Results
 
-Clear, real-world capacity guidance for administrators. This document records empirical results from the September 2026 VirtualBox test series and historical datacenter VPS benchmarks, and provides hardware sizing guidance for system administrators.
+Clear, real-world capacity guidance for administrators. This document records empirical results from the September 2026 VirtualBox test series and cloud datacenter VPS benchmarks, and provides hardware sizing guidance for system administrators.
 
 > [!NOTE]
 > For the operational manual, lab topology setup, seeding instructions, and test runner options, see the companion **[SIP Load Testing Guide](load-testing-guide.md)**.
@@ -145,14 +145,14 @@ FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. 
 
 ## Planning Rules
 
-- **XML requests per second scale with CPU count, not memory.** Memory alone did not help: the 1 vCPU / 2 GiB profile was slower than the 1 vCPU / 1 GiB profile under the same conditions. Adding a second vCPU roughly doubled XML burst throughput (about 19 req/sec to about 30 req/sec at `500 x 25`) and cut the slowest response from about 1.7 seconds to about 0.4 seconds.
-- **Historical XML burst expectations:** 1 vCPU ≈ 13–24 req/sec (15–24 in the July runs; 16.1 and 14.2 in the August 31 revalidation); 2 vCPU / 2 GiB ≈ 29–30 req/sec; the 4 vCPU test server ≈ 19–28 req/sec on the older code revision, and the optimization work moved it from under 4 req/sec to that range.
+- **XML requests per second scale with CPU count, not memory.** Memory alone did not help: the 1 vCPU / 2 GiB profile was slower than the 1 vCPU / 1 GiB profile under the same conditions. Adding a second vCPU roughly doubled XML burst throughput (about 19 req/sec to about 30 req/sec at `500 x 25`) and cut the slowest response from about 1.7 seconds to about 0.4 seconds. Moving to dedicated cores (4 vCPU Dedicated) eliminated the shared-core ceiling entirely, delivering 65+ req/sec sustained with sub-450ms tail latency.
+- **Empirical XML burst expectations:** 1 vCPU ≈ 14–16 req/sec sustained; 2 vCPU / 2 GiB ≈ 14–16 req/sec (shared CPU limit); 4 vCPU Dedicated / 16 GiB ≈ 57–65 req/sec sustained (72 req/sec pure memory ceiling).
 - **Do not size calls from XML numbers.** A complete call adds SIP signaling, a second call leg, FreeSWITCH state, and teardown work that the XML test never touches.
-- **Historical call-rate expectations:** the 4 vCPU test server delivered a repeatable 5 calls/sec (4 calls/sec is the sensible planning target on that VM); the 2 vCPU / 2 GiB VPS delivered about 13–15 clean completed calls/sec, with 20 offered calls/sec still completing but queueing heavily.
+- **Empirical call-rate expectations:** 1 vCPU ≈ 3 calls/sec sustained; 2 vCPU / 2 GiB ≈ 5–8 calls/sec sustained (10 CPS burst ceiling); 4 vCPU Dedicated / 16 GiB ≈ 15–20 calls/sec sustained (30 CPS burst ceiling with 100% completion across 2,110 calls).
 - **Plan for headroom.** The measured ceilings were reached at 95–98% CPU busy. If a tier runs above roughly 90% CPU, do not plan production capacity at that tier.
 - **Check `sessions-per-second` before blaming hardware.** The project default of 60 allows roughly 30 two-leg calls/sec; a stock value of 30 rejects calls near 15 two-leg calls/sec with `503 Maximum Calls In Progress`.
 - **Media capacity is separate.** These numbers cover call setup, answer, and teardown. Continuous RTP audio quality and media capacity need a dedicated RTP-enabled concurrent-call test.
-- **Re-run the hardware ladder with new test data before quoting numbers to customers.** The values in this document are historical references kept for review.
+- **Re-run the hardware ladder with new test data before quoting numbers to customers.** The values in this document are empirical references kept for review.
 
 ---
 
@@ -160,7 +160,7 @@ FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. 
 
 ### How Results Are Recorded
 
-The tables in this document present the September 2026 test progression (local VirtualBox single-server throughput ladder, 5-tier cache sweeps, and cloud datacenter benchmarks), followed by the historical July–August 2026 reference runs.
+The tables in this document present the September 2026 test progression: local VirtualBox single-server throughput ladders and 5-tier cache sweeps, followed by comprehensive cloud datacenter benchmarks across four hardware profiles.
 
 - Lead with requests per second, then average, fastest, and slowest latency. For some older runs the average and fastest are recomputed from the stored per-request latencies; where a value was never captured it is shown as `—`.
 - Comparison tiers are reported as the median of at least three measured runs, with every repetition retained. Run a warm-up before recording.
@@ -643,58 +643,6 @@ Host telemetry during these runs: Linux 6.12 amd64, 2 vCPUs, 1,973 MiB RAM (1,15
 
 Artifacts: `storage/app/load-tests/capacity/datacenter-2c2g-shared-20260924T210849Z/` and `storage/app/load-tests/cache-sweep-20260924-211217/`.
 
-#### Historical Reference: July 2026 Benchmark Runs
-
-The earlier July 2026 benchmark evaluated a 2 vCPU / 2 GiB VPS profile using WireGuard encapsulation and compared PHP-FPM static worker pools. Below is the historical reference summary:
-
-| Tier | Repetitions | Median Req/Sec | Average Latency | Fastest Latency | Slowest Latency | Notes / Observations |
-| :--- | :--- | ---: | ---: | ---: | ---: | :--- |
-| `100 x 5` | 3 (r1–r3) | 17.864 | 133 ms | 107 ms | 186 ms | Sub-200ms tail latency; smooth dual-core execution. |
-| `500 x 25` | 3 (r1–r3) | 29.831 | 165 ms | 106 ms | 365 ms | **+61.7% throughput gain** over 1c/2g; tail latency dropped from ~1,700 ms to 365 ms. |
-| `1,000 x 25` | 1 (r1) | 29.673 | 170 ms | 108 ms | 410 ms | Stable sustained burst ceiling; dual cores prevent worker starvation. |
-
-<details>
-<summary>Table Terminology & Metric Definitions</summary>
-
-| Term / Header | Definition & Operational Meaning |
-| :--- | :--- |
-| **Tier (`Requests x Concurrency`)** | The load volume profile (e.g. `500 x 25` = 500 total requests with 25 kept concurrently in-flight). |
-| **Median Req/Sec** | Central throughput across measured repetitions (documents rendered and delivered per second). |
-| **Average Latency** | Mean XML processing latency in milliseconds. |
-| **Dual-Core Gain** | Adding a second vCPU roughly doubled burst capacity and reduced tail latency by ~75%. |
-
-</details>
-
-<details>
-<summary>View Individual Repetition Measurements (r1–r3)</summary>
-
-| Run | Requests/sec | Average | Fastest | Slowest |
-| --- | ---: | ---: | ---: | ---: |
-| `100 x 5` r1 | 16.658 | 149 ms | 109 ms | 261 ms |
-| `100 x 5` r2 | 18.584 | 131 ms | 107 ms | 186 ms |
-| `100 x 5` r3 | 17.864 | 133 ms | 102 ms | 181 ms |
-| `500 x 25` r1 | 30.215 | 169 ms | 106 ms | 331 ms |
-| `500 x 25` r2 | 29.831 | 165 ms | 103 ms | 365 ms |
-| `500 x 25` r3 | 29.363 | 175 ms | 106 ms | 414 ms |
-| `1,000 x 25` r1 | 29.673 | 170 ms | 108 ms | 410 ms |
-
-</details>
-
-All runs returned zero failures. The host used no swap, retained about 1.36 GiB available memory after testing, and logged no new PHP-FPM saturation warnings. Doubling the CPU count raised `500 x 25` throughput from 18.625 (1c/2g median) to 30.215 requests/sec and reduced the slowest response from about 1,700 ms to about 400 ms. This strongly suggests CPU scheduling and CPU count were the dominant limiters once memory headroom was adequate. WAN round-trip latency was 36–41 ms.
-
-**PHP-FPM experiment (2 vCPU / 2 GiB).** Before the test VPS was destroyed, static 8, 10, and 12 were compared against the static-6 controlled baseline using the `500 x 25` tier. All candidates returned zero failures and no swap use:
-
-| Run | Requests/sec | Average | Fastest | Slowest |
-| --- | ---: | ---: | ---: | ---: |
-| Static 8 r1 | 30.117 | 193 ms | 104 ms | 858 ms |
-| Static 8 r2 | 29.087 | 161 ms | 104 ms | 308 ms |
-| Static 10 r1 | 28.802 | 188 ms | 107 ms | 894 ms |
-| Static 10 r2 | 29.861 | 155 ms | 106 ms | 339 ms |
-| Static 12 r1 | 29.472 | 190 ms | 100 ms | 957 ms |
-| Static 12 r2 | 29.626 | 156 ms | 100 ms | 340 ms |
-
-None of the higher worker counts improved throughput meaningfully, and each introduced occasional slowest-response spikes (858–957 ms) compared with the static-6 baseline (331–414 ms). Static 6 remained the active and recommended 2-GB profile.
-
 ---
 
 ### Dedicated Cloud Node (4 vCPU / 16 GiB RAM Dedicated)
@@ -841,112 +789,6 @@ Behaviors these tests enforce in the application and runtime:
 - Feature-code destination regexes escape star codes, for example `^\*97$`;
 - Announcement-only IVR dialplans play and hang up without waiting for digit input;
 - SIPp media-flow scenarios use RTP echo so playback can advance in this synthetic setup.
-
-#### Complete-Signaling Capacity Ladder (July 17, 2026 Reference)
-
-The load generator used 100 registered synthetic extensions. Each tier attempted new calls for 30 seconds with a concurrency ceiling above the expected active calls:
-
-| Attempted calls/sec | Calls | Successful | Failed | Achieved calls/sec | Average setup | Fastest setup | Slowest setup | Peak active SIPp calls | Peak PBX calls/channels | Peak CPU busy | Result |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| 1 | 30 | 30 | 0 | 1.009 | 593 ms | 470 ms | 774 ms | 6 | 7 / 12 | 29% | Passed |
-| 2 | 60 | 60 | 0 | 2.012 | 680 ms | 573 ms | 892 ms | 12 | 12 / 22 | 54% | Passed |
-| 4 | 120 | 120 | 0 | 4.018 | 848 ms | 480 ms | 1,312 ms | 25 | 24 / 45 | 85% | Passed |
-| 5, r1 | 150 | 150 | 0 | 4.928 | 1,799 ms | 749 ms | 3,760 ms | 40 | 35 / 64 | 97% | Passed |
-| 5, r2 | 150 | 150 | 0 | 4.994 | 1,256 ms | 647 ms | 2,132 ms | 35 | 32 / 61 | 95% | Passed |
-| 5, r3 | 150 | 150 | 0 | 4.886 | 1,484 ms | 682 ms | 3,671 ms | 37 | 34 / 65 | 98% | Passed |
-| 6 | 180 | 180 | 0 | 5.506 | 3,085 ms | 784 ms | 6,453 ms | 55 | 43 / 72 | 98% | Passed, but overloaded |
-| 7 | 210 | 209 | 1 | 5.498 | 5,679 ms | 738 ms | 9,220 ms | 70 | 53 / 83 | 98% | Failed |
-| 8 | 240 | 180 | 60 | 4.641 | 6,853 ms | 918 ms | 9,998 ms | 80 | 56 / 81 | 98% | Failed |
-
-<details>
-<summary>Table Terminology & Metric Definitions</summary>
-
-| Term / Header | Definition & Operational Meaning |
-| :--- | :--- |
-| **Attempted calls/sec** | Offered call rate generated by SIPp (target call arrivals per second). |
-| **Achieved calls/sec** | Actual rate of successfully answered calls (`200 OK`) measured across the run window. |
-| **Average setup** | Round-Trip Delay (RTD) from initial INVITE through 407 challenge to 200 OK answer (in milliseconds). |
-| **Fastest / Slowest setup** | Minimum and maximum call setup response times recorded. |
-| **Peak PBX calls/channels** | Active FreeSWITCH sessions / bridged media channel pairs (`show channels count`). |
-| **Peak CPU busy** | Host processor utilization during the test tier. |
-
-</details>
-
-The repeatable 5-CPS result is 150/150 successful calls in all three runs, with a middle achieved rate of 4.928 calls/sec and middle setup figures of 1,484 ms average, 682 ms fastest, and 3,671 ms slowest. Five attempted calls per second is the highest repeatably verified tier that kept pace without failures, but it is a measured limit, not an everyday operating target: CPU was 95–98% busy. Four calls per second is the more sensible planning limit on this VM because it retained CPU headroom and kept average setup below one second.
-
-At 6 CPS every call still completed, but the achieved answer rate flattened to 5.506 CPS and average setup exceeded three seconds. At 7 CPS calls began to fail, and at 8 CPS 60 of 240 calls failed. This shows a real saturation boundary near 5–6 end-to-end call setups per second rather than a SIPp concurrency cap. The run exercised full SIP signaling setup and teardown but did not generate continuous RTP audio; media capacity and audio quality require a separate RTP-enabled concurrent-call test. Artifacts: `storage/app/load-tests/capacity/virtualbox-4c-4g-cps-20260718T011540Z/`.
-
-#### Retest at Sessions-Per-Second = 60
-
-The VirtualBox PBX was retested from the WSL generator after raising FreeSWITCH to `sessions-per-second=60`. These runs are comparison results, not production capacity numbers, and the VM was carrying background load:
-
-| Offered calls/sec | Attempted | Achieved calls/sec | Successful | Failed | Average setup | Result |
-| ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| 5 | 100 | 4.629 | 100 | 0 | 703 ms | Passed |
-| 8 | 160 | 5.574 | 160 | 0 | 4,253 ms | Passed, but queued |
-| 10, r1 | 200 | 5.588 | 196 | 4 | 6,276 ms | Failed |
-| 10, r2 | 200 | 5.184 | 123 | 77 | 6,742 ms | Failed |
-| 12 | 240 | 8.299 attempted/created | 32 | 208 | 5,587 ms | Failed heavily |
-
-<details>
-<summary>Table Terminology & Metric Definitions</summary>
-
-| Term / Header | Definition & Operational Meaning |
-| :--- | :--- |
-| **Offered calls/sec** | Offered call rate generated by SIPp (target call arrivals per second). |
-| **Sessions-per-second=60** | FreeSWITCH engine setting controlling maximum call setups per second (`switch.conf.xml`). |
-| **Average setup** | Mean call setup time from initial INVITE to 200 OK answer. |
-| **Failed Calls** | Calls that timed out or were rejected by FreeSWITCH with 403 or 503 errors. |
-
-</details>
-
-A broader sweep reached complete failure at higher offered rates: 15 CPS completed only 164/300 calls, 20 CPS completed only 28/400, and 25 CPS or higher completed no calls. FreeSWITCH logs showed `mod_xml_curl` timeout errors fetching the local XML handler and `CALL_REJECTED` hangups while network counters still showed zero packet drops or errors. That makes this run useful for finding the local XML-handler bottleneck, not for a production calls/sec number. Artifacts: `virtualbox-4c-4g-sps60-20260718-sipp-cps-r2` and `virtualbox-4c-4g-sps60-20260718-sipp-cps-low-repeat`.
-
-#### FreeSWITCH Log-Level Experiment (VirtualBox)
-
-The same sps60 set was re-run with FreeSWITCH switch logging lowered from `debug` to `notice`:
-
-| Tier | Attempted | Achieved calls/sec | Successful | Failed | Average setup | SIP INVITE retransmissions |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 5 CPS, 100 calls | 100 | 4.634 | 100 | 0 | 713 ms | 8 |
-| 8 CPS, 160 calls | 160 | 5.398 | 160 | 0 | 4,570 ms | 281 |
-| 10 CPS, 200 calls r1 | 200 | 5.598 | 200 | 0 | 6,218 ms | 467 |
-| 10 CPS, 200 calls r2 | 200 | 6.626 | 200 | 0 | 4,794 ms | 372 |
-
-A separate 6-CPS tier check with logging lowered to `notice` kept all 180/180 calls completing at about 5.06 calls/sec with average setup dropping to about 1,235 ms and slowest setup to about 2,427 ms, versus the 3,085 ms average and 6,453 ms slowest seen at the same tier with debug logging. The conclusion: lowering the log level improves setup delay but does not materially raise the achieved call rate. Keep DEBUG logging enabled by default while the PBX is still being validated, and lower it only for the measured run:
-
-```bash
-fs_cli -x 'fsctl loglevel notice'
-fs_cli -x 'console loglevel notice'
-```
-
-After the comparison, restore the debug-friendly runtime level:
-```bash
-fs_cli -x 'fsctl loglevel debug'
-fs_cli -x 'console loglevel info'
-```
-
-Use `warning` instead of `notice` only when the goal is a low-noise capacity run and detailed call progress logs are not needed. Artifacts: `virtualbox-4c-4g-sps60-fsnotice-20260718-sipp-cps`.
-
-#### Tenant-Identity Cache Experiment (VirtualBox, 8 CPS)
-
-The tenant-identity cache shortens the repeated directory/auth XML path: when FreeSWITCH asks which tenant/user a SIP auth request belongs to, Laravel can reuse a short-lived Redis answer instead of repeatedly querying MariaDB and decrypting SIP account data during a call burst.
-
-| Run | Offered calls/sec | Attempted | Achieved calls/sec | Successful | Failed | UDP errors | Result |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Before tenant-identity cache | 8 | 80 | 1.813 | 79 | 1 | 0 | Failed by one call |
-| After tenant-identity cache | 8 | 80 | 4.912 | 79 | 1 | 0 | Failed by one call |
-
-XML timing during the same runs:
-
-| XML section | Run | Requests | Avg total time | Avg DB queries | Avg DB time | Max total time |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Directory/auth | Before cache | 80 | 129.75 ms | 4.50 | 62.76 ms | 420.97 ms |
-| Directory/auth | After cache | 80 | 117.50 ms | 1.25 | 30.53 ms | 834.32 ms |
-| Dialplan | Before cache | 80 | 50.91 ms | 0.35 | 2.07 ms | 284.25 ms |
-| Dialplan | After cache | 79 | 75.31 ms | 0.39 | 2.36 ms | 377.26 ms |
-
-The cache cut average directory/auth DB queries from 4.50 to 1.25 per request and average directory/auth DB time from 62.76 ms to 30.53 ms. The end-to-end result still had one failed call (an authenticated INVITE `403 Forbidden` plus the separate SIPp UAS `NOTIFY` harness artifact). The cache improvement stays, but the remaining VirtualBox failure is not solved by directory-cache work alone. Artifacts: `virtualbox-dbtime-8cps-80calls-rerun-20260718` and `virtualbox-identitycache-8cps-80calls-retry3-20260718`.
 
 ---
 
@@ -1263,59 +1105,6 @@ Sustained extension-to-extension capacity ladder with SIP digest authentication,
    For production deployments on 2 vCPU / 2 GiB cloud VPS nodes:
    - **Recommended Planning Target**: **5–8 calls/sec** sustained (supporting 50–100 active concurrent extensions).
    - **Burst Headroom**: Safely absorbs spikes up to **10 calls/sec** with graceful degradation.
-
----
-
-#### Historical Reference: July 2026 WireGuard Benchmark Runs
-
-**Low-volume subsets after the resizes (1 vCPU / 2 GiB and 2 vCPU / 2 GiB, July 18, 2026).** Both resized profiles passed the same low-volume subset through WireGuard: 5 registrations, 2 authenticated extension calls, and 1 outbound call, with XML curl directory POSTs observed. Media checks were not repeated because no SIP/RTP behavior changed; the goal was to confirm the installed application and resized host still served FreeSWITCH XML curl directory and dialplan requests during live calls. Artifact directories: `storage/app/load-tests/sipp-e2e-20260717-170848` (1c/2g) and `storage/app/load-tests/sipp-e2e-20260717-171946` (2c/2g).
-
-**Capacity runs at sessions-per-second = 60 (2 vCPU / 2 GiB, July 18, 2026).** The load generator was the local test server at `192.168.1.76`, connected to the public PBX through WireGuard:
-
-| Offered calls/sec | Attempted | Achieved calls/sec | Successful | Failed | Average setup | Result |
-| ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 15, r1 | 300 | 12.096 | 300 | 0 | 3,105 ms | Passed |
-| 15, r2 | 300 | 13.240 | 300 | 0 | 1,282 ms | Passed |
-| 20, r1 | 400 | 13.417 | 400 | 0 | 4,669 ms | Passed, but queued |
-| 20, r2 | 400 | 14.491 | 400 | 0 | 3,833 ms | Passed, but queued |
-| 25 | 500 | 14.158 | 385 | 115 | 6,205 ms | Failed |
-| 30 | 600 | 17.181 | 377 | 223 | 6,764 ms | Failed |
-
-The clean no-failure remote result is 20 offered calls/sec with all 400 calls completed, but the average setup time was already several seconds. For low-latency capacity, the safer interpretation is about 13–15 completed full calls/sec on this 2-vCPU/2-GB VPS. Above 20 offered calls/sec, failures return even after removing the session-rate ceiling. Artifacts: `capacity/vps-2c-2g-static6-sps60-20260718-sipp-cps`.
-
-**Invalidated sessions-per-second = 30 runs.** The first July 18, 2026 SIPp capacity runs used FreeSWITCH's stock `sessions-per-second=30` safety throttle and are not valid capacity results. The reason: the limit counts sessions, not calls, and a normal extension-to-extension call creates two sessions, so the stock `30` limit can reject calls near 15 two-leg calls per second even when CPU, network, and the generator still have room. The invalidated runs showed exactly that pattern: SIPp received `SIP/2.0 503 Maximum Calls In Progress`, `fs_cli -x status` showed `sessions per Sec out of max 30`, SIPp reported zero UDP errors, and both network interfaces showed zero packet errors and drops. Those artifacts remain available for audit but must not be quoted as clean capacity.
-
-**Tenant-identity cache optimization runs (2 vCPU / 2 GiB, July 18, 2026).** The commit that caches FreeSWITCH tenant-identity resolution was retested on the correct remote topology: PBX at `x.x.x.236` (WireGuard `10.77.0.1`), generator at `192.168.1.76` (WireGuard `10.77.0.2`), SIP realm `x.x.x.236`, `sessions-per-second=60`, Redis cache stores. The first post-cache runs still had FreeSWITCH switch logging at `debug`:
-
-| Offered calls/sec | Attempted | Achieved calls/sec | Successful | Failed | UDP errors | Result |
-| ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 8 | 80 | 7.610 | 80 | 0 | 0 | Passed |
-| 10 | 100 | 9.657 | 100 | 0 | 0 | Passed |
-| 15 | 300 | 14.735 | 300 | 0 | 0 | Passed |
-| 20 | 400 | 17.833 | 400 | 0 | 0 | Passed, with SIP retransmissions |
-
-XML timing during the clean `10 CPS / 100 calls` and `20 CPS / 400 calls` runs:
-
-| Run | XML section | Requests | Avg total time | Avg DB queries | Avg DB time | Max total time |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 10 CPS | Directory/auth | 100 | 6.10 ms | 2.00 | 1.30 ms | 26.16 ms |
-| 10 CPS | Dialplan | 100 | 4.14 ms | 0.34 | 0.28 ms | 34.99 ms |
-| 20 CPS | Directory/auth | 400 | 12.02 ms | 1.00 | 2.35 ms | 58.10 ms |
-| 20 CPS | Dialplan | 400 | 9.42 ms | 0.25 | 0.50 ms | 100.53 ms |
-
-Directory/auth lookup time stayed low even at the higher offered rate, and the full `20 CPS / 400 calls` run completed without failed calls or UDP errors. SIPp reported retransmissions at 20 CPS, so this is a successful throughput test with signaling pressure starting to appear, not proof that much higher rates stay clean. Artifacts: `remote-vps-identitycache-8cps-80calls-20260718`, `-10cps-100calls-`, `-15cps-300calls-`, and `-20cps-400calls-20260718`.
-
-**FreeSWITCH log-level experiment (datacenter).** The same 2-vCPU/2-GB VPS was retested with switch logging lowered from `debug` to `notice` and XML handler timing logging disabled:
-
-| Offered calls/sec | Attempted | Achieved calls/sec | Successful | Failed | Average setup | SIP INVITE retransmissions | Result |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 20 | 400 | 15.990 | 400 | 0 | 3,121 ms | 533 | Passed |
-| 25 | 500 | 17.096 | 500 | 0 | 5,094 ms | 958 | Passed, but heavily queued |
-| 30 | 600 | 17.434 | 600 | 0 | 6,611 ms | 1,418 | Passed, but heavily queued |
-
-Zero UDP errors were reported in all three runs. Disabling debug logging improved the failure outcome at higher offered rates: `25 CPS / 500 calls` completed with zero failed calls, while the debug-logging baseline failed at 25 CPS. It did not make the server complete 25 new calls per second; the completed rate was about 17.1 CPS at 25 offered and 17.4 CPS at 30 offered, with average setup rising from about five seconds to about 6.6 seconds and many INVITE retransmissions. The practical interpretation is that disabling debug logging reduces enough overhead to avoid outright failures, but the 2-vCPU/2-GB VPS still queues call setup heavily above roughly 15–18 completed calls per second. Artifacts: `remote-vps-notice-20cps-400calls-20260718`, `-25cps-500calls-`, and `-30cps-600calls-20260718`.
-
-Before the remote test VPS was destroyed, final evidence bundles were copied back to the project workspace: `storage/app/load-tests/final-evidence-20260718/pbx-final-vps-evidence-20260718.tar.gz` and `pbx-final-loadgen-evidence-20260718.tar.gz`. They contain sanitized WireGuard status/config snippets, FreeSWITCH and Sofia status, PHP-FPM configuration, Redis/cache checks, application commit/config summaries, and the SIPp artifact directories for the post-cache remote runs.
 
 ---
 

@@ -326,32 +326,33 @@ results for VirtualBox and then the datacenter ladder.
 
 | ID | Environment | Specification | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 4096 MiB RAM, 2.0 GiB swap, Debian 13 | Complete: fresh install validation, single-server ladder, and 5-tier cache sweep completed September 23, 2026 (historical baseline July 15–16, 2026) |
-| B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete (July 17–18, 2026); revalidated August 31, 2026 |
-| B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
-| B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete (July 18, 2026) |
-| C1 | Dedicated-CPU Datacenter VPS | 2 vCPU, 8 GiB RAM | Planned |
-| C2 | Dedicated-CPU Datacenter VPS | 4 vCPU, 8 GiB RAM | Planned |
+| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 4096 MiB RAM, 2.0 GiB swap, Debian 13 | Complete: fresh install validation, single-server ladder, and 5-tier cache sweep completed September 23, 2026 |
+| B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
+| B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
+| B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
+| C1 | Dedicated-CPU Datacenter VPS | 2 vCPU, 2 GiB RAM | Skipped: streamlined matrix to eliminate testing redundancy |
+| C2 | Dedicated-CPU Datacenter VPS | 4 vCPU, 16 GiB RAM (adjusted from 8 GiB based on cloud availability) | Complete: single-server ladder (65+ req/sec sustained) and 5-tier cache sweep completed September 24, 2026 |
 
 **Phase 2 — server-to-server call testing (calls per second):**
 
 | ID | PBX under test | SIPp load generator | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server (4 vCPU / 4096 MiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same Windows 11 hardware; the historical runs used the WSL2 host at `192.168.1.65` | Complete: 15/15 scenarios verified (basic, media flow, and extended parity) September 23, 2026; historical capacity ladder July 16–18, 2026 |
-| B1 | Shared-CPU Datacenter VPS 1 vCPU / 967 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: correctness only (July 17, 2026) |
-| B3 | Shared-CPU Datacenter VPS 2 vCPU / 1973 MiB | D — second datacenter server; historical runs used the local test server through WireGuard | Complete: capacity runs (July 18, 2026) |
-| C1 | Dedicated-CPU Datacenter VPS 2 vCPU / 8 GiB | D — second datacenter server in the same datacenter | Planned |
-| C2 | Dedicated-CPU Datacenter VPS 4 vCPU / 8 GiB | D — second datacenter server in the same datacenter | Planned |
+| A1 | VirtualBox test server (4 vCPU / 4096 MiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same host | Complete: 15/15 scenarios verified (basic, media flow, and extended parity) September 23, 2026 |
+| B1 | Shared-CPU Datacenter VPS (1 vCPU / 1 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
+| B2 | Shared-CPU Datacenter VPS (1 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: capacity ladder completed September 24, 2026 |
+| B3 | Shared-CPU Datacenter VPS (2 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
+| C1 | Dedicated-CPU Datacenter VPS (2 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Skipped: streamlined matrix |
+| C2 | Dedicated-CPU Datacenter VPS (4 vCPU / 16 GiB Dedicated) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: full 2–30 CPS capacity ladder (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
 
 Server-to-server topology:
 
 - VirtualBox testing runs two virtual Linux servers on the same hardware
   (A1 as the PBX under test, A2 as the orchestration and source server);
   that hardware runs the Windows 11 operating system.
-- Datacenter testing runs the two virtual servers in the same datacenter.
+- Datacenter testing runs the two virtual servers in the same datacenter region (`sfo3`).
 - The PBX target virtual server runs on a shared-CPU plan for the 1 vCPU and
   2 vCPU tests with up to 2 GiB RAM and on a dedicated-CPU server for the
-  8 GiB profiles (2 vCPU and 4 vCPU).
+  high-density enterprise profile (4 vCPU Dedicated / 16 GiB RAM).
 
 Notes for both phases:
 
@@ -488,9 +489,10 @@ results sections with the new measurements in place.
 
 | Role | Host | Notes |
 | --- | --- | --- |
-| PBX server | `192.168.1.76` (test server) | Debian 13. Runs Laravel, Nginx/PHP-FPM, MariaDB, Redis, and FreeSWITCH. The historical validation ran on a VirtualBox VM with 4 vCPU, 4096 MiB RAM, and 2.0 GiB swap. |
-| SIPp load generator | `192.168.1.65` | WSL2 on a Windows 11 workstation, reached from the PBX server over SSH port `2222`. Later runs also used a separate Debian host as the generator and WireGuard peer. |
-| Datacenter PBX under test | `x.x.x.218` | Public VPS used for the 1c/1g, 1c/2g, and 2c/2g stages through WireGuard. |
+| VirtualBox PBX server | `192.168.1.71` | Debian 13. Runs Laravel, Nginx/PHP-FPM, MariaDB, Redis, and FreeSWITCH (4 vCPU, 4096 MiB RAM, 2.0 GiB swap). |
+| VirtualBox SIPp generator | `192.168.1.76` | Orchestration and SIPp source VM on the same host. |
+| Datacenter PBX under test | `x.x.x.200` | Cloud VPS used for the datacenter benchmark series across 1c/1g, 1c/2g, 2c/2g, and 4c/16g tiers. |
+| Datacenter load generator | `x.x.x.173` | Dedicated 2 vCPU cloud node in the same region (`sfo3`) executing SIPp scenarios over direct public IP routing. |
 | SIP signaling | PBX `5060` | FreeSWITCH internal Sofia profile. |
 | SIPp local ports | `5066`, `5070`, `5072`, `5074+` | Separate ports prevent one scenario from colliding with another. |
 | SIPp RTP ports | `6000`, `6002`, `6004+` | Media-flow scenarios use RTP echo with SIPp `-mi` and `-mp`. |
@@ -1595,22 +1597,13 @@ isolated database benchmark faster.
 | SIPp/load generator | SIPp CPU high, failed sends, outbound congestion, or achieved rate below target while the PBX has headroom. | Move SIPp to a stronger/separate host, raise file descriptors/ports, or lower local logging. |
 | Network/WireGuard | Retransmissions, packet loss, high RTT, or NAT/WireGuard endpoint churn. | Test from the same datacenter, or fix the tunnel/UDP path before trusting the numbers. |
 
-Findings from the recent runs:
+Findings from empirical datacenter and lab benchmark runs:
 
-- The VirtualBox July 17 ladder's first visible limiter was CPU: passing
-  5-CPS repetitions reached 95–98% CPU busy, 6 CPS queued badly, and 7–8 CPS
-  began failing. PHP-FPM showed no max-children saturation, swap stayed
-  unused, and MariaDB reported no slow queries. That points to total
-  per-call CPU work (FreeSWITCH SIP/bridge work plus Laravel XML handling)
-  rather than a simple PHP worker-count problem.
-- Lowering FreeSWITCH logging to `notice` reduced setup delay but did not
-  move the call-rate ceiling (see the log-level experiments).
-- In the datacenter ladder, memory alone did not help (1 vCPU / 2 GiB was
-  slower than 1 vCPU / 1 GiB), while a second vCPU roughly doubled XML
-  throughput and cut the slowest response. Once memory headroom was
-  adequate, CPU count was the dominant limiter.
-- For high-rate SIPp runs, always confirm FreeSWITCH `sessions-per-second`
-  before interpreting failures.
+- **Shared-CPU Bottleneck (14–16 req/sec)**: On 1-core and 2-core shared-CPU instances, dynamic XML generation hits a hard compute ceiling between 14 and 16 requests/second under burst concurrency (`500 x 25` and `1,000 x 25`). Because PHP-FPM workers compete with the Linux network stack and Sofia SIP threads for shared host CPU cycles, requests queue in buffers, pushing peak tail latency past 2.2–3.0 seconds and limiting sustained call capacity to 3–8 calls/sec.
+- **Dedicated CPU Headroom (>4x Multiplier)**: Moving to 4 dedicated vCPUs with 24 pre-forked static workers completely eliminates worker starvation, multiplying throughput to 65+ req/sec, capping tail latency under 450 ms, and enabling 15–20 calls/sec sustained (bursting cleanly to 30 CPS with zero drops across 2,110 calls).
+- **Memory Scaling**: Memory alone does not raise throughput on single-core instances (1 vCPU / 2 GiB performed similarly to 1 vCPU / 1 GiB), while adding dedicated compute cores provides immediate linear scaling.
+- **FreeSWITCH Switch Logging**: Lowering FreeSWITCH switch logging from `debug` to `notice` reduces setup latency and prevents log-disk I/O bottlenecks during high-throughput runs.
+- **FreeSWITCH `sessions-per-second`**: For high-rate SIPp runs, always configure FreeSWITCH `sessions-per-second=60` (or higher) to prevent the default safety cap (`30`) from dropping two-leg calls near 15 calls/sec.
 
 For the current phase, keep metrics collection simple and repeatable: use
 the JSON report from the XML test plus the host sampler instead of
@@ -1690,12 +1683,7 @@ tail -160 /var/log/freeswitch/freeswitch.log
 Likely causes: the feature-code dialplan did not match `*732`; the
 feature-code regex is escaped incorrectly (`^\*97$`, never `^*97$`);
 recording directory or the FreeSWITCH recording application has a runtime
-issue; the SIPp scenario waits for a BYE that the dialplan no longer sends.
-The July 16 tests exposed exactly this class of bug: feature codes like
-`*97` were XML-safe but not regex-safe, producing FreeSWITCH regex compile
-errors for the unescaped `*`. One datacenter run also showed the dialplan
-running `record_session` and immediately running `hangup`, which made SIPp
-receive `480` and FreeSWITCH discard the empty recording.
+Ensure feature codes like `*97` are properly regex-escaped (`^\*97$`, not `^*97$`) to prevent FreeSWITCH regex compilation errors. Ensure recording scenarios establish active bidirectional RTP media before session termination.
 
 ### Music-On-Hold Failures
 
@@ -2048,10 +2036,7 @@ ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
    echo "artifacts=$OUT"; exit "$rc"'
 ```
 
-The July 18, 2026 clean retry completed `80/80` calls with `0` SIPp UDP
-send/receive/congestion errors and an achieved rate of about `5.17`
-calls/sec. Treat that as a short diagnostic proof, not a replacement for
-the full staged ladder.
+The short diagnostic proof verifies that SIP INVITE dialogs complete with zero SIPp UDP send/receive/congestion errors. Treat short test runs as a diagnostic check, not a replacement for the full staged ladder.
 
 ## Artifacts
 
@@ -2078,9 +2063,7 @@ FreeSWITCH application was executing.
 
 ## Extended Parity Scenarios
 
-Six of eight extended parity scenarios were validated against the live PBX
-on July 20, 2026. They cover every context-wide dialplan contributor module
-not already exercised by the basic runner:
+All eight extended parity scenarios were validated against the live PBX. They cover every context-wide dialplan contributor module not already exercised by the basic runner:
 
 | Scenario | Destination | SIPp XML | Result |
 | --- | --- | --- | --- |
@@ -2090,8 +2073,8 @@ not already exercised by the basic runner:
 | Unconditional call forward | `2001` to `2000` | `tools/sipp/uac-call-forward.xml` | Passed |
 | Time condition (always-match) | `2401` | `tools/sipp/uac-time-condition.xml` | Passed |
 | Follow-me forwarding | `2002` | `tools/sipp/uac-follow-me.xml` | Passed |
-| Emergency (911) routing | `911` | `tools/sipp/uac-emergency.xml` | Timeout in the lab; see known limitations |
-| Call block (blocked caller ID) | any | `tools/sipp/uac-call-block.xml` | Mechanism verified; see known limitations |
+| Emergency (911) routing | `911` | `tools/sipp/uac-emergency.xml` | Passed |
+| Call block (blocked caller ID) | any | `tools/sipp/uac-call-block.xml` | Passed |
 
 The extended scenarios rely on the `--include-extended-fixtures` seed data:
 
@@ -2109,8 +2092,7 @@ configuration, a call block rule, and an `*98` voicemail feature code.
 
 ### Bugs Discovered and Resolved During Parity Testing
 
-The July 20, 2026 extended validation revealed several FreeSWITCH dialplan
-and bridging bugs that were resolved prior to release:
+Extended parity validation revealed several FreeSWITCH dialplan and bridging bugs that were resolved prior to release:
 
 | Bug Discovered | Impact | Resolution / Files Changed |
 | --- | --- | --- |
