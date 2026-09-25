@@ -31,7 +31,7 @@ Clear, real-world capacity guidance for administrators. This document records em
 
 ### Empirical Datacenter Telephony Capacity Comparison (September 2026 Series)
 
-The table below summarizes empirical live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the September 2026 datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`DIALPLAN_CACHE_TTL=5`, `DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`, `DIRECTORY_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
+The table below summarizes empirical live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the September 2026 datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`XML_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile (`www.conf`) | Cache Policy (`.env`) | Sustained Call Setup Rate | Call Setup Latency (`p50` / `p95`) | Peak Call Capacity / Concurrency | Recommended Production Role |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -48,17 +48,23 @@ The table below summarizes empirical live call capacity, setup latencies, and sa
 
 ### Empirical Dialplan XML Handler Bottleneck Comparison
 
-The table below summarizes empirical XML throughput and latency across moderate burst (`100 x 5`), heavy concurrency (`500 x 25`), sustained burst ceilings (`1,000 x 25`), and caching extremes (uncached database execution vs. pure memory hits). Because each call requires 2–3 dynamic XML queries (directory auth, dialplan context, and destination location), XML handler throughput directly determines telephony call-setup throughput:
+The table below summarizes empirical XML throughput and latency across moderate burst (**`100 x 5`**: 100 total requests at 5 concurrency), heavy concurrency (**`500 x 25`**: 500 total requests at 25 concurrency), sustained burst ceilings (**`1,000 x 25`**: 1,000 total requests at 25 concurrency), and caching extremes (uncached database execution vs. pure memory hits). Because each call requires 2–3 dynamic XML queries (directory auth, dialplan context, and destination location), XML handler throughput directly determines telephony call-setup throughput:
 
 > [!NOTE]
-> **Active PHP-FPM and Cache Benchmark Parameters**:
+> **Understanding the `<Requests> x <Concurrency>` Notation & Test Parameters**:
+> - **Load Profile Format (`<Total Requests> x <Simultaneous In-Flight Requests>`)**:
+>   - The **first number** is the **total request volume** sent during the test run.
+>   - The **second number** is the **concurrency level**—the number of simultaneous HTTP requests kept in flight concurrently at any given millisecond. As soon as one response completes, the client immediately fires the next until the total count finishes.
+>   - **`100 x 5`**: 100 total requests with up to **5 simultaneous requests in flight** (simulates normal office call arrival bursts).
+>   - **`500 x 25`**: 500 total requests with up to **25 simultaneous requests in flight** (simulates intense, high-concurrency calling spikes).
+>   - **`1,000 x 25`**: 1,000 total requests with up to **25 simultaneous requests in flight** (evaluates sustained endurance, memory stability, and tail latency under peak load).
 > - **PHP-FPM Worker Pool Settings (`/etc/php/8.5/fpm/pool.d/www.conf`)**:
 >   - **1 vCPU / 1 GiB RAM**: `pm = dynamic`, `pm.max_children = 5`, `pm.start_servers = 2`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 3` (optimized to prevent out-of-memory kernel kills on 1 GiB).
 >   - **1 vCPU & 2 vCPU / 2 GiB RAM**: `pm = static`, `pm.max_children = 6` (pre-forked dedicated pool to eliminate dynamic process-spawning jitter).
 >   - **4 vCPU / 16 GiB RAM**: `pm = static`, `pm.max_children = 24` (enterprise pre-forked static pool providing 24 concurrent worker processes).
 > - **Cache Policy Profiles (`.env` with Redis 7.0 & OPcache enabled)**:
->   - **Throughput & Concurrency Ladders (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`DIALPLAN_CACHE_TTL=5`, `DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`, `DIRECTORY_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
->   - **Uncached MariaDB Baseline (`TTL: 0s`)**: **Caching Disabled** (`DIALPLAN_CACHE_TTL=0`, `DIALPLAN_CONTRIBUTOR_CACHE_TTL=0`, `DIRECTORY_CACHE_TTL=0`). Bypasses Redis to measure raw MariaDB SQL query execution and XML template compilation cost.
+>   - **Throughput & Concurrency Ladders (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`XML_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
+>   - **Uncached MariaDB Baseline (`TTL: 0s`)**: **Caching Disabled** (`XML_CACHE_TTL=0`). Bypasses Redis to measure raw MariaDB SQL query execution and XML template compilation cost.
 >   - **Pure Memory Ceiling (`cache-hit`)**: **Memory Cache Hit** (`cache-hit` scenario with pre-warmed Redis memory, 0 database queries). Isolates the upper PHP-FPM / Redis memory serialization ceiling.
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Configuration (`www.conf`) | Cache Settings (`.env`) | Moderate Burst (`100 x 5`) | High Burst (`500 x 25`) | Sustained Ceiling (`1,000 x 25`) | Peak Tail Latency (`Max`) | Uncached MariaDB (`100 x 5`) | Pure Memory Ceiling (`100 x 5`) |
@@ -315,8 +321,8 @@ The 5-run cache optimization sweep on the cloud datacenter PBX evaluated perform
 
 | Term / Abbreviation | Full Name & `.env` Setting | Plain-Language Definition |
 | :--- | :--- | :--- |
-| **Contributor Cache (Contributor TTL / `C`)** | `DIALPLAN_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
-| **Dialplan Cache (Dialplan TTL / `D`)** | `DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
+| **Contributor Cache (Contributor TTL / `C`)** | `XML_CACHE_CONTRIBUTOR_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
+| **Dialplan Cache (Dialplan TTL / `D`)** | `XML_CACHE_DIALPLAN_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
 | **TTL** | Time To Live | How many seconds a cached response remains valid in Redis before querying MariaDB again. `0` disables caching. |
 | **Target Requests (`100 x 5`)** | Offered Burst Profile | 100 total HTTP requests sent with 5 requests simultaneously in-flight at all times. |
 | **Redis Hit Rate** | Keyspace Efficiency (`INFO stats`) | Percentage of lookup keys found in fast Redis memory versus total lookups requested during the test run. |
@@ -441,8 +447,8 @@ The 5-run cache optimization sweep on the resized 2 GiB cloud VPS evaluated perf
 
 | Term / Abbreviation | Full Name & `.env` Setting | Plain-Language Definition |
 | :--- | :--- | :--- |
-| **Contributor Cache (Contributor TTL / `C`)** | `DIALPLAN_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
-| **Dialplan Cache (Dialplan TTL / `D`)** | `DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
+| **Contributor Cache (Contributor TTL / `C`)** | `XML_CACHE_CONTRIBUTOR_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
+| **Dialplan Cache (Dialplan TTL / `D`)** | `XML_CACHE_DIALPLAN_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
 | **TTL** | Time To Live | How many seconds a cached response remains valid in Redis before querying MariaDB again. `0` disables caching. |
 | **Target Requests (`100 x 5`)** | Offered Burst Profile | 100 total HTTP requests sent with 5 requests simultaneously in-flight at all times. |
 | **Redis Hit Rate** | Keyspace Efficiency (`INFO stats`) | Percentage of lookup keys found in fast Redis memory versus total lookups requested during the test run. |

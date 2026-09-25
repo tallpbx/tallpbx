@@ -193,11 +193,15 @@ FREESWITCH_XML_HANDLER_TOKEN=generated-by-installer
 # Successful request debug logging is intentionally opt-in.
 FREESWITCH_XML_HANDLER_LOG_REQUESTS=false
 
-# Repeated generated dialplan XML cache. Set 0 to disable.
-FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5
+# Master XML cache duration in seconds. Sets the default for dialplan,
+# contributor, directory, and ACL caches.
+XML_CACHE_TTL=5
 
-# Repeated context-wide fragment cache for standard dialplans and contributors.
-FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5
+# Optional granular overrides:
+# XML_CACHE_DIALPLAN_TTL=5
+# XML_CACHE_CONTRIBUTOR_TTL=5
+# XML_CACHE_DIRECTORY_TTL=5
+# XML_CACHE_ACL_TTL=5
 
 # Production default. Use file only for simple local installs without Redis.
 CACHE_STORE=redis
@@ -206,8 +210,12 @@ CACHE_STORE=redis
 SESSION_DRIVER=redis
 SESSION_CONNECTION=cache
 
-# Optional. Defaults to CACHE_STORE.
-FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis
+# Master cache store for all XML handler caches. Defaults to CACHE_STORE.
+XML_CACHE_STORE=redis
+# Optional granular overrides:
+# XML_CACHE_DIALPLAN_STORE=redis
+# XML_CACHE_DIRECTORY_STORE=redis
+# XML_CACHE_ACL_STORE=redis
 ```
 
 Redis is the recommended cache and session backend for this project because the XML handler is a hot path, control-panel sessions should not depend on local disk, and file/database stores add avoidable I/O under concurrent calls. Simple local development can temporarily use `CACHE_STORE=file` and `SESSION_DRIVER=file` if Redis is not installed.
@@ -365,7 +373,7 @@ php artisan pbx:load-test:dialplan \
 
 Use `--scenario=cache-hit` to repeat one exact dialplan lookup and isolate XML cache-hit behavior. Use `--scenario=mixed` for a more realistic blend of internal, inbound, and outbound requests.
 
-For concurrency testing, prefer Redis or another memory-backed store for `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE`. After changing cache-related env values, run `php artisan optimize:clear` followed by `php artisan optimize` before load testing the real PHP-FPM endpoint. Avoid running `optimize:clear` while traffic is active; PHP-FPM workers can briefly fail if they request bootstrap cache files while those files are being rebuilt.
+For concurrency testing, prefer Redis or another memory-backed store for `XML_CACHE_STORE`. After changing cache-related env values, run `php artisan optimize:clear` followed by `php artisan optimize` before load testing the real PHP-FPM endpoint. Avoid running `optimize:clear` while traffic is active; PHP-FPM workers can briefly fail if they request bootstrap cache files while those files are being rebuilt.
 
 Useful tiers:
 
@@ -419,9 +427,12 @@ In `static` mode, all workers are ready for FreeSWITCH XML handler bursts; `pm.s
 
 TallPBX uses a tiered in-memory caching architecture backed by Redis to keep dialplan lookups fast and protect MariaDB during high-frequency call bursts:
 
-1. **Full Dialplan XML Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5`)**: Stores the complete compiled XML response per tenant, context, and destination. Eliminates dialplan rebuilding for repeat calls within the TTL window.
-2. **Contributor Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5`)**: Caches individual dialplan contributor query fragments (extensions, ring groups, call forwards, IVRs) across calls to different destinations.
-3. **Directory Cache (`FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5`)**: Caches SIP authentication and registration lookups.
+- **Master XML Cache (`XML_CACHE_TTL=5`)**: Sets the default TTL across all telephony XML caches.
+- **Granular Overrides**:
+  1. **Full Dialplan XML Cache (`XML_CACHE_DIALPLAN_TTL=5`)**: Stores the complete compiled XML response per tenant, context, and destination. Eliminates dialplan rebuilding for repeat calls within the TTL window.
+  2. **Contributor Cache (`XML_CACHE_CONTRIBUTOR_TTL=5`)**: Caches individual dialplan contributor query fragments (extensions, ring groups, call forwards, IVRs) across calls to different destinations.
+  3. **Directory Cache (`XML_CACHE_DIRECTORY_TTL=5`)**: Caches SIP authentication and registration lookups.
+  4. **ACL Cache (`XML_CACHE_ACL_TTL=5`)**: Caches access control list XML.
 
 To benchmark all 5 standard cache configurations and calculate Redis hit rates on your hardware:
 
@@ -438,9 +449,9 @@ redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
 ```
 
 Recommended settings in `.env`:
-- **Standard Office**: `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5` (default: optimal balance between high burst throughput and quick 5-second propagation of panel changes).
-- **High-Density Call Center**: `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
-- **Development**: `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
+- **Standard Office**: `XML_CACHE_TTL=5` (default: optimal balance between high burst throughput and quick 5-second propagation of panel changes).
+- **High-Density Call Center**: `XML_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
+- **Development**: `XML_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
 
 ## Tech Stack
 

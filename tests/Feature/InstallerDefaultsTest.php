@@ -568,7 +568,7 @@ it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML cu
         ->and($script)->toContain('cut -d= -f2-')
         ->and($script)->toContain('bin2hex(random_bytes(32))')
         ->and($script)->toContain('bin2hex(random_bytes(12))')
-        ->and($script)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis')
+        ->and($script)->toContain('XML_CACHE_STORE=redis')
         ->and($script)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false')
         ->and($script)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000')
         ->and($script)->toContain('FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false')
@@ -945,12 +945,10 @@ it('auto-configures PHP-FPM static worker pools based on host memory', function 
         ->and($phpScript)->toContain('pm.max_children = $target_max_children');
 });
 
-it('configures default XML handler cache TTLs in tall.sh', function (): void {
+it('configures default XML handler cache TTL in tall.sh', function (): void {
     $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
 
-    expect($tallScript)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5')
-        ->and($tallScript)->toContain('FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5')
-        ->and($tallScript)->toContain('FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5');
+    expect($tallScript)->toContain('XML_CACHE_TTL=5');
 });
 
 

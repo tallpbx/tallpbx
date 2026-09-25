@@ -905,12 +905,15 @@ FREESWITCH_XML_HANDLER_AUTH=true
 FREESWITCH_XML_HANDLER_TOKEN=generated-by-installer
 FREESWITCH_XML_HANDLER_LOG_REQUESTS=false
 FREESWITCH_XML_HANDLER_LOG_TIMING=false
-FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5
-FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5
-FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5
-FREESWITCH_XML_HANDLER_ACL_CACHE_TTL=5
-FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis
-FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_STORE=redis
+XML_CACHE_TTL=5
+# XML_CACHE_DIALPLAN_TTL=5
+# XML_CACHE_CONTRIBUTOR_TTL=5
+# XML_CACHE_DIRECTORY_TTL=5
+# XML_CACHE_ACL_TTL=5
+XML_CACHE_STORE=redis
+# XML_CACHE_DIALPLAN_STORE=redis
+# XML_CACHE_DIRECTORY_STORE=redis
+# XML_CACHE_ACL_STORE=redis
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 SESSION_CONNECTION=cache
@@ -927,20 +930,25 @@ What each setting does:
 - `FREESWITCH_XML_HANDLER_LOG_TIMING=false` keeps per-request timing
   logging off. Enable it only for diagnostics; it adds log I/O to the path
   being measured.
-- `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5` caches generated dialplan
+- `XML_CACHE_TTL=5` acts as the master default TTL (in seconds)
+  for all FreeSWITCH XML handler caches (dialplan, contributor, directory, and ACL).
+  Uncomment any individual setting below if you need a granular override.
+- `XML_CACHE_DIALPLAN_TTL=5` caches generated dialplan
   XML by tenant/context/destination for short bursts. Set it to `0` to
   measure fully cold generation. Control-panel changes may take up to this
   many seconds to appear in FreeSWITCH dialplan lookups.
-- `FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5` caches standard
+- `XML_CACHE_CONTRIBUTOR_TTL=5` caches standard
   dialplan fragments and first-party context-wide contributor fragments by
   tenant/context, so cold misses for different destinations avoid repeated
   MariaDB reads.
-- `FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5` caches SIP directory XML
+- `XML_CACHE_DIRECTORY_TTL=5` caches SIP directory XML
   so repeated registration and authentication lookups avoid rebuilding the
   same user or domain XML.
-- `FREESWITCH_XML_HANDLER_ACL_CACHE_TTL=5` caches ACL XML the same way. The
-  directory and ACL cache stores fall back to the dialplan cache store when
-  not set explicitly.
+- `XML_CACHE_ACL_TTL=5` caches ACL XML the same way.
+- `XML_CACHE_STORE=redis` acts as the master cache store for all
+  telephony XML handler caches. Granular overrides (`XML_CACHE_DIALPLAN_STORE`,
+  `XML_CACHE_DIRECTORY_STORE`, `XML_CACHE_ACL_STORE`) fall back to this master store
+  when not explicitly set.
 - `FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false` means `mod_hiredis` is
   loaded, but normal local-extension calls do not use Redis-backed
   FreeSWITCH counters. Set it to `true` only when testing or enforcing
@@ -985,13 +993,13 @@ measuring exact Redis hit rates.
 
 #### The Layered Telephony Caching Architecture
 
-1. **Outer Full Dialplan Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL`, default `5`)**:
+1. **Outer Full Dialplan Cache (`XML_CACHE_DIALPLAN_TTL`, default `5`)**:
    - Caches the complete rendered FreeSWITCH dialplan XML document.
    - Cache key: `freeswitch:xml-handler:dialplan:{tenant_id}:{context}:{destination}:{version}`.
    - When a call arrives for the same destination number within the TTL window,
      Laravel serves the complete XML directly from Redis in ~10–25 ms, bypassing
      all MariaDB queries and XML rendering logic.
-2. **Inner Contributor & Fragment Cache (`FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL`, default `5`)**:
+2. **Inner Contributor & Fragment Cache (`XML_CACHE_CONTRIBUTOR_TTL`, default `5`)**:
    - Caches static context-wide dialplan fragments (call forwards, IVR menus,
      ring groups, time conditions, conference bridges) that do not vary by
      destination number.
@@ -1000,7 +1008,7 @@ measuring exact Redis hit rates.
    - When calls arrive for *different* destinations (resulting in an outer cache
      miss), the contributor cache still prevents 80%+ of MariaDB table reads by
      reusing the compiled static routing fragments.
-3. **Directory / SIP Auth Cache (`FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL`, default `5`)**:
+3. **Directory / SIP Auth Cache (`XML_CACHE_DIRECTORY_TTL`, default `5`)**:
    - Caches SIP user credentials, auth tokens, and domain configuration.
    - Cache key: `freeswitch:xml-handler:directory:{tenant_id}:{tag_name}:{domain}:{username}:{key_value}`.
    - Absorbs repeated authentication challenges during SIP registration storms
@@ -1094,11 +1102,11 @@ entire spectrum, from bare database reads to 100% in-memory cache hits:
 
 | Run | Name | Cache Configuration | Scenario | Target Requests | Expected Hit Rate | Purpose |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Cold Baseline | `DIALPLAN_CACHE_TTL=0`<br>`CONTRIBUTOR_CACHE_TTL=0` | `mixed` | 100 (c=5) | 0.0% | Measures raw MariaDB read throughput and worst-case latency with zero caching. |
-| 2 | Contributor Only | `DIALPLAN_CACHE_TTL=0`<br>`CONTRIBUTOR_CACHE_TTL=5` | `mixed` | 100 (c=5) | 45.0% – 60.0% | Validates static fragment reuse across differing destination numbers. |
-| 3 | Production Baseline | `DIALPLAN_CACHE_TTL=5`<br>`CONTRIBUTOR_CACHE_TTL=5` | `mixed` | 100 (c=5) & 500 (c=25) | 75.0% – 85.0% | Validates the recommended production profile (5-second convergence window). |
-| 4 | Call Center Profile | `DIALPLAN_CACHE_TTL=30`<br>`CONTRIBUTOR_CACHE_TTL=30` | `mixed` | 100 (c=5) | 85.0% – 95.0% | Evaluates extended burst absorption for static, high-volume call centers. |
-| 5 | Memory Hit Ceiling | `DIALPLAN_CACHE_TTL=5`<br>`CONTRIBUTOR_CACHE_TTL=5` | `cache-hit` | 100 (c=5) | 99.0% | Isolates framework and Redis serialization ceiling (zero database queries). |
+| 1 | Cold Baseline | `XML_CACHE_TTL=0` | `mixed` | 100 (c=5) | 0.0% | Measures raw MariaDB read throughput and worst-case latency with zero caching. |
+| 2 | Contributor Only | `XML_CACHE_DIALPLAN_TTL=0`<br>`XML_CACHE_CONTRIBUTOR_TTL=5` | `mixed` | 100 (c=5) | 45.0% – 60.0% | Validates static fragment reuse across differing destination numbers. |
+| 3 | Production Baseline | `XML_CACHE_TTL=5` | `mixed` | 100 (c=5) & 500 (c=25) | 75.0% – 85.0% | Validates the recommended production profile (5-second convergence window). |
+| 4 | Call Center Profile | `XML_CACHE_TTL=30` | `mixed` | 100 (c=5) | 85.0% – 95.0% | Evaluates extended burst absorption for static, high-volume call centers. |
+| 5 | Memory Hit Ceiling | `XML_CACHE_TTL=5` | `cache-hit` | 100 (c=5) | 99.0% | Isolates framework and Redis serialization ceiling (zero database queries). |
 
 ##### Execution Steps for Each Run
 
@@ -1107,8 +1115,7 @@ application caches, and flush the Redis database:
 
 ```bash
 # Example for Run 1 (Cold Baseline):
-sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=0/' .env
-sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=0/' .env
+sed -i 's/^XML_CACHE_TTL=.*/XML_CACHE_TTL=0/' .env
 php artisan optimize:clear && php artisan optimize
 redis-cli flushdb
 
@@ -1173,8 +1180,8 @@ for item in "${RUNS[@]}"; do
   IFS="|" read -r num name d_ttl c_ttl scenario reqs conc <<< "$item"
 
   # Update configuration
-  sed -i "s/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=$d_ttl/" .env
-  sed -i "s/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=$c_ttl/" .env
+  sed -i "s/^#\? \?XML_CACHE_DIALPLAN_TTL=.*/XML_CACHE_DIALPLAN_TTL=$d_ttl/" .env
+  sed -i "s/^#\? \?XML_CACHE_CONTRIBUTOR_TTL=.*/XML_CACHE_CONTRIBUTOR_TTL=$c_ttl/" .env
   php artisan optimize:clear > /dev/null 2>&1
   php artisan optimize > /dev/null 2>&1
   redis-cli flushdb > /dev/null 2>&1
@@ -1212,8 +1219,9 @@ for item in "${RUNS[@]}"; do
 done
 
 # Restore recommended defaults
-sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5/' .env
-sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5/' .env
+sed -i 's/^XML_CACHE_TTL=.*/XML_CACHE_TTL=5/' .env
+sed -i 's/^XML_CACHE_DIALPLAN_TTL=.*/# XML_CACHE_DIALPLAN_TTL=5/' .env
+sed -i 's/^XML_CACHE_CONTRIBUTOR_TTL=.*/# XML_CACHE_CONTRIBUTOR_TTL=5/' .env
 php artisan optimize:clear > /dev/null 2>&1
 php artisan optimize > /dev/null 2>&1
 echo "=========================================================="
@@ -1237,7 +1245,7 @@ echo " Cache sweep completed. Production defaults restored (TTL=5s)."
     60s). This provides a higher sustained hit rate (>90%) across rolling call
     bursts.
 - **Cache Store Selection**:
-  - Always keep `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis` and
+  - Always keep `XML_CACHE_STORE=redis` and
     `CACHE_STORE=redis`. File-based cache drivers (`CACHE_STORE=file`) introduce
     filesystem lock contention on `storage/framework/cache/` during concurrent
     bursts, and database-backed cache drivers (`database`) defeat the purpose by
@@ -2151,7 +2159,7 @@ For beta or release candidates:
   remains file-backed with database paths and metadata only.
 - The dialplan XML cache introduces a short propagation delay for
   control-panel changes, controlled by
-  `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL`.
+  `XML_CACHE_DIALPLAN_TTL` (or default `XML_CACHE_TTL`).
 - Emergency (911) routing bridges to
   `sofia/external/911@<gateway-host>:<gateway-port>` using the emergency
   gateway's host and port from the database. The bridge executes correctly

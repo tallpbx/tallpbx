@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Streamlined Telephony XML Cache Settings (`XML_CACHE_TTL` & `XML_CACHE_STORE`)**:
+  - Streamlined telephony XML cache configuration in `config/freeswitch.php`, `.env`, and `.env.example` to use concise `XML_CACHE_*` naming (e.g. `XML_CACHE_TTL`, `XML_CACHE_STORE`, `XML_CACHE_DIALPLAN_TTL`, `XML_CACHE_CONTRIBUTOR_TTL`, `XML_CACHE_DIRECTORY_TTL`, `XML_CACHE_ACL_TTL`, `XML_CACHE_DIALPLAN_STORE`, `XML_CACHE_DIRECTORY_STORE`, `XML_CACHE_ACL_STORE`).
+  - Introduced `XML_CACHE_TTL` as the master default cache TTL (in seconds) for all dynamically rendered FreeSWITCH XML responses (dialplans, directory auth, contributor fragments, and ACLs).
+  - Cascades the master TTL automatically to all granular caches unless an explicit granular override is uncommented in `.env`.
+  - Introduced `XML_CACHE_STORE` as the master cache store setting (defaulting to `redis`), automatically cascading across all XML handler caches.
+  - Preserved 100% backward compatibility with legacy `FREESWITCH_XML_HANDLER_CACHE_TTL`, `FREESWITCH_XML_HANDLER_CACHE_STORE`, and subsystem-specific `FREESWITCH_XML_HANDLER_*` keys in existing installations.
+  - Formatted `.env` and `.env.example` with the master TTL (`XML_CACHE_TTL=5`) and store (`XML_CACHE_STORE=redis`) active, leaving granular overrides cleanly commented out with plain-language explanations.
+  - Updated installer (`scripts/resources/tall.sh`), cache benchmark sweep tool (`scripts/run-cache-sweep.sh`), test suites, and all documentation (`README.md`, `INSTALL.md`, `docs/load-testing-guide.md`, `docs/load-testing-results.md`, `AGENTS.md`) to reflect the streamlined naming convention.
 - **Cloud Datacenter 4 vCPU Dedicated / 16 GiB RAM Empirical Benchmarks**:
   - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on the 4 vCPU Dedicated / 16 GiB enterprise node (`pm = static`, `pm.max_children = 24`).
   - Achieved **65.32 req/sec** dynamic XML throughput with tail latency capped under **448 ms** across 1,000 sustained requests (a >4x throughput increase over single/dual-core baselines).

@@ -227,15 +227,11 @@ grep -q "^SESSION_DRIVER=" .env 2>/dev/null \
 grep -q "^SESSION_CONNECTION=" .env 2>/dev/null \
     && sed -i "s/^SESSION_CONNECTION=.*/SESSION_CONNECTION=cache/" .env \
     || echo "SESSION_CONNECTION=cache" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=" .env 2>/dev/null \
-    && sed -i "s/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis/" .env \
-    || echo "FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=" .env 2>/dev/null \
-    || echo "FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=" .env 2>/dev/null \
-    || echo "FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=" .env 2>/dev/null \
-    || echo "FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL=5" >> .env
+grep -q "^XML_CACHE_STORE=" .env 2>/dev/null \
+    && sed -i "s/^XML_CACHE_STORE=.*/XML_CACHE_STORE=redis/" .env \
+    || echo "XML_CACHE_STORE=redis" >> .env
+grep -q "^XML_CACHE_TTL=" .env 2>/dev/null \
+    || echo "XML_CACHE_TTL=5" >> .env
 grep -q "^FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=" .env 2>/dev/null \
     || echo "FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false" >> .env
 grep -q "^FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=" .env 2>/dev/null \
