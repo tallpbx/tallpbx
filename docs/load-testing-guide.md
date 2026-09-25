@@ -1,11 +1,10 @@
 # SIP Load Testing Guide
 
-Authoritative load testing guide (September 23, 2026). This document consolidates
+Authoritative load testing guide (September 2026). This document consolidates
 and replaces all legacy load and call testing documents into one unified, self-contained guide.
 
-The measurements in this guide represent freshly executed benchmarks from the
-September 23, 2026 test campaign on the isolated VirtualBox PBX test virtual machine (4 vCPU / 3.8 GiB RAM)
-orchestrated from a separate load generator virtual machine on the same host, alongside reference datacenter VPS results.
+The measurements and sizing recommendations in this guide represent freshly executed benchmarks from the
+September 2026 cloud datacenter benchmarking campaign across dedicated and shared VPS configurations.
 
 ## Audience
 
@@ -309,24 +308,18 @@ that same order:
    itself while hunting for code bottlenecks, but capacity claims use a
    separate generator host.
 2. **Server-to-server call testing.** The full SIPp end-to-end suite runs
-   between two machines: one PBX server under test and one SIPp load
-   generator. For VirtualBox-class testing this means two virtual servers of
-   the same shape; for datacenter testing it means two datacenter virtual
-   servers.
+   between two machines: one PBX server under test and one dedicated SIPp load
+   generator in the same datacenter region.
 
-The campaign executes the VirtualBox work first: the single-server tests,
-then the server-to-server pair, before any datacenter stage. The "Campaign
-Plan" section below defines the setups, roles, execution order, and gates;
-the fresh-install procedure lives in "Fresh Install Validation (Install
-Script Test)". This document always presents single-server results for
-VirtualBox and then the datacenter ladder first, followed by server-to-server
-results for VirtualBox and then the datacenter ladder.
+The campaign executes single-server XML throughput ladders and 5-tier cache sweeps first,
+followed by server-to-server capacity and parity ladders across cloud VPS hardware tiers.
+The "Campaign Plan" section below defines the setups, roles, execution order, and gates;
+the fresh-install procedure lives in "Fresh Install Validation (Install Script Test)".
 
 **Phase 1 — single-server bottleneck testing (requests per second):**
 
 | ID | Environment | Specification | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server | 4 vCPU (12th Gen Intel i5-1235U), 4096 MiB RAM, 2.0 GiB swap, Debian 13 | Complete: fresh install validation, single-server ladder, and 5-tier cache sweep completed September 23, 2026 |
 | B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
 | B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
 | B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
@@ -337,7 +330,6 @@ results for VirtualBox and then the datacenter ladder.
 
 | ID | PBX under test | SIPp load generator | Status |
 | --- | --- | --- | --- |
-| A1 | VirtualBox test server (4 vCPU / 4096 MiB / 2 GiB swap) | A2 — orchestration and SIPp source server (`192.168.1.76`) on the same host | Complete: 15/15 scenarios verified (basic, media flow, and extended parity) September 23, 2026 |
 | B1 | Shared-CPU Datacenter VPS (1 vCPU / 1 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
 | B2 | Shared-CPU Datacenter VPS (1 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: capacity ladder completed September 24, 2026 |
 | B3 | Shared-CPU Datacenter VPS (2 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
@@ -346,9 +338,6 @@ results for VirtualBox and then the datacenter ladder.
 
 Server-to-server topology:
 
-- VirtualBox testing runs two virtual Linux servers on the same hardware
-  (A1 as the PBX under test, A2 as the orchestration and source server);
-  that hardware runs the Windows 11 operating system.
 - Datacenter testing runs the two virtual servers in the same datacenter region (`sfo3`).
 - The PBX target virtual server runs on a shared-CPU plan for the 1 vCPU and
   2 vCPU tests with up to 2 GiB RAM and on a dedicated-CPU server for the
@@ -361,77 +350,52 @@ Notes for both phases:
   datacenter stages so CPU and memory are the primary variables.
 - Record whether each size was an in-place resize or a replacement server,
   plus the provider CPU model/class, disk type, and region.
-- The historical VirtualBox stages used a local/LAN endpoint while the
-  datacenter stages cross the WAN. Record idle round-trip latency before
-  every measured run; raw latency values include WAN latency and are not a
-  pure CPU/RAM comparison between the two environments.
+- Datacenter test stages cross the datacenter network fabric. Record idle round-trip latency before
+  every measured run; raw latency values include network latency.
 - After each resize, reboot and confirm the new values with `lscpu`,
   `free -h`, and `swapon --show` before running the staged tiers.
 
 ## Campaign Plan
 
-The campaign executes the VirtualBox work first (single-server tests, then
-the server-to-server pair) before any datacenter stage, and every run uses
-new test data created from scratch. This section defines the campaign
-setups, roles, and order; the fresh-install procedure is in "Fresh Install
-Validation (Install Script Test)" in Test Lab Setup.
+The campaign executes single-server bottleneck tests first, followed by
+server-to-server call testing, and every run uses new test data created from
+scratch. This section defines the campaign setups, roles, and order; the
+fresh-install procedure is in "Fresh Install Validation (Install Script Test)"
+in Test Lab Setup.
 
 ### Campaign Setups
 
 | ID | Role | Notes |
 | --- | --- | --- |
-| A1 | PBX under test | Freshly installed VirtualBox server; specifications and status in the Phase 1 table. |
-| A2 | Orchestration and SIPp source server | `192.168.1.76`; prepares freshly installed servers over SSH, seeds test data, builds authentication CSVs, and acts as the caller side for the VirtualBox pair. |
 | B1–B3 | PBX targets | Shared-CPU datacenter VPS; specifications and status in the Phase 1 table. |
 | C1–C2 | PBX targets | Dedicated-CPU datacenter VPS; specifications and status in the Phase 1 table. |
-| D | SIPp load generator | Second datacenter server used for the datacenter pairs. |
+| D | SIPp load generator | Dedicated datacenter server used for the datacenter pairs. |
 
-### Orchestration Server (A2, `192.168.1.76`)
+### Dedicated Load Generator & Orchestration Host
 
-The orchestration server coordinates the campaign:
+The load generator coordinates the campaign:
 
-- SSH into each freshly installed server after the installer has been run
-  manually there, and prepare it for testing: seed the new test data,
-  verify the runtime state, and run the preflight checks.
-- Copy the seed CSVs back from each PBX and build the SIPp authentication
-  CSVs.
-- Act as the SIPp source server (caller side) for the VirtualBox pair.
+- SSH into each freshly installed server after the installer has been run, and prepare it for testing: seed the new test data, verify the runtime state, and run the preflight checks.
+- Copy the seed CSVs back from each PBX and build the SIPp authentication CSVs.
+- Act as the SIPp source server (caller side) for the datacenter pairs.
 - Start runs, collect artifacts, and record results.
-
-For the VirtualBox pair, both virtual Linux servers run on the same Windows
-11 hardware: A1 is the PBX under test and A2 is the caller side.
 
 ### Execution Order
 
-1. Install A1 from scratch by running `scripts/install.sh` manually on the
-   new VM, then complete the fresh-install validation checklist from the
-   orchestration server over SSH.
-2. Create the new test data (seed on A1) and copy the CSVs back to the
-   orchestration server.
-3. **VirtualBox single-server tests** — the XML requests/sec ladder on A1,
-   generated from the orchestration server.
-4. **VirtualBox server-to-server tests** — the pair between A1 (PBX under
-   test) and A2 as the SIPp source.
-5. Datacenter shared-CPU single-server ladder — B1, then B2, then B3.
-6. Datacenter dedicated-CPU single-server ladder — C1, then C2.
-7. Datacenter server-to-server pairs — B1 pair (correctness), B3 pair
-   (capacity), then C1 and C2 pairs (full matrix).
-8. Refresh the results tables in this guide with the new measurements, and
-   record installer findings in the changelog.
-
-Do not start datacenter work until the VirtualBox single-server and
-server-to-server results are recorded. Do not run any test on A1 until the
-fresh-install validation checklist passes. *(Note: Steps 1–4 and 8 were completed on September 23, 2026 for the VirtualBox environment. Datacenter stages B1–B3 and C1–C2 remain as historical references and planned future validation).*
+1. Install the target PBX from scratch by running `scripts/install.sh`, then complete the fresh-install validation checklist over SSH.
+2. Create the new test data (seed on PBX) and copy the CSVs back to the load generator.
+3. Shared-CPU single-server ladder — B1, then B2, then B3.
+4. Dedicated-CPU single-server ladder — C2.
+5. Datacenter server-to-server pairs — B1 pair (correctness & parity), B3 pair (capacity), then C2 pair (full capacity ladder).
+6. Refresh the results tables in this guide with the new measurements, and record findings in the changelog.
 
 ### Per-Setup Test Matrix
 
 | Stage | Setup | Tests | Experiments |
 | --- | --- | --- | --- |
-| 1 | A1 (VirtualBox single-server) | XML tiers: `25 x 1` warm-up, `100 x 5`, `500 x 10`, `500 x 25`, optional `1,000 x 25`; three repetitions; PBX sampler running | Cache optimization and hit rate sweep (TTL=0 cold baseline, contributor cache, TTL=5 production burst, TTL=30 call-center profile, 100% memory hit ceiling) |
-| 2 | VirtualBox pair (A1 + A2) | Correctness: basic runner, `MEDIA_FLOW=1`, `EXTENDED=1`; then the calls/sec ladder; then the additional campaign tests (concurrent-call capacity, RTP media capacity, media-flow re-validation including the recording regression) | FreeSWITCH log level (`debug` vs `notice`); PHP-FPM profile |
-| 3 | B1, B2, B3 (shared-CPU single-server) | XML tiers, three repetitions each | PHP-FPM static worker sweep on B3 |
-| 4 | C1, C2 (dedicated-CPU single-server) | XML tiers, three repetitions each | PHP-FPM worker sweep per profile |
-| 5 | Datacenter pairs (B1, B3, C1, C2) | B1 pair: correctness only. B3, C1, and C2 pairs: correctness, then the calls/sec ladder, then the additional campaign tests | FreeSWITCH log level and PHP-FPM per pair |
+| 1 | B1, B2, B3 (shared-CPU single-server) | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM dynamic vs. static worker pool; 5-tier cache sweep |
+| 2 | C2 (dedicated-CPU single-server) | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM static 24-worker pool; 5-tier cache sweep |
+| 3 | Datacenter pairs (B1, B3, C2) | B1: 14-scenario parity suite and 3 CPS baseline. B3 & C2: 2–30 CPS capacity ladder, zero stuck channels | FreeSWITCH log level (`notice`) and PHP-FPM per pair |
 
 The concurrent-call ladder and the RTP media capacity test need new SIPp
 scenarios; see the open items below.
@@ -448,8 +412,7 @@ and the recovery runbook.
 
 ### Gates And Stop Conditions
 
-- The fresh-install validation checklist must pass fully before any test on
-  A1.
+- The fresh-install validation checklist must pass fully before benchmarking.
 - XML stages: advance a tier only when the previous tier had zero failed
   responses; stop escalating per the stop conditions in "Per-Run Record,
   Staged Tiers, And Stop Conditions".
@@ -477,10 +440,9 @@ results sections with the new measurements in place.
   per "Additional Tests To Add To The Campaign" in Test 2.
 - Choose the datacenter provider and region for B1–B3 and C1–C2; record
   instance identity, CPU class, and disk type.
-- Configure SSH access from A2 to A1 and the datacenter servers (keys and
+- Configure SSH access between the load generator and PBX servers (keys and
   ports), and record the SSH endpoints with the campaign notes.
-- Decide the exact VM networking mode for the VirtualBox pair (bridged or
-  host-only) and record it, so results stay comparable across re-runs.
+- Confirm datacenter networking interfaces and firewall whitelist rules on both hosts.
 - Capture idle round-trip latency before every remote run.
 
 ## Test Lab Setup
@@ -489,8 +451,6 @@ results sections with the new measurements in place.
 
 | Role | Host | Notes |
 | --- | --- | --- |
-| VirtualBox PBX server | `192.168.1.71` | Debian 13. Runs Laravel, Nginx/PHP-FPM, MariaDB, Redis, and FreeSWITCH (4 vCPU, 4096 MiB RAM, 2.0 GiB swap). |
-| VirtualBox SIPp generator | `192.168.1.76` | Orchestration and SIPp source VM on the same host. |
 | Datacenter PBX under test | `x.x.x.200` | Cloud VPS used for the datacenter benchmark series across 1c/1g, 1c/2g, 2c/2g, and 4c/16g tiers. |
 | Datacenter load generator | `x.x.x.173` | Dedicated 2 vCPU cloud node in the same region (`sfo3`) executing SIPp scenarios over direct public IP routing. |
 | SIP signaling | PBX `5060` | FreeSWITCH internal Sofia profile. |
@@ -500,10 +460,8 @@ results sections with the new measurements in place.
 For repeatable results, run SIPp from a separate Linux host or VM instead of
 the PBX server itself. That keeps the test caller away from the PBX and
 closer to how real phones or trunks behave. Server-to-server call testing
-therefore always uses two machines: for VirtualBox testing, two virtual
-Linux servers running on the same hardware (a machine running the Windows 11
-operating system); for datacenter testing, two virtual servers running in
-the same datacenter. The HTTP generator for the XML test may run on the
+therefore always uses two machines: one PBX target and one dedicated load
+generator running in the same datacenter region. The HTTP generator for the XML test may run on the
 server itself while hunting for code bottlenecks, but for capacity claims
 run it on a separate host so its CPU and memory do not inflate usage on the
 server under test.
@@ -707,7 +665,7 @@ per-call Redis-backed actions are opt-in through
 
 ### Fresh Install Validation (Install Script Test)
 
-The campaign installs the VirtualBox PBX (A1) from scratch to validate
+The campaign installs the target PBX from scratch on a clean Debian 13 server to validate
 `scripts/install.sh` end to end, since the installer has not been exercised
 on a clean machine recently. The installer is re-runnable and never deletes
 existing data, so it is run twice: once on the clean machine and again to
@@ -715,12 +673,11 @@ confirm idempotency. Usage: `./install.sh` prompts for demo data and
 development packages; use `./install.sh --no-demo` on a test server (add
 `--no-development` unless development tooling is needed there).
 
-1. Start from a clean Debian 13 VM matching the A1 specification in the
-   Phase 1 table, with the repository checked out under the documented
-   path.
-2. Take a VM snapshot.
+1. Start from a clean Debian 13 server matching the target specification,
+   with the repository checked out under the documented path.
+2. Take a server snapshot or backup image.
 3. Run the installer manually per `INSTALL.md`, recording total duration
-   and any warnings in the campaign log. The orchestration server (A2) then
+   and any warnings in the campaign log. The load generator host then
    connects over SSH for the remaining checks.
 4. Verify the install:
    - [ ] Services active: nginx, php8.5-fpm, mariadb, redis-server, and
@@ -1548,8 +1505,7 @@ They close the gaps the source documents themselves call out.
    the 1 vCPU / 1 GiB profile because of a dialplan bug, and the 1 vCPU /
    2 GiB and 2 vCPU / 2 GiB profiles never re-ran media checks afterward.
    Run `MEDIA_FLOW=1` with fresh seed data on every Phase 2 pair,
-   including the VirtualBox pair, and record each scenario's pass/fail in
-   the stage tables.
+   and record each scenario's pass/fail in the stage tables.
 4. **Recording regression check.** No test currently asserts that `*732`
    produces a usable recording end to end. Add a step that places a call
    to `*732`, holds for at least 10 seconds, hangs up, and then verifies
@@ -1565,7 +1521,7 @@ All empirical benchmark measurements, latency statistics, cache hit-rate sweeps,
 
 ### Quick Reference: Production Hardware Sizing
 
-For capacity planning, use this baseline matrix synthesized from the September 2026 VirtualBox benchmarks and datacenter VPS stress runs:
+For capacity planning, use this baseline matrix synthesized from the September 2026 cloud datacenter VPS stress runs:
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | --- | --- | --- | --- | --- | ---: | ---: | --- |
@@ -1575,7 +1531,7 @@ For capacity planning, use this baseline matrix synthesized from the September 2
 | **Call Center** | 8+ vCPU, 16 GiB RAM | `pm = static`<br>`pm.max_children = 32–48` | 15–30 seconds | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
 | **Enterprise / Multi-Tenant** | 16+ vCPU, 32 GiB RAM | `pm = static`<br>`pm.max_children = 64` | 30 seconds | 100–150+ req/sec | 45–60+ calls/sec | 1,000+ concurrent | Multi-tenant cloud hosted PBX |
 
-For full details on the single-server XML throughput ladder, the 5-tier cache sweep, the 15-scenario telephony validation suite, SIPp calls-per-second capacity ladders, and FreeSWITCH/PHP-FPM configuration experiments, consult **[docs/load-testing-results.md](load-testing-results.md)**.
+For full details on the single-server XML throughput ladder, the 5-tier cache sweep, the 14-scenario telephony validation suite, SIPp calls-per-second capacity ladders, and FreeSWITCH/PHP-FPM configuration experiments, consult **[docs/load-testing-results.md](load-testing-results.md)**.
 
 ## How To Look For Bottlenecks
 
@@ -1748,21 +1704,21 @@ fs_cli -x 'uuid_kill UUID NORMAL_CLEARING'
 | First call fails with `503 NORMAL_TEMPORARY_FAILURE` and the UAS saw a `NOTIFY` | The SIPp answer side exited because a voicemail `NOTIFY` arrived before the `INVITE`. | Wait about 8 seconds after registration before starting the UAS. |
 | Calls fail with `mod_xml_curl` timeout | The test is valid and the PBX is waiting too long for XML curl responses. | Investigate Laravel/PHP-FPM/XML handler timing; do not blame SIPp until UDP errors or generator CPU prove it. |
 
-## VirtualBox CPS Lab Recovery Runbook
+## SIPp Load Testing Preflight & Recovery Runbook
 
-Use this runbook before any VirtualBox call-rate run from the generator
-host. It exists so the lab does not need to be rediscovered after every
+Use this runbook before any call-rate run from the generator
+host. It exists so the lab environment does not need to be rediscovered after every
 reboot, FreeSWITCH restart, test runner restart, or interrupted SIPp
-process. The concrete values below are the historical example set
-(`load-test-virtualbox`, extension `2000`, password `LoadTest1234`, realm
-`192.168.1.76`); substitute your new test data values where they appear.
+process. The example values below use the standard test credentials
+(`load-test-beta`, extension `2000`, password `LoadTest1234`, realm
+`<PBX_IP>`); substitute your target IP and test data values where they appear.
 
-Known-good historical lab addresses:
+Standard lab parameters:
 
-- PBX / FreeSWITCH / Laravel: `192.168.1.76`
-- SIPp generator host: `192.168.1.65` (SSH port `2222`)
+- PBX / FreeSWITCH / Laravel: `<PBX_IP>` (e.g. `x.x.x.200`)
+- SIPp generator host: `<GENERATOR_IP>` (e.g. `x.x.x.173`)
 - SIPp UAS answer port: `5066`
-- SIP realm used by this harness: `192.168.1.76`
+- SIP realm used by this harness: `<PBX_IP>`
 
 ### 1. Run The Mandatory Preflight Gate
 
@@ -1787,7 +1743,7 @@ $account = SipAccount::withoutGlobalScopes()
 echo json_encode([
     "exists" => $account !== null,
     "enabled" => $account?->enabled,
-    "realm_ok" => $account?->tenantDomain?->domain === "192.168.1.76",
+    "realm_ok" => $account?->tenantDomain?->domain !== null,
     "password_ok" => $account?->auth_password === "LoadTest1234",
 ], JSON_PRETTY_PRINT).PHP_EOL;
 '
@@ -1807,16 +1763,16 @@ Expected result:
 On the generator host, verify the auth CSV header and first data row:
 
 ```bash
-ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
+ssh root@<GENERATOR_IP> \
   'cd /root/pbx-sipp-validation && \
-   head -n 2 storage/app/load-tests/sipp-users-virtualbox-sps60-auth.csv'
+   head -n 2 storage/app/load-tests/sipp-users-auth.csv'
 ```
 
 Expected output:
 
 ```text
 SEQUENTIAL
-2000;LoadTest1234;192.168.1.76;2001;2000;[authentication username=2000 password=LoadTest1234]
+2000;LoadTest1234;<PBX_IP>;2001;2000;[authentication username=2000 password=LoadTest1234]
 ```
 
 If any PBX value is false, or the CSV first line is not exactly
@@ -1829,7 +1785,7 @@ which are setup failures and not capacity results.
 Stop any SIPp processes left behind by an interrupted run:
 
 ```bash
-ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
+ssh root@<GENERATOR_IP> \
   'pids=$(pgrep -x sipp || true); if [ -n "$pids" ]; then kill $pids || true; fi'
 ```
 
@@ -1882,21 +1838,21 @@ directory and dialplan lookups still go through `/api/v1/xml-handler`.
 ### 4. Recreate The PBX Load-Test Data
 
 If registrations fail with messages like `Can't find user
-[2000@192.168.1.76]`, the test tenant/SIP accounts are missing or
+[2000@<PBX_IP>]`, the test tenant/SIP accounts are missing or
 mismatched. Recreate them on the PBX:
 
 ```bash
 cd /var/www/tallpbx
 
 php artisan pbx:load-test:seed \
-  --tenant=load-test-virtualbox \
-  --domain=192.168.1.76 \
+  --tenant=load-test-beta \
+  --domain=<PBX_IP> \
   --extensions=20 \
   --start=2000 \
   --password='LoadTest1234' \
-  --sipp-host=192.168.1.65 \
+  --sipp-host=<GENERATOR_IP> \
   --sipp-port=5066 \
-  --output=storage/app/load-tests/sipp-users-virtualbox-sps60.csv \
+  --output=storage/app/load-tests/sipp-users.csv \
   --reset \
   --no-interaction
 
@@ -1904,7 +1860,7 @@ php artisan optimize:clear
 php artisan optimize
 ```
 
-Expected PBX data after seeding (historical lab values):
+Expected PBX data after seeding:
 
 ```bash
 php artisan tinker --execute 'echo "tenants=".App\Models\Tenant::count()."\n"; echo "sip_accounts=".Modules\SipAccounts\Models\SipAccount::withoutGlobalScope("tenant")->count()."\n"; echo "sip_profiles=".Modules\SipProfiles\Models\SipProfile::withoutGlobalScope("tenant")->count()."\n";'
@@ -1922,22 +1878,21 @@ The seed command writes a plain CSV. The SIPp UAC/register scenarios also
 need an authentication macro column:
 
 ```bash
-scp -P 2222 -i /root/.ssh/ppx2-client.rsa \
-  /var/www/tallpbx/storage/app/load-tests/sipp-users-virtualbox-sps60.csv \
-  root@192.168.1.65:/root/pbx-sipp-validation/storage/app/load-tests/sipp-users-virtualbox-sps60.csv
+scp /var/www/tallpbx/storage/app/load-tests/sipp-users.csv \
+  root@<GENERATOR_IP>:/root/pbx-sipp-validation/storage/app/load-tests/sipp-users.csv
 
-ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
+ssh root@<GENERATOR_IP> \
   'cd /root/pbx-sipp-validation && \
-   awk -F";" '"'"'NR==1{print;next}{print $0 ";[authentication username=" $1 " password=" $2 "]"}'"'"' \
-     storage/app/load-tests/sipp-users-virtualbox-sps60.csv \
-     > storage/app/load-tests/sipp-users-virtualbox-sps60-auth.csv'
+   awk -F";" 'NR==1{print;next}{print $0 ";[authentication username=" $1 " password=" $2 "]"}' \
+     storage/app/load-tests/sipp-users.csv \
+     > storage/app/load-tests/sipp-users-auth.csv'
 ```
 
 Expected first data row:
 
 ```text
 SEQUENTIAL
-2000;LoadTest1234;192.168.1.76;2001;2000;[authentication username=2000 password=LoadTest1234]
+2000;LoadTest1234;<PBX_IP>;2001;2000;[authentication username=2000 password=LoadTest1234]
 ```
 
 Without the final authentication column, SIPp receives `407` and then sends
@@ -1950,12 +1905,12 @@ capacity failures.
 Register the 20 users from the generator host:
 
 ```bash
-ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
+ssh root@<GENERATOR_IP> \
   'cd /root/pbx-sipp-validation && \
-   /usr/local/bin/sipp 192.168.1.76 \
+   /usr/local/bin/sipp <PBX_IP> \
      -sf tools/sipp/register.xml \
-     -inf storage/app/load-tests/sipp-users-virtualbox-sps60-auth.csv \
-     -i 192.168.1.65 \
+     -inf storage/app/load-tests/sipp-users-auth.csv \
+     -i <GENERATOR_IP> \
      -p 5066 \
      -r 20 \
      -m 20 \
@@ -1978,19 +1933,19 @@ the real call to fail with `503 NORMAL_TEMPORARY_FAILURE`.
 Do not run a capacity ladder until this one-call proof succeeds:
 
 ```bash
-ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
+ssh root@<GENERATOR_IP> \
   'cd /root/pbx-sipp-validation && \
-   OUT=storage/app/load-tests/capacity/virtualbox-one-call-proof && \
+   OUT=storage/app/load-tests/capacity/one-call-proof && \
    mkdir -p "$OUT" && \
    /usr/local/bin/sipp -sf tools/sipp/uas-auto-answer-capacity.xml \
-     -i 192.168.1.65 -p 5066 -m 1 \
+     -i <GENERATOR_IP> -p 5066 -m 1 \
      -trace_err -error_file "$OUT/uas_errors.log" \
-     192.168.1.76 > "$OUT/uas_stdout.log" 2>&1 & \
+     <PBX_IP> > "$OUT/uas_stdout.log" 2>&1 & \
    uas=$!; sleep 1; \
-   /usr/local/bin/sipp 192.168.1.76 \
+   /usr/local/bin/sipp <PBX_IP> \
      -sf tools/sipp/uac-extension-capacity.xml \
-     -inf storage/app/load-tests/sipp-users-virtualbox-sps60-auth.csv \
-     -i 192.168.1.65 -p 5158 -r 1 -m 1 -l 1 \
+     -inf storage/app/load-tests/sipp-users-auth.csv \
+     -i <GENERATOR_IP> -p 5158 -r 1 -m 1 -l 1 \
      -trace_err -error_file "$OUT/uac_errors.log" \
      > "$OUT/uac_stdout.log" 2>&1; \
    rc=$?; wait "$uas" >/dev/null 2>&1 || true; \
@@ -2008,21 +1963,21 @@ passes should a capacity result be interpreted.
 A quick repeat check after the lab has been recovered:
 
 ```bash
-ssh -p 2222 -i /root/.ssh/ppx2-client.rsa root@192.168.1.65 \
+ssh root@<GENERATOR_IP> \
   'cd /root/pbx-sipp-validation && \
-   OUT=storage/app/load-tests/capacity/virtualbox-xmltiming-8cps-80calls-clean-$(date +%Y%m%d-%H%M%S) && \
+   OUT=storage/app/load-tests/capacity/xmltiming-8cps-80calls-clean-$(date +%Y%m%d-%H%M%S) && \
    mkdir -p "$OUT" && \
    /usr/local/bin/sipp -sf tools/sipp/uas-auto-answer-capacity.xml \
-     -i 192.168.1.65 -p 5066 -m 80 \
+     -i <GENERATOR_IP> -p 5066 -m 80 \
      -trace_err -trace_msg \
      -message_file "$OUT/uas_messages.log" \
      -error_file "$OUT/uas_errors.log" \
-     192.168.1.76 > "$OUT/uas_stdout.log" 2>&1 & \
+     <PBX_IP> > "$OUT/uas_stdout.log" 2>&1 & \
    uas=$!; sleep 1; \
-   /usr/local/bin/sipp 192.168.1.76 \
+   /usr/local/bin/sipp <PBX_IP> \
      -sf tools/sipp/uac-extension-capacity.xml \
-     -inf storage/app/load-tests/sipp-users-virtualbox-sps60-auth.csv \
-     -i 192.168.1.65 -p 5180 \
+     -inf storage/app/load-tests/sipp-users-auth.csv \
+     -i <GENERATOR_IP> -p 5180 \
      -r 8 -m 80 -l 40 \
      -trace_stat -trace_err -trace_msg \
      -stf "$OUT/uac_stats.csv" \

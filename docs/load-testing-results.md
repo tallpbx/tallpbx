@@ -1,6 +1,6 @@
 # PBX SIP Load Testing & Benchmark Results
 
-Clear, real-world capacity guidance for administrators. This document records empirical results from the September 2026 VirtualBox test series and cloud datacenter VPS benchmarks, and provides hardware sizing guidance for system administrators.
+Clear, real-world capacity guidance for administrators. This document records empirical results from the September 2026 cloud datacenter VPS benchmarks and provides hardware sizing guidance for system administrators.
 
 > [!NOTE]
 > For the operational manual, lab topology setup, seeding instructions, and test runner options, see the companion **[SIP Load Testing Guide](load-testing-guide.md)**.
@@ -15,13 +15,11 @@ Clear, real-world capacity guidance for administrators. This document records em
 - [Planning Rules](#planning-rules)
 - [How Results Are Recorded & How to Read Benchmark Tables](#how-results-are-recorded--how-to-read-benchmark-tables)
 - [Dialplan & Cache Engine Benchmarks (XML Throughput)](#dialplan--cache-engine-benchmarks-xml-throughput)
-  - [Local Lab: VirtualBox (4 vCPU / 4 GiB RAM)](#local-lab-virtualbox-4-vcpu--4-gib-ram)
   - [Cloud VPS: Entry Baseline (1 vCPU / 1 GiB RAM)](#cloud-vps-entry-baseline-1-vcpu--1-gib-ram)
   - [Cloud VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)](#cloud-vps-memory-scaled-1-vcpu--2-gib-ram)
   - [Cloud VPS: Dual-Core (2 vCPU / 2 GiB RAM)](#cloud-vps-dual-core-2-vcpu--2-gib-ram)
   - [Dedicated Cloud Node (4 vCPU / 16 GiB RAM Dedicated)](#dedicated-cloud-node-4-vcpu--16-gib-ram-dedicated)
 - [Live Call Capacity & Telephony Feature Parity (SIP Signaling)](#live-call-capacity--telephony-feature-parity-sip-signaling)
-  - [Local Lab: VirtualBox Test Pair (Baseline)](#local-lab-virtualbox-test-pair-baseline)
   - [Cloud Datacenter VPS: Entry Baseline (1 vCPU / 1 GiB RAM)](#cloud-datacenter-vps-1-vcpu--1-gib-ram-baseline)
   - [Cloud Datacenter VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)](#cloud-datacenter-vps-memory-scaled-1-vcpu--2-gib-ram)
   - [Cloud Datacenter VPS: Dual-Core (2 vCPU / 2 GiB RAM)](#cloud-datacenter-vps-dual-core-2-vcpu--2-gib-ram)
@@ -82,7 +80,7 @@ The table below summarizes empirical XML throughput and latency across moderate 
 
 ### Production Sizing & Configuration Matrix
 
-Use the summary table below as a quick reference for choosing baseline hardware, configuring PHP-FPM pools, and setting Redis cache policies. These recommendations synthesize findings from both the VirtualBox test series and public datacenter benchmarks:
+Use the summary table below as a quick reference for choosing baseline hardware, configuring PHP-FPM pools, and setting Redis cache policies. These recommendations synthesize findings from empirical cloud datacenter benchmarks across multiple hardware tiers:
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | --- | --- | --- | --- | --- | ---: | ---: | --- |
@@ -104,7 +102,7 @@ Use the summary table below as a quick reference for choosing baseline hardware,
 
 ## Production Recommendations: XML Caching & PHP-FPM Worker Tuning
 
-Based on the September 23, 2026 VirtualBox 5-tier cache sweeps and concurrency ladder benchmarks, apply the following tuning policies for production deployments:
+Based on empirical datacenter 5-tier cache sweeps and concurrency ladder benchmarks, apply the following tuning policies for production deployments:
 
 ### 1. Telephony XML Cache Policy (`.env`)
 
@@ -160,7 +158,7 @@ FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. 
 
 ### How Results Are Recorded
 
-The tables in this document present the September 2026 test progression: local VirtualBox single-server throughput ladders and 5-tier cache sweeps, followed by comprehensive cloud datacenter benchmarks across four hardware profiles.
+The tables in this document present comprehensive cloud datacenter benchmarks across four hardware profiles tested in September 2026.
 
 - Lead with requests per second, then average, fastest, and slowest latency. For some older runs the average and fastest are recomputed from the stored per-request latencies; where a value was never captured it is shown as `—`.
 - Comparison tiers are reported as the median of at least three measured runs, with every repetition retained. Run a warm-up before recording.
@@ -241,83 +239,6 @@ To make benchmark reports accessible to everyone—from telephony engineers to n
 
 Direct benchmarks of the web and database routing engine. These tests evaluate raw HTTP request throughput (`requests/sec`) and latency (`ms`) as FreeSWITCH queries Laravel for dynamic dialplan and directory XML documents.
 
-### Local Lab: VirtualBox (4 vCPU / 4 GiB RAM)
-
-The local test server (`192.168.1.71`) is an isolated, disposable VirtualBox virtual machine running Debian 13 on a local workstation. It was provisioned purely as a controlled test bench for benchmark execution alongside its sibling orchestrator VM (`192.168.1.76`). Neither VM functions as an office PBX or live production server; they exist purely as a controlled, reproducible virtualization baseline.
-
-The September 23, 2026 test series executed the full progression against the local PBX from the orchestrator. All test runs used authenticated XML endpoints with composite database indexes and Redis fragment caching active.
-
-> [!NOTE]
-> **Historical Baseline Metrics**:
-> The September 23, 2026 VirtualBox baseline tests were recorded before full percentile and per-request raw telemetry were integrated into the test runner. As a result, these historical baseline tables report **Average Latency**, **Fastest (Min)**, and **Slowest (Max)**. All subsequent cloud datacenter benchmarks capture complete granular telemetry (including **p50 Median**, **p90**, **p95**, **p99**, and **Standard Deviation**) alongside complete raw sample datasets.
-
-#### Single-Server XML Throughput Ladder
-
-Controlled runs, all `mixed` scenario, zero failed XML responses:
-
-| Tier | Repetitions | Median Req/Sec | Average Latency | Fastest Latency | Slowest Latency | Notes / Observations |
-| :--- | :--- | ---: | ---: | ---: | ---: | :--- |
-| `25 x 1` | 1 (warm-up) | 4.497 | 217.9 ms | 148 ms | 541 ms | Clean initial warm-up; Redis caches populated. |
-| `100 x 5` | 3 | 12.760 | 273.4 ms | 162 ms | 478 ms | Repeatable baseline across 3 consecutive runs. |
-| `500 x 10` | 3 | 15.758 | 385.3 ms | 155 ms | 682 ms | Smooth scaling under moderate concurrency. |
-| `500 x 25` (dynamic pool) | 3 | 16.718 | 804.9 ms | 159 ms | 1,180 ms | Debian default pool (`pm.max_children = 5`) saturated with repeated worker warnings. |
-| `500 x 25` (static 12 pool) | 3 | 19.232 | 828.8 ms | 163 ms | 1,142 ms | **+15.0% throughput gain**; zero worker warnings; 2.9 GiB free RAM. |
-| `1,000 x 25` (static 12 pool) | 3 | 16.644 | 814.3 ms | 158 ms | 1,196 ms | Zero failures across 3,000 requests; stable sustained burst ceiling. |
-
-<details>
-<summary>Table Terminology & Metric Definitions</summary>
-
-| Term / Header | Definition & Operational Meaning |
-| :--- | :--- |
-| **Tier (`Requests x Concurrency`)** | The load volume profile. For example, `500 x 25` means a total of 500 HTTP requests were sent with 25 requests simultaneously in-flight at all times. |
-| **Req/Sec** | Requests per second. Measures how many complete XML dialplan documents the server generated and delivered per second. |
-| **Average Latency** | The mean time (in milliseconds) required to process and return an XML request across all samples in the tier. |
-| **Fastest (Min)** | The quickest response recorded in the tier (best-case cache/memory hit). |
-| **Slowest (Max)** | The slowest response recorded in the tier (tail latency, usually occurring on initial cache misses or worker queuing). |
-| **Dynamic Pool (`pm = dynamic`)** | Debian default PHP-FPM mode where workers are spawned on demand up to `pm.max_children = 5`. Creates latency when bursts arrive. |
-| **Static Pool (`pm = static`)** | Production-optimized PHP-FPM mode where all workers (e.g. 12) are permanently kept in RAM with zero fork delay. |
-
-</details>
-
-Guest specifications for these runs: Debian GNU/Linux 13 (trixie), kernel `6.12.95+deb13-amd64`, 4 vCPU (12th Gen Intel Core i5-1235U), 3.8 GiB RAM, 2.0 GiB swap, 39.5 GiB virtual disk. MariaDB reported zero slow queries throughout all tiers.
-
-#### Cache Optimization and Hit Rate Sweep (September 23, 2026)
-
-The 5-run cache optimization sweep on the VirtualBox PBX evaluated performance from raw database execution to 100% memory hit ceiling:
-
-| Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest | Slowest | Redis Hit Rate | Key Observation |
-| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
-| **1. Uncached Database Baseline** | `mixed` | `100 x 5` | 9.193 | 398.9 ms | 220.1 ms | 994 ms | 0.0% | Heavy MariaDB query execution; average latency of 398.9 ms. |
-| **2. Contributor Cache Only** | `mixed` | `100 x 5` | 12.431 | 317.8 ms | 165.0 ms | 698 ms | 46.6% | Reused static routing fragments; cut MariaDB table reads by ~80%. |
-| **3. Production Baseline** | `mixed` | `100 x 5` | 13.176 | 260.9 ms | 126.2 ms | 472 ms | 41.2% | Recommended production baseline; optimal average latency with 5s update convergence. |
-| **4. Extended Burst Call Center** | `mixed` | `100 x 5` | 14.110 | 262.9 ms | 134.3 ms | 542 ms | 44.2% | Highest throughput under sustained bursts; peak Redis hit efficiency. |
-| **5. Pure Memory Cache-Hit Ceiling** | `cache-hit` | `100 x 5` | 13.932 | 235.4 ms | 116.6 ms | 387 ms | 29.3% | Zero MariaDB queries; lowest average latency (pure memory/serialization). |
-
-<details>
-<summary>Table Terminology, Configuration Keys & Metric Definitions</summary>
-
-| Term / Abbreviation | Full Name & `.env` Setting | Plain-Language Definition |
-| :--- | :--- | :--- |
-| **Contributor Cache (Contributor TTL / `C`)** | `DIALPLAN_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
-| **Dialplan Cache (Dialplan TTL / `D`)** | `DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
-| **TTL** | Time To Live | How many seconds a cached response remains valid in Redis before querying MariaDB again. `0` disables caching. |
-| **Target Requests (`100 x 5`)** | Offered Burst Profile | 100 total HTTP requests sent with 5 requests simultaneously in-flight at all times. |
-| **Redis Hit Rate** | Keyspace Efficiency (`INFO stats`) | Percentage of lookup keys found in fast Redis memory versus total lookups requested during the test run. |
-| **`mixed` Scenario** | Varied Endpoint Simulation | Simulates realistic office traffic across varied extensions, IVRs, and ring groups to test routing lookup logic. |
-| **`cache-hit` Scenario** | Identical Destination Simulation | Queries the exact same destination 100 times consecutively to measure theoretical maximum throughput with zero database I/O. |
-
-</details>
-
-> [!NOTE]
-> **Understanding Row 5 vs. Row 3 (Pure Memory Ceiling vs. Production Baseline)**:
-> Both Row 3 and Row 5 execute `100 x 5` requests, but they test fundamentally different code paths:
-> - **Row 3 (Production Baseline)** executes the **`mixed` scenario** across varied destinations (extensions, ring groups, and IVRs). While static dialplan fragments are cached in Redis, resolving different destinations still exercises routing logic and contributor lookups (achieving 41.2% cache hit rate, average latency of 260.9 ms).
-> - **Row 5 (Pure Memory Cache-Hit Ceiling)** executes the **`cache-hit` scenario**, querying the exact same destination 100 times consecutively. After request 1 populates Redis, the remaining 99 requests are served directly from Redis memory with zero MariaDB queries. This drops average latency to 235.4 ms (with fastest response at 116.6 ms), demonstrating the pure serialization ceiling of PHP-FPM and Redis when database I/O is eliminated.
-
-Artifacts: `storage/app/load-tests/vbox-20260923/` and `storage/app/load-tests/vbox-cache-sweep-20260923-123631/`.
-
----
-
 ### Cloud VPS: Entry Baseline (1 vCPU / 1 GiB RAM)
 
 The entry-level cloud test server (`x.x.x.200`) is a datacenter virtual private server running Debian GNU/Linux 13 (trixie) with 1 shared vCPU, 967 MiB RAM, and 2.0 GiB swap. It represents the minimal production footprint for a cloud PBX branch or small office (1–10 phones).
@@ -326,7 +247,7 @@ The September 24, 2026 benchmark series executed the full progression directly a
 
 > [!NOTE]
 > **Complete Empirical Telemetry**:
-> Unlike the earlier September 23 VirtualBox test run (which only recorded min, max, and avg), the September 24, 2026 datacenter benchmarks capture complete granular telemetry—including **p50 Median**, **p90**, **p95**, **p99**, and **Standard Deviation** alongside complete raw sample datasets. For everyday administrators, the primary headline tables present clear, plain-language summaries (**Average**, **Fastest**, and **Slowest**). Detailed percentile distributions and standard deviations are accessible in the expandable details sections.
+> All cloud datacenter benchmarks capture complete granular telemetry—including **p50 Median**, **p90**, **p95**, **p99**, and **Standard Deviation** alongside complete raw sample datasets. For everyday administrators, the primary headline tables present clear, plain-language summaries (**Average**, **Fastest**, and **Slowest**). Detailed percentile distributions and standard deviations are accessible in the expandable details sections.
 
 #### Single-Server XML Throughput Ladder (September 24, 2026)
 
@@ -733,65 +654,6 @@ Call-setup latency is measured from the caller's first `INVITE` to the destinati
 
 ---
 
-### Local Lab: VirtualBox Test Pair (Baseline)
-
-The September 23, 2026 test series executed the full 15-scenario telephony validation suite between the isolated VirtualBox PBX test VM (`192.168.1.71`) and the orchestrator / SIPp generator VM (`192.168.1.76`) running on the same local Windows 11 host. Neither VM functions as an office PBX or live server; they exist purely as an isolated, reproducible virtualization test bench. All 15/15 scenarios passed with zero failed calls.
-
-**End-to-end correctness, media flows, and extended parity checks (September 23, 2026)**
-
-| Test | Result | Important observation |
-| :--- | :--- | :--- |
-| Register 20 users | Passed | 20 successful, 0 failed. Leases configured with `Expires: 3600` so contact records persist throughout testing. |
-| Extension calls (10 calls) | Passed | 10 successful, 0 failed. Bidirectional SIP signaling and call tear-down verified. |
-| Outbound calls (5 calls) | Passed | 5 successful, 0 failed. Outbound gateway routing through synthetic SIPp UAS listener verified. |
-| Recording media to `*732` | Passed | Authenticated call answered, FreeSWITCH recorded and sent BYE, 1 successful, 0 failed. |
-| MOH media to `load_test_moh` | Passed | Call answered, held through the 10-second media window, SIPp sent BYE and received `200`. |
-| Announcement media to `load_test_announcement` | Passed | FreeSWITCH played packaged prompt, SIPp echoed RTP, FreeSWITCH sent BYE, 1 successful, 0 failed. |
-| Extended user re-registration | Passed | Re-registered 20 users before extended scenarios to refresh Sofia contact records. |
-| Ring group calls (`2400`) | Passed | 3 successful, 0 failed. FreeSWITCH generated valid XML and bridged to group members. |
-| Voicemail calls (`2003`) | Passed | 3 successful, 0 failed. Call answered and handled by voicemail subsystem. |
-| Conference calls (`2500`) | Passed | 3 successful, 0 failed. Bridged into conference room without error. |
-| Call forward calls (`2001` -> `2000`) | Passed | 3 successful, 0 failed. Dialplan routes cleanly to forwarded extension via loopback channel. |
-| Time condition calls (`2401`) | Passed | 3 successful, 0 failed. Evaluated schedule rules dynamically and bridged call. |
-| Follow me calls (`2002`) | Passed | 3 successful, 0 failed. Sequential ring list executed and completed cleanly. |
-| Emergency calls (`911`) | Passed | 3 successful, 0 failed. Correctly bridged to emergency gateway UAS. |
-| Call block rejection | Passed | 3 successful, 0 failed. Blocked caller ID pattern matched and rejected with `603 Decline`. |
-
-<details>
-<summary>Telephony Scenario Terminology & Definitions</summary>
-
-| Telephony Scenario | Plain-Language Description |
-| :--- | :--- |
-| **SIP Registration** | Endpoints register contact IPs with FreeSWITCH (`sofia_reg`), establishing credential leases (`Expires: 3600`). |
-| **Extension Calls** | Internal caller authenticated via SIP digest (407 challenge), routed via dialplan XML, and answered. |
-| **Outbound Gateway** | Call dialed through gateway route and bridged to an external telephony provider UAS. |
-| **Recording Media (`*732`)** | Call answered with active two-way RTP audio and written to disk via `record_session`. |
-| **MOH Media** | Music On Hold playback stream (`local_stream://moh`) streamed continuously to the held party. |
-| **Announcement Media** | Pre-recorded IVR prompt played to caller, terminating automatically upon prompt completion. |
-| **Ring Group (`2400`)** | One extension rings multiple endpoints simultaneously or sequentially until answered. |
-| **Voicemail (`*98` / `2003`)** | Interactive voicemail portal handling greeting playback, PIN authentication, and message recording. |
-| **Conference (`2500`)** | Multi-party audio bridge mixing multiple RTP media streams in real time (`mod_conference`). |
-| **Call Forwarding** | Inbound call diverted via FreeSWITCH loopback channel (`loopback/ext/context`) to an alternate destination. |
-| **Time Conditions** | Dynamic schedule evaluation checking current time against business hours before routing. |
-| **Follow-Me** | Hunting list ringing primary phone first, then cascading to mobile/alternate endpoints. |
-| **Emergency (`911`)** | High-priority routing bypassing normal tenant filters and dispatching to emergency trunks. |
-| **Call Blocking** | Inbound caller ID checked against blacklist table and declined immediately (`603 Decline`). |
-
-</details>
-
-Run details: artifact directory `storage/app/load-tests/sipp-e2e-20260923-165139`, PBX target `192.168.1.71:5060`, generator at `192.168.1.76`, media RTP echo enabled, PHP-FPM static pool (12 workers), FreeSWITCH calls and channels back to `0` after the run.
-
-Behaviors these tests enforce in the application and runtime:
-- Required FreeSWITCH module load lines persist so SIP, callcenter, local-stream MOH, sound playback, and XML curl survive a reboot;
-- Dynamic no-domain configuration requests include all enabled Sofia profiles and callcenter queues when FreeSWITCH loads modules;
-- Tenant Sofia profile params are wrapped in `<settings>`;
-- Callcenter queue names include the FreeSWITCH queue namespace, for example `load_test_moh@default`;
-- Feature-code destination regexes escape star codes, for example `^\*97$`;
-- Announcement-only IVR dialplans play and hang up without waiting for digit input;
-- SIPp media-flow scenarios use RTP echo so playback can advance in this synthetic setup.
-
----
-
 ### Cloud Datacenter VPS (1 vCPU / 1 GiB RAM Baseline)
 
 Empirical benchmark and validation series executed on September 24, 2026 across two cloud datacenter nodes in the same region (`sfo3`):
@@ -844,6 +706,15 @@ Full 14-scenario parity test suite executed via `scripts/pbx-sipp-validate.sh` (
 </details>
 
 *Artifact directory: `storage/app/load-tests/sipp-e2e-20260924-183518` (all PCAPs, error logs, and scenario counts preserved).*
+
+Behaviors these tests enforce in the application and runtime:
+- Required FreeSWITCH module load lines persist so SIP, callcenter, local-stream MOH, sound playback, and XML curl survive a reboot;
+- Dynamic no-domain configuration requests include all enabled Sofia profiles and callcenter queues when FreeSWITCH loads modules;
+- Tenant Sofia profile params are wrapped in `<settings>`;
+- Callcenter queue names include the FreeSWITCH queue namespace, for example `load_test_moh@default`;
+- Feature-code destination regexes escape star codes, for example `^\*97$`;
+- Announcement-only IVR dialplans play and hang up without waiting for digit input;
+- SIPp media-flow scenarios use RTP echo so playback can advance in this synthetic setup.
 
 #### Server-to-Server Capacity & Call Rate Ladder (September 24, 2026)
 

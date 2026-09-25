@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput (~14–19 req/sec) and call setup capacity (3 CPS clean baseline, 5 CPS saturation boundary) constant, confirming single-core CPU compute saturation.
 
 ### Removed
+- **VirtualBox Test Baseline Removal**:
+  - Removed all legacy VirtualBox test tables, benchmarks, and VM references from `docs/load-testing-results.md` and `docs/load-testing-guide.md`, standardizing all documentation and sizing recommendations entirely on the comprehensive September 2026 cloud datacenter benchmarks.
+  - Renamed and generalized the VirtualBox recovery runbook into a universal `SIPp Load Testing Preflight & Recovery Runbook` using standard environment placeholders (`<PBX_IP>`, `<GENERATOR_IP>`, `load-test-beta`).
 - **Environment B1 July–August 2026 Historical Archive**:
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
