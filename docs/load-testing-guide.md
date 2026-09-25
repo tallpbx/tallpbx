@@ -2133,8 +2133,6 @@ For beta or release candidates:
 
 ## Known Limitations
 
-- Generator-host networking (for example WSL2) can behave differently from
-  a separate Linux VM on the LAN.
 - The basic and media runners are low-volume by design and are intended for
   correctness, not capacity claims.
 - SIPp RTP echo confirms media negotiation and packet flow, not audio

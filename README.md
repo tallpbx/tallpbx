@@ -384,11 +384,11 @@ Useful tiers:
 | Practical repeat check | 500 | 10-25 | Expose PHP-FPM, DB, Redis, and contributor problems that may return on small/medium workloads. |
 | Optional stability | 1,000 | 25 | Use after meaningful code/config changes to confirm a longer burst stays stable. |
 
-The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The current `192.168.1.76` beta host is a Windows-hosted VM, so use these runs for relative comparison checks rather than capacity claims. Run heavier capacity tiers only on representative VPS/datacenter hardware. The detailed operational guide is in `docs/load-testing-guide.md`, and authoritative benchmark measurements and hardware sizing tables are in `docs/load-testing-results.md`.
+The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The detailed operational guide is in `docs/load-testing-guide.md`, and authoritative benchmark measurements and hardware sizing tables are in `docs/load-testing-results.md`.
 
 Report terms: `req/sec` is completed XML handler responses per second. `average` is the mean response time across all requests. `min` is the fastest response, and `max` is the slowest single response in the run.
 
-For SIPp end-to-end validation, run the load generator from WSL2 or a separate Linux VM when possible:
+For SIPp end-to-end validation, run the load generator from a separate Linux host or VM when possible:
 
 ```bash
 PBX_HOST=PBX_HOST \

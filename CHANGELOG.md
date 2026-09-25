@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **VirtualBox Test Baseline Removal**:
   - Removed all legacy VirtualBox test tables, benchmarks, and VM references from `docs/load-testing-results.md` and `docs/load-testing-guide.md`, standardizing all documentation and sizing recommendations entirely on the comprehensive September 2026 cloud datacenter benchmarks.
   - Renamed and generalized the VirtualBox recovery runbook into a universal `SIPp Load Testing Preflight & Recovery Runbook` using standard environment placeholders (`<PBX_IP>`, `<GENERATOR_IP>`, `load-test-beta`).
+- **Legacy Windows VM & WSL2 Reference Removal**:
+  - Removed obsolete Windows-hosted VM test warnings and WSL2 load-generator references from `README.md`, `docs/load-testing-guide.md`, and `AGENTS.md`.
 - **Environment B1 July–August 2026 Historical Archive**:
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
