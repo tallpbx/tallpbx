@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Automatic Telephony Dialplan Cache Invalidation**:
+  - Implemented `App\Observers\RoutingCacheObserver` to automatically observe all 29 PBX telephony models across the modular architecture (including Extensions, SIP Accounts, Inbound and Outbound Routes, Ring Groups, IVR Menus, Time Conditions, Call Flows, Bridges, Follow Me, Voicemail, Conferences, Queues, Call Forwarding, Emergency Routes, Dialplans, Number Translations, and Tenant Limits).
+  - Automatically bumps the tenant's atomic routing version (`RoutingCacheVersion::bump($tenantId)`) in Redis whenever any telephony record is created, updated, deleted, or restored.
+  - Resolves nested parent tenant ownership automatically for related child models (such as `DialplanDetail` to `Dialplan`, `RingGroupExtension` to `RingGroup`, `IvrMenuOption` to `IvrMenu`, and `Tier` to `Queue`).
+  - Detects dirty tenant reassignments on model updates, invalidating active caches for both the originating and destination tenants simultaneously.
+  - Completely eliminates dialplan stale-cache windows and propagation delays when changes are saved in the web panel, ensuring new routing instructions take effect on the very next call attempt without waiting for the XML cache TTL to expire.
+  - In-flight active calls continue uninterrupted because FreeSWITCH executes instructions pre-compiled into channel variables during call setup (`CS_ROUTING`).
 - **Streamlined Telephony XML Cache Settings (`XML_CACHE_TTL` & `XML_CACHE_STORE`)**:
   - Streamlined telephony XML cache configuration in `config/freeswitch.php`, `.env`, and `.env.example` to use concise `XML_CACHE_*` naming (e.g. `XML_CACHE_TTL`, `XML_CACHE_STORE`, `XML_CACHE_DIALPLAN_TTL`, `XML_CACHE_CONTRIBUTOR_TTL`, `XML_CACHE_DIRECTORY_TTL`, `XML_CACHE_ACL_TTL`, `XML_CACHE_DIALPLAN_STORE`, `XML_CACHE_DIRECTORY_STORE`, `XML_CACHE_ACL_STORE`).
   - Introduced `XML_CACHE_TTL` as the master default cache TTL (in seconds) for all dynamically rendered FreeSWITCH XML responses (dialplans, directory auth, contributor fragments, and ACLs).

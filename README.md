@@ -429,7 +429,7 @@ TallPBX uses a tiered in-memory caching architecture backed by Redis to keep dia
 
 - **Master XML Cache (`XML_CACHE_TTL=5`)**: Sets the default TTL across all telephony XML caches.
 - **Granular Overrides**:
-  1. **Full Dialplan XML Cache (`XML_CACHE_DIALPLAN_TTL=5`)**: Stores the complete compiled XML response per tenant, context, and destination. Eliminates dialplan rebuilding for repeat calls within the TTL window.
+  1. **Full Dialplan XML Cache (`XML_CACHE_DIALPLAN_TTL=5`)**: Stores the complete compiled XML response per tenant, context, and destination. Eliminates dialplan rebuilding for repeat calls within the TTL window, with automatic immediate invalidation upon any telephony or routing change.
   2. **Contributor Cache (`XML_CACHE_CONTRIBUTOR_TTL=5`)**: Caches individual dialplan contributor query fragments (extensions, ring groups, call forwards, IVRs) across calls to different destinations.
   3. **Directory Cache (`XML_CACHE_DIRECTORY_TTL=5`)**: Caches SIP authentication and registration lookups.
   4. **ACL Cache (`XML_CACHE_ACL_TTL=5`)**: Caches access control list XML.
@@ -449,7 +449,7 @@ redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
 ```
 
 Recommended settings in `.env`:
-- **Standard Office**: `XML_CACHE_TTL=5` (default: optimal balance between high burst throughput and quick 5-second propagation of panel changes).
+- **Standard Office**: `XML_CACHE_TTL=5` (default: optimal balance between high burst throughput and low memory footprint; web panel changes invalidate active caches immediately via atomic per-tenant versioning).
 - **High-Density Call Center**: `XML_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
 - **Development**: `XML_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
 

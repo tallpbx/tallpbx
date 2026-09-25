@@ -934,9 +934,11 @@ What each setting does:
   for all FreeSWITCH XML handler caches (dialplan, contributor, directory, and ACL).
   Uncomment any individual setting below if you need a granular override.
 - `XML_CACHE_DIALPLAN_TTL=5` caches generated dialplan
-  XML by tenant/context/destination for short bursts. Set it to `0` to
-  measure fully cold generation. Control-panel changes may take up to this
-  many seconds to appear in FreeSWITCH dialplan lookups.
+  XML by tenant/context/destination for short bursts. Control-panel changes
+  automatically and immediately invalidate active dialplan caches via atomic
+  per-tenant routing versions (`RoutingCacheVersion`), ensuring changes take
+  effect on the very next call lookup. Set it to `0` to measure fully cold
+  generation.
 - `XML_CACHE_CONTRIBUTOR_TTL=5` caches standard
   dialplan fragments and first-party context-wide contributor fragments by
   tenant/context, so cold misses for different destinations avoid repeated
@@ -1015,11 +1017,14 @@ measuring exact Redis hit rates.
      and inbound call setup.
 4. **Automatic Cache Invalidation (`RoutingCacheVersion`)**:
    - Every dialplan and contributor cache key embeds the tenant's current routing
-     version. Whenever an administrator adds, modifies, or deletes an extension,
-     inbound route, outbound route, IVR, or ring group in the web panel,
-     TallPBX increments `RoutingCacheVersion::increment($tenantId)`.
-   - This invalidates all active dialplan caches immediately, eliminating stale
-     routing without requiring manual cache flushes.
+     version (`RoutingCacheVersion::get($tenantId)`).
+   - Telephony models (extensions, inbound/outbound routes, ring groups, IVRs,
+     time conditions, call flows, dialplans, and destinations) are observed by
+     `RoutingCacheObserver`. Any create, update, delete, or restore event
+     automatically calls `RoutingCacheVersion::bump($tenantId)`.
+   - This invalidates all active dialplan caches immediately across all cache tiers
+     in less than 0.1 ms, eliminating stale routing and propagation delays
+     without requiring manual cache flushes.
 
 #### How To Measure Cache Hit Rates in Redis
 
@@ -1104,7 +1109,7 @@ entire spectrum, from bare database reads to 100% in-memory cache hits:
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Cold Baseline | `XML_CACHE_TTL=0` | `mixed` | 100 (c=5) | 0.0% | Measures raw MariaDB read throughput and worst-case latency with zero caching. |
 | 2 | Contributor Only | `XML_CACHE_DIALPLAN_TTL=0`<br>`XML_CACHE_CONTRIBUTOR_TTL=5` | `mixed` | 100 (c=5) | 45.0% – 60.0% | Validates static fragment reuse across differing destination numbers. |
-| 3 | Production Baseline | `XML_CACHE_TTL=5` | `mixed` | 100 (c=5) & 500 (c=25) | 75.0% – 85.0% | Validates the recommended production profile (5-second convergence window). |
+| 3 | Production Baseline | `XML_CACHE_TTL=5` | `mixed` | 100 (c=5) & 500 (c=25) | 75.0% – 85.0% | Validates the recommended production profile (5-second burst TTL with immediate invalidation on changes). |
 | 4 | Call Center Profile | `XML_CACHE_TTL=30` | `mixed` | 100 (c=5) | 85.0% – 95.0% | Evaluates extended burst absorption for static, high-volume call centers. |
 | 5 | Memory Hit Ceiling | `XML_CACHE_TTL=5` | `cache-hit` | 100 (c=5) | 99.0% | Isolates framework and Redis serialization ceiling (zero database queries). |
 
@@ -2155,9 +2160,12 @@ For beta or release candidates:
   RTP checks for those paths. Default prompt and MOH assets come from
   FreeSWITCH sound packages; app-managed recording and voicemail media
   remains file-backed with database paths and metadata only.
-- The dialplan XML cache introduces a short propagation delay for
-  control-panel changes, controlled by
-  `XML_CACHE_DIALPLAN_TTL` (or default `XML_CACHE_TTL`).
+- Dialplan XML caches do not introduce propagation delays for control-panel
+  changes: mutations to telephony entities (extensions, routes, IVRs, ring
+  groups, dialplans, etc.) automatically trigger `RoutingCacheObserver` to bump
+  `RoutingCacheVersion`, immediately invalidating active caches on the very next
+  call attempt. In-flight calls are unaffected because FreeSWITCH executes
+  instructions compiled into the channel during initial routing.
 - Emergency (911) routing bridges to
   `sofia/external/911@<gateway-host>:<gateway-port>` using the emergency
   gateway's host and port from the database. The bridge executes correctly

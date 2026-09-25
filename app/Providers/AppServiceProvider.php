@@ -15,6 +15,7 @@ use App\Models\Admin;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Observers\DashboardStatsObserver;
+use App\Observers\RoutingCacheObserver;
 use App\Services\DialplanXmlCollector;
 use App\Services\FreeSwitchService;
 use App\Services\FreeSwitchServiceInterface;
@@ -184,6 +185,9 @@ class AppServiceProvider extends ServiceProvider
         User::observe(DashboardStatsObserver::class);
         Tenant::observe(DashboardStatsObserver::class);
 
+        // Keep dialplan XML routing caches reactive: invalidate on telephony model mutations
+        $this->registerRoutingCacheObservers();
+
         Event::listen([
             ChannelCreate::class,
             ChannelAnswer::class,
@@ -249,5 +253,50 @@ class AppServiceProvider extends ServiceProvider
                 });
             }
         });
+    }
+
+    /**
+     * Register model observers that invalidate dialplan routing caches
+     * whenever telephony models are created, updated, or deleted.
+     */
+    protected function registerRoutingCacheObservers(): void
+    {
+        $telephonyModels = [
+            \Modules\Extensions\Models\Extension::class,
+            \Modules\SipAccounts\Models\SipAccount::class,
+            \Modules\RingGroups\Models\RingGroup::class,
+            \Modules\RingGroups\Models\RingGroupExtension::class,
+            \Modules\InboundRoutes\Models\InboundRoute::class,
+            \Modules\Destinations\Models\Destination::class,
+            \Modules\OutboundRoutes\Models\OutboundRoute::class,
+            \Modules\IvrMenus\Models\IvrMenu::class,
+            \Modules\IvrMenus\Models\IvrMenuOption::class,
+            \Modules\TimeConditions\Models\TimeCondition::class,
+            \Modules\CallFlows\Models\CallFlow::class,
+            \Modules\CallBlocks\Models\CallBlock::class,
+            \Modules\Bridges\Models\Bridge::class,
+            \Modules\FollowMe\Models\FollowMe::class,
+            \Modules\HotDesking\Models\HotDeskSession::class,
+            \Modules\Voicemails\Models\Voicemail::class,
+            \Modules\Conferences\Models\Conference::class,
+            \Modules\ConferenceCenters\Models\ConferenceCenter::class,
+            \Modules\CallCenters\Models\Queue::class,
+            \Modules\CallCenters\Models\Agent::class,
+            \Modules\CallCenters\Models\Tier::class,
+            \Modules\CallForwards\Models\CallForward::class,
+            \Modules\FeatureCodes\Models\FeatureCode::class,
+            \Modules\Emergency\Models\Emergency::class,
+            \Modules\Dialplans\Models\Dialplan::class,
+            \Modules\Dialplans\Models\DialplanDetail::class,
+            \Modules\NumberTranslations\Models\NumberTranslation::class,
+            \Modules\PinNumbers\Models\PinNumber::class,
+            \Modules\TenantLimits\Models\TenantLimit::class,
+        ];
+
+        foreach ($telephonyModels as $modelClass) {
+            if (class_exists($modelClass)) {
+                $modelClass::observe(RoutingCacheObserver::class);
+            }
+        }
     }
 }

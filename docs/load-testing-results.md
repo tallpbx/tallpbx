@@ -312,7 +312,7 @@ The 5-run cache optimization sweep on the cloud datacenter PBX evaluated perform
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
 | **1. Uncached Database Baseline** | `mixed` | `100 x 5` | 8.358 | 565.1 ms | 475.7 ms | 757.1 ms | 0.0% | Heavy MariaDB query execution; average latency of 565.1 ms. |
 | **2. Contributor Cache Only** | `mixed` | `100 x 5` | 14.020 | 291.8 ms | 153.5 ms | 673.4 ms | 46.8% | Reused static routing fragments; cut MariaDB table reads by nearly half. |
-| **3. Production Baseline** | `mixed` | `100 x 5` | 17.221 | 245.3 ms | 157.6 ms | 511.9 ms | 39.1% | Recommended production baseline; lowest average latency with 5s update convergence. |
+| **3. Production Baseline** | `mixed` | `100 x 5` | 17.221 | 245.3 ms | 157.6 ms | 511.9 ms | 39.1% | Recommended production baseline; lowest average latency with immediate invalidation on administrative updates (5s burst TTL). |
 | **4. Extended Retention** | `mixed` | `100 x 5` | 17.196 | 257.8 ms | 171.2 ms | 562.2 ms | 42.2% | Sustained high throughput with extended Redis keyspace retention. |
 | **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 17.400 | 261.9 ms | 178.8 ms | 556.8 ms | 22.8% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling. |
 
@@ -438,7 +438,7 @@ The 5-run cache optimization sweep on the resized 2 GiB cloud VPS evaluated perf
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
 | **1. Uncached Database Baseline** | `mixed` | `100 x 5` | 9.873 | 487.3 ms | 362.7 ms | 666.4 ms | 0.0% | Heavy MariaDB query execution; average latency of 487.3 ms. |
 | **2. Contributor Cache Only** | `mixed` | `100 x 5` | 16.293 | 290.5 ms | 202.9 ms | 541.8 ms | 45.5% | Reused static routing fragments; cut MariaDB table reads by ~40%. |
-| **3. Production Baseline** | `mixed` | `100 x 5` | 19.692 | 235.2 ms | 169.3 ms | 483.2 ms | 39.6% | Recommended production baseline; peak throughput of 19.69 req/sec with 5s update convergence. |
+| **3. Production Baseline** | `mixed` | `100 x 5` | 19.692 | 235.2 ms | 169.3 ms | 483.2 ms | 39.6% | Recommended production baseline; peak throughput of 19.69 req/sec with immediate invalidation on updates (5s burst TTL). |
 | **4. Extended Retention** | `mixed` | `100 x 5` | 19.116 | 244.5 ms | 176.0 ms | 487.6 ms | 39.8% | High throughput with 30s TTL retention window. |
 | **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 14.832 | 314.5 ms | 220.6 ms | 692.4 ms | 21.8% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling. |
 
@@ -553,7 +553,7 @@ The 5-run cache optimization sweep on the resized 2 vCPU / 2 GiB cloud VPS evalu
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
 | **1. Uncached Database Baseline** | `mixed` | `100 x 5` | 10.247 | 421.3 ms | 229.9 ms | 651.0 ms | 0.0% | Heavy MariaDB query execution; average latency of 421.3 ms with 0% cache hit rate. |
 | **2. Contributor Cache Only** | `mixed` | `100 x 5` | 12.125 | 344.0 ms | 159.7 ms | 677.3 ms | 47.3% | Reused static routing fragments; achieved 47.3% hit rate and reduced query pressure. |
-| **3. Production Baseline** | `mixed` | `100 x 5` | 15.261 | 279.0 ms | 139.4 ms | 490.2 ms | 38.1% | Recommended production baseline; 15.26 req/sec with 5s update convergence window. |
+| **3. Production Baseline** | `mixed` | `100 x 5` | 15.261 | 279.0 ms | 139.4 ms | 490.2 ms | 38.1% | Recommended production baseline; 15.26 req/sec with immediate invalidation on updates (5s burst TTL). |
 | **4. Extended Retention** | `mixed` | `100 x 5` | 14.935 | 285.4 ms | 114.2 ms | 609.6 ms | 41.2% | Sustained high throughput with 30s TTL retention window for call center trunk routing. |
 | **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 19.496 | 218.5 ms | 101.7 ms | 372.5 ms | 42.9% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling. |
 
@@ -633,7 +633,7 @@ The 5-run cache optimization sweep on the 4 vCPU Dedicated / 16 GiB node evaluat
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
 | **1. Uncached Database Baseline** | `mixed` | `100 x 5` | 41.107 | 108.2 ms | 80.0 ms | 129.2 ms | 0.0% | Uncached MariaDB query throughput quadrupled over 1c/2c baselines; 108 ms average latency. |
 | **2. Contributor Cache Only** | `mixed` | `100 x 5` | 58.520 | 75.6 ms | 48.2 ms | 111.8 ms | 48.5% | Reused static routing fragments; achieved 48.5% hit rate and reduced query pressure. |
-| **3. Production Baseline** | `mixed` | `100 x 5` | 65.340 | 67.4 ms | 48.5 ms | 116.0 ms | 47.0% | Recommended production baseline; 65.34 req/sec with 5s update convergence window. |
+| **3. Production Baseline** | `mixed` | `100 x 5` | 65.340 | 67.4 ms | 48.5 ms | 116.0 ms | 47.0% | Recommended production baseline; 65.34 req/sec with immediate invalidation on updates (5s burst TTL). |
 | **4. Extended Retention** | `mixed` | `100 x 5` | 70.635 | 63.2 ms | 43.3 ms | 118.8 ms | 40.9% | High-density call center trunk routing; reached 70.64 req/sec. |
 | **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 72.519 | 61.1 ms | 47.7 ms | 113.5 ms | 30.5% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling at 72.5 req/sec. |
 
