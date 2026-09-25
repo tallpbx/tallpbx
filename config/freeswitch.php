@@ -9,6 +9,19 @@ declare(strict_types=1);
  * the mod_xml_curl XML Handler API configuration, and the
  * SIP server hostname used for device provisioning templates.
  */
+
+/*
+ * XML handler cache master defaults.
+ *
+ * Resolved once here so every subsystem key inside the config array
+ * needs at most one legacy fallback instead of re-deriving the full
+ * cascade inline. The old FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE
+ * was the original sole store key, so it remains the deepest legacy
+ * fallback for the master store.
+ */
+$xmlCacheMasterTtl = (int) env('XML_CACHE_TTL', env('FREESWITCH_XML_HANDLER_CACHE_TTL', 5));
+$xmlCacheMasterStore = env('XML_CACHE_STORE', env('FREESWITCH_XML_HANDLER_CACHE_STORE', env('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE')));
+
 return [
 
     /*
@@ -298,86 +311,22 @@ return [
         |--------------------------------------------------------------------------
         |
         | Short-lived caching avoids rebuilding identical XML responses during
-        | call bursts. 'cache_ttl' acts as the master default (in seconds) for
-        | all XML handler caches. Individual caches inherit this duration unless
-        | an explicit granular override is defined in the environment.
+        | call bursts. The master defaults ($xmlCacheMasterTtl and
+        | $xmlCacheMasterStore) are defined above the return statement.
+        | Individual caches inherit them unless an explicit granular
+        | override is defined in the environment.
         |
         */
-        'cache_ttl' => (int) env(
-            'XML_CACHE_TTL',
-            env('FREESWITCH_XML_HANDLER_CACHE_TTL', 5),
-        ),
-        'dialplan_cache_ttl' => (int) env(
-            'XML_CACHE_DIALPLAN_TTL',
-            env(
-                'FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL',
-                env('XML_CACHE_TTL', env('FREESWITCH_XML_HANDLER_CACHE_TTL', 5)),
-            ),
-        ),
-        'dialplan_contributor_cache_ttl' => (int) env(
-            'XML_CACHE_CONTRIBUTOR_TTL',
-            env(
-                'FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL',
-                env('XML_CACHE_TTL', env('FREESWITCH_XML_HANDLER_CACHE_TTL', 5)),
-            ),
-        ),
-        'directory_cache_ttl' => (int) env(
-            'XML_CACHE_DIRECTORY_TTL',
-            env(
-                'FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL',
-                env('XML_CACHE_TTL', env('FREESWITCH_XML_HANDLER_CACHE_TTL', 5)),
-            ),
-        ),
-        'cache_store' => env(
-            'XML_CACHE_STORE',
-            env(
-                'FREESWITCH_XML_HANDLER_CACHE_STORE',
-                env('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE'),
-            ),
-        ),
-        'dialplan_cache_store' => env(
-            'XML_CACHE_DIALPLAN_STORE',
-            env(
-                'FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE',
-                env(
-                    'XML_CACHE_STORE',
-                    env('FREESWITCH_XML_HANDLER_CACHE_STORE'),
-                ),
-            ),
-        ),
-        'directory_cache_store' => env(
-            'XML_CACHE_DIRECTORY_STORE',
-            env(
-                'FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_STORE',
-                env(
-                    'XML_CACHE_STORE',
-                    env(
-                        'FREESWITCH_XML_HANDLER_CACHE_STORE',
-                        env('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE'),
-                    ),
-                ),
-            ),
-        ),
-        'acl_cache_ttl' => (int) env(
-            'XML_CACHE_ACL_TTL',
-            env(
-                'FREESWITCH_XML_HANDLER_ACL_CACHE_TTL',
-                env('XML_CACHE_TTL', env('FREESWITCH_XML_HANDLER_CACHE_TTL', 5)),
-            ),
-        ),
-        'acl_cache_store' => env(
-            'XML_CACHE_ACL_STORE',
-            env(
-                'FREESWITCH_XML_HANDLER_ACL_CACHE_STORE',
-                env(
-                    'XML_CACHE_STORE',
-                    env(
-                        'FREESWITCH_XML_HANDLER_CACHE_STORE',
-                        env('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE'),
-                    ),
-                ),
-            ),
-        ),
+        'cache_ttl' => $xmlCacheMasterTtl,
+        'dialplan_cache_ttl' => (int) env('XML_CACHE_DIALPLAN_TTL', env('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL', $xmlCacheMasterTtl)),
+        'dialplan_contributor_cache_ttl' => (int) env('XML_CACHE_CONTRIBUTOR_TTL', env('FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL', $xmlCacheMasterTtl)),
+        'directory_cache_ttl' => (int) env('XML_CACHE_DIRECTORY_TTL', env('FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL', $xmlCacheMasterTtl)),
+        'acl_cache_ttl' => (int) env('XML_CACHE_ACL_TTL', env('FREESWITCH_XML_HANDLER_ACL_CACHE_TTL', $xmlCacheMasterTtl)),
+
+        'cache_store' => $xmlCacheMasterStore,
+        'dialplan_cache_store' => env('XML_CACHE_DIALPLAN_STORE', env('FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE', $xmlCacheMasterStore)),
+        'directory_cache_store' => env('XML_CACHE_DIRECTORY_STORE', env('FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_STORE', $xmlCacheMasterStore)),
+        'acl_cache_store' => env('XML_CACHE_ACL_STORE', env('FREESWITCH_XML_HANDLER_ACL_CACHE_STORE', $xmlCacheMasterStore)),
         'pin_trigger' => env('FREESWITCH_PIN_TRIGGER', '*97'),
         'routing_version_store' => env('FREESWITCH_XML_HANDLER_ROUTING_VERSION_STORE'),
 
