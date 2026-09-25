@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
 ### Changed
+- **Benchmark Summary Matrix Clarification (2 vCPU / 2 GiB Latency Context)**:
+  - Updated Table 1 in `docs/load-testing-results.md` to distinguish calm baseline setup latency (~1.1s at 2 CPS) from high-concurrency burst queueing delay (~4.0s p50 / ~9.5s p95 at 5 CPS with concurrency limit 25).
+  - Added an explanatory note detailing PHP-FPM worker queueing under 25 in-flight calls contending for 6 static workers.
 - **Project Positioning & Audience Duality ("Modern Simplicity / Enterprise Engineering")**:
   - Embedded the core philosophy ("Modern simplicity on the surface, enterprise-grade telecommunications engineering under the hood") into the project guidelines within `AGENTS.md` and `.agents/skills/tallpbx-custom/SKILL.md`.
   - Added the official tagline to the guest landing page (`resources/views/pages/home.blade.php`, `lang/en/home.php`, `lang/es/home.php`, `lang/fr/home.php`).

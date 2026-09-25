@@ -37,8 +37,12 @@ The table below summarizes empirical live call capacity, setup latencies, and sa
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic` (5 max) | Production (`TTL: 5s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 CPS saturation boundary) | Micro / Edge (1–10 extensions) |
 | **1 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 3 calls/sec | 276 ms / ~2.2s | 0 MiB swap; single-core compute bound | Small Branch (1–15 extensions) |
-| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 5–8 calls/sec | ~4.0s / ~9.5s | 10 CPS burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
+| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 3–5 calls/sec<br>*(up to 8–10 CPS burst)* | ~1.1s (at 2 CPS)<br>~4.0s / ~9.5s (at 5 CPS)* | 10 CPS burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
 | **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Production (`TTL: 5s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 CPS burst ceiling (100% completion across 2,110 calls, 0 drops)** | **Mid-Market / Call Center (150–400+ extensions)** |
+
+> [!NOTE]
+> **Understanding 2 vCPU Latency**:
+> At baseline call arrival rates (2–3 CPS), call setup latency on the 2 vCPU instance is sub-second to ~1.1s (fastest 580 ms). The ~4.0s p50 and ~9.5s p95 figures reflect queueing delay under heavy 5 CPS load where 25 in-flight call setups simultaneously compete for 6 static PHP-FPM workers.
 
 ---
 
