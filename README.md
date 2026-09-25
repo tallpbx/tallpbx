@@ -413,15 +413,33 @@ php-fpm8.5 -tt 2>&1 | grep -E 'pm\.max_children|pm\.start_servers|pm\.min_spare_
 tail -n 50 /var/log/php8.5-fpm.log
 ```
 
-If the log repeatedly shows `server reached pm.max_children`, requests are queueing behind PHP-FPM. The standard install recommendation for a 4 GB combined PBX/application server is:
+If the log repeatedly shows `server reached pm.max_children`, requests are queueing behind PHP-FPM. The installer automatically detects system RAM and configures `/etc/php/8.5/fpm/pool.d/www.conf`:
 
-```ini
-pm = static
-pm.max_children = 12
-pm.max_requests = 500
-```
+| Server Size | Process Mode (`pm`) | Workers (`pm.max_children`) | Notes |
+|---|---|---:|---|
+| **1 GB RAM** (Minimal) | `dynamic` | `5` | Conserves memory on constrained instances. |
+| **2 GB RAM** (Small) | `static` | `6` | Pre-forked pool eliminates fork latency for small office bursts. |
+| **4 GB+ RAM** (Standard) | `static` | `12` | Recommended baseline (validated for 25+ calls/sec, leaves >2.5 GiB free RAM). |
 
-In `static` mode, all workers are ready for FreeSWITCH XML handler bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored. Use `INSTALL.md` for small/standard/larger server sizing guidance. More workers are not automatically faster: tune PHP-FPM while watching CPU load, memory, MariaDB, and XML handler latency.
+Configuration profiles:
+
+- **1 GB RAM** (Minimal):
+  ```ini
+  pm = dynamic
+  pm.max_children = 5
+  ```
+- **2 GB RAM** (Small):
+  ```ini
+  pm = static
+  pm.max_children = 6
+  ```
+- **4 GB RAM** (Standard baseline):
+  ```ini
+  pm = static
+  pm.max_children = 12
+  ```
+
+In `static` mode, all workers remain initialized and ready for FreeSWITCH XML handler bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored. Use `INSTALL.md` for larger server sizing guidance (e.g. `24` workers for 8 GB+). More workers are not automatically faster: tune PHP-FPM while watching CPU load, memory, MariaDB, and XML handler latency.
 
 ### Telephony XML Cache Tuning & Hit Rate Sweep
 
