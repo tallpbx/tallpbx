@@ -80,7 +80,7 @@
 - Consumes: Existing PHP 8.5 & Node v24 environment.
 - Produces: `vendor/pestphp/pest-plugin-browser` package and `node_modules/playwright` installed.
 
-- [ ] **Step 1: Add `pestphp/pest-plugin-browser` to Composer**
+- [x] **Step 1: Add `pestphp/pest-plugin-browser` to Composer**
 
 Run:
 ```bash
@@ -88,7 +88,7 @@ COMPOSER_ALLOW_SUPERUSER=1 composer require pestphp/pest-plugin-browser:^4.3 --d
 ```
 Expected: Installs `pestphp/pest-plugin-browser` (v4.3.1) and AmpHP dependencies cleanly.
 
-- [ ] **Step 2: Add `playwright` to npm and install browser binaries**
+- [x] **Step 2: Add `playwright` to npm and install browser binaries**
 
 Run:
 ```bash
@@ -97,7 +97,7 @@ npx playwright install chromium
 ```
 Expected: Playwright installed, Chromium browser binaries downloaded to `~/.cache/ms-playwright`.
 
-- [ ] **Step 3: Update `.gitignore`**
+- [x] **Step 3: Update `.gitignore`**
 
 Ensure `tests/Browser/screenshots` and `tests/Browser/Screenshots` are ignored in `.gitignore`:
 ```gitignore
@@ -107,7 +107,7 @@ tests/Browser/console/
 tests/Browser/source/
 ```
 
-- [ ] **Step 4: Verify Pest recognizes the browser plugin**
+- [x] **Step 4: Verify Pest recognizes the browser plugin**
 
 Run:
 ```bash
@@ -115,11 +115,11 @@ Run:
 ```
 Expected: Pest 4 prints version with browser plugin active.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add composer.json composer.lock package.json package-lock.json .gitignore
-git commit -m "build: install pest-plugin-browser and playwright"
+git commit -m "build: install pest-plugin-browser and playwright on branch 2.0"
 ```
 
 ---
