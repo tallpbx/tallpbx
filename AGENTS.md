@@ -275,7 +275,7 @@ When creating a new module:
 ### Safe Module Uninstall
 
 - Module uninstall support is opt-in through an explicit `ModuleUninstaller` handler. A module without a reviewed handler must remain non-uninstallable.
-- The currently reviewed table-owned modules are `pin-numbers`, `access-controls`, `email-templates`, `email-queue`, `tenant-limits`, and `call-broadcast`. Their ownership is isolated and their schemas can be recreated on reinstall.
+- The currently reviewed table-owned modules are `pin-numbers`, `acl`, `email-templates`, `email-queue`, `tenant-limits`, and `call-broadcast`. Their ownership is isolated and their schemas can be recreated on reinstall.
 - Do not add uninstall handlers to core SIP, directory, or routing modules, XML dialplan contributors with application-level indexes, modules involved in cross-module foreign-key chains, file-owning modules, or operational modules with runtime state until their cleanup and retention contracts are explicit.
 - Before making another module uninstallable, audit table and file ownership, cross-module references, foreign keys, application-level migrations and indexes, runtime jobs/events/ESL behavior, and retention requirements.
 - Add TDD lifecycle coverage proving handler registration, exact owned schema/data removal, preservation of unrelated tenant and permission data, migration-record cleanup, schema recreation, and successful writes after reinstall.

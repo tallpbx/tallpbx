@@ -29,7 +29,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | :--- | :--- | :--- | :--- | :---: |
 | **Total Analyzed Feature Areas** | **59** | **57** | **53** | High Convergence |
 | **Functional / Feature Parity** | **57 (96.6%)** | 57 (100%) | 50 (94.3%) | 🟢 **Core Parity Met** |
-| **Architecturally Superior in TallPBX** | **10 capabilities** (OAuth, Limits, Rate Limits, Backups, Local Spooling, Security Firewall, Bounded CLI Security, Layouts & Themes) | Legacy PHP scripts | Commercial closed modules | 🚀 **Substantial Advantage** |
+| **Architecturally Superior in TallPBX** | **10 capabilities** (OAuth, Limits, Event Rate Limits, Backups, Local Spooling, Security Firewall, Bounded CLI Security, Layouts & Themes) | Legacy PHP scripts | Commercial closed modules | 🚀 **Substantial Advantage** |
 | **Intentionally Excluded (Security)** | **2 modules** (Web DB client, Web shell) | Exposes `app/database`, `app/exec` | None in core | 🛡️ **Superior Security** |
 
 ---
@@ -60,7 +60,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Outbound Routes** | `outbound-routes` (Prefix/length patterns, gateways) | `app/dialplan_outbound` | `core` (Outbound Routes) | 🟢 **Full Parity** |
 | **Number Translations** | `number-translations` (Inbound/Outbound digit rewrites) | Dialplan regex actions | `core` (Dial Rules) | 🟢 **Full Parity** |
 | **Bridges & Destinations**| `bridges`, `destinations` | `app/bridges`, `app/destinations` | `customappsreg`, `miscapps` | 🟢 **Full Parity** |
-| **Access Control Lists (ACL)** | `access-controls` (FreeSWITCH application-level `acl.conf.xml` for SIP/ESL trust) | `app/access_controls` | `sipsettings` / Asterisk ACLs (`permit/deny`) | 🟢 **Full Parity** |
+| **Access Control Lists (ACL)** | `acl` (FreeSWITCH application-level `acl.conf.xml` for SIP/ESL trust) | `app/access_controls` | `sipsettings` / Asterisk ACLs (`permit/deny`) | 🟢 **Full Parity** |
 
 ---
 
@@ -108,7 +108,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Active Call Center** | `call-center-active` (agent status, pause/resume, logout)| `app/call_center_active` | `queues` FOP2 view | 🟢 **Full Parity** |
 | **SIP Status / Regs** | `sip-status`, `registrations` (real-time registrations) | `app/sip_status`, `app/registrations` | `core` registrations / `sipsettings` | 🟢 **Full Parity** |
 | **Call Detail Records** | `xml-cdr` (billsec, caller, destination, hangup cause) | `app/xml_cdr` | `cdr`, `cel` | 🟢 **Full Parity** |
-| **Rate Limits** | `event-guard` (FreeSWITCH event flood protection) | *None* | `firewall` (Fail2ban IP only) | 🚀 **Superior in TallPBX** |
+| **Event Rate Limits** | `event-rate-limits` (event flood protection) | `app/event_guard` (Event Guard) | `firewall` (Fail2ban IP only) | 🟢 **Full Parity** |
 
 ---
 

@@ -123,7 +123,7 @@ instead of being clipped by the header.
 
 ```blade
 {{-- Near top of page: use align="start" so bubble extends downward --}}
-<x-tooltip :tip="__('admin.event_guard_tooltip')" align="start" position="right">
+<x-tooltip :tip="__('admin.event_rate_limits_tooltip')" align="start" position="right">
     <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
 </x-tooltip>
 ```

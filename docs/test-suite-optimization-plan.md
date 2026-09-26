@@ -125,7 +125,7 @@ Currently, 7 domains have separate `ListTest.php`, `EditTest.php`, and `ServiceT
 | **Destinations** | `DestinationsListTest` (5), `DestinationsEditTest` (6), `DestinationServiceTest` (5) | `tests/Feature/Pbx/DestinationsTest.php` | 16 tests |
 | **Devices** | `DevicesListTest` (5), `DevicesEditTest` (7), `DeviceServiceTest` (6) | `tests/Feature/Pbx/DevicesTest.php` | 18 tests |
 | **SipAccounts** | `SipAccountsListTest` (5), `SipAccountsEditTest` (7), `SipAccountServiceTest` (8) | `tests/Feature/Pbx/SipAccountsTest.php` | 20 tests |
-| **AccessControls**| `AccessControlsListTest` (6), `AccessControlsEditTest` (6), `AccessControlServiceTest` (5) | `tests/Feature/Pbx/AccessControlsTest.php` | 17 tests |
+| **Acl**| `AclListTest` (6), `AclEditTest` (6), `AccessControlServiceTest` (5) | `tests/Feature/Pbx/AclTest.php` | 17 tests |
 | **FeatureCodes** | `FeatureCodesListTest` (6), `FeatureCodesEditTest` (6), `FeatureCodeServiceTest` (5) | `tests/Feature/Pbx/FeatureCodesTest.php` | 17 tests |
 | **IvrMenus** | `IvrMenusListTest` (6), `IvrMenusEditTest` (7), `IvrMenuServiceTest` (6) | `tests/Feature/Pbx/IvrMenusTest.php` | 19 tests |
 | **SipProfiles** | `SipProfilesListTest` (6), `SipProfilesEditTest` (10), `SipProfileServiceTest` (6) | `tests/Feature/Pbx/SipProfilesTest.php` | 22 tests |

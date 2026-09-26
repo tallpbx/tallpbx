@@ -200,7 +200,9 @@ TallPBX features distinct layers of security designed for different parts of the
 | **Host Firewall** | Network / Kernel (OS) | Linux `nftables` | Blocks unwanted network traffic before it reaches any service. Protects the entire operating system. | Dropping brute-force bots, restricting SSH to management IPs, blocking unauthorized SIP traffic. |
 | **Attack Protection** | In-Process Intrusion Defense | Redis + Reverb + `nftables` | Tracks authentication failures across SIP, Web login, and SSH, and automatically bans offenders in kernel RAM. | Automatically blocking an IP for 24 hours after 5 failed phone registrations or admin passwords. |
 | **Access Control Lists (ACL)** | Telephony Engine (FreeSWITCH) | FreeSWITCH `mod_sofia` ACLs | Authorizes which trusted IP subnets or devices are allowed to register SIP extensions or connect carriers inside the phone engine. | Allowing SIP carriers (e.g. Twilio, Telnyx) to deliver calls without SIP password challenges. |
-| **Rate Limits (Telephony)** | Telephony Engine (FreeSWITCH) | FreeSWITCH `event_guard` | Controls call setup rates to prevent denial-of-service floods or SIP INVITE exhaustion attacks. | Limiting maximum incoming calls per second on external SIP profiles. |
+| **Event Rate Limits (Telephony)** | Application (TallPBX ESL Listener) | TallPBX `event-rate-limits` module (event rate limiting) | Caps how many FreeSWITCH events a single source can send per minute and per burst, protecting the PBX from event storms. | Blocking a misconfigured device that floods the system with repeated registration or DTMF events. |
+
+**Event Rate Limits vs FreeSWITCH Rate Limits**: TallPBX's Event Rate Limits cap how many FreeSWITCH events (calls, registrations, DTMF tones, state changes) a single source may generate, protecting the PBX from event storms. FreeSWITCH's own rate limits are a different feature: the `sessions-per-second` core setting and the `limit` dialplan application, which cap call and session rates. The OS kernel firewall (`nftables`) is separate again, blocking network packets before they reach any service.
 
 ---
 
