@@ -201,6 +201,8 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->toContain('# Pin the stable 1.1 release branch instead of the default 2.0:')
         ->and($install)->toContain('bash -s -- --ref 1.1')
         ->and($install)->toContain('TallPBX 2.x is **not 100% backwards compatible** with the 1.x release')
+        ->and($install)->toContain('rapid development, so future releases may include more changes')
+        ->and($install)->toContain('will eventually stabilize as the platform matures')
         ->and($install)->toContain('will require a clean re-install')
         ->and($install)->not->toContain('bootstrap.sh.example')
         ->and($install)->not->toContain('(Roadmap)')

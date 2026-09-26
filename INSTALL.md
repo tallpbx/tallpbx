@@ -122,8 +122,7 @@ working copy to `2.0`.
 
 > [!WARNING]
 > **Major Version Notice (2.x vs 1.x Compatibility)**:
-> TallPBX 2.x is **not 100% backwards compatible** with the 1.x release branches (`1.0`, `1.1`).
-> Updating an existing installation from 1.x to 2.x is **not supported via in-place updates** and **will require a clean re-install**.
+> TallPBX is still in active, rapid development, so future releases may include more changes that are **not backwards compatible** with earlier versions. This will eventually stabilize as the platform matures. For the current transition, TallPBX 2.x is **not 100% backwards compatible** with the 1.x release branches (`1.0`, `1.1`), and updating an existing installation from 1.x to 2.x is **not supported via in-place updates** and **will require a clean re-install**.
 > If you are operating an existing 1.x deployment, remain on your `1.x` release series branch (e.g. `--ref 1.1`) or back up your data before performing a fresh 2.0 installation.
 
 To customize the installation, add options after `-s --`:
