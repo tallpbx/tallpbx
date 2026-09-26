@@ -257,7 +257,7 @@ and how long did callers or callers-to-be wait for it?
 - **Slowest** is the single longest wait. Treat it as a warning sign,
   especially if it repeats, rather than as the normal caller experience.
 
-Values are in milliseconds (`ms`); 1,000 ms is one second. Example:
+Values are in milliseconds (`ms`). Example:
 
 ```text
 30 req/sec | average 220 ms | fastest 110 ms | slowest 900 ms
