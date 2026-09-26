@@ -114,11 +114,17 @@ The command downloads a small bootstrap script and runs it. The bootstrap
 prepares the TallPBX source code in `/var/www/tallpbx`, then starts the main
 installer, which asks a few setup questions and installs everything.
 
-Re-running the command is safe — the installer can run repeatedly without
-affecting existing data, and it updates TallPBX in place. See
+Re-running the command is safe within the same release series — the installer can
+run repeatedly without affecting existing data, and it updates TallPBX in place. See
 [Upgrading TallPBX](#upgrading-tallpbx) for details.
 Use the same `--ref` value every time: without it, the re-run switches the
 working copy to `2.0`.
+
+> [!WARNING]
+> **Major Version Notice (2.x vs 1.x Compatibility)**:
+> TallPBX 2.x is **not 100% backwards compatible** with the 1.x release branches (`1.0`, `1.1`).
+> Updating an existing installation from 1.x to 2.x is **not supported via in-place updates** and **will require a clean re-install**.
+> If you are operating an existing 1.x deployment, remain on your `1.x` release series branch (e.g. `--ref 1.1`) or back up your data before performing a fresh 2.0 installation.
 
 To customize the installation, add options after `-s --`:
 
@@ -451,6 +457,12 @@ For a certificate from another provider, place `fullchain.pem` and
 > cannot be easily reversed. If an upgrade fails, restoring the backup is the
 > safest recovery path.
 
+> [!WARNING]
+> **Major Version Notice (Upgrading from 1.x to 2.x Requires a Re-install)**:
+> TallPBX 2.x is **not 100% backwards compatible** with the 1.x release series (`1.0`, `1.1`).
+> In-place updates across major version boundaries (e.g. attempting to update a 1.x system to 2.x via the web panel Git updater or CLI fast-forward pull) are **not supported** and will cause breaking incompatibilities.
+> Upgrading an existing system from 1.x to 2.x **requires a clean re-install**. Routine in-place updates are intended strictly for maintenance releases within the same series (e.g. updating within `1.1.x`, or updating within `2.0.x`).
+
 ### Updating from the Web Panel (Recommended)
 
 The recommended way to update TallPBX is directly from the web interface:
@@ -496,8 +508,8 @@ To update manually step by step, take a backup first, then run from `/var/www/ta
 
 ```bash
 # 1. Pull the latest code from the branch you installed
-#    (main, or a release branch such as 1.1).
-git pull --ff-only origin main
+#    (such as 2.0, or a maintenance release branch such as 1.1).
+git pull --ff-only origin 2.0
 
 # 2. Install PHP dependencies and rebuild browser files.
 composer install --no-dev --optimize-autoloader

@@ -49,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
 ### Changed
+- **Major Version 2.x Incompatibility & Re-install Requirement**:
+  - Explicitly documented in `INSTALL.md` and `scripts/bootstrap.sh` that TallPBX 2.x is **not 100% backwards compatible** with the 1.x release series (`1.0`, `1.1`).
+  - Stated that in-place updates from 1.x to 2.x are unsupported and will require a clean re-install, while in-place updates remain supported strictly within the same release series.
 - **Branching Model Adoption (Laravel Versioned-Series Model)**:
   - Formally adopted the Laravel framework versioned-branch model (`1.0`, `1.1`, `2.0`) in place of maintaining a perpetual `main` branch. Active development occurs directly on the active major/series branch (`2.0`), with previous branches serving as maintenance lines (`1.0`, `1.1`).
   - Updated bootstrap installer and documentation (`scripts/bootstrap.sh`, `INSTALL.md`, `tests/Feature/BootstrapInstallerTest.php`) to target the `2.0` release series by default.

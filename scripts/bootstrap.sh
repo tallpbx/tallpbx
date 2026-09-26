@@ -16,6 +16,10 @@
 #   --no-demo               Do not ask the installer to add demo data.
 #   --no-development        Do not install development tooling.
 #   --help                  Show this help text.
+#
+# Note:
+#   TallPBX 2.x is not backwards compatible with 1.x release branches.
+#   Updating from 1.x to 2.x requires a fresh re-install.
 # ==============================================================================
 
 # Stop on a failing command, an unset variable, or a failed pipeline so a
@@ -47,6 +51,10 @@ Options:
   --no-demo               Do not ask the installer to add demo data.
   --no-development        Do not install development tooling.
   --help                  Show this help text.
+
+Note:
+  TallPBX 2.x is not backwards compatible with 1.x release branches.
+  Updating from 1.x to 2.x requires a fresh re-install.
 USAGE
 }
 

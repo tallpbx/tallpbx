@@ -19,6 +19,7 @@ it('keeps the bootstrap safe for piped one-line installs', function (): void {
         ->and($bootstrap)->toContain('The TallPBX bootstrap must run as root')
         ->and($bootstrap)->toContain('requested_ref="2.0"')
         ->and($bootstrap)->toContain('requested_ref="$2"')
+        ->and($bootstrap)->toContain('TallPBX 2.x is not backwards compatible with 1.x')
         ->and($bootstrap)->toContain('git ls-remote --exit-code')
         ->and($bootstrap)->toContain('git -C "$application_root" merge --ff-only')
         ->and($bootstrap)->toContain('git -C "$application_root" status --porcelain')
@@ -199,6 +200,8 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->toContain('To customize the installation, add options after `-s --`')
         ->and($install)->toContain('# Pin the stable 1.1 release branch instead of the default 2.0:')
         ->and($install)->toContain('bash -s -- --ref 1.1')
+        ->and($install)->toContain('TallPBX 2.x is **not 100% backwards compatible** with the 1.x release')
+        ->and($install)->toContain('will require a clean re-install')
         ->and($install)->not->toContain('bootstrap.sh.example')
         ->and($install)->not->toContain('(Roadmap)')
         ->and($install)->not->toContain('bash ./scripts/install.sh --no-demo');
