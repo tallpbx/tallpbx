@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Stated that in-place updates from 1.x to 2.x are unsupported and will require a clean re-install, while in-place updates remain supported strictly within the same release series.
 - **Branching Model Adoption (Laravel Versioned-Series Model)**:
   - Formally adopted the Laravel framework versioned-branch model (`1.0`, `1.1`, `2.0`) in place of maintaining a perpetual `main` branch. Active development occurs directly on the active major/series branch (`2.0`), with previous branches serving as maintenance lines (`1.0`, `1.1`).
+  - Added a dedicated "Versioning & Release Strategy" section to `README.md` explaining the Laravel versioned-series branch model and Semantic Versioning (`MAJOR.MINOR.PATCH`).
   - Updated bootstrap installer and documentation (`scripts/bootstrap.sh`, `INSTALL.md`, `tests/Feature/BootstrapInstallerTest.php`) to target the `2.0` release series by default.
   - Enhanced the web panel GitHub updater (`GitUpdate.php` and `git-update.blade.php`) to fall back to the highest stable release branch (`$this->stableBranches[0] ?? '2.0'`) and conditionally display the Development Channel card only when development branches exist.
   - Escaped git log format arguments in `GitUpdateService::incomingCommits()` to prevent shell pipe evaluation errors.

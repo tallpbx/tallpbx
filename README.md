@@ -453,6 +453,21 @@ Recommended settings in `.env`:
 - **High-Density Call Center**: `XML_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
 - **Development**: `XML_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
 
+## Versioning & Release Strategy
+
+TallPBX follows the **[Laravel framework versioning model](https://laravel.com/docs/releases#versioning-scheme)** and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`):
+
+- **Versioned Series Branches**: Following the pattern used by Laravel, the repository does not maintain a perpetual `main` or `master` branch. Instead, active development takes place directly on versioned series branches representing release lines (e.g. `1.0`, `1.1`, `2.0`).
+- **Release Strategy**:
+  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `2.0` series introduces major modernizations and requires a fresh install rather than an in-place upgrade from `1.x`.
+  - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
+  - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
+- **Active Release Branches**:
+  - **`2.0`**: Current primary development branch for 2.x features and releases.
+  - **`1.1`**: Maintenance release series for 1.1.x deployments.
+  - **`1.0`**: Frozen maintenance branch for critical security fixes only.
+- **In-Place Updates**: In-place updates via the web updater panel (**System Settings → Updates**) and CLI (`scripts/update.sh`) are supported within the same release series branch. For detailed deployment notes, see [INSTALL.md](INSTALL.md), and for a complete historical record of releases, see [CHANGELOG.md](CHANGELOG.md).
+
 ## Tech Stack
 
 | Component | Version |
