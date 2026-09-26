@@ -329,14 +329,14 @@ the fresh-install procedure lives in "Fresh Install Validation (Install Script T
 
 | Hardware Configuration | PBX Architecture | Dedicated Load Generator | Benchmark Status |
 | :--- | :--- | :--- | :--- |
-| **1 vCPU / 1 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
-| **1 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: capacity ladder completed September 24, 2026 |
-| **2 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
-| **4 vCPU / 16 GiB RAM** | Dedicated CPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: full 2–30 CPS capacity ladder (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
+| **1 vCPU / 1 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
+| **1 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: capacity ladder completed September 24, 2026 |
+| **2 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
+| **4 vCPU / 16 GiB RAM** | Dedicated CPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: full 2–30 CPS capacity ladder (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
 
 Server-to-server topology:
 
-- Datacenter testing runs the two virtual servers in the same datacenter region (`sfo3`).
+- Datacenter testing runs the two virtual servers in the same datacenter.
 - The PBX target virtual server runs on a shared-CPU plan for the 1 vCPU and
   2 vCPU tests with up to 2 GiB RAM and on a dedicated-CPU server for the
   high-density enterprise profile (4 vCPU Dedicated / 16 GiB RAM).
@@ -453,7 +453,7 @@ results sections with the new measurements in place.
 | Role | Host | Notes |
 | --- | --- | --- |
 | Datacenter PBX under test | `x.x.x.200` | Cloud VPS used for the datacenter benchmark series across 1c/1g, 1c/2g, 2c/2g, and 4c/16g tiers. |
-| Datacenter load generator | `x.x.x.173` | Dedicated 2 vCPU cloud node in the same region (`sfo3`) executing SIPp scenarios over direct public IP routing. |
+| Datacenter load generator | `x.x.x.173` | Dedicated 2 vCPU cloud node in the same datacenter executing SIPp scenarios over direct public IP routing. |
 | SIP signaling | PBX `5060` | FreeSWITCH internal Sofia profile. |
 | SIPp local ports | `5066`, `5070`, `5072`, `5074+` | Separate ports prevent one scenario from colliding with another. |
 | SIPp RTP ports | `6000`, `6002`, `6004+` | Media-flow scenarios use RTP echo with SIPp `-mi` and `-mp`. |

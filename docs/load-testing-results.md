@@ -501,7 +501,7 @@ Artifacts: `storage/app/load-tests/capacity/datacenter-1c-2g-20260924T193809Z/` 
 
 ### Cloud VPS: Dual-Core (2 vCPU / 2 GiB RAM)
 
-The cloud test server was resized in place to 2 vCPUs and 1,973 MiB RAM, testing the impact of adding a second compute core while retaining the same PHP-FPM static-6 profile (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, and 0 MiB swap usage. This benchmark series was executed on September 24, 2026 across two direct cloud datacenter nodes in the same region (`sfo3`) without VPN encapsulation overhead.
+The cloud test server was resized in place to 2 vCPUs and 1,973 MiB RAM, testing the impact of adding a second compute core while retaining the same PHP-FPM static-6 profile (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, and 0 MiB swap usage. This benchmark series was executed on September 24, 2026 across two direct cloud datacenter nodes in the same datacenter without VPN encapsulation overhead.
 
 #### Single-Server XML Throughput Ladder (September 24, 2026)
 
@@ -580,7 +580,7 @@ Artifacts: `storage/app/load-tests/capacity/datacenter-2c2g-shared-20260924T2108
 
 The dedicated-CPU 4 vCPU / 16 GiB profile represents the high-density multi-tenant enterprise PBX tier. *(Note: Sizing was adjusted from 8 GiB to 16 GiB based on cloud provider availability, with the intermediate 2 vCPU / 2 GiB dedicated test skipped to streamline the testing matrix).*
 
-The cloud test server was provisioned with 4 dedicated compute cores and 15,999 MiB RAM (15,090 MiB available), Linux 6.12 amd64, and configured with the production static worker pool (`pm = static`, `pm.max_children = 24`), MariaDB 10.11, Redis 7.0, and 0 MiB swap usage. Benchmarks were executed on September 24, 2026 across two direct cloud datacenter nodes in the same region (`sfo3`).
+The cloud test server was provisioned with 4 dedicated compute cores and 15,999 MiB RAM (15,090 MiB available), Linux 6.12 amd64, and configured with the production static worker pool (`pm = static`, `pm.max_children = 24`), MariaDB 10.11, Redis 7.0, and 0 MiB swap usage. Benchmarks were executed on September 24, 2026 across two direct cloud datacenter nodes in the same datacenter.
 
 #### Single-Server XML Throughput Ladder (September 24, 2026)
 
@@ -666,7 +666,7 @@ Call-setup latency is measured from the caller's first `INVITE` to the destinati
 
 ### Cloud Datacenter VPS (1 vCPU / 1 GiB RAM Baseline)
 
-Empirical benchmark and validation series executed on September 24, 2026 across two cloud datacenter nodes in the same region (`sfo3`):
+Empirical benchmark and validation series executed on September 24, 2026 across two cloud datacenter nodes in the same datacenter:
 - **Target PBX VPS**: 1 vCPU, 967 MiB RAM, 2.0 GiB swap. Debian 13, Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 5`), MariaDB 10.11, Redis 7.0, FreeSWITCH 1.11. Public IPv4 `x.x.x.200`, Private IPv4 `10.124.0.2`, Public IPv6 `2604:a880:...9b49:0`.
 - **Dedicated Load Generator**: 2 vCPU, 2048 MiB RAM. Debian 13, SIPp 3.7.3. Public IPv4 `x.x.x.173`, Private IPv4 `10.124.0.3`, Public IPv6 `2604:a880:...9b53:9000`.
 - **Network**: Direct datacenter interface routing; SIP signalling and RTP media exchange over direct public IP interfaces without VPN tunneling overhead.
