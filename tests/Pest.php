@@ -10,7 +10,8 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\DuskTestCase;
 use Tests\TestCase;
 
-pest()->extend(DuskTestCase::class)
+pest()->extend(TestCase::class)
+    ->use(LazilyRefreshDatabase::class)
     ->use(Tests\Browser\Concerns\InteractsWithAuthentication::class)
     ->in('Browser');
 

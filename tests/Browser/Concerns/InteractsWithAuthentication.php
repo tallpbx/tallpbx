@@ -23,6 +23,7 @@ trait InteractsWithAuthentication
      */
     public function loginAs(Model $user, string $guard = 'admin'): void
     {
-        visit("/_testing/login/{$guard}/{$user->getKey()}");
+        visit("/_testing/login/{$guard}/{$user->getKey()}")
+            ->assertPathBeginsWith('/panel');
     }
 }
