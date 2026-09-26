@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `docs/load-testing-results.md` benchmark tables to standardize on `Average Latency`, `Fastest`, and `Slowest`.
   - Updated test fixtures in `tests/Feature/PbxDialplanLoadTestCommandTest.php` and `tests/Feature/PbxCacheSweepScriptTest.php` to assert average latency and verify raw sample preservation.
 - **Load Testing Readability & Terminology Overhaul**:
-  - Eliminated abstract stage, phase, and lettered environment codes (`Environment A1/B1/B2/B3/C1/C2/D`, `Stage 1–6`, `Phase 1–2`) in favor of clear, domain-driven organization (`Local Lab: VirtualBox`, `Cloud VPS: Entry Baseline`, `Cloud VPS: Dual-Core`, etc.).
+  - Eliminated abstract stage, phase, and lettered environment codes (`Environment A1/B1/B2/B3/C1/C2/D`, `Stage 1–6`, `Phase 1–2`) across `docs/load-testing-results.md` and `docs/load-testing-guide.md` in favor of clear, domain-driven organization (`Local Lab: VirtualBox`, `Cloud VPS: Entry Baseline`, `Cloud VPS: Dual-Core`, `Dedicated Cloud Node`, etc.).
   - Replaced cryptic cache sweep notation (`C=5, D=0`, `D=5, C=5`) with explicit plain-language descriptions (`Contributor TTL: 5s, Dialplan TTL: 0s`).
   - Added expandable `<details><summary>` definitions tables under all benchmark and parity tables explaining metrics, headers, and `.env` cache settings in simple administrative terms.
   - Added a dedicated "How to Read These Benchmark Tables" glossary defining `<Total Requests> x <Concurrency>` notation, repetitions and median reporting, the purpose of `25 x 1` warm-up runs, and the difference between `mixed` and `cache-hit` scenarios.

@@ -54,8 +54,8 @@ without rediscovering and fixing subtle environment traps, follow this checklist
    forwarding or internal dialplan bridges must use `loopback/${destination}/${context}`.
    Attempting to bridge directly to raw numbers or `{dialplan=XML...}` causes FreeSWITCH
    to abort with `Cannot create outgoing channel of type [...] cause: [CHAN_NOT_IMPLEMENTED]`.
-7. **Clean Up Background UAS Listeners Between Phases**: In multi-phase SIPp scripts,
-   background UAS processes from earlier phases must be explicitly terminated (`cleanup`)
+7. **Clean Up Background UAS Listeners Between Scenario Suites**: In multi-scenario SIPp scripts,
+   background UAS processes from earlier test runs must be explicitly terminated (`cleanup`)
    before binding new listeners on the same ports (such as 5066 and 5088). Failure to do
    so causes SIPp to exit immediately with `errno 98 (Address already in use)`, leaving
    scenarios unmonitored and failing with `503 Service Unavailable` (`NORMAL_TEMPORARY_FAILURE`).
@@ -69,8 +69,8 @@ without rediscovering and fixing subtle environment traps, follow this checklist
    `pm.max_children = 12` (+15% throughput, 0 queueing errors, 2.9 GiB free RAM).
 10. **SIP Registration Expiry During Long Test Suites**: The SIP registration scenario
     (`tools/sipp/register.xml`) must specify a long lease (`Expires: 3600`) instead of
-    300s so registrations do not expire before later test phases execute. In addition,
-    multi-phase runners should refresh registrations before extended parity scenarios to
+    300s so registrations do not expire before later test scenarios execute. In addition,
+    multi-scenario runners should refresh registrations before extended parity scenarios to
     prevent `Reason: SIP;cause=806;text="USER_NOT_REGISTERED"` when bridging calls.
 
 ## How This Document Is Organized
@@ -101,7 +101,7 @@ different questions and must never be mixed up:
    registration, `INVITE`, authentication, Laravel XML lookups through
    FreeSWITCH, bridging, answer, hold time, and hangup. Tools:
    `scripts/pbx-sipp-validate.sh` with the SIPp scenarios in `tools/sipp/`,
-   plus higher-rate capacity scenarios for staged call-rate runs.
+   plus higher-rate capacity scenarios for stepped call-rate runs.
 
 ### What Each Test Answers
 
@@ -297,9 +297,9 @@ active at steady state. A low concurrency limit forces SIPp to wait, so the
 configured attempt rate may be higher than the rate the test actually
 achieves.
 
-## Test Phases And Hardware Progression
+## Benchmark Architecture & Hardware Progression
 
-Testing runs in two phases, and the results in this guide are presented in
+Testing evaluates two complementary workload dimensions, and the results in this guide are presented in
 that same order:
 
 1. **Single-server bottleneck testing.** The dynamic dialplan XML test runs
@@ -316,25 +316,23 @@ followed by server-to-server capacity and parity ladders across cloud VPS hardwa
 The "Campaign Plan" section below defines the setups, roles, execution order, and gates;
 the fresh-install procedure lives in "Fresh Install Validation (Install Script Test)".
 
-**Phase 1 — single-server bottleneck testing (requests per second):**
+**Single-Server Dialplan XML Bottleneck Testing (Requests Per Second):**
 
-| ID | Environment | Specification | Status |
-| --- | --- | --- | --- |
-| B1 | Shared-CPU Datacenter VPS | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
-| B2 | Shared-CPU Datacenter VPS | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
-| B3 | Shared-CPU Datacenter VPS | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
-| C1 | Dedicated-CPU Datacenter VPS | 2 vCPU, 2 GiB RAM | Skipped: streamlined matrix to eliminate testing redundancy |
-| C2 | Dedicated-CPU Datacenter VPS | 4 vCPU, 16 GiB RAM (adjusted from 8 GiB based on cloud availability) | Complete: single-server ladder (65+ req/sec sustained) and 5-tier cache sweep completed September 24, 2026 |
+| Hardware Configuration | CPU Allocation | Specification | Benchmark Status |
+| :--- | :--- | :--- | :--- |
+| **1 vCPU / 1 GiB RAM** | Shared vCPU | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
+| **1 vCPU / 2 GiB RAM** | Shared vCPU | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
+| **2 vCPU / 2 GiB RAM** | Shared vCPU | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
+| **4 vCPU / 16 GiB RAM** | Dedicated CPU | 4 vCPU Dedicated, 16 GiB RAM | Complete: single-server ladder (65+ req/sec sustained) and 5-tier cache sweep completed September 24, 2026 |
 
-**Phase 2 — server-to-server call testing (calls per second):**
+**Server-to-Server Live SIP Call Capacity Testing (Calls Per Second):**
 
-| ID | PBX under test | SIPp load generator | Status |
-| --- | --- | --- | --- |
-| B1 | Shared-CPU Datacenter VPS (1 vCPU / 1 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
-| B2 | Shared-CPU Datacenter VPS (1 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: capacity ladder completed September 24, 2026 |
-| B3 | Shared-CPU Datacenter VPS (2 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
-| C1 | Dedicated-CPU Datacenter VPS (2 vCPU / 2 GiB RAM) | Dedicated load generator in the same datacenter (`sfo3`) | Skipped: streamlined matrix |
-| C2 | Dedicated-CPU Datacenter VPS (4 vCPU / 16 GiB Dedicated) | Dedicated load generator in the same datacenter (`sfo3`) | Complete: full 2–30 CPS capacity ladder (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
+| Hardware Configuration | PBX Architecture | Dedicated Load Generator | Benchmark Status |
+| :--- | :--- | :--- | :--- |
+| **1 vCPU / 1 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
+| **1 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: capacity ladder completed September 24, 2026 |
+| **2 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
+| **4 vCPU / 16 GiB RAM** | Dedicated CPU Cloud VPS | Dedicated cloud node in the same datacenter (`sfo3`) | Complete: full 2–30 CPS capacity ladder (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
 
 Server-to-server topology:
 
@@ -343,33 +341,32 @@ Server-to-server topology:
   2 vCPU tests with up to 2 GiB RAM and on a dedicated-CPU server for the
   high-density enterprise profile (4 vCPU Dedicated / 16 GiB RAM).
 
-Notes for both phases:
+Notes:
 
 - Keep the provider, datacenter region, public IP, disk, operating system,
   application commit, seed data, and generator hosts constant across the
-  datacenter stages so CPU and memory are the primary variables.
+  datacenter benchmarks so CPU and memory are the primary variables.
 - Record whether each size was an in-place resize or a replacement server,
   plus the provider CPU model/class, disk type, and region.
-- Datacenter test stages cross the datacenter network fabric. Record idle round-trip latency before
+- Datacenter server-to-server tests cross the datacenter network fabric. Record idle round-trip latency before
   every measured run; raw latency values include network latency.
 - After each resize, reboot and confirm the new values with `lscpu`,
-  `free -h`, and `swapon --show` before running the staged tiers.
+  `free -h`, and `swapon --show` before running the benchmark ladders.
 
 ## Campaign Plan
 
 The campaign executes single-server bottleneck tests first, followed by
 server-to-server call testing, and every run uses new test data created from
-scratch. This section defines the campaign setups, roles, and order; the
+scratch. This section defines the campaign hardware tiers, roles, and order; the
 fresh-install procedure is in "Fresh Install Validation (Install Script Test)"
 in Test Lab Setup.
 
-### Campaign Setups
+### Infrastructure Roles
 
-| ID | Role | Notes |
-| --- | --- | --- |
-| B1–B3 | PBX targets | Shared-CPU datacenter VPS; specifications and status in the Phase 1 table. |
-| C1–C2 | PBX targets | Dedicated-CPU datacenter VPS; specifications and status in the Phase 1 table. |
-| D | SIPp load generator | Dedicated datacenter server used for the datacenter pairs. |
+| Role | Target System | Description |
+| :--- | :--- | :--- |
+| **PBX Under Test** | Cloud VPS (1–4 vCPU) | Target PBX server evaluated across the cloud VPS hardware tiers. |
+| **SIPp Load Generator** | Dedicated Cloud Node | Dedicated server in the same datacenter region coordinating load generation and scenario dispatch. |
 
 ### Dedicated Load Generator & Orchestration Host
 
@@ -384,18 +381,22 @@ The load generator coordinates the campaign:
 
 1. Install the target PBX from scratch by running `scripts/install.sh`, then complete the fresh-install validation checklist over SSH.
 2. Create the new test data (seed on PBX) and copy the CSVs back to the load generator.
-3. Shared-CPU single-server ladder — B1, then B2, then B3.
-4. Dedicated-CPU single-server ladder — C2.
-5. Datacenter server-to-server pairs — B1 pair (correctness & parity), B3 pair (capacity), then C2 pair (full capacity ladder).
-6. Refresh the results tables in this guide with the new measurements, and record findings in the changelog.
+3. Single-server XML throughput ladder:
+   - Shared-CPU tiers (1 vCPU / 1 GiB, 1 vCPU / 2 GiB, 2 vCPU / 2 GiB)
+   - Dedicated-CPU tier (4 vCPU / 16 GiB Dedicated)
+4. Server-to-server SIP signaling benchmarks:
+   - 1 vCPU / 1 GiB Cloud VPS: 14-scenario telephony feature parity and 3 CPS baseline
+   - 2 vCPU / 2 GiB Cloud VPS: Concurrency scaling and saturation boundary
+   - 4 vCPU / 16 GiB Dedicated Node: Complete 2–30 CPS capacity ladder (full enterprise load)
+5. Refresh the results tables in `docs/load-testing-results.md` with the new measurements, and record findings in the changelog.
 
-### Per-Setup Test Matrix
+### Benchmark Evaluation Matrix
 
-| Stage | Setup | Tests | Experiments |
-| --- | --- | --- | --- |
-| 1 | B1, B2, B3 (shared-CPU single-server) | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM dynamic vs. static worker pool; 5-tier cache sweep |
-| 2 | C2 (dedicated-CPU single-server) | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM static 24-worker pool; 5-tier cache sweep |
-| 3 | Datacenter pairs (B1, B3, C2) | B1: 14-scenario parity suite and 3 CPS baseline. B3 & C2: 2–30 CPS capacity ladder, zero stuck channels | FreeSWITCH log level (`notice`) and PHP-FPM per pair |
+| Hardware Tier | Benchmark Category | Workload Profile | Configuration Variables Evaluated |
+| :--- | :--- | :--- | :--- |
+| **Shared-CPU Cloud VPS** (1–2 vCPU) | Single-Server XML Throughput | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM dynamic vs. static worker pool; 5-tier cache sweep |
+| **Dedicated-CPU Cloud VPS** (4 vCPU / 16 GiB) | Single-Server XML Throughput | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM static 24-worker pool; 5-tier cache sweep |
+| **Server-to-Server Pairs** (1, 2, 4 vCPU) | Live SIP Signaling & Parity | 1 vCPU: 14-scenario parity suite and 3 CPS baseline.<br>2 vCPU & 4 vCPU: 2–30 CPS capacity ladder, zero stuck channels | FreeSWITCH log level (`notice`) and PHP-FPM per tier |
 
 The concurrent-call ladder and the RTP media capacity test need new SIPp
 scenarios; see the open items below.
@@ -413,10 +414,10 @@ and the recovery runbook.
 ### Gates And Stop Conditions
 
 - The fresh-install validation checklist must pass fully before benchmarking.
-- XML stages: advance a tier only when the previous tier had zero failed
+- XML throughput benchmarks: advance a tier only when the previous tier had zero failed
   responses; stop escalating per the stop conditions in "Per-Run Record,
-  Staged Tiers, And Stop Conditions".
-- Pair stages: correctness (basic, media, extended) passes before the
+  Benchmark Tiers, And Stop Conditions".
+- Server-to-server call benchmarks: correctness (basic, media, extended) passes before the
   capacity ladder; each capacity tier must end with zero stuck channels
   after teardown; a tier fails when the success rate or setup time degrades
   beyond the recorded thresholds.
@@ -425,7 +426,7 @@ and the recovery runbook.
 
 ### Recording And Artifacts
 
-Follow "How Results Are Recorded", "Per-Run Record, Staged Tiers, And Stop
+Follow "How Results Are Recorded", "Per-Run Record, Benchmark Tiers, And Stop
 Conditions", and "Artifacts". Keep every XML JSON report, sampler log, SIPp
 artifact directory, and the installer logs with the campaign artifacts.
 When the campaign completes, replace the historical reference tables in the
@@ -438,7 +439,7 @@ results sections with the new measurements in place.
 - Implement the two new SIPp scenarios (concurrent-call hold ladder and
   RTP media capacity) plus the recording assertion for the media runner,
   per "Additional Tests To Add To The Campaign" in Test 2.
-- Choose the datacenter provider and region for B1–B3 and C1–C2; record
+- Choose the datacenter provider and region for the target PBX hardware tiers and load generator; record
   instance identity, CPU class, and disk type.
 - Configure SSH access between the load generator and PBX servers (keys and
   ports), and record the SSH endpoints with the campaign notes.
@@ -1346,7 +1347,7 @@ The current runner defaults are deliberately small: 10 extension calls
 attempted at 2 per second with no more than 5 active, followed by 5 outbound
 calls attempted at 1 per second with no more than 2 active. These defaults
 prove the full chain works; they do not establish capacity. A capacity claim
-requires staged, repeated runs with increasing `CALL_RATE`,
+requires stepped, repeated runs with increasing `CALL_RATE`,
 `MAX_SIMULTANEOUS`, and `CALLS`, plus retained statistics and server
 metrics. The safe capacity is the highest repeatable tier that keeps the
 chosen success-rate and setup-time limits and leaves no stuck calls after
@@ -1507,7 +1508,7 @@ They close the gaps the source documents themselves call out.
    hold time (for example 60–120 seconds each) until the success rate or
    setup time degrades, then record peak simultaneous calls, peak
    FreeSWITCH channels, CPU and memory, and confirm zero stuck channels
-   after teardown. Run it on each Phase 2 pair after the signaling ladder.
+   after teardown. Run it on each server-to-server hardware tier after the signaling ladder.
 2. **RTP-enabled media capacity test.** The signaling capacity runs carry
    no continuous audio. Add a media scenario that plays real RTP (pcap
    playback) for a fixed duration at increasing concurrency, and record
@@ -1517,8 +1518,8 @@ They close the gaps the source documents themselves call out.
 3. **Media-flow re-validation per profile.** The recording check failed on
    the 1 vCPU / 1 GiB profile because of a dialplan bug, and the 1 vCPU /
    2 GiB and 2 vCPU / 2 GiB profiles never re-ran media checks afterward.
-   Run `MEDIA_FLOW=1` with fresh seed data on every Phase 2 pair,
-   and record each scenario's pass/fail in the stage tables.
+   Run `MEDIA_FLOW=1` with fresh seed data on each server-to-server hardware tier,
+   and record each scenario's pass/fail in the benchmark tables.
 4. **Recording regression check.** No test currently asserts that `*732`
    produces a usable recording end to end. Add a step that places a call
    to `*732`, holds for at least 10 seconds, hangs up, and then verifies
@@ -1574,7 +1575,7 @@ Findings from empirical datacenter and lab benchmark runs:
 - **FreeSWITCH Switch Logging**: Lowering FreeSWITCH switch logging from `debug` to `notice` reduces setup latency and prevents log-disk I/O bottlenecks during high-throughput runs.
 - **FreeSWITCH `sessions-per-second`**: For high-rate SIPp runs, always configure FreeSWITCH `sessions-per-second=60` (or higher) to prevent the default safety cap (`30`) from dropping two-leg calls near 15 calls/sec.
 
-For the current phase, keep metrics collection simple and repeatable: use
+For current benchmark runs, keep metrics collection simple and repeatable: use
 the JSON report from the XML test plus the host sampler instead of
 introducing a dedicated metrics exporter. Consider Prometheus, Grafana, or
 another exporter stack only when longer campaigns need continuous
@@ -2004,7 +2005,7 @@ ssh root@<GENERATOR_IP> \
    echo "artifacts=$OUT"; exit "$rc"'
 ```
 
-The short diagnostic proof verifies that SIP INVITE dialogs complete with zero SIPp UDP send/receive/congestion errors. Treat short test runs as a diagnostic check, not a replacement for the full staged ladder.
+The short diagnostic proof verifies that SIP INVITE dialogs complete with zero SIPp UDP send/receive/congestion errors. Treat short test runs as a diagnostic check, not a replacement for the full capacity ladder.
 
 ## Artifacts
 
@@ -2072,9 +2073,9 @@ Extended parity validation revealed several FreeSWITCH dialplan and bridging bug
 | Feature-code log markers shadowed real feature dialplans (`continue=false`) | Single-leg stereo recording failed to start | Fixed execution order in `XmlHandlerController.php` and `recording-start` dialplan. |
 | Call forward condition matched extension UUID instead of number | Call forward bridge failed without tenant context | Corrected destination matching in `CallForwardService.php` and `XmlHandlerController.php`. |
 
-## Per-Run Record, Staged Tiers, And Stop Conditions
+## Per-Run Record, Benchmark Tiers, And Stop Conditions
 
-### Staged Run Tiers (XML Test)
+### Benchmark Run Ladders (XML Test)
 
 Start small and increase only after the prior tier is stable:
 
