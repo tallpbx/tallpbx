@@ -250,8 +250,8 @@ the old program first; that does not touch your database or recordings.
 Redis is TallPBX's in-memory storage for sessions, cache, dynamic intrusion bans,
 and FreeSWITCH XML handler caching. New installs configure it automatically.
 The telephony XML handler utilizes Redis to cache compiled dialplans, query contributors,
-and directory lookups (`XML_CACHE_TTL=5`), protecting MariaDB during call bursts.
-Granular overrides (`XML_CACHE_DIALPLAN_TTL`, `XML_CACHE_DIRECTORY_TTL`, etc.)
+and directory lookups (`XML_HANDLER_CACHE_TTL=5`), protecting MariaDB during call bursts.
+Granular overrides (`XML_HANDLER_DIALPLAN_CACHE_TTL`, `XML_HANDLER_DIRECTORY_CACHE_TTL`, etc.)
 are available in `.env` if individual subsystems require different durations.
 You can run `bash scripts/run-cache-sweep.sh` to benchmark cache hit rates across configurations.
 Keep `redis-server` running in production: if Redis is temporarily down the PBX
@@ -360,7 +360,7 @@ recordings, queues, music, and dynamic configuration. It requires a free
 SignalWire Personal Access Token — create one at https://signalwire.com under
 **Personal Access Tokens** (repo access). The installer configures FreeSWITCH
 to fetch its phone directory and call routing from the application. If you
-change `FREESWITCH_XML_HANDLER_TOKEN` later, re-apply the configuration:
+change `XML_HANDLER_TOKEN` later, re-apply the configuration:
 
 ```bash
 cd /var/www/tallpbx

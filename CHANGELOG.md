@@ -15,13 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Detects dirty tenant reassignments on model updates, invalidating active caches for both the originating and destination tenants simultaneously.
   - Completely eliminates dialplan stale-cache windows and propagation delays when changes are saved in the web panel, ensuring new routing instructions take effect on the very next call attempt without waiting for the XML cache TTL to expire.
   - In-flight active calls continue uninterrupted because FreeSWITCH executes instructions pre-compiled into channel variables during call setup (`CS_ROUTING`).
-- **Streamlined Telephony XML Cache Settings (`XML_CACHE_TTL` & `XML_CACHE_STORE`)**:
-  - Streamlined telephony XML cache configuration in `config/freeswitch.php`, `.env`, and `.env.example` to use concise `XML_CACHE_*` naming (e.g. `XML_CACHE_TTL`, `XML_CACHE_STORE`, `XML_CACHE_DIALPLAN_TTL`, `XML_CACHE_CONTRIBUTOR_TTL`, `XML_CACHE_DIRECTORY_TTL`, `XML_CACHE_ACL_TTL`, `XML_CACHE_DIALPLAN_STORE`, `XML_CACHE_DIRECTORY_STORE`, `XML_CACHE_ACL_STORE`).
-  - Introduced `XML_CACHE_TTL` as the master default cache TTL (in seconds) for all dynamically rendered FreeSWITCH XML responses (dialplans, directory auth, contributor fragments, and ACLs).
+- **Standardized XML Handler & Cache Settings (`XML_HANDLER_*`)**:
+  - Standardized FreeSWITCH XML handler and cache environment variables in `config/freeswitch.php`, `.env`, and `.env.example` under the unified, canonical `XML_HANDLER_*` prefix (e.g. `XML_HANDLER_AUTH`, `XML_HANDLER_TOKEN`, `XML_HANDLER_PATH`, `XML_HANDLER_LOG_REQUESTS`, `XML_HANDLER_LOG_TIMING`, `XML_HANDLER_CACHE_TTL`, `XML_HANDLER_CACHE_STORE`, and granular subsystem overrides `XML_HANDLER_DIALPLAN_CACHE_TTL`, `XML_HANDLER_CONTRIBUTOR_CACHE_TTL`, `XML_HANDLER_DIRECTORY_CACHE_TTL`, `XML_HANDLER_ACL_CACHE_TTL`, `XML_HANDLER_DIALPLAN_CACHE_STORE`, etc.).
+  - Introduced `XML_HANDLER_CACHE_TTL` as the master default cache TTL (in seconds) for all dynamically rendered FreeSWITCH XML responses (dialplans, directory auth, contributor fragments, and ACLs).
   - Cascades the master TTL automatically to all granular caches unless an explicit granular override is uncommented in `.env`.
-  - Introduced `XML_CACHE_STORE` as the master cache store setting (defaulting to `redis`), automatically cascading across all XML handler caches.
-  - Formatted `.env` and `.env.example` with the master TTL (`XML_CACHE_TTL=5`) and store (`XML_CACHE_STORE=redis`) active, leaving granular overrides cleanly commented out with plain-language explanations.
-  - Updated installer (`scripts/resources/tall.sh`), cache benchmark sweep tool (`scripts/run-cache-sweep.sh`), test suites, and all documentation (`README.md`, `INSTALL.md`, `docs/load-testing-guide.md`, `docs/load-testing-results.md`, `AGENTS.md`) to reflect the streamlined naming convention.
+  - Introduced `XML_HANDLER_CACHE_STORE` as the master cache store setting (defaulting to `redis`), automatically cascading across all XML handler caches.
+  - Formatted `.env` and `.env.example` with the master TTL (`XML_HANDLER_CACHE_TTL=5`) and store (`XML_HANDLER_CACHE_STORE=redis`) active, leaving granular overrides cleanly commented out with plain-language explanations.
+  - Updated installer (`scripts/resources/tall.sh`, `scripts/resources/freeswitch.sh`), cache benchmark sweep tool (`scripts/run-cache-sweep.sh`), test suites, and all documentation (`README.md`, `INSTALL.md`, `docs/load-testing-guide.md`, `docs/load-testing-results.md`, `AGENTS.md`) to reflect the unified naming convention.
 - **Cloud Datacenter 4 vCPU Dedicated / 16 GiB RAM Empirical Benchmarks**:
   - Documented empirical September 24, 2026 single-server dynamic dialplan XML throughput ladder (`100 x 5`, `500 x 25`, `1,000 x 25`) and 5-tier cache optimization sweep results on the 4 vCPU Dedicated / 16 GiB enterprise node (`pm = static`, `pm.max_children = 24`).
   - Achieved **65.32 req/sec** dynamic XML throughput with tail latency capped under **448 ms** across 1,000 sustained requests (a >4x throughput increase over single/dual-core baselines).
@@ -40,10 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **1.x Backward Compatibility Fallbacks**:
-  - Removed all legacy 1.x `FREESWITCH_XML_HANDLER_*` cache configuration fallbacks from `config/freeswitch.php`, standardizing exclusively on the canonical `XML_CACHE_*` settings (`XML_CACHE_TTL`, `XML_CACHE_STORE`, and granular subsystem overrides).
+  - Removed all legacy 1.x `FREESWITCH_XML_HANDLER_*` cache configuration fallbacks and standalone `XML_CACHE_*` settings from `config/freeswitch.php`, standardizing exclusively on canonical `XML_HANDLER_*` settings (`XML_HANDLER_CACHE_TTL`, `XML_HANDLER_CACHE_STORE`, and granular subsystem overrides).
   - Removed legacy 1.x `/smtp-connector` redirect in the Email Connector module routes (`app-modules/email-connector/routes/web.php`).
-  - Removed legacy `FREESWITCH_XML_HANDLER_*` environment variable sed mutations and assertions from `scripts/run-cache-sweep.sh` and `tests/Feature/PbxCacheSweepScriptTest.php`.
-  - Removed legacy backwards-compatibility test assertions in `tests/Feature/XmlHandlerCacheConfigTest.php` and updated `phpunit.xml` to define canonical `XML_CACHE_STORE` and `XML_CACHE_ACL_STORE`.
+  - Removed legacy environment variable sed mutations and assertions from `scripts/run-cache-sweep.sh` and `tests/Feature/PbxCacheSweepScriptTest.php`.
+  - Removed legacy backwards-compatibility test assertions in `tests/Feature/XmlHandlerCacheConfigTest.php` and updated `phpunit.xml` to define canonical `XML_HANDLER_CACHE_STORE` and `XML_HANDLER_ACL_CACHE_STORE`.
 - **VirtualBox Test Baseline Removal**:
   - Removed all legacy VirtualBox test tables, benchmarks, and VM references from `docs/load-testing-results.md` and `docs/load-testing-guide.md`, standardizing all documentation and sizing recommendations entirely on the comprehensive September 2026 cloud datacenter benchmarks.
   - Renamed and generalized the VirtualBox recovery runbook into a universal `SIPp Load Testing Preflight & Recovery Runbook` using standard environment placeholders (`<PBX_IP>`, `<GENERATOR_IP>`, `load-test-beta`).

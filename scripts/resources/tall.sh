@@ -202,13 +202,13 @@ fi
 grep -q "^FREESWITCH_ESL_HOST=" .env 2>/dev/null || echo "FREESWITCH_ESL_HOST=127.0.0.1" >> .env
 grep -q "^FREESWITCH_ESL_PORT=" .env 2>/dev/null || echo "FREESWITCH_ESL_PORT=8021" >> .env
 grep -q "^FREESWITCH_ESL_PASSWORD=" .env 2>/dev/null || echo "FREESWITCH_ESL_PASSWORD=ClueCon" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_AUTH=" .env 2>/dev/null || echo "FREESWITCH_XML_HANDLER_AUTH=true" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_PATH=" .env 2>/dev/null || echo "FREESWITCH_XML_HANDLER_PATH=/api/v1/xml-handler" >> .env
-grep -q "^FREESWITCH_XML_HANDLER_LOG_REQUESTS=" .env 2>/dev/null || echo "FREESWITCH_XML_HANDLER_LOG_REQUESTS=false" >> .env
-if ! grep -q "^FREESWITCH_XML_HANDLER_TOKEN=" .env 2>/dev/null; then
-    echo "FREESWITCH_XML_HANDLER_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')" >> .env
-elif [ -z "$(grep -E '^FREESWITCH_XML_HANDLER_TOKEN=' .env | tail -1 | cut -d= -f2- | sed 's/^\"//; s/\"$//')" ]; then
-    sed -i "s/^FREESWITCH_XML_HANDLER_TOKEN=.*/FREESWITCH_XML_HANDLER_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')/" .env
+grep -q "^XML_HANDLER_AUTH=" .env 2>/dev/null || echo "XML_HANDLER_AUTH=true" >> .env
+grep -q "^XML_HANDLER_PATH=" .env 2>/dev/null || echo "XML_HANDLER_PATH=/api/v1/xml-handler" >> .env
+grep -q "^XML_HANDLER_LOG_REQUESTS=" .env 2>/dev/null || echo "XML_HANDLER_LOG_REQUESTS=false" >> .env
+if ! grep -q "^XML_HANDLER_TOKEN=" .env 2>/dev/null; then
+    echo "XML_HANDLER_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')" >> .env
+elif [ -z "$(grep -E '^XML_HANDLER_TOKEN=' .env | tail -1 | cut -d= -f2- | sed 's/^\"//; s/\"$//')" ]; then
+    sed -i "s/^XML_HANDLER_TOKEN=.*/XML_HANDLER_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')/" .env
 fi
 if ! grep -q "^PBX_DEFAULT_SIP_PASSWORD=" .env 2>/dev/null; then
     echo "PBX_DEFAULT_SIP_PASSWORD=$(php -r 'echo bin2hex(random_bytes(12));')" >> .env
@@ -227,11 +227,11 @@ grep -q "^SESSION_DRIVER=" .env 2>/dev/null \
 grep -q "^SESSION_CONNECTION=" .env 2>/dev/null \
     && sed -i "s/^SESSION_CONNECTION=.*/SESSION_CONNECTION=cache/" .env \
     || echo "SESSION_CONNECTION=cache" >> .env
-grep -q "^XML_CACHE_STORE=" .env 2>/dev/null \
-    && sed -i "s/^XML_CACHE_STORE=.*/XML_CACHE_STORE=redis/" .env \
-    || echo "XML_CACHE_STORE=redis" >> .env
-grep -q "^XML_CACHE_TTL=" .env 2>/dev/null \
-    || echo "XML_CACHE_TTL=5" >> .env
+grep -q "^XML_HANDLER_CACHE_STORE=" .env 2>/dev/null \
+    && sed -i "s/^XML_HANDLER_CACHE_STORE=.*/XML_HANDLER_CACHE_STORE=redis/" .env \
+    || echo "XML_HANDLER_CACHE_STORE=redis" >> .env
+grep -q "^XML_HANDLER_CACHE_TTL=" .env 2>/dev/null \
+    || echo "XML_HANDLER_CACHE_TTL=5" >> .env
 grep -q "^FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=" .env 2>/dev/null \
     || echo "FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false" >> .env
 grep -q "^FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=" .env 2>/dev/null \

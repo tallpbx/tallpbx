@@ -551,7 +551,7 @@ it('installs and enables FreeSWITCH modules needed by the default PBX runtime', 
         ->and($script)->toContain("fs_cli -x 'unload mod_redis'")
         ->and($script)->toContain("fs_cli -x 'unload mod_memcache'")
         ->and($script)->toContain('bindings="directory|dialplan|configuration"')
-        ->and($script)->toContain('FREESWITCH_XML_HANDLER_TOKEN');
+        ->and($script)->toContain('XML_HANDLER_TOKEN');
 });
 
 it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML curl', function (): void {
@@ -559,16 +559,16 @@ it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML cu
     $envExample = (string) file_get_contents(base_path('.env.example'));
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 
-    expect($script)->toContain('FREESWITCH_XML_HANDLER_AUTH=true')
-        ->and($script)->toContain('FREESWITCH_XML_HANDLER_PATH=/api/v1/xml-handler')
-        ->and($script)->toContain('FREESWITCH_XML_HANDLER_LOG_REQUESTS=false')
+    expect($script)->toContain('XML_HANDLER_AUTH=true')
+        ->and($script)->toContain('XML_HANDLER_PATH=/api/v1/xml-handler')
+        ->and($script)->toContain('XML_HANDLER_LOG_REQUESTS=false')
         ->and($script)->toContain('FREESWITCH_SERVER=http://127.0.0.1')
         ->and($script)->toContain('FREESWITCH_DEFAULT_SIP_REALM=127.0.0.1')
         ->and($script)->toContain('PBX_DEFAULT_SIP_PASSWORD')
         ->and($script)->toContain('cut -d= -f2-')
         ->and($script)->toContain('bin2hex(random_bytes(32))')
         ->and($script)->toContain('bin2hex(random_bytes(12))')
-        ->and($script)->toContain('XML_CACHE_STORE=redis')
+        ->and($script)->toContain('XML_HANDLER_CACHE_STORE=redis')
         ->and($script)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false')
         ->and($script)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000')
         ->and($script)->toContain('FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false')
@@ -576,10 +576,10 @@ it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML cu
         ->and($script)->toContain('freeswitch.sh --configure-only')
         ->and($envExample)->toContain('FREESWITCH_SERVER=http://127.0.0.1')
         ->and($envExample)->toContain('FREESWITCH_DEFAULT_SIP_REALM=127.0.0.1')
-        ->and($envExample)->toContain('FREESWITCH_XML_HANDLER_AUTH=true')
-        ->and($envExample)->toContain('FREESWITCH_XML_HANDLER_PATH=/api/v1/xml-handler')
-        ->and($envExample)->toContain('FREESWITCH_XML_HANDLER_TOKEN=')
-        ->and($envExample)->toContain('FREESWITCH_XML_HANDLER_LOG_REQUESTS=false')
+        ->and($envExample)->toContain('XML_HANDLER_AUTH=true')
+        ->and($envExample)->toContain('XML_HANDLER_PATH=/api/v1/xml-handler')
+        ->and($envExample)->toContain('XML_HANDLER_TOKEN=')
+        ->and($envExample)->toContain('XML_HANDLER_LOG_REQUESTS=false')
         ->and($envExample)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false')
         ->and($envExample)->toContain('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000')
         ->and($envExample)->toContain('FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false')
@@ -948,7 +948,7 @@ it('auto-configures PHP-FPM static worker pools based on host memory', function 
 it('configures default XML handler cache TTL in tall.sh', function (): void {
     $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
 
-    expect($tallScript)->toContain('XML_CACHE_TTL=5');
+    expect($tallScript)->toContain('XML_HANDLER_CACHE_TTL=5');
 });
 
 

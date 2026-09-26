@@ -385,8 +385,8 @@ configure_dynamic_xml() {
     fi
 
     app_url="$(grep -E '^APP_URL=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
-    xml_path="$(grep -E '^FREESWITCH_XML_HANDLER_PATH=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
-    xml_token="$(grep -E '^FREESWITCH_XML_HANDLER_TOKEN=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
+    xml_path="$(grep -E '^XML_HANDLER_PATH=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
+    xml_token="$(grep -E '^XML_HANDLER_TOKEN=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
 
     if [ -z "$app_url" ]; then
         app_url="http://127.0.0.1"
@@ -397,7 +397,7 @@ configure_dynamic_xml() {
     fi
 
     if [ -z "$xml_token" ]; then
-        warning "FREESWITCH_XML_HANDLER_TOKEN is empty; skipping xml_curl.conf.xml generation"
+        warning "XML_HANDLER_TOKEN is empty; skipping xml_curl.conf.xml generation"
         load_required_freeswitch_modules
         return 0
     fi
