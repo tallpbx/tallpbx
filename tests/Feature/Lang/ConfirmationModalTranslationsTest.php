@@ -19,8 +19,8 @@ it('resolves every modal confirmation key in all locales', function (string $key
     }
 })->with([
     // Titles and confirm labels (per entity).
-    'modal_delete_access_control_title',
-    'modal_delete_access_control_confirm',
+    'modal_delete_acl_title',
+    'modal_delete_acl_confirm',
     'modal_delete_backup_title',
     'modal_delete_backup_confirm',
     'modal_delete_bridge_title',
