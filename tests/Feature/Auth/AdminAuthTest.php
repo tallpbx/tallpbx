@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\User;
 
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\get;
@@ -29,7 +30,7 @@ beforeEach(function () {
         'gateways.view',
         'ivr-menus.view',
         'devices.view',
-        'access-controls.view',
+        'acl.view',
         'feature-codes.view',
         'dialplans.view',
         'destinations.view',
@@ -62,7 +63,7 @@ it('authenticates an admin with valid credentials', function () {
 });
 
 it('authenticates a tenant user with valid credentials through the unified login', function () {
-    $user = \App\Models\User::factory()->create([
+    $user = User::factory()->create([
         'email' => 'tenantuser@example.com',
         'password' => bcrypt('password'),
     ]);

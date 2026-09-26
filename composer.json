@@ -16,7 +16,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "app-modules/access-controls"
+            "url": "app-modules/acl"
         },
         {
             "type": "path",
@@ -116,7 +116,7 @@
         },
         {
             "type": "path",
-            "url": "app-modules/event-guard"
+            "url": "app-modules/event-rate-limits"
         },
         {
             "type": "path",
@@ -258,7 +258,7 @@
         "laravel/reverb": "^1.11",
         "laravel/tinker": "^3.0",
         "livewire/livewire": "^4.0",
-        "tallpbx/module-access-controls": "*",
+        "tallpbx/module-acl": "*",
         "tallpbx/module-active-calls": "*",
         "tallpbx/module-active-conferences": "*",
         "tallpbx/module-admin": "*",
@@ -283,7 +283,7 @@
         "tallpbx/module-email-queue": "*",
         "tallpbx/module-email-templates": "*",
         "tallpbx/module-emergency": "*",
-        "tallpbx/module-event-guard": "*",
+        "tallpbx/module-event-rate-limits": "*",
         "tallpbx/module-extension-settings": "*",
         "tallpbx/module-extensions": "*",
         "tallpbx/module-fax": "*",

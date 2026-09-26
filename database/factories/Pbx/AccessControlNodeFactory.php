@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories\Pbx;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Modules\AccessControls\Models\AccessControlNode;
+use Modules\Acl\Models\AccessControlNode;
 
 /**
  * @extends Factory<AccessControlNode>

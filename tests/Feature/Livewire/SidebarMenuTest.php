@@ -24,7 +24,7 @@ beforeEach(function (): void {
         'extension-settings.view',
         'gateways.view',
         'devices.view',
-        'access-controls.view',
+        'acl.view',
         'call-broadcast.view',
         'feature-codes.view',
         'pin-numbers.view',
@@ -154,7 +154,7 @@ it('renders reported deep panel links in sidebar', function (string $routeName):
         ->assertOk()
         ->assertSee(route($routeName), false);
 })->with([
-    'access controls' => 'panel.access-controls.index',
+    'access control lists' => 'panel.acl.index',
     'destinations' => 'panel.destinations.index',
     'dialplans' => 'panel.dialplans.index',
 ]);

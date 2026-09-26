@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d34a4a85b61a9f88b7937c9055e83f7f",
+    "content-hash": "bc7602adc075f969b33697a5d4addbf8",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -7810,11 +7810,11 @@
             "time": "2026-09-03T16:02:27+00:00"
         },
         {
-            "name": "tallpbx/module-access-controls",
+            "name": "tallpbx/module-acl",
             "version": "1.0.0",
             "dist": {
                 "type": "path",
-                "url": "app-modules/access-controls",
+                "url": "app-modules/acl",
                 "reference": "79f9b0397115b8211e0c5d5a8ede08bf37e94d53"
             },
             "require": {
@@ -7825,19 +7825,19 @@
             "extra": {
                 "laravel": {
                     "providers": [
-                        "Modules\\AccessControls\\Providers\\ModuleServiceProvider"
+                        "Modules\\Acl\\Providers\\ModuleServiceProvider"
                     ]
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "Modules\\AccessControls\\": "src/"
+                    "Modules\\Acl\\": "src/"
                 }
             },
             "license": [
                 "Apache-2.0"
             ],
-            "description": "Network ACL management with CIDR and IP allow/deny rules for FreeSwitchPBX.",
+            "description": "Access Control List (ACL) management with CIDR and IP allow/deny rules for FreeSWITCH.",
             "transport-options": {
                 "relative": true
             }
@@ -8693,11 +8693,11 @@
             }
         },
         {
-            "name": "tallpbx/module-event-guard",
+            "name": "tallpbx/module-event-rate-limits",
             "version": "1.0.0",
             "dist": {
                 "type": "path",
-                "url": "app-modules/event-guard",
+                "url": "app-modules/event-rate-limits",
                 "reference": "188fa847cce556e77766a8b1c80706fb062bbb7b"
             },
             "require": {
@@ -8707,13 +8707,13 @@
             "extra": {
                 "laravel": {
                     "providers": [
-                        "Modules\\EventGuard\\Providers\\ModuleServiceProvider"
+                        "Modules\\EventRateLimits\\Providers\\ModuleServiceProvider"
                     ]
                 }
             },
             "autoload": {
                 "psr-4": {
-                    "Modules\\EventGuard\\": "src/"
+                    "Modules\\EventRateLimits\\": "src/"
                 }
             },
             "license": [
@@ -8725,7 +8725,7 @@
                     "homepage": "https://pbx.local"
                 }
             ],
-            "description": "Event guard module for FreeSwitchPBX",
+            "description": "Event rate limiting for FreeSWITCH events (event flood protection).",
             "transport-options": {
                 "relative": true
             }

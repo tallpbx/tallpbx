@@ -1,0 +1,23 @@
+{
+    "name": "tallpbx/module-acl",
+    "type": "tallpbx-module",
+    "description": "Access Control List (ACL) management with CIDR and IP allow/deny rules for FreeSWITCH.",
+    "license": "Apache-2.0",
+    "autoload": {
+        "psr-4": {
+            "Modules\\Acl\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.3",
+        "laravel/framework": ">=13.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Acl\\Providers\\ModuleServiceProvider"
+            ]
+        }
+    },
+    "version": "1.0.0"
+}

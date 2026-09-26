@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Tenant;
 use Illuminate\Validation\ValidationException;
-use Modules\AccessControls\Models\AccessControl;
-use Modules\AccessControls\Services\AccessControlServiceInterface;
+use Modules\Acl\Models\AccessControl;
+use Modules\Acl\Services\AccessControlServiceInterface;
 
 beforeEach(function () {
     $this->service = app(AccessControlServiceInterface::class);

@@ -67,7 +67,7 @@ it('discovers all 15 local modules', function () {
     $localModules = [
         'admin', 'auth', 'tenant',
         'sip-profiles', 'sip-accounts', 'extensions', 'devices',
-        'gateways', 'access-controls', 'feature-codes',
+        'gateways', 'acl', 'feature-codes',
         'dialplans', 'destinations', 'inbound-routes', 'outbound-routes',
         'ivr-menus',
     ];

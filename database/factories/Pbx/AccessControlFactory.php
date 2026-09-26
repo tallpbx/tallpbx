@@ -6,8 +6,8 @@ namespace Database\Factories\Pbx;
 
 use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Modules\AccessControls\Models\AccessControl;
-use Modules\AccessControls\Models\AccessControlNode;
+use Modules\Acl\Models\AccessControl;
+use Modules\Acl\Models\AccessControlNode;
 
 /**
  * @extends Factory<AccessControl>

@@ -12,7 +12,7 @@ use App\Services\TenantManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Modules\AccessControls\Models\AccessControl;
+use Modules\Acl\Models\AccessControl;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
 use Modules\Extensions\Models\Extension;

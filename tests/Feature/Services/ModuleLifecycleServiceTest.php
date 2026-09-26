@@ -134,7 +134,7 @@ it('previews the first reviewed table-owned module uninstall handlers', function
         ->and($preview['items'])->not->toBeEmpty();
 })->with([
     'PIN numbers' => 'pin-numbers',
-    'access controls' => 'access-controls',
+    'access control lists' => 'acl',
     'email templates' => 'email-templates',
     'email queue' => 'email-queue',
     'tenant limits' => 'tenant-limits',
