@@ -61,7 +61,7 @@
             </div>
 
             {{-- Channel Selector Cards --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 {{ ! empty($developmentBranches) ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-3">
                 {{-- Stable Channel --}}
                 <div wire:click="selectChannel('stable')"
                      class="cursor-pointer border rounded-xl p-4 transition-all {{ $selectedChannel === 'stable' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 hover:border-base-content/20' }}">
@@ -78,6 +78,7 @@
                 </div>
 
                 {{-- Development Channel --}}
+                @if (! empty($developmentBranches))
                 <div wire:click="selectChannel('development')"
                      class="cursor-pointer border rounded-xl p-4 transition-all {{ $selectedChannel === 'development' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 hover:border-base-content/20' }}">
                     <div class="flex items-center justify-between">
@@ -91,6 +92,7 @@
                     </div>
                     <p class="text-xs text-base-content/60 mt-2">{{ __('admin.git_dev_desc') }}</p>
                 </div>
+                @endif
 
                 {{-- Custom Channel --}}
                 <div wire:click="selectChannel('custom')"

@@ -49,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
 ### Changed
+- **Branching Model Adoption (Laravel Versioned-Series Model)**:
+  - Formally adopted the Laravel framework versioned-branch model (`1.0`, `1.1`, `2.0`) in place of maintaining a perpetual `main` branch. Active development occurs directly on the active major/series branch (`2.0`), with previous branches serving as maintenance lines (`1.0`, `1.1`).
+  - Updated bootstrap installer and documentation (`scripts/bootstrap.sh`, `INSTALL.md`, `tests/Feature/BootstrapInstallerTest.php`) to target the `2.0` release series by default.
+  - Enhanced the web panel GitHub updater (`GitUpdate.php` and `git-update.blade.php`) to fall back to the highest stable release branch (`$this->stableBranches[0] ?? '2.0'`) and conditionally display the Development Channel card only when development branches exist.
+  - Escaped git log format arguments in `GitUpdateService::incomingCommits()` to prevent shell pipe evaluation errors.
 - **PHP-FPM Worker Tuning Guidance (1 GB, 2 GB, 4 GB Tiers)**:
   - Updated `README.md` to document the installer auto-configuration profiles and sizing table across 1 GB minimal (`pm = dynamic`, 5 workers), 2 GB small (`pm = static`, 6 workers), and 4 GB+ standard (`pm = static`, 12 workers) deployments.
 - **Benchmark Summary Matrix Clarification (2 vCPU / 2 GiB Latency Context)**:

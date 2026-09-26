@@ -107,7 +107,7 @@ ip addr show enp0s3
 Install TallPBX with a single command:
 
 ```bash
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash
 ```
 
 The command downloads a small bootstrap script and runs it. The bootstrap
@@ -118,19 +118,19 @@ Re-running the command is safe — the installer can run repeatedly without
 affecting existing data, and it updates TallPBX in place. See
 [Upgrading TallPBX](#upgrading-tallpbx) for details.
 Use the same `--ref` value every time: without it, the re-run switches the
-working copy to `main`.
+working copy to `2.0`.
 
 To customize the installation, add options after `-s --`:
 
 ```bash
-# Pin the stable 1.1 release branch instead of the default main:
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --ref 1.1
+# Pin the stable 1.1 release branch instead of the default 2.0:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --ref 1.1
 
 # Skip the demo-data question (recommended for production):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --no-demo
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --no-demo
 
 # Install without demo data or development tooling (recommended for production):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
 ```
 
 ### First Administrator Setup
@@ -480,11 +480,11 @@ database migrations, and preserves all your existing configuration, accounts,
 and recordings:
 
 ```bash
-# Update on the default main branch:
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash
+# Update on the default 2.0 branch:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash
 
 # Or update on a specific release branch (such as 1.1):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash -s -- --ref 1.1
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --ref 1.1
 ```
 
 Use the same `--ref` value you used during initial installation so the working

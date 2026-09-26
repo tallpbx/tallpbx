@@ -17,7 +17,7 @@ it('keeps the bootstrap safe for piped one-line installs', function (): void {
 
     expect($bootstrap)->toContain('set -euo pipefail')
         ->and($bootstrap)->toContain('The TallPBX bootstrap must run as root')
-        ->and($bootstrap)->toContain('requested_ref="main"')
+        ->and($bootstrap)->toContain('requested_ref="2.0"')
         ->and($bootstrap)->toContain('requested_ref="$2"')
         ->and($bootstrap)->toContain('git ls-remote --exit-code')
         ->and($bootstrap)->toContain('git -C "$application_root" merge --ff-only')
@@ -180,7 +180,7 @@ it('refuses to touch a folder that is not a git working copy', function (): void
 it('presents the one-line install as the primary method', function (): void {
     $install = (string) file_get_contents(base_path('INSTALL.md'));
 
-    expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/main/scripts/bootstrap.sh | bash')
+    expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash')
         ->and($install)->not->toContain('curl -fsSL')
         ->and($install)->not->toContain('sha256sum')
         ->and($install)->not->toContain('Verified Installation')
@@ -197,7 +197,7 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->not->toContain('systemctl status <name>')
         ->and($install)->not->toContain('app:test')
         ->and($install)->toContain('To customize the installation, add options after `-s --`')
-        ->and($install)->toContain('# Pin the stable 1.1 release branch instead of the default main:')
+        ->and($install)->toContain('# Pin the stable 1.1 release branch instead of the default 2.0:')
         ->and($install)->toContain('bash -s -- --ref 1.1')
         ->and($install)->not->toContain('bootstrap.sh.example')
         ->and($install)->not->toContain('(Roadmap)')

@@ -633,16 +633,20 @@ Run the narrow affected test files first, then `php artisan app:test --smoke` wh
 - If a change requires database migrations (`php artisan migrate`), new Linux packages (e.g. `nftables`), FreeSWITCH reloads, or `.env` updates, note it explicitly.
 - When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
 
-### Branching & Sync Strategy
-- `main` is the primary development branch.
-- Minor release branches (`1.0`, `1.1`) represent release series.
-  - `1.0` is the frozen maintenance branch for 1.0.x (bug fixes only). Do not push new feature work (like the Security module) to `1.0`.
-  - `1.1` is the current release branch for 1.1.x features.
-  - When syncing development work, keep `main` and the active release branch (`1.1`) synchronized.
+### Branching & Release Strategy (Laravel Model)
+- TallPBX follows the **Laravel framework versioned-branch model** (e.g. `1.0`, `1.1`, `2.0`). There is no perpetual `main` or `master` branch.
+- Active development occurs directly on the current major/series branch (currently `2.0`). All new features, modernizations, and architectural improvements are committed directly to this branch or merged into it.
+- Numbered release series branches represent release lines:
+  - `1.0`: Frozen maintenance branch for 1.0.x (critical security/bug fixes only). Never push new feature work to `1.0`.
+  - `1.1`: Maintenance release series for 1.1.x.
+  - `2.0`: Current primary development branch for 2.x features and releases.
+- There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`2.0`) or maintenance branches when backporting fixes for existing releases.
+- The web updater UI recognizes version branches (`^\d+(\.\d+)+`) as stable release series, sorting them in reverse version order so `2.0` is the top/default target.
 
 ### Tagging Best Practices (Do NOT Tag Every Commit)
 - **Never tag individual commits or task completions.**
-- Tags (`v1.0.0`, `v1.1.0`, `v1.0.1`) are reserved strictly for official, finished production releases.
+- Tags (`v1.0.0`, `v1.1.0`, `v2.0.0`, etc.) are reserved strictly for official, finished production releases.
+- Tags are created directly on their respective series branch heads (`1.0`, `1.1`, `2.0`).
 - Use branch heads and commit SHAs for intermediate work and references.
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
 

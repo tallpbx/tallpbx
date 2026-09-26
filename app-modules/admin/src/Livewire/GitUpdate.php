@@ -100,7 +100,7 @@ class GitUpdate extends Component
         $this->currentVersion = $this->gitService->currentVersion();
         $this->remoteUrl = $this->gitService->remoteUrl();
         $this->isClean = $this->gitService->isClean();
-        $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : 'main';
+        $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '2.0');
 
         $status = $this->gitService->getStatus();
         if (($status['running'] ?? false) === true) {
@@ -137,7 +137,7 @@ class GitUpdate extends Component
         }
 
         if ($this->selectedTarget === '' || (! in_array($this->selectedTarget, $this->branches, true) && ! in_array($this->selectedTarget, $this->tags, true))) {
-            $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : 'main';
+            $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '2.0');
         }
 
         $this->refreshCommitStatus();
@@ -166,11 +166,11 @@ class GitUpdate extends Component
         $this->selectedChannel = $channel;
 
         if ($channel === 'stable') {
-            $this->selectedTarget = $this->stableBranches[0] ?? '';
+            $this->selectedTarget = $this->stableBranches[0] ?? ($this->currentBranch !== '' ? $this->currentBranch : '2.0');
         } elseif ($channel === 'development') {
-            $this->selectedTarget = $this->developmentBranches[0] ?? 'main';
+            $this->selectedTarget = $this->developmentBranches[0] ?? ($this->stableBranches[0] ?? '2.0');
         } else {
-            $this->selectedTarget = $this->otherBranches[0] ?? ($this->branches[0] ?? '');
+            $this->selectedTarget = $this->otherBranches[0] ?? ($this->branches[0] ?? ($this->currentBranch !== '' ? $this->currentBranch : '2.0'));
         }
 
         $this->refreshCommitStatus();

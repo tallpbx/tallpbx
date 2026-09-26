@@ -147,7 +147,7 @@ class GitUpdateService
      */
     public function incomingCommits(string $target, int $limit = 5): array
     {
-        $output = $this->runGitCommand('log HEAD..origin/'.escapeshellarg($target).' -n '.$limit.' --format=%h|%an|%ar|%s', $exitCode);
+        $output = $this->runGitCommand('log HEAD..origin/'.escapeshellarg($target).' -n '.(int) $limit.' --format='.escapeshellarg('%h|%an|%ar|%s'), $exitCode);
 
         if ($exitCode !== 0 || trim($output) === '') {
             return [];
