@@ -659,8 +659,8 @@ The installer installs and enables `mod_sofia`, `mod_callcenter`,
 `mod_xml_curl`, and disables the legacy `mod_redis` and `mod_memcache` load
 lines. `mod_hiredis` being loaded does not mean every call uses Redis; the
 per-call Redis-backed actions are opt-in through
-`FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED` and
-`FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED`. On existing installs, run
+`FS_HIREDIS_LIMIT_ENABLED` and
+`FS_HIREDIS_MARKER_ENABLED`. On existing installs, run
 `scripts/resources/freeswitch.sh --configure-only` after `.env` contains
 `XML_HANDLER_TOKEN`, then restart or reload FreeSWITCH.
 
@@ -819,7 +819,7 @@ actually listens. The stock internal profile uses
 `force-register-domain=$${domain}`, so seeding an unrelated realm such as
 `load.test.local` while FreeSWITCH forces the PBX realm causes
 authenticated registrations to be rejected with `403 Forbidden`. Use the
-`FREESWITCH_DEFAULT_SIP_REALM` value from `.env` as the seed `--domain` in
+`FS_DEFAULT_SIP_REALM` value from `.env` as the seed `--domain` in
 that case.
 
 ## Test 1: Dynamic Dialplan XML (Requests Per Second)
@@ -918,10 +918,10 @@ XML_HANDLER_CACHE_STORE=redis
 CACHE_STORE=redis
 SESSION_DRIVER=redis
 SESSION_CONNECTION=cache
-FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false
-FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000
-FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false
-FREESWITCH_SWITCH_LOG_LEVEL=debug
+FS_HIREDIS_LIMIT_ENABLED=false
+FS_HIREDIS_LIMIT_MAX=100000
+FS_HIREDIS_MARKER_ENABLED=false
+FS_LOG_LEVEL=debug
 ```
 
 What each setting does:
@@ -952,18 +952,18 @@ What each setting does:
   telephony XML handler caches. Granular overrides (`XML_HANDLER_DIALPLAN_CACHE_STORE`,
   `XML_HANDLER_DIRECTORY_CACHE_STORE`, `XML_HANDLER_ACL_CACHE_STORE`) fall back to this master store
   when not explicitly set.
-- `FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false` means `mod_hiredis` is
+- `FS_HIREDIS_LIMIT_ENABLED=false` means `mod_hiredis` is
   loaded, but normal local-extension calls do not use Redis-backed
   FreeSWITCH counters. Set it to `true` only when testing or enforcing
   Redis-backed FreeSWITCH call limits.
-- `FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000` is the safety ceiling used
+- `FS_HIREDIS_LIMIT_MAX=100000` is the safety ceiling used
   when the optional counter is enabled for instrumentation rather than real
   throttling.
-- `FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false` keeps the deliberate
+- `FS_HIREDIS_MARKER_ENABLED=false` keeps the deliberate
   `hiredis_raw` marker action out of normal calls. Set it to `true` during
   diagnostics when Redis `MONITOR` should show a FreeSWITCH-written
   `pbx:mod_hiredis:last_call:*` key for each local-extension call.
-- `FREESWITCH_SWITCH_LOG_LEVEL=debug` keeps detailed FreeSWITCH logs while
+- `FS_LOG_LEVEL=debug` keeps detailed FreeSWITCH logs while
   the PBX is still being validated. Lower it at runtime for measured
   capacity runs (see the FreeSWITCH log-level experiments).
 - Redis is the recommended default cache and session store. File cache or

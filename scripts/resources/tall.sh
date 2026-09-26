@@ -185,23 +185,26 @@ set_env_value .env DB_PASSWORD "$database_password"
 # Set the application name shown in Laravel notifications and page titles.
 set_env_value .env APP_NAME TallPBX
 
-# Add FreeSWITCH connection and XML-handler defaults. Existing explicit values
-# are preserved; only old loopback placeholders are replaced with this server.
-if grep -q "^FREESWITCH_SERVER=http://127.0.0.1" .env 2>/dev/null; then
-    sed -i "s#^FREESWITCH_SERVER=.*#FREESWITCH_SERVER=http://$(hostname -I | awk '{print $1}')#" .env
-elif ! grep -q "^FREESWITCH_SERVER=" .env 2>/dev/null; then
-    echo "FREESWITCH_SERVER=http://$(hostname -I | awk '{print $1}')" >> .env
+# Configure FreeSWITCH connection, SIP realm, and telephony XML-handler settings.
+# On a fresh installation, replace loopback placeholders with this server's primary IP
+# address so devices on the local network can register and reach the PBX.
+# Existing custom configuration is preserved across re-runs.
+if grep -q "^FS_SERVER=http://127.0.0.1" .env 2>/dev/null; then
+    sed -i "s#^FS_SERVER=.*#FS_SERVER=http://$(hostname -I | awk '{print $1}')#" .env
+elif ! grep -q "^FS_SERVER=" .env 2>/dev/null; then
+    echo "FS_SERVER=http://$(hostname -I | awk '{print $1}')" >> .env
 fi
 
-if grep -q "^FREESWITCH_DEFAULT_SIP_REALM=127.0.0.1" .env 2>/dev/null; then
-    sed -i "s#^FREESWITCH_DEFAULT_SIP_REALM=.*#FREESWITCH_DEFAULT_SIP_REALM=$(hostname -I | awk '{print $1}')#" .env
-elif ! grep -q "^FREESWITCH_DEFAULT_SIP_REALM=" .env 2>/dev/null; then
-    echo "FREESWITCH_DEFAULT_SIP_REALM=$(hostname -I | awk '{print $1}')" >> .env
+if grep -q "^FS_DEFAULT_SIP_REALM=127.0.0.1" .env 2>/dev/null; then
+    sed -i "s#^FS_DEFAULT_SIP_REALM=.*#FS_DEFAULT_SIP_REALM=$(hostname -I | awk '{print $1}')#" .env
+elif ! grep -q "^FS_DEFAULT_SIP_REALM=" .env 2>/dev/null; then
+    echo "FS_DEFAULT_SIP_REALM=$(hostname -I | awk '{print $1}')" >> .env
 fi
 
-grep -q "^FREESWITCH_ESL_HOST=" .env 2>/dev/null || echo "FREESWITCH_ESL_HOST=127.0.0.1" >> .env
-grep -q "^FREESWITCH_ESL_PORT=" .env 2>/dev/null || echo "FREESWITCH_ESL_PORT=8021" >> .env
-grep -q "^FREESWITCH_ESL_PASSWORD=" .env 2>/dev/null || echo "FREESWITCH_ESL_PASSWORD=ClueCon" >> .env
+# Ensure default FreeSWITCH Event Socket Layer (ESL) connection parameters exist.
+grep -q "^FS_ESL_HOST=" .env 2>/dev/null || echo "FS_ESL_HOST=127.0.0.1" >> .env
+grep -q "^FS_ESL_PORT=" .env 2>/dev/null || echo "FS_ESL_PORT=8021" >> .env
+grep -q "^FS_ESL_PASSWORD=" .env 2>/dev/null || echo "FS_ESL_PASSWORD=ClueCon" >> .env
 grep -q "^XML_HANDLER_AUTH=" .env 2>/dev/null || echo "XML_HANDLER_AUTH=true" >> .env
 grep -q "^XML_HANDLER_PATH=" .env 2>/dev/null || echo "XML_HANDLER_PATH=/api/v1/xml-handler" >> .env
 grep -q "^XML_HANDLER_LOG_REQUESTS=" .env 2>/dev/null || echo "XML_HANDLER_LOG_REQUESTS=false" >> .env
@@ -232,12 +235,12 @@ grep -q "^XML_HANDLER_CACHE_STORE=" .env 2>/dev/null \
     || echo "XML_HANDLER_CACHE_STORE=redis" >> .env
 grep -q "^XML_HANDLER_CACHE_TTL=" .env 2>/dev/null \
     || echo "XML_HANDLER_CACHE_TTL=5" >> .env
-grep -q "^FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=" .env 2>/dev/null \
-    || echo "FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED=false" >> .env
-grep -q "^FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=" .env 2>/dev/null \
-    || echo "FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX=100000" >> .env
-grep -q "^FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=" .env 2>/dev/null \
-    || echo "FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED=false" >> .env
+grep -q "^FS_HIREDIS_LIMIT_ENABLED=" .env 2>/dev/null \
+    || echo "FS_HIREDIS_LIMIT_ENABLED=false" >> .env
+grep -q "^FS_HIREDIS_LIMIT_MAX=" .env 2>/dev/null \
+    || echo "FS_HIREDIS_LIMIT_MAX=100000" >> .env
+grep -q "^FS_HIREDIS_MARKER_ENABLED=" .env 2>/dev/null \
+    || echo "FS_HIREDIS_MARKER_ENABLED=false" >> .env
 
 # --- Build application assets and update the database ---
 # Build browser assets after all Node packages are present. The build writes

@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
 ### Changed
+- **FreeSWITCH Environment Variable Modernization (`FS_*` Prefix)**:
+  - Standardized all FreeSWITCH-specific environment variables in `config/freeswitch.php`, `config/call-broadcast.php`, `.env`, and `.env.example` to use the concise, canonical `FS_` prefix (e.g. `FS_SERVER`, `FS_DEFAULT_SIP_REALM`, `FS_ESL_HOST`, `FS_ESL_PORT`, `FS_ESL_PASSWORD`, `FS_ESL_RECONNECT_INTERVAL`, `FS_ESL_TIMEOUT`, `FS_LOG_LEVEL`, `FS_SESSIONS_PER_SECOND`, `FS_SOFIA_LOG_LEVEL`, `FS_SOFIA_AUTO_RESTART`, `FS_SOFIA_DEBUG_PRESENCE`, `FS_SOFIA_CAPTURE_SERVER`, `FS_SOFIA_INBOUND_REG_THREAD`, `FS_SOFIA_MAX_REG_THREADS`, `FS_PIN_TRIGGER`, `FS_HIREDIS_LIMIT_ENABLED`, `FS_HIREDIS_LIMIT_MAX`, `FS_HIREDIS_MARKER_ENABLED`, `FS_DB_DRIVER`, `FS_DB_HOST`, `FS_DB_PORT`, `FS_DB_NAME`, `FS_DB_USERNAME`, `FS_DB_PASSWORD`, `FS_CALL_BROADCAST_MEDIA`, etc.).
+  - Consolidated all FreeSWITCH runtime, connection, XML handler, and telephony settings in `.env` and `.env.example` underneath a single, organized `# FREESWITCH SETTINGS` section header.
+  - Updated installer setup scripts (`scripts/resources/tall.sh`), test suites (`tests/Feature/InstallerDefaultsTest.php`, `tests/Feature/Config/FreeswitchConfigTest.php`), and technical documentation.
 - **Major Version 2.x Incompatibility & Re-install Requirement**:
   - Explicitly documented in `INSTALL.md` and `scripts/bootstrap.sh` that TallPBX 2.x is **not 100% backwards compatible** with the 1.x release series (`1.0`, `1.1`).
   - Stated that in-place updates from 1.x to 2.x are unsupported and will require a clean re-install, while in-place updates remain supported strictly within the same release series.

@@ -15,11 +15,11 @@ return [
     | pacing_seconds: delay between recipient originates (0 = none).
     */
 
-    'media' => env('FREESWITCH_CALL_BROADCAST_MEDIA', 'tone_stream://%(1000,0,640)'),
+    'media' => env('FS_CALL_BROADCAST_MEDIA', 'tone_stream://%(1000,0,640)'),
 
-    'caller_id_number' => env('FREESWITCH_CALL_BROADCAST_CALLER_ID', ''),
+    'caller_id_number' => env('FS_CALL_BROADCAST_CALLER_ID', ''),
 
-    'pacing_seconds' => (int) env('FREESWITCH_CALL_BROADCAST_PACING_SECONDS', 0),
+    'pacing_seconds' => (int) env('FS_CALL_BROADCAST_PACING_SECONDS', 0),
 
-    'outcome_window_minutes' => (int) env('FREESWITCH_CALL_BROADCAST_OUTCOME_WINDOW_MINUTES', 15),
+    'outcome_window_minutes' => (int) env('FS_CALL_BROADCAST_OUTCOME_WINDOW_MINUTES', 15),
 ];

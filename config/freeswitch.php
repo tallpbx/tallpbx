@@ -21,7 +21,7 @@ return [
     | module to generate device configuration templates.
     |
     */
-    'server' => env('FREESWITCH_SERVER', env('APP_URL', 'pbx.example.com')),
+    'server' => env('FS_SERVER', env('APP_URL', 'pbx.example.com')),
 
     /*
     |--------------------------------------------------------------------------
@@ -33,7 +33,7 @@ return [
     | specific values so phones can register without manual setup.
     |
     */
-    'default_sip_realm' => env('FREESWITCH_DEFAULT_SIP_REALM'),
+    'default_sip_realm' => env('FS_DEFAULT_SIP_REALM'),
     'default_sip_password' => env('PBX_DEFAULT_SIP_PASSWORD'),
 
     /*
@@ -59,8 +59,8 @@ return [
     |
     */
     'esl' => [
-        'host' => env('FREESWITCH_ESL_HOST', '127.0.0.1'),
-        'port' => (int) env('FREESWITCH_ESL_PORT', 8021),
+        'host' => env('FS_ESL_HOST', '127.0.0.1'),
+        'port' => (int) env('FS_ESL_PORT', 8021),
 
         /*
         |--------------------------------------------------------------------------
@@ -70,11 +70,11 @@ return [
         | The password for the FreeSWITCH Event Socket Layer connection.
         | The default 'ClueCon' is FreeSWITCH's well-known default password.
         | In production, this MUST be changed to a strong, unique value via
-        | the FREESWITCH_ESL_PASSWORD environment variable, and the matching
+        | the FS_ESL_PASSWORD environment variable, and the matching
         | password must be set in FreeSWITCH's event_socket.conf.xml.
         |
         */
-        'password' => env('FREESWITCH_ESL_PASSWORD', 'ClueCon'),
+        'password' => env('FS_ESL_PASSWORD', 'ClueCon'),
 
         /*
         |--------------------------------------------------------------------------
@@ -86,7 +86,7 @@ return [
         | automatic reconnection.
         |
         */
-        'reconnect_interval' => (int) env('FREESWITCH_ESL_RECONNECT_INTERVAL', 5),
+        'reconnect_interval' => (int) env('FS_ESL_RECONNECT_INTERVAL', 5),
 
         /*
         |--------------------------------------------------------------------------
@@ -97,7 +97,7 @@ return [
         | to be established before timing out.
         |
         */
-        'timeout' => (int) env('FREESWITCH_ESL_TIMEOUT', 10),
+        'timeout' => (int) env('FS_ESL_TIMEOUT', 10),
     ],
 
     /*
@@ -158,20 +158,20 @@ return [
     |
     */
     'database' => [
-        'driver' => env('FREESWITCH_DATABASE_DRIVER', 'sqlite'),
-        'dsn' => env('FREESWITCH_DATABASE_DSN'),
-        'odbc_dsn' => env('FREESWITCH_DATABASE_ODBC_DSN'),
-        'host' => env('FREESWITCH_DATABASE_HOST', '127.0.0.1'),
-        'port' => (int) env('FREESWITCH_DATABASE_PORT', 3306),
-        'database' => env('FREESWITCH_DATABASE_NAME', 'freeswitch'),
-        'username' => env('FREESWITCH_DATABASE_USERNAME', 'freeswitch'),
-        'password' => env('FREESWITCH_DATABASE_PASSWORD', ''),
-        'options' => env('FREESWITCH_DATABASE_OPTIONS', ''),
-        'core_db_name' => env('FREESWITCH_CORE_DB_NAME'),
-        'auto_create_schemas' => (bool) env('FREESWITCH_AUTO_CREATE_SCHEMAS', true),
-        'auto_clear_sql' => env('FREESWITCH_AUTO_CLEAR_SQL'),
-        'core_non_sqlite_db_required' => (bool) env('FREESWITCH_CORE_NON_SQLITE_DB_REQUIRED', false),
-        'odbc_skip_autocommit_flip' => (bool) env('FREESWITCH_ODBC_SKIP_AUTOCOMMIT_FLIP', false),
+        'driver' => env('FS_DB_DRIVER', 'sqlite'),
+        'dsn' => env('FS_DB_DSN'),
+        'odbc_dsn' => env('FS_DB_ODBC_DSN'),
+        'host' => env('FS_DB_HOST', '127.0.0.1'),
+        'port' => (int) env('FS_DB_PORT', 3306),
+        'database' => env('FS_DB_NAME', 'freeswitch'),
+        'username' => env('FS_DB_USERNAME', 'freeswitch'),
+        'password' => env('FS_DB_PASSWORD', ''),
+        'options' => env('FS_DB_OPTIONS', ''),
+        'core_db_name' => env('FS_CORE_DB_NAME'),
+        'auto_create_schemas' => (bool) env('FS_AUTO_CREATE_SCHEMAS', true),
+        'auto_clear_sql' => env('FS_AUTO_CLEAR_SQL'),
+        'core_non_sqlite_db_required' => (bool) env('FS_CORE_NON_SQLITE_DB_REQUIRED', false),
+        'odbc_skip_autocommit_flip' => (bool) env('FS_ODBC_SKIP_AUTOCOMMIT_FLIP', false),
     ],
 
     /*
@@ -199,8 +199,8 @@ return [
     |
     */
     'switch' => [
-        'loglevel' => env('FREESWITCH_SWITCH_LOG_LEVEL', 'debug'),
-        'sessions_per_second' => (int) env('FREESWITCH_SWITCH_SESSIONS_PER_SECOND', 60),
+        'loglevel' => env('FS_LOG_LEVEL', 'debug'),
+        'sessions_per_second' => (int) env('FS_SESSIONS_PER_SECOND', 60),
     ],
 
     /*
@@ -214,12 +214,12 @@ return [
     |
     */
     'sofia' => [
-        'log_level' => env('FREESWITCH_SOFIA_LOG_LEVEL', '0'),
-        'auto_restart' => (bool) env('FREESWITCH_SOFIA_AUTO_RESTART', true),
-        'debug_presence' => (bool) env('FREESWITCH_SOFIA_DEBUG_PRESENCE', false),
-        'capture_server' => env('FREESWITCH_SOFIA_CAPTURE_SERVER', ''),
-        'inbound_reg_in_new_thread' => (bool) env('FREESWITCH_SOFIA_INBOUND_REG_THREAD', true),
-        'max_reg_threads' => (int) env('FREESWITCH_SOFIA_MAX_REG_THREADS', 8),
+        'log_level' => env('FS_SOFIA_LOG_LEVEL', '0'),
+        'auto_restart' => (bool) env('FS_SOFIA_AUTO_RESTART', true),
+        'debug_presence' => (bool) env('FS_SOFIA_DEBUG_PRESENCE', false),
+        'capture_server' => env('FS_SOFIA_CAPTURE_SERVER', ''),
+        'inbound_reg_in_new_thread' => (bool) env('FS_SOFIA_INBOUND_REG_THREAD', true),
+        'max_reg_threads' => (int) env('FS_SOFIA_MAX_REG_THREADS', 8),
     ],
 
     /*
@@ -313,7 +313,7 @@ return [
         'dialplan_cache_store' => env('XML_HANDLER_DIALPLAN_CACHE_STORE', env('XML_HANDLER_CACHE_STORE')),
         'directory_cache_store' => env('XML_HANDLER_DIRECTORY_CACHE_STORE', env('XML_HANDLER_CACHE_STORE')),
         'acl_cache_store' => env('XML_HANDLER_ACL_CACHE_STORE', env('XML_HANDLER_CACHE_STORE')),
-        'pin_trigger' => env('FREESWITCH_PIN_TRIGGER', '*97'),
+        'pin_trigger' => env('FS_PIN_TRIGGER', '*97'),
         'routing_version_store' => env('XML_HANDLER_ROUTING_VERSION_STORE'),
 
         /*
@@ -327,9 +327,9 @@ return [
         | FreeSWITCH actions during calls.
         |
         */
-        'hiredis_limit_enabled' => filter_var(env('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
-        'hiredis_limit_max' => max(1, (int) env('FREESWITCH_HIREDIS_DIALPLAN_LIMIT_MAX', 100000)),
-        'hiredis_marker_enabled' => filter_var(env('FREESWITCH_HIREDIS_DIALPLAN_MARKER_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'hiredis_limit_enabled' => filter_var(env('FS_HIREDIS_LIMIT_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'hiredis_limit_max' => max(1, (int) env('FS_HIREDIS_LIMIT_MAX', 100000)),
+        'hiredis_marker_enabled' => filter_var(env('FS_HIREDIS_MARKER_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
 
         /*
         |--------------------------------------------------------------------------

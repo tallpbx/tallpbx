@@ -170,7 +170,7 @@ Before every SIPp CPS run, perform the repeatable preflight gate instead of trou
 3. SIPp is installed on WSL at `/usr/local/bin/sipp`.
 4. Synthetic PBX data still contains enabled SIP account `2000`.
 5. SIP account `2000` still belongs to domain/realm `192.168.1.76` and its password still decrypts to the expected test password.
-6. The SIP realm/domain in the CSV matches the PBX IP or test realm FreeSWITCH is actually using. On the stock internal profile, `force-register-domain=$${domain}` means the seed domain should normally match `FREESWITCH_DEFAULT_SIP_REALM`; seeding `load.test.local` against a public-IP realm can produce valid-looking accounts that fail REGISTER with `403 Forbidden`.
+6. The SIP realm/domain in the CSV matches the PBX IP or test realm FreeSWITCH is actually using. On the stock internal profile, `force-register-domain=$${domain}` means the seed domain should normally match `FS_DEFAULT_SIP_REALM`; seeding `load.test.local` against a public-IP realm can produce valid-looking accounts that fail REGISTER with `403 Forbidden`.
 7. The WSL auth CSV preserves the first `SEQUENTIAL` header row exactly, then appends the SIPp authentication field only to real users. If the header has authentication text, regenerate the CSV.
 8. FreeSWITCH `sessions-per-second` is high enough for the test target; the project default is 60 so tests are not accidentally capped by the old 30 SPS setting.
 9. PHP-FPM and Laravel config caches have been refreshed after `.env` or code changes.
@@ -191,12 +191,12 @@ When interpreting CPS results:
 
 For XML-curl bottleneck work, use the XML handler timing log deliberately:
 
-- Enable `FREESWITCH_XML_HANDLER_LOG_TIMING=true` only for diagnostic runs, then disable it afterward.
+- Enable `XML_HANDLER_LOG_TIMING=true` only for diagnostic runs, then disable it afterward.
 - Compare `elapsed_ms`, `db_query_count`, `db_time_ms`, and `non_db_time_ms` by XML section.
 - Dialplan XML may be cached and cheap while directory/auth XML is still expensive; do not assume dialplan timing represents the whole call setup path.
 - In recent VirtualBox testing, directory/auth lookups were the larger Laravel-side cost than cached dialplan lookups, so optimize tenant identity and directory XML caching before broad MariaDB/PHP tuning.
-- Keep `FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_TTL` short enough that new/changed SIP accounts become usable quickly, but long enough to absorb call bursts.
-- Prefer Redis for XML handler caches during load testing: `FREESWITCH_XML_HANDLER_DIRECTORY_CACHE_STORE=redis` and `FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_STORE=redis`.
+- Keep `XML_HANDLER_DIRECTORY_CACHE_TTL` short enough that new/changed SIP accounts become usable quickly, but long enough to absorb call bursts.
+- Prefer Redis for XML handler caches during load testing: `XML_HANDLER_DIRECTORY_CACHE_STORE=redis` and `XML_HANDLER_DIALPLAN_CACHE_STORE=redis`.
 - Cache scalar payloads or XML strings, not Eloquent models, especially on Laravel 13 where cache unserialization is stricter.
 
 After diagnostic load testing, restore noisy/runtime flags such as XML timing logs to their normal disabled state and record whether a failed run was a valid PBX result or a harness/setup artifact.
