@@ -6,6 +6,7 @@
 #
 # Security Controls:
 # - Restricted strictly to a single executable (/usr/local/sbin/tallpbx-security).
+# - Runas pinned to root, so www-data cannot invoke the helper as any other user account.
 # - No wildcard arguments or arbitrary shell commands are permitted.
 # ==============================================================================
-www-data ALL=(ALL) NOPASSWD: /usr/local/sbin/tallpbx-security
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/tallpbx-security

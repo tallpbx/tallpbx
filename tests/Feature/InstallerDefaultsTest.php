@@ -895,6 +895,15 @@ it('ensures sudo and sudoers directory are installed for host security helper', 
         ->and($freeSwitchScript)->toContain('mkdir -p "${conf_dir}/autoload_configs"');
 });
 
+it('pins the security helper sudoers rule to the root runas user', function (): void {
+    $sudoers = (string) file_get_contents(base_path('scripts/resources/tallpbx-security.sudoers'));
+
+    // The helper must only ever run as root; allowing (ALL) runas users would
+    // let www-data invoke it as any other account on the system.
+    expect($sudoers)->toContain('www-data ALL=(root) NOPASSWD: /usr/local/sbin/tallpbx-security')
+        ->and($sudoers)->not->toContain('(ALL)');
+});
+
 it('prompts interactively for initial admin mode until setup is completed', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 
@@ -950,6 +959,3 @@ it('configures default XML handler cache TTL in tall.sh', function (): void {
 
     expect($tallScript)->toContain('FS_XML_HANDLER_CACHE_TTL=5');
 });
-
-
-

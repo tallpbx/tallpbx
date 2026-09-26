@@ -18,6 +18,11 @@
 # ==============================================================================
 set -euo pipefail
 
+# Files created by this helper (such as the verification sidecar) must never
+# be world-readable. A restrictive umask makes 0640 the default for every new
+# file, so even a future edit that forgets an explicit chmod stays private.
+umask 027
+
 ACTION="${1:-}"
 
 # Strict regular expression matching valid IPv4 addresses and CIDR subnets with
@@ -84,10 +89,17 @@ case "$ACTION" in
         chown root:www-data "$FIREWALL_ACTIVE" 2>/dev/null || true
         chmod 0640 "$FIREWALL_ACTIVE" 2>/dev/null || true
 
-        # Step 4: Load the validated configuration into the Linux kernel atomically
+        # Step 4: Re-validate the exact promoted content before loading it.
+        # The pre-check above ran on the pending path, so a concurrent writer
+        # could have swapped that file between the check and the 'mv'. Running
+        # 'nft -c' again on the promoted file closes that window and guarantees
+        # the kernel only ever receives syntax-valid rules.
+        "$NFT_BIN" -c -f "$FIREWALL_ACTIVE"
+
+        # Step 5: Load the validated configuration into the Linux kernel atomically
         "$NFT_BIN" -f "$FIREWALL_ACTIVE"
 
-        # Step 5: Post-apply verification and authoritative sidecar creation
+        # Step 6: Post-apply verification and authoritative sidecar creation
         DECLARED_POLICY="$(sed -n 's/^# tallpbx-policy:[[:space:]]*\([a-z]*\).*/\1/p' "$FIREWALL_ACTIVE")"
         RULESET_DIGEST="$(sed -n 's/^# tallpbx-digest:[[:space:]]*\(sha256:[0-9a-f]\{64\}\).*/\1/p' "$FIREWALL_ACTIVE")"
         LIVE_CHAIN="$("$NFT_BIN" list chain inet tallpbx_filter input 2>/dev/null || true)"
@@ -142,6 +154,11 @@ case "$ACTION" in
         # Ensure table exists in kernel before adding element; restore active ruleset if needed
         if ! "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
             if [ -f "$FIREWALL_ACTIVE" ]; then
+                # Validate the active file before restoring it so a corrupt
+                # ruleset fails loudly with a syntax error instead of being
+                # silently skipped (which would make the add below fail with
+                # a confusing missing-table error).
+                "$NFT_BIN" -c -f "$FIREWALL_ACTIVE"
                 "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
             fi
         fi
@@ -168,6 +185,11 @@ case "$ACTION" in
         # Ensure table exists in kernel before deleting element
         if ! "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
             if [ -f "$FIREWALL_ACTIVE" ]; then
+                # Validate the active file before restoring it so a corrupt
+                # ruleset fails loudly with a syntax error instead of being
+                # silently skipped (which would make the delete below fail with
+                # a confusing missing-table error).
+                "$NFT_BIN" -c -f "$FIREWALL_ACTIVE"
                 "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
             fi
         fi

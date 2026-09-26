@@ -306,6 +306,165 @@ it('applies ruleset atomically, verifies live kernel, and creates sidecar when p
     }
 });
 
+it('re-validates the promoted ruleset before loading it into the kernel', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_race_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    // Stub nft that simulates a concurrent writer replacing the pending file
+    // with an invalid ruleset right after the first pre-check, and rejects the
+    // swapped content on any later validation. Every invocation is logged so
+    // the test can prove the kernel apply step was never reached.
+    $stubNft = $isolatedDir.'/stub-nft';
+    $log = $isolatedDir.'/nft-calls.log';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "echo \"\$*\" >> '{$log}'\n".
+        "if [ \"\$1\" = \"-c\" ] && [ \"\$3\" = \"\$TALLPBX_FIREWALL_CONF_DIR/firewall.nft.pending\" ]; then\n".
+        "    printf 'BROKEN RULESET\\n' > \"\$3\"\n".
+        "    exit 0\n".
+        "fi\n".
+        "if [ \"\$1\" = \"-c\" ] && grep -q 'BROKEN RULESET' \"\$3\"; then\n".
+        "    exit 1\n".
+        "fi\n".
+        "exit 0\n"
+    );
+    chmod($stubNft, 0755);
+
+    file_put_contents(
+        $isolatedDir.'/firewall.nft.pending',
+        "#!/usr/sbin/nft -f\n".
+        "# tallpbx-policy: drop\n".
+        "# tallpbx-digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n".
+        "table inet tallpbx_filter {}\n"
+    );
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
+        );
+        $process->run();
+
+        // The swapped-in invalid ruleset must never reach the kernel: the
+        // helper must abort after re-checking the promoted file, before any
+        // 'nft -f' apply invocation happens.
+        expect($process->getExitCode())->not->toBe(0)
+            ->and((string) file_get_contents($log))->not->toMatch('/^-f /m');
+    } finally {
+        @unlink($isolatedDir.'/firewall.nft');
+        @unlink($isolatedDir.'/firewall.nft.pending');
+        @unlink($stubNft);
+        @unlink($log);
+        @rmdir($isolatedDir);
+    }
+});
+
+it('validates the active ruleset before restoring it when the kernel table is missing', function (string $action): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_restore_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    // Stub nft that reports the kernel table as missing (forcing the restore
+    // path) and rejects the corrupt active ruleset during validation. Every
+    // call is logged so the test can prove the restore apply step never ran.
+    $stubNft = $isolatedDir.'/stub-nft';
+    $log = $isolatedDir.'/nft-calls.log';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "echo \"\$*\" >> '{$log}'\n".
+        "if [ \"\$1\" = \"list\" ] && [ \"\$2\" = \"table\" ]; then\n".
+        "    exit 1\n".
+        "fi\n".
+        "if [ \"\$1\" = \"-c\" ] && grep -q 'BROKEN RULESET' \"\$3\"; then\n".
+        "    exit 1\n".
+        "fi\n".
+        "exit 0\n"
+    );
+    chmod($stubNft, 0755);
+
+    // A corrupt active ruleset: restoring it without validation would load
+    // broken syntax into the kernel, and the masked failure would go unseen.
+    file_put_contents($isolatedDir.'/firewall.nft', "BROKEN RULESET\n");
+
+    // The ban action needs an IP plus seconds; the unban action needs only
+    // the IP. Both trigger the same restore block.
+    $args = $action === 'ban' ? ['ban', '192.0.2.1', '3600'] : ['unban', '192.0.2.1'];
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, ...$args],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
+        );
+        $process->run();
+
+        // The helper must fail loudly on the corrupt active file instead of
+        // silently skipping the restore and proceeding to the kernel action.
+        expect($process->getExitCode())->toBe(1)
+            ->and((string) file_get_contents($log))->not->toMatch('/^-f /m');
+    } finally {
+        @unlink($isolatedDir.'/firewall.nft');
+        @unlink($stubNft);
+        @unlink($log);
+        @rmdir($isolatedDir);
+    }
+})->with(['ban', 'unban']);
+
+it('runs with a restrictive umask so helper-created files are never world-readable', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_umask_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    // Stub nft creates a probe file. Child processes inherit the helper's
+    // umask, so the probe's resulting mode reveals the umask the helper runs
+    // with: 027 produces 0640, while the permissive default 022 produces 0644.
+    $probe = $isolatedDir.'/umask-probe';
+    $stubNft = $isolatedDir.'/stub-nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "printf 'probe' > '{$probe}'\n".
+        "exit 0\n"
+    );
+    chmod($stubNft, 0755);
+
+    file_put_contents(
+        $isolatedDir.'/firewall.nft.pending',
+        "#!/usr/sbin/nft -f\n\ntable inet tallpbx_umask_probe {}\n"
+    );
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'validate'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $stubNft,
+            ],
+        );
+        $process->run();
+
+        $probeMode = (int) fileperms($probe) & 0777;
+        expect($process->getExitCode())->toBe(0)
+            ->and($probeMode)->toBe(0640);
+    } finally {
+        @unlink($probe);
+        @unlink($isolatedDir.'/firewall.nft.pending');
+        @unlink($stubNft);
+        @rmdir($isolatedDir);
+    }
+});
+
 it('deletes existing sidecar and warns when live policy does not match declared policy', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
     $isolatedDir = sys_get_temp_dir().'/tallpbx_security_mismatch_test_'.uniqid();
