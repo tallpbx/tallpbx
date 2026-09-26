@@ -31,7 +31,7 @@ Clear, real-world capacity guidance for administrators. This document records em
 
 ### Empirical Datacenter Telephony Capacity Comparison (September 2026 Series)
 
-The table below summarizes empirical live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the September 2026 datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`XML_HANDLER_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
+The table below summarizes empirical live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the September 2026 datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`FS_XML_HANDLER_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile (`www.conf`) | Cache Policy (`.env`) | Sustained Call Setup Rate | Call Setup Latency (`p50` / `p95`) | Peak Call Capacity / Concurrency | Recommended Production Role |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -63,8 +63,8 @@ The table below summarizes empirical XML throughput and latency across moderate 
 >   - **1 vCPU & 2 vCPU / 2 GiB RAM**: `pm = static`, `pm.max_children = 6` (pre-forked dedicated pool to eliminate dynamic process-spawning jitter).
 >   - **4 vCPU / 16 GiB RAM**: `pm = static`, `pm.max_children = 24` (enterprise pre-forked static pool providing 24 concurrent worker processes).
 > - **Cache Policy Profiles (`.env` with Redis 7.0 & OPcache enabled)**:
->   - **Throughput & Concurrency Ladders (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`XML_HANDLER_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
->   - **Uncached MariaDB Baseline (`TTL: 0s`)**: **Caching Disabled** (`XML_HANDLER_CACHE_TTL=0`). Bypasses Redis to measure raw MariaDB SQL query execution and XML template compilation cost.
+>   - **Throughput & Concurrency Ladders (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`FS_XML_HANDLER_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
+>   - **Uncached MariaDB Baseline (`TTL: 0s`)**: **Caching Disabled** (`FS_XML_HANDLER_CACHE_TTL=0`). Bypasses Redis to measure raw MariaDB SQL query execution and XML template compilation cost.
 >   - **Pure Memory Ceiling (`cache-hit`)**: **Memory Cache Hit** (`cache-hit` scenario with pre-warmed Redis memory, 0 database queries). Isolates the upper PHP-FPM / Redis memory serialization ceiling.
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Configuration (`www.conf`) | Cache Settings (`.env`) | Moderate Burst (`100 x 5`) | High Burst (`500 x 25`) | Sustained Ceiling (`1,000 x 25`) | Peak Tail Latency (`Max`) | Uncached MariaDB (`100 x 5`) | Pure Memory Ceiling (`100 x 5`) |
@@ -321,8 +321,8 @@ The 5-run cache optimization sweep on the cloud datacenter PBX evaluated perform
 
 | Term / Abbreviation | Full Name & `.env` Setting | Plain-Language Definition |
 | :--- | :--- | :--- |
-| **Contributor Cache (Contributor TTL / `C`)** | `XML_HANDLER_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
-| **Dialplan Cache (Dialplan TTL / `D`)** | `XML_HANDLER_DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
+| **Contributor Cache (Contributor TTL / `C`)** | `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
+| **Dialplan Cache (Dialplan TTL / `D`)** | `FS_XML_HANDLER_DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
 | **TTL** | Time To Live | How many seconds a cached response remains valid in Redis before querying MariaDB again. `0` disables caching. |
 | **Target Requests (`100 x 5`)** | Offered Burst Profile | 100 total HTTP requests sent with 5 requests simultaneously in-flight at all times. |
 | **Redis Hit Rate** | Keyspace Efficiency (`INFO stats`) | Percentage of lookup keys found in fast Redis memory versus total lookups requested during the test run. |
@@ -447,8 +447,8 @@ The 5-run cache optimization sweep on the resized 2 GiB cloud VPS evaluated perf
 
 | Term / Abbreviation | Full Name & `.env` Setting | Plain-Language Definition |
 | :--- | :--- | :--- |
-| **Contributor Cache (Contributor TTL / `C`)** | `XML_HANDLER_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
-| **Dialplan Cache (Dialplan TTL / `D`)** | `XML_HANDLER_DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
+| **Contributor Cache (Contributor TTL / `C`)** | `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL` | Redis cache window (in seconds) for individual dialplan building blocks (extensions, ring groups, IVRs). Cached fragments are stitched together dynamically. |
+| **Dialplan Cache (Dialplan TTL / `D`)** | `FS_XML_HANDLER_DIALPLAN_CACHE_TTL` | Redis cache window (in seconds) for the complete rendered XML dialplan document for a tenant. |
 | **TTL** | Time To Live | How many seconds a cached response remains valid in Redis before querying MariaDB again. `0` disables caching. |
 | **Target Requests (`100 x 5`)** | Offered Burst Profile | 100 total HTTP requests sent with 5 requests simultaneously in-flight at all times. |
 | **Redis Hit Rate** | Keyspace Efficiency (`INFO stats`) | Percentage of lookup keys found in fast Redis memory versus total lookups requested during the test run. |

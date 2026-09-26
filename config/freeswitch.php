@@ -265,7 +265,7 @@ return [
         | mod_xml_curl bindings should point to this path.
         |
         */
-        'path' => env('XML_HANDLER_PATH', '/api/v1/xml-handler'),
+        'path' => env('FS_XML_HANDLER_PATH', '/api/v1/xml-handler'),
 
         /*
         |--------------------------------------------------------------------------
@@ -277,7 +277,7 @@ return [
         | mod_xml_curl configuration.
         |
         */
-        'auth' => filter_var(env('XML_HANDLER_AUTH', true), FILTER_VALIDATE_BOOLEAN),
+        'auth' => filter_var(env('FS_XML_HANDLER_AUTH', true), FILTER_VALIDATE_BOOLEAN),
 
         /*
         |--------------------------------------------------------------------------
@@ -289,8 +289,8 @@ return [
         | endpoint on every directory, dialplan, and configuration lookup.
         |
         */
-        'log_requests' => filter_var(env('XML_HANDLER_LOG_REQUESTS', false), FILTER_VALIDATE_BOOLEAN),
-        'log_timing' => filter_var(env('XML_HANDLER_LOG_TIMING', false), FILTER_VALIDATE_BOOLEAN),
+        'log_requests' => filter_var(env('FS_XML_HANDLER_LOG_REQUESTS', false), FILTER_VALIDATE_BOOLEAN),
+        'log_timing' => filter_var(env('FS_XML_HANDLER_LOG_TIMING', false), FILTER_VALIDATE_BOOLEAN),
 
         /*
         |--------------------------------------------------------------------------
@@ -303,18 +303,18 @@ return [
         | an explicit granular override is defined in the environment.
         |
         */
-        'cache_ttl' => (int) env('XML_HANDLER_CACHE_TTL', 5),
-        'dialplan_cache_ttl' => (int) env('XML_HANDLER_DIALPLAN_CACHE_TTL', env('XML_HANDLER_CACHE_TTL', 5)),
-        'dialplan_contributor_cache_ttl' => (int) env('XML_HANDLER_CONTRIBUTOR_CACHE_TTL', env('XML_HANDLER_CACHE_TTL', 5)),
-        'directory_cache_ttl' => (int) env('XML_HANDLER_DIRECTORY_CACHE_TTL', env('XML_HANDLER_CACHE_TTL', 5)),
-        'acl_cache_ttl' => (int) env('XML_HANDLER_ACL_CACHE_TTL', env('XML_HANDLER_CACHE_TTL', 5)),
+        'cache_ttl' => (int) env('FS_XML_HANDLER_CACHE_TTL', 5),
+        'dialplan_cache_ttl' => (int) env('FS_XML_HANDLER_DIALPLAN_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
+        'dialplan_contributor_cache_ttl' => (int) env('FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
+        'directory_cache_ttl' => (int) env('FS_XML_HANDLER_DIRECTORY_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
+        'acl_cache_ttl' => (int) env('FS_XML_HANDLER_ACL_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
 
-        'cache_store' => env('XML_HANDLER_CACHE_STORE'),
-        'dialplan_cache_store' => env('XML_HANDLER_DIALPLAN_CACHE_STORE', env('XML_HANDLER_CACHE_STORE')),
-        'directory_cache_store' => env('XML_HANDLER_DIRECTORY_CACHE_STORE', env('XML_HANDLER_CACHE_STORE')),
-        'acl_cache_store' => env('XML_HANDLER_ACL_CACHE_STORE', env('XML_HANDLER_CACHE_STORE')),
+        'cache_store' => env('FS_XML_HANDLER_CACHE_STORE'),
+        'dialplan_cache_store' => env('FS_XML_HANDLER_DIALPLAN_CACHE_STORE', env('FS_XML_HANDLER_CACHE_STORE')),
+        'directory_cache_store' => env('FS_XML_HANDLER_DIRECTORY_CACHE_STORE', env('FS_XML_HANDLER_CACHE_STORE')),
+        'acl_cache_store' => env('FS_XML_HANDLER_ACL_CACHE_STORE', env('FS_XML_HANDLER_CACHE_STORE')),
         'pin_trigger' => env('FS_PIN_TRIGGER', '*97'),
-        'routing_version_store' => env('XML_HANDLER_ROUTING_VERSION_STORE'),
+        'routing_version_store' => env('FS_XML_HANDLER_ROUTING_VERSION_STORE'),
 
         /*
         |--------------------------------------------------------------------------
@@ -358,7 +358,7 @@ return [
         | requests to the XML handler. Only used when auth is enabled.
         |
         */
-        'token' => env('XML_HANDLER_TOKEN'),
+        'token' => env('FS_XML_HANDLER_TOKEN'),
     ],
 
 ];

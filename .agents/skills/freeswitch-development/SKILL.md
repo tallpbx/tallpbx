@@ -191,12 +191,12 @@ When interpreting CPS results:
 
 For XML-curl bottleneck work, use the XML handler timing log deliberately:
 
-- Enable `XML_HANDLER_LOG_TIMING=true` only for diagnostic runs, then disable it afterward.
+- Enable `FS_XML_HANDLER_LOG_TIMING=true` only for diagnostic runs, then disable it afterward.
 - Compare `elapsed_ms`, `db_query_count`, `db_time_ms`, and `non_db_time_ms` by XML section.
 - Dialplan XML may be cached and cheap while directory/auth XML is still expensive; do not assume dialplan timing represents the whole call setup path.
 - In recent VirtualBox testing, directory/auth lookups were the larger Laravel-side cost than cached dialplan lookups, so optimize tenant identity and directory XML caching before broad MariaDB/PHP tuning.
-- Keep `XML_HANDLER_DIRECTORY_CACHE_TTL` short enough that new/changed SIP accounts become usable quickly, but long enough to absorb call bursts.
-- Prefer Redis for XML handler caches during load testing: `XML_HANDLER_DIRECTORY_CACHE_STORE=redis` and `XML_HANDLER_DIALPLAN_CACHE_STORE=redis`.
+- Keep `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` short enough that new/changed SIP accounts become usable quickly, but long enough to absorb call bursts.
+- Prefer Redis for XML handler caches during load testing: `FS_XML_HANDLER_DIRECTORY_CACHE_STORE=redis` and `FS_XML_HANDLER_DIALPLAN_CACHE_STORE=redis`.
 - Cache scalar payloads or XML strings, not Eloquent models, especially on Laravel 13 where cache unserialization is stricter.
 
 After diagnostic load testing, restore noisy/runtime flags such as XML timing logs to their normal disabled state and record whether a failed run was a valid PBX result or a harness/setup artifact.

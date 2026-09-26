@@ -18,28 +18,28 @@ function setTestEnv(string $key, ?string $value): void
 }
 
 $savedEnv = [
-    'XML_HANDLER_CACHE_TTL' => $_ENV['XML_HANDLER_CACHE_TTL'] ?? null,
-    'XML_HANDLER_DIALPLAN_CACHE_TTL' => $_ENV['XML_HANDLER_DIALPLAN_CACHE_TTL'] ?? null,
-    'XML_HANDLER_CONTRIBUTOR_CACHE_TTL' => $_ENV['XML_HANDLER_CONTRIBUTOR_CACHE_TTL'] ?? null,
-    'XML_HANDLER_DIRECTORY_CACHE_TTL' => $_ENV['XML_HANDLER_DIRECTORY_CACHE_TTL'] ?? null,
-    'XML_HANDLER_ACL_CACHE_TTL' => $_ENV['XML_HANDLER_ACL_CACHE_TTL'] ?? null,
-    'XML_HANDLER_CACHE_STORE' => $_ENV['XML_HANDLER_CACHE_STORE'] ?? null,
-    'XML_HANDLER_DIALPLAN_CACHE_STORE' => $_ENV['XML_HANDLER_DIALPLAN_CACHE_STORE'] ?? null,
-    'XML_HANDLER_DIRECTORY_CACHE_STORE' => $_ENV['XML_HANDLER_DIRECTORY_CACHE_STORE'] ?? null,
-    'XML_HANDLER_ACL_CACHE_STORE' => $_ENV['XML_HANDLER_ACL_CACHE_STORE'] ?? null,
+    'FS_XML_HANDLER_CACHE_TTL' => $_ENV['FS_XML_HANDLER_CACHE_TTL'] ?? null,
+    'FS_XML_HANDLER_DIALPLAN_CACHE_TTL' => $_ENV['FS_XML_HANDLER_DIALPLAN_CACHE_TTL'] ?? null,
+    'FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL' => $_ENV['FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL'] ?? null,
+    'FS_XML_HANDLER_DIRECTORY_CACHE_TTL' => $_ENV['FS_XML_HANDLER_DIRECTORY_CACHE_TTL'] ?? null,
+    'FS_XML_HANDLER_ACL_CACHE_TTL' => $_ENV['FS_XML_HANDLER_ACL_CACHE_TTL'] ?? null,
+    'FS_XML_HANDLER_CACHE_STORE' => $_ENV['FS_XML_HANDLER_CACHE_STORE'] ?? null,
+    'FS_XML_HANDLER_DIALPLAN_CACHE_STORE' => $_ENV['FS_XML_HANDLER_DIALPLAN_CACHE_STORE'] ?? null,
+    'FS_XML_HANDLER_DIRECTORY_CACHE_STORE' => $_ENV['FS_XML_HANDLER_DIRECTORY_CACHE_STORE'] ?? null,
+    'FS_XML_HANDLER_ACL_CACHE_STORE' => $_ENV['FS_XML_HANDLER_ACL_CACHE_STORE'] ?? null,
 ];
 
 $clearAllCacheEnv = function (): void {
-    setTestEnv('XML_HANDLER_CACHE_TTL', null);
-    setTestEnv('XML_HANDLER_DIALPLAN_CACHE_TTL', null);
-    setTestEnv('XML_HANDLER_CONTRIBUTOR_CACHE_TTL', null);
-    setTestEnv('XML_HANDLER_DIRECTORY_CACHE_TTL', null);
-    setTestEnv('XML_HANDLER_ACL_CACHE_TTL', null);
+    setTestEnv('FS_XML_HANDLER_CACHE_TTL', null);
+    setTestEnv('FS_XML_HANDLER_DIALPLAN_CACHE_TTL', null);
+    setTestEnv('FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL', null);
+    setTestEnv('FS_XML_HANDLER_DIRECTORY_CACHE_TTL', null);
+    setTestEnv('FS_XML_HANDLER_ACL_CACHE_TTL', null);
 
-    setTestEnv('XML_HANDLER_CACHE_STORE', null);
-    setTestEnv('XML_HANDLER_DIALPLAN_CACHE_STORE', null);
-    setTestEnv('XML_HANDLER_DIRECTORY_CACHE_STORE', null);
-    setTestEnv('XML_HANDLER_ACL_CACHE_STORE', null);
+    setTestEnv('FS_XML_HANDLER_CACHE_STORE', null);
+    setTestEnv('FS_XML_HANDLER_DIALPLAN_CACHE_STORE', null);
+    setTestEnv('FS_XML_HANDLER_DIRECTORY_CACHE_STORE', null);
+    setTestEnv('FS_XML_HANDLER_ACL_CACHE_STORE', null);
 };
 
 beforeEach($clearAllCacheEnv);
@@ -50,8 +50,8 @@ afterAll(function () use ($savedEnv): void {
     }
 });
 
-it('inherits master XML_HANDLER_CACHE_TTL for all XML handler caches when no granular overrides are set', function (): void {
-    setTestEnv('XML_HANDLER_CACHE_TTL', '45');
+it('inherits master FS_XML_HANDLER_CACHE_TTL for all XML handler caches when no granular overrides are set', function (): void {
+    setTestEnv('FS_XML_HANDLER_CACHE_TTL', '45');
 
     $config = require config_path('freeswitch.php');
     $xmlHandler = $config['xml_handler'];
@@ -63,9 +63,9 @@ it('inherits master XML_HANDLER_CACHE_TTL for all XML handler caches when no gra
         ->and($xmlHandler['acl_cache_ttl'])->toBe(45);
 });
 
-it('allows granular XML_HANDLER cache overrides to take precedence over master XML_HANDLER_CACHE_TTL', function (): void {
-    setTestEnv('XML_HANDLER_CACHE_TTL', '30');
-    setTestEnv('XML_HANDLER_DIRECTORY_CACHE_TTL', '10');
+it('allows granular FS_XML_HANDLER cache overrides to take precedence over master FS_XML_HANDLER_CACHE_TTL', function (): void {
+    setTestEnv('FS_XML_HANDLER_CACHE_TTL', '30');
+    setTestEnv('FS_XML_HANDLER_DIRECTORY_CACHE_TTL', '10');
 
     $config = require config_path('freeswitch.php');
     $xmlHandler = $config['xml_handler'];
@@ -77,8 +77,8 @@ it('allows granular XML_HANDLER cache overrides to take precedence over master X
         ->and($xmlHandler['acl_cache_ttl'])->toBe(30);
 });
 
-it('inherits master XML_HANDLER_CACHE_STORE for all XML handler caches', function (): void {
-    setTestEnv('XML_HANDLER_CACHE_STORE', 'redis');
+it('inherits master FS_XML_HANDLER_CACHE_STORE for all XML handler caches', function (): void {
+    setTestEnv('FS_XML_HANDLER_CACHE_STORE', 'redis');
 
     $config = require config_path('freeswitch.php');
     $xmlHandler = $config['xml_handler'];
@@ -89,9 +89,9 @@ it('inherits master XML_HANDLER_CACHE_STORE for all XML handler caches', functio
         ->and($xmlHandler['acl_cache_store'])->toBe('redis');
 });
 
-it('allows granular XML_HANDLER cache store overrides to take precedence', function (): void {
-    setTestEnv('XML_HANDLER_CACHE_STORE', 'redis');
-    setTestEnv('XML_HANDLER_DIRECTORY_CACHE_STORE', 'array');
+it('allows granular FS_XML_HANDLER cache store overrides to take precedence', function (): void {
+    setTestEnv('FS_XML_HANDLER_CACHE_STORE', 'redis');
+    setTestEnv('FS_XML_HANDLER_DIRECTORY_CACHE_STORE', 'array');
 
     $config = require config_path('freeswitch.php');
     $xmlHandler = $config['xml_handler'];
