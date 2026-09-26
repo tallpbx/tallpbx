@@ -118,6 +118,14 @@ Route::prefix('panel')->name('panel.')->middleware('panel.ip')->group(function (
         ->name('tenant.switch');
 });
 
+// ─── Fast Testing Authentication Bridge ───────────────────────────────────────
+// Only registered in the testing environment to provide rapid session authentication
+// for browser tests, bypassing repeated UI login forms.
+if (app()->environment('testing')) {
+    Route::get('/_testing/login/{guard}/{id}', [App\Http\Controllers\Testing\TestAuthController::class, 'login'])
+        ->middleware(['web']);
+}
+
 // ─── Fallback ────────────────────────────────────────────────────────────────
 Route::fallback(function () {
     if (auth()->guard('admin')->check()) {

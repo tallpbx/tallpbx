@@ -11,6 +11,7 @@ use Tests\DuskTestCase;
 use Tests\TestCase;
 
 pest()->extend(DuskTestCase::class)
+    ->use(Tests\Browser\Concerns\InteractsWithAuthentication::class)
     ->in('Browser');
 
 /*

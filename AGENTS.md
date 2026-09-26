@@ -81,6 +81,7 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 ### Branching & Release Strategy (Laravel Model)
 - TallPBX follows the **Laravel framework versioned-branch model** (e.g. `1.0`, `1.1`, `2.0`). There is no perpetual `main` or `master` branch.
 - Active development occurs directly on the current major/series branch (currently `2.0`). All new features, modernizations, and architectural improvements are committed directly to this branch or merged into it.
+- **No Backwards Compatibility for Unreleased Series Branches**: Because major series branch `2.0` is currently unreleased (no `v2.0.0` tag exists yet) and is explicitly not backwards compatible with the 1.x series, do not introduce or retain backward-compatibility fallbacks, deprecated aliases, transitional shims, or migration bridges for 1.x or unreleased 2.0 iterations. Write all configuration, schema, routes, services, and tests directly in their modern canonical form. Backwards compatibility guarantees apply strictly to maintenance releases after a production tag (`v2.0.0`) is cut.
 - Numbered release series branches represent release lines:
   - `1.0`: Frozen maintenance branch for 1.0.x (critical security/bug fixes only). Never push new feature work to `1.0`.
   - `1.1`: Maintenance release series for 1.1.x.
