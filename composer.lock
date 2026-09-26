@@ -7815,7 +7815,7 @@
             "dist": {
                 "type": "path",
                 "url": "app-modules/acl",
-                "reference": "79f9b0397115b8211e0c5d5a8ede08bf37e94d53"
+                "reference": "95c61645af2bf04dfb8448a124baa1d7a8839a7b"
             },
             "require": {
                 "laravel/framework": ">=13.0",
@@ -7982,7 +7982,7 @@
         },
         {
             "name": "tallpbx/module-backups",
-            "version": "dev-main",
+            "version": "2.0.x-dev",
             "dist": {
                 "type": "path",
                 "url": "app-modules/backups",
@@ -8698,7 +8698,7 @@
             "dist": {
                 "type": "path",
                 "url": "app-modules/event-rate-limits",
-                "reference": "188fa847cce556e77766a8b1c80706fb062bbb7b"
+                "reference": "a0c7b2863a54f83fdc495eddc085c9393eccbabe"
             },
             "require": {
                 "php": ">=8.3"
@@ -8874,7 +8874,7 @@
         },
         {
             "name": "tallpbx/module-file-stores",
-            "version": "dev-main",
+            "version": "2.0.x-dev",
             "dist": {
                 "type": "path",
                 "url": "app-modules/file-stores",
