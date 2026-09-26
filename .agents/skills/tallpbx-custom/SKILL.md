@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts)."
+description: "Invoke when working on TallPBX-specific patterns: versioning and release strategy (Laravel versioned series model, SemVer, unreleased 2.0 modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts)."
 license: MIT
 metadata:
   author: tallpbx
@@ -634,14 +634,16 @@ Run the narrow affected test files first, then `php artisan app:test --smoke` wh
 - When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
 
 ### Branching & Release Strategy (Laravel Model)
-- TallPBX follows the **Laravel framework versioned-branch model** (e.g. `1.0`, `1.1`, `2.0`). There is no perpetual `main` or `master` branch.
-- Active development occurs directly on the current major/series branch (currently `2.0`). All new features, modernizations, and architectural improvements are committed directly to this branch or merged into it.
-- Numbered release series branches represent release lines:
+- TallPBX follows the **[Laravel framework versioned-branch model](https://laravel.com/docs/releases#versioning-scheme)** (e.g. `1.0`, `1.1`, `2.0`) and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`).
+- **Active Branch Confirmation**: Run `git branch --show-current` before starting work. Active development occurs directly on the current major/series branch (`2.0`). There is no perpetual `main` or `master` branch; never attempt to branch off or merge into `main`. All new features, modernizations, and architectural improvements are committed directly to `2.0` or merged into it.
+- **No Backwards Compatibility for Unreleased Series Branches**: Because major series branch `2.0` is currently unreleased (no `v2.0.0` tag exists yet) and is explicitly not backwards compatible with the 1.x series, do not introduce or retain backward-compatibility fallbacks, deprecated aliases, transitional shims, or migration bridges for 1.x or unreleased 2.0 iterations. Write all configuration, schema, routes, services, and tests directly in their modern canonical form. Backwards compatibility guarantees apply strictly to maintenance releases after a production tag (`v2.0.0`) is cut.
+- **Numbered Release Series Branches**:
   - `1.0`: Frozen maintenance branch for 1.0.x (critical security/bug fixes only). Never push new feature work to `1.0`.
-  - `1.1`: Maintenance release series for 1.1.x.
+  - `1.1`: Maintenance release series for 1.1.x deployments.
   - `2.0`: Current primary development branch for 2.x features and releases.
-- There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`2.0`) or maintenance branches when backporting fixes for existing releases.
-- The web updater UI recognizes version branches (`^\d+(\.\d+)+`) as stable release series, sorting them in reverse version order so `2.0` is the top/default target.
+- **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`2.0`) or maintenance branches when backporting fixes for existing releases.
+- **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.\d+)+`) as stable release series, sorting them in reverse version order so `2.0` is the top/default target.
+- **Documentation**: User-facing versioning details are in [`README.md#versioning--release-strategy`](README.md#versioning--release-strategy), installation notes in [`INSTALL.md`](INSTALL.md), and release logs in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Tagging Best Practices (Do NOT Tag Every Commit)
 - **Never tag individual commits or task completions.**
