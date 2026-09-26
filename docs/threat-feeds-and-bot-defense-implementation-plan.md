@@ -16,7 +16,7 @@ This document specifies the architecture and implementation roadmap for three in
 
 > [!IMPORTANT]
 > **Bounded Host Helper Execution**:
-> All Linux firewall mutations run through `/usr/local/sbin/tallpbx-security`, owned by `root:www-data` (mode `0750`), accessible via `/etc/sudoers.d/tallpbx-security`. The web user (`www-data`) never executes arbitrary shell commands or wildcard sudo binaries.
+> All Linux firewall mutations run through `/usr/local/sbin/tallpbx-security`, owned by `root:www-data` (mode `0750`, so the web user can execute but never modify it), accessible via `/etc/sudoers.d/tallpbx-security`. The web user (`www-data`) never executes arbitrary shell commands or wildcard sudo binaries.
 
 > [!NOTE]
 > **Database & Memory Isolation**:

@@ -280,7 +280,7 @@ php artisan security:apply
 
 ### 9.2 Method 2: Bounded Root Helper (`/usr/local/sbin/tallpbx-security`)
 
-TallPBX installs a dedicated, root-owned helper script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`) with a matching sudoers entry (`/etc/sudoers.d/tallpbx-security`). This script enforces strict parameter regex validation before executing kernel operations:
+TallPBX installs a dedicated, root-owned helper script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`, so the web user can execute but never modify the script) with a matching sudoers entry (`/etc/sudoers.d/tallpbx-security`). This script enforces strict parameter regex validation before executing kernel operations:
 
 > **PHP-FPM systemd hardening:** The stock Debian/Ubuntu PHP-FPM service runs with `ProtectSystem=full`, which mounts `/etc` read-only inside the PHP-FPM service. The installer therefore adds a scoped drop-in (`/etc/systemd/system/php<version>-fpm.service.d/tallpbx-security.conf`) with `ReadWritePaths=/etc/tallpbx`, so web workers can safely write and test pending ruleset files in exactly that directory — and nowhere else in `/etc` — before restarting PHP-FPM. Because the `nft` utility requires `CAP_NET_ADMIN` even for check-only runs, the web application routes its syntax preflight through the helper's `validate` action.
 

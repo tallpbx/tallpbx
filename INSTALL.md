@@ -330,8 +330,9 @@ sudo nft flush ruleset                   # emergency: clear all rules if locked 
 ```
 
 Privileged firewall changes run through the bounded helper
-`/usr/local/sbin/tallpbx-security` (mode `0750 root:www-data`); the web user
-never receives general sudo access.
+`/usr/local/sbin/tallpbx-security` (mode `0750 root:www-data`, so the web
+user can execute but never modify the script); the web user never receives
+general sudo access.
 
 ### Browser Testing (Dusk)
 

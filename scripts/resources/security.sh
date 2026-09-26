@@ -12,8 +12,9 @@
 #    permissions (mode 2775, owned by root:www-data) so the web application can
 #    safely stage validated firewall configuration files.
 # 3. Installs the bounded host helper '/usr/local/sbin/tallpbx-security' with
-#    restricted permissions (mode 0750, owned by root:www-data) to perform
-#    kernel-level nftables operations without granting general root access.
+#    restricted permissions (mode 0750, owned by root:www-data, so the web
+#    user can execute but never modify the script) to perform kernel-level
+#    nftables operations without granting general root access.
 # 4. Installs the sudoers drop-in '/etc/sudoers.d/tallpbx-security' (mode 0440,
 #    owned by root:root) allowing 'www-data' to invoke only that specific helper.
 # 5. Seeds the standard PBX Port Catalog and security configuration settings in
