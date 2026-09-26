@@ -19,7 +19,4 @@ Route::middleware(['web', 'auth.panel', 'throttle:30,1'])
         Route::get('/email-connector/oauth-callback', EmailConnectorEdit::class)
             ->middleware('admin.can:email-connector.view')
             ->name('email-connector.oauth-callback');
-
-        // Backwards compatibility redirect
-        Route::redirect('/smtp-connector', '/panel/email-connector');
     });

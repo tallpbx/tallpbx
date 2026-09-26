@@ -51,9 +51,6 @@ restore_defaults() {
   sed -i 's/^XML_CACHE_TTL=.*/XML_CACHE_TTL=5/' .env
   sed -i 's/^XML_CACHE_DIALPLAN_TTL=.*/# XML_CACHE_DIALPLAN_TTL=5/' .env
   sed -i 's/^XML_CACHE_CONTRIBUTOR_TTL=.*/# XML_CACHE_CONTRIBUTOR_TTL=5/' .env
-  sed -i 's/^FREESWITCH_XML_HANDLER_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_CACHE_TTL=5/' .env
-  sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/# FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=5/' .env
-  sed -i 's/^FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/# FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=5/' .env
   php artisan optimize:clear > /dev/null 2>&1 || true
   php artisan optimize > /dev/null 2>&1 || true
 }
@@ -65,8 +62,6 @@ for item in "${RUNS[@]}"; do
   # Update cache settings in .env for this run (uncomments if currently commented)
   sed -i "s/^#\? \?XML_CACHE_DIALPLAN_TTL=.*/XML_CACHE_DIALPLAN_TTL=$d_ttl/" .env
   sed -i "s/^#\? \?XML_CACHE_CONTRIBUTOR_TTL=.*/XML_CACHE_CONTRIBUTOR_TTL=$c_ttl/" .env
-  sed -i "s/^#\? \?FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CACHE_TTL=$d_ttl/" .env
-  sed -i "s/^#\? \?FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=.*/FREESWITCH_XML_HANDLER_DIALPLAN_CONTRIBUTOR_CACHE_TTL=$c_ttl/" .env
   php artisan optimize:clear > /dev/null 2>&1
   php artisan optimize > /dev/null 2>&1
   redis-cli flushdb > /dev/null 2>&1

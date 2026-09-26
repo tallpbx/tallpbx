@@ -20,7 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Introduced `XML_CACHE_TTL` as the master default cache TTL (in seconds) for all dynamically rendered FreeSWITCH XML responses (dialplans, directory auth, contributor fragments, and ACLs).
   - Cascades the master TTL automatically to all granular caches unless an explicit granular override is uncommented in `.env`.
   - Introduced `XML_CACHE_STORE` as the master cache store setting (defaulting to `redis`), automatically cascading across all XML handler caches.
-  - Preserved 100% backward compatibility with legacy `FREESWITCH_XML_HANDLER_CACHE_TTL`, `FREESWITCH_XML_HANDLER_CACHE_STORE`, and subsystem-specific `FREESWITCH_XML_HANDLER_*` keys in existing installations.
   - Formatted `.env` and `.env.example` with the master TTL (`XML_CACHE_TTL=5`) and store (`XML_CACHE_STORE=redis`) active, leaving granular overrides cleanly commented out with plain-language explanations.
   - Updated installer (`scripts/resources/tall.sh`), cache benchmark sweep tool (`scripts/run-cache-sweep.sh`), test suites, and all documentation (`README.md`, `INSTALL.md`, `docs/load-testing-guide.md`, `docs/load-testing-results.md`, `AGENTS.md`) to reflect the streamlined naming convention.
 - **Cloud Datacenter 4 vCPU Dedicated / 16 GiB RAM Empirical Benchmarks**:
@@ -40,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput (~14–19 req/sec) and call setup capacity (3 CPS clean baseline, 5 CPS saturation boundary) constant, confirming single-core CPU compute saturation.
 
 ### Removed
+- **1.x Backward Compatibility Fallbacks**:
+  - Removed all legacy 1.x `FREESWITCH_XML_HANDLER_*` cache configuration fallbacks from `config/freeswitch.php`, standardizing exclusively on the canonical `XML_CACHE_*` settings (`XML_CACHE_TTL`, `XML_CACHE_STORE`, and granular subsystem overrides).
+  - Removed legacy 1.x `/smtp-connector` redirect in the Email Connector module routes (`app-modules/email-connector/routes/web.php`).
+  - Removed legacy `FREESWITCH_XML_HANDLER_*` environment variable sed mutations and assertions from `scripts/run-cache-sweep.sh` and `tests/Feature/PbxCacheSweepScriptTest.php`.
+  - Removed legacy backwards-compatibility test assertions in `tests/Feature/XmlHandlerCacheConfigTest.php` and updated `phpunit.xml` to define canonical `XML_CACHE_STORE` and `XML_CACHE_ACL_STORE`.
 - **VirtualBox Test Baseline Removal**:
   - Removed all legacy VirtualBox test tables, benchmarks, and VM references from `docs/load-testing-results.md` and `docs/load-testing-guide.md`, standardizing all documentation and sizing recommendations entirely on the comprehensive September 2026 cloud datacenter benchmarks.
   - Renamed and generalized the VirtualBox recovery runbook into a universal `SIPp Load Testing Preflight & Recovery Runbook` using standard environment placeholders (`<PBX_IP>`, `<GENERATOR_IP>`, `load-test-beta`).

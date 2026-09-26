@@ -35,8 +35,7 @@ it('safely restores production cache defaults on exit', function (): void {
     $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
 
     expect($script)->toContain('trap restore_defaults EXIT')
-        ->and($script)->toContain('XML_CACHE_TTL=5')
-        ->and($script)->toContain('FREESWITCH_XML_HANDLER_CACHE_TTL=5');
+        ->and($script)->toContain('XML_CACHE_TTL=5');
 });
 
 it('formats output with average latency instead of percentiles', function (): void {
