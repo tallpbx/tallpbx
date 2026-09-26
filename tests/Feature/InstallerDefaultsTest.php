@@ -8,19 +8,19 @@ it('defaults the installer to production data and supports the approved demo cho
     $script = (string) file_get_contents(base_path('scripts/install.sh'));
     $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
     $environmentExample = (string) file_get_contents(base_path('.env.example'));
-    $demoModePosition = strpos($tallScript, 'set_env_value .env FSPBX_DEMO_MODE');
+    $demoModePosition = strpos($tallScript, 'set_env_value .env PBX_DEMO_MODE');
     $clearCachePosition = strpos($tallScript, 'php artisan optimize:clear');
     $seedPosition = strpos($tallScript, 'php artisan db:seed --force');
 
     expect($script)->toContain('DEMO_MODE=false')
         ->and($script)->toMatch('/--no-demo\)\s+DEMO_MODE=false/')
         ->and($script)->not->toContain('--demo) DEMO_MODE=true')
-        ->and($script)->toContain('resolve_boolean_env_value /var/www/tallpbx/.env FSPBX_DEMO_MODE')
+        ->and($script)->toContain('resolve_boolean_env_value /var/www/tallpbx/.env PBX_DEMO_MODE')
         ->and($script)->toContain('Reusing existing demo data mode: $DEMO_MODE')
         ->and($script)->toContain('prompt_demo_mode "$DEMO_MODE"')
         ->and($script)->toContain('Clean or demo [${default_number}]: ')
-        ->and($script)->toContain('export FSPBX_DEMO_MODE="$DEMO_MODE"')
-        ->and($environmentExample)->toContain('FSPBX_DEMO_MODE=false')
+        ->and($script)->toContain('export PBX_DEMO_MODE="$DEMO_MODE"')
+        ->and($environmentExample)->toContain('PBX_DEMO_MODE=false')
         ->and($demoModePosition)->not->toBeFalse()
         ->and($clearCachePosition)->not->toBeFalse()
         ->and($seedPosition)->not->toBeFalse()
@@ -282,13 +282,13 @@ it('resolves persisted installer modes consistently', function (): void {
 
     expect($environmentPath)->not->toBeFalse();
 
-    file_put_contents($environmentPath, "FSPBX_DEMO_MODE=true\nFSPBX_DEVELOPMENT_MODE=false\n");
+    file_put_contents($environmentPath, "PBX_DEMO_MODE=true\nFSPBX_DEVELOPMENT_MODE=false\n");
 
     $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
     $environmentArgument = escapeshellarg($environmentPath);
     $command = implode(' && ', [
         'source '.$helperPath,
-        "test \"\$(resolve_boolean_env_value {$environmentArgument} FSPBX_DEMO_MODE)\" = true",
+        "test \"\$(resolve_boolean_env_value {$environmentArgument} PBX_DEMO_MODE)\" = true",
         "test \"\$(resolve_boolean_env_value {$environmentArgument} FSPBX_DEVELOPMENT_MODE)\" = false",
         "! resolve_boolean_env_value {$environmentArgument} MISSING_MODE",
     ]);

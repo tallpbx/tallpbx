@@ -119,3 +119,17 @@ it('binds call broadcast runtime settings from FS_CALL_BROADCAST_ environment va
     setFsTestEnv('FS_CALL_BROADCAST_PACING_SECONDS', null);
     setFsTestEnv('FS_CALL_BROADCAST_OUTCOME_WINDOW_MINUTES', null);
 });
+
+it('binds demo mode from PBX_DEMO_MODE environment variable', function () {
+    setFsTestEnv('PBX_DEMO_MODE', 'true');
+    $config = require config_path('freeswitch.php');
+    expect($config['demo_mode'])->toBeTrue();
+
+    setFsTestEnv('PBX_DEMO_MODE', 'false');
+    $config = require config_path('freeswitch.php');
+    expect($config['demo_mode'])->toBeFalse();
+
+    // Clean up
+    setFsTestEnv('PBX_DEMO_MODE', null);
+});
+

@@ -364,7 +364,7 @@ prompt_sound_languages () {
 # Preserve the previously selected demo mode on installer re-runs. Explicit
 # flags override it, while interactive prompts use it as the default.
 if [ "$DEMO_MODE_EXPLICIT" = false ]; then
-    if saved_demo_mode=$(resolve_boolean_env_value /var/www/tallpbx/.env FSPBX_DEMO_MODE); then
+    if saved_demo_mode=$(resolve_boolean_env_value /var/www/tallpbx/.env PBX_DEMO_MODE); then
         DEMO_MODE="$saved_demo_mode"
         verbose "Reusing existing demo data mode: $DEMO_MODE"
     fi
@@ -374,7 +374,7 @@ if [ "$INSTALLER_OPTIONS_EXPLICIT" = false ] && [ -t 0 ]; then
     prompt_demo_mode "$DEMO_MODE"
 fi
 
-export FSPBX_DEMO_MODE="$DEMO_MODE"
+export PBX_DEMO_MODE="$DEMO_MODE"
 
 # Preserve the selected development mode. Legacy installations used local mode
 # with Boost installed, so detect that state until the explicit value is saved.

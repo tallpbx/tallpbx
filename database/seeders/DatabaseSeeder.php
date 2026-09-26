@@ -25,14 +25,14 @@ use Modules\Voicemails\Models\Voicemail;
 /**
  * Seeds the application with default data for local development.
  *
- * When FSPBX_DEMO_MODE is true, creates:
+ * When PBX_DEMO_MODE is true, creates:
  *   - 2 customer tenants (TallPBX, Acme Corp) with SIP extensions,
  *     voicemail, inbound routes, and tenant defaults
  *   - 4 demo users across the two tenants, one of whom belongs to
  *     both tenants (multi-tenant scenario)
  *   - Admin permission groups; the first administrator is created separately
  *
- * When FSPBX_DEMO_MODE is false, only creates the Default tenant and admin
+ * When PBX_DEMO_MODE is false, only creates the Default tenant and admin
  * groups — no demo extensions, users, or administrator account.
  */
 class DatabaseSeeder extends Seeder
@@ -308,7 +308,7 @@ class DatabaseSeeder extends Seeder
     /**
      * Determine whether demo data should be seeded.
      *
-     * Controlled by the FSPBX_DEMO_MODE environment variable set by the
+     * Controlled by the PBX_DEMO_MODE environment variable set by the
      * installer and read through configuration so cached deployments use the
      * value selected when configuration was generated.
      */

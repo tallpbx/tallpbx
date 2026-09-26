@@ -95,7 +95,7 @@ fi
 # Write installer mode and method into .env early so the values are available
 # if Composer or Artisan boots Laravel before the full configure step below.
 # Database credentials are written once in the "Configure environment" section.
-set_env_value .env FSPBX_DEMO_MODE "${FSPBX_DEMO_MODE:-false}"
+set_env_value .env PBX_DEMO_MODE "${PBX_DEMO_MODE:-false}"
 set_env_value .env FSPBX_DEVELOPMENT_MODE "${FSPBX_DEVELOPMENT_MODE:-false}"
 set_env_value .env FSPBX_FREESWITCH_INSTALL_METHOD "${FSPBX_FREESWITCH_INSTALL_METHOD}"
 

@@ -46,7 +46,7 @@ return [
     | configuration has been cached.
     |
     */
-    'demo_mode' => filter_var(env('FSPBX_DEMO_MODE', false), FILTER_VALIDATE_BOOL),
+    'demo_mode' => filter_var(env('PBX_DEMO_MODE', false), FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
