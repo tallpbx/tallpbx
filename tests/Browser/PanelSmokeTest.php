@@ -24,9 +24,9 @@ namespace Tests\Browser;
 
 use App\Models\Admin;
 use App\Models\Group;
-use App\Models\Permission;
 use App\Models\Tenant;
 use App\Services\TenantManager;
+use Database\Seeders\AdminSeeder;
 use Database\Seeders\SecurityServiceSeeder;
 use Modules\Extensions\Models\Extension;
 use Modules\FeatureCodes\Models\FeatureCode;
@@ -36,52 +36,23 @@ use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 
 beforeEach(function () {
-    $this->admin = Admin::where('email', 'admin@smoke.test')->first();
+    // Mirror the production permission setup so the smoke admin can open
+    // every panel page: sync module state, seed AdminSeeder (which syncs all
+    // module-registered permissions and grants them to the Super
+    // Administrators group), then attach the smoke admin to that group.
+    // This is the same convention used by feature tests such as
+    // SecurityManagerLivewireTest.
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
 
-    if (! $this->admin) {
-        $this->admin = Admin::create([
-            'email' => 'admin@smoke.test',
-            'name' => 'Smoke Test Admin',
-            'password' => bcrypt('smoke-secret'),
-            'enabled' => true,
-        ]);
+    $this->superAdminGroup = Group::where('name', 'Super Administrators')->first();
 
-        $group = Group::firstOrCreate(
-            ['name' => 'Smoke Test Group'],
-            ['system' => true],
-        );
-        $this->superAdminGroup = Group::firstOrCreate(
-            ['name' => 'Super Administrators', 'tenant_id' => null],
-            ['description' => 'Smoke superadmin group.'],
-        );
+    $this->admin = Admin::firstOrCreate(
+        ['email' => 'admin@smoke.test'],
+        ['name' => 'Smoke Test Admin', 'password' => bcrypt('smoke-secret'), 'enabled' => true],
+    );
 
-        $pagePermissions = [
-            'extensions.view', 'extensions.create', 'extensions.edit',
-            'feature-codes.view',
-            'email-connector.view',
-            'backups.view', 'backups.create', 'backups.restore',
-            'admin.git-update.view',
-            'admin.queue.view',
-            'admin.monitoring.view',
-            'security.view',
-            'security.manage',
-        ];
-
-        foreach ($pagePermissions as $permissionName) {
-            $permission = Permission::firstOrCreate(
-                ['name' => $permissionName],
-                [
-                    'module' => 'admin',
-                    'description' => 'Smoke permission for '.$permissionName,
-                ],
-            );
-
-            $group->permissions()->syncWithoutDetaching([$permission->id]);
-            $this->superAdminGroup->permissions()->syncWithoutDetaching([$permission->id]);
-        }
-
-        $this->admin->groups()->syncWithoutDetaching([$group->id, $this->superAdminGroup->id]);
-    }
+    $this->admin->groups()->syncWithoutDetaching([$this->superAdminGroup->id]);
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -248,7 +219,7 @@ it('expands description from single line text box into text area on hover when l
         ->assertPresent('input[value*="Forward incoming sales"]');
 
     // Dispatch mouseenter on the Alpine component wrapping the truncated input
-    $page->evaluate(
+    $page->script(
         'const el = document.querySelector(\'input[value*="Forward incoming sales"]\')?'
         .'.closest(\'[x-data]\'); if (el) el.dispatchEvent(new MouseEvent("mouseenter"));'
     );
@@ -306,7 +277,7 @@ it('renders the create extension form', function () {
 
     $page = visit('/panel/extensions/create');
     $page->assertPathIs('/panel/extensions/create')
-        ->assertPresent('input')
+        ->assertPresent('input[type], input:not([type])')
         ->assertPresent('button[type="submit"]');
 });
 
@@ -335,7 +306,7 @@ it('renders the edit extension form', function () {
     $page = visit("/panel/extensions/{$extension->id}/edit");
     $page->assertPathIs("/panel/extensions/{$extension->id}/edit")
         ->assertSee('Edit Extension')
-        ->assertInputValue('input[wire\:model="displayName"]', 'Browser Edit Extension')
+        ->assertValue('input[wire\:model="displayName"]', 'Browser Edit Extension')
         ->assertPresent('button[type="submit"]')
         ->assertPresent('[wire\:id]');
 
@@ -347,7 +318,7 @@ it('renders the create dialplan form', function () {
 
     $page = visit('/panel/dialplans/create');
     $page->assertPathIs('/panel/dialplans/create')
-        ->assertPresent('input')
+        ->assertPresent('input[type], input:not([type])')
         ->assertPresent('button[type="submit"]');
 });
 
@@ -356,7 +327,7 @@ it('renders the create gateway form', function () {
 
     $page = visit('/panel/gateways/create');
     $page->assertPathIs('/panel/gateways/create')
-        ->assertPresent('input')
+        ->assertPresent('input[type], input:not([type])')
         ->assertPresent('button[type="submit"]');
 });
 
@@ -365,7 +336,7 @@ it('renders the create sip account form', function () {
 
     $page = visit('/panel/sip-accounts/create');
     $page->assertPathIs('/panel/sip-accounts/create')
-        ->assertPresent('input')
+        ->assertPresent('input[type], input:not([type])')
         ->assertPresent('button[type="submit"]');
 });
 
@@ -414,7 +385,7 @@ it('renders the gateway create form with profile field', function () {
     $page->assertPathIs('/panel/gateways/create')
         ->assertSee('Create Gateway')
         ->assertPresent('input[wire\:model="profile"]')
-        ->assertInputValue('input[wire\:model="profile"]', 'external');
+        ->assertValue('input[wire\:model="profile"]', 'external');
 });
 
 it('renders the inbound routes list page with table', function () {
@@ -649,7 +620,7 @@ it('renders the security manager dashboard', function () {
     $this->loginAs($this->admin, 'admin');
 
     // Use a tall viewport so the full security dashboard is visible at once
-    $page = visit('/panel/security')->setViewportSize(1920, 2400);
+    $page = visit('/panel/security')->resize(1920, 2400);
     $page->assertSee('Security Center')
         ->assertSee('Firewall Status')
         ->assertSee('Attack Protection')
@@ -678,10 +649,10 @@ it('renders the security manager dashboard', function () {
         ->assertSee('Stateful Connection Tracking');
 
     // Grow the viewport to the full document height for documentation screenshots
-    $expandedHeight = (int) ($page->evaluate(
+    $expandedHeight = (int) ($page->script(
         'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight)'
     ) ?? 2900);
-    $page->setViewportSize(1920, max(2900, $expandedHeight + 120));
+    $page->resize(1920, max(2900, $expandedHeight + 120));
 
     // Documentation screenshots are refreshed on demand only (DUSK_CAPTURE_DOCS=1)
     if (getenv('DUSK_CAPTURE_DOCS') === '1') {
@@ -689,7 +660,7 @@ it('renders the security manager dashboard', function () {
         $src = base_path("tests/Browser/screenshots/{$imgName}");
         $dest = base_path("docs/images/{$imgName}");
 
-        $page->screenshot($src);
+        $page->screenshot(filename: $src);
 
         if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
             copy($src, $dest);
