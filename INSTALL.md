@@ -6,14 +6,14 @@ TallPBX is a web-managed phone system that runs on your own server. After
 installing, you'll have a working web panel ready for phones, extensions, call
 routing, voicemail, and recordings — all manageable from your browser.
 
-## 1. Create the Virtual Machine
+## 1. Create the Server
 
 - **OS Type**: Linux, Debian 13 (64-bit)
 - **Hardware Requirements**:
 
 | | Minimum (Production) | Recommended (Development) |
 |---|---|---|
-| CPU | 1 vCPU (2+ recommended) | 4 vCPUs |
+| CPU | 1 CPU core (2+ recommended) | 4 CPU cores |
 | Storage | 25 GB (40 GB+ for recordings) | 40 GB |
 | RAM | 1 GB | 4 GB |
 | Swap | 2 GB | 2 GB |
@@ -75,7 +75,7 @@ swapon --show
 free -h
 ```
 
-## 4. Configure a Static IP Address (Optional)
+## 4. Configure a Static IP Address
 
 If you need a static IP address, edit the network interfaces file:
 
@@ -84,11 +84,11 @@ nano /etc/network/interfaces
 ```
 
 Replace the DHCP line for your interface with your static configuration
-(the IP address and gateway below are examples — use the values for your
-particular network):
+(the interface name, IP address, and gateway below are examples — use the
+values for your particular network):
 
 ```
-iface enp0s3 inet static
+iface <interface> inet static
 address 192.168.1.76
 netmask 255.255.255.0
 gateway 192.168.1.254
@@ -99,7 +99,7 @@ Restart networking and verify:
 
 ```bash
 systemctl restart networking
-ip addr show enp0s3
+ip addr show <interface>
 ```
 
 ## 5. Run the Install Script
@@ -273,7 +273,7 @@ to static worker pools to eliminate process-fork latency during simultaneous cal
 
 | Server size | Auto-configured `pm` | Sizing (`pm.max_children`) | Notes |
 | --- | --- | --- | --- |
-| Minimum, 1 GB RAM | `dynamic` | `5` | Conserves memory on small instances. |
+| Minimum, 1 GB RAM | `dynamic` | `5` | Conserves memory on small servers. |
 | Small, 2 GB RAM | `static` | `6` | Balanced for small office bursts. |
 | Standard, 4 GB RAM | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
 | Larger, 8 GB+ RAM | `static` | `24` | For higher concurrency call centers. |
@@ -553,7 +553,7 @@ saved change remains available as a Git stash until it is applied successfully.
 
 ### Installer Fails at "Installing Composer"
 
-Some VPS providers assign a global IPv6 address without a default IPv6 route.
+Some hosting providers assign a global IPv6 address without a default IPv6 route.
 PHP tries IPv6 first when downloading files, the connection times out, and
 the installer fails with:
 

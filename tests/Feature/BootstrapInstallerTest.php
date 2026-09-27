@@ -187,6 +187,8 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->not->toContain('Verified Installation')
         ->and($install)->toContain('same `--ref` value every time')
         ->and($install)->not->toContain('VMware or VirtualBox')
+        ->and($install)->not->toContain('Virtual Machine')
+        ->and($install)->toContain('Create the Server')
         ->and($install)->not->toContain('Manual Installation')
         ->and($install)->not->toContain('A headless run')
         ->and($install)->not->toContain('Installer Questionnaire')
