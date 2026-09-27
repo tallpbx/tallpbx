@@ -37,6 +37,24 @@ php artisan dusk
 php artisan route:list --name=<feature-name>
 ```
 
+## CRITICAL — Permission Setup in Pest Tests (Standard Convention)
+
+Panel routes are gated by `admin.can:<permission>` middleware (`AdminAuthorize`), and in-memory SQLite test databases are migrated but **never seeded**. Tests that visit panel pages MUST establish permissions explicitly. Always use the established convention (the same one used by `SecurityManagerLivewireTest` and other feature tests):
+
+```php
+$this->artisan('module:sync --only-local');  // populate module registry so modules register their permissions
+$this->seed(AdminSeeder::class);             // sync every permission into the DB and create the Super Administrators group with ALL permissions
+$superAdminGroup = Group::where('name', 'Super Administrators')->first();
+$this->admin = Admin::factory()->create(['enabled' => true]);
+$this->admin->groups()->attach($superAdminGroup->id); // inherit every permission
+```
+
+Rules:
+- Do NOT hand-create a `firstOrCreate` "Super Administrators" group and attach a hard-coded permission list — that silently fails on any page whose permission is not in the list (`AuthorizationException: You don't have permission: X`).
+- Do NOT invent new permission-granting helpers for this purpose; reuse `AdminSeeder` so every agent and harness follows one path.
+- Browser tests (Pest 4 + Playwright) follow the same convention inside `beforeEach` — `loginAs()` only establishes the session, it does not grant permissions.
+- For tests needing a *curated* subset, use `AdminSeeder`'s "Administrators" group or the `grantAdminPermissions()` helper in `tests/Pest.php`.
+
 ## SIP Load Testing & Multi-Host Reproducibility Guidelines
 
 When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `scripts/pbx-sipp-validate.sh`, or `scripts/run-cache-sweep.sh`), agents must follow these operational rules:

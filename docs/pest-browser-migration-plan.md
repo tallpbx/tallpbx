@@ -394,7 +394,7 @@ git commit -m "test(browser): migrate RiskConfirmationBrowserTest to Pest 4 brow
 - Consumes: `loginAs()`, `visit()`, Livewire CRUD components.
 - Produces: Full browser verification of panel routes and navigation in ~20-30 seconds.
 
-- [ ] **Step 1: Convert `PanelSmokeTest.php`**
+- [x] **Step 1: Convert `PanelSmokeTest.php`**
 
 Replace `$this->browse(function (Browser $browser) { ... })` across all tests:
 1. `it('displays the admin login page')`:
@@ -431,7 +431,7 @@ Replace `$this->browse(function (Browser $browser) { ... })` across all tests:
    ```
 4. Convert remaining 17 tests to use `$this->loginAs($this->admin, 'admin')` followed by `$page = visit('/panel/...')` and element assertions.
 
-- [ ] **Step 2: Run the migrated smoke suite**
+- [x] **Step 2: Run the migrated smoke suite**
 
 Run:
 ```bash
@@ -439,7 +439,7 @@ Run:
 ```
 Expected: PASS with all tests passing.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/Browser/PanelSmokeTest.php
