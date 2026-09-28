@@ -176,16 +176,21 @@ class ModuleLifecycleService
         $isVendor = $preview['module_kind'] === 'vendor';
         $moduleDirDeleted = false;
 
-        if (! $isVendor) {
-            // Only local modules own files in the installation tree. Vendor
-            // packages belong to Composer, which deletes them itself.
-            $moduleDirDeleted = $this->files->deleteDirectory((string) $preview['module_dir']);
-        }
-
+        // Remove the Composer package (and its vendor symlink plus autoload
+        // mappings) BEFORE deleting local files: a path-repository package
+        // whose source directory is already gone cannot be resolved by
+        // Composer, which would leave the autoloader pointing at a missing
+        // directory and break every subsequent artisan boot.
         $composerRemoved = $this->runComposer(['remove', $preview['composer_package'], '--no-interaction']);
 
         if (! $composerRemoved) {
             $preview['warnings'][] = "Composer could not remove [{$preview['composer_package']}]; run composer update manually to finish.";
+        }
+
+        if (! $isVendor) {
+            // Only local modules own files in the installation tree. Vendor
+            // packages belong to Composer, which deletes them itself.
+            $moduleDirDeleted = $this->files->deleteDirectory((string) $preview['module_dir']);
         }
 
         $repositoryEntryRemoved = false;
@@ -263,6 +268,7 @@ class ModuleLifecycleService
                 ? [
                     "Restore the module directory (code, migrations, factories, and tests) from git: app-modules/{$name}",
                     'Re-add the Composer path-repository and require entries',
+                    'Re-link the Composer path package so the module classes autoload again',
                 ]
                 : [
                     "Reinstall the Composer package: {$registryRow->composer_package}",
@@ -301,6 +307,17 @@ class ModuleLifecycleService
 
             $this->addRepositoryEntry($name);
             $this->addRequireEntry($preview['composer_package']);
+
+            // Re-link the path package so Composer recreates its vendor
+            // symlink and autoload mappings — without this, the restored
+            // module's classes cannot be loaded by the application.
+            $relinked = $this->runComposer(['require', $preview['composer_package'], '--no-interaction']);
+
+            if (! $relinked) {
+                throw ValidationException::withMessages([
+                    'module' => "Module files were restored, but Composer could not re-link [{$preview['composer_package']}]. Run composer install to finish restoring the module.",
+                ]);
+            }
         } else {
             $restored = $this->runComposer(['require', $preview['composer_package'], '--no-interaction']);
 

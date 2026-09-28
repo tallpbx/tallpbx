@@ -105,6 +105,31 @@ it('uninstalls a local module completely but keeps the registry marker', functio
     ]);
 });
 
+it('removes the composer package before deleting the local module directory', function (): void {
+    $moduleExistedDuringComposerRemove = null;
+
+    // Composer needs the path-repository source to resolve the package;
+    // deleting the directory first would break the removal and leave the
+    // autoloader pointing at a missing directory.
+    $service = new ModuleLifecycleService(
+        app(),
+        app(Filesystem::class),
+        $this->sandbox,
+        function (array $args) use (&$moduleExistedDuringComposerRemove): bool {
+            if ($args[0] === 'remove') {
+                $moduleExistedDuringComposerRemove = is_dir($this->sandbox.'/app-modules/demo-module');
+            }
+
+            return true;
+        },
+        fn (array $args): bool => true,
+    );
+
+    $service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    expect($moduleExistedDuringComposerRemove)->toBeTrue();
+});
+
 it('runs the module uninstall handler when one is registered', function (): void {
     $uninstaller = testDemoUninstaller();
     registerDemoUninstaller($uninstaller);
@@ -191,6 +216,8 @@ it('restores a local module from git with empty tables and its central tests', f
     expect($report['source'])->toBe('git')
         ->and($report['files_restored'])->toBeTrue()
         ->and($this->gitCalls)->toContain('restore --source=HEAD -- app-modules/demo-module')
+        // Re-linking the path package restores Composer's autoload mapping.
+        ->and($this->composerCalls)->toContain('require tallpbx/module-demo-module --no-interaction')
         ->and(File::exists($this->sandbox.'/app-modules/demo-module/module.json'))->toBeTrue();
 
     $this->assertDatabaseHas('modules', [
@@ -238,6 +265,10 @@ it('restores a vendor module through Composer', function (): void {
     ]);
 });
 
+/**
+ * Register a module uninstall handler under the tagged binding the
+ * lifecycle service resolves at runtime.
+ */
 function registerDemoUninstaller(ModuleUninstaller $uninstaller): void
 {
     $binding = 'tests.module-lifecycle.uninstaller';
@@ -246,27 +277,42 @@ function registerDemoUninstaller(ModuleUninstaller $uninstaller): void
     app()->tag([$binding], 'module.uninstallers');
 }
 
+/**
+ * Build an anonymous uninstall handler that records when it ran.
+ */
 function testDemoUninstaller(): ModuleUninstaller
 {
     return new class implements ModuleUninstaller
     {
         public bool $uninstalled = false;
 
+        /**
+         * Return the module this handler owns.
+         */
         public function moduleName(): string
         {
             return 'demo-module';
         }
 
+        /**
+         * Always allow the uninstall in this test double.
+         */
         public function canUninstall(Module $module): bool
         {
             return true;
         }
 
+        /**
+         * Describe what the uninstall would remove.
+         */
         public function previewUninstall(Module $module): array
         {
             return ['Drop demo-module tables'];
         }
 
+        /**
+         * Flag that the real uninstall handler was invoked.
+         */
         public function uninstall(Module $module): void
         {
             $this->uninstalled = true;
@@ -274,6 +320,10 @@ function testDemoUninstaller(): ModuleUninstaller
     };
 }
 
+/**
+ * Build the lifecycle service against the hermetic sandbox, recording
+ * every composer and git invocation through the injectable seams.
+ */
 function sandboxService(
     string $sandbox,
     array &$composerCalls,
@@ -330,6 +380,10 @@ function sandboxService(
     );
 }
 
+/**
+ * Render the demo migration every sandbox restore re-runs so tests can
+ * assert tables come back empty.
+ */
 function demoRestoreMigration(): string
 {
     return <<<'PHP'
