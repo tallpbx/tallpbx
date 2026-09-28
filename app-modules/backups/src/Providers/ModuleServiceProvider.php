@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Backups\Providers;
 
-use Modules\Backups\Listeners\BlockFileStoreDeletion;
 use Modules\Backups\Services\RestoreCommandRunnerInterface;
 use Modules\Backups\Services\SymfonyRestoreCommandRunner;
-use Modules\FileStores\Events\FileStoreDeleting;
 
 /**
  * Service provider for the Backups module.
@@ -47,19 +45,5 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     protected function routeGroups(): array
     {
         return [];
-    }
-
-    /**
-     * Refuse file store deletions that backup profiles still reference.
-     *
-     * @return array<class-string, array<int, class-string>>
-     */
-    protected function listeners(): array
-    {
-        return [
-            FileStoreDeleting::class => [
-                BlockFileStoreDeletion::class,
-            ],
-        ];
     }
 }

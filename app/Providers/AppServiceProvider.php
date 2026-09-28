@@ -57,6 +57,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Modules\Backups\Listeners\BlockFileStoreDeletion;
 use Modules\Backups\Services\BackupService;
 use Modules\Backups\Services\BackupServiceInterface;
 use Modules\Bridges\Models\Bridge;
@@ -77,6 +78,7 @@ use Modules\Extensions\Models\Extension;
 use Modules\Fax\Models\FaxInbox;
 use Modules\Fax\Models\FaxOutgoing;
 use Modules\FeatureCodes\Models\FeatureCode;
+use Modules\FileStores\Events\FileStoreDeleting;
 use Modules\FollowMe\Models\FollowMe;
 use Modules\HotDesking\Models\HotDeskSession;
 use Modules\InboundRoutes\Models\InboundRoute;
@@ -239,6 +241,15 @@ class AppServiceProvider extends ServiceProvider
             ChannelDestroy::class,
             Heartbeat::class,
         ], BroadcastDashboardStatsOnFreeSwitchEvent::class);
+
+        // Keep the backups module's file-store deletion guard active even
+        // while that module is disabled: the guard prevents backup profiles
+        // from silently losing their destination store, so it must not
+        // depend on the enable/disable toggle or on module provider boot
+        // ordering. Skipped automatically when the module is uninstalled.
+        if (class_exists(BlockFileStoreDeletion::class)) {
+            Event::listen(FileStoreDeleting::class, BlockFileStoreDeletion::class);
+        }
 
         if ($this->app->environment('testing')) {
             TestDatabaseSafety::enforce();
