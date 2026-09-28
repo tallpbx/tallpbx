@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\InitialAdminSetupController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\TenantSwitchController;
+use App\Http\Controllers\Testing\TestAuthController;
 use App\Http\Middleware\EnforcePanelLivewireActionPermissions;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
@@ -22,9 +23,12 @@ use Modules\Tenant\Livewire\Dashboard;
 // but actions travel through this shared endpoint instead; without the
 // middleware a view-only user could invoke delete/save actions. Auth and
 // layout components remain unrestricted here and keep their own checks.
+// The rate limiter runs first so request floods — including sign-in and
+// password-reset submissions, which also travel through this endpoint —
+// are refused before any component work begins.
 Livewire::setUpdateRoute(function ($handle, $path) {
     return Route::post($path, $handle)
-        ->middleware(['web', RequireLivewireHeaders::class, EnforcePanelLivewireActionPermissions::class])
+        ->middleware(['web', 'throttle:60,1', RequireLivewireHeaders::class, EnforcePanelLivewireActionPermissions::class])
         ->name('panel.livewire.update');
 });
 
@@ -122,7 +126,7 @@ Route::prefix('panel')->name('panel.')->middleware('panel.ip')->group(function (
 // Only registered in the testing environment to provide rapid session authentication
 // for browser tests, bypassing repeated UI login forms.
 if (app()->environment('testing')) {
-    Route::get('/_testing/login/{guard}/{id}', [App\Http\Controllers\Testing\TestAuthController::class, 'login'])
+    Route::get('/_testing/login/{guard}/{id}', [TestAuthController::class, 'login'])
         ->middleware(['web']);
 }
 
