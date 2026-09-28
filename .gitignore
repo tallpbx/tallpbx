@@ -38,6 +38,3 @@ Homestead.yaml
 Thumbs.db
 app-modules/backups/backups
 tests/Browser/Screenshots/
-
-# Internal audit reports (security-sensitive, never publish)
-/docs/project-audit-report.md
