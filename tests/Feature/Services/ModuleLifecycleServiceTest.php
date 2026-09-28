@@ -5,245 +5,240 @@ declare(strict_types=1);
 use App\Contracts\ModuleUninstaller;
 use App\Models\Module;
 use App\Models\Permission;
-use App\Models\Tenant;
 use App\Services\ModuleLifecycleService;
-use App\Support\ModuleTableUninstaller;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Modules\PinNumbers\Models\PinNumber;
 
-it('requires an explicit uninstall handler', function () {
-    $module = Module::create([
-        'name' => 'extensions',
-        'display_name' => 'Extensions',
+beforeEach(function () {
+    // Build a hermetic sandbox that mirrors the project layout, so tests
+    // never touch the real app-modules/ tree or composer.json.
+    $this->sandbox = sys_get_temp_dir().'/pbx-lifecycle-'.bin2hex(random_bytes(8));
+
+    File::makeDirectory($this->sandbox.'/app-modules/demo-module', 0755, true);
+    File::put($this->sandbox.'/app-modules/demo-module/module.json', json_encode([
+        'name' => 'demo-module',
         'version' => '1.0.0',
-    ]);
+        'namespace' => 'Modules\\DemoModule',
+        'display_name' => 'Demo Module',
+        'required' => false,
+        'protected' => false,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    File::put($this->sandbox.'/composer.json', json_encode([
+        'repositories' => [['type' => 'path', 'url' => 'app-modules/demo-module']],
+        'require' => ['tallpbx/module-demo-module' => '*'],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-    $preview = app(ModuleLifecycleService::class)->previewUninstall($module);
+    $this->composerCalls = [];
+    $this->gitCalls = [];
 
-    expect($preview['can_uninstall'])->toBeFalse()
-        ->and($preview['reason'])->toBe('This module does not provide an uninstall handler.');
+    $this->service = sandboxService($this->sandbox, $this->composerCalls, $this->gitCalls, gitTracked: true);
 });
 
-it('prevents protected modules from being uninstalled', function () {
-    $module = Module::create([
-        'name' => 'admin',
-        'display_name' => 'Admin',
-        'version' => '1.0.0',
-        'protected' => true,
-        'required' => true,
-    ]);
-
-    $preview = app(ModuleLifecycleService::class)->previewUninstall($module);
-
-    expect($preview['can_uninstall'])->toBeFalse()
-        ->and($preview['reason'])->toBe('Required and protected modules cannot be uninstalled.');
+afterEach(function () {
+    File::deleteDirectory($this->sandbox);
 });
 
-it('requires the exact confirmation phrase before uninstalling', function () {
-    $module = Module::create([
-        'name' => 'extensions',
-        'display_name' => 'Extensions',
-        'version' => '1.0.0',
-    ]);
-
-    registerTestUninstaller(testModuleUninstaller('extensions'));
-
-    app(ModuleLifecycleService::class)->uninstall($module, 'wrong phrase');
-})->throws(ValidationException::class);
-
-it('uninstalls module data and permissions through the registered handler', function () {
-    $module = Module::create([
-        'name' => 'extensions',
-        'display_name' => 'Extensions',
-        'version' => '1.0.0',
-    ]);
-
-    Permission::create([
-        'name' => 'extensions.view',
-        'module' => 'extensions',
-        'description' => 'View extensions',
-    ]);
-
-    $uninstaller = testModuleUninstaller('extensions');
-    registerTestUninstaller($uninstaller);
-
-    Artisan::shouldReceive('call')
-        ->once()
-        ->with('optimize:clear')
-        ->andReturn(0);
-
-    app(ModuleLifecycleService::class)->uninstall($module, 'UNINSTALL extensions');
-
-    $module->refresh();
-
-    expect($uninstaller->uninstalled)->toBeTrue()
-        ->and($module->enabled)->toBeFalse()
-        ->and($module->status)->toBe(Module::StatusUninstalled)
-        ->and(Permission::where('module', 'extensions')->exists())->toBeFalse();
+it('exposes the uninstall confirmation phrase', function (): void {
+    expect($this->service->confirmationPhrase('demo-module'))->toBe('UNINSTALL demo-module');
 });
 
-it('reinstalls an uninstalled module from its discovered manifest', function () {
-    $module = Module::create([
-        'name' => 'extensions',
-        'display_name' => 'Old Extensions',
-        'version' => '0.1.0',
+it('refuses modules that are neither local nor vendor', function (): void {
+    expect(fn () => $this->service->uninstall('ghost-module', 'UNINSTALL ghost-module'))
+        ->toThrow(ValidationException::class);
+});
+
+it('refuses invalid module names', function (): void {
+    expect(fn () => $this->service->uninstall('../evil', 'UNINSTALL ../evil'))
+        ->toThrow(ValidationException::class);
+});
+
+it('refuses required or protected modules', function (): void {
+    File::put($this->sandbox.'/app-modules/demo-module/module.json', json_encode([
+        'name' => 'demo-module', 'version' => '1.0.0',
+        'namespace' => 'Modules\\DemoModule', 'display_name' => 'Demo Module',
+        'required' => false, 'protected' => true,
+    ]));
+
+    expect(fn () => $this->service->uninstall('demo-module', 'UNINSTALL demo-module'))
+        ->toThrow(ValidationException::class);
+});
+
+it('refuses a mismatched confirmation phrase', function (): void {
+    expect(fn () => $this->service->uninstall('demo-module', 'not the phrase'))
+        ->toThrow(ValidationException::class);
+
+    expect(File::exists($this->sandbox.'/app-modules/demo-module'))->toBeTrue();
+});
+
+it('uninstalls a local module completely but keeps the registry marker', function (): void {
+    Module::create(['name' => 'demo-module', 'display_name' => 'Demo Module', 'version' => '1.0.0']);
+    Permission::create(['name' => 'demo-module.view', 'module' => 'demo-module']);
+
+    $report = $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    expect($report['module_kind'])->toBe('local')
+        ->and($report['module_dir_deleted'])->toBeTrue()
+        ->and($report['composer_package_removed'])->toBeTrue()
+        ->and($report['repository_entry_removed'])->toBeTrue()
+        ->and($report['require_entry_removed'])->toBeTrue()
+        ->and($report['permissions_deleted'])->toBe(1)
+        ->and($report['uninstall_ran'])->toBeFalse()
+        ->and($this->composerCalls)->toBe(['remove tallpbx/module-demo-module --no-interaction'])
+        ->and(File::exists($this->sandbox.'/app-modules/demo-module'))->toBeFalse()
+        ->and(Permission::where('module', 'demo-module')->exists())->toBeFalse()
+        ->and($report['warnings'])->not->toBeEmpty()
+        ->and($report['restore_hint'])->toContain('module:restore demo-module');
+
+    $composer = json_decode((string) file_get_contents($this->sandbox.'/composer.json'), true);
+
+    expect($composer['repositories'])->toBe([])
+        ->and($composer['require'])->not->toHaveKey('tallpbx/module-demo-module');
+
+    // The registry marker row is what makes restore possible.
+    $this->assertDatabaseHas('modules', [
+        'name' => 'demo-module',
         'enabled' => false,
         'status' => Module::StatusUninstalled,
+        'composer_package' => 'tallpbx/module-demo-module',
     ]);
-
-    Artisan::shouldReceive('call')
-        ->once()
-        ->with('migrate', [
-            '--path' => base_path('app-modules/extensions/database/migrations'),
-            '--realpath' => true,
-            '--force' => true,
-        ])
-        ->andReturn(0);
-
-    Artisan::shouldReceive('call')
-        ->once()
-        ->with('optimize:clear')
-        ->andReturn(0);
-
-    $reinstalled = app(ModuleLifecycleService::class)->reinstall('extensions');
-
-    expect($reinstalled->id)->toBe($module->id);
-
-    $module->refresh();
-
-    expect($module->display_name)->toBe('Extensions')
-        ->and($module->enabled)->toBeTrue()
-        ->and($module->status)->toBe(Module::StatusEnabled);
 });
 
-it('previews the first reviewed table-owned module uninstall handlers', function (string $moduleName): void {
-    $module = Module::create([
-        'name' => $moduleName,
-        'display_name' => str($moduleName)->replace('-', ' ')->title()->toString(),
-        'version' => '1.0.0',
-    ]);
+it('runs the module uninstall handler when one is registered', function (): void {
+    $uninstaller = testDemoUninstaller();
+    registerDemoUninstaller($uninstaller);
+    Module::create(['name' => 'demo-module', 'display_name' => 'Demo Module', 'version' => '1.0.0']);
 
-    $preview = app(ModuleLifecycleService::class)->previewUninstall($module);
+    $report = $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
 
-    expect($preview['can_uninstall'])->toBeTrue()
-        ->and($preview['reason'])->toBeNull()
-        ->and($preview['items'])->not->toBeEmpty();
-})->with([
-    'PIN numbers' => 'pin-numbers',
-    'access control lists' => 'acl',
-    'email templates' => 'email-templates',
-    'email queue' => 'email-queue',
-    'tenant limits' => 'tenant-limits',
-    'call broadcast' => 'call-broadcast',
-]);
-
-it('uninstalls only reviewed module schema and recreates usable schema on reinstall', function (
-    string $moduleName,
-    array $tables,
-    string $migration,
-): void {
-    $tenant = Tenant::factory()->create();
-    $unrelatedTenant = Tenant::factory()->create();
-    $unrelatedPinNumber = PinNumber::factory()->forTenant($unrelatedTenant->id)->create();
-    $unrelatedPermission = Permission::create([
-        'name' => 'unrelated.view',
-        'module' => 'unrelated',
-        'description' => 'View unrelated module data',
-    ]);
-
-    $module = Module::create([
-        'name' => $moduleName,
-        'display_name' => str($moduleName)->replace('-', ' ')->title()->toString(),
-        'version' => '1.0.0',
-    ]);
-
-    Permission::create([
-        'name' => $moduleName.'.view',
-        'module' => $moduleName,
-        'description' => 'View module data',
-    ]);
-
-    createReviewedModuleRecords($moduleName, $tenant->id);
-
-    expect(DB::table('migrations')->where('migration', $migration)->exists())->toBeTrue();
-
-    app(ModuleLifecycleService::class)->uninstall($module, 'UNINSTALL '.$moduleName);
-
-    foreach ($tables as $table) {
-        expect(Schema::hasTable($table))->toBeFalse();
-    }
-
-    expect(DB::table('migrations')->where('migration', $migration)->exists())->toBeFalse()
-        ->and(Permission::where('module', $moduleName)->exists())->toBeFalse();
-
-    $this->assertModelExists($tenant);
-    $this->assertModelExists($unrelatedTenant);
-    $this->assertModelExists($unrelatedPinNumber);
-    $this->assertModelExists($unrelatedPermission);
-
-    $reinstalled = app(ModuleLifecycleService::class)->reinstall($moduleName);
-
-    foreach ($tables as $table) {
-        expect(Schema::hasTable($table))->toBeTrue();
-    }
-
-    expect($reinstalled->enabled)->toBeTrue()
-        ->and($reinstalled->status)->toBe(Module::StatusEnabled)
-        ->and(DB::table('migrations')->where('migration', $migration)->exists())->toBeTrue();
-
-    createReviewedModuleRecords($moduleName, $tenant->id);
-
-    foreach ($tables as $table) {
-        expect(DB::table($table)->count())->toBe(1);
-    }
-})->with([
-    'email queue' => [
-        'email-queue',
-        ['email_queue'],
-        '2026_07_06_000021_create_email_queue_table',
-    ],
-    'tenant limits' => [
-        'tenant-limits',
-        ['tenant_limits'],
-        '2026_07_06_000016_create_tenant_limits_table',
-    ],
-    'call broadcast' => [
-        'call-broadcast',
-        ['call_broadcasts', 'call_broadcast_recipients'],
-        '2026_07_06_000011_create_call_broadcasts_table',
-    ],
-]);
-
-it('drops table-owned module tables and clears their migration records', function (): void {
-    Schema::create('test_owned_parent', fn ($table) => $table->id());
-    Schema::create('test_owned_child', fn ($table) => $table->id());
-
-    DB::table('migrations')->insert([
-        'migration' => '2099_01_01_000001_create_test_owned_tables',
-        'batch' => 1,
-    ]);
-
-    $module = Module::create([
-        'name' => 'test-owned',
-        'display_name' => 'Test Owned',
-        'version' => '1.0.0',
-    ]);
-
-    testTableUninstaller()->uninstall($module);
-
-    expect(Schema::hasTable('test_owned_child'))->toBeFalse()
-        ->and(Schema::hasTable('test_owned_parent'))->toBeFalse()
-        ->and(DB::table('migrations')->where('migration', '2099_01_01_000001_create_test_owned_tables')->exists())->toBeFalse();
+    expect($report['uninstall_ran'])->toBeTrue()
+        ->and($uninstaller->uninstalled)->toBeTrue();
 });
 
-/**
- * Register a module uninstaller with the container for lifecycle tests.
- */
-function registerTestUninstaller(ModuleUninstaller $uninstaller): void
+it('uninstalls a vendor module through Composer without touching host files', function (): void {
+    File::deleteDirectory($this->sandbox.'/app-modules/demo-module');
+    File::makeDirectory($this->sandbox.'/vendor/acme/demo-package', 0755, true);
+    File::put($this->sandbox.'/vendor/acme/demo-package/module.json', json_encode([
+        'name' => 'demo-module', 'version' => '1.0.0',
+        'namespace' => 'Modules\\DemoModule', 'display_name' => 'Demo Module',
+        'required' => false, 'protected' => false,
+    ]));
+
+    Module::create(['name' => 'demo-module', 'display_name' => 'Demo Module', 'version' => '1.0.0']);
+    Permission::create(['name' => 'demo-module.view', 'module' => 'demo-module']);
+
+    $this->service = sandboxService($this->sandbox, $this->composerCalls, $this->gitCalls, gitTracked: false);
+
+    $report = $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    expect($report['module_kind'])->toBe('vendor')
+        ->and($report['module_dir_deleted'])->toBeFalse()
+        ->and($report['repository_entry_removed'])->toBeFalse()
+        ->and($this->composerCalls)->toBe(['remove acme/demo-package --no-interaction'])
+        // Vendor files belong to Composer: the service leaves them for composer remove.
+        ->and(File::exists($this->sandbox.'/vendor/acme/demo-package/module.json'))->toBeTrue();
+
+    $composer = json_decode((string) file_get_contents($this->sandbox.'/composer.json'), true);
+
+    expect($composer['repositories'])->toHaveCount(1)
+        ->and($composer['require'])->toHaveKey('tallpbx/module-demo-module');
+
+    $this->assertDatabaseHas('modules', [
+        'name' => 'demo-module',
+        'status' => Module::StatusUninstalled,
+        'composer_package' => 'acme/demo-package',
+    ]);
+});
+
+it('prefers the local directory when a module exists both locally and in vendor', function (): void {
+    File::makeDirectory($this->sandbox.'/vendor/acme/demo-package', 0755, true);
+    File::put($this->sandbox.'/vendor/acme/demo-package/module.json', json_encode([
+        'name' => 'demo-module', 'version' => '1.0.0',
+        'namespace' => 'Modules\\DemoModule', 'display_name' => 'Demo Module',
+    ]));
+
+    $preview = $this->service->previewUninstall('demo-module');
+
+    expect($preview['module_kind'])->toBe('local')
+        ->and($preview['composer_package'])->toBe('tallpbx/module-demo-module');
+});
+
+it('refuses to uninstall while installed modules require it', function (): void {
+    File::makeDirectory($this->sandbox.'/app-modules/dependent-module', 0755, true);
+    File::put($this->sandbox.'/app-modules/dependent-module/module.json', json_encode([
+        'name' => 'dependent-module', 'version' => '1.0.0',
+        'namespace' => 'Modules\\DependentModule', 'display_name' => 'Dependent Module',
+        'required' => false, 'protected' => false,
+        'requirements' => ['modules' => ['demo-module']],
+    ]));
+
+    try {
+        $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+        $this->fail('Uninstall should have been refused.');
+    } catch (ValidationException $exception) {
+        expect(collect($exception->errors())->flatten()->first())->toContain('dependent-module');
+    }
+
+    expect(File::exists($this->sandbox.'/app-modules/demo-module'))->toBeTrue();
+});
+
+it('restores a local module from git with empty tables and its central tests', function (): void {
+    $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    $report = $this->service->restore('demo-module');
+
+    expect($report['source'])->toBe('git')
+        ->and($report['files_restored'])->toBeTrue()
+        ->and($this->gitCalls)->toContain('restore --source=HEAD -- app-modules/demo-module')
+        ->and(File::exists($this->sandbox.'/app-modules/demo-module/module.json'))->toBeTrue();
+
+    $this->assertDatabaseHas('modules', [
+        'name' => 'demo-module',
+        'enabled' => true,
+        'status' => Module::StatusEnabled,
+    ]);
+
+    $composer = json_decode((string) file_get_contents($this->sandbox.'/composer.json'), true);
+
+    expect(collect($composer['repositories'])->pluck('url'))->toContain('app-modules/demo-module')
+        ->and($composer['require'])->toHaveKey('tallpbx/module-demo-module')
+        // Migrations re-ran into a fresh (empty) table.
+        ->and(Schema::hasTable('demo_restore'))->toBeTrue();
+});
+
+it('refuses to restore when the origin is unknown', function (): void {
+    $this->service = sandboxService($this->sandbox, $this->composerCalls, $this->gitCalls, gitTracked: false);
+
+    expect(fn () => $this->service->restore('demo-module'))
+        ->toThrow(ValidationException::class);
+});
+
+it('restores a vendor module through Composer', function (): void {
+    File::deleteDirectory($this->sandbox.'/app-modules/demo-module');
+    File::makeDirectory($this->sandbox.'/vendor/acme/demo-package', 0755, true);
+    File::put($this->sandbox.'/vendor/acme/demo-package/module.json', json_encode([
+        'name' => 'demo-module', 'version' => '1.0.0',
+        'namespace' => 'Modules\\DemoModule', 'display_name' => 'Demo Module',
+    ]));
+
+    $this->service = sandboxService($this->sandbox, $this->composerCalls, $this->gitCalls, gitTracked: false);
+
+    $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    $report = $this->service->restore('demo-module');
+
+    expect($report['source'])->toBe('composer')
+        ->and($this->composerCalls)->toContain('require acme/demo-package --no-interaction');
+
+    $this->assertDatabaseHas('modules', [
+        'name' => 'demo-module',
+        'enabled' => true,
+        'status' => Module::StatusEnabled,
+    ]);
+});
+
+function registerDemoUninstaller(ModuleUninstaller $uninstaller): void
 {
     $binding = 'tests.module-lifecycle.uninstaller';
 
@@ -251,47 +246,27 @@ function registerTestUninstaller(ModuleUninstaller $uninstaller): void
     app()->tag([$binding], 'module.uninstallers');
 }
 
-/**
- * Build an inline module uninstaller double that records uninstall calls.
- */
-function testModuleUninstaller(string $moduleName): ModuleUninstaller
+function testDemoUninstaller(): ModuleUninstaller
 {
-    return new class($moduleName) implements ModuleUninstaller
+    return new class implements ModuleUninstaller
     {
         public bool $uninstalled = false;
 
-        /**
-         * Remember the module name this double answers for.
-         */
-        public function __construct(private readonly string $moduleName) {}
-
-        /**
-         * The kebab-case module name this double answers for.
-         */
         public function moduleName(): string
         {
-            return $this->moduleName;
+            return 'demo-module';
         }
 
-        /**
-         * Always allow uninstalling in tests.
-         */
         public function canUninstall(Module $module): bool
         {
             return true;
         }
 
-        /**
-         * Describe what an uninstall would remove.
-         */
         public function previewUninstall(Module $module): array
         {
-            return ['Drop extension-owned tables'];
+            return ['Drop demo-module tables'];
         }
 
-        /**
-         * Record that the uninstall ran.
-         */
         public function uninstall(Module $module): void
         {
             $this->uninstalled = true;
@@ -299,93 +274,87 @@ function testModuleUninstaller(string $moduleName): ModuleUninstaller
     };
 }
 
-/**
- * Build an inline table uninstaller double for a fake module.
- */
-function testTableUninstaller(): ModuleTableUninstaller
+function sandboxService(
+    string $sandbox,
+    array &$composerCalls,
+    array &$gitCalls,
+    bool $gitTracked,
+): ModuleLifecycleService {
+    return new ModuleLifecycleService(
+        app(),
+        app(Filesystem::class),
+        $sandbox,
+        // Record every composer invocation; vendor reinstall re-creates the package.
+        function (array $args) use (&$composerCalls, $sandbox): bool {
+            $composerCalls[] = implode(' ', $args);
+
+            if ($args[0] === 'require') {
+                $package = $args[1];
+                [$vendorName, $packageName] = explode('/', $package);
+
+                File::makeDirectory("{$sandbox}/vendor/{$vendorName}/{$packageName}/database/migrations", 0755, true);
+                File::put("{$sandbox}/vendor/{$vendorName}/{$packageName}/module.json", json_encode([
+                    'name' => 'demo-module', 'version' => '1.0.0',
+                    'namespace' => 'Modules\\DemoModule', 'display_name' => 'Demo Module',
+                    'required' => false, 'protected' => false,
+                ]));
+                File::put(
+                    "{$sandbox}/vendor/{$vendorName}/{$packageName}/database/migrations/2026_01_01_000001_create_demo_restore_table.php",
+                    demoRestoreMigration(),
+                );
+            }
+
+            return true;
+        },
+        // Record git invocations; simulate a restore by re-creating module files.
+        function (array $args) use (&$gitCalls, $sandbox, $gitTracked): bool {
+            $gitCalls[] = implode(' ', $args);
+
+            if ($args[0] === 'restore') {
+                File::makeDirectory("{$sandbox}/app-modules/demo-module/database/migrations", 0755, true);
+                File::put("{$sandbox}/app-modules/demo-module/module.json", json_encode([
+                    'name' => 'demo-module', 'version' => '1.0.0',
+                    'namespace' => 'Modules\\DemoModule', 'display_name' => 'Demo Module',
+                    'required' => false, 'protected' => false,
+                ]));
+                File::put(
+                    "{$sandbox}/app-modules/demo-module/database/migrations/2026_01_01_000001_create_demo_restore_table.php",
+                    demoRestoreMigration(),
+                );
+
+                return true;
+            }
+
+            return $gitTracked; // answers 'cat-file -e' existence checks
+        },
+    );
+}
+
+function demoRestoreMigration(): string
 {
-    return new class extends ModuleTableUninstaller
+    return <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
     {
-        /**
-         * The kebab-case module name this double answers for.
-         */
-        public function moduleName(): string
-        {
-            return 'test-owned';
-        }
+        Schema::create('demo_restore', function (Blueprint $table): void {
+            $table->id();
+            $table->timestamps();
+        });
+    }
 
-        /**
-         * The database tables the uninstaller owns.
-         */
-        protected function tables(): array
-        {
-            return ['test_owned_parent', 'test_owned_child'];
-        }
-
-        /**
-         * The migration records the uninstaller owns.
-         */
-        protected function migrations(): array
-        {
-            return ['2099_01_01_000001_create_test_owned_tables'];
-        }
-    };
-}
-
-/**
- * Insert representative records into a reviewed module's owned tables.
- */
-function createReviewedModuleRecords(string $moduleName, int $tenantId): void
-{
-    $now = now();
-
-    match ($moduleName) {
-        'email-queue' => DB::table('email_queue')->insert([
-            'id' => (string) Str::uuid(),
-            'tenant_id' => $tenantId,
-            'to' => 'recipient@example.com',
-            'subject' => 'Lifecycle test',
-            'body' => 'Module-owned queued email.',
-            'status' => 'pending',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]),
-        'tenant-limits' => DB::table('tenant_limits')->insert([
-            'id' => (string) Str::uuid(),
-            'tenant_id' => $tenantId,
-            'resource' => 'extensions',
-            'soft_limit' => 10,
-            'hard_limit' => 20,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]),
-        'call-broadcast' => createCallBroadcastRecords($tenantId, $now),
-        default => throw new InvalidArgumentException("Unsupported reviewed module [{$moduleName}]."),
-    };
-}
-
-/**
- * Insert a call broadcast and its owned recipient record.
- */
-function createCallBroadcastRecords(int $tenantId, DateTimeInterface $now): bool
-{
-    $broadcastId = (string) Str::uuid();
-
-    DB::table('call_broadcasts')->insert([
-        'id' => $broadcastId,
-        'tenant_id' => $tenantId,
-        'name' => 'Lifecycle test broadcast',
-        'status' => 'draft',
-        'created_at' => $now,
-        'updated_at' => $now,
-    ]);
-
-    return DB::table('call_broadcast_recipients')->insert([
-        'id' => (string) Str::uuid(),
-        'broadcast_id' => $broadcastId,
-        'phone_number' => '+15555550100',
-        'call_status' => 'pending',
-        'created_at' => $now,
-        'updated_at' => $now,
-    ]);
+    public function down(): void
+    {
+        Schema::dropIfExists('demo_restore');
+    }
+};
+PHP;
 }

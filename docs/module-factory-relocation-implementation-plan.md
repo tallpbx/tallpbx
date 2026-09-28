@@ -579,7 +579,7 @@ git commit -m "feat: record composer package origin on module registry rows" -m 
 - Both destructive entry points throw `Illuminate\Validation\ValidationException` on refusal. The class must NOT be final.
 - Constructor: `(Application $app, Filesystem $files, ?string $basePath = null, ?Closure $composerRunner = null, ?Closure $gitRunner = null)` — auto-resolvable by the container, no provider binding needed. Runners: `Closure(array<int, string> $args): bool`.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 ```php
 <?php
@@ -948,12 +948,12 @@ PHP;
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `php artisan test --compact --parallel --filter=ModuleLifecycleServiceTest`
 Expected: FAIL — the service still has the old soft-uninstall API.
 
-- [ ] **Step 3: Implement the rewritten service**
+- [x] **Step 3: Implement the rewritten service**
 
 ```php
 <?php
@@ -1737,7 +1737,7 @@ class ModuleLifecycleService
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `php artisan test --compact --parallel --filter=ModuleLifecycleServiceTest`
 Expected: PASS.
