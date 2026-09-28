@@ -253,7 +253,7 @@ it('standardizes colon port ranges to hyphens', function (): void {
         'enabled' => true,
     ]);
 
-    $migration = require __DIR__.'/../../../../app-modules/security/database/migrations/2026_09_20_000009_standardize_security_port_ranges_to_hyphens.php';
+    $migration = require base_path('app-modules/security/database/migrations/2026_09_20_000009_standardize_security_port_ranges_to_hyphens.php');
     $migration->up();
 
     expect($service->fresh()->port_range)->toBe('20000-30000')

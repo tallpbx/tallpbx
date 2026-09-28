@@ -52,9 +52,9 @@ it('sets module metadata from manifest', function () {
     expect($admin->required)->toBeTrue();
     expect($admin->protected)->toBeTrue();
 
-    // Extensions is neither required nor protected
+    // Extensions is protected (core PBX spine) but not required
     expect($extensions->required)->toBeFalse();
-    expect($extensions->protected)->toBeFalse();
+    expect($extensions->protected)->toBeTrue();
 });
 
 // ─── Idempotency ────────────────────────────────────────────────

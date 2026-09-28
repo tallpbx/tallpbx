@@ -60,21 +60,33 @@ it('leaves centralized settings untouched when the module ships no config file',
  */
 class DemoConfigProvider extends ModuleServiceProvider
 {
+    /**
+     * Bind the provider to an explicit sandbox module directory.
+     */
     public function __construct(Application $app, private readonly string $sandboxPath)
     {
         parent::__construct($app);
     }
 
+    /**
+     * Return the sandbox module's kebab-case name.
+     */
     protected function moduleName(): string
     {
         return 'demo-config';
     }
 
+    /**
+     * Return the sandbox module's PHP namespace.
+     */
     protected function moduleNamespace(): string
     {
         return 'Modules\\DemoConfig';
     }
 
+    /**
+     * Point path resolution at the sandbox instead of a real module.
+     */
     protected function modulePath(): string
     {
         return $this->sandboxPath;
