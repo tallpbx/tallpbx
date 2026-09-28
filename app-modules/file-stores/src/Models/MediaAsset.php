@@ -98,8 +98,4 @@ class MediaAsset extends Model
     {
         return $this->morphTo();
     }
-
-    /**
-     * Create the dedicated media asset test factory.
-     */
 }
