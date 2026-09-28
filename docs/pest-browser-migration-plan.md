@@ -23,7 +23,7 @@
 | Task 5: Migrate MediaStorageBrowserTest | ✅ Complete | `fix(testing)` + `test(browser): migrate MediaStorageBrowserTest` |
 | Task 6: Migrate DocumentationScreenshotsTest | ✅ Complete | `test(browser): migrate DocumentationScreenshotsTest` |
 | Task 7: Runner/phpunit.xml updates | ✅ Complete | `feat(testing)` runner + `scripts/test-browser.sh` |
-| Task 8: Remove legacy Dusk infrastructure | ⏳ Not started | — |
+| Task 8: Remove legacy Dusk infrastructure | ✅ Complete | refactor(testing): remove laravel/dusk + docs: Playwright guidance |
 | Task 9: CI, AGENTS.md, INSTALL.md, CHANGELOG | ⏳ Not started | — |
 
 ---
@@ -521,86 +521,45 @@ git commit -m "feat(testing): run browser tests via Pest in app:test and add tes
 
 ### Task 8: Cleanup Legacy Dusk Infrastructure
 
-**Files:**
-- Delete: `tests/DuskTestCase.php`
-- Delete: `tests/Browser/Pages/Page.php`
-- Delete: `tests/Browser/Pages/LoginPage.php`
-- Delete: `tests/Browser/Pages/HomePage.php`
-- Delete: `scripts/dusk.sh`
-- Delete: `app/Support/DuskDatabaseSafety.php`
-- Delete: `tests/Feature/Support/DuskDatabaseSafetyTest.php`
-- Delete: `.env.dusk.example`
-- Modify: [`app/Providers/AppServiceProvider.php`](file:///var/www/tallpbx/app/Providers/AppServiceProvider.php)
-- Modify: [`scripts/resources/mariadb.sh`](file:///var/www/tallpbx/scripts/resources/mariadb.sh)
-- Modify: [`scripts/resources/tall.sh`](file:///var/www/tallpbx/scripts/resources/tall.sh)
-- Modify: [`scripts/resources/config.sh`](file:///var/www/tallpbx/scripts/resources/config.sh)
-- Modify: [`composer.json`](file:///var/www/tallpbx/composer.json)
+**Files (as executed):**
+- Deleted: `tests/DuskTestCase.php`, `tests/Browser/Pages/` (3 page objects), `scripts/dusk.sh`, `app/Support/DuskDatabaseSafety.php`, `tests/Feature/Support/DuskDatabaseSafetyTest.php`, `.env.dusk.example`, `.env.dusk` (local), `phpunit.dusk.xml` (ruling), and the Dusk artifact dirs `tests/Browser/{console,source,screenshots}/`
+- Modified: `app/Providers/AppServiceProvider.php`, `config/app.php`, `app-modules/security/src/Services/SecurityExecutor.php`, `tests/Pest.php`, `scripts/resources/{mariadb,tall,config}.sh`, `tests/Feature/InstallerDefaultsTest.php`, `tests/Feature/Support/PrimaryDatabaseSafetyTest.php`, `.gitignore`, `composer.json`/`composer.lock`
 
 **Interfaces:**
 - Consumes: Cleaned codebase without Dusk dependencies.
 - Produces: MariaDB installer without redundant `_dusk` user/database.
 
-- [ ] **Step 1: Remove `DuskDatabaseSafety` check from `AppServiceProvider.php`**
+- [x] **Step 1: Remove `DuskDatabaseSafety` check from `AppServiceProvider.php`** ✅
 
-In [`app/Providers/AppServiceProvider.php`](file:///var/www/tallpbx/app/Providers/AppServiceProvider.php#L202-L204):
-Remove lines:
-```php
-        if (config('app.dusk_testing')) {
-            DuskDatabaseSafety::enforce();
-        }
-```
-And remove `use App\Support\DuskDatabaseSafety;`.
+Guard and import removed; `app/Support/DuskDatabaseSafety.php` + its test deleted; the now-unused `app.dusk_testing` key removed from `config/app.php`.
+**Ruling:** `SecurityExecutor`'s privileged-helper test guard is reduced to `app()->runningUnitTests()` — it also covers Pest browser tests (their in-process HTTP requests are served by the same CLI test binary in the `testing` environment), so the `app()->environment('dusk')` / `config('app.dusk_testing')` terms became dead weight.
 
-- [ ] **Step 2: Remove Dusk provisioning from installer scripts**
+- [x] **Step 2: Remove Dusk provisioning from installer scripts** ✅
 
-In [`scripts/resources/mariadb.sh`](file:///var/www/tallpbx/scripts/resources/mariadb.sh#L48-L65):
-Remove `CREATE DATABASE IF NOT EXISTS ${database_name}_dusk...` and `CREATE USER IF NOT EXISTS '$dusk_database_username'...`.
+`mariadb.sh` no longer creates the `_dusk` database/user; `tall.sh`'s Dusk note now explains that no browser-test database or environment file is provisioned.
+**Ruling (user-directed):** `config.sh` guidance removes **both** `chromium` and `chromium-driver` — Playwright ships its own Chromium and the system packages had no remaining consumer. The comment now documents `npx playwright install --with-deps chromium` (`--with-deps` installs the shared libraries the APT package used to pull in) instead of `apt-get install chromium` + `dusk:chrome-driver`.
 
-In [`scripts/resources/tall.sh`](file:///var/www/tallpbx/scripts/resources/tall.sh):
-Remove `.env.dusk` generation block.
+- [x] **Step 3: Remove `laravel/dusk` from Composer** ✅
 
-In [`scripts/resources/config.sh`](file:///var/www/tallpbx/scripts/resources/config.sh#L38):
-Remove `chromium-driver` from apt install list (retain `chromium`).
+`COMPOSER_ALLOW_SUPERUSER=1 composer remove laravel/dusk --dev` succeeded (permission-repair hook ran). A `laravel/dusk` string remains only inside `pest-plugin-laravel`'s descriptive `require-dev` metadata in `composer.lock`, which is correct and must not be edited.
 
-- [ ] **Step 3: Remove `laravel/dusk` from Composer**
+- [x] **Step 4: Delete legacy Dusk files** ✅
 
-Run:
-```bash
-COMPOSER_ALLOW_SUPERUSER=1 composer remove laravel/dusk --dev
-```
-Expected: `laravel/dusk` and `facebook/webdriver` removed from `composer.json` and `composer.lock`.
+All files above removed via `git rm` along with `phpunit.dusk.xml` (**ruling**: orphaned Dusk runner configuration, omitted from the plan's list) and the Dusk artifact dirs `tests/Browser/{console,source,screenshots}/` with their `.gitignore` entries. `tests/Browser/` now contains only `Concerns/` and the four Pest suites.
 
-- [ ] **Step 4: Delete legacy Dusk files**
-
-Run:
-```bash
-rm -f tests/DuskTestCase.php \
-      tests/Browser/Pages/Page.php \
-      tests/Browser/Pages/LoginPage.php \
-      tests/Browser/Pages/HomePage.php \
-      scripts/dusk.sh \
-      app/Support/DuskDatabaseSafety.php \
-      tests/Feature/Support/DuskDatabaseSafetyTest.php \
-      .env.dusk.example \
-      .env.dusk
-```
-
-- [ ] **Step 5: Run full test suite verification**
-
-Run:
-```bash
-php artisan optimize:clear
-php artisan test --compact --parallel
-./vendor/bin/pest tests/Browser
-```
-Expected: 100% of unit, feature, and browser tests pass.
-
-- [ ] **Step 6: Commit**
+- [x] **Step 5: Run full test suite verification** ✅
 
 ```bash
-git add -u
-git commit -m "refactor(testing): remove legacy laravel/dusk and dedicated dusk database infrastructure"
+php artisan test --compact --parallel   # → 2395 passed (9919 assertions), exit 0
+./vendor/bin/pest tests/Browser         # → 1 skipped, 47 passed (213 assertions), exit 0
 ```
+
+**Ruling:** two `InstallerDefaultsTest` cases covering the deleted Dusk database/env fixtures were removed with their subjects; the third kept its package-metadata assertions, and `PrimaryDatabaseSafetyTest`'s sample name changed from `tallpbx_dusk` to `tallpbx_test` (no `_dusk` logic existed there).
+Note for Task 9: the `DUSK_CAPTURE_DOCS` env flag name is retained by the docs-capture suite; Task 9 should document it with the new runner (a neutral rename remains optional).
+
+- [x] **Step 6: Commit** ✅
+
+Split into `refactor(testing): remove legacy laravel/dusk and dedicated dusk database infrastructure` and `docs: update browser testing guidance from Dusk/Chromium to Playwright`.
 
 ---
 
