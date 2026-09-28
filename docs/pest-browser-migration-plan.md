@@ -21,7 +21,7 @@
 | Task 3: Migrate RiskConfirmationBrowserTest | ✅ Complete | test(browser): migrate RiskConfirmationBrowserTest |
 | Task 4: Migrate PanelSmokeTest | ✅ Complete | `ee7c0d0` |
 | Task 5: Migrate MediaStorageBrowserTest | ✅ Complete | `fix(testing)` + `test(browser): migrate MediaStorageBrowserTest` |
-| Task 6: Migrate DocumentationScreenshotsTest | ⏳ Not started | — |
+| Task 6: Migrate DocumentationScreenshotsTest | ✅ Complete | `test(browser): migrate DocumentationScreenshotsTest` |
 | Task 7: Runner/phpunit.xml updates | ⏳ Not started | — |
 | Task 8: Remove legacy Dusk infrastructure | ⏳ Not started | — |
 | Task 9: CI, AGENTS.md, INSTALL.md, CHANGELOG | ⏳ Not started | — |
@@ -114,6 +114,19 @@ $page->assertScript(<<<'JS'
     })()
     JS);
 ```
+
+### 7. `script()` Returns the Evaluated Value and Breaks Fluent Chains
+
+`$page->script($js)` returns the evaluated JavaScript value, so a void snippet (an IIFE without `return`) yields `null` and the fluent chain breaks (`Call to a member function wait() on null`). Run void scripts as standalone statements:
+
+```php
+$page->script(<<<'JS'
+    (() => { localStorage.setItem('theme', 'dark'); })()
+    JS);
+$page->wait(1.2)->screenshot(filename: 'landing-dark');
+```
+
+Also note when capturing files: `screenshot(bool $fullPage = true, ?string $filename = null)` requires the **named** `filename:` argument, and `Screenshot::save()` always writes into `tests/Browser/Screenshots/` (git-ignored) regardless of the name passed. Documentation captures therefore stage there and are copied into `docs/images/` with an md5 freshness check.
 
 ---
 
@@ -425,73 +438,28 @@ git commit -m "test(browser): migrate MediaStorageBrowserTest to Pest 4 browser"
 - Consumes: `DUSK_CAPTURE_DOCS=1` environment flag, `docs/images/` directory.
 - Produces: High-resolution PNG screenshots with exact viewport sizing (1920x1080) for documentation.
 
-- [ ] **Step 1: Convert `DocumentationScreenshotsTest.php` from class to Pest syntax**
+- [x] **Step 1: Convert `DocumentationScreenshotsTest.php` to Pest syntax** ✅
 
-Convert `DocumentationScreenshotsTest.php` to functional Pest syntax:
-```php
-<?php
+The full 10-screenshot walkthrough was converted (not the abbreviated example below): landing light/dark themes, three dashboard layouts, tenants/devices/extensions, impersonation, and the multi-language switcher.
+- Class-based Dusk test → functional Pest test with `beforeEach` seeding + `markTestSkipped` gate on `DUSK_CAPTURE_DOCS=1`.
+- `beforeEach` now runs `module:sync --only-local` + `AdminSeeder` (Super Administrators convention) — the Dusk suite relied on a persistent pre-seeded `_dusk` database, which refreshed in-memory SQLite never has.
+- `resize(1440, 900)` → per-visit context option `['viewport' => ['width' => 1440, 'height' => 900]]` (each `visit()` is a fresh context).
+- `pause(ms)` → `wait(seconds)`; `waitForText(text, secs)` → `waitForText(text)`; `screenshot('name')` → `screenshot(filename: 'name')`; void `script([...])` snippets → standalone IIFE `script()` calls (§7).
+- Freshness copy step unchanged in behavior: compares md5 against `docs/images/{name}` and copies only changed captures.
 
-declare(strict_types=1);
+- [x] **Step 2: Run verification (dry-run without flag, then opted-in)** ✅
 
-namespace Tests\Browser;
-
-use App\Models\Admin;
-use App\Models\Group;
-use App\Models\Tenant;
-use Modules\Devices\Models\Device;
-use Modules\Extensions\Models\Extension;
-
-beforeEach(function () {
-    if (getenv('DUSK_CAPTURE_DOCS') !== '1') {
-        $this->markTestSkipped('Set DUSK_CAPTURE_DOCS=1 to refresh documentation screenshots.');
-    }
-
-    $this->admin = Admin::firstOrCreate(
-        ['email' => 'admin@tallpbx.org'],
-        [
-            'name' => 'System Administrator',
-            'password' => bcrypt('tallpbx-secret'),
-            'enabled' => true,
-            'theme' => 'light',
-            'layout_mode' => 'sidebar',
-            'sidebar_collapsed' => false,
-        ],
-    );
-
-    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
-    if ($superAdminGroup) {
-        $this->admin->groups()->syncWithoutDetaching([$superAdminGroup->id]);
-    }
-});
-
-it('captures documentation screenshots', function () {
-    $this->loginAs($this->admin, 'admin');
-
-    $page = visit('/panel')->resize(1920, 1080);
-    $page->assertSee('System Status');
-
-    $outputPath = base_path('docs/images/dashboard.png');
-    $page->screenshot($outputPath);
-
-    expect(file_exists($outputPath))->toBeTrue();
-});
-```
-
-- [ ] **Step 2: Run verification (dry-run without flag, then opted-in)**
-
-Run:
 ```bash
 ./vendor/bin/pest tests/Browser/DocumentationScreenshotsTest.php
-```
-Expected: Skipped (due to missing `DUSK_CAPTURE_DOCS=1`).
+# → 1 skipped (DUSK_CAPTURE_DOCS gate)
 
-Run:
-```bash
 DUSK_CAPTURE_DOCS=1 ./vendor/bin/pest tests/Browser/DocumentationScreenshotsTest.php
+# → PASS — 1 passed (12 assertions), ~70 s, screenshots captured
 ```
-Expected: PASS with screenshot generated.
 
-- [ ] **Step 3: Commit**
+The opted-in run refreshed 8 of 10 panels (landing images were byte-identical — no churn), proving the capture → freshness-copy pipeline end-to-end. The refreshed images were **reverted** (not committed): they are content decisions for the maintainer to review, and the migration itself changes no UI. Re-run the opted-in command any time to regenerate them.
+
+- [x] **Step 3: Commit** ✅
 
 ```bash
 git add tests/Browser/DocumentationScreenshotsTest.php
