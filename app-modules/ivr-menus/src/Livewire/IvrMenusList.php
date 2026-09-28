@@ -62,6 +62,7 @@ class IvrMenusList extends BaseListComponent
     public function deleteMenu(string $menuId): void
     {
         $menu = IvrMenu::withoutGlobalScope('tenant')->findOrFail($menuId);
+        $this->assertCanAccessTenantRecord($menu);
 
         try {
             $this->ivrMenuService->delete($menu);
@@ -81,6 +82,7 @@ class IvrMenusList extends BaseListComponent
     public function confirmMenuDeletion(string $menuId): void
     {
         $menu = IvrMenu::withoutGlobalScope('tenant')->findOrFail($menuId);
+        $this->assertCanAccessTenantRecord($menu);
         $this->pendingDeletionId = $menu->id;
         $this->pendingDeletionName = $menu->name;
         $this->deleteError = null;

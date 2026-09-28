@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Services\ImpersonationServiceInterface;
+use App\Services\TenantManager;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -31,6 +33,28 @@ abstract class BaseListComponent extends Component
     {
         return Auth::guard('admin')->check()
             && ! app(ImpersonationServiceInterface::class)->isImpersonating();
+    }
+
+    /**
+     * Abort with HTTP 403 when a tenant user tries to reach a record of
+     * another tenant from a list action (for example a delete-confirmation
+     * modal). Admins may reach any record; tenant users are fail-closed
+     * when the record belongs to a different tenant or when no tenant is
+     * active, so list actions never disclose cross-tenant data.
+     *
+     * @param  Model  $record  The record loaded for the list action.
+     */
+    protected function assertCanAccessTenantRecord(Model $record): void
+    {
+        if ($this->isAdminGuard()) {
+            return;
+        }
+
+        $activeTenantId = app(TenantManager::class)->getTenantId();
+
+        if ($activeTenantId === null || (string) $record->tenant_id !== (string) $activeTenantId) {
+            abort(403, 'Cross-tenant access denied.');
+        }
     }
 
     /**

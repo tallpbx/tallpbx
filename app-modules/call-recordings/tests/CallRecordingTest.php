@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\CallRecordings\Livewire\CallRecordingsList;
 use Modules\CallRecordings\Models\CallRecording;
@@ -21,6 +22,20 @@ it('renders the call recordings list component', function () {
         ->assertViewHas('recordings', function ($recordings) {
             return $recordings->count() === 2;
         });
+});
+
+it('denies tenant users the deletion confirmation for another tenant recording', function () {
+    $tenantA = Tenant::factory()->create();
+    $tenantB = Tenant::factory()->create();
+    $userA = grantTenantUserPermissions($tenantA, ['call-recordings.view', 'call-recordings.delete']);
+    $foreignRecording = CallRecording::factory()->create(['tenant_id' => $tenantB->id]);
+
+    // The confirmation fetch is unscoped, so the handler must assert tenant
+    // access before the modal can display another tenant's recording.
+    Livewire::actingAs($userA, 'web')
+        ->test(CallRecordingsList::class)
+        ->call('confirmRecordingDeletion', $foreignRecording->id)
+        ->assertForbidden();
 });
 
 it('deletes a call recording', function () {

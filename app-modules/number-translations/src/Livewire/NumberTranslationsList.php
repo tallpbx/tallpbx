@@ -58,6 +58,7 @@ class NumberTranslationsList extends BaseListComponent
     public function deleteTranslation(string $id): void
     {
         $translation = NumberTranslation::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($translation);
         $this->service->delete($translation);
         $this->cancelTranslationDeletion();
         $this->load();
@@ -69,6 +70,7 @@ class NumberTranslationsList extends BaseListComponent
     public function confirmTranslationDeletion(string $id): void
     {
         $translation = NumberTranslation::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($translation);
         $this->pendingDeletionId = $translation->id;
         $this->pendingDeletionName = $translation->name;
     }

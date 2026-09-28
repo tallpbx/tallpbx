@@ -53,6 +53,7 @@ class SipProfilesList extends BaseListComponent
     public function deleteProfile(string $profileId): void
     {
         $profile = SipProfile::withoutGlobalScope('tenant')->findOrFail($profileId);
+        $this->assertCanAccessTenantRecord($profile);
         $this->profileService->delete($profile);
         $this->cancelProfileDeletion();
         $this->loadProfiles();
@@ -64,6 +65,7 @@ class SipProfilesList extends BaseListComponent
     public function confirmProfileDeletion(string $profileId): void
     {
         $profile = SipProfile::withoutGlobalScope('tenant')->findOrFail($profileId);
+        $this->assertCanAccessTenantRecord($profile);
         $this->pendingDeletionId = $profile->id;
         $this->pendingDeletionName = $profile->name;
     }

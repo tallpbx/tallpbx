@@ -48,6 +48,7 @@ class CallForwardsList extends BaseListComponent
     public function deleteForward(string $forwardId): void
     {
         $forward = CallForward::withoutGlobalScope('tenant')->findOrFail($forwardId);
+        $this->assertCanAccessTenantRecord($forward);
         $forward->delete();
         $this->cancelForwardDeletion();
         $this->loadForwards();
@@ -59,6 +60,7 @@ class CallForwardsList extends BaseListComponent
     public function confirmForwardDeletion(string $forwardId): void
     {
         $forward = CallForward::withoutGlobalScope('tenant')->findOrFail($forwardId);
+        $this->assertCanAccessTenantRecord($forward);
         $this->pendingDeletionId = $forward->id;
         $this->pendingDeletionName = $forward->destination;
     }

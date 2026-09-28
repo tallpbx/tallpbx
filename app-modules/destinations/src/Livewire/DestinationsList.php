@@ -57,6 +57,7 @@ class DestinationsList extends BaseListComponent
     public function deleteDestination(string $destinationId): void
     {
         $destination = Destination::withoutGlobalScope('tenant')->findOrFail($destinationId);
+        $this->assertCanAccessTenantRecord($destination);
         $this->destinationService->delete($destination);
         $this->cancelDestinationDeletion();
         $this->loadDestinations();
@@ -68,6 +69,7 @@ class DestinationsList extends BaseListComponent
     public function confirmDestinationDeletion(string $destinationId): void
     {
         $destination = Destination::withoutGlobalScope('tenant')->findOrFail($destinationId);
+        $this->assertCanAccessTenantRecord($destination);
         $this->pendingDeletionId = $destination->id;
         $this->pendingDeletionName = $destination->name;
     }

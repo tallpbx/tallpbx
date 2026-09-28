@@ -73,6 +73,7 @@ class BroadcastList extends BaseListComponent
     public function confirmBroadcastDeletion(string $id): void
     {
         $broadcast = CallBroadcast::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($broadcast);
         $this->pendingDeletionId = $broadcast->id;
         $this->pendingDeletionName = $broadcast->name;
     }
@@ -87,6 +88,7 @@ class BroadcastList extends BaseListComponent
     public function deleteBroadcast(): void
     {
         $broadcast = CallBroadcast::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($broadcast);
         $this->broadcastService->delete($broadcast);
         $this->cancelBroadcastDeletion();
         $this->loadBroadcasts();
@@ -98,6 +100,7 @@ class BroadcastList extends BaseListComponent
     public function confirmSend(string $id): void
     {
         $broadcast = CallBroadcast::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($broadcast);
         $this->sendingId = $broadcast->id;
         $this->sendingName = $broadcast->name;
     }
@@ -112,6 +115,7 @@ class BroadcastList extends BaseListComponent
     public function sendBroadcast(): void
     {
         $broadcast = CallBroadcast::withoutGlobalScope('tenant')->findOrFail($this->sendingId);
+        $this->assertCanAccessTenantRecord($broadcast);
 
         // Atomic claim: only a draft may flip to sending, so concurrent
         // sends cannot both win (the update is the race guard).

@@ -55,6 +55,7 @@ class ExtensionsList extends BaseListComponent
     public function confirmExtensionDeletion(string $extensionId): void
     {
         $extension = Extension::withoutGlobalScope('tenant')->findOrFail($extensionId);
+        $this->assertCanAccessTenantRecord($extension);
         $this->pendingDeletionId = $extension->id;
         $this->pendingDeletionName = $extension->extension_number;
     }
@@ -69,6 +70,7 @@ class ExtensionsList extends BaseListComponent
     public function deleteExtension(): void
     {
         $extension = Extension::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($extension);
         $this->extensionService->delete($extension);
         $this->cancelExtensionDeletion();
         $this->loadExtensions();

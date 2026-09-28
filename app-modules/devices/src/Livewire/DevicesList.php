@@ -34,6 +34,7 @@ class DevicesList extends BaseListComponent
     public function deleteDevice(string $deviceId): void
     {
         $device = Device::withoutGlobalScope('tenant')->findOrFail($deviceId);
+        $this->assertCanAccessTenantRecord($device);
         $this->deviceService->delete($device);
         $this->cancelDeviceDeletion();
         $this->showSuccess('Device deleted.');
@@ -44,6 +45,7 @@ class DevicesList extends BaseListComponent
     public function confirmDeviceDeletion(string $deviceId): void
     {
         $device = Device::withoutGlobalScope('tenant')->findOrFail($deviceId);
+        $this->assertCanAccessTenantRecord($device);
         $this->pendingDeletionId = $device->id;
         $this->pendingDeletionName = $device->mac_address;
     }

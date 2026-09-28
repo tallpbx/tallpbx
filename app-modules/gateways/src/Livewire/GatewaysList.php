@@ -57,6 +57,7 @@ class GatewaysList extends BaseListComponent
     public function deleteGateway(string $gatewayId): void
     {
         $gateway = Gateway::withoutGlobalScope('tenant')->findOrFail($gatewayId);
+        $this->assertCanAccessTenantRecord($gateway);
         $this->gatewayService->delete($gateway);
         $this->cancelGatewayDeletion();
         $this->loadGateways();
@@ -68,6 +69,7 @@ class GatewaysList extends BaseListComponent
     public function confirmGatewayDeletion(string $gatewayId): void
     {
         $gateway = Gateway::withoutGlobalScope('tenant')->findOrFail($gatewayId);
+        $this->assertCanAccessTenantRecord($gateway);
         $this->pendingDeletionId = $gateway->id;
         $this->pendingDeletionName = $gateway->name;
     }

@@ -47,6 +47,7 @@ class CallFlowsList extends BaseListComponent
     public function deleteCallFlow(string $id): void
     {
         $flow = CallFlow::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($flow);
         $this->callFlowService->delete($flow);
         $this->cancelCallFlowDeletion();
         $this->loadCallFlows();
@@ -58,6 +59,7 @@ class CallFlowsList extends BaseListComponent
     public function confirmCallFlowDeletion(string $id): void
     {
         $flow = CallFlow::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($flow);
         $this->pendingDeletionId = $flow->id;
         $this->pendingDeletionName = $flow->name;
     }

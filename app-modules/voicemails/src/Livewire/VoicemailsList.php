@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\Voicemails\Models\Voicemail;
 use Modules\Voicemails\Services\VoicemailServiceInterface;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Livewire component that lists voicemail mailboxes with CRUD actions.
@@ -60,10 +61,11 @@ class VoicemailsList extends BaseListComponent
     public function deleteVoicemail(string $voicemailId): void
     {
         $voicemail = Voicemail::withoutGlobalScope('tenant')->findOrFail($voicemailId);
+        $this->assertCanAccessTenantRecord($voicemail);
 
         try {
             $this->voicemailService->delete($voicemail);
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+        } catch (HttpException $exception) {
             throw $exception;
         } catch (RuntimeException $exception) {
             $this->deleteError = $exception->getMessage();
@@ -81,6 +83,7 @@ class VoicemailsList extends BaseListComponent
     public function confirmVoicemailDeletion(string $voicemailId): void
     {
         $voicemail = Voicemail::withoutGlobalScope('tenant')->findOrFail($voicemailId);
+        $this->assertCanAccessTenantRecord($voicemail);
         $this->pendingDeletionId = $voicemail->id;
         $this->pendingDeletionName = $voicemail->voicemail_id;
         $this->deleteError = null;

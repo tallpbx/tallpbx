@@ -47,6 +47,7 @@ class PinNumbersList extends BaseListComponent
     public function deletePinNumber(string $pinId): void
     {
         $pin = PinNumber::withoutGlobalScope('tenant')->findOrFail($pinId);
+        $this->assertCanAccessTenantRecord($pin);
         $pin->delete();
         $this->cancelPinNumberDeletion();
         $this->loadPinNumbers();
@@ -58,6 +59,7 @@ class PinNumbersList extends BaseListComponent
     public function confirmPinNumberDeletion(string $pinId): void
     {
         $pin = PinNumber::withoutGlobalScope('tenant')->findOrFail($pinId);
+        $this->assertCanAccessTenantRecord($pin);
         $this->pendingDeletionId = $pin->id;
         $this->pendingDeletionName = $pin->pin_number;
     }

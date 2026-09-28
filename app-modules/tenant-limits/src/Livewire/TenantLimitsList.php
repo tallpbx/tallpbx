@@ -58,6 +58,7 @@ class TenantLimitsList extends BaseListComponent
     public function deleteLimit(string $id): void
     {
         $limit = TenantLimit::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($limit);
         $this->limitService->delete($limit);
         $this->cancelLimitDeletion();
         $this->load();
@@ -69,6 +70,7 @@ class TenantLimitsList extends BaseListComponent
     public function confirmLimitDeletion(string $id): void
     {
         $limit = TenantLimit::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($limit);
         $this->pendingDeletionId = $limit->id;
         $this->pendingDeletionName = $limit->resource;
     }

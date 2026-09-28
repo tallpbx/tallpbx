@@ -64,6 +64,7 @@ class FaxInbox extends BaseListComponent
     public function confirmFaxDeletion(string $id): void
     {
         $fax = FaxInboxModel::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($fax);
         $this->pendingDeletionId = $fax->id;
         // Caller ID is nullable for received faxes, so keep the modal name safe.
         $this->pendingDeletionName = $fax->caller_id ?? '';
@@ -80,6 +81,7 @@ class FaxInbox extends BaseListComponent
     public function deleteFax(): void
     {
         $fax = FaxInboxModel::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($fax);
         try {
             $this->faxService->deleteInbox($fax);
         } catch (\RuntimeException $exception) {

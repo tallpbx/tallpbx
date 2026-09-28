@@ -34,6 +34,7 @@ class DialplansList extends BaseListComponent
     public function deleteDialplan(string $dialplanId): void
     {
         $dialplan = Dialplan::withoutGlobalScope('tenant')->findOrFail($dialplanId);
+        $this->assertCanAccessTenantRecord($dialplan);
         $this->dialplanService->delete($dialplan);
         $this->cancelDialplanDeletion();
         $this->showSuccess('Dialplan deleted.');
@@ -44,6 +45,7 @@ class DialplansList extends BaseListComponent
     public function confirmDialplanDeletion(string $dialplanId): void
     {
         $dialplan = Dialplan::withoutGlobalScope('tenant')->findOrFail($dialplanId);
+        $this->assertCanAccessTenantRecord($dialplan);
         $this->pendingDeletionId = $dialplan->id;
         $this->pendingDeletionName = $dialplan->name;
     }

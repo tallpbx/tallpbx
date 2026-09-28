@@ -60,6 +60,7 @@ class EmailQueueList extends BaseListComponent
     public function confirmItemDeletion(string $id): void
     {
         $item = EmailQueueItem::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($item);
         $this->pendingDeletionId = $item->id;
         $this->pendingDeletionName = $item->subject;
     }
@@ -74,6 +75,7 @@ class EmailQueueList extends BaseListComponent
     public function deleteItem(): void
     {
         $item = EmailQueueItem::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($item);
         $this->queueService->delete($item);
         $this->cancelItemDeletion();
         $this->load();

@@ -57,6 +57,7 @@ class AclList extends BaseListComponent
     public function deleteRule(string $ruleId): void
     {
         $rule = AccessControl::withoutGlobalScope('tenant')->findOrFail($ruleId);
+        $this->assertCanAccessTenantRecord($rule);
         $this->accessControlService->delete($rule);
         $this->cancelRuleDeletion();
         $this->loadRules();
@@ -68,6 +69,7 @@ class AclList extends BaseListComponent
     public function confirmRuleDeletion(string $ruleId): void
     {
         $rule = AccessControl::withoutGlobalScope('tenant')->findOrFail($ruleId);
+        $this->assertCanAccessTenantRecord($rule);
         $this->pendingDeletionId = $rule->id;
         $this->pendingDeletionName = $rule->name;
     }

@@ -35,6 +35,7 @@ class VoicemailMessagesList extends BaseListComponent
     public function deleteMessage(string $id): void
     {
         $message = VoicemailMessage::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($message);
         try {
             $this->messageService->delete($message);
         } catch (\RuntimeException $exception) {

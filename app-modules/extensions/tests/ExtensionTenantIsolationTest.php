@@ -82,16 +82,24 @@ it('prevents cross-tenant updates by tenant users via TenantMutationGuard', func
     expect($foreignExtension->fresh()->display_name)->toBe('Original Name');
 });
 
-it('prevents cross-tenant deletion by tenant users via TenantMutationGuard in list action', function () {
+it('prevents cross-tenant deletion by tenant users in list actions', function () {
     $userA = grantTenantUserPermissions($this->tenantA, ['extensions.view', 'extensions.delete']);
     $foreignExtension = Extension::factory()->create([
         'tenant_id' => $this->tenantB->id,
         'extension_number' => '203',
     ]);
 
+    // Opening the confirmation must already refuse the foreign record so
+    // its details can never be shown in the modal.
     Livewire::actingAs($userA, 'web')
         ->test(ExtensionsList::class)
         ->call('confirmExtensionDeletion', $foreignExtension->id)
+        ->assertForbidden();
+
+    // Replaying the deletion with the pending id set is refused as well.
+    Livewire::actingAs($userA, 'web')
+        ->test(ExtensionsList::class)
+        ->set('pendingDeletionId', $foreignExtension->id)
         ->call('deleteExtension')
         ->assertForbidden();
 

@@ -53,6 +53,7 @@ class MusicOnHoldList extends BaseListComponent
     public function confirmMusicOnHoldDeletion(string $mohId): void
     {
         $music = MusicOnHold::withoutGlobalScope('tenant')->findOrFail($mohId);
+        $this->assertCanAccessTenantRecord($music);
         $this->pendingDeletionId = $music->id;
         $this->pendingDeletionName = $music->name;
     }
@@ -67,6 +68,7 @@ class MusicOnHoldList extends BaseListComponent
     public function deleteMusicOnHold(): void
     {
         $moh = MusicOnHold::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($moh);
         $this->musicOnHoldService->delete($moh);
         $this->cancelMusicOnHoldDeletion();
         $this->loadHoldMusics();

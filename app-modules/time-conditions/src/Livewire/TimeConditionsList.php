@@ -62,6 +62,7 @@ class TimeConditionsList extends BaseListComponent
     public function deleteTimeCondition(string $id): void
     {
         $condition = TimeCondition::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($condition);
         $this->timeConditionService->delete($condition);
         $this->cancelTimeConditionDeletion();
         $this->loadTimeConditions();
@@ -73,6 +74,7 @@ class TimeConditionsList extends BaseListComponent
     public function confirmTimeConditionDeletion(string $id): void
     {
         $condition = TimeCondition::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($condition);
         $this->pendingDeletionId = $condition->id;
         $this->pendingDeletionName = $condition->name;
     }

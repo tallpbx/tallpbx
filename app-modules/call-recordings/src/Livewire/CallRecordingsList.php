@@ -60,6 +60,7 @@ class CallRecordingsList extends BaseListComponent
     public function deleteRecording(string $id): void
     {
         $recording = CallRecording::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($recording);
         try {
             $this->recordingService->delete($recording);
         } catch (\RuntimeException $exception) {
@@ -81,7 +82,9 @@ class CallRecordingsList extends BaseListComponent
     /** Open the shared destructive-action confirmation for one call recording. */
     public function confirmRecordingDeletion(string $id): void
     {
-        $this->pendingDeletionId = CallRecording::withoutGlobalScope('tenant')->findOrFail($id)->id;
+        $recording = CallRecording::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($recording);
+        $this->pendingDeletionId = $recording->id;
         $this->deleteError = null;
     }
 

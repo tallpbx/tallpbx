@@ -65,6 +65,7 @@ class ConferencesList extends BaseListComponent
     public function deleteConference(string $id): void
     {
         $conference = Conference::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($conference);
         $this->conferenceService->delete($conference);
         $this->cancelConferenceDeletion();
         $this->loadConferences();
@@ -76,6 +77,7 @@ class ConferencesList extends BaseListComponent
     public function confirmConferenceDeletion(string $id): void
     {
         $conference = Conference::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($conference);
         $this->pendingDeletionId = $conference->id;
         $this->pendingDeletionName = $conference->name;
     }

@@ -57,6 +57,7 @@ class FeatureCodesList extends BaseListComponent
     public function deleteCode(string $codeId): void
     {
         $code = FeatureCode::withoutGlobalScope('tenant')->findOrFail($codeId);
+        $this->assertCanAccessTenantRecord($code);
         $this->featureCodeService->delete($code);
         $this->cancelCodeDeletion();
         $this->loadCodes();
@@ -68,6 +69,7 @@ class FeatureCodesList extends BaseListComponent
     public function confirmCodeDeletion(string $codeId): void
     {
         $code = FeatureCode::withoutGlobalScope('tenant')->findOrFail($codeId);
+        $this->assertCanAccessTenantRecord($code);
         $this->pendingDeletionId = $code->id;
         $this->pendingDeletionName = $code->name;
     }

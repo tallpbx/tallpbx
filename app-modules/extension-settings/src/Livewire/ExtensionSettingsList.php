@@ -59,6 +59,7 @@ class ExtensionSettingsList extends BaseListComponent
     public function deleteSetting(string $id): void
     {
         $setting = ExtensionSetting::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($setting);
         $this->service->delete($setting);
         $this->cancelSettingDeletion();
         $this->load();
@@ -70,6 +71,7 @@ class ExtensionSettingsList extends BaseListComponent
     public function confirmSettingDeletion(string $id): void
     {
         $setting = ExtensionSetting::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($setting);
         $this->pendingDeletionId = $setting->id;
         $this->pendingDeletionName = $setting->key;
     }

@@ -58,6 +58,7 @@ class ConferenceCentersList extends BaseListComponent
     public function confirmConferenceCenterDeletion(string $id): void
     {
         $center = ConferenceCenter::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($center);
         $this->pendingDeletionId = $center->id;
         $this->pendingDeletionName = $center->name;
     }
@@ -72,6 +73,7 @@ class ConferenceCentersList extends BaseListComponent
     public function deleteConferenceCenter(): void
     {
         $center = ConferenceCenter::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($center);
         $this->centerService->delete($center);
         $this->cancelConferenceCenterDeletion();
         $this->loadCenters();

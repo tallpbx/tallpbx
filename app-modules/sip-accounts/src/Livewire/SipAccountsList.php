@@ -30,6 +30,7 @@ class SipAccountsList extends BaseListComponent
     public function deleteAccount(string $accountId): void
     {
         $account = SipAccount::withoutGlobalScope('tenant')->findOrFail($accountId);
+        $this->assertCanAccessTenantRecord($account);
         $this->accountService->delete($account);
         $this->cancelAccountDeletion();
         $this->showSuccess('SIP account deleted.');
@@ -40,6 +41,7 @@ class SipAccountsList extends BaseListComponent
     public function confirmAccountDeletion(string $accountId): void
     {
         $account = SipAccount::withoutGlobalScope('tenant')->findOrFail($accountId);
+        $this->assertCanAccessTenantRecord($account);
         $this->pendingDeletionId = $account->id;
         $this->pendingDeletionName = $account->auth_username;
     }

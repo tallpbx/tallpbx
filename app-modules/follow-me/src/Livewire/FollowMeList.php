@@ -62,6 +62,7 @@ class FollowMeList extends BaseListComponent
     public function deleteFollowMe(string $id): void
     {
         $record = FollowMe::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($record);
         $this->followMeService->delete($record);
         $this->cancelFollowMeDeletion();
         $this->loadRecords();
@@ -73,6 +74,7 @@ class FollowMeList extends BaseListComponent
     public function confirmFollowMeDeletion(string $id): void
     {
         $record = FollowMe::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($record);
         $this->pendingDeletionId = $record->id;
         $this->pendingDeletionName = $record->name;
     }

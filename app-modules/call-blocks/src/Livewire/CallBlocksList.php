@@ -47,6 +47,7 @@ class CallBlocksList extends BaseListComponent
     public function deleteBlock(string $blockId): void
     {
         $block = CallBlock::withoutGlobalScope('tenant')->findOrFail($blockId);
+        $this->assertCanAccessTenantRecord($block);
         $block->delete();
         $this->cancelBlockDeletion();
         $this->loadBlocks();
@@ -58,6 +59,7 @@ class CallBlocksList extends BaseListComponent
     public function confirmBlockDeletion(string $blockId): void
     {
         $block = CallBlock::withoutGlobalScope('tenant')->findOrFail($blockId);
+        $this->assertCanAccessTenantRecord($block);
         $this->pendingDeletionId = $block->id;
         $this->pendingDeletionName = $block->name;
     }

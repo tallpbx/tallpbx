@@ -58,6 +58,7 @@ class EmailTemplatesList extends BaseListComponent
     public function confirmTemplateDeletion(string $id): void
     {
         $template = EmailTemplate::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($template);
         $this->pendingDeletionId = $template->id;
         $this->pendingDeletionName = $template->name;
     }
@@ -72,6 +73,7 @@ class EmailTemplatesList extends BaseListComponent
     public function deleteTemplate(): void
     {
         $template = EmailTemplate::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($template);
         $this->templateService->delete($template);
         $this->cancelTemplateDeletion();
         $this->load();

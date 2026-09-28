@@ -50,6 +50,7 @@ class QueueList extends BaseListComponent
     public function deleteQueue(string $id): void
     {
         $q = Queue::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($q);
         $this->service->deleteQueue($q);
         $this->cancelQueueDeletion();
         $this->load();
@@ -61,6 +62,7 @@ class QueueList extends BaseListComponent
     public function confirmQueueDeletion(string $id): void
     {
         $queue = Queue::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($queue);
         $this->pendingDeletionId = $queue->id;
         $this->pendingDeletionName = $queue->name;
     }

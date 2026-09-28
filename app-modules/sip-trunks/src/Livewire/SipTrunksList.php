@@ -51,6 +51,7 @@ class SipTrunksList extends BaseListComponent
     public function deleteTrunk(string $id): void
     {
         $trunk = SipTrunk::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($trunk);
         $this->service->delete($trunk);
         $this->cancelTrunkDeletion();
         $this->load();
@@ -62,6 +63,7 @@ class SipTrunksList extends BaseListComponent
     public function confirmTrunkDeletion(string $id): void
     {
         $trunk = SipTrunk::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($trunk);
         $this->pendingDeletionId = $trunk->id;
         $this->pendingDeletionName = $trunk->name;
     }

@@ -66,6 +66,7 @@ class InboundRoutesList extends BaseListComponent
         }
 
         $route = InboundRoute::withoutGlobalScope('tenant')->findOrFail($routeId);
+        $this->assertCanAccessTenantRecord($route);
         $this->inboundRouteService->delete($route);
         $this->cancelRouteDeletion();
         $this->loadRoutes();
@@ -81,6 +82,7 @@ class InboundRoutesList extends BaseListComponent
         }
 
         $route = InboundRoute::withoutGlobalScope('tenant')->findOrFail($routeId);
+        $this->assertCanAccessTenantRecord($route);
         $this->pendingDeletionId = $route->id;
         $this->pendingDeletionName = $route->name;
     }

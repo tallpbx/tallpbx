@@ -32,6 +32,7 @@ class RecordingsList extends BaseListComponent
     public function confirmRecordingDeletion(string $id): void
     {
         $recording = Recording::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($recording);
         $this->pendingDeletionId = $recording->id;
         $this->pendingDeletionName = $recording->name;
     }
@@ -46,6 +47,7 @@ class RecordingsList extends BaseListComponent
     public function deleteRecording(): void
     {
         $recording = Recording::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($recording);
         $this->recordingService->delete($recording);
         $this->cancelRecordingDeletion();
         $this->showSuccess('Recording deleted.');

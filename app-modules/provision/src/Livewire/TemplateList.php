@@ -57,6 +57,7 @@ class TemplateList extends BaseListComponent
     public function confirmTemplateDeletion(string $id): void
     {
         $template = ProvisionTemplate::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($template);
         $this->pendingDeletionId = $template->id;
         $this->pendingDeletionName = $template->name;
     }
@@ -71,6 +72,7 @@ class TemplateList extends BaseListComponent
     public function deleteTemplate(): void
     {
         $t = ProvisionTemplate::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($t);
         $this->service->deleteTemplate($t);
         $this->cancelTemplateDeletion();
         $this->load();

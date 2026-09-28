@@ -61,6 +61,7 @@ class RingGroupsList extends BaseListComponent
     public function deleteRingGroup(string $groupId): void
     {
         $group = RingGroup::withoutGlobalScope('tenant')->findOrFail($groupId);
+        $this->assertCanAccessTenantRecord($group);
         $this->ringGroupService->delete($group);
         $this->cancelRingGroupDeletion();
         $this->loadRingGroups();
@@ -72,6 +73,7 @@ class RingGroupsList extends BaseListComponent
     public function confirmRingGroupDeletion(string $groupId): void
     {
         $group = RingGroup::withoutGlobalScope('tenant')->findOrFail($groupId);
+        $this->assertCanAccessTenantRecord($group);
         $this->pendingDeletionId = $group->id;
         $this->pendingDeletionName = $group->name;
     }

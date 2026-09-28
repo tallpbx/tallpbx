@@ -97,6 +97,23 @@ it('prevents cross-tenant deletion by tenant users via TenantMutationGuard in li
     expect(Dialplan::withoutGlobalScope('tenant')->where('id', $foreignDialplan->id)->exists())->toBeTrue();
 });
 
+it('denies tenant users the deletion confirmation for another tenant dialplan', function () {
+    $userA = grantTenantUserPermissions($this->tenantA, ['dialplans.view', 'dialplans.delete']);
+    $foreignDialplan = Dialplan::factory()->create([
+        'tenant_id' => $this->tenantB->id,
+        'name' => 'Hidden Library',
+        'context' => 'default',
+    ]);
+
+    // Opening the confirmation modal must not disclose another tenant's
+    // record: the fetch happens unscoped, so the handler must assert tenant
+    // access before storing any of the record's details for display.
+    Livewire::actingAs($userA, 'web')
+        ->test(DialplansList::class)
+        ->call('confirmDialplanDeletion', $foreignDialplan->id)
+        ->assertForbidden();
+});
+
 it('allows two tenants to have dialplans with the same name without collision', function () {
     $dpA = Dialplan::factory()->create([
         'tenant_id' => $this->tenantA->id,

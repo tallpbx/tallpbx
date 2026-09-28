@@ -44,6 +44,7 @@ class BridgesList extends BaseListComponent
     public function deleteBridge(string $bridgeId): void
     {
         $bridge = Bridge::withoutGlobalScope('tenant')->findOrFail($bridgeId);
+        $this->assertCanAccessTenantRecord($bridge);
         $bridge->delete();
         $this->cancelBridgeDeletion();
         $this->loadBridges();
@@ -55,6 +56,7 @@ class BridgesList extends BaseListComponent
     public function confirmBridgeDeletion(string $bridgeId): void
     {
         $bridge = Bridge::withoutGlobalScope('tenant')->findOrFail($bridgeId);
+        $this->assertCanAccessTenantRecord($bridge);
         $this->pendingDeletionId = $bridge->id;
         $this->pendingDeletionName = $bridge->bridge_name;
     }
