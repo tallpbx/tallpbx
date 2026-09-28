@@ -61,13 +61,31 @@ class MediaStreamController
     }
 
     /**
-     * Restrict response content types to a valid media-type token pair.
+     * Restrict response content types to a safe allowlist of media types.
+     *
+     * Values outside the allowlist fall back to a generic binary type —
+     * including scriptable types such as text/html and image/svg+xml,
+     * which browsers can execute when served inline.
      */
     private function safeMimeType(string $mimeType): string
     {
-        return preg_match('/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i', $mimeType) === 1
-            ? $mimeType
-            : 'application/octet-stream';
+        // Shape check first: never echo a malformed header value back.
+        if (preg_match('/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i', $mimeType) !== 1) {
+            return 'application/octet-stream';
+        }
+
+        $allowed = preg_match(
+            '~^(?:'
+            .'image/(?!svg\+xml)[a-z0-9!#$&^_.+-]+' // Images, except scriptable SVG
+            .'|audio/[a-z0-9!#$&^_.+-]+'
+            .'|video/[a-z0-9!#$&^_.+-]+'
+            .'|application/(?:pdf|zip|gzip|octet-stream)'
+            .'|text/plain'
+            .')$~i',
+            $mimeType,
+        ) === 1;
+
+        return $allowed ? strtolower($mimeType) : 'application/octet-stream';
     }
 
     /**

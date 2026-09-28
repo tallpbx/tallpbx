@@ -58,6 +58,44 @@ it('streams an available local asset to an authorized member of its tenant', fun
     expect($response->streamedContent())->toBe('local media');
 });
 
+it('serves svg media types as generic binary downloads', function (): void {
+    $user = User::factory()->create();
+    $user->tenants()->attach($this->tenant, ['role' => 'admin', 'primary' => true]);
+    ($this->grantCallRecordingsView)($user, $this->tenant);
+    File::put($this->root.'/files/payload.svg', '<svg onload="alert(1)"/>');
+    $asset = createMediaStreamAsset($this, [
+        'object_key' => 'files/payload.svg',
+        'original_filename' => 'payload.svg',
+        'mime_type' => 'image/svg+xml',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->withSession(['selected_tenant_id' => (string) $this->tenant->id])
+        ->get(route('panel.media-assets.stream', $asset));
+
+    // SVG documents can execute scripts when served inline, so they must
+    // never reach the browser with their own content type.
+    $response->assertOk()->assertHeader('Content-Type', 'application/octet-stream');
+});
+
+it('serves html media types as generic binary downloads', function (): void {
+    $user = User::factory()->create();
+    $user->tenants()->attach($this->tenant, ['role' => 'admin', 'primary' => true]);
+    ($this->grantCallRecordingsView)($user, $this->tenant);
+    File::put($this->root.'/files/page.html', '<script>alert(1)</script>');
+    $asset = createMediaStreamAsset($this, [
+        'object_key' => 'files/page.html',
+        'original_filename' => 'page.html',
+        'mime_type' => 'text/html',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->withSession(['selected_tenant_id' => (string) $this->tenant->id])
+        ->get(route('panel.media-assets.stream', $asset));
+
+    $response->assertOk()->assertHeader('Content-Type', 'application/octet-stream');
+});
+
 it('streams an archived asset through the storage service and closes its stream', function (): void {
     $admin = Admin::factory()->create();
     ($this->grantCallRecordingsView)($admin);
