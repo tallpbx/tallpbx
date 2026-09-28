@@ -35,14 +35,6 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     }
 
     /**
-     * This module ships its own translation files.
-     */
-    protected function hasTranslations(): bool
-    {
-        return true;
-    }
-
-    /**
      * Register sidebar navigation menu items.
      *
      * Items with guard 'admin' appear in the admin sidebar.
