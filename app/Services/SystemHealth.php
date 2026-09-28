@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Process;
+
 /**
  * Collects system health metrics for the monitoring dashboard.
  *
@@ -24,13 +28,16 @@ class SystemHealth
      */
     public function summary(): array
     {
-        return [
+        // Cache the collected metrics for 30 seconds: each collection spawns
+        // several system processes, and the monitoring dashboard must not
+        // repeat them on every render (see class docblock).
+        return Cache::remember('system.health.summary', 30, fn (): array => [
             'disk' => $this->diskUsage(),
             'memory' => $this->memoryUsage(),
             'services' => $this->serviceStatus(),
             'freeswitch' => $this->freeswitchStatus(),
             'certificate' => $this->certificateExpiry(),
-        ];
+        ]);
     }
 
     /**
@@ -239,7 +246,14 @@ class SystemHealth
         $daysRemaining = (int) round(($certData['validTo_time_t'] - time()) / 86400);
         $issuer = $certData['issuer']['O'] ?? ($certData['issuer']['CN'] ?? 'Unknown');
 
-        return compact('domain', 'expiresAt', 'daysRemaining', 'issuer');
+        // Snake-case keys are the documented contract consumed by the
+        // monitoring dashboard and the health test.
+        return [
+            'domain' => $domain,
+            'expires_at' => $expiresAt,
+            'days_remaining' => $daysRemaining,
+            'issuer' => $issuer,
+        ];
     }
 
     /**
@@ -263,52 +277,71 @@ class SystemHealth
     /**
      * Fetch certificate expiry via an OpenSSL connection to the domain.
      *
+     * The connection runs as an argument-array process instead of a shell
+     * string, so the domain is passed as a literal argument and can never
+     * be interpreted as shell syntax, even though it originates from
+     * operator configuration (APP_URL / hostname).
+     *
      * @return array{domain: string, expires_at: string, days_remaining: int, issuer: string}|null
      */
     private function fetchCertViaOpenssl(string $domain): ?array
     {
-        exec(
-            "echo | openssl s_client -servername {$domain} -connect {$domain}:443 2>/dev/null | openssl x509 -noout -enddate -issuer 2>/dev/null",
-            $output,
-            $exitCode
-        );
+        // Prefer the system OpenSSL binary; fall back to a PATH lookup for
+        // non-standard installations.
+        $openssl = is_executable('/usr/bin/openssl') ? '/usr/bin/openssl' : 'openssl';
 
-        if ($exitCode !== 0 || empty($output)) {
+        $process = new Process([
+            $openssl, 's_client',
+            '-servername', $domain,
+            '-connect', $domain.':443',
+        ]);
+
+        // Close standard input immediately (the equivalent of the previous
+        // "echo |" pipeline) and bound the connection attempt so a
+        // black-holed host cannot hang the dashboard request.
+        $process->setInput("\n");
+        $process->setTimeout(15);
+
+        try {
+            $process->run();
+        } catch (ProcessTimedOutException) {
             return null;
         }
 
-        $expiresAt = '';
-        $issuer = 'Unknown';
+        $certificate = $this->extractCertificatePem($process->getOutput());
 
-        foreach ($output as $line) {
-            if (str_starts_with($line, 'notAfter=')) {
-                // Trim the 'notAfter=' key reported by openssl.
-                $expiresAt = substr($line, 9);
-            }
-            if (str_starts_with($line, 'issuer=')) {
-                $issuer = substr($line, 7);
-                // Extract O= or CN= from issuer string
-                if (preg_match('/O\s*=\s*([^,]+)/', $issuer, $m)) {
-                    $issuer = trim($m[1]);
-                } elseif (preg_match('/CN\s*=\s*([^,]+)/', $issuer, $m)) {
-                    $issuer = trim($m[1]);
-                }
-            }
-        }
-
-        if ($expiresAt === '') {
+        if ($certificate === null) {
             return null;
         }
 
-        $expireTs = strtotime($expiresAt);
-        $daysRemaining = $expireTs !== false ? (int) round(($expireTs - time()) / 86400) : 0;
+        $certData = @openssl_x509_parse($certificate);
+
+        if ($certData === false || ! isset($certData['validTo_time_t'])) {
+            return null;
+        }
+
+        $expiresAt = date('Y-m-d H:i:s', $certData['validTo_time_t']);
+        $daysRemaining = (int) round(($certData['validTo_time_t'] - time()) / 86400);
+        $issuer = $certData['issuer']['O'] ?? ($certData['issuer']['CN'] ?? 'Unknown');
 
         return [
             'domain' => $domain,
-            'expiresAt' => date('Y-m-d H:i:s', $expireTs ?: 0),
-            'daysRemaining' => $daysRemaining,
+            'expires_at' => $expiresAt,
+            'days_remaining' => $daysRemaining,
             'issuer' => $issuer,
         ];
+    }
+
+    /**
+     * Extract the first PEM certificate block from openssl s_client output.
+     */
+    private function extractCertificatePem(string $output): ?string
+    {
+        if (preg_match('/-----BEGIN CERTIFICATE-----(.+?)-----END CERTIFICATE-----/s', $output, $matches) !== 1) {
+            return null;
+        }
+
+        return "-----BEGIN CERTIFICATE-----\n".trim($matches[1])."\n-----END CERTIFICATE-----";
     }
 
     /**

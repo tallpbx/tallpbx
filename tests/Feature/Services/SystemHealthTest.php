@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Services\SystemHealth;
+use Illuminate\Support\Facades\Cache;
 
 beforeEach(function (): void {
     // Ensure the service can be instantiated even in test environments
@@ -63,4 +64,42 @@ it('returns a complete health summary', function (): void {
     $summary = $health->summary();
 
     expect($summary)->toHaveKeys(['disk', 'memory', 'services', 'freeswitch', 'certificate']);
+});
+
+it('serves the summary from the cache while the 30 second window is open', function (): void {
+    // Prefill the cache the way an earlier dashboard refresh would have;
+    // the service must reuse it instead of spawning system processes again.
+    $sentinel = [
+        'disk' => ['total_gb' => 42.0, 'used_gb' => 21.0, 'free_gb' => 21.0, 'percent_used' => 50.0, 'mount_point' => '/'],
+        'memory' => ['total_gb' => 8.0, 'used_gb' => 4.0, 'free_gb' => 4.0, 'percent_used' => 50.0],
+        'services' => [],
+        'freeswitch' => ['running' => false, 'uptime' => 'N/A', 'sessions' => 0, 'calls_per_second' => 0],
+        'certificate' => null,
+    ];
+    Cache::put('system.health.summary', $sentinel, 30);
+
+    expect(app(SystemHealth::class)->summary())->toBe($sentinel);
+});
+
+it('never passes the domain through a shell when fetching a certificate', function (): void {
+    // Run from a scratch directory so a relative marker file would land
+    // there if the domain reached a shell interpreter.
+    $workDir = sys_get_temp_dir();
+    $marker = 'tallpbx-injection-'.bin2hex(random_bytes(6));
+    $previousDir = getcwd();
+    chdir($workDir);
+
+    try {
+        // Semicolon plus dollar-IFS field splitting: if this value were
+        // interpolated into a shell command, "touch <marker>" would run.
+        // An argument-array process can only ever treat it as a hostname.
+        config(['app.url' => 'http://x;touch${IFS}'.$marker.';']);
+
+        app(SystemHealth::class)->certificateExpiry();
+
+        expect(file_exists($workDir.'/'.$marker))->toBeFalse();
+    } finally {
+        chdir($previousDir);
+        @unlink($workDir.'/'.$marker);
+    }
 });
