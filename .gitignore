@@ -43,3 +43,6 @@ tests/Browser/Screenshots/
 tests/Browser/screenshots/
 tests/Browser/console/
 tests/Browser/source/
+
+# Internal audit reports (security-sensitive, never publish)
+/docs/project-audit-report.md
