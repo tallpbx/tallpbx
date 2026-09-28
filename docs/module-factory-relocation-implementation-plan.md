@@ -479,7 +479,7 @@ git commit -m "refactor: move module factories into their owning modules" -m "Re
 **Interfaces:**
 - Produces: `modules.composer_package` nullable string column, mass-assignable on `Module`. Task 4 records it at uninstall and reads it at restore.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -504,12 +504,12 @@ it('stores the composer package on module registry rows', function (): void {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test --compact --parallel --filter=ModuleComposerPackageMigrationTest`
 Expected: FAIL — `composer_package` column does not exist.
 
-- [ ] **Step 3: Create the migration**
+- [x] **Step 3: Create the migration**
 
 ```php
 <?php
@@ -545,11 +545,11 @@ return new class extends Migration
 };
 ```
 
-- [ ] **Step 4: Allow mass assignment on the model**
+- [x] **Step 4: Allow mass assignment on the model**
 
 In `app/Models/Module.php` add `'composer_package'` to `$fillable`.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `php artisan test --compact --parallel --filter=ModuleComposerPackageMigrationTest`
 Expected: PASS.

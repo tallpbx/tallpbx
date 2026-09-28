@@ -25,6 +25,7 @@ class Module extends Model
 
     protected $fillable = [
         'name',
+        'composer_package',
         'display_name',
         'version',
         'enabled',
