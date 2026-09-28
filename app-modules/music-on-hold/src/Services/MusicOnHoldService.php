@@ -14,6 +14,10 @@ use Modules\MusicOnHold\Models\MusicOnHold;
  */
 class MusicOnHoldService extends CrudService
 {
+    /**
+     * Tell the shared CRUD base class which model it manages, and keep
+     * the media storage service for audio file cleanup.
+     */
     public function __construct(private readonly MediaStorageServiceInterface $mediaStorage)
     {
         $this->modelClass = MusicOnHold::class;

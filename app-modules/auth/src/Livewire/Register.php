@@ -49,6 +49,9 @@ class Register extends Component
         $this->redirect(route('panel.dashboard'));
     }
 
+    /**
+     * Render the tenant user registration form.
+     */
     public function render(): View
     {
         return view('auth::register');

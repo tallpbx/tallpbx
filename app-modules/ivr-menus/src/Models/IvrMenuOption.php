@@ -37,6 +37,9 @@ class IvrMenuOption extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -53,6 +56,9 @@ class IvrMenuOption extends Model
         return $this->belongsTo(IvrMenu::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): IvrMenuOptionFactory
     {
         return IvrMenuOptionFactory::new();

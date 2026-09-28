@@ -42,11 +42,17 @@ class GroupsList extends Component
 
     private GroupServiceInterface $groupService;
 
+    /**
+     * Inject the group service used by this component.
+     */
     public function boot(GroupServiceInterface $groupService): void
     {
         $this->groupService = $groupService;
     }
 
+    /**
+     * Load the tenant filter options and the group list.
+     */
     public function mount(): void
     {
         $this->tenants = Tenant::orderBy('name')->get();
@@ -116,6 +122,9 @@ class GroupsList extends Component
         $this->dispatch('group-deleted');
     }
 
+    /**
+     * Render the groups list view.
+     */
     public function render(): View
     {
         return view('admin::groups-list');

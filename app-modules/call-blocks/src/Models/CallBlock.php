@@ -38,6 +38,9 @@ class CallBlock extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -53,6 +56,9 @@ class CallBlock extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): CallBlockFactory
     {
         return CallBlockFactory::new();

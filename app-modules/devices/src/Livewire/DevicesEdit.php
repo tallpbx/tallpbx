@@ -129,6 +129,9 @@ class DevicesEdit extends BaseEditComponent
         $this->redirect(route('panel.devices.index'));
     }
 
+    /**
+     * Validation rules for the device form.
+     */
     protected function rules(): array
     {
         $rules = [

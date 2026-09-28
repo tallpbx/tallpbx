@@ -156,6 +156,9 @@ function featureMediaTenantWithDomain(string $domain): array
     return [$tenant, $tenantDomain];
 }
 
+/**
+ * Request the dialplan XML section for a context and destination.
+ */
 function featureMediaDialplanXml(string $context, string $destination): TestResponse
 {
     return get('/api/v1/xml-handler?'.http_build_query([
@@ -166,6 +169,9 @@ function featureMediaDialplanXml(string $context, string $destination): TestResp
     ]));
 }
 
+/**
+ * Request the configuration XML section for a configuration key and domain.
+ */
 function featureMediaConfigurationXml(string $configuration, string $domain): TestResponse
 {
     return get('/api/v1/xml-handler?'.http_build_query([

@@ -15,6 +15,11 @@ class GatewayFactory extends Factory
 {
     protected $model = Gateway::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

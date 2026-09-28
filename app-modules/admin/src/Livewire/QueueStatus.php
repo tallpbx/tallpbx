@@ -35,6 +35,9 @@ class QueueStatus extends Component
 
     public ?string $retryResult = null;
 
+    /**
+     * Load the current queue statistics when the page opens.
+     */
     public function mount(): void
     {
         $this->refresh();
@@ -179,6 +182,9 @@ class QueueStatus extends Component
         return 'Unknown error';
     }
 
+    /**
+     * Render the queue status view with the latest counters and failures.
+     */
     public function render(): View
     {
         return view('admin::queue-status', [

@@ -29,6 +29,9 @@ class SipTrunk extends Model
         'password',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -38,6 +41,9 @@ class SipTrunk extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): SipTrunkFactory
     {
         return SipTrunkFactory::new();

@@ -188,6 +188,8 @@ class ModuleServiceProvider extends ServiceProvider
         if (str_starts_with($constraint, '~')) {
             $lower = substr($constraint, 1);
             $parts = explode('.', $lower);
+            // The ~ constraint accepts the current minor line only:
+            // ~1.2 means >= 1.2 and < 1.3.
             $nextMinor = $parts[0].'.'.((int) ($parts[1] ?? 0) + 1).'.0';
 
             return version_compare($installed, $lower, '>=')
@@ -197,6 +199,8 @@ class ModuleServiceProvider extends ServiceProvider
         if (str_starts_with($constraint, '^')) {
             $lower = substr($constraint, 1);
             $parts = explode('.', $lower);
+            // The ^ constraint accepts everything below the next major
+            // version: ^1.2 means >= 1.2 and < 2.0.
             $nextMajor = ((int) $parts[0] + 1).'.0.0';
 
             return version_compare($installed, $lower, '>=')

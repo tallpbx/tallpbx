@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing SIP trunk credentials per tenant.
+     */
     public function up(): void
     {
         Schema::create('sip_trunks', function (Blueprint $table) {
@@ -24,6 +27,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the SIP trunks table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('sip_trunks');

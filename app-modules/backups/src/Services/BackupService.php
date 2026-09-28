@@ -516,6 +516,7 @@ class BackupService implements BackupServiceInterface
             })
             ->sortBy('created_at')
             ->values();
+        // Runs beyond the retention count are the oldest ones (the list is sorted by creation date).
         $expiredRuns = $completedRuns->slice(0, max(0, $completedRuns->count() - $backup->retention_count));
 
         foreach ($expiredRuns as $expiredRun) {

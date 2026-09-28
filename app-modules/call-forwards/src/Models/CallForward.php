@@ -41,6 +41,9 @@ class CallForward extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -57,6 +60,9 @@ class CallForward extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): CallForwardFactory
     {
         return CallForwardFactory::new();

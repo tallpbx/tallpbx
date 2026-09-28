@@ -28,6 +28,9 @@ class IvrMenuService implements ContextWideDialplanXmlContributor, IvrMenuServic
         return 70;
     }
 
+    /**
+     * Create a new IVR menu, rejecting duplicate names within the tenant.
+     */
     public function create(array $data): IvrMenu
     {
         $this->validateUniqueName($data['tenant_id'], $data['name'] ?? '', null);
@@ -35,6 +38,9 @@ class IvrMenuService implements ContextWideDialplanXmlContributor, IvrMenuServic
         return IvrMenu::create($data);
     }
 
+    /**
+     * Update an existing IVR menu and return the fresh copy.
+     */
     public function update(IvrMenu $menu, array $data): IvrMenu
     {
         if (isset($data['name']) && $data['name'] !== $menu->name) {
@@ -46,6 +52,9 @@ class IvrMenuService implements ContextWideDialplanXmlContributor, IvrMenuServic
         return $menu->fresh();
     }
 
+    /**
+     * Delete an IVR menu, removing its managed greeting first.
+     */
     public function delete(IvrMenu $menu): void
     {
         if ($menu->mediaAsset !== null) {
@@ -55,6 +64,9 @@ class IvrMenuService implements ContextWideDialplanXmlContributor, IvrMenuServic
         $menu->delete();
     }
 
+    /**
+     * Get every IVR menu for one tenant, ordered by name.
+     */
     public function getByTenant(int $tenantId): Collection
     {
         return IvrMenu::withoutGlobalScope('tenant')->where('tenant_id', $tenantId)

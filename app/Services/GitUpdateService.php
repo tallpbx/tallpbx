@@ -28,6 +28,9 @@ class GitUpdateService
      */
     private string $repoPath;
 
+    /**
+     * Create the service and remember the application root where .git lives.
+     */
     public function __construct(private readonly ProcessRunner $runner)
     {
         $this->repoPath = base_path();
@@ -99,6 +102,7 @@ class GitUpdateService
             } elseif (
                 $lower === 'stable'
                 || str_starts_with($lower, 'release/')
+                // Version branches such as "2.0" count as stable release series.
                 || preg_match('/^v?\d+(\.\d+)+(-stable)?$/i', $branch) === 1
             ) {
                 $stable[] = $branch;
@@ -532,6 +536,7 @@ class GitUpdateService
             return null;
         }
 
+        // Best-effort reads: the file may be replaced between the exists check and the read.
         $contents = @file_get_contents($path);
         if ($contents === false || $contents === '') {
             return null;
@@ -552,6 +557,7 @@ class GitUpdateService
             return '';
         }
 
+        // Best-effort read: unreadable line files are treated as an empty log.
         $lines = @file($path, FILE_IGNORE_NEW_LINES);
         if ($lines === false || empty($lines)) {
             return '';
@@ -581,6 +587,7 @@ class GitUpdateService
      */
     public function writeStatus(array $data): void
     {
+        // Best-effort write: a failed status update must never break a running update.
         @file_put_contents($this->statusFilePath(), json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
@@ -589,6 +596,7 @@ class GitUpdateService
      */
     public function appendLog(string $message): void
     {
+        // Best-effort append: the update itself must continue even if logging fails.
         @file_put_contents($this->logFilePath(), trim($message)."\n", FILE_APPEND);
     }
 
@@ -613,6 +621,7 @@ class GitUpdateService
             'started_at' => time(),
         ]);
 
+        // Best-effort marker so the log shows when this run started.
         @file_put_contents($logPath, "=== TallPBX Update started for target '{$target}' at ".date('Y-m-d H:i:s')." ===\n");
 
         $cmd = sprintf(

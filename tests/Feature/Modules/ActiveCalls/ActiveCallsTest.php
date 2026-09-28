@@ -11,6 +11,9 @@ use App\Services\TenantManager;
 use Livewire\Livewire;
 use Modules\ActiveCalls\Livewire\ActiveCallsList;
 
+/**
+ * Create an admin account holding one active calls permission.
+ */
 function activeCallsAdminWithPermission(string $permission): Admin
 {
     $permissionModel = Permission::factory()->create([
@@ -25,6 +28,10 @@ function activeCallsAdminWithPermission(string $permission): Admin
     return $admin;
 }
 
+/**
+ * Build the JSON response that "show channels as json" would return
+ * for the given channel rows.
+ */
 function channelsJson(array $rows): string
 {
     return json_encode(['header' => ['uuid', 'direction'], 'rows' => $rows, 'row_count' => count($rows)]);

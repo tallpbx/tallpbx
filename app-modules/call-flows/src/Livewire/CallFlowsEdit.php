@@ -9,6 +9,9 @@ use App\Support\BaseEditComponent;
 use Modules\CallFlows\Models\CallFlow;
 use Modules\CallFlows\Services\CallFlowService;
 
+/**
+ * Livewire component for creating and editing call flow rules.
+ */
 class CallFlowsEdit extends BaseEditComponent
 {
     public string $name = '';
@@ -23,11 +26,18 @@ class CallFlowsEdit extends BaseEditComponent
 
     private CallFlowService $callFlowService;
 
+    /**
+     * Inject the call flow service used by this component.
+     */
     public function boot(CallFlowService $callFlowService): void
     {
         $this->callFlowService = $callFlowService;
     }
 
+    /**
+     * Open the create form, or load the given flow for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $callFlowId = null): void
     {
         $this->loadTenants();
@@ -46,11 +56,19 @@ class CallFlowsEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing flow rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->callFlowId !== null;
     }
 
+    /**
+     * Validate the form, store the flow, and ask FreeSWITCH to reload
+     * its configuration so the change takes effect.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -77,6 +95,9 @@ class CallFlowsEdit extends BaseEditComponent
         ReloadFreeSwitchXml::dispatch('call flow saved');
     }
 
+    /**
+     * Validation rules for the call flow form.
+     */
     public function rules(): array
     {
         return [

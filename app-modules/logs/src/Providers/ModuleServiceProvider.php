@@ -26,6 +26,9 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         return 'Modules\Logs';
     }
 
+    /**
+     * This module ships its own translation files.
+     */
     protected function hasTranslations(): bool
     {
         return true;

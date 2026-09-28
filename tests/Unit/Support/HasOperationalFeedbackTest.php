@@ -9,26 +9,41 @@ it('stores each semantic operational feedback type and clears it', function (): 
     {
         use HasOperationalFeedback;
 
+        /**
+         * Record a success message.
+         */
         public function success(): void
         {
             $this->showSuccess('Saved.');
         }
 
+        /**
+         * Record a warning message.
+         */
         public function warning(): void
         {
             $this->showWarning('Check this.');
         }
 
+        /**
+         * Record an error message.
+         */
         public function error(): void
         {
             $this->showError('Could not continue.');
         }
 
+        /**
+         * Record an informational message.
+         */
         public function info(): void
         {
             $this->showInfo('Useful information.');
         }
 
+        /**
+         * Clear the currently stored message.
+         */
         public function clear(): void
         {
             $this->clearOperationalMessage();

@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Modules\FileStores\Models\MediaAsset;
 
+/**
+ * An outbound fax queued for delivery, with its document stored
+ * as a managed media asset.
+ */
 class FaxOutgoing extends Model
 {
     use BelongsToTenant;
@@ -25,6 +29,9 @@ class FaxOutgoing extends Model
         'sent_at',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

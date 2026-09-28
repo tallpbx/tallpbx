@@ -58,6 +58,9 @@ class Voicemail extends Model
         'password',
     ];
 
+    /**
+     * The tenant that owns this voicemail box.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
@@ -69,11 +72,17 @@ class Voicemail extends Model
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): VoicemailFactory
     {
         return VoicemailFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

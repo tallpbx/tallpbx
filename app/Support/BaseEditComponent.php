@@ -145,6 +145,7 @@ abstract class BaseEditComponent extends Component
 
         preg_match($pattern, $filePath, $m);
 
+        // Capture groups: 1 = module directory, 2 = legacy path marker, 3 = class name.
         $moduleDir = $m[1] ?? '';
         $isLegacy = ($m[2] ?? '') !== '';
         $className = $m[3] ?? '';

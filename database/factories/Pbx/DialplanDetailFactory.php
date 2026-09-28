@@ -14,6 +14,11 @@ class DialplanDetailFactory extends Factory
 {
     protected $model = DialplanDetail::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

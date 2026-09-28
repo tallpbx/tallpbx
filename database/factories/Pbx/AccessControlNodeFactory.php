@@ -14,6 +14,11 @@ class AccessControlNodeFactory extends Factory
 {
     protected $model = AccessControlNode::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

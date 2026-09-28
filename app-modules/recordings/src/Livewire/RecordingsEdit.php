@@ -12,6 +12,9 @@ use Modules\FileStores\Services\MediaStorageServiceInterface;
 use Modules\Recordings\Models\Recording;
 use Modules\Recordings\Services\RecordingService;
 
+/**
+ * Livewire component for creating and editing recordings.
+ */
 class RecordingsEdit extends BaseEditComponent
 {
     use WithFileUploads;
@@ -30,12 +33,20 @@ class RecordingsEdit extends BaseEditComponent
 
     private MediaStorageServiceInterface $mediaStorage;
 
+    /**
+     * Inject the recording service and the media storage service used
+     * for uploaded audio files.
+     */
     public function boot(RecordingService $recordingService, MediaStorageServiceInterface $mediaStorage): void
     {
         $this->recordingService = $recordingService;
         $this->mediaStorage = $mediaStorage;
     }
 
+    /**
+     * Open the create form, or load the given recording for editing when
+     * a record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $recordingId = null): void
     {
         $this->loadTenants();
@@ -53,11 +64,19 @@ class RecordingsEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing recording rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->recordingId !== null;
     }
 
+    /**
+     * Validate the form, store the recording, and store any uploaded
+     * file as a managed media asset.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -94,6 +113,9 @@ class RecordingsEdit extends BaseEditComponent
         $this->redirect(route('panel.recordings.index'));
     }
 
+    /**
+     * Validation rules for the recording form.
+     */
     public function rules(): array
     {
         $rules = [

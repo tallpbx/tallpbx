@@ -5,6 +5,10 @@ declare(strict_types=1);
 use App\Services\FreeSwitchControlService;
 use App\Services\FreeSwitchServiceInterface;
 
+/**
+ * Bind the given mock as the FreeSWITCH session and build the control
+ * service around it.
+ */
 function controlService(FreeSwitchServiceInterface $mock): FreeSwitchControlService
 {
     app()->instance(FreeSwitchServiceInterface::class, $mock);

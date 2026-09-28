@@ -15,6 +15,11 @@ class DeviceFactory extends Factory
 {
     protected $model = Device::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

@@ -25,11 +25,17 @@ class NumberTranslation extends Model
         'tenant_id', 'name', 'match_pattern', 'replace_pattern', 'direction', 'enabled', 'order',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return ['enabled' => 'boolean'];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): NumberTranslationFactory
     {
         return NumberTranslationFactory::new();

@@ -13,6 +13,10 @@ use App\Support\OperationalControlFeedback;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
+/**
+ * Livewire component listing active conferences and offering mute, unmute,
+ * and kick actions for permitted users.
+ */
 class ActiveConferencesList extends BaseListComponent
 {
     use OperationalControlFeedback;
@@ -28,6 +32,10 @@ class ActiveConferencesList extends BaseListComponent
 
     private TenantEslScoping $scoping;
 
+    /**
+     * Resolve the FreeSWITCH session, its control service, and the
+     * tenant scoper used by this component.
+     */
     public function boot(FreeSwitchServiceInterface $fs, FreeSwitchControlService $control, TenantEslScoping $scoping): void
     {
         $this->fs = $fs;
@@ -35,11 +43,18 @@ class ActiveConferencesList extends BaseListComponent
         $this->scoping = $scoping;
     }
 
+    /**
+     * Load the active conference list when the page opens.
+     */
     public function mount(): void
     {
         $this->refresh();
     }
 
+    /**
+     * Fetch the current conferences from FreeSWITCH, keep only the calling
+     * tenant's conferences, and refresh the list.
+     */
     #[On('refresh')]
     public function refresh(): void
     {
@@ -73,6 +88,10 @@ class ActiveConferencesList extends BaseListComponent
         return $id !== null ? (int) $id : null;
     }
 
+    /**
+     * Parse the plain-text "conference list" output into conference rows
+     * with their member lines.
+     */
     private function parseConferences(string $raw): array
     {
         $lines = explode("\n", trim($raw));

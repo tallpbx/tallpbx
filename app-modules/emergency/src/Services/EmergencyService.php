@@ -24,21 +24,33 @@ class EmergencyService implements ContextWideDialplanXmlContributor, EmergencySe
         return 10;
     }
 
+    /**
+     * Find one emergency configuration by its id.
+     */
     public function find(string $id): Emergency
     {
         return Emergency::withoutGlobalScope('tenant')->findOrFail($id);
     }
 
+    /**
+     * Get every emergency configuration, ordered by address.
+     */
     public function all(): Collection
     {
         return Emergency::withoutGlobalScope('tenant')->orderBy('address')->get();
     }
 
+    /**
+     * Create a new emergency configuration.
+     */
     public function create(array $data): Emergency
     {
         return DB::transaction(fn () => Emergency::create($data));
     }
 
+    /**
+     * Update an existing emergency configuration and return the fresh copy.
+     */
     public function update(Emergency $emergency, array $data): Emergency
     {
         return DB::transaction(function () use ($emergency, $data): Emergency {
@@ -48,6 +60,9 @@ class EmergencyService implements ContextWideDialplanXmlContributor, EmergencySe
         });
     }
 
+    /**
+     * Delete an emergency configuration.
+     */
     public function delete(Emergency $emergency): void
     {
         DB::transaction(fn () => $emergency->delete());

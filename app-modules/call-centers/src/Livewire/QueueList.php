@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\CallCenters\Models\Queue;
 use Modules\CallCenters\Services\CallCenterServiceInterface;
 
+/**
+ * Livewire component listing call center queues with a delete action.
+ */
 #[Layout('layouts.app')]
 class QueueList extends BaseListComponent
 {

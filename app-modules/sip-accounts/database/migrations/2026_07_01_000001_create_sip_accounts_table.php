@@ -33,6 +33,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the SIP accounts table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('sip_accounts');

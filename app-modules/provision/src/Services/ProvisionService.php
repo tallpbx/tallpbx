@@ -22,11 +22,17 @@ class ProvisionService implements ProvisionServiceInterface
     /** @var array<string, array<string, string>> */
     private array $registeredTemplates = [];
 
+    /**
+     * Create a new provisioning template.
+     */
     public function createTemplate(array $data): ProvisionTemplate
     {
         return DB::transaction(fn () => ProvisionTemplate::create($data));
     }
 
+    /**
+     * Update an existing provisioning template and return the fresh copy.
+     */
     public function updateTemplate(ProvisionTemplate $template, array $data): ProvisionTemplate
     {
         return DB::transaction(function () use ($template, $data): ProvisionTemplate {
@@ -36,6 +42,9 @@ class ProvisionService implements ProvisionServiceInterface
         });
     }
 
+    /**
+     * Delete a provisioning template.
+     */
     public function deleteTemplate(ProvisionTemplate $template): void
     {
         DB::transaction(fn () => $template->delete());

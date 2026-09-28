@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing inbound (DID) routing rules per tenant.
+     */
     public function up(): void
     {
         Schema::create('inbound_routes', function (Blueprint $table) {
@@ -27,6 +30,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the inbound routes table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('inbound_routes');

@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing soft and hard resource limits per tenant.
+     */
     public function up(): void
     {
         Schema::create('tenant_limits', function (Blueprint $table) {
@@ -20,6 +23,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the tenant limits table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('tenant_limits');

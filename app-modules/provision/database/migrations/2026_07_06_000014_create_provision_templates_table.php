@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing device provisioning templates per tenant.
+     */
     public function up(): void
     {
         Schema::create('provision_templates', function (Blueprint $table) {
@@ -22,6 +25,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the provision templates table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('provision_templates');

@@ -12,6 +12,10 @@ use Modules\FileStores\Enums\MediaCategory;
 use Modules\FileStores\Services\MediaStorageServiceInterface;
 use RuntimeException;
 
+/**
+ * Service managing the fax lifecycle: storing outbound documents and
+ * tracking inbound faxes through managed media assets.
+ */
 class FaxService implements FaxServiceInterface
 {
     /**
@@ -19,6 +23,10 @@ class FaxService implements FaxServiceInterface
      */
     public function __construct(private readonly MediaStorageServiceInterface $mediaStorage) {}
 
+    /**
+     * Queue an uploaded document as an outbound fax and store it
+     * as a managed media asset.
+     */
     public function send(array $data): FaxOutgoing
     {
         return DB::transaction(function () use ($data): FaxOutgoing {
@@ -98,6 +106,9 @@ class FaxService implements FaxServiceInterface
         });
     }
 
+    /**
+     * Delete a received fax and schedule its stored document for removal.
+     */
     public function deleteInbox(FaxInbox $fax): void
     {
         DB::transaction(function () use ($fax): void {

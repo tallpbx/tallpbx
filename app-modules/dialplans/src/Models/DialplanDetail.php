@@ -38,16 +38,25 @@ class DialplanDetail extends Model
         'order',
     ];
 
+    /**
+     * The dialplan this detail row belongs to.
+     */
     public function dialplan(): BelongsTo
     {
         return $this->belongsTo(Dialplan::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): DialplanDetailFactory
     {
         return DialplanDetailFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

@@ -12,6 +12,9 @@ use Livewire\Livewire;
 use Modules\Extensions\Models\Extension;
 use Modules\OperatorPanel\Livewire\OperatorPanelIndex;
 
+/**
+ * Create an admin account holding one operator panel permission.
+ */
 function operatorPanelAdminWithPermission(string $permission): Admin
 {
     $permissionModel = Permission::factory()->create([

@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\XmlCdr\Models\Cdr;
 use Modules\XmlCdr\Services\CdrService;
 
+/**
+ * Livewire component listing call detail records with a delete action.
+ */
 #[Layout('layouts.app')]
 class CdrList extends BaseListComponent
 {
@@ -22,16 +25,26 @@ class CdrList extends BaseListComponent
 
     private CdrService $cdrService;
 
+    /**
+     * Inject the CDR service used by this component.
+     */
     public function boot(CdrService $cdrService): void
     {
         $this->cdrService = $cdrService;
     }
 
+    /**
+     * Load the call detail record list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadRecords();
     }
 
+    /**
+     * Fetch call detail records newest first. Administrators see every
+     * tenant's records; tenant users only see their own.
+     */
     private function loadRecords(): void
     {
         $this->records = Cdr::withoutGlobalScope('tenant')

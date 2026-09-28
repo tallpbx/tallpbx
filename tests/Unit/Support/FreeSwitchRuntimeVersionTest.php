@@ -11,6 +11,10 @@ afterEach(function (): void {
     Mockery::close();
 });
 
+/**
+ * Build the runtime version reader around the given FreeSWITCH mock and
+ * an array-backed cache.
+ */
 function freeSwitchVersionReader(FreeSwitchServiceInterface $freeSwitch): FreeSwitchRuntimeVersion
 {
     return new FreeSwitchRuntimeVersion($freeSwitch, new Repository(new ArrayStore));

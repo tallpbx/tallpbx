@@ -36,6 +36,9 @@ class Recording extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -44,6 +47,9 @@ class Recording extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): RecordingFactory
     {
         return RecordingFactory::new();

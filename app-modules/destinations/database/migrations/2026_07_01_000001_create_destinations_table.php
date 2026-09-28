@@ -27,6 +27,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the destinations table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('destinations');

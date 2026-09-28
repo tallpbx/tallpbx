@@ -25,6 +25,9 @@ class EmailTemplate extends Model
         'tenant_id', 'name', 'subject', 'body',
     ];
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): EmailTemplateFactory
     {
         return EmailTemplateFactory::new();

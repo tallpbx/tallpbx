@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Modules\FileStores\Models\MediaAsset;
 
+/**
+ * A received fax stored in a tenant's inbox.
+ */
 class FaxInbox extends Model
 {
     use BelongsToTenant;
@@ -28,6 +31,9 @@ class FaxInbox extends Model
         'received_at',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -36,6 +42,9 @@ class FaxInbox extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): FaxInboxFactory
     {
         return FaxInboxFactory::new();

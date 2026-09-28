@@ -57,11 +57,17 @@ class InboundRoute extends Model
         ];
     }
 
+    /**
+     * The tenant that owns this inbound route.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): InboundRouteFactory
     {
         return InboundRouteFactory::new();

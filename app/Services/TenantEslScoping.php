@@ -24,6 +24,9 @@ use Modules\SipAccounts\Models\SipAccount;
  */
 class TenantEslScoping
 {
+    /**
+     * Create the scoper, which needs dialplan context parsing to recognise tenants.
+     */
     public function __construct(private readonly DialplanContext $dialplanContext) {}
 
     /**

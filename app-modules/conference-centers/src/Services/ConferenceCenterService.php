@@ -24,6 +24,10 @@ class ConferenceCenterService extends CrudService implements ContextWideDialplan
         return 70;
     }
 
+    /**
+     * Tell the shared CRUD base class which model it manages, and keep
+     * the media storage service for greeting cleanup.
+     */
     public function __construct(private readonly MediaStorageServiceInterface $mediaStorage)
     {
         $this->modelClass = ConferenceCenter::class;

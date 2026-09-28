@@ -21,6 +21,9 @@ use Modules\PinNumbers\Models\PinNumber;
  */
 class PinNumberService extends CrudService implements DialplanXmlContributor
 {
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = PinNumber::class;

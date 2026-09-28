@@ -64,11 +64,19 @@ class GatewaysEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing gateway rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->gatewayId !== null;
     }
 
+    /**
+     * Validate the form, store the gateway, and reload the affected
+     * Sofia profile so FreeSWITCH picks up the change.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -122,6 +130,9 @@ class GatewaysEdit extends BaseEditComponent
         ReloadSofiaProfile::dispatch($profile, $trigger);
     }
 
+    /**
+     * Validation rules for the gateway form.
+     */
     protected function rules(): array
     {
         return [

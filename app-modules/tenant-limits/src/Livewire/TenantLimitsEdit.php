@@ -8,6 +8,9 @@ use App\Support\BaseEditComponent;
 use Modules\TenantLimits\Models\TenantLimit;
 use Modules\TenantLimits\Services\TenantLimitService;
 
+/**
+ * Livewire component for creating and editing tenant resource limits.
+ */
 class TenantLimitsEdit extends BaseEditComponent
 {
     public string $resource = '';
@@ -20,11 +23,18 @@ class TenantLimitsEdit extends BaseEditComponent
 
     private TenantLimitService $limitService;
 
+    /**
+     * Inject the tenant limit service used by this component.
+     */
     public function boot(TenantLimitService $limitService): void
     {
         $this->limitService = $limitService;
     }
 
+    /**
+     * Open the create form, or load the given limit for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $limitId = null): void
     {
         $this->loadTenants();
@@ -43,11 +53,18 @@ class TenantLimitsEdit extends BaseEditComponent
         $this->hardLimit = $limit->hard_limit;
     }
 
+    /**
+     * Whether the form is editing an existing limit rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->limitId !== null;
     }
 
+    /**
+     * Validate the form and create or update the tenant limit.
+     */
     public function save(): void
     {
         $this->validate();
@@ -69,6 +86,9 @@ class TenantLimitsEdit extends BaseEditComponent
         $this->redirect(route('panel.tenant-limits.index'), navigate: true);
     }
 
+    /**
+     * Validation rules for the tenant limit form.
+     */
     public function rules(): array
     {
         return [

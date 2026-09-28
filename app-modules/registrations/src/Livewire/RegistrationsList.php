@@ -11,6 +11,9 @@ use App\Support\BaseListComponent;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
+/**
+ * Livewire component listing SIP registrations, scoped to the tenant.
+ */
 class RegistrationsList extends BaseListComponent
 {
     public bool $fsConnected = false;
@@ -21,17 +24,28 @@ class RegistrationsList extends BaseListComponent
 
     private TenantEslScoping $scoping;
 
+    /**
+     * Resolve the FreeSWITCH session and the tenant scoper used by
+     * this component.
+     */
     public function boot(FreeSwitchServiceInterface $fs, TenantEslScoping $scoping): void
     {
         $this->fs = $fs;
         $this->scoping = $scoping;
     }
 
+    /**
+     * Load the current registrations when the page opens.
+     */
     public function mount(): void
     {
         $this->refresh();
     }
 
+    /**
+     * Fetch the registrations from FreeSWITCH, keep only the calling
+     * tenant's entries, and refresh the list.
+     */
     #[On('refresh')]
     public function refresh(): void
     {

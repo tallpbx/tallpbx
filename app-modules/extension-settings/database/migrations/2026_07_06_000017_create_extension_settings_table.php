@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing per-extension feature override settings.
+     */
     public function up(): void
     {
         Schema::create('extension_settings', function (Blueprint $table) {
@@ -20,6 +23,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the extension settings table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('extension_settings');

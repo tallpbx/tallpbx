@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing recordings per tenant.
+     */
     public function up(): void
     {
         Schema::create('recordings', function (Blueprint $table) {
@@ -22,6 +25,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the recordings table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('recordings');

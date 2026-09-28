@@ -33,6 +33,7 @@ class SystemProcessRunner implements ProcessRunner
         // Ensure COMPOSER_HOME points to writable runtime storage for www-data
         $composerHome = storage_path('framework/composer');
         if (! is_dir($composerHome)) {
+            // The directory may appear concurrently; a failed mkdir is harmless.
             @mkdir($composerHome, 0775, true);
         }
 

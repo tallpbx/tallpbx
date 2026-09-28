@@ -6,11 +6,17 @@ use App\Contracts\ProcessRunner;
 use App\Services\GitUpdateService;
 use Tests\Feature\Services\FakeProcessRunner;
 
+/**
+ * Create the git update service under test with the given fake runner.
+ */
 function pipelineService(FakeProcessRunner $runner): GitUpdateService
 {
     return new GitUpdateService($runner);
 }
 
+/**
+ * Create a fake process runner that reports a clean, up-to-date repository.
+ */
 function pipelineRunner(): FakeProcessRunner
 {
     $runner = new FakeProcessRunner;

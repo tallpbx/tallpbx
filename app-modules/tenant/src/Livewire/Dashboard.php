@@ -18,6 +18,9 @@ use Livewire\Component;
 #[Title('Dashboard')]
 class Dashboard extends Component
 {
+    /**
+     * Render the tenant dashboard view.
+     */
     public function render(): mixed
     {
         return view('tenant::dashboard');

@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing voicemail transcriptions per tenant.
+     */
     public function up(): void
     {
         Schema::create('transcriptions', function (Blueprint $table) {
@@ -21,6 +24,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the transcriptions table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('transcriptions');

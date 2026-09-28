@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing number translation rules per tenant.
+     */
     public function up(): void
     {
         Schema::create('number_translations', function (Blueprint $table) {
@@ -23,6 +26,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the number translations table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('number_translations');

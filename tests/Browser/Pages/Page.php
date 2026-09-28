@@ -4,6 +4,9 @@ namespace Tests\Browser\Pages;
 
 use Laravel\Dusk\Page as BasePage;
 
+/**
+ * Base page object for the Dusk browser tests.
+ */
 abstract class Page extends BasePage
 {
     /**

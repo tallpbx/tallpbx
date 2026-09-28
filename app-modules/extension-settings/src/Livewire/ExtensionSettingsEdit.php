@@ -10,6 +10,9 @@ use Modules\Extensions\Models\Extension;
 use Modules\ExtensionSettings\Models\ExtensionSetting;
 use Modules\ExtensionSettings\Services\ExtensionSettingServiceInterface;
 
+/**
+ * Livewire component for creating and editing per-extension settings.
+ */
 class ExtensionSettingsEdit extends BaseEditComponent
 {
     /** @var Collection<int, Extension> */
@@ -25,11 +28,18 @@ class ExtensionSettingsEdit extends BaseEditComponent
 
     private ExtensionSettingServiceInterface $service;
 
+    /**
+     * Inject the extension setting service used by this component.
+     */
     public function boot(ExtensionSettingServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Open the create form, or load the given setting for editing when
+     * a record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $settingId = null): void
     {
         $this->loadTenants();
@@ -49,6 +59,9 @@ class ExtensionSettingsEdit extends BaseEditComponent
         $this->value = $setting->value ?? '';
     }
 
+    /**
+     * Reload the extension choices whenever the selected tenant changes.
+     */
     public function updatedTenantId($value): void
     {
         if ($value) {
@@ -61,11 +74,18 @@ class ExtensionSettingsEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing setting rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->settingId !== null;
     }
 
+    /**
+     * Validate the form and create or update the extension setting.
+     */
     public function save(): void
     {
         $this->validate();
@@ -87,6 +107,9 @@ class ExtensionSettingsEdit extends BaseEditComponent
         $this->redirect(route('panel.extension-settings.index'), navigate: true);
     }
 
+    /**
+     * Validation rules for the extension setting form.
+     */
     public function rules(): array
     {
         return [

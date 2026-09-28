@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * A FreeSWITCH call detail record owned by a tenant.
+ */
 class Cdr extends Model
 {
     use BelongsToTenant;
@@ -33,6 +36,9 @@ class Cdr extends Model
         'end_stamp',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -44,6 +50,9 @@ class Cdr extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): CdrFactory
     {
         return CdrFactory::new();

@@ -21,6 +21,10 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Modules\Extensions\Models\Extension;
 
+/**
+ * Livewire component providing the operator panel: click-to-call,
+ * active call control, and transfer actions.
+ */
 #[Layout('layouts.app')]
 class OperatorPanelIndex extends Component
 {
@@ -46,6 +50,10 @@ class OperatorPanelIndex extends Component
 
     private TenantEslScoping $scoping;
 
+    /**
+     * Resolve the FreeSWITCH session, its control service, and the
+     * tenant scoper used by this component.
+     */
     public function boot(FreeSwitchServiceInterface $fs, FreeSwitchControlService $control, TenantEslScoping $scoping): void
     {
         $this->fs = $fs;
@@ -53,6 +61,9 @@ class OperatorPanelIndex extends Component
         $this->scoping = $scoping;
     }
 
+    /**
+     * Load the operator's extensions and active calls when the page opens.
+     */
     public function mount(): void
     {
         $this->fsConnected = $this->fs->isConnected();
@@ -64,6 +75,9 @@ class OperatorPanelIndex extends Component
         $this->loadActiveCalls();
     }
 
+    /**
+     * Re-check the FreeSWITCH connection and reload active calls.
+     */
     #[On('refresh')]
     public function refresh(): void
     {
@@ -209,6 +223,9 @@ class OperatorPanelIndex extends Component
         $this->refresh();
     }
 
+    /**
+     * Render the operator panel view.
+     */
     public function render(): View
     {
         return view('operator-panel::operator-panel-index');

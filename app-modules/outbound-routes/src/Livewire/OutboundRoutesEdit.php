@@ -77,11 +77,19 @@ class OutboundRoutesEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing route rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->routeId !== null;
     }
 
+    /**
+     * Validate the form, store the route, and ask FreeSWITCH to reload
+     * its configuration so the change takes effect.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -110,6 +118,10 @@ class OutboundRoutesEdit extends BaseEditComponent
         ReloadFreeSwitchXml::dispatch('outbound route '.($this->routeId !== null ? 'updated' : 'created'));
     }
 
+    /**
+     * Validation rules for the outbound route form, checking the dial
+     * pattern is a valid regular expression.
+     */
     public function rules(): array
     {
         $rules = [

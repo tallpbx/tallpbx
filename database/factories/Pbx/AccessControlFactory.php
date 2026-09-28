@@ -16,6 +16,11 @@ class AccessControlFactory extends Factory
 {
     protected $model = AccessControl::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

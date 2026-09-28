@@ -62,6 +62,9 @@ class DialplansEdit extends BaseEditComponent
         return $this->dialplanId !== null;
     }
 
+    /**
+     * Validate the form and create or update the dialplan.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -85,6 +88,9 @@ class DialplansEdit extends BaseEditComponent
         $this->redirect(route('panel.dialplans.index'));
     }
 
+    /**
+     * Validation rules for the dialplan form.
+     */
     protected function rules(): array
     {
         return [

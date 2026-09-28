@@ -100,6 +100,10 @@ it('smoke tests seeded internal inbound outbound and cached dialplan XML paths',
         ->and($queries)->toBe([]);
 });
 
+/**
+ * Request the dialplan XML for a context and destination, as
+ * FreeSWITCH would over mod_xml_curl.
+ */
 function dialplanXml(string $context, string $destination, string $callerId): TestResponse
 {
     return get('/api/v1/xml-handler?'.http_build_query([

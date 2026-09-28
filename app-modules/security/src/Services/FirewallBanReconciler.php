@@ -34,6 +34,10 @@ class FirewallBanReconciler
      */
     public const SKEW_THRESHOLD = 300;
 
+    /**
+     * Create the reconciler with the security executor, lockout guard,
+     * and configuration generator it needs.
+     */
     public function __construct(
         protected SecurityExecutorInterface $executor,
         protected LockoutGuardService $lockoutGuard,

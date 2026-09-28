@@ -563,6 +563,7 @@ class FreeSwitchService implements FreeSwitchServiceInterface
         if ($headers !== null) {
             foreach (explode("\n", $headers) as $headerLine) {
                 if (str_starts_with($headerLine, 'Content-Length: ')) {
+                    // Strip the 'Content-Length: ' prefix (16 characters) to read the byte count.
                     $contentLength = (int) substr($headerLine, 16);
                     break;
                 }

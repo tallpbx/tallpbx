@@ -24,11 +24,18 @@ class CallBlocksEdit extends BaseEditComponent
 
     private CallBlockServiceInterface $callBlockService;
 
+    /**
+     * Inject the call block service used by this component.
+     */
     public function boot(CallBlockServiceInterface $callBlockService): void
     {
         $this->callBlockService = $callBlockService;
     }
 
+    /**
+     * Open the create form, or load the given rule for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $blockId = null): void
     {
         $this->loadTenants();
@@ -46,11 +53,19 @@ class CallBlocksEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing rule rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->blockId !== null;
     }
 
+    /**
+     * Validate the form, store the rule, and ask FreeSWITCH to reload
+     * its configuration so the change takes effect.
+     */
     public function save(): void
     {
         $this->validate();
@@ -76,6 +91,9 @@ class CallBlocksEdit extends BaseEditComponent
         ReloadFreeSwitchXml::dispatch('call block saved');
     }
 
+    /**
+     * Validation rules for the call block form.
+     */
     public function rules(): array
     {
         return [

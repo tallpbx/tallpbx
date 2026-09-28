@@ -46,6 +46,9 @@ class Device extends Model
         'enabled',
     ];
 
+    /**
+     * The tenant that owns this device.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
@@ -62,11 +65,17 @@ class Device extends Model
         return $this->belongsTo(SipAccount::class)->withoutGlobalScope('tenant');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): DeviceFactory
     {
         return DeviceFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

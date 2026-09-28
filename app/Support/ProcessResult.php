@@ -9,6 +9,9 @@ namespace App\Support;
  */
 readonly class ProcessResult
 {
+    /**
+     * Create a result holding the exit code and captured output of a process run.
+     */
     public function __construct(
         public int $exitCode,
         public string $output,

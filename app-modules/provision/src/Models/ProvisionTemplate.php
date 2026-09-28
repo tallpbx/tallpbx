@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * A device provisioning template owned by a tenant.
+ */
 class ProvisionTemplate extends Model
 {
     use BelongsToTenant;
@@ -20,11 +23,17 @@ class ProvisionTemplate extends Model
         'tenant_id', 'name', 'vendor', 'model', 'file_path', 'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return ['enabled' => 'boolean'];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): ProvisionTemplateFactory
     {
         return ProvisionTemplateFactory::new();

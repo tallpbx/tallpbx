@@ -154,6 +154,7 @@ class PbxDialplanLoadTestCommand extends Command
                             ->withOptions([
                                 'on_stats' => function ($stats) use (&$timings, $key): void {
                                     if (method_exists($stats, 'getTransferTime')) {
+                                        // Guzzle reports transfer time in seconds; convert to milliseconds.
                                         $timings[$key] = (float) $stats->getTransferTime() * 1000;
                                     }
                                 },
@@ -276,6 +277,7 @@ class PbxDialplanLoadTestCommand extends Command
             ->all();
         $latencySummary = [
             'sample_count' => count($latencies),
+            // Requests that never reported a transfer time (timeouts or connection errors).
             'missing_count' => max(0, count($results) - count($latencies)),
             'average' => $latencies === [] ? null : round(array_sum($latencies) / count($latencies), 3),
             'min' => $latencies === [] ? null : min($latencies),
@@ -488,7 +490,6 @@ class PbxDialplanLoadTestCommand extends Command
         return rtrim(rtrim(number_format($value, 3, '.', ''), '0'), '.');
     }
 
-
     /**
      * Calculate a nearest-rank percentile for sorted latency values on demand.
      *
@@ -500,6 +501,8 @@ class PbxDialplanLoadTestCommand extends Command
             return null;
         }
 
+        // Nearest-rank method: the p-th percentile is the smallest sample
+        // whose rank covers p% of the values.
         $rank = (int) ceil(($percentile / 100) * count($sortedValues));
         $index = max(0, min(count($sortedValues) - 1, $rank - 1));
 

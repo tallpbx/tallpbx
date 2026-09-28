@@ -12,6 +12,9 @@ use Livewire\Livewire;
 use Modules\ActiveConferences\Livewire\ActiveConferencesList;
 use Modules\Extensions\Models\Extension;
 
+/**
+ * Create an admin account holding one active conferences permission.
+ */
 function activeConferencesAdminWithPermission(string $permission): Admin
 {
     $permissionModel = Permission::factory()->create([

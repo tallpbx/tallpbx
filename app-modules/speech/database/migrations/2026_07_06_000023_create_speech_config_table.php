@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing text-to-speech configuration per tenant.
+     */
     public function up(): void
     {
         Schema::create('speech_config', function (Blueprint $table) {
@@ -22,6 +25,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the speech configuration table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('speech_config');

@@ -28,6 +28,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the SIP profiles table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('sip_profiles');

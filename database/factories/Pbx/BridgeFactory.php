@@ -17,6 +17,11 @@ class BridgeFactory extends Factory
 {
     protected $model = Bridge::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

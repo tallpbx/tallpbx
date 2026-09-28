@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\CallForwards\Models\CallForward;
 use Modules\Extensions\Models\Extension;
 
+/**
+ * Service implementing call forward CRUD operations with
+ * FreeSWITCH dialplan XML generation.
+ */
 class CallForwardService implements CallForwardServiceInterface, ContextWideDialplanXmlContributor
 {
     /**
@@ -19,11 +23,17 @@ class CallForwardService implements CallForwardServiceInterface, ContextWideDial
         return 70;
     }
 
+    /**
+     * Create a new call forward rule.
+     */
     public function create(array $data): CallForward
     {
         return CallForward::create($data);
     }
 
+    /**
+     * Update an existing call forward rule and return the fresh copy.
+     */
     public function update(CallForward $forward, array $data): CallForward
     {
         $forward->update($data);
@@ -31,11 +41,17 @@ class CallForwardService implements CallForwardServiceInterface, ContextWideDial
         return $forward->fresh();
     }
 
+    /**
+     * Delete a call forward rule.
+     */
     public function delete(CallForward $forward): void
     {
         $forward->delete();
     }
 
+    /**
+     * Get every call forward rule for one tenant, ordered by forward type.
+     */
     public function getByTenant(int $tenantId): Collection
     {
         return CallForward::withoutGlobalScope('tenant')->where('tenant_id', $tenantId)

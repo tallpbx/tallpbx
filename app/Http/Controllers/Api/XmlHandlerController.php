@@ -1254,6 +1254,7 @@ class XmlHandlerController extends Controller
         /** @var Collection<int, IvrMenu> $menus */
         $menus = IvrMenu::withoutGlobalScope('tenant')
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            // Fail closed: with no tenant context and no include-all flag, no menus are served.
             ->when($tenantId === null && ! $includeAllMenus, fn ($query) => $query->whereRaw('1 = 0'))
             ->where('enabled', true)
             ->with(['options', 'mediaAsset'])
@@ -1264,6 +1265,7 @@ class XmlHandlerController extends Controller
             $safeName = $this->escapeXml($menu->name);
             $greeting = $this->managedGreetingPath($menu->mediaAsset?->id, $menu->greeting);
             $digitLen = $menu->digit_length > 0 ? $menu->digit_length : 1;
+            // FreeSWITCH expects the IVR menu timeout in milliseconds.
             $timeout = ($menu->timeout > 0 ? $menu->timeout : 10) * 1000;
             $maxFailures = $menu->max_failures > 0 ? $menu->max_failures : 3;
 
@@ -1338,6 +1340,7 @@ class XmlHandlerController extends Controller
         /** @var Collection<int, Conference> $conferences */
         $conferences = Conference::withoutGlobalScope('tenant')
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            // Fail closed: with no tenant context and no include-all flag, no conferences are served.
             ->when($tenantId === null && ! $includeAllConferences, fn ($query) => $query->whereRaw('1 = 0'))
             ->where('enabled', true)
             ->orderBy('name')
@@ -1387,6 +1390,7 @@ class XmlHandlerController extends Controller
         /** @var Collection<int, Queue> $queues */
         $queues = Queue::withoutGlobalScope('tenant')
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            // Fail closed: with no tenant context and no include-all flag, no queues are served.
             ->when($tenantId === null && ! $includeAllQueues, fn ($query) => $query->whereRaw('1 = 0'))
             ->where('enabled', true)
             ->orderBy('name')
@@ -1431,6 +1435,7 @@ class XmlHandlerController extends Controller
             'moh/8000' => ['rate' => 8000, 'interval' => 20],
             'moh/16000' => ['rate' => 16000, 'interval' => 20],
             'moh/32000' => ['rate' => 32000, 'interval' => 20],
+            // 48 kHz uses a shorter 10 ms packet interval to keep RTP frames within the default size.
             'moh/48000' => ['rate' => 48000, 'interval' => 10],
         ];
 

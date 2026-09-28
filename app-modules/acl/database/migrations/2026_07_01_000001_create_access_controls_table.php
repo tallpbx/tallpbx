@@ -41,6 +41,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the access control rules and their nodes from the database.
+     */
     public function down(): void
     {
         Schema::dropIfExists('access_control_nodes');

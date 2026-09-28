@@ -39,11 +39,17 @@ class TenantsList extends Component
 
     private TenantServiceInterface $tenantService;
 
+    /**
+     * Inject the tenant service used by this component.
+     */
     public function boot(TenantServiceInterface $tenantService): void
     {
         $this->tenantService = $tenantService;
     }
 
+    /**
+     * Load the tenant list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadTenants();
@@ -107,6 +113,9 @@ class TenantsList extends Component
         $this->dispatch('tenant-deleted');
     }
 
+    /**
+     * Render the tenant list view.
+     */
     public function render(): View
     {
         // Reload with eager-loaded relations: Livewire re-hydrates the serialized

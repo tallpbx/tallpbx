@@ -444,6 +444,7 @@ class MediaStorageService implements MediaStorageServiceInterface
         }
 
         if (! rename($temporary, $destination)) {
+            // Best-effort temp cleanup before surfacing the failure.
             @unlink($temporary);
             throw new RuntimeException('Managed media file could not be finalized.');
         }

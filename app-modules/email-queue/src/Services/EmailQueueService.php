@@ -12,6 +12,9 @@ use Modules\EmailQueue\Models\EmailQueueItem;
  */
 class EmailQueueService extends CrudService
 {
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = EmailQueueItem::class;

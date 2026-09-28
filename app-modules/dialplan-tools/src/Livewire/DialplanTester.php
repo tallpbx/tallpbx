@@ -46,6 +46,7 @@ class DialplanTester extends Component
         $this->tested = true;
         $this->matchGroups = [];
 
+        // Escape the delimiter so a pattern containing '/' still compiles.
         $matched = preg_match('/'.str_replace('/', '\/', $this->testPattern).'/', $this->testNumber, $matches);
 
         if ($matched) {

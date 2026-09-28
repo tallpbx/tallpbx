@@ -196,6 +196,8 @@ class ApplicationFilePermissions
         }
 
         foreach (explode("\n", trim($process->getOutput())) as $line) {
+            // Git reports tracked executables with file mode 100755; only
+            // those entry points need the executable bit preserved.
             if (! str_starts_with($line, '100755 ')) {
                 continue;
             }

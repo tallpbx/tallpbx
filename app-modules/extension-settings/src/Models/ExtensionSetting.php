@@ -27,11 +27,17 @@ class ExtensionSetting extends Model
         'tenant_id', 'extension_id', 'key', 'value',
     ];
 
+    /**
+     * The extension this setting belongs to.
+     */
     public function extension(): BelongsTo
     {
         return $this->belongsTo(Extension::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): ExtensionSettingFactory
     {
         return ExtensionSettingFactory::new();

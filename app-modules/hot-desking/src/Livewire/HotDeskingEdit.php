@@ -30,6 +30,9 @@ class HotDeskingEdit extends BaseEditComponent
 
     private HotDeskingServiceInterface $hotDeskingService;
 
+    /**
+     * Inject the hot desking service used by this component.
+     */
     public function boot(HotDeskingServiceInterface $hotDeskingService): void
     {
         $this->hotDeskingService = $hotDeskingService;

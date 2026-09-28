@@ -18,6 +18,10 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AttachRequestId
 {
+    /**
+     * Generate a correlation ID, share it with the log context, and hand the
+     * request to the next middleware.
+     */
     public function handle(Request $request, Closure $next): Response
     {
         $requestId = 'req_'.bin2hex(random_bytes(8));

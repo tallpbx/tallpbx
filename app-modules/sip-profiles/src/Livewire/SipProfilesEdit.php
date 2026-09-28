@@ -27,6 +27,9 @@ class SipProfilesEdit extends BaseEditComponent
 
     private SipProfileServiceInterface $profileService;
 
+    /**
+     * Inject the SIP profile service used by this component.
+     */
     public function boot(SipProfileServiceInterface $profileService): void
     {
         $this->profileService = $profileService;

@@ -23,6 +23,9 @@ class FeatureCodeService implements ContextWideDialplanXmlContributor, FeatureCo
         return 50;
     }
 
+    /**
+     * Create a new feature code, rejecting duplicates within the tenant.
+     */
     public function create(array $data): FeatureCode
     {
         $this->validateUniqueCode($data['tenant_id'], $data['code']);
@@ -30,6 +33,9 @@ class FeatureCodeService implements ContextWideDialplanXmlContributor, FeatureCo
         return FeatureCode::create($data);
     }
 
+    /**
+     * Update an existing feature code and return the fresh copy.
+     */
     public function update(FeatureCode $code, array $data): FeatureCode
     {
         if (isset($data['code']) && $data['code'] !== $code->code) {
@@ -41,11 +47,17 @@ class FeatureCodeService implements ContextWideDialplanXmlContributor, FeatureCo
         return $code->fresh();
     }
 
+    /**
+     * Delete a feature code.
+     */
     public function delete(FeatureCode $code): void
     {
         $code->delete();
     }
 
+    /**
+     * Get every feature code for one tenant, ordered by code.
+     */
     public function getByTenant(int $tenantId): Collection
     {
         return FeatureCode::withoutGlobalScope('tenant')
@@ -54,6 +66,11 @@ class FeatureCodeService implements ContextWideDialplanXmlContributor, FeatureCo
             ->get();
     }
 
+    /**
+     * Ensure the feature code is unique within the tenant.
+     *
+     * @throws ValidationException
+     */
     private function validateUniqueCode(int $tenantId, string $code, ?string $excludeId = null): void
     {
         $query = FeatureCode::withoutGlobalScope('tenant')

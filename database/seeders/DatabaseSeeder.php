@@ -130,6 +130,7 @@ class DatabaseSeeder extends Seeder
             ['email' => $email],
             [
                 'name' => $name,
+                // Demo accounts get an unguessable random password; access happens through an explicit reset.
                 'password' => Hash::make(bin2hex(random_bytes(8))),
             ],
         );
@@ -288,6 +289,7 @@ class DatabaseSeeder extends Seeder
             return $host;
         }
 
+        // Fallback for hostless inputs: strip the scheme, path, and port manually.
         $server = preg_replace('#^https?://#', '', $server) ?? $server;
         $server = explode('/', $server)[0] ?? $server;
         $server = explode(':', $server)[0] ?? $server;

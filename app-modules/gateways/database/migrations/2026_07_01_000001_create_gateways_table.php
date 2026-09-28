@@ -38,6 +38,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the gateways table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('gateways');

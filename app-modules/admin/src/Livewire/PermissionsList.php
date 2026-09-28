@@ -32,6 +32,9 @@ class PermissionsList extends Component
 
     private PermissionService $permissionService;
 
+    /**
+     * Inject the permission service used by this component.
+     */
     public function boot(PermissionService $permissionService): void
     {
         $this->permissionService = $permissionService;
@@ -59,6 +62,9 @@ class PermissionsList extends Component
         $this->modules = array_keys($this->permissions);
     }
 
+    /**
+     * Render the permissions list view.
+     */
     public function render(): View
     {
         return view('admin::permissions-list');

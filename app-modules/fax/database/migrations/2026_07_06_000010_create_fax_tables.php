@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the tables storing outbound faxes and received faxes
+     * for each tenant.
+     */
     public function up(): void
     {
         Schema::create('fax_queue', function (Blueprint $table) {
@@ -31,6 +35,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the fax inbox and fax queue tables.
+     */
     public function down(): void
     {
         Schema::dropIfExists('fax_inbox');

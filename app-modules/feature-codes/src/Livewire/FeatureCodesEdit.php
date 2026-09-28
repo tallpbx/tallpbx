@@ -60,6 +60,10 @@ class FeatureCodesEdit extends BaseEditComponent
         return $this->codeId !== null;
     }
 
+    /**
+     * Validate the form, store the feature code, and ask FreeSWITCH to
+     * reload its configuration so the change takes effect.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -85,6 +89,9 @@ class FeatureCodesEdit extends BaseEditComponent
         ReloadFreeSwitchXml::dispatch('feature code saved');
     }
 
+    /**
+     * Validation rules for the feature code form.
+     */
     protected function rules(): array
     {
         return [

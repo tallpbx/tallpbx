@@ -45,6 +45,9 @@ class UsersEdit extends Component
 
     private UserServiceInterface $userService;
 
+    /**
+     * Inject the user service used by this component.
+     */
     public function boot(UserServiceInterface $userService): void
     {
         $this->userService = $userService;
@@ -127,6 +130,9 @@ class UsersEdit extends Component
         ];
     }
 
+    /**
+     * Render the user edit form.
+     */
     public function render(): View
     {
         return view('admin::users-edit');

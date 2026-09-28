@@ -237,6 +237,7 @@ class OutboundRouteService implements ContextWideDialplanXmlContributor, Outboun
      */
     public function isValidDialPattern(string $pattern): bool
     {
+        // A pattern is valid when PHP can compile it; the empty subject avoids evaluating it.
         return @preg_match($this->wrapPattern($pattern), '') !== false;
     }
 

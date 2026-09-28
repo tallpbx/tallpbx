@@ -77,6 +77,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the extension-user assignments and the extensions table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('extension_user');

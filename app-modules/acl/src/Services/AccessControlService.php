@@ -76,6 +76,10 @@ class AccessControlService implements AccessControlServiceInterface
         AclConfigurationCache::invalidateAndReload();
     }
 
+    /**
+     * Get every access control rule that belongs to one tenant,
+     * together with its nodes.
+     */
     public function getByTenant(int $tenantId): Collection
     {
         return AccessControl::withoutGlobalScope('tenant')->with('nodes')->where('tenant_id', $tenantId)->get();

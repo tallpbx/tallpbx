@@ -4,6 +4,9 @@ namespace Tests\Browser\Pages;
 
 use Laravel\Dusk\Browser;
 
+/**
+ * Page object for the public site home page.
+ */
 class HomePage extends Page
 {
     /**

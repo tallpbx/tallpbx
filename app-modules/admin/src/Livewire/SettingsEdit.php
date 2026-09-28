@@ -53,11 +53,17 @@ class SettingsEdit extends Component
 
     private SettingServiceInterface $settingService;
 
+    /**
+     * Inject the settings service used by this component.
+     */
     public function boot(SettingServiceInterface $settingService): void
     {
         $this->settingService = $settingService;
     }
 
+    /**
+     * Load the application settings when the page opens.
+     */
     public function mount(): void
     {
         $this->loadSettings();
@@ -176,6 +182,9 @@ class SettingsEdit extends Component
         $this->dispatch('setting-deleted');
     }
 
+    /**
+     * Render the settings editor view.
+     */
     public function render(): View
     {
         return view('admin::settings-edit');

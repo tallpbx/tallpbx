@@ -25,6 +25,9 @@ class TenantLimit extends Model
         'tenant_id', 'resource', 'soft_limit', 'hard_limit',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -33,6 +36,9 @@ class TenantLimit extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): TenantLimitFactory
     {
         return TenantLimitFactory::new();

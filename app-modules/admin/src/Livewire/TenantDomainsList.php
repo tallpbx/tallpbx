@@ -35,11 +35,17 @@ class TenantDomainsList extends Component
 
     private TenantDomainServiceInterface $domainService;
 
+    /**
+     * Inject the tenant domain service used by this component.
+     */
     public function boot(TenantDomainServiceInterface $domainService): void
     {
         $this->domainService = $domainService;
     }
 
+    /**
+     * Load the tenant domain list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadDomains();
@@ -91,6 +97,9 @@ class TenantDomainsList extends Component
         $this->dispatch('domain-deleted');
     }
 
+    /**
+     * Render the tenant domains list view.
+     */
     public function render(): View
     {
         return view('admin::tenant-domains-list');

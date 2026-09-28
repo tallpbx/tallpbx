@@ -199,6 +199,10 @@ class ExtensionsEdit extends BaseEditComponent
         return $this->extensionId !== null;
     }
 
+    /**
+     * Validate the form, create or update the extension, and sync its
+     * SIP account and voicemail settings.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -265,6 +269,10 @@ class ExtensionsEdit extends BaseEditComponent
         $this->redirect(route('panel.extensions.index'));
     }
 
+    /**
+     * Validation rules for the extension form, keeping the extension
+     * number unique within the tenant.
+     */
     protected function rules(): array
     {
         $uniqueRule = Rule::unique('extensions', 'extension_number')

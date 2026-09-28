@@ -89,6 +89,7 @@ class InitialAdminProvisioner
                 return null;
             }
 
+            // 256-bit single-use code shown once in the terminal; only its hash is stored.
             $activationCode = bin2hex(random_bytes(32));
             $this->saveState($state, $mode, 'pending', Hash::make($activationCode));
 
@@ -163,6 +164,8 @@ class InitialAdminProvisioner
     {
         $data = $this->decodeState($state);
 
+        // Serialise concurrent setup attempts: the row lock stops two posts
+        // from both passing the "no administrator yet" check.
         if (Admin::query()->lockForUpdate()->exists() || ($data['status'] ?? null) !== 'pending') {
             throw new InitialAdminProvisioningException('An administrator has already been created.');
         }

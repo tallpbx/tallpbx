@@ -15,6 +15,11 @@ class CdrFactory extends Factory
 {
     protected $model = Cdr::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         $start = fake()->dateTimeThisMonth();

@@ -22,6 +22,9 @@ class CallFlowService extends CrudService implements ContextWideDialplanXmlContr
         return 70;
     }
 
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = CallFlow::class;

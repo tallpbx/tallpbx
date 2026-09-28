@@ -14,6 +14,10 @@ use Modules\Recordings\Models\Recording;
  */
 class RecordingService extends CrudService
 {
+    /**
+     * Tell the shared CRUD base class which model it manages, and keep
+     * the media storage service for recording cleanup.
+     */
     public function __construct(private readonly MediaStorageServiceInterface $mediaStorage)
     {
         $this->modelClass = Recording::class;

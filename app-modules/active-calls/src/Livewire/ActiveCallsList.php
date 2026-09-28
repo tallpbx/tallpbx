@@ -13,6 +13,10 @@ use App\Support\OperationalControlFeedback;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
+/**
+ * Livewire component listing active calls and offering hangup and
+ * transfer actions for permitted users.
+ */
 class ActiveCallsList extends BaseListComponent
 {
     use OperationalControlFeedback;
@@ -31,6 +35,10 @@ class ActiveCallsList extends BaseListComponent
 
     private TenantEslScoping $scoping;
 
+    /**
+     * Resolve the FreeSWITCH session, its control service, and the
+     * tenant scoper used by this component.
+     */
     public function boot(FreeSwitchServiceInterface $fs, FreeSwitchControlService $control, TenantEslScoping $scoping): void
     {
         $this->fs = $fs;
@@ -38,11 +46,18 @@ class ActiveCallsList extends BaseListComponent
         $this->scoping = $scoping;
     }
 
+    /**
+     * Load the active call list when the page opens.
+     */
     public function mount(): void
     {
         $this->refreshCalls();
     }
 
+    /**
+     * Fetch the current channels from FreeSWITCH, keep only the calling
+     * tenant's calls, and refresh the list (also used for event-driven refreshes).
+     */
     #[On('refresh-calls')]
     public function refreshCalls(): void
     {

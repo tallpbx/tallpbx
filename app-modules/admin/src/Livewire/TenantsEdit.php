@@ -41,6 +41,9 @@ class TenantsEdit extends Component
 
     private TenantServiceInterface $tenantService;
 
+    /**
+     * Inject the tenant service used for tenant lookups and saves.
+     */
     public function boot(TenantServiceInterface $tenantService): void
     {
         $this->tenantService = $tenantService;
@@ -110,6 +113,9 @@ class TenantsEdit extends Component
         ];
     }
 
+    /**
+     * Render the tenant edit form.
+     */
     public function render(): View
     {
         return view('admin::tenants-edit');

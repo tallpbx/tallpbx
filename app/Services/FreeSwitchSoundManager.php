@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Jobs\ReloadFreeSwitchXml;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -486,6 +484,7 @@ class FreeSwitchSoundManager
             $curlProcess->run();
 
             if (! $curlProcess->isSuccessful() || ! file_exists($tmpFile) || filesize($tmpFile) < 1000) {
+                // Best-effort temp cleanup; the failure is already decided.
                 @unlink($tmpFile);
 
                 return [
@@ -496,6 +495,7 @@ class FreeSwitchSoundManager
 
             $tarProcess = new Process(['tar', '-xzf', $tmpFile, '-C', $targetDir]);
             $tarProcess->run();
+            // Best-effort temp cleanup; the extraction result is checked below.
             @unlink($tmpFile);
 
             if (! $tarProcess->isSuccessful()) {

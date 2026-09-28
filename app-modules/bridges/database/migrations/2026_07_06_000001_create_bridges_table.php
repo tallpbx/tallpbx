@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /**
+     * Create the table storing bridge (conference room) destinations
+     * for each tenant.
+     */
     public function up(): void
     {
         Schema::create('bridges', function (Blueprint $table) {
@@ -27,6 +31,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the bridges table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('bridges');

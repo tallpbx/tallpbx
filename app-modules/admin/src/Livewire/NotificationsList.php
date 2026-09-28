@@ -28,6 +28,9 @@ class NotificationsList extends Component
 
     public int $unreadCount = 0;
 
+    /**
+     * Refresh the unread notification count when the page opens.
+     */
     public function mount(): void
     {
         $this->refreshCount();
@@ -108,6 +111,7 @@ class NotificationsList extends Component
         $actor = $this->currentActor();
 
         if ($actor === null) {
+            // No signed-in actor (unreachable behind auth): return an empty list, never every notification.
             return DatabaseNotification::query()->whereRaw('1 = 0');
         }
 
@@ -116,6 +120,9 @@ class NotificationsList extends Component
             ->where('notifiable_id', $actor->getAuthIdentifier());
     }
 
+    /**
+     * Render the paginated notifications list for the signed-in account.
+     */
     public function render(): View
     {
         $notifications = $this->actorNotifications()

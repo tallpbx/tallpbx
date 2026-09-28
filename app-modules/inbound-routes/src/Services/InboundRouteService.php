@@ -21,6 +21,10 @@ class InboundRouteService implements ContextWideDialplanXmlContributor, InboundR
      */
     private DestinationResolver $destinationResolver;
 
+    /**
+     * Create the service with the destination resolver that turns typed
+     * destinations into FreeSWITCH dialplan actions.
+     */
     public function __construct(DestinationResolver $destinationResolver)
     {
         $this->destinationResolver = $destinationResolver;

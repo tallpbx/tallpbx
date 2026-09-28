@@ -21,11 +21,18 @@ class PinNumbersEdit extends BaseEditComponent
 
     private PinNumberService $pinNumberService;
 
+    /**
+     * Inject the PIN number service used by this component.
+     */
     public function boot(PinNumberService $pinNumberService): void
     {
         $this->pinNumberService = $pinNumberService;
     }
 
+    /**
+     * Open the create form, or load the given PIN for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $pinId = null): void
     {
         $this->loadTenants();
@@ -42,11 +49,18 @@ class PinNumbersEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing PIN rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->pinId !== null;
     }
 
+    /**
+     * Validate the form and create or update the PIN number.
+     */
     public function save(): void
     {
         $this->validate();
@@ -68,6 +82,9 @@ class PinNumbersEdit extends BaseEditComponent
         $this->redirect(route('panel.pin-numbers.index'));
     }
 
+    /**
+     * Validation rules for the PIN number form.
+     */
     public function rules(): array
     {
         return [

@@ -11,6 +11,9 @@ namespace App\Support;
  */
 readonly class UpdateResult
 {
+    /**
+     * Create a result describing how the update pipeline ended.
+     */
     public function __construct(
         public bool $success,
         public string $target,

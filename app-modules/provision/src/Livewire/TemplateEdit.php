@@ -8,6 +8,9 @@ use App\Support\BaseEditComponent;
 use Modules\Provision\Models\ProvisionTemplate;
 use Modules\Provision\Services\ProvisionServiceInterface;
 
+/**
+ * Livewire component for creating and editing provisioning templates.
+ */
 #[Layout('layouts.app')]
 class TemplateEdit extends BaseEditComponent
 {
@@ -23,11 +26,18 @@ class TemplateEdit extends BaseEditComponent
 
     private ProvisionServiceInterface $service;
 
+    /**
+     * Inject the provision service used by this component.
+     */
     public function boot(ProvisionServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Open the create form, or load the given template for editing when
+     * a record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $templateId = null): void
     {
         $this->loadTenants();
@@ -46,11 +56,18 @@ class TemplateEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing template rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->templateId !== null;
     }
 
+    /**
+     * Validate the form and create or update the provisioning template.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -74,6 +91,9 @@ class TemplateEdit extends BaseEditComponent
         $this->redirect(route('panel.provision.templates.index'));
     }
 
+    /**
+     * Validation rules for the provisioning template form.
+     */
     public function rules(): array
     {
         return [

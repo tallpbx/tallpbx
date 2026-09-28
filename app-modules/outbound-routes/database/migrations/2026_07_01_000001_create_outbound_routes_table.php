@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing outbound routing rules per tenant.
+     */
     public function up(): void
     {
         Schema::create('outbound_routes', function (Blueprint $table) {
@@ -29,6 +32,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the outbound routes table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('outbound_routes');

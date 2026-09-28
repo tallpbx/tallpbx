@@ -42,6 +42,9 @@ class HotDeskSession extends Model
     use HasFactory;
     use HasUuids;
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): HotDeskSessionFactory
     {
         return HotDeskSessionFactory::new();

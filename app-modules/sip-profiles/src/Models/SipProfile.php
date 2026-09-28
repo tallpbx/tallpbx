@@ -42,16 +42,25 @@ class SipProfile extends Model
         'enabled',
     ];
 
+    /**
+     * The tenant that owns this SIP profile.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): SipProfileFactory
     {
         return SipProfileFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

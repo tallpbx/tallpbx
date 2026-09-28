@@ -9,13 +9,12 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
-#[Layout('layouts.app')]
-
 /**
  * Admin form for configuring FreeSWITCH event rate limiting.
  *
  * Uses the SettingService to persist event rate limit thresholds.
  */
+#[Layout('layouts.app')]
 class EventRateLimitsSettings extends Component
 {
     public int $maxEventsPerMinute = 300;
@@ -26,11 +25,17 @@ class EventRateLimitsSettings extends Component
 
     private SettingServiceInterface $settings;
 
+    /**
+     * Inject the settings service used by this component.
+     */
     public function boot(SettingServiceInterface $settings): void
     {
         $this->settings = $settings;
     }
 
+    /**
+     * Load the saved rate limit thresholds when the page opens.
+     */
     public function mount(): void
     {
         $this->maxEventsPerMinute = (int) ($this->settings->get('event_rate_limits.max_events_per_minute') ?? 300);
@@ -38,6 +43,9 @@ class EventRateLimitsSettings extends Component
         $this->blockDuration = (int) ($this->settings->get('event_rate_limits.block_duration') ?? 60);
     }
 
+    /**
+     * Validate the form and persist the rate limit thresholds.
+     */
     public function save(): void
     {
         $this->validate();
@@ -49,6 +57,9 @@ class EventRateLimitsSettings extends Component
         $this->dispatch('notify', message: __('admin.settings_saved'));
     }
 
+    /**
+     * Validation rules for the event rate limits form.
+     */
     public function rules(): array
     {
         return [
@@ -58,6 +69,9 @@ class EventRateLimitsSettings extends Component
         ];
     }
 
+    /**
+     * Render the event rate limits form.
+     */
     public function render(): View
     {
         return view('event-rate-limits::event-rate-limits-settings');

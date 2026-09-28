@@ -12,6 +12,9 @@ use Modules\XmlCdr\Models\Cdr;
  */
 class CdrService extends CrudService
 {
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = Cdr::class;

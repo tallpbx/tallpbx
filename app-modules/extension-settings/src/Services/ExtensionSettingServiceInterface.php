@@ -28,9 +28,18 @@ interface ExtensionSettingServiceInterface
      */
     public function all(): Collection;
 
+    /**
+     * Create a new extension setting.
+     */
     public function create(array $data): ExtensionSetting;
 
+    /**
+     * Update an existing extension setting and return the fresh copy.
+     */
     public function update(ExtensionSetting $setting, array $data): ExtensionSetting;
 
+    /**
+     * Delete an extension setting.
+     */
     public function delete(ExtensionSetting $setting): void;
 }

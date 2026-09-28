@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing call flow routing rules for each tenant.
+     */
     public function up(): void
     {
         Schema::create('call_flows', function (Blueprint $table) {
@@ -24,6 +27,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the call flows table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('call_flows');

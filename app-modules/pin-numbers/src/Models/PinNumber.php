@@ -58,6 +58,9 @@ class PinNumber extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): PinNumberFactory
     {
         return PinNumberFactory::new();

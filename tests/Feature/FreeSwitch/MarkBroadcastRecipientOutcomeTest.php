@@ -7,6 +7,9 @@ use App\Models\Tenant;
 use Modules\CallBroadcast\Models\CallBroadcast;
 use Modules\CallBroadcast\Models\CallBroadcastRecipient;
 
+/**
+ * Create a broadcast that is currently sending for outcome tests.
+ */
 function outcomeBroadcast(): CallBroadcast
 {
     return CallBroadcast::factory()->create([
@@ -16,6 +19,9 @@ function outcomeBroadcast(): CallBroadcast
     ]);
 }
 
+/**
+ * Create one recipient for a broadcast with the given call status.
+ */
 function outcomeRecipient(CallBroadcast $broadcast, string $status = 'attempted'): CallBroadcastRecipient
 {
     return CallBroadcastRecipient::factory()->create([

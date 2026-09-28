@@ -62,6 +62,9 @@ class Bridge extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): BridgeFactory
     {
         return BridgeFactory::new();

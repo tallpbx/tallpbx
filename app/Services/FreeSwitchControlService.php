@@ -15,6 +15,9 @@ namespace App\Services;
  */
 class FreeSwitchControlService
 {
+    /**
+     * Create the service around the low-level FreeSWITCH connection.
+     */
     public function __construct(private readonly FreeSwitchServiceInterface $fs) {}
 
     /**

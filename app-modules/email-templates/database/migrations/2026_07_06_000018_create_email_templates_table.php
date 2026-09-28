@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing email notification templates per tenant.
+     */
     public function up(): void
     {
         Schema::create('email_templates', function (Blueprint $table) {
@@ -20,6 +23,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the email templates table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('email_templates');

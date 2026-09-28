@@ -22,6 +22,9 @@ class ConferenceService extends CrudService implements ContextWideDialplanXmlCon
         return 70;
     }
 
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = Conference::class;

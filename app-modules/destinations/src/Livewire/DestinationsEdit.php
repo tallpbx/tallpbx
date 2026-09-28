@@ -88,6 +88,9 @@ class DestinationsEdit extends BaseEditComponent
         $this->redirect(route('panel.destinations.index'));
     }
 
+    /**
+     * Validation rules for the destination form.
+     */
     protected function rules(): array
     {
         return [

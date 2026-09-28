@@ -13,6 +13,9 @@ use Modules\CallCenterActive\Livewire\CallCenterActiveList;
 use Modules\CallCenters\Models\Queue;
 use Modules\Extensions\Models\Extension;
 
+/**
+ * Create an admin account holding one call center active permission.
+ */
 function callCenterAdminWithPermission(string $permission): Admin
 {
     $permissionModel = Permission::factory()->create([

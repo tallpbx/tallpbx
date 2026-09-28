@@ -13,6 +13,9 @@ use Modules\CallBroadcast\Models\CallBroadcast;
  */
 class CallBroadcastService extends CrudService
 {
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = CallBroadcast::class;

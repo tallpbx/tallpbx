@@ -15,6 +15,11 @@ class SipAccountFactory extends Factory
 {
     protected $model = SipAccount::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         $username = fake()->unique()->userName();

@@ -287,6 +287,7 @@ class SecurityManager extends Component
             return;
         }
 
+        // Extract the live input-hook policy (drop or accept) from the kernel's nft status output.
         $this->liveFirewallPolicy = preg_match(
             '/type\s+filter\s+hook\s+input[^;]*;\s*policy\s+(drop|accept)\s*;/',
             $output,
@@ -1226,6 +1227,7 @@ class SecurityManager extends Component
             ->get();
 
         $catalogServices = SecurityService::where('is_system', true)
+            // Show ICMP rules first so the related group stays together in the table.
             ->orderByRaw("CASE WHEN protocol = 'icmp' THEN 0 ELSE 1 END, name ASC")
             ->get();
 

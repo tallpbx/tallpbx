@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing outbound emails waiting to be sent.
+     */
     public function up(): void
     {
         Schema::create('email_queue', function (Blueprint $table) {
@@ -22,6 +25,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the email queue table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('email_queue');

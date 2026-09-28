@@ -57,6 +57,7 @@ class SystemHealth
             $parts = preg_split('/\s+/', trim($output[0]));
 
             if (count($parts) >= 5) {
+                // df -B1 columns: [0] filesystem, [1] size, [2] used, [3] available, [4] use%, [5] mount point.
                 $totalBytes = (float) ($parts[1] ?? 0);
                 $usedBytes = (float) ($parts[2] ?? 0);
                 $freeBytes = (float) ($parts[3] ?? 0);
@@ -92,6 +93,7 @@ class SystemHealth
         $freeGb = 0.0;
         $percentUsed = 0.0;
 
+        // /proc/meminfo only exists on Linux; treat a missing file as "memory info unavailable".
         $memInfo = @file_get_contents('/proc/meminfo');
 
         if ($memInfo !== false) {
@@ -280,6 +282,7 @@ class SystemHealth
 
         foreach ($output as $line) {
             if (str_starts_with($line, 'notAfter=')) {
+                // Trim the 'notAfter=' key reported by openssl.
                 $expiresAt = substr($line, 9);
             }
             if (str_starts_with($line, 'issuer=')) {

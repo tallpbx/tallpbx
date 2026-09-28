@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\CallCenters\Models\Queue;
 use Modules\CallCenters\Services\CallCenterServiceInterface;
 
+/**
+ * Livewire component for creating and editing call center queues.
+ */
 #[Layout('layouts.app')]
 class QueueEdit extends BaseEditComponent
 {
@@ -27,11 +30,18 @@ class QueueEdit extends BaseEditComponent
 
     private CallCenterServiceInterface $service;
 
+    /**
+     * Inject the call center service used by this component.
+     */
     public function boot(CallCenterServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Open the create form, or load the given queue for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $queueId = null): void
     {
         $this->loadTenants();
@@ -53,11 +63,19 @@ class QueueEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing queue rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->queueId !== null;
     }
 
+    /**
+     * Validate the form, store the queue, and ask FreeSWITCH to reload
+     * its configuration so the change takes effect.
+     */
     public function save(): void
     {
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;

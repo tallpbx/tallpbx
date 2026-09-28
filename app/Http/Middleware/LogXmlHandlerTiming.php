@@ -60,6 +60,7 @@ class LogXmlHandlerTiming
             'elapsed_ms' => $elapsedMs,
             'db_query_count' => $queryCount,
             'db_time_ms' => $dbTimeMs,
+            // Clamp at zero: the DB timer can exceed wall time by a fraction on clock skew.
             'non_db_time_ms' => round(max(0.0, $elapsedMs - $dbTimeMs), 2),
             'section' => $request->input('section', 'directory'),
             'status' => $response->getStatusCode(),

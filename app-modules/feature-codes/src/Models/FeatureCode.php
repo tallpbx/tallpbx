@@ -42,16 +42,25 @@ class FeatureCode extends Model
         'enabled',
     ];
 
+    /**
+     * The tenant that owns this feature code.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): FeatureCodeFactory
     {
         return FeatureCodeFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

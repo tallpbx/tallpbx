@@ -34,6 +34,9 @@ class CallFlow extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -41,6 +44,9 @@ class CallFlow extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): CallFlowFactory
     {
         return CallFlowFactory::new();

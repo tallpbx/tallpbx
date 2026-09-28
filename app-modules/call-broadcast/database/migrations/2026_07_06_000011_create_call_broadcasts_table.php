@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the broadcast and recipient tables used to track
+     * bulk outbound calls and their outcomes.
+     */
     public function up(): void
     {
         Schema::create('call_broadcasts', function (Blueprint $table) {
@@ -31,6 +35,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the broadcast recipient and broadcast tables.
+     */
     public function down(): void
     {
         Schema::dropIfExists('call_broadcast_recipients');

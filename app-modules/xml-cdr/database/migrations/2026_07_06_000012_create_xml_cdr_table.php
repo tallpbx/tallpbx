@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing FreeSWITCH call detail records.
+     */
     public function up(): void
     {
         Schema::create('xml_cdr', function (Blueprint $table) {
@@ -28,6 +31,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the call detail records table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('xml_cdr');

@@ -240,6 +240,9 @@ it('drops table-owned module tables and clears their migration records', functio
         ->and(DB::table('migrations')->where('migration', '2099_01_01_000001_create_test_owned_tables')->exists())->toBeFalse();
 });
 
+/**
+ * Register a module uninstaller with the container for lifecycle tests.
+ */
 function registerTestUninstaller(ModuleUninstaller $uninstaller): void
 {
     $binding = 'tests.module-lifecycle.uninstaller';
@@ -248,29 +251,47 @@ function registerTestUninstaller(ModuleUninstaller $uninstaller): void
     app()->tag([$binding], 'module.uninstallers');
 }
 
+/**
+ * Build an inline module uninstaller double that records uninstall calls.
+ */
 function testModuleUninstaller(string $moduleName): ModuleUninstaller
 {
     return new class($moduleName) implements ModuleUninstaller
     {
         public bool $uninstalled = false;
 
+        /**
+         * Remember the module name this double answers for.
+         */
         public function __construct(private readonly string $moduleName) {}
 
+        /**
+         * The kebab-case module name this double answers for.
+         */
         public function moduleName(): string
         {
             return $this->moduleName;
         }
 
+        /**
+         * Always allow uninstalling in tests.
+         */
         public function canUninstall(Module $module): bool
         {
             return true;
         }
 
+        /**
+         * Describe what an uninstall would remove.
+         */
         public function previewUninstall(Module $module): array
         {
             return ['Drop extension-owned tables'];
         }
 
+        /**
+         * Record that the uninstall ran.
+         */
         public function uninstall(Module $module): void
         {
             $this->uninstalled = true;
@@ -278,20 +299,32 @@ function testModuleUninstaller(string $moduleName): ModuleUninstaller
     };
 }
 
+/**
+ * Build an inline table uninstaller double for a fake module.
+ */
 function testTableUninstaller(): ModuleTableUninstaller
 {
     return new class extends ModuleTableUninstaller
     {
+        /**
+         * The kebab-case module name this double answers for.
+         */
         public function moduleName(): string
         {
             return 'test-owned';
         }
 
+        /**
+         * The database tables the uninstaller owns.
+         */
         protected function tables(): array
         {
             return ['test_owned_parent', 'test_owned_child'];
         }
 
+        /**
+         * The migration records the uninstaller owns.
+         */
         protected function migrations(): array
         {
             return ['2099_01_01_000001_create_test_owned_tables'];

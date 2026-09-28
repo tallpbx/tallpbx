@@ -48,6 +48,9 @@ class OutboundRoute extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -56,6 +59,9 @@ class OutboundRoute extends Model
         ];
     }
 
+    /**
+     * The tenant that owns this outbound route.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
@@ -72,6 +78,9 @@ class OutboundRoute extends Model
         return $this->belongsTo(Gateway::class, 'gateway_id');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): OutboundRouteFactory
     {
         return OutboundRouteFactory::new();

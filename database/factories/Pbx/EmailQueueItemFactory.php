@@ -17,6 +17,11 @@ class EmailQueueItemFactory extends Factory
 {
     protected $model = EmailQueueItem::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

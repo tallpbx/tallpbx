@@ -38,6 +38,9 @@ class NumberTranslationService implements NumberTranslationServiceInterface
             ->get();
     }
 
+    /**
+     * Create a new translation rule and invalidate the cached dialplan.
+     */
     public function create(array $data): NumberTranslation
     {
         $translation = DB::transaction(function () use ($data): NumberTranslation {
@@ -50,6 +53,9 @@ class NumberTranslationService implements NumberTranslationServiceInterface
         return $translation;
     }
 
+    /**
+     * Update an existing translation rule and invalidate the cached dialplan.
+     */
     public function update(NumberTranslation $translation, array $data): NumberTranslation
     {
         $translation = DB::transaction(function () use ($translation, $data): NumberTranslation {
@@ -64,6 +70,9 @@ class NumberTranslationService implements NumberTranslationServiceInterface
         return $translation;
     }
 
+    /**
+     * Delete a translation rule and invalidate the cached dialplan.
+     */
     public function delete(NumberTranslation $translation): void
     {
         DB::transaction(function () use ($translation): void {

@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing call recordings for each tenant.
+     */
     public function up(): void
     {
         Schema::create('call_recordings', function (Blueprint $table) {
@@ -23,6 +26,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the call recordings table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('call_recordings');

@@ -9,6 +9,9 @@ use Modules\CallBroadcast\Jobs\SendCallBroadcast;
 use Modules\CallBroadcast\Models\CallBroadcast;
 use Modules\CallBroadcast\Models\CallBroadcastRecipient;
 
+/**
+ * Create a broadcast with the given status and two pending recipients.
+ */
 function sendJobBroadcast(string $status = 'draft'): CallBroadcast
 {
     $broadcast = CallBroadcast::factory()->create([
@@ -22,6 +25,10 @@ function sendJobBroadcast(string $status = 'draft'): CallBroadcast
     return $broadcast;
 }
 
+/**
+ * Replace the FreeSWITCH session with a connected mock that accepts
+ * one originate attempt.
+ */
 function sendJobMockFreeSwitch(): FreeSwitchServiceInterface
 {
     $mock = Mockery::mock(FreeSwitchServiceInterface::class);

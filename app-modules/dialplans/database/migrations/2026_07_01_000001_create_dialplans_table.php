@@ -47,6 +47,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the dialplan detail and dialplan tables.
+     */
     public function down(): void
     {
         Schema::dropIfExists('dialplan_details');

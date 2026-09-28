@@ -33,12 +33,20 @@ class MusicOnHoldEdit extends BaseEditComponent
 
     private MediaStorageServiceInterface $mediaStorage;
 
+    /**
+     * Inject the music on hold service and the media storage service
+     * used for audio file cleanup.
+     */
     public function boot(MusicOnHoldService $musicOnHoldService, MediaStorageServiceInterface $mediaStorage): void
     {
         $this->musicOnHoldService = $musicOnHoldService;
         $this->mediaStorage = $mediaStorage;
     }
 
+    /**
+     * Open the create form, or load the given entry for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $mohId = null): void
     {
         $this->loadTenants();
@@ -56,11 +64,19 @@ class MusicOnHoldEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing entry rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->mohId !== null;
     }
 
+    /**
+     * Validate the form, store the entry, and store any uploaded audio
+     * as a managed media asset.
+     */
     public function save(): void
     {
         $this->validate();
@@ -97,6 +113,9 @@ class MusicOnHoldEdit extends BaseEditComponent
         $this->redirect(route('panel.music-on-hold.index'));
     }
 
+    /**
+     * Validation rules for the music on hold form.
+     */
     public function rules(): array
     {
         return [

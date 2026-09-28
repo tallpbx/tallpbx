@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing emergency (E911) configuration per tenant.
+     */
     public function up(): void
     {
         Schema::create('emergency_config', function (Blueprint $table) {
@@ -23,6 +26,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the emergency configuration table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('emergency_config');

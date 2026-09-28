@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the tables storing call center queues, agents, and
+     * the tiers that link agents to queues.
+     */
     public function up(): void
     {
         Schema::create('call_center_queues', function (Blueprint $table) {
@@ -41,6 +45,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the call center tier, agent, and queue tables.
+     */
     public function down(): void
     {
         Schema::dropIfExists('call_center_tiers');

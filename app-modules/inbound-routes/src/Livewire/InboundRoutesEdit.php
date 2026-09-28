@@ -69,6 +69,10 @@ class InboundRoutesEdit extends BaseEditComponent
         return $this->routeId !== null;
     }
 
+    /**
+     * Validate the form, store the route, and ask FreeSWITCH to reload
+     * its configuration so the change takes effect.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -95,6 +99,10 @@ class InboundRoutesEdit extends BaseEditComponent
         ReloadFreeSwitchXml::dispatch('inbound route '.($this->routeId !== null ? 'updated' : 'created'));
     }
 
+    /**
+     * Validation rules for the inbound route form, checking that the
+     * action is a recognised FreeSWITCH application or destination type.
+     */
     public function rules(): array
     {
         return [

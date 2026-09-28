@@ -22,6 +22,9 @@ class BridgeService extends CrudService implements ContextWideDialplanXmlContrib
         return 70;
     }
 
+    /**
+     * Point the shared CRUD base class at the Bridge model.
+     */
     public function __construct()
     {
         $this->modelClass = Bridge::class;

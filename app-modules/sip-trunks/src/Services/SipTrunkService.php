@@ -35,11 +35,17 @@ class SipTrunkService implements SipTrunkServiceInterface
             ->get();
     }
 
+    /**
+     * Create a new SIP trunk.
+     */
     public function create(array $data): SipTrunk
     {
         return DB::transaction(fn () => SipTrunk::withoutGlobalScope('tenant')->create($data));
     }
 
+    /**
+     * Update an existing SIP trunk and return the fresh copy.
+     */
     public function update(SipTrunk $trunk, array $data): SipTrunk
     {
         return DB::transaction(function () use ($trunk, $data): SipTrunk {
@@ -49,6 +55,9 @@ class SipTrunkService implements SipTrunkServiceInterface
         });
     }
 
+    /**
+     * Delete a SIP trunk.
+     */
     public function delete(SipTrunk $trunk): void
     {
         DB::transaction(fn () => $trunk->delete());

@@ -17,6 +17,11 @@ class CallCenterAgentFactory extends Factory
 {
     protected $model = Agent::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

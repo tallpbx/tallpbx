@@ -22,11 +22,17 @@ class CallCenterService implements CallCenterServiceInterface, ContextWideDialpl
         return 70;
     }
 
+    /**
+     * Create a new call center queue.
+     */
     public function createQueue(array $data): Queue
     {
         return DB::transaction(fn () => Queue::create($data));
     }
 
+    /**
+     * Update an existing queue and return the fresh copy.
+     */
     public function updateQueue(Queue $queue, array $data): Queue
     {
         return DB::transaction(function () use ($queue, $data): Queue {
@@ -36,6 +42,9 @@ class CallCenterService implements CallCenterServiceInterface, ContextWideDialpl
         });
     }
 
+    /**
+     * Delete a queue.
+     */
     public function deleteQueue(Queue $queue): void
     {
         DB::transaction(fn () => $queue->delete());

@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * A bulk outbound calling campaign owned by a tenant.
+ */
 class CallBroadcast extends Model
 {
     use BelongsToTenant;
@@ -23,11 +26,17 @@ class CallBroadcast extends Model
         'status',
     ];
 
+    /**
+     * The phone recipients queued for this broadcast.
+     */
     public function recipients(): HasMany
     {
         return $this->hasMany(CallBroadcastRecipient::class, 'broadcast_id');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): CallBroadcastFactory
     {
         return CallBroadcastFactory::new();

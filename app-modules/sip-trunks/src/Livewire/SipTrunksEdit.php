@@ -31,11 +31,18 @@ class SipTrunksEdit extends BaseEditComponent
 
     private SipTrunkServiceInterface $service;
 
+    /**
+     * Inject the SIP trunk service used by this component.
+     */
     public function boot(SipTrunkServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Open the create form, or load the given trunk for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $trunkId = null): void
     {
         $this->loadTenants();
@@ -58,11 +65,18 @@ class SipTrunksEdit extends BaseEditComponent
         $this->enabled = $trunk->enabled;
     }
 
+    /**
+     * Whether the form is editing an existing trunk rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->trunkId !== null;
     }
 
+    /**
+     * Validate the form and create or update the SIP trunk.
+     */
     public function save(): void
     {
         $this->validate();
@@ -88,6 +102,9 @@ class SipTrunksEdit extends BaseEditComponent
         $this->redirect(route('panel.sip-trunks.index'), navigate: true);
     }
 
+    /**
+     * Validation rules for the SIP trunk form.
+     */
     public function rules(): array
     {
         return [

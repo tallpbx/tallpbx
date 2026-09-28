@@ -440,10 +440,12 @@ class SecurityConfigGenerator
 
         $dir = dirname($target);
         if (! is_dir($dir)) {
+            // The @ guards against a concurrent create between the check and the mkdir.
             @mkdir($dir, 0750, true);
         }
 
         file_put_contents($target, $content);
+        // Chmod after writing so the ruleset is never world-readable, even under a permissive umask.
         @chmod($target, 0640);
 
         return $target;
@@ -461,10 +463,12 @@ class SecurityConfigGenerator
 
         $dir = dirname($target);
         if (! is_dir($dir)) {
+            // The @ guards against a concurrent create between the check and the mkdir.
             @mkdir($dir, 0750, true);
         }
 
         file_put_contents($target, $content);
+        // Chmod after writing so the ruleset is never world-readable, even under a permissive umask.
         @chmod($target, 0640);
 
         return $target;

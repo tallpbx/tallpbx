@@ -141,6 +141,9 @@ it('kills old profile gateway and starts new profile gateway when profile change
         && gatewayJobProperty($job, 'profileName') === 'internal');
 });
 
+/**
+ * Read a protected or private property from a queued job via reflection.
+ */
 function gatewayJobProperty(object $job, string $property): mixed
 {
     $reflection = new ReflectionProperty($job, $property);

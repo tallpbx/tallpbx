@@ -51,6 +51,9 @@ class ResetPassword extends Component
         }
     }
 
+    /**
+     * Render the password reset form.
+     */
     public function render(): View
     {
         return view('auth::reset-password');

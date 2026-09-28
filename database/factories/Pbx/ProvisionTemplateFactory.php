@@ -17,6 +17,11 @@ class ProvisionTemplateFactory extends Factory
 {
     protected $model = ProvisionTemplate::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         $vendor = fake()->randomElement(['grandstream', 'polycom', 'cisco', 'yealink']);

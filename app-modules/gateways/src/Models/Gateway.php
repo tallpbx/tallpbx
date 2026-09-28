@@ -61,16 +61,25 @@ class Gateway extends Model
         'password',
     ];
 
+    /**
+     * The tenant that owns this gateway.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): GatewayFactory
     {
         return GatewayFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

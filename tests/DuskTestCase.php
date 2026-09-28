@@ -9,6 +9,9 @@ use Illuminate\Support\Collection;
 use Laravel\Dusk\TestCase as BaseTestCase;
 use PHPUnit\Framework\Attributes\BeforeClass;
 
+/**
+ * Base test case for the Dusk browser tests.
+ */
 abstract class DuskTestCase extends BaseTestCase
 {
     /**

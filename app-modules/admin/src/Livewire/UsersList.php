@@ -35,11 +35,17 @@ class UsersList extends Component
 
     private UserServiceInterface $userService;
 
+    /**
+     * Inject the user service used by this component.
+     */
     public function boot(UserServiceInterface $userService): void
     {
         $this->userService = $userService;
     }
 
+    /**
+     * Load the user list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadUsers();
@@ -92,6 +98,9 @@ class UsersList extends Component
         $this->dispatch('user-deleted');
     }
 
+    /**
+     * Render the user list view.
+     */
     public function render(): View
     {
         return view('admin::users-list');

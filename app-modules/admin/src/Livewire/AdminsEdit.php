@@ -43,6 +43,11 @@ class AdminsEdit extends Component
     /** @var Collection<int, Group> */
     public Collection $systemGroups;
 
+    /**
+     * Load the system groups and, when editing, fill the form with the
+     * administrator's current details. New admins default to the
+     * Super Administrators group when it exists.
+     */
     public function mount(?int $adminId = null): void
     {
         $this->systemGroups = Group::whereNull('tenant_id')
@@ -67,6 +72,9 @@ class AdminsEdit extends Component
         }
     }
 
+    /**
+     * Validate the form and create or update the administrator account.
+     */
     public function save(): void
     {
         $rules = [
@@ -134,6 +142,9 @@ class AdminsEdit extends Component
         $this->redirect(route('panel.admins.index'), navigate: true);
     }
 
+    /**
+     * Render the administrator edit form.
+     */
     public function render(): View
     {
         return view('admin::admins-edit');

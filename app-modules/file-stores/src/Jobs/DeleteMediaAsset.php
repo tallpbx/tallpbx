@@ -49,6 +49,7 @@ class DeleteMediaAsset implements ShouldBeUnique, ShouldQueue
         return [(new WithoutOverlapping('media-asset:'.$this->mediaAssetId))
             ->shared()
             ->releaseAfter(60)
+            // If a worker dies mid-job, the overlap lock expires after an hour so retries can resume.
             ->expireAfter(3600)];
     }
 

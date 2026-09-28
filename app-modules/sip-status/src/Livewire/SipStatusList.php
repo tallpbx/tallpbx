@@ -9,6 +9,9 @@ use App\Support\BaseListComponent;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
+/**
+ * Livewire component listing Sofia SIP profile statuses.
+ */
 class SipStatusList extends BaseListComponent
 {
     public bool $fsConnected = false;
@@ -17,16 +20,26 @@ class SipStatusList extends BaseListComponent
 
     private FreeSwitchServiceInterface $fs;
 
+    /**
+     * Inject the FreeSWITCH session used by this component.
+     */
     public function boot(FreeSwitchServiceInterface $fs): void
     {
         $this->fs = $fs;
     }
 
+    /**
+     * Load the SIP profile statuses when the page opens.
+     */
     public function mount(): void
     {
         $this->refresh();
     }
 
+    /**
+     * Fetch the Sofia profile statuses from FreeSWITCH and refresh
+     * the list.
+     */
     #[On('refresh')]
     public function refresh(): void
     {
@@ -47,6 +60,9 @@ class SipStatusList extends BaseListComponent
         }
     }
 
+    /**
+     * Parse the plain-text "sofia status" output into profile rows.
+     */
     private function parseProfiles(string $raw): array
     {
         $lines = explode("\n", trim($raw));

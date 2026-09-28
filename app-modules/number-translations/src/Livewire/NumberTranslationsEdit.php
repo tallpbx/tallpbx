@@ -8,6 +8,9 @@ use App\Support\BaseEditComponent;
 use Modules\NumberTranslations\Models\NumberTranslation;
 use Modules\NumberTranslations\Services\NumberTranslationServiceInterface;
 
+/**
+ * Livewire component for creating and editing number translation rules.
+ */
 class NumberTranslationsEdit extends BaseEditComponent
 {
     public string $name = '';
@@ -24,11 +27,18 @@ class NumberTranslationsEdit extends BaseEditComponent
 
     private NumberTranslationServiceInterface $service;
 
+    /**
+     * Inject the number translation service used by this component.
+     */
     public function boot(NumberTranslationServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Open the create form, or load the given rule for editing when a
+     * record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $translationId = null): void
     {
         $this->loadTenants();
@@ -50,11 +60,18 @@ class NumberTranslationsEdit extends BaseEditComponent
         $this->enabled = $translation->enabled;
     }
 
+    /**
+     * Whether the form is editing an existing rule rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->translationId !== null;
     }
 
+    /**
+     * Validate the form and create or update the translation rule.
+     */
     public function save(): void
     {
         $this->validate();
@@ -84,6 +101,9 @@ class NumberTranslationsEdit extends BaseEditComponent
         $this->redirect(route('panel.number-translations.index'), navigate: true);
     }
 
+    /**
+     * Validation rules for the number translation form.
+     */
     public function rules(): array
     {
         $rules = [

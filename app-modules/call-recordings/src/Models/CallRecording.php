@@ -38,6 +38,9 @@ class CallRecording extends Model
         'call_uuid',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -45,6 +48,9 @@ class CallRecording extends Model
         ];
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): CallRecordingFactory
     {
         return CallRecordingFactory::new();

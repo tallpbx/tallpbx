@@ -25,11 +25,18 @@ class EmailTemplatesEdit extends BaseEditComponent
 
     private EmailTemplateService $templateService;
 
+    /**
+     * Inject the email template service used by this component.
+     */
     public function boot(EmailTemplateService $templateService): void
     {
         $this->templateService = $templateService;
     }
 
+    /**
+     * Open the create form, or load the given template for editing when
+     * a record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $templateId = null): void
     {
         $this->loadTenants();
@@ -48,11 +55,18 @@ class EmailTemplatesEdit extends BaseEditComponent
         $this->body = $template->body;
     }
 
+    /**
+     * Whether the form is editing an existing template rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->templateId !== null;
     }
 
+    /**
+     * Validate the form and create or update the email template.
+     */
     public function save(): void
     {
         $this->validate();
@@ -74,6 +88,9 @@ class EmailTemplatesEdit extends BaseEditComponent
         $this->redirect(route('panel.email-templates.index'), navigate: true);
     }
 
+    /**
+     * Validation rules for the email template form.
+     */
     public function rules(): array
     {
         return [

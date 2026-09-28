@@ -17,6 +17,11 @@ class TenantLimitFactory extends Factory
 {
     protected $model = TenantLimit::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

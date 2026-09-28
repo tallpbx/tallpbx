@@ -12,6 +12,9 @@ use Modules\EmailTemplates\Models\EmailTemplate;
  */
 class EmailTemplateService extends CrudService
 {
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = EmailTemplate::class;

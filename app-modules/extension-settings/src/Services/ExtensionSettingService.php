@@ -35,11 +35,17 @@ class ExtensionSettingService implements ExtensionSettingServiceInterface
             ->get();
     }
 
+    /**
+     * Create a new extension setting.
+     */
     public function create(array $data): ExtensionSetting
     {
         return DB::transaction(fn () => ExtensionSetting::withoutGlobalScope('tenant')->create($data));
     }
 
+    /**
+     * Update an existing extension setting and return the fresh copy.
+     */
     public function update(ExtensionSetting $setting, array $data): ExtensionSetting
     {
         return DB::transaction(function () use ($setting, $data): ExtensionSetting {
@@ -49,6 +55,9 @@ class ExtensionSettingService implements ExtensionSettingServiceInterface
         });
     }
 
+    /**
+     * Delete an extension setting.
+     */
     public function delete(ExtensionSetting $setting): void
     {
         DB::transaction(fn () => $setting->withoutGlobalScope('tenant')->delete());

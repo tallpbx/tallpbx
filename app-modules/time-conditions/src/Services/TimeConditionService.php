@@ -22,6 +22,9 @@ class TimeConditionService extends CrudService implements ContextWideDialplanXml
         return 70;
     }
 
+    /**
+     * Tell the shared CRUD base class which model it manages.
+     */
     public function __construct()
     {
         $this->modelClass = TimeCondition::class;

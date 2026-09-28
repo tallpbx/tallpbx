@@ -208,6 +208,9 @@ class ModuleServiceProvider extends ServiceProvider
         ]);
     }
 
+    /**
+     * Register every admin panel permission declared by this module.
+     */
     private function registerPermissions(): void
     {
         $perm = app(PermissionService::class);

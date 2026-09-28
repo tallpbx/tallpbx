@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Create the table storing voicemail messages per tenant.
+     */
     public function up(): void
     {
         Schema::create('voicemail_messages', function (Blueprint $table) {
@@ -26,6 +29,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the voicemail messages table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('voicemail_messages');

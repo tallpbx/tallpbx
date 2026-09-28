@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /**
+     * Create the table storing music-on-hold entries per tenant.
+     */
     public function up(): void
     {
         Schema::create('music_on_hold', function (Blueprint $table) {
@@ -24,6 +27,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the music on hold table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('music_on_hold');

@@ -13,6 +13,9 @@ use App\Support\OperationalControlFeedback;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
+/**
+ * Livewire component listing active call-center queues and agents.
+ */
 class CallCenterActiveList extends BaseListComponent
 {
     use OperationalControlFeedback;
@@ -31,6 +34,10 @@ class CallCenterActiveList extends BaseListComponent
 
     private TenantEslScoping $scoping;
 
+    /**
+     * Resolve the FreeSWITCH session, its control service, and the
+     * tenant scoper used by this component.
+     */
     public function boot(FreeSwitchServiceInterface $fs, FreeSwitchControlService $control, TenantEslScoping $scoping): void
     {
         $this->fs = $fs;
@@ -38,11 +45,18 @@ class CallCenterActiveList extends BaseListComponent
         $this->scoping = $scoping;
     }
 
+    /**
+     * Load the queue and agent status when the page opens.
+     */
     public function mount(): void
     {
         $this->refresh();
     }
 
+    /**
+     * Fetch queues and agents from FreeSWITCH, keep only the calling
+     * tenant's data, and refresh the list.
+     */
     #[On('refresh')]
     public function refresh(): void
     {

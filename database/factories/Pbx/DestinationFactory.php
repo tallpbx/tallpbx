@@ -15,6 +15,11 @@ class DestinationFactory extends Factory
 {
     protected $model = Destination::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

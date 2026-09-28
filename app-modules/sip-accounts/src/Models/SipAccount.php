@@ -53,11 +53,17 @@ class SipAccount extends Model
         'auth_password',
     ];
 
+    /**
+     * The tenant that owns this SIP account.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * The tenant domain this SIP account registers under.
+     */
     public function tenantDomain(): BelongsTo
     {
         return $this->belongsTo(TenantDomain::class);
@@ -71,11 +77,17 @@ class SipAccount extends Model
         return $this->belongsTo(Extension::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): SipAccountFactory
     {
         return SipAccountFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

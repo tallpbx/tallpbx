@@ -28,9 +28,18 @@ interface SipTrunkServiceInterface
      */
     public function all(): Collection;
 
+    /**
+     * Create a new SIP trunk.
+     */
     public function create(array $data): SipTrunk;
 
+    /**
+     * Update an existing SIP trunk and return the fresh copy.
+     */
     public function update(SipTrunk $trunk, array $data): SipTrunk;
 
+    /**
+     * Delete a SIP trunk.
+     */
     public function delete(SipTrunk $trunk): void;
 }

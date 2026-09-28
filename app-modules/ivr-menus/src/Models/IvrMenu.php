@@ -51,6 +51,9 @@ class IvrMenu extends Model
         'enabled',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -83,6 +86,9 @@ class IvrMenu extends Model
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): IvrMenuFactory
     {
         return IvrMenuFactory::new();

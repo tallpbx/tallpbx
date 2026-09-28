@@ -84,6 +84,9 @@ class Extension extends Model
         'enabled',
     ];
 
+    /**
+     * The tenant that owns this extension.
+     */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
@@ -114,11 +117,17 @@ class Extension extends Model
         return $this->hasMany(SipAccount::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): ExtensionFactory
     {
         return ExtensionFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

@@ -17,6 +17,11 @@ class SpeechConfigFactory extends Factory
 {
     protected $model = SpeechConfig::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

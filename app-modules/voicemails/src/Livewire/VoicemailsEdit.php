@@ -86,11 +86,19 @@ class VoicemailsEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing voicemail box rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->voicemailUuid !== null;
     }
 
+    /**
+     * Validate the form, store the voicemail box, and store any
+     * uploaded greeting as a managed media asset.
+     */
     public function save(): void
     {
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
@@ -138,6 +146,9 @@ class VoicemailsEdit extends BaseEditComponent
         ReloadFreeSwitchXml::dispatch('voicemail saved');
     }
 
+    /**
+     * Validation rules for the voicemail form.
+     */
     protected function rules(): array
     {
         return array_merge(VoicemailValidation::rules(

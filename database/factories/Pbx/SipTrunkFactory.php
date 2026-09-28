@@ -17,6 +17,11 @@ class SipTrunkFactory extends Factory
 {
     protected $model = SipTrunk::class;
 
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [

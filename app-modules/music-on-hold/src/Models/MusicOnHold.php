@@ -70,6 +70,9 @@ class MusicOnHold extends Model
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): MusicOnHoldFactory
     {
         return MusicOnHoldFactory::new();

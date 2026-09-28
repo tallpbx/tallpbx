@@ -11,6 +11,10 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Modules\CallBroadcast\Services\CallBroadcastService;
 
+/**
+ * Livewire component for creating a call broadcast draft from a
+ * pasted list of phone numbers.
+ */
 #[Layout('layouts.app')]
 class BroadcastCreate extends Component
 {
@@ -25,16 +29,26 @@ class BroadcastCreate extends Component
 
     private CallBroadcastService $broadcastService;
 
+    /**
+     * Inject the call broadcast service used by this component.
+     */
     public function boot(CallBroadcastService $broadcastService): void
     {
         $this->broadcastService = $broadcastService;
     }
 
+    /**
+     * Load the tenant options when the page opens.
+     */
     public function mount(): void
     {
         $this->tenants = Tenant::orderBy('name')->get();
     }
 
+    /**
+     * Validate the form and store the new broadcast draft together
+     * with its parsed recipients.
+     */
     public function save(): void
     {
         $this->validate($this->rules());
@@ -88,6 +102,9 @@ class BroadcastCreate extends Component
         return array_keys($numbers);
     }
 
+    /**
+     * Validation rules for the broadcast creation form.
+     */
     public function rules(): array
     {
         return [
@@ -97,6 +114,9 @@ class BroadcastCreate extends Component
         ];
     }
 
+    /**
+     * Render the broadcast creation form.
+     */
     public function render(): View
     {
         return view('call-broadcast::broadcast-create');

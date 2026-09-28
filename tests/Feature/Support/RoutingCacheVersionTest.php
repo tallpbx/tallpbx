@@ -30,6 +30,10 @@ it('still bumps when the cache store cannot increment a missing key', function (
         // missing key returns false instead of creating it.
         $store = new class extends ArrayStore
         {
+            /**
+             * Increment the value only when the key already exists,
+             * mimicking the database store's behaviour.
+             */
             public function increment($key, $value = 1)
             {
                 if (parent::get($key) === null) {

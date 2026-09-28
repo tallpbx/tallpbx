@@ -32,16 +32,25 @@ class AccessControlNode extends Model
         'order',
     ];
 
+    /**
+     * The access control rule this node belongs to.
+     */
     public function accessControl(): BelongsTo
     {
         return $this->belongsTo(AccessControl::class);
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): AccessControlNodeFactory
     {
         return AccessControlNodeFactory::new();
     }
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [

@@ -110,16 +110,25 @@ it('does not register menu items or permissions for disabled base modules', func
     $permissions = new PermissionService;
     $provider = new class(app()) extends ModuleServiceProvider
     {
+        /**
+         * The kebab-case module name the provider registers under.
+         */
         protected function moduleName(): string
         {
             return 'disabled-test-module';
         }
 
+        /**
+         * The PHP root namespace of the test module.
+         */
         protected function moduleNamespace(): string
         {
             return 'Modules\\DisabledTestModule';
         }
 
+        /**
+         * The menu items the provider would register.
+         */
         protected function menuItems(): array
         {
             return [
@@ -134,6 +143,9 @@ it('does not register menu items or permissions for disabled base modules', func
             ];
         }
 
+        /**
+         * The permissions the provider would register.
+         */
         protected function permissions(): array
         {
             return [

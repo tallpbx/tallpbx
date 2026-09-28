@@ -43,6 +43,9 @@ class VoicemailMessage extends Model
         'freeswitch_folder',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     */
     protected function casts(): array
     {
         return [
@@ -51,6 +54,9 @@ class VoicemailMessage extends Model
         ];
     }
 
+    /**
+     * The voicemail box this message was left in.
+     */
     public function voicemail(): BelongsTo
     {
         return $this->belongsTo(Voicemail::class);
@@ -64,6 +70,9 @@ class VoicemailMessage extends Model
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
     }
 
+    /**
+     * Create a new factory instance for this model.
+     */
     protected static function newFactory(): VoicemailMessageFactory
     {
         return VoicemailMessageFactory::new();

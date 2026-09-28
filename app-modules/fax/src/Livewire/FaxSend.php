@@ -14,6 +14,9 @@ use Livewire\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\Fax\Services\FaxServiceInterface;
 
+/**
+ * Livewire component for uploading a document and sending it as a fax.
+ */
 #[Layout('layouts.app')]
 class FaxSend extends Component
 {
@@ -32,16 +35,26 @@ class FaxSend extends Component
 
     private FaxServiceInterface $faxService;
 
+    /**
+     * Inject the fax service used by this component.
+     */
     public function boot(FaxServiceInterface $faxService): void
     {
         $this->faxService = $faxService;
     }
 
+    /**
+     * Load the tenant options when the page opens.
+     */
     public function mount(): void
     {
         $this->tenants = Tenant::orderBy('name')->get();
     }
 
+    /**
+     * Validate the form, queue the uploaded document as a fax, and
+     * return to the fax page.
+     */
     public function send(): void
     {
         $this->validate($this->rules());
@@ -62,6 +75,9 @@ class FaxSend extends Component
         $this->redirect(route('panel.fax.index'));
     }
 
+    /**
+     * Validation rules for the fax sending form.
+     */
     public function rules(): array
     {
         return [
@@ -71,6 +87,9 @@ class FaxSend extends Component
         ];
     }
 
+    /**
+     * Render the fax sending form.
+     */
     public function render(): View
     {
         return view('fax::fax-send');

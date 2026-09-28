@@ -105,6 +105,9 @@ class AdminsList extends Component
         $this->dispatch('admin-deleted');
     }
 
+    /**
+     * Render the administrator list view with group memberships loaded.
+     */
     public function render(): View
     {
         return view('admin::admins-list', [

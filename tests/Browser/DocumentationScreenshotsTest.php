@@ -25,6 +25,10 @@ class DocumentationScreenshotsTest extends DuskTestCase
 {
     private Admin $admin;
 
+    /**
+     * Skip the capture unless DUSK_CAPTURE_DOCS=1 requested it, then
+     * prepare the fixture administrator.
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -208,6 +212,10 @@ class DocumentationScreenshotsTest extends DuskTestCase
         );
     }
 
+    /**
+     * Walk through the panel pages and write freshness-checked
+     * documentation screenshots for each one.
+     */
     public function test_capture_documentation_screenshots(): void
     {
         $this->browse(function (Browser $browser) {

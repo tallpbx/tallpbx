@@ -31,6 +31,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the feature codes table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('feature_codes');

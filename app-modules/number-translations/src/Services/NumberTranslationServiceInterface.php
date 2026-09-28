@@ -37,9 +37,18 @@ interface NumberTranslationServiceInterface
      */
     public function translate(string $destination, string $direction): string;
 
+    /**
+     * Create a new translation rule.
+     */
     public function create(array $data): NumberTranslation;
 
+    /**
+     * Update an existing translation rule and return the fresh copy.
+     */
     public function update(NumberTranslation $translation, array $data): NumberTranslation;
 
+    /**
+     * Delete a translation rule.
+     */
     public function delete(NumberTranslation $translation): void;
 }

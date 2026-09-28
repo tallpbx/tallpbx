@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /**
+     * Create the table storing PIN numbers per tenant.
+     */
     public function up(): void
     {
         Schema::create('pin_numbers', function (Blueprint $table) {
@@ -23,6 +26,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the PIN numbers table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('pin_numbers');

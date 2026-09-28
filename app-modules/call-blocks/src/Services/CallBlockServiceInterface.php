@@ -12,11 +12,23 @@ use Modules\CallBlocks\Models\CallBlock;
  */
 interface CallBlockServiceInterface
 {
+    /**
+     * Create a new call block rule.
+     */
     public function create(array $data): CallBlock;
 
+    /**
+     * Update an existing call block rule and return the fresh copy.
+     */
     public function update(CallBlock $block, array $data): CallBlock;
 
+    /**
+     * Delete a call block rule.
+     */
     public function delete(CallBlock $block): void;
 
+    /**
+     * Get every call block rule for one tenant, ordered by name.
+     */
     public function getByTenant(int $tenantId): Collection;
 }

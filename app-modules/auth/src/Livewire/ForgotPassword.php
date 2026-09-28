@@ -36,6 +36,9 @@ class ForgotPassword extends Component
         }
     }
 
+    /**
+     * Render the forgot-password form.
+     */
     public function render(): View
     {
         return view('auth::forgot-password');

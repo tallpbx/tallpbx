@@ -12,11 +12,17 @@ it('delivers a database notification to an admin through the morph map', functio
 
     $admin->notify(new class extends Notification
     {
+        /**
+         * Send the notification through the database channel.
+         */
         public function via(object $notifiable): array
         {
             return ['database'];
         }
 
+        /**
+         * Provide the stored notification payload.
+         */
         public function toArray(object $notifiable): array
         {
             return ['ok' => true];
@@ -35,11 +41,17 @@ it('delivers a database notification to a tenant user through the morph map', fu
 
     $user->notify(new class extends Notification
     {
+        /**
+         * Send the notification through the database channel.
+         */
         public function via(object $notifiable): array
         {
             return ['database'];
         }
 
+        /**
+         * Provide the stored notification payload.
+         */
         public function toArray(object $notifiable): array
         {
             return ['ok' => true];

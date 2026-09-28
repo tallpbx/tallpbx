@@ -37,6 +37,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the voicemails table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('voicemails');

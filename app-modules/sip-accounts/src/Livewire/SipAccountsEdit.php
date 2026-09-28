@@ -31,11 +31,18 @@ class SipAccountsEdit extends BaseEditComponent
 
     private SipAccountServiceInterface $accountService;
 
+    /**
+     * Inject the SIP account service used by this component.
+     */
     public function boot(SipAccountServiceInterface $accountService): void
     {
         $this->accountService = $accountService;
     }
 
+    /**
+     * Open the create form, or load the given account for editing when
+     * a record id is supplied (tenant users may only open their own).
+     */
     public function mount(?string $accountId = null): void
     {
         $this->loadTenants();
@@ -54,11 +61,19 @@ class SipAccountsEdit extends BaseEditComponent
         }
     }
 
+    /**
+     * Whether the form is editing an existing account rather than
+     * creating a new one.
+     */
     public function getIsEditProperty(): bool
     {
         return $this->accountId !== null;
     }
 
+    /**
+     * Validate the form and create or update the SIP account, keeping
+     * the existing password when the field is left blank.
+     */
     public function save(): void
     {
         $this->validate();
@@ -85,6 +100,9 @@ class SipAccountsEdit extends BaseEditComponent
         $this->redirect(route('panel.sip-accounts.index'));
     }
 
+    /**
+     * Validation rules for the SIP account form.
+     */
     protected function rules(): array
     {
         return SipAccountValidation::rules(

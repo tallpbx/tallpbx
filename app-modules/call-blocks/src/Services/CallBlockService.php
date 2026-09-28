@@ -22,11 +22,17 @@ class CallBlockService implements CallBlockServiceInterface, ContextWideDialplan
         return 20;
     }
 
+    /**
+     * Create a new call block rule.
+     */
     public function create(array $data): CallBlock
     {
         return CallBlock::create($data);
     }
 
+    /**
+     * Update an existing call block rule and return the fresh copy.
+     */
     public function update(CallBlock $block, array $data): CallBlock
     {
         $block->update($data);
@@ -34,11 +40,17 @@ class CallBlockService implements CallBlockServiceInterface, ContextWideDialplan
         return $block->fresh();
     }
 
+    /**
+     * Delete a call block rule.
+     */
     public function delete(CallBlock $block): void
     {
         $block->delete();
     }
 
+    /**
+     * Get every call block rule for one tenant, ordered by name.
+     */
     public function getByTenant(int $tenantId): Collection
     {
         return CallBlock::withoutGlobalScope('tenant')->where('tenant_id', $tenantId)->orderBy('name')->get();

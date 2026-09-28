@@ -29,6 +29,9 @@ return new class extends Migration
         });
     }
 
+    /**
+     * Remove the devices table.
+     */
     public function down(): void
     {
         Schema::dropIfExists('devices');

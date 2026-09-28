@@ -16,6 +16,9 @@ beforeEach(function () {
     $this->admin = Admin::factory()->create(['enabled' => true]);
 });
 
+/**
+ * Create a draft broadcast with two pending recipients for send-flow tests.
+ */
 function broadcastSendFixture(): CallBroadcast
 {
     $broadcast = CallBroadcast::factory()->create([
