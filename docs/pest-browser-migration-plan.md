@@ -20,7 +20,7 @@
 | Task 2: Auth Bridge | ✅ Complete | feat(testing): add fast session auth bridge |
 | Task 3: Migrate RiskConfirmationBrowserTest | ✅ Complete | test(browser): migrate RiskConfirmationBrowserTest |
 | Task 4: Migrate PanelSmokeTest | ✅ Complete | `ee7c0d0` |
-| Task 5: Migrate MediaStorageBrowserTest | ⏳ Not started | — |
+| Task 5: Migrate MediaStorageBrowserTest | ✅ Complete | `fix(testing)` + `test(browser): migrate MediaStorageBrowserTest` |
 | Task 6: Migrate DocumentationScreenshotsTest | ⏳ Not started | — |
 | Task 7: Runner/phpunit.xml updates | ⏳ Not started | — |
 | Task 8: Remove legacy Dusk infrastructure | ⏳ Not started | — |
@@ -93,6 +93,27 @@ beforeEach(function () {
 ```
 
 See `AGENTS.md` § "CRITICAL — Permission Setup in Pest Tests" for rationale.
+
+### 5. Shared Session Across Visits — Identity Switching Requires Bridge Cleanup
+
+Every `visit()` creates a fresh browser context, but the in-process test server shares **one session** across all requests (`test()->prepareCookiesForRequest()` + a singleton session store). `loginAs()` persistence across visits depends on this. Consequences for tests that switch identities mid-test:
+
+- The bridge must sign out the **opposite guard** and forget `selected_tenant_id`, otherwise the previous identity (or its tenant selection) leaks into the next identity's requests — an admin stays signed in, or `ScopeTenant` aborts with 403 on a tenant the new user does not belong to. `TestAuthController` now performs this cleanup.
+- Multiple users **cannot be active simultaneously** in one test (no independent sessions). Serialize: `loginAs(A)` → assert as A → `loginAs(B)` → assert as B.
+
+### 6. `<option>` Elements Are Not Visible to `assertSee()`
+
+Text inside `<select>`/`<option>` (e.g. a destination offered in a dropdown) fails `assertSee()` because Playwright does not report `<option>` elements as visible. Verify dropdown choices through the DOM instead:
+
+```php
+$page->assertScript(<<<'JS'
+    (() => {
+        const select = document.querySelector('#media-archive-file-store');
+        if (!select) return false;
+        return [...select.options].some((option) => option.textContent.includes('Local storage - media'));
+    })()
+    JS);
+```
 
 ---
 
@@ -367,26 +388,29 @@ All 20+ tests converted. Key patterns applied (see **Pest 4 Browser API — Crit
 - Consumes: `FileStore`, `MediaAsset`, SFTP and local storage forms.
 - Produces: Validated storage archive selection flows in Playwright.
 
-- [ ] **Step 1: Convert `MediaStorageBrowserTest.php`**
+- [x] **Step 1: Convert `MediaStorageBrowserTest.php`** ✅
 
-Update `$this->browse()` callbacks to Pest 4 `visit()` chains:
-- Replace `$browser->loginAs($this->admin, 'admin')` with `$this->loginAs($this->admin, 'admin')`.
-- Replace `$browser->visit(...)` with `visit(...)`.
-- Replace `$browser->select(...)` with `$page->select(...)`.
-- Replace `$browser->waitForText(...)` with direct `$page->assertSee(...)`.
+Updated [`tests/Browser/MediaStorageBrowserTest.php`](file:///var/www/tallpbx/tests/Browser/MediaStorageBrowserTest.php) to Pest 4 browser syntax:
+- `$this->browse()` callbacks replaced with sequential `$this->loginAs()` + `visit()` chains.
+- The three-browser identity-switching test was serialized (shared in-process session; see Critical Findings §5).
+- `$browser->waitFor(selector)` replaced with retried `assertPresent()` chains; `waitForText()` replaced with retried `assertSee()`.
+- The XHR response reader now uses `$page->script()` with an IIFE (Playwright evaluates script content as an expression).
+- The reserved-destination assertion uses an `assertScript` DOM check because `<option>` text is not visible to `assertSee()` (§6).
+- `beforeEach` creates the reserved "Local storage - media" destination up front — on a freshly refreshed test database the component's option query runs before the destination is firstOrCreate'd, so the selector would otherwise omit it on first load.
+- `TestAuthController` (Test 2's bridge) was fixed: switching identities now signs out the opposite guard and clears `selected_tenant_id` (previously leaked through the shared session, causing 403s).
 
-- [ ] **Step 2: Run the test**
+- [x] **Step 2: Run the test** ✅
 
-Run:
 ```bash
 ./vendor/bin/pest tests/Browser/MediaStorageBrowserTest.php
 ```
-Expected: PASS.
 
-- [ ] **Step 3: Commit**
+Result: PASS — 5 tests, 26 assertions (~42 s). Regression checks: `TestAuthControllerTest` 4/4, `RiskConfirmationBrowserTest` 2/2, representative `PanelSmokeTest` dashboard test — all green.
+
+- [x] **Step 3: Commit** ✅
 
 ```bash
-git add tests/Browser/MediaStorageBrowserTest.php
+git add tests/Browser/MediaStorageBrowserTest.php app/Http/Controllers/Testing/TestAuthController.php tests/Feature/Testing/TestAuthControllerTest.php
 git commit -m "test(browser): migrate MediaStorageBrowserTest to Pest 4 browser"
 ```
 
