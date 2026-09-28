@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Console\Commands\ModuleSyncCommand;
 use App\Models\Module;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 
 beforeEach(function () {
     // Ensure we're testing against the local modules directory
@@ -95,6 +97,32 @@ it('skips a manifest that disappears after filesystem discovery', function (): v
     $result = $method->invoke($command, base_path('app-modules/removed-during-scan/module.json'));
 
     expect($result)->toBeNull();
+});
+
+it('rejects manifests whose module name is not canonical kebab-case', function (): void {
+    // Underscore names cannot round-trip through the kebab-case mapping used
+    // for dependency matching, so manifests using them must not sync. The
+    // fixture lives in vendor/ where the sync scan picks it up without
+    // touching the real app-modules tree.
+    $packageDir = base_path('vendor/pbx-test-invalid/module-with-bad-name');
+    File::ensureDirectoryExists($packageDir);
+    File::put("{$packageDir}/module.json", json_encode([
+        'name' => 'my_mod', 'version' => '1.0.0',
+        'namespace' => 'Modules\\MyMod', 'display_name' => 'My Mod',
+    ]));
+
+    try {
+        Artisan::call('module:sync');
+
+        // Console components wrap long lines, so compare whitespace-
+        // normalized output before asserting the operator was told.
+        $output = preg_replace('/\s+/', ' ', (string) Artisan::output());
+
+        expect($output)->toContain('invalid module name')
+            ->and(Module::where('name', 'my_mod')->exists())->toBeFalse();
+    } finally {
+        File::deleteDirectory(base_path('vendor/pbx-test-invalid'));
+    }
 });
 
 // ─── Edge Cases ─────────────────────────────────────────────────

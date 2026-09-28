@@ -34,8 +34,11 @@ class MakeModuleCommand extends Command
     {
         $name = $this->argument('name');
 
-        if (! preg_match('/^[a-z][a-z0-9_-]+$/', $name)) {
-            $this->components->error('Module name must start with a lowercase letter and contain only lowercase letters, numbers, hyphens, and underscores.');
+        // Canonical kebab-case only: module names must round-trip through the
+        // Str::kebab namespace mapping used by dependency matching and the
+        // module-aware test guard, which underscores would break.
+        if (! preg_match('/^[a-z][a-z0-9-]*$/', $name)) {
+            $this->components->error('Module name must start with a lowercase letter and contain only lowercase letters, numbers, and hyphens.');
 
             return self::FAILURE;
         }

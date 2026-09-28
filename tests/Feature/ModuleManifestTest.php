@@ -27,3 +27,13 @@ test('all module manifests contain required fields', function () {
 
     expect($errors)->toBeEmpty(implode("\n", $errors));
 });
+
+test('the manifest schema allows only canonical kebab-case module names', function () {
+    $schema = json_decode((string) file_get_contents(base_path('resources/schemas/module.json')), true);
+
+    // Underscore names cannot round-trip through the kebab-case mapping used
+    // for dependency matching, so the schema must reject them everywhere a
+    // module machine name appears.
+    expect($schema['properties']['name']['pattern'])->toBe('^[a-z][a-z0-9-]*$')
+        ->and($schema['properties']['requirements']['properties']['modules']['items']['pattern'])->toBe('^[a-z][a-z0-9-]*$');
+});

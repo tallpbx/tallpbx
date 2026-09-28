@@ -16,8 +16,8 @@
         },
         "name": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9_-]*$",
-            "description": "Machine name (lowercase, underscore-separated)."
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Machine name (lowercase, hyphen-separated)."
         },
         "version": {
             "type": "string",
@@ -82,7 +82,7 @@
                     "description": "Required TallPBX module machine names (enforced by ModuleBoundaryTest).",
                     "items": {
                         "type": "string",
-                        "pattern": "^[a-z][a-z0-9_-]*$"
+                        "pattern": "^[a-z][a-z0-9-]*$"
                     }
                 },
                 "packages": {

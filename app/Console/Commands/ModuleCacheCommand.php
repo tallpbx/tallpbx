@@ -104,7 +104,10 @@ class ModuleCacheCommand extends Command
             }
         }
 
-        if (! preg_match('/^[a-z][a-z0-9_-]*$/', $manifest['name'])) {
+        // Canonical kebab-case only, matching make:module: names must
+        // round-trip through the Str::kebab namespace mapping used by
+        // dependency matching, so underscore names are refused here too.
+        if (! preg_match('/^[a-z][a-z0-9-]*$/', $manifest['name'])) {
             $this->components->warn("Manifest [{$path}] has invalid module name.");
 
             return null;
