@@ -41,9 +41,6 @@ return [
 
     'debug' => (bool) env('APP_DEBUG', false),
 
-    // Marks the browser-test server so it rejects the primary application database.
-    'dusk_testing' => (bool) env('DUSK_TESTING', false),
-
     // Identifies the database that Laravel must protect from destructive Artisan commands.
     'primary_database' => env('TALLPBX_PRIMARY_DATABASE', env('DB_DATABASE', '')),
 

@@ -45,24 +45,16 @@ else
     password=$(od -An -N10 -tx1 /dev/urandom | tr -d ' \n')
 fi
 
-# The Dusk user has access only to the disposable browser-test database. A
-# mistaken Dusk database name therefore fails instead of touching TallPBX data.
-dusk_database_username="${database_username}_dusk"
-
-# Create the database and user accounts.
+# Create the database and user account.
 # "IF NOT EXISTS" and "ALTER USER" make this safe to re-run —
 # existing databases and data are preserved, and the password
-# is updated to match the current config. The separate _dusk database keeps
-# browser-test schema resets away from the installed application's data.
+# is updated to match the current config. Browser tests run against an
+# in-memory SQLite database, so no separate test database is created.
 mysql -u root <<EOF
 CREATE DATABASE IF NOT EXISTS $database_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS ${database_name}_dusk CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$database_username'@'$database_host' IDENTIFIED BY '$password';
 ALTER USER '$database_username'@'$database_host' IDENTIFIED BY '$password';
 GRANT ALL PRIVILEGES ON $database_name.* TO '$database_username'@'$database_host';
-CREATE USER IF NOT EXISTS '$dusk_database_username'@'$database_host' IDENTIFIED BY '$password';
-ALTER USER '$dusk_database_username'@'$database_host' IDENTIFIED BY '$password';
-GRANT ALL PRIVILEGES ON ${database_name}_dusk.* TO '$dusk_database_username'@'$database_host';
 FLUSH PRIVILEGES;
 EOF
 

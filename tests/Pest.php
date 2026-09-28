@@ -7,12 +7,13 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantManager;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Tests\DuskTestCase;
+use Illuminate\Support\Str;
+use Tests\Browser\Concerns\InteractsWithAuthentication;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->use(Tests\Browser\Concerns\InteractsWithAuthentication::class)
+    ->use(InteractsWithAuthentication::class)
     ->in('Browser');
 
 /*
@@ -122,7 +123,7 @@ function grantTenantUserPermissions(Tenant $tenant, array $permissions = [], ?Us
 
     if (! empty($permissions)) {
         $group = Group::factory()->forTenant($tenant->id)->create([
-            'name' => 'Test Tenant Group ' . \Illuminate\Support\Str::random(6),
+            'name' => 'Test Tenant Group '.Str::random(6),
         ]);
 
         foreach ($permissions as $name) {

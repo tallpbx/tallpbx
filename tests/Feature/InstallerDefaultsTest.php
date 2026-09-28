@@ -588,35 +588,13 @@ it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML cu
         ->and($installer)->not->toContain('Configure FreeSWITCH integration');
 });
 
-it('leaves tracked Dusk fixtures and package metadata unchanged during installation', function (): void {
-    $script = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+it('leaves package metadata unchanged during installation', function (): void {
     $package = json_decode((string) file_get_contents(base_path('package.json')), true, flags: JSON_THROW_ON_ERROR);
     $lock = json_decode((string) file_get_contents(base_path('package-lock.json')), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($script)->not->toContain('set_env_value .env.dusk')
-        ->and($package['name'])->toBe('tallpbx')
+    expect($package['name'])->toBe('tallpbx')
         ->and($lock['name'])->toBe($package['name'])
         ->and($lock['packages']['']['name'])->toBe($package['name']);
-});
-
-it('prepares the isolated Dusk database with the shared administrator seeder', function (): void {
-    $script = (string) file_get_contents(base_path('scripts/dusk.sh'));
-
-    expect($script)->toContain('php artisan migrate --force --env=dusk')
-        ->and($script)->toContain('php artisan db:seed --class=AdminSeeder --force --env=dusk')
-        ->and($script)->toContain('chromedriver --port="$DUSK_CHROMEDRIVER_PORT"');
-});
-
-it('tracks .env.dusk.example without secrets and auto-provisions isolated test key in dusk.sh', function (): void {
-    $duskExample = (string) file_get_contents(base_path('.env.dusk.example'));
-    $gitignore = (string) file_get_contents(base_path('.gitignore'));
-    $script = (string) file_get_contents(base_path('scripts/dusk.sh'));
-
-    expect($duskExample)->toContain('APP_KEY=')
-        ->and($duskExample)->not->toMatch('/^APP_KEY=.+/m')
-        ->and($gitignore)->toContain('.env.dusk')
-        ->and($script)->toContain('cp .env.dusk.example .env.dusk')
-        ->and($script)->toContain('php artisan key:generate --env=dusk --force');
 });
 
 it('stops the TALL setup when migrations or seeding fail', function (): void {

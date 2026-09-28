@@ -35,7 +35,7 @@ switch_package=true                          # Older direct-script package-insta
 switch_version=1.11                          # FreeSWITCH version hint used by legacy configuration
 
 # Browser Testing (Optional)
-# Install Chromium for Laravel Dusk browser tests:
-#   apt-get install -y chromium
-#   cd /var/www/tallpbx && php artisan dusk:chrome-driver
-#   php artisan dusk
+# Browser tests use Pest 4 with Playwright, which ships its own Chromium build —
+# no system browser package is needed. To enable them run:
+#   cd /var/www/tallpbx && npx playwright install --with-deps chromium
+#   php artisan app:test --full

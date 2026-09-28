@@ -38,7 +38,6 @@ use App\Services\TenantService;
 use App\Services\TenantServiceInterface;
 use App\Services\UserService;
 use App\Services\UserServiceInterface;
-use App\Support\DuskDatabaseSafety;
 use App\Support\GeneratedFilePermissions;
 use App\Support\MigrationSafetyGuard;
 use App\Support\PrimaryDatabaseSafety;
@@ -58,13 +57,39 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Modules\Backups\Services\BackupService;
 use Modules\Backups\Services\BackupServiceInterface;
+use Modules\Bridges\Models\Bridge;
+use Modules\CallBlocks\Models\CallBlock;
+use Modules\CallCenters\Models\Agent;
+use Modules\CallCenters\Models\Queue;
+use Modules\CallCenters\Models\Tier;
+use Modules\CallFlows\Models\CallFlow;
+use Modules\CallForwards\Models\CallForward;
 use Modules\CallRecordings\Models\CallRecording;
 use Modules\ConferenceCenters\Models\ConferenceCenter;
+use Modules\Conferences\Models\Conference;
+use Modules\Destinations\Models\Destination;
+use Modules\Dialplans\Models\Dialplan;
+use Modules\Dialplans\Models\DialplanDetail;
+use Modules\Emergency\Models\Emergency;
+use Modules\Extensions\Models\Extension;
 use Modules\Fax\Models\FaxInbox;
 use Modules\Fax\Models\FaxOutgoing;
+use Modules\FeatureCodes\Models\FeatureCode;
+use Modules\FollowMe\Models\FollowMe;
+use Modules\HotDesking\Models\HotDeskSession;
+use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\IvrMenus\Models\IvrMenu;
+use Modules\IvrMenus\Models\IvrMenuOption;
 use Modules\MusicOnHold\Models\MusicOnHold;
+use Modules\NumberTranslations\Models\NumberTranslation;
+use Modules\OutboundRoutes\Models\OutboundRoute;
+use Modules\PinNumbers\Models\PinNumber;
 use Modules\Recordings\Models\Recording;
+use Modules\RingGroups\Models\RingGroup;
+use Modules\RingGroups\Models\RingGroupExtension;
+use Modules\SipAccounts\Models\SipAccount;
+use Modules\TenantLimits\Models\TenantLimit;
+use Modules\TimeConditions\Models\TimeCondition;
 use Modules\VoicemailMessages\Models\VoicemailMessage;
 use Modules\Voicemails\Models\Voicemail;
 
@@ -199,10 +224,6 @@ class AppServiceProvider extends ServiceProvider
             TestDatabaseSafety::enforce();
         }
 
-        if (config('app.dusk_testing')) {
-            DuskDatabaseSafety::enforce();
-        }
-
         Model::preventLazyLoading(! $this->app->isProduction());
 
         if ($this->app->runningInConsole()) {
@@ -262,35 +283,35 @@ class AppServiceProvider extends ServiceProvider
     protected function registerRoutingCacheObservers(): void
     {
         $telephonyModels = [
-            \Modules\Extensions\Models\Extension::class,
-            \Modules\SipAccounts\Models\SipAccount::class,
-            \Modules\RingGroups\Models\RingGroup::class,
-            \Modules\RingGroups\Models\RingGroupExtension::class,
-            \Modules\InboundRoutes\Models\InboundRoute::class,
-            \Modules\Destinations\Models\Destination::class,
-            \Modules\OutboundRoutes\Models\OutboundRoute::class,
-            \Modules\IvrMenus\Models\IvrMenu::class,
-            \Modules\IvrMenus\Models\IvrMenuOption::class,
-            \Modules\TimeConditions\Models\TimeCondition::class,
-            \Modules\CallFlows\Models\CallFlow::class,
-            \Modules\CallBlocks\Models\CallBlock::class,
-            \Modules\Bridges\Models\Bridge::class,
-            \Modules\FollowMe\Models\FollowMe::class,
-            \Modules\HotDesking\Models\HotDeskSession::class,
-            \Modules\Voicemails\Models\Voicemail::class,
-            \Modules\Conferences\Models\Conference::class,
-            \Modules\ConferenceCenters\Models\ConferenceCenter::class,
-            \Modules\CallCenters\Models\Queue::class,
-            \Modules\CallCenters\Models\Agent::class,
-            \Modules\CallCenters\Models\Tier::class,
-            \Modules\CallForwards\Models\CallForward::class,
-            \Modules\FeatureCodes\Models\FeatureCode::class,
-            \Modules\Emergency\Models\Emergency::class,
-            \Modules\Dialplans\Models\Dialplan::class,
-            \Modules\Dialplans\Models\DialplanDetail::class,
-            \Modules\NumberTranslations\Models\NumberTranslation::class,
-            \Modules\PinNumbers\Models\PinNumber::class,
-            \Modules\TenantLimits\Models\TenantLimit::class,
+            Extension::class,
+            SipAccount::class,
+            RingGroup::class,
+            RingGroupExtension::class,
+            InboundRoute::class,
+            Destination::class,
+            OutboundRoute::class,
+            IvrMenu::class,
+            IvrMenuOption::class,
+            TimeCondition::class,
+            CallFlow::class,
+            CallBlock::class,
+            Bridge::class,
+            FollowMe::class,
+            HotDeskSession::class,
+            Voicemail::class,
+            Conference::class,
+            ConferenceCenter::class,
+            Queue::class,
+            Agent::class,
+            Tier::class,
+            CallForward::class,
+            FeatureCode::class,
+            Emergency::class,
+            Dialplan::class,
+            DialplanDetail::class,
+            NumberTranslation::class,
+            PinNumber::class,
+            TenantLimit::class,
         ];
 
         foreach ($telephonyModels as $modelClass) {

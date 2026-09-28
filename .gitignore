@@ -2,8 +2,6 @@
 .DS_Store
 .env
 .env.backup
-.env.dusk
-.env.dusk.backup
 .env.production
 .phpactor.json
 .phpunit.result.cache
@@ -40,9 +38,6 @@ Homestead.yaml
 Thumbs.db
 app-modules/backups/backups
 tests/Browser/Screenshots/
-tests/Browser/screenshots/
-tests/Browser/console/
-tests/Browser/source/
 
 # Internal audit reports (security-sensitive, never publish)
 /docs/project-audit-report.md

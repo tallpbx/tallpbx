@@ -15,11 +15,11 @@ it('prohibits destructive commands for the configured primary database', functio
     expect(PrimaryDatabaseSafety::shouldProhibitDestructiveCommands())->toBeTrue();
 });
 
-// Disposable databases must remain available to tests and browser-test tooling.
+// Disposable test databases must remain available to the test suite.
 it('allows destructive commands for a non-primary database', function (): void {
     config([
         'database.default' => 'mysql',
-        'database.connections.mysql.database' => 'tallpbx_dusk',
+        'database.connections.mysql.database' => 'tallpbx_test',
         'app.primary_database' => 'tallpbx',
     ]);
 
