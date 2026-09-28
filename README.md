@@ -38,7 +38,7 @@ Built to eliminate the steep learning curve and dated interfaces of legacy PBX p
 | **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme, no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no dark mode) |
 | **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Multi-Vector Defense** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
-| **Automated Testing** | **2,337 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **2,400+ Pest tests incl. Pest 4 browser tests via Playwright** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 59 PBX modules (Extensions, Routing, PBX Features, Media, Operations, Security, and Administration).
@@ -94,7 +94,7 @@ those individual choices for an unattended install. [Full installation guide →
   - **Storage**: 40GB storage
   - **RAM**: 4GB RAM
   - **Swap**: 2GB swap
-  *(Recommended for running Vite frontend compilation, Pest test suites in parallel, and Dusk headless browser testing).*
+  *(Recommended for running Vite frontend compilation, Pest test suites in parallel, and Playwright browser testing).*
 - **Minimum Hardware (Production)**:
   - **CPU**: 1 vCPU (2+ vCPUs recommended for active PBX workloads)
   - **Storage**: 25 GB disk space (40 GB+ recommended for local call recordings and voicemail storage)
@@ -321,8 +321,8 @@ php artisan app:test --smoke
 # Default — all feature tests, parallel by default (~65s)
 php artisan app:test
 
-# Full — features + Dusk browser tests (~150s, requires Chromium; do not use the
-# web panel in another tab while they run — see INSTALL.md, "Browser Testing (Dusk)")
+# Full — features + Pest 4 browser tests via Playwright (~10 min on a 4 GB
+# server; no system browser needed — see INSTALL.md, section "Browser Testing")
 php artisan app:test --full
 
 # Filter a specific test file

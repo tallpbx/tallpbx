@@ -35,7 +35,7 @@ Developers can run the broader suites:
 
 ```bash
 php artisan app:test              # all application tests
-php artisan app:test --full       # also browser tests (Chromium required)
+php artisan app:test --full       # also Pest 4 browser tests (Playwright browsers required)
 php artisan app:test --sequential # one process at a time when investigating failures
 ```
 
