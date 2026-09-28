@@ -175,6 +175,11 @@ else
     set_env_value .env APP_ENV production
     set_env_value .env APP_DEBUG false
 fi
+
+# Encrypt stored session payloads in both install modes: without the
+# application key the session store content is unreadable, so a copied or
+# leaked session file reveals nothing. Re-runs keep this on.
+set_env_value .env SESSION_ENCRYPT true
 set_env_value .env APP_URL "http://$(hostname -I | awk '{print $1}')"
 set_env_value .env DB_CONNECTION mysql
 set_env_value .env DB_HOST "$database_host"

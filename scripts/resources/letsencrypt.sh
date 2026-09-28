@@ -267,6 +267,11 @@ server {
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; }
 
+    # FreeSWITCH fetches its XML here with the shared token in the query
+    # string; disable logging for this path so the token never lands in
+    # the access log (the application logs handler activity itself).
+    location = /api/v1/xml-handler { access_log off; try_files \$uri /index.php?\$query_string; }
+
     error_page 404 /index.php;
 
     location ~ ^/index\.php(/|\$) {
@@ -284,6 +289,14 @@ NGINX
 
         nginx -t 2>/dev/null && systemctl reload nginx
         verbose "Nginx updated and reloaded with HTTPS configuration"
+
+        # HTTPS is now actively serving the panel, so mark the session cookie
+        # secure-only: browsers will only send it over encrypted connections.
+        # This takes effect on the next request and does not log anyone out
+        # because the cookie name and payload are unchanged. Safe on re-runs.
+        if [ -f /var/www/tallpbx/.env ]; then
+            set_env_value /var/www/tallpbx/.env SESSION_SECURE_COOKIE true
+        fi
     fi
 
     # Enable auto-renewal via systemd timer (certbot package creates this)

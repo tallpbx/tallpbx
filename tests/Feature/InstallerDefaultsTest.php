@@ -57,6 +57,36 @@ it('waits for APT locks in every resource script that changes packages', functio
     }
 });
 
+it('keeps the XML handler token out of the nginx access logs', function (): void {
+    // FreeSWITCH fetches its XML with the shared token in the query string,
+    // so both nginx site templates must disable access logging for that
+    // path; otherwise the token lands in the web server log files.
+    foreach (['letsencrypt.sh', 'nginx.sh'] as $resourceScript) {
+        $script = (string) file_get_contents(base_path("scripts/resources/{$resourceScript}"));
+
+        expect($script)->toMatch(
+            '/location = \/api\/v1\/xml-handler \{[\s\S]*?access_log off;/'
+        );
+    }
+});
+
+it('ships production-safe debug and session defaults in the environment template', function (): void {
+    $example = (string) file_get_contents(base_path('.env.example'));
+
+    expect($example)->toContain('APP_ENV=production')
+        ->and($example)->toContain('APP_DEBUG=false')
+        ->and($example)->toContain('SESSION_ENCRYPT=true')
+        ->and($example)->toContain('SESSION_SECURE_COOKIE=false');
+});
+
+it('encrypts sessions in every install mode and enables secure cookies on HTTPS', function (): void {
+    $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+    $tlsScript = (string) file_get_contents(base_path('scripts/resources/letsencrypt.sh'));
+
+    expect($tallScript)->toContain('set_env_value .env SESSION_ENCRYPT true')
+        ->and($tlsScript)->toContain('set_env_value /var/www/tallpbx/.env SESSION_SECURE_COOKIE true');
+});
+
 it('requires an interactive FreeSWITCH installation method choice and persists it', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
     $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));

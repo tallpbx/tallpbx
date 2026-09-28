@@ -66,6 +66,11 @@ server {
     location = /favicon.ico { access_log off; log_not_found off; }
     location = /robots.txt  { access_log off; log_not_found off; }
 
+    # FreeSWITCH fetches its XML here with the shared token in the query
+    # string; disable logging for this path so the token never lands in
+    # the access log (the application logs handler activity itself).
+    location = /api/v1/xml-handler { access_log off; try_files \$uri /index.php?\$query_string; }
+
     error_page 404 /index.php;
 
     location ~ ^/index\.php(/|\$) {
