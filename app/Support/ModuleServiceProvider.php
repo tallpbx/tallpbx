@@ -64,6 +64,7 @@ abstract class ModuleServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerTranslations();
         $this->registerMigrations();
+        $this->registerConfig();
 
         if (! $modules->isEnabled($this->moduleName())) {
             return;
@@ -109,6 +110,15 @@ abstract class ModuleServiceProvider extends ServiceProvider
     protected function hasTranslations(): bool
     {
         return is_dir($this->modulePath().'/resources/lang');
+    }
+
+    /**
+     * Whether this module ships its own configuration file.
+     * Checks for the existence of a config/{moduleName}.php file.
+     */
+    protected function hasConfig(): bool
+    {
+        return is_file($this->modulePath().'/config/'.$this->moduleName().'.php');
     }
 
     // ─── Menu and permission configuration ───────────────────────────────
@@ -226,6 +236,28 @@ abstract class ModuleServiceProvider extends ServiceProvider
                 $this->modulePath().'/database/migrations',
             );
         }
+    }
+
+    /**
+     * Register the module's configuration file when one exists.
+     *
+     * Module settings are merged over the centralized app-level defaults
+     * under the module's own key: module values win on conflicts while
+     * every central key the module does not touch survives.
+     */
+    private function registerConfig(): void
+    {
+        if (! $this->hasConfig()) {
+            return;
+        }
+
+        $key = $this->moduleName();
+        $config = $this->app->make('config');
+
+        $config->set($key, array_merge(
+            $config->get($key, []),
+            require $this->modulePath().'/config/'.$key.'.php',
+        ));
     }
 
     /**

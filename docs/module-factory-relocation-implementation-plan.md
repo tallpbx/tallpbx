@@ -1870,7 +1870,7 @@ git commit -m "refactor: move module tests into their owning modules" -m "Reloca
 **Interfaces:**
 - Produces: the provider base merges `app-modules/{name}/config/{name}.php` under the `{name}` config key when the file exists. Centralized app-level settings under the same key keep working and are overridden only where the module file defines values.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```php
 <?php
@@ -1957,12 +1957,12 @@ class DemoConfigProvider extends ModuleServiceProvider
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `php artisan test --compact --parallel --filter=ModuleConfigMergeTest`
 Expected: FAIL — no config merging happens, so `overridden` stays `central-value`.
 
-- [ ] **Step 3: Implement the base-provider hook**
+- [x] **Step 3: Implement the base-provider hook**
 
 In `app/Support/ModuleServiceProvider.php`, call the new registration in `boot()` right after `registerMigrations()`:
 
@@ -2003,7 +2003,7 @@ And add the two methods (next to `hasTranslations()`):
     }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `php artisan test --compact --parallel --filter=ModuleConfigMergeTest`
 Expected: PASS.
