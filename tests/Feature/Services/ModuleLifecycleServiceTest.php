@@ -130,6 +130,27 @@ it('removes the composer package before deleting the local module directory', fu
     expect($moduleExistedDuringComposerRemove)->toBeTrue();
 });
 
+it('keeps a local module intact when composer cannot remove the package', function (): void {
+    $service = new ModuleLifecycleService(
+        app(),
+        app(Filesystem::class),
+        $this->sandbox,
+        fn (array $args): bool => false, // composer always fails
+        fn (array $args): bool => true,
+    );
+
+    expect(fn () => $service->uninstall('demo-module', 'UNINSTALL demo-module'))
+        ->toThrow(ValidationException::class);
+
+    // The module files, Composer entries and registry stay untouched so
+    // the installation remains bootable and the uninstall can be retried.
+    expect(File::exists($this->sandbox.'/app-modules/demo-module/module.json'))->toBeTrue();
+
+    $composer = json_decode((string) file_get_contents($this->sandbox.'/composer.json'), true);
+
+    expect($composer['require'])->toHaveKey('tallpbx/module-demo-module');
+});
+
 it('runs the module uninstall handler when one is registered', function (): void {
     $uninstaller = testDemoUninstaller();
     registerDemoUninstaller($uninstaller);

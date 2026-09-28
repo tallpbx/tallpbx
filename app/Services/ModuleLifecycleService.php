@@ -159,6 +159,21 @@ class ModuleLifecycleService
             throw ValidationException::withMessages(['confirmation' => 'The confirmation phrase did not match.']);
         }
 
+        $isVendor = $preview['module_kind'] === 'vendor';
+
+        // Remove the Composer package FIRST, before touching any data, files,
+        // or the registry: a path-repository package whose source directory
+        // is already gone cannot be resolved by Composer, and a registry or
+        // autoloader left pointing at a missing package makes every subsequent
+        // artisan boot fail — including the module:restore recovery command.
+        $composerRemoved = $this->runComposer(['remove', $preview['composer_package'], '--no-interaction']);
+
+        if (! $composerRemoved) {
+            throw ValidationException::withMessages([
+                'module' => "Composer could not remove [{$preview['composer_package']}]. The module was left untouched so the installation stays bootable; fix Composer and retry.",
+            ]);
+        }
+
         $uninstallRan = false;
         $permissionsDeleted = Permission::where('module', $name)->count();
 
@@ -173,19 +188,7 @@ class ModuleLifecycleService
             Permission::query()->where('module', $name)->delete();
         });
 
-        $isVendor = $preview['module_kind'] === 'vendor';
         $moduleDirDeleted = false;
-
-        // Remove the Composer package (and its vendor symlink plus autoload
-        // mappings) BEFORE deleting local files: a path-repository package
-        // whose source directory is already gone cannot be resolved by
-        // Composer, which would leave the autoloader pointing at a missing
-        // directory and break every subsequent artisan boot.
-        $composerRemoved = $this->runComposer(['remove', $preview['composer_package'], '--no-interaction']);
-
-        if (! $composerRemoved) {
-            $preview['warnings'][] = "Composer could not remove [{$preview['composer_package']}]; run composer update manually to finish.";
-        }
 
         if (! $isVendor) {
             // Only local modules own files in the installation tree. Vendor
