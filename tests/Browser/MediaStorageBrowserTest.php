@@ -123,6 +123,8 @@ afterEach(function (): void {
 // Verify that an administrator can keep the reserved local media destination
 // or select a remote archive destination through the panel.
 it('lets a system admin select the reserved local or a remote media archive destination', function (): void {
+    $this->skipWhenModuleUninstalled('file-stores');
+
     // Authenticate through the fast session bridge, then exercise the same
     // controls an administrator uses in the File Stores page.
     $this->loginAs($this->admin, 'admin');

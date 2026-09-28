@@ -2273,7 +2273,7 @@ git commit -m "feat: protect core modules and enforce declared module dependenci
   - `extractModuleNames(string $contents): array`
 - Consumes: nothing. Works after Tasks 3–4 land because it only inspects the filesystem.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/Feature/Testing/ModuleAwareTestGuardTest.php`:
 
@@ -2304,12 +2304,12 @@ it('skips the current test when its module is not installed', function (): void 
 
 The third test demonstrates the behavior by being reported as SKIPPED.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `php artisan test --compact --parallel --filter=ModuleAwareTestGuardTest`
 Expected: FAIL — the trait does not exist.
 
-- [ ] **Step 3: Implement the trait**
+- [x] **Step 3: Implement the trait**
 
 ```php
 <?php
@@ -2426,11 +2426,11 @@ trait ModuleAwareTestGuard
 }
 ```
 
-- [ ] **Step 4: Wire the trait into the test cases**
+- [x] **Step 4: Wire the trait into the test cases**
 
 In `tests/TestCase.php` add `use Tests\Traits\ModuleAwareTestGuard;` inside the class. Do the same in `tests/DuskTestCase.php`.
 
-- [ ] **Step 5: Wire the global hook for the Feature suite**
+- [x] **Step 5: Wire the global hook for the Feature suite**
 
 In `tests/Pest.php`, extend the existing Feature declaration:
 
@@ -2445,11 +2445,11 @@ pest()->extend(TestCase::class)
 
 (Only Feature gets the automatic file-level hook; Unit tests referencing modules are rare and get explicit `$this->skipWhenModuleUninstalled(...)` annotations where Step 7's grep finds them.)
 
-- [ ] **Step 6: Annotate module-page Dusk smoke tests**
+- [x] **Step 6: Annotate module-page Dusk smoke tests**
 
 In `tests/Browser/PanelSmokeTest.php`, add `$this->skipWhenModuleUninstalled('<kebab-module>');` as the first line of every test that visits a module's panel page (e.g. the extensions page test gets `'extensions'`). Browser tests need per-test annotations because one file covers many modules — file-level detection would skip everything when any one module is gone.
 
-- [ ] **Step 7: Find URL-only stragglers**
+- [x] **Step 7: Find URL-only stragglers**
 
 Run:
 ```bash
@@ -2458,7 +2458,7 @@ grep -rn "get('/panel/\|visit('/panel/" tests --include="*.php" | grep -v "Modul
 ```
 For any Unit test or URL-only Feature/Browser test that depends on a removable module without a `Modules\` import, add an explicit `$this->skipWhenModuleUninstalled('<module>');` annotation.
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [x] **Step 8: Run tests to verify they pass**
 
 Run: `php artisan test --compact --parallel --filter=ModuleAwareTestGuardTest`
 Expected: PASS (one test reported as skipped).

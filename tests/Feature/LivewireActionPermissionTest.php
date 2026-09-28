@@ -129,6 +129,8 @@ afterEach(function () {
 });
 
 it('blocks a view-only tenant user from calling delete actions through the update endpoint', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $user = tenantUser($this->tenant);
     grantTenantPermissions($user, $this->tenant, ['extensions.view']);
 
@@ -148,6 +150,8 @@ it('blocks a view-only tenant user from calling delete actions through the updat
 });
 
 it('still lets a view-only tenant user sync properties and use confirmation dialogs', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $user = tenantUser($this->tenant);
     grantTenantPermissions($user, $this->tenant, ['extensions.view']);
 
@@ -170,6 +174,8 @@ it('still lets a view-only tenant user sync properties and use confirmation dial
 });
 
 it('allows a tenant user with the delete permission to delete through the update endpoint', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $user = tenantUser($this->tenant);
     grantTenantPermissions($user, $this->tenant, ['extensions.view', 'extensions.delete']);
 
@@ -188,6 +194,8 @@ it('allows a tenant user with the delete permission to delete through the update
 });
 
 it('blocks a view-only tenant user from saving an edit component', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     // Capture the edit form snapshot with a fully privileged user, then
     // replay it as a view-only user — snapshots are signed but not bound
     // to a user, so this is exactly the replay a restricted user performs.
@@ -209,6 +217,8 @@ it('blocks a view-only tenant user from saving an edit component', function () {
 });
 
 it('requires an authenticated panel actor before touching module components', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $user = tenantUser($this->tenant);
     grantTenantPermissions($user, $this->tenant, ['extensions.view']);
 
@@ -231,6 +241,8 @@ it('requires an authenticated panel actor before touching module components', fu
 });
 
 it('enforces the same action gate for restricted admins', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $admin = grantAdminPermissions(null, ['panel.dashboard.view', 'extensions.view']);
 
     $page = $this->actingAs($admin, 'admin')->get('/panel/extensions')->assertOk();
@@ -248,6 +260,8 @@ it('enforces the same action gate for restricted admins', function () {
 });
 
 it('lets a fully privileged admin delete through the update endpoint', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $admin = grantAdminPermissions(null, [
         'panel.dashboard.view',
         'extensions.view',

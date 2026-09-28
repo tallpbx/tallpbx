@@ -29,6 +29,9 @@ pest()->extend(TestCase::class)
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
+    ->beforeEach(function (): void {
+        $this->skipWhenReferencedModuleUninstalled();
+    })
     ->in('Feature', dirname(__DIR__).'/app-modules');
 
 pest()->extend(TestCase::class)

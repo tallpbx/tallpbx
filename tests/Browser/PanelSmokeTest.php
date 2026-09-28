@@ -130,6 +130,8 @@ it('shows the admin identity in the top bar', function () {
 // ═══════════════════════════════════════════════════════════════════
 
 it('renders the extensions list page with a table', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/extensions');
@@ -151,6 +153,8 @@ it('renders the extensions list page with a table', function () {
 });
 
 it('renders the dialplans list page', function () {
+    $this->skipWhenModuleUninstalled('dialplans');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/dialplans');
@@ -159,6 +163,8 @@ it('renders the dialplans list page', function () {
 });
 
 it('renders the sip accounts list page', function () {
+    $this->skipWhenModuleUninstalled('sip-accounts');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/sip-accounts');
@@ -167,6 +173,8 @@ it('renders the sip accounts list page', function () {
 });
 
 it('renders the gateways list page', function () {
+    $this->skipWhenModuleUninstalled('gateways');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/gateways');
@@ -175,6 +183,8 @@ it('renders the gateways list page', function () {
 });
 
 it('renders the voicemails list page', function () {
+    $this->skipWhenModuleUninstalled('voicemails');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/voicemails');
@@ -183,6 +193,8 @@ it('renders the voicemails list page', function () {
 });
 
 it('renders the ring groups list page', function () {
+    $this->skipWhenModuleUninstalled('ring-groups');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/ring-groups');
@@ -191,6 +203,8 @@ it('renders the ring groups list page', function () {
 });
 
 it('renders the feature codes list page', function () {
+    $this->skipWhenModuleUninstalled('feature-codes');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/feature-codes');
@@ -199,6 +213,8 @@ it('renders the feature codes list page', function () {
 });
 
 it('expands description from single line text box into text area on hover when long', function () {
+    $this->skipWhenModuleUninstalled('feature-codes');
+
     $tenant = Tenant::first() ?? Tenant::factory()->create();
     $tenantManager = app(TenantManager::class);
     $tenantManager->setTenantId((string) $tenant->id);
@@ -233,6 +249,8 @@ it('expands description from single line text box into text area on hover when l
 });
 
 it('renders the call centers list page', function () {
+    $this->skipWhenModuleUninstalled('call-centers');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/call-centers/queues');
@@ -244,6 +262,8 @@ it('renders the call centers list page', function () {
 // ═══════════════════════════════════════════════════════════════════
 
 it('renders the active calls monitoring page', function () {
+    $this->skipWhenModuleUninstalled('active-calls');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/active-calls');
@@ -253,6 +273,8 @@ it('renders the active calls monitoring page', function () {
 });
 
 it('renders the registrations monitoring page', function () {
+    $this->skipWhenModuleUninstalled('registrations');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/registrations');
@@ -261,6 +283,8 @@ it('renders the registrations monitoring page', function () {
 });
 
 it('renders the SIP status page', function () {
+    $this->skipWhenModuleUninstalled('sip-status');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/sip-status');
@@ -273,6 +297,8 @@ it('renders the SIP status page', function () {
 // ═══════════════════════════════════════════════════════════════════
 
 it('renders the create extension form', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/extensions/create');
@@ -282,6 +308,8 @@ it('renders the create extension form', function () {
 });
 
 it('renders the create multiple extensions form', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/extensions/create-multiple');
@@ -294,6 +322,8 @@ it('renders the create multiple extensions form', function () {
 });
 
 it('renders the edit extension form', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+
     $tenant = Tenant::first() ?? Tenant::factory()->create();
     $extension = Extension::withoutGlobalScope('tenant')->where('extension_number', '2401')->first()
         ?? Extension::factory()->forTenant($tenant->id)->create([
@@ -314,6 +344,8 @@ it('renders the edit extension form', function () {
 });
 
 it('renders the create dialplan form', function () {
+    $this->skipWhenModuleUninstalled('dialplans');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/dialplans/create');
@@ -323,6 +355,8 @@ it('renders the create dialplan form', function () {
 });
 
 it('renders the create gateway form', function () {
+    $this->skipWhenModuleUninstalled('gateways');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/gateways/create');
@@ -332,6 +366,8 @@ it('renders the create gateway form', function () {
 });
 
 it('renders the create sip account form', function () {
+    $this->skipWhenModuleUninstalled('sip-accounts');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/sip-accounts/create');
@@ -341,6 +377,8 @@ it('renders the create sip account form', function () {
 });
 
 it('creates a new tenant via the browser form', function () {
+    $this->skipWhenModuleUninstalled('tenant');
+
     $slug = 'browser-tenant-'.bin2hex(random_bytes(3));
 
     $this->loginAs($this->admin, 'admin');
@@ -357,6 +395,12 @@ it('creates a new tenant via the browser form', function () {
 // ═══════════════════════════════════════════════════════════════════
 
 it('navigates between pages without errors', function () {
+    $this->skipWhenModuleUninstalled('extensions');
+    $this->skipWhenModuleUninstalled('dialplans');
+    $this->skipWhenModuleUninstalled('gateways');
+    $this->skipWhenModuleUninstalled('sip-accounts');
+    $this->skipWhenModuleUninstalled('voicemails');
+
     $this->loginAs($this->admin, 'admin');
 
     $urls = [
@@ -379,6 +423,8 @@ it('navigates between pages without errors', function () {
 // ═══════════════════════════════════════════════════════════════════
 
 it('renders the gateway create form with profile field', function () {
+    $this->skipWhenModuleUninstalled('gateways');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/gateways/create');
@@ -389,6 +435,8 @@ it('renders the gateway create form with profile field', function () {
 });
 
 it('renders the inbound routes list page with table', function () {
+    $this->skipWhenModuleUninstalled('inbound-routes');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/inbound-routes');
@@ -398,6 +446,8 @@ it('renders the inbound routes list page with table', function () {
 });
 
 it('renders the outbound routes list page with table', function () {
+    $this->skipWhenModuleUninstalled('outbound-routes');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/outbound-routes');
@@ -407,6 +457,8 @@ it('renders the outbound routes list page with table', function () {
 });
 
 it('renders the SIP profiles list page with no JavaScript errors', function () {
+    $this->skipWhenModuleUninstalled('sip-profiles');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/sip-profiles');
@@ -416,6 +468,8 @@ it('renders the SIP profiles list page with no JavaScript errors', function () {
 });
 
 it('renders the SIP profiles create form', function () {
+    $this->skipWhenModuleUninstalled('sip-profiles');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/sip-profiles/create');
@@ -425,6 +479,8 @@ it('renders the SIP profiles create form', function () {
 });
 
 it('renders the IVR menus list page', function () {
+    $this->skipWhenModuleUninstalled('ivr-menus');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/ivr-menus');
@@ -433,6 +489,8 @@ it('renders the IVR menus list page', function () {
 });
 
 it('renders the conference centers list page', function () {
+    $this->skipWhenModuleUninstalled('conference-centers');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/conference-centers');
@@ -445,6 +503,8 @@ it('renders the conference centers list page', function () {
 // ═══════════════════════════════════════════════════════════════════
 
 it('renders the email connector configuration page', function () {
+    $this->skipWhenModuleUninstalled('email-connector');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/email-connector');
@@ -453,6 +513,8 @@ it('renders the email connector configuration page', function () {
 });
 
 it('renders the backups list page', function () {
+    $this->skipWhenModuleUninstalled('backups');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/backups');
@@ -460,6 +522,8 @@ it('renders the backups list page', function () {
 });
 
 it('renders the backups create form', function () {
+    $this->skipWhenModuleUninstalled('backups');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/backups/create');
@@ -468,6 +532,8 @@ it('renders the backups create form', function () {
 });
 
 it('renders the superadmin backup restore screen', function () {
+    $this->skipWhenModuleUninstalled('backups');
+
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/backups/restore');
@@ -502,6 +568,8 @@ it('renders the monitoring dashboard with metrics', function () {
 });
 
 it('renders the security manager dashboard', function () {
+    $this->skipWhenModuleUninstalled('security');
+
     $this->seed(SecurityServiceSeeder::class);
 
     // Seed representative threat and trust entries so the documentation
