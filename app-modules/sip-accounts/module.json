@@ -7,7 +7,7 @@
     "description": "Manage FreeSWITCH SIP authentication accounts with identity mode support.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 110,
     "providers": [
         "Modules\\SipAccounts\\Providers\\ModuleServiceProvider"

@@ -71,8 +71,8 @@ class ModulesList extends Component
             return;
         }
 
-        // Required modules cannot be disabled
-        if ($module->required && $module->enabled) {
+        // Required and protected modules cannot be disabled
+        if (($module->required || $module->protected) && $module->enabled) {
             return;
         }
 

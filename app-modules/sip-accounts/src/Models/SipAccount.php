@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\Extensions\Models\Extension;
 
 /**
  * A SIP account is the authentication identity FreeSWITCH uses to register
@@ -66,14 +65,6 @@ class SipAccount extends Model
     public function tenantDomain(): BelongsTo
     {
         return $this->belongsTo(TenantDomain::class);
-    }
-
-    /**
-     * The PBX extension this SIP identity registers for.
-     */
-    public function extension(): BelongsTo
-    {
-        return $this->belongsTo(Extension::class);
     }
 
     /**

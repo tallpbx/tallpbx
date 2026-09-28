@@ -7,7 +7,7 @@
     "description": "Manage call routing dialplans with ordered conditions and actions.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 170,
     "providers": [
         "Modules\\Dialplans\\Providers\\ModuleServiceProvider"

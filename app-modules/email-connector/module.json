@@ -7,5 +7,8 @@
     "type": "pbx-module",
     "protected": false,
     "required": false,
-    "priority": 51
+    "priority": 51,
+    "requirements": {
+        "modules": []
+    }
 }

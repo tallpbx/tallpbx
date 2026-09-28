@@ -15,7 +15,10 @@
     "requirements": {
         "php": ">=8.3",
         "laravel": ">=13.0",
-        "modules": [],
+        "modules": [
+            "file-stores",
+            "voicemails"
+        ],
         "packages": []
     }
 }

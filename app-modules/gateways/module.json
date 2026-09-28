@@ -7,7 +7,7 @@
     "description": "Manage SIP trunks and upstream provider connections for outbound routing.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 140,
     "providers": [
         "Modules\\Gateways\\Providers\\ModuleServiceProvider"

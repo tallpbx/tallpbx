@@ -7,7 +7,7 @@
     "description": "Manage tenant-local phone extensions and extension-level settings.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 120,
     "providers": [
         "Modules\\Extensions\\Providers\\ModuleServiceProvider"
@@ -15,7 +15,10 @@
     "requirements": {
         "php": ">=8.3",
         "laravel": ">=13.0",
-        "modules": [],
+        "modules": [
+            "sip-accounts",
+            "voicemails"
+        ],
         "packages": []
     }
 }

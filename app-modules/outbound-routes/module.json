@@ -7,7 +7,7 @@
     "description": "Manage outbound call routing rules with dial pattern matching, gateway selection, and caller ID manipulation.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 210,
     "providers": [
         "Modules\\OutboundRoutes\\Providers\\ModuleServiceProvider"
@@ -15,7 +15,9 @@
     "requirements": {
         "php": ">=8.3",
         "laravel": ">=13.0",
-        "modules": [],
+        "modules": [
+            "gateways"
+        ],
         "packages": []
     }
 }

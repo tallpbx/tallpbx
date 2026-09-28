@@ -7,7 +7,7 @@
     "description": "Manage FreeSWITCH Sofia SIP profiles with per-tenant JSON settings.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 100,
     "providers": [
         "Modules\\SipProfiles\\Providers\\ModuleServiceProvider"
@@ -15,7 +15,9 @@
     "requirements": {
         "php": ">=8.3",
         "laravel": ">=13.0",
-        "modules": [],
+        "modules": [
+            "gateways"
+        ],
         "packages": []
     }
 }

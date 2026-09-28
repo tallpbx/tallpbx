@@ -53,6 +53,21 @@ it('toggles module enabled status', function () {
     ]);
 });
 
+it('prevents disabling protected modules', function () {
+    $module = Module::create(['name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0', 'enabled' => true, 'protected' => true]);
+
+    Artisan::shouldReceive('call')->never();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->call('toggleEnabled', $module->id);
+
+    $this->assertDatabaseHas('modules', [
+        'id' => $module->id,
+        'enabled' => true,
+    ]);
+});
+
 it('can re-enable disabled modules', function () {
     $module = Module::create(['name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0', 'enabled' => false]);
 

@@ -7,7 +7,7 @@
     "description": "Manage physical and soft phones with vendor, model, MAC address, and provisioning templates.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 130,
     "providers": [
         "Modules\\Devices\\Providers\\ModuleServiceProvider"
@@ -15,7 +15,9 @@
     "requirements": {
         "php": ">=8.3",
         "laravel": ">=13.0",
-        "modules": [],
+        "modules": [
+            "sip-accounts"
+        ],
         "packages": []
     }
 }

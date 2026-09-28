@@ -7,7 +7,7 @@ namespace Modules\FileStores\Services;
 use App\Services\SettingServiceInterface;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Modules\Backups\Models\Backup;
+use Modules\FileStores\Events\FileStoreDeleting;
 use Modules\FileStores\Models\FileStore;
 use Modules\FileStores\Models\MediaAsset;
 use RuntimeException;
@@ -65,18 +65,12 @@ class FileStoreService implements FileStoreServiceInterface
      */
     public function delete(FileStore $fileStore): void
     {
+        // Modules that depend on this store may refuse the deletion by
+        // throwing from this event (the backups module blocks stores that
+        // backup profiles still reference).
+        FileStoreDeleting::dispatch($fileStore);
+
         $selectedMediaArchiveStore = $this->settings->get('media.archive_file_store_id');
-
-        $backupNames = Backup::query()
-            ->where('file_store_id', $fileStore->id)
-            ->orderBy('name')
-            ->pluck('name');
-
-        if ($backupNames->isNotEmpty()) {
-            $backupList = $backupNames->map(fn (string $name): string => '“'.$name.'”')->join(', ');
-
-            throw new RuntimeException('Cannot delete “'.$fileStore->name.'” because it is used by backup '.$backupList.'. Delete or move that backup first.');
-        }
 
         if ($selectedMediaArchiveStore === $fileStore->id) {
             throw new RuntimeException('Cannot delete “'.$fileStore->name.'” because it is the selected media archive destination. Select another destination first.');

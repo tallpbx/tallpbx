@@ -7,7 +7,7 @@
     "description": "Manage inbound call routing rules with DID matching, destination selection, and time conditions.",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 200,
     "providers": [
         "Modules\\InboundRoutes\\Providers\\ModuleServiceProvider"

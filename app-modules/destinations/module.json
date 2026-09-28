@@ -7,7 +7,7 @@
     "description": "Manage named call destinations (conferences, IVRs, voicemails, ring groups).",
     "category": "PBX",
     "required": false,
-    "protected": false,
+    "protected": true,
     "priority": 180,
     "providers": [
         "Modules\\Destinations\\Providers\\ModuleServiceProvider"

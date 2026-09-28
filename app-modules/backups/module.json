@@ -7,5 +7,10 @@
     "type": "pbx-module",
     "protected": false,
     "required": false,
-    "priority": 90
+    "priority": 90,
+    "requirements": {
+        "modules": [
+            "file-stores"
+        ]
+    }
 }

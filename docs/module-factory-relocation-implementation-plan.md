@@ -2033,7 +2033,7 @@ git commit -m "feat: auto-register module config with centralized fallback" -m "
 **Interfaces:**
 - Produces: a protected core set (never uninstallable, never disable-able); authoritative `requirements.modules` declarations; an acyclic declared dependency graph. Uninstall refusal for installed dependents is already implemented in Task 4 and becomes effective once the declarations are populated here.
 
-- [ ] **Step 1: Write the failing core-protection test**
+- [x] **Step 1: Write the failing core-protection test**
 
 `tests/Feature/Modules/CoreModulesProtectedTest.php`:
 
@@ -2062,11 +2062,11 @@ it('marks the core PBX modules as protected or required', function (): void {
 Run: `php artisan test --compact --parallel --filter=CoreModulesProtectedTest`
 Expected: FAIL — the ten telephony modules are neither protected nor required.
 
-- [ ] **Step 2: Mark the core modules protected**
+- [x] **Step 2: Mark the core modules protected**
 
 Add `"protected": true` to the ten manifests listed above. Re-run the test: PASS. (Uninstall refusal for protected modules is already covered by Task 4's tests; `module:sync` copies the flag into the registry row.)
 
-- [ ] **Step 3: Make the panel refuse to disable protected modules (TDD)**
+- [x] **Step 3: Make the panel refuse to disable protected modules (TDD)**
 
 Add to `tests/Feature/Livewire/ModulesListTest.php`:
 
@@ -2098,7 +2098,7 @@ Run: FAIL (protected modules can currently be disabled). Then in `ModulesList::t
 
 Re-run: PASS.
 
-- [ ] **Step 4: Write the failing boundary tests**
+- [x] **Step 4: Write the failing boundary tests**
 
 `tests/Feature/Modules/ModuleBoundaryTest.php`:
 
@@ -2198,7 +2198,7 @@ it('keeps the module dependency graph acyclic', function (): void {
 Run: `php artisan test --compact --parallel --filter=ModuleBoundaryTest`
 Expected: FAIL — declarations are empty and cycles are possible.
 
-- [ ] **Step 5: Populate the declarations and resolve any cycles**
+- [x] **Step 5: Populate the declarations and resolve any cycles**
 
 Create and run `scripts/migrate-module-requirements.php`:
 
