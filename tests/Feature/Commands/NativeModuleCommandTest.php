@@ -8,6 +8,21 @@ use Illuminate\Support\Facades\File;
 
 afterEach(function () {
     File::deleteDirectory(base_path('app-modules/native-command-test'));
+    File::deleteDirectory(base_path('app-modules/my_mod'));
+});
+
+it('rejects module names that are not canonical kebab-case', function () {
+    // Underscore names cannot round-trip through the kebab-case mapping used
+    // by dependency checks, so scaffolding must refuse them.
+    $this->artisan('make:module my_mod')->assertFailed();
+
+    expect(File::exists(base_path('app-modules/my_mod')))->toBeFalse();
+});
+
+it('propagates failure exit codes from wrapped module commands', function () {
+    // The closure wrappers in routes/console.php must return the wrapped
+    // command's exit code, so scripts and tests can detect failures.
+    $this->artisan('make:module extensions')->assertFailed();
 });
 
 it('exposes native module and modules command names', function () {
