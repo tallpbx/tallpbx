@@ -1,11 +1,11 @@
 # TallPBX test pipeline.
 #
 # Purpose:
-# Run the complete Pest feature/unit suite on every push to the main and release
-# branches and on every pull request. This is the automated enforcement of the
-# "Mandatory Pre-Claim Verification" gate in AGENTS.md, so a red suite can never
-# reach a release again (v1.1.0 briefly shipped with a MariaDB-only migration
-# that broke every SQLite-backed test).
+# Run the complete Pest test suite (feature/unit plus Playwright browser tests)
+# on the main and release branches and on every pull request. This is the
+# automated enforcement of the "Mandatory Pre-Claim Verification" gate in
+# AGENTS.md, so a red suite can never reach a release again (v1.1.0 briefly
+# shipped with a MariaDB-only migration that broke every SQLite-backed test).
 #
 # Environment notes:
 # - `phpunit.xml` forces the in-memory SQLite connection, so no database service
@@ -14,6 +14,9 @@
 #   real Redis sliding-window counters (no fake is used).
 # - PHP 8.5 matches the development toolchain and the Symfony 8.4 packages locked
 #   in composer.lock (they require PHP >= 8.4.1); it is also what ships in production.
+# - Browser tests (tests/Browser) run on Pest 4 with Playwright after the feature
+#   suite; Playwright installs its own Chromium build and pulls the shared system
+#   libraries it needs via `--with-deps`.
 
 name: Tests
 
@@ -34,7 +37,7 @@ jobs:
   pest:
     name: Pest Test Suite
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     # Redis backing service used by the security incident rate-limit tests.
     services:
@@ -85,3 +88,18 @@ jobs:
       # compact output plus parallel workers (paratest).
       - name: Run the Pest test suite
         run: php artisan test --compact --parallel
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # Pest 4 browser tests served by the in-process SQLite test server.
+      - name: Run the Pest browser suite
+        run: ./vendor/bin/pest tests/Browser --compact
