@@ -22,7 +22,7 @@
 | Task 4: Migrate PanelSmokeTest | ✅ Complete | `ee7c0d0` |
 | Task 5: Migrate MediaStorageBrowserTest | ✅ Complete | `fix(testing)` + `test(browser): migrate MediaStorageBrowserTest` |
 | Task 6: Migrate DocumentationScreenshotsTest | ✅ Complete | `test(browser): migrate DocumentationScreenshotsTest` |
-| Task 7: Runner/phpunit.xml updates | ⏳ Not started | — |
+| Task 7: Runner/phpunit.xml updates | ✅ Complete | `feat(testing)` runner + `scripts/test-browser.sh` |
 | Task 8: Remove legacy Dusk infrastructure | ⏳ Not started | — |
 | Task 9: CI, AGENTS.md, INSTALL.md, CHANGELOG | ⏳ Not started | — |
 
@@ -127,6 +127,11 @@ $page->wait(1.2)->screenshot(filename: 'landing-dark');
 ```
 
 Also note when capturing files: `screenshot(bool $fullPage = true, ?string $filename = null)` requires the **named** `filename:` argument, and `Screenshot::save()` always writes into `tests/Browser/Screenshots/` (git-ignored) regardless of the name passed. Documentation captures therefore stage there and are copied into `docs/images/` with an md5 freshness check.
+
+### 8. Killed Runs Leak Playwright Servers; Full-Suite Timings on Small Servers
+
+- Browser runs can leave an orphaned `playwright run-server` process behind (~120 MB RSS each; the plugin starts it through an `sh -c` wrapper that survives the plugin's stop call). A stalled `app:test --full` run was traced to 12 accumulated orphans (~1.5 GB on a 4 GB server) — after cleanup the identical run completes in ~10 minutes. Before heavy suites, reclaim memory with `pkill -f "playwright run-server"`.
+- Measured on the 4 GB validation server: full feature suite ≈ 3 min (4 parallel workers, 2 400 tests); full browser suite ≈ 6.2 min (sequential, 47 tests + 1 skipped); `php artisan app:test --full` ≈ 10 min total.
 
 ---
 
@@ -471,79 +476,45 @@ git commit -m "test(browser): migrate DocumentationScreenshotsTest to Pest 4 bro
 ### Task 7: Update Test Runner Command & Add Browser Testsuite
 
 **Files:**
-- Modify: [`phpunit.xml`](file:///var/www/tallpbx/phpunit.xml)
 - Modify: [`app/Console/Commands/TestCommand.php`](file:///var/www/tallpbx/app/Console/Commands/TestCommand.php)
 - Create: `scripts/test-browser.sh`
+- [`phpunit.xml`](file:///var/www/tallpbx/phpunit.xml): intentionally unchanged (see ruling in Step 1)
 
 **Interfaces:**
 - Consumes: `php artisan app:test --full`, `bash scripts/test-browser.sh`.
 - Produces: Integrated test runner that can run unit, feature, and browser tests together or separately.
 
-- [ ] **Step 1: Add Browser testsuite to `phpunit.xml`**
+- [x] **Step 1: Browser testsuite — Ruling: NOT added to phpunit.xml** ✅
 
-In [`phpunit.xml`](file:///var/www/tallpbx/phpunit.xml#L11-L18):
-```xml
-    <testsuites>
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
-        </testsuite>
-        <testsuite name="Feature">
-            <directory>tests/Feature</directory>
-        </testsuite>
-        <testsuite name="Browser">
-            <directory>tests/Browser</directory>
-        </testsuite>
-    </testsuites>
-```
+Reasoning (recorded as an execution ruling): PHPUnit runs **every** `<testsuite>` in the configuration by default, so adding a `Browser` suite would (a) make `php artisan test`, the default `app:test` mode, and the CI gate execute the ~6-minute browser suite on every invocation, and (b) make `--full` run browser tests **twice** (`runPest` covers all suites, then `runBrowserTests` runs them again). The tiered runner design (fast default, `--full` = feature + browser) and AGENTS.md's separate browser step stay intact, and path-based runs need no testsuite entry: `./vendor/bin/pest tests/Browser` and `bash scripts/test-browser.sh`.
+Cost if wrong: bare `--testsuite=Browser` invocations are unavailable; browser tests remain reachable by path.
 
-- [ ] **Step 2: Create lightweight `scripts/test-browser.sh`**
+- [x] **Step 2: Create `scripts/test-browser.sh`** ✅
 
-Create `scripts/test-browser.sh`:
+Thin, commented runner: `exec ./vendor/bin/pest tests/Browser "$@"` — extra arguments pass through (e.g. `--filter=...`).
+
+- [x] **Step 3: Update `TestCommand.php`** ✅
+
+`runDusk()` replaced with `runBrowserTests()`: spawns `vendor/bin/pest tests/Browser --compact` with the shared cleaned test environment (`cleanTestingEnvironment()` keeps `.env` values from leaking into the child) and a **900 s** timeout — the plan's 300 s figure would time out the full panel smoke suite (measured browser suite: 374 s).
+
+- [x] **Step 4: Verify** ✅
+
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
+bash scripts/test-browser.sh --filter="renders the sidebar with navigation"
+# → 1 passed
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
-
-./vendor/bin/pest tests/Browser "$@"
-```
-Make executable: `chmod +x scripts/test-browser.sh`.
-
-- [ ] **Step 3: Update `TestCommand.php` to use the Pest runner**
-
-In [`app/Console/Commands/TestCommand.php`](file:///var/www/tallpbx/app/Console/Commands/TestCommand.php#L243-L255):
-```php
-    /**
-     * Run browser tests via Pest 4 and Playwright.
-     */
-    private function runDusk(): int
-    {
-        $this->line('<comment>$ ./vendor/bin/pest tests/Browser</comment>');
-
-        $process = new Process(['./vendor/bin/pest', 'tests/Browser', '--compact'], base_path());
-        $process->setTimeout(300);
-        $process->run(function (string $type, string $buffer): void {
-            $this->output->write($buffer);
-        });
-
-        return $process->getExitCode() ?? self::FAILURE;
-    }
-```
-
-- [ ] **Step 4: Verify `php artisan app:test --full`**
-
-Run:
-```bash
 php artisan app:test --full
+# → Step 1/2 feature suite: 2400 passed (9933 assertions), 4 workers
+# → Step 2/2 browser suite: 1 skipped, 47 passed (213 assertions) in 374 s
 ```
-Expected: PASS across feature tests and all browser tests.
 
-- [ ] **Step 5: Commit**
+The first `--full` attempt stalled past 28 minutes because 12 orphaned `playwright run-server` processes (~1.5 GB) starved the 4 GB server — after cleanup the identical run completed in ~10 minutes (see Critical Findings §8).
+
+- [x] **Step 5: Commit** ✅
 
 ```bash
-git add phpunit.xml app/Console/Commands/TestCommand.php scripts/test-browser.sh
-git commit -m "feat(testing): integrate browser testsuite into phpunit.xml and app:test"
+git add app/Console/Commands/TestCommand.php scripts/test-browser.sh
+git commit -m "feat(testing): run browser tests via Pest in app:test and add test-browser script"
 ```
 
 ---
