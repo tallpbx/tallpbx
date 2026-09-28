@@ -161,8 +161,11 @@ class LogViewer extends Component
 
         $filePath = storage_path('logs/'.$this->selectedFile);
 
-        // Security: ensure the resolved path is within storage/logs/
-        $logDir = realpath(storage_path('logs'));
+        // Security: ensure the resolved path is within storage/logs/. The
+        // trailing separator matters: without it, a sibling directory that
+        // shares the prefix (for example storage/logs-backup/) would also
+        // pass the check.
+        $logDir = realpath(storage_path('logs')).DIRECTORY_SEPARATOR;
         $resolvedPath = realpath($filePath);
 
         if ($resolvedPath === false || ! Str::startsWith($resolvedPath, $logDir)) {
