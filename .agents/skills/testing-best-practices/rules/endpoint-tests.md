@@ -37,9 +37,9 @@ Write a browser test only for JavaScript behavior that an HTTP test cannot reach
 
 - Assert the state that the user can see, and assert the state in the database that the interaction saves.
 - Wait until the test reaches the required state. Do not wait for a fixed number of seconds, which can fail on a slower machine.
-- Put each browser test in `tests/Browser`, which is the suite that Dusk runs.
-- Run the browser tests with `php artisan dusk`. The run needs a ChromeDriver, and `php artisan dusk:install` downloads it.
-- Fetch `https://laravel.com/framework/docs/dusk` for the selectors, the interactions, and the assertions of Dusk.
+- Put each browser test in `tests/Browser`, which is the Pest 4 browser suite.
+- Run the browser tests with `bash scripts/test-browser.sh` (or `./vendor/bin/pest tests/Browser`). They need Playwright's browser binaries (`npx playwright install chromium`) and run against an in-process HTTP server backed by in-memory SQLite — no ChromeDriver and no dedicated test database.
+- Fetch `https://pestphp.com/docs/browser-testing` for the selectors, the interactions, and the assertions of the Pest browser API.
 
 ## Testing Validation
 

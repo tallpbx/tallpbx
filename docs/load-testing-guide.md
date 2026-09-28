@@ -700,8 +700,8 @@ development packages; use `./install.sh --no-demo` on a test server (add
      `FS_XML_HANDLER_AUTH=true`.
    - [ ] `php artisan app:test --smoke` passes.
    - [ ] Optional: `php artisan app:test --full` passes when development
-     tooling and Dusk are installed; follow the Dusk isolation rules if it
-     is run.
+     tooling and Playwright browsers (`npx playwright install chromium`) are
+     installed.
 5. Re-run the installer once more and confirm it completes cleanly without
    deleting data and with all services still healthy.
 6. Snapshot the validated state and attach the install log to the campaign

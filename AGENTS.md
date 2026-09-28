@@ -30,8 +30,8 @@ php artisan optimize:clear
 # 2. All feature/unit tests must pass (always use --parallel for fast multi-process execution)
 php artisan test --compact --parallel
 
-# 3. Dusk browser tests must pass (for UI changes)
-php artisan dusk
+# 3. Pest browser tests must pass (for UI changes)
+./vendor/bin/pest tests/Browser
 
 # 4. Routes must exist (especially for new features)
 php artisan route:list --name=<feature-name>
@@ -75,7 +75,7 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 - `module.json` exists and `php artisan module:sync --only-local` succeeds
 - Permissions are in the database: check with `php artisan tinker --execute 'echo Permission::where("name","your.permission")->exists() ? "YES" : "NO";'`
 - Translation keys exist in `lang/en/admin.php` (use `grep` to verify)
-- View namespace is registered (test by visiting the page in Dusk)
+- View namespace is registered (test by visiting the page in a browser test)
 - Route middleware includes `web` (sessions), `auth.panel` (auth), and `throttle` (rate limit)
 - Super Admin group has the new permissions: `php artisan db:seed --class=AdminSeeder`
 
@@ -130,12 +130,13 @@ bash scripts/fix-generated-permissions.sh
 ```
 - Do not commit generated cache/build artifacts or permission-only mode changes.
 
-## Dusk Database Isolation
-- Dusk must use local `.env.dusk` (auto-provisioned from `.env.dusk.example` by `scripts/dusk.sh`) with `DUSK_TESTING=true`, a database name ending in `_dusk`, and a database user name ending in `_dusk`. `App\Support\DuskDatabaseSafety` fails application boot when any of these conditions would allow a browser test to use the primary application database.
-- The installer creates a separate `${database_name}_dusk` database and `${database_username}_dusk` MariaDB user. The Dusk user receives privileges only on the disposable Dusk database; never grant it access to the primary database.
-- Run browser tests with `bash scripts/dusk.sh`. It starts an isolated `APP_ENV=dusk` Laravel server on `127.0.0.1:8001`; do not point Dusk at Nginx/PHP-FPM. `php artisan app:test --full` invokes this runner automatically.
-- Do not use the web panel while Dusk is running. `php artisan dusk` temporarily swaps the application's `.env` with `.env.dusk` for the duration of the run; any request served by Nginx/PHP-FPM in that window (for example, an administrator logging in) boots with the Dusk environment — it operates on the disposable `*_dusk` database, shares sessions and Redis counters with the running tests (making browser tests flaky or fail), and failed logins are still counted by intrusion detection. Privileged firewall execution is blocked whenever `DUSK_TESTING=true`, including this swap window.
-- Documentation screenshots under `docs/images/` are captured on demand only: normal `bash scripts/dusk.sh` runs never touch them. To recapture after a UI change run `DUSK_CAPTURE_DOCS=1 bash scripts/dusk.sh` and commit only the images whose pages actually changed (the capture step copies an image only when its content differs).
+## Playwright Browser Testing
+- Browser tests run on Pest 4 with Playwright (`pestphp/pest-plugin-browser`). Each `visit()` opens a fresh browser context served by an in-process HTTP server backed by the same in-memory SQLite database as the rest of the suite — there is no dedicated browser-test database, no `.env` swapping, and no system browser package. Playwright uses its own Chromium download (`npx playwright install --with-deps chromium`).
+- Run browser tests with `bash scripts/test-browser.sh` (or `./vendor/bin/pest tests/Browser`). `php artisan app:test --full` runs the feature suite first, then the browser suite automatically with parallel workers capped at four (`--parallel --processes=4`) — each worker keeps its own Chromium instance alive, so the cap prevents memory starvation on small servers. The browser suite takes several minutes on a 4 GB server; reclaim memory by clearing orphaned `playwright run-server` processes before heavy runs.
+- The web panel is safe to use while browser tests run: the tests never swap `.env`, never touch the primary database, and privileged firewall execution stays blocked during test runs.
+- Authenticate browser tests through the `loginAs()` session bridge. The in-process server shares one session across visits, so switch identities sequentially (`loginAs(A)` → assert as A → `loginAs(B)` → assert as B); two users can never be active at the same time within one test.
+- Assertions retry until a timeout, but `script()` returns the evaluated value and breaks fluent chains when it returns `null` — run void snippets as standalone statements.
+- Documentation screenshots under `docs/images/` are captured on demand only: normal `bash scripts/test-browser.sh` runs never touch them. To recapture after a UI change run `TALLPBX_CAPTURE_DOCS=1 bash scripts/test-browser.sh` and commit only the images whose pages actually changed (the capture step copies an image only when its content differs).
 
 ## Linux Command Execution & Privileged Host Helper Policy
 
@@ -494,10 +495,10 @@ All three are fed by `App\Support\Concerns\HasOperationalFeedback` (inherited vi
 # Smoke — critical-path only (~200 tests, ~20s)
 php artisan app:test --smoke
 
-# Default — all feature tests with --parallel (~2,337 tests, ~65s)
+# Default — all feature tests with --parallel (~2,400 tests, a few minutes)
 php artisan app:test
 
-# Full — features + Dusk browser tests (~150s)
+# Full — features + Pest 4 browser tests via Playwright (~10 min on a 4 GB server)
 php artisan app:test --full
 
 # Sequential — for debugging without --parallel

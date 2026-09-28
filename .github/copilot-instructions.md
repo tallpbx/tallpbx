@@ -20,5 +20,5 @@ php artisan optimize:clear
 Before claiming a feature is complete:
 1. `php artisan optimize:clear`
 2. `php artisan test --compact --parallel`
-3. `php artisan dusk` (for UI changes)
+3. `./vendor/bin/pest tests/Browser` (for UI changes)
 4. `php artisan route:list --name=<feature-name>` (for new routes)

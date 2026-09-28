@@ -29,7 +29,7 @@ Read this section before you write a test.
 - Leave framework behavior to framework tests. Testing project configuration is not testing the framework. A constrained relationship, cast, scope, or validation rule belongs to this project.
 - Keep every test that can detect a distinct defect. When two tests detect the same defect, trim the higher-layer test to one case and report the duplication. Do not delete an existing test.
 - Write a feature test first. Write a unit test only for logic that does not use the framework.
-- Write a Dusk test only for behavior in JavaScript that a feature test cannot reach. Put a Dusk test in `tests/Browser`.
+- Write a browser test (Pest 4 + Playwright) only for behavior in JavaScript that a feature test cannot reach. Put it in `tests/Browser` and run it with `bash scripts/test-browser.sh`.
 - Judge an architecture test by the convention it protects, not by the rules above. An `arch()` test declares a rule for an entire directory, such as the parent class of every model, the classes that may use an enum, or the methods every factory declares. It intentionally checks declarations and fails when a new file breaks the convention.
 - Use the test tools that the project installs. Add a new test dependency, plugin, or browser only after the user asks for it.
 

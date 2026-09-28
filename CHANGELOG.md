@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Pest 4 Native Browser Testing (Playwright)**:
+  - Replaced Laravel Dusk with `pestphp/pest-plugin-browser` on the existing Pest 4 suite: browser tests now run against an in-process HTTP server backed by the same in-memory SQLite database as the rest of the suite — no dedicated browser-test database, no `.env` swapping, and no system browser packages.
+  - Added a fast session authentication bridge (`/_testing/login/{guard}/{id}`, testing environment only) that signs admins and tenant users into browser sessions in milliseconds.
+  - Added `scripts/test-browser.sh` and taught `php artisan app:test --full` to run the feature suite followed by the browser suite automatically.
+  - Enabling browser tests on a server now requires `npx playwright install --with-deps chromium` instead of APT `chromium`/`chromium-driver`; Playwright downloads and uses its own Chromium build.
 - **Automatic Telephony Dialplan Cache Invalidation**:
   - Implemented `App\Observers\RoutingCacheObserver` to automatically observe all 29 PBX telephony models across the modular architecture (including Extensions, SIP Accounts, Inbound and Outbound Routes, Ring Groups, IVR Menus, Time Conditions, Call Flows, Bridges, Follow Me, Voicemail, Conferences, Queues, Call Forwarding, Emergency Routes, Dialplans, Number Translations, and Tenant Limits).
   - Automatically bumps the tenant's atomic routing version (`RoutingCacheVersion::bump($tenantId)`) in Redis whenever any telephony record is created, updated, deleted, or restored.
@@ -39,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput (~14–19 req/sec) and call setup capacity (3 CPS clean baseline, 5 CPS saturation boundary) constant, confirming single-core CPU compute saturation.
 
 ### Removed
+- **Laravel Dusk Infrastructure Removed**:
+  - Removed the `laravel/dusk` dependency together with `scripts/dusk.sh`, `tests/DuskTestCase.php`, `tests/Browser/Pages/`, `phpunit.dusk.xml`, and `App\Support\DuskDatabaseSafety` (plus its test and the `app.dusk_testing` configuration key).
+  - The installer no longer creates the disposable `_dusk` MariaDB database and user, and no longer manages `.env.dusk`. Existing installations may drop the old `*_dusk` database and user manually; nothing else changes.
+  - The installer guidance no longer requires APT `chromium`/`chromium-driver`; browser tests ship their own browser via Playwright.
 - **1.x Backward Compatibility Fallbacks**:
   - Removed all legacy 1.x `FREESWITCH_XML_HANDLER_*` cache configuration fallbacks and standalone `XML_CACHE_*` settings from `config/freeswitch.php`, standardizing exclusively on canonical `FS_XML_HANDLER_*` settings (`FS_XML_HANDLER_CACHE_TTL`, `FS_XML_HANDLER_CACHE_STORE`, and granular subsystem overrides).
   - Removed legacy 1.x `/smtp-connector` redirect in the Email Connector module routes (`app-modules/email-connector/routes/web.php`).
@@ -53,6 +62,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
 
 ### Changed
+- **Browser Testing Workflow Modernized**:
+  - Converted every browser suite (`PanelSmokeTest`, `RiskConfirmationBrowserTest`, `MediaStorageBrowserTest`, `DocumentationScreenshotsTest`) to Pest 4's fluent browser API with the `loginAs()` session bridge and permission-seeded test databases.
+  - The web panel is now safe to use while browser tests run — the previous `.env`-swap restriction no longer applies.
+  - Renamed the documentation-capture flag from `DUSK_CAPTURE_DOCS` to `TALLPBX_CAPTURE_DOCS`; captures remain on-demand only (`TALLPBX_CAPTURE_DOCS=1 bash scripts/test-browser.sh`).
+  - Updated `README.md`, `INSTALL.md`, `docs/operations.md`, `AGENTS.md`, the CI workflow, and the installer guidance to document the Playwright-based workflow.
 - **Project-Wide Code Documentation Completed**: Every class, interface, trait, enum, and method in the application now carries a PHPDoc comment explaining what it does in plain language, as required by the `AGENTS.md` code style directive. The pass covered the core `app/` layer, all 57 modules under `app-modules/`, the 44 model factories under `database/factories/`, and the test suite. In the same pass, inline comments were added to every code section whose intent is not immediately obvious — system and CLI output parsing offsets, FreeSWITCH ms/sample-rate conversions, cache and queue-lock TTLs, security sanitisation and fail-closed guards, file-permission sequences, and best-effort file operations — across the core services, module panels, security services, and seeders. A new guard test (`tests/Feature/CodeDocumentationTest.php`) tokenizes the whole project on every test run and fails whenever a newly added class or method is missing its PHPDoc comment, so the convention can no longer silently regress.
 - **FreeSWITCH Environment Variable Modernization (`FS_*` Prefix)**:
   - Standardized all FreeSWITCH-specific environment variables in `config/freeswitch.php`, `config/call-broadcast.php`, `.env`, and `.env.example` to use the concise, canonical `FS_` prefix (e.g. `FS_SERVER`, `FS_DEFAULT_SIP_REALM`, `FS_ESL_HOST`, `FS_ESL_PORT`, `FS_ESL_PASSWORD`, `FS_ESL_RECONNECT_INTERVAL`, `FS_ESL_TIMEOUT`, `FS_LOG_LEVEL`, `FS_SESSIONS_PER_SECOND`, `FS_SOFIA_LOG_LEVEL`, `FS_SOFIA_AUTO_RESTART`, `FS_SOFIA_DEBUG_PRESENCE`, `FS_SOFIA_CAPTURE_SERVER`, `FS_SOFIA_INBOUND_REG_THREAD`, `FS_SOFIA_MAX_REG_THREADS`, `FS_PIN_TRIGGER`, `FS_HIREDIS_LIMIT_ENABLED`, `FS_HIREDIS_LIMIT_MAX`, `FS_HIREDIS_MARKER_ENABLED`, `FS_DB_DRIVER`, `FS_DB_HOST`, `FS_DB_PORT`, `FS_DB_NAME`, `FS_DB_USERNAME`, `FS_DB_PASSWORD`, `FS_CALL_BROADCAST_MEDIA`, etc.).

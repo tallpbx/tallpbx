@@ -333,13 +333,25 @@ Privileged firewall changes run through the bounded helper
 user can execute but never modify the script); the web user never receives
 general sudo access.
 
-### Browser Testing (Dusk)
+### Browser Testing
 
-Browser tests are optional developer tooling. **Do not use the web panel while
-they run**: `bash scripts/dusk.sh` temporarily swaps in the test environment,
-and concurrent panel use interferes with the run. Documentation screenshots
-are refreshed on demand only (`DUSK_CAPTURE_DOCS=1 bash scripts/dusk.sh`); see
-`AGENTS.md` for the full workflow.
+Browser tests are optional developer tooling. They run on Pest 4 with
+Playwright against an in-memory SQLite database, fully isolated from the
+installed application — the web panel stays safe to use while they run, and
+no test database or `.env` change is required.
+
+First-time setup downloads Playwright's own Chromium build (no system
+browser package is needed):
+
+```bash
+cd /var/www/tallpbx
+npx playwright install --with-deps chromium
+```
+
+Run the browser suite with `bash scripts/test-browser.sh`. Documentation
+screenshots are refreshed on demand only
+(`TALLPBX_CAPTURE_DOCS=1 bash scripts/test-browser.sh`); see `AGENTS.md` for
+the full workflow.
 
 ## 6. FreeSWITCH Installation Choice
 
