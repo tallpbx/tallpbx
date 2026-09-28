@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Models\User;
 
 use function Pest\Laravel\actingAs;
@@ -58,6 +59,22 @@ it('rejects login for a disabled user', function () {
     ])->assertInvalid('email');
 
     $this->assertGuest('web');
+});
+
+it('activates the tenant context when logging in through a tenant domain', function () {
+    TenantDomain::factory()->create([
+        'tenant_id' => $this->tenant->id,
+        'domain' => 'tenant-a.example.test',
+        'enabled' => true,
+    ]);
+
+    // Logging in on the tenant's own web domain must set that tenant as the
+    // active context for the session.
+    test()->post('http://tenant-a.example.test/panel/login', [
+        'email' => 'user@example.com',
+        'password' => 'password',
+    ])->assertRedirect(route('panel.dashboard'))
+        ->assertSessionHas('selected_tenant_id', (string) $this->tenant->id);
 });
 
 it('rate-limits login attempts after 10 tries', function () {

@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Controller;
-use App\Models\Tenant;
-use App\Models\User;
-use App\Services\TenantContext;
-use App\Services\TenantIdentityResolver;
+use App\Services\PanelLoginService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -31,9 +28,9 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming login request via the unified authentication handler.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuthController $authController, PanelLoginService $panelLogin): RedirectResponse
     {
-        return app(\App\Http\Controllers\Admin\AuthController::class)->store($request);
+        return $authController->store($request, $panelLogin);
     }
 
     /**
