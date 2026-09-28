@@ -58,8 +58,12 @@ class DevicesList extends BaseListComponent
     /** Render the paginated device list. */
     public function render(): View
     {
+        $query = $this->isAdminGuard()
+            ? Device::withoutGlobalScope('tenant')
+            : Device::query();
+
         return view('devices::devices-list', [
-            'devices' => Device::withoutGlobalScope('tenant')
+            'devices' => $query
                 ->orderBy('vendor')
                 ->paginate(15),
         ]);

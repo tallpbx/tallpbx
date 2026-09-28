@@ -44,7 +44,11 @@ class GatewaysList extends BaseListComponent
      */
     private function loadGateways(): void
     {
-        $this->gateways = Gateway::withoutGlobalScope('tenant')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? Gateway::withoutGlobalScope('tenant')
+            : Gateway::query();
+
+        $this->gateways = $query->orderBy('name')->get();
     }
 
     /**

@@ -11,6 +11,10 @@ use Modules\CallBroadcast\Jobs\SendCallBroadcast;
 use Modules\CallBroadcast\Models\CallBroadcast;
 use Modules\CallBroadcast\Services\CallBroadcastService;
 
+/**
+ * Livewire component listing call broadcasts with send, resend,
+ * and delete actions.
+ */
 #[Layout('layouts.app')]
 class BroadcastList extends BaseListComponent
 {
@@ -29,24 +33,38 @@ class BroadcastList extends BaseListComponent
 
     private CallBroadcastService $broadcastService;
 
+    /**
+     * Inject the call broadcast service used by this component.
+     */
     public function boot(CallBroadcastService $broadcastService): void
     {
         $this->broadcastService = $broadcastService;
     }
 
+    /**
+     * Load the broadcast list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadBroadcasts();
     }
 
+    /**
+     * Fetch broadcasts with answered and failed recipient counts,
+     * newest first. Administrators see every tenant's broadcasts;
+     * tenant users only see their own.
+     */
     private function loadBroadcasts(): void
     {
-        $this->broadcasts = CallBroadcast::withoutGlobalScope('tenant')
-            ->withCount([
-                'recipients',
-                'recipients as answered_count' => fn ($query) => $query->where('call_status', 'answered'),
-                'recipients as failed_count' => fn ($query) => $query->where('call_status', 'failed'),
-            ])
+        $query = $this->isAdminGuard()
+            ? CallBroadcast::withoutGlobalScope('tenant')
+            : CallBroadcast::query();
+
+        $this->broadcasts = $query->withCount([
+            'recipients',
+            'recipients as answered_count' => fn ($query) => $query->where('call_status', 'answered'),
+            'recipients as failed_count' => fn ($query) => $query->where('call_status', 'failed'),
+        ])
             ->orderBy('created_at', 'desc')
             ->get();
     }

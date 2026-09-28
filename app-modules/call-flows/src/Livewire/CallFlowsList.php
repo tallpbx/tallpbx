@@ -36,9 +36,11 @@ class CallFlowsList extends BaseListComponent
     /** Fetch call flows ordered by name. */
     private function loadCallFlows(): void
     {
-        $this->callFlows = CallFlow::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? CallFlow::withoutGlobalScope('tenant')
+            : CallFlow::query();
+
+        $this->callFlows = $query->orderBy('name')->get();
     }
 
     /** Delete the confirmed call flow and refresh the list. */

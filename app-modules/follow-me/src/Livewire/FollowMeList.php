@@ -47,9 +47,11 @@ class FollowMeList extends BaseListComponent
      */
     private function loadRecords(): void
     {
-        $this->followMeRecords = FollowMe::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? FollowMe::withoutGlobalScope('tenant')
+            : FollowMe::query();
+
+        $this->followMeRecords = $query->orderBy('name')->get();
     }
 
     /**

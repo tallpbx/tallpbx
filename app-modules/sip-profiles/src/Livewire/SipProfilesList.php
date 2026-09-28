@@ -40,7 +40,11 @@ class SipProfilesList extends BaseListComponent
      */
     private function loadProfiles(): void
     {
-        $this->profiles = SipProfile::withoutGlobalScope('tenant')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? SipProfile::withoutGlobalScope('tenant')
+            : SipProfile::query();
+
+        $this->profiles = $query->orderBy('name')->get();
     }
 
     /**

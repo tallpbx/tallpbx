@@ -49,7 +49,11 @@ class IvrMenusList extends BaseListComponent
      */
     private function loadMenus(): void
     {
-        $this->menus = IvrMenu::withoutGlobalScope('tenant')->withCount('options')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? IvrMenu::withoutGlobalScope('tenant')
+            : IvrMenu::query();
+
+        $this->menus = $query->withCount('options')->orderBy('name')->get();
     }
 
     /**

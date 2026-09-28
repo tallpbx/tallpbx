@@ -9,6 +9,9 @@ use Illuminate\Contracts\View\View;
 use Modules\Recordings\Models\Recording;
 use Modules\Recordings\Services\RecordingService;
 
+/**
+ * Livewire component listing recordings with a delete action.
+ */
 class RecordingsList extends BaseListComponent
 {
     public ?string $pendingDeletionId = null;
@@ -17,6 +20,9 @@ class RecordingsList extends BaseListComponent
 
     private RecordingService $recordingService;
 
+    /**
+     * Inject the recording service used by this component.
+     */
     public function boot(RecordingService $recordingService): void
     {
         $this->recordingService = $recordingService;
@@ -46,10 +52,18 @@ class RecordingsList extends BaseListComponent
         $this->dispatch('recording-deleted');
     }
 
+    /**
+     * Render the paginated recordings list. Administrators see every
+     * tenant's recordings; tenant users only see their own.
+     */
     public function render(): View
     {
+        $query = $this->isAdminGuard()
+            ? Recording::withoutGlobalScope('tenant')
+            : Recording::query();
+
         return view('recordings::recordings-list', [
-            'recordings' => Recording::withoutGlobalScope('tenant')
+            'recordings' => $query
                 ->orderBy('name')
                 ->paginate(15),
         ]);

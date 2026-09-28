@@ -44,7 +44,11 @@ class FeatureCodesList extends BaseListComponent
      */
     private function loadCodes(): void
     {
-        $this->codes = FeatureCode::withoutGlobalScope('tenant')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? FeatureCode::withoutGlobalScope('tenant')
+            : FeatureCode::query();
+
+        $this->codes = $query->orderBy('name')->get();
     }
 
     /**

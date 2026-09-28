@@ -58,8 +58,12 @@ class DialplansList extends BaseListComponent
     /** Render the paginated dialplan list. */
     public function render(): View
     {
+        $query = $this->isAdminGuard()
+            ? Dialplan::withoutGlobalScope('tenant')
+            : Dialplan::query();
+
         return view('dialplans::dialplans-list', [
-            'dialplans' => Dialplan::withoutGlobalScope('tenant')
+            'dialplans' => $query
                 ->withCount('details')
                 ->orderBy('order')
                 ->paginate(15),

@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\TenantLimits\Models\TenantLimit;
 use Modules\TenantLimits\Services\TenantLimitService;
 
+/**
+ * Livewire component listing tenant resource limits with a delete action.
+ */
 class TenantLimitsList extends BaseListComponent
 {
     /** @var Collection<int, TenantLimit> */
@@ -20,23 +23,38 @@ class TenantLimitsList extends BaseListComponent
 
     private TenantLimitService $limitService;
 
+    /**
+     * Inject the tenant limit service used by this component.
+     */
     public function boot(TenantLimitService $limitService): void
     {
         $this->limitService = $limitService;
     }
 
+    /**
+     * Load the tenant limits list when the page opens.
+     */
     public function mount(): void
     {
         $this->load();
     }
 
+    /**
+     * Fetch limits ordered by resource. Administrators see every
+     * tenant's limits; tenant users only see their own.
+     */
     private function load(): void
     {
-        $this->limits = TenantLimit::withoutGlobalScope('tenant')
-            ->orderBy('resource')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? TenantLimit::withoutGlobalScope('tenant')
+            : TenantLimit::query();
+
+        $this->limits = $query->orderBy('resource')->get();
     }
 
+    /**
+     * Delete the confirmed limit and refresh the list.
+     */
     public function deleteLimit(string $id): void
     {
         $limit = TenantLimit::withoutGlobalScope('tenant')->findOrFail($id);

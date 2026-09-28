@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\NumberTranslations\Models\NumberTranslation;
 use Modules\NumberTranslations\Services\NumberTranslationServiceInterface;
 
+/**
+ * Livewire component listing number translation rules with a delete action.
+ */
 class NumberTranslationsList extends BaseListComponent
 {
     /** @var Collection<int, NumberTranslation> */
@@ -20,23 +23,38 @@ class NumberTranslationsList extends BaseListComponent
 
     private NumberTranslationServiceInterface $service;
 
+    /**
+     * Inject the number translation service used by this component.
+     */
     public function boot(NumberTranslationServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Load the translation list when the page opens.
+     */
     public function mount(): void
     {
         $this->load();
     }
 
+    /**
+     * Fetch translation rules ordered by name. Administrators see every
+     * tenant's rules; tenant users only see their own.
+     */
     private function load(): void
     {
-        $this->translations = NumberTranslation::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? NumberTranslation::withoutGlobalScope('tenant')
+            : NumberTranslation::query();
+
+        $this->translations = $query->orderBy('name')->get();
     }
 
+    /**
+     * Delete the confirmed translation rule and refresh the list.
+     */
     public function deleteTranslation(string $id): void
     {
         $translation = NumberTranslation::withoutGlobalScope('tenant')->findOrFail($id);

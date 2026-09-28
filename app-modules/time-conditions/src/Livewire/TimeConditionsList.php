@@ -47,9 +47,11 @@ class TimeConditionsList extends BaseListComponent
      */
     private function loadTimeConditions(): void
     {
-        $this->timeConditions = TimeCondition::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? TimeCondition::withoutGlobalScope('tenant')
+            : TimeCondition::query();
+
+        $this->timeConditions = $query->orderBy('name')->get();
     }
 
     /**

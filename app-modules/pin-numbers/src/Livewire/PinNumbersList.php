@@ -21,6 +21,9 @@ class PinNumbersList extends BaseListComponent
 
     public string $pendingDeletionName = '';
 
+    /**
+     * Load the PIN number list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadPinNumbers();
@@ -31,9 +34,11 @@ class PinNumbersList extends BaseListComponent
      */
     private function loadPinNumbers(): void
     {
-        $this->pinNumbers = PinNumber::withoutGlobalScope('tenant')
-            ->orderBy('pin_number')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? PinNumber::withoutGlobalScope('tenant')
+            : PinNumber::query();
+
+        $this->pinNumbers = $query->orderBy('pin_number')->get();
     }
 
     /**

@@ -44,7 +44,11 @@ class DestinationsList extends BaseListComponent
      */
     private function loadDestinations(): void
     {
-        $this->destinations = Destination::withoutGlobalScope('tenant')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? Destination::withoutGlobalScope('tenant')
+            : Destination::query();
+
+        $this->destinations = $query->orderBy('name')->get();
     }
 
     /**

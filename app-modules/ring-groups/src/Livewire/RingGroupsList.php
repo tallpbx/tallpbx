@@ -44,11 +44,15 @@ class RingGroupsList extends BaseListComponent
     }
 
     /**
-     * Fetch all ring groups ordered by name with their extensions loaded.
+     * Fetch ring groups ordered by name with their extensions loaded.
      */
     private function loadRingGroups(): void
     {
-        $this->ringGroups = $this->ringGroupService->getAll();
+        $query = $this->isAdminGuard()
+            ? RingGroup::withoutGlobalScope('tenant')
+            : RingGroup::query();
+
+        $this->ringGroups = $query->with('extensions')->orderBy('name')->get();
     }
 
     /**

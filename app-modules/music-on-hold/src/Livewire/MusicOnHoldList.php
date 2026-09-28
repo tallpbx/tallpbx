@@ -29,6 +29,9 @@ class MusicOnHoldList extends BaseListComponent
         $this->musicOnHoldService = $musicOnHoldService;
     }
 
+    /**
+     * Load the music on hold list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadHoldMusics();
@@ -39,9 +42,11 @@ class MusicOnHoldList extends BaseListComponent
      */
     private function loadHoldMusics(): void
     {
-        $this->holdMusics = MusicOnHold::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? MusicOnHold::withoutGlobalScope('tenant')
+            : MusicOnHold::query();
+
+        $this->holdMusics = $query->orderBy('name')->get();
     }
 
     /** Open the shared confirmation modal for a music-on-hold entry. */

@@ -35,9 +35,11 @@ class CallForwardsList extends BaseListComponent
      */
     private function loadForwards(): void
     {
-        $this->forwards = CallForward::withoutGlobalScope('tenant')
-            ->orderBy('forward_type')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? CallForward::withoutGlobalScope('tenant')
+            : CallForward::query();
+
+        $this->forwards = $query->orderBy('forward_type')->get();
     }
 
     /**

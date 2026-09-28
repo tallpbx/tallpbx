@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\Provision\Models\ProvisionTemplate;
 use Modules\Provision\Services\ProvisionServiceInterface;
 
+/**
+ * Livewire component listing provisioning templates with a delete action.
+ */
 #[Layout('layouts.app')]
 class TemplateList extends BaseListComponent
 {
@@ -21,21 +24,33 @@ class TemplateList extends BaseListComponent
 
     private ProvisionServiceInterface $service;
 
+    /**
+     * Inject the provision service used by this component.
+     */
     public function boot(ProvisionServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Load the template list when the page opens.
+     */
     public function mount(): void
     {
         $this->load();
     }
 
+    /**
+     * Fetch templates ordered by name. Administrators see every
+     * tenant's templates; tenant users only see their own.
+     */
     private function load(): void
     {
-        $this->templates = ProvisionTemplate::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? ProvisionTemplate::withoutGlobalScope('tenant')
+            : ProvisionTemplate::query();
+
+        $this->templates = $query->orderBy('name')->get();
     }
 
     /** Open the shared confirmation modal for a provisioning template. */

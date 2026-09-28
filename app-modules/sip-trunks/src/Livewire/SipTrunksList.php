@@ -40,9 +40,11 @@ class SipTrunksList extends BaseListComponent
     /** Fetch SIP trunks ordered by name. */
     private function load(): void
     {
-        $this->trunks = SipTrunk::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? SipTrunk::withoutGlobalScope('tenant')
+            : SipTrunk::query();
+
+        $this->trunks = $query->orderBy('name')->get();
     }
 
     /** Delete the confirmed SIP trunk and refresh the list. */

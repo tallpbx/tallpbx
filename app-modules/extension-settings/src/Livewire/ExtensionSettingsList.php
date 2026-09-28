@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\ExtensionSettings\Models\ExtensionSetting;
 use Modules\ExtensionSettings\Services\ExtensionSettingServiceInterface;
 
+/**
+ * Livewire component listing per-extension settings with a delete action.
+ */
 class ExtensionSettingsList extends BaseListComponent
 {
     /** @var Collection<int, ExtensionSetting> */
@@ -20,24 +23,39 @@ class ExtensionSettingsList extends BaseListComponent
 
     private ExtensionSettingServiceInterface $service;
 
+    /**
+     * Inject the extension setting service used by this component.
+     */
     public function boot(ExtensionSettingServiceInterface $service): void
     {
         $this->service = $service;
     }
 
+    /**
+     * Load the settings list when the page opens.
+     */
     public function mount(): void
     {
         $this->load();
     }
 
+    /**
+     * Fetch settings with their extensions ordered by key.
+     * Administrators see every tenant's settings; tenant users only
+     * see their own.
+     */
     private function load(): void
     {
-        $this->settings = ExtensionSetting::withoutGlobalScope('tenant')
-            ->with('extension')
-            ->orderBy('key')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? ExtensionSetting::withoutGlobalScope('tenant')
+            : ExtensionSetting::query();
+
+        $this->settings = $query->with('extension')->orderBy('key')->get();
     }
 
+    /**
+     * Delete the confirmed setting and refresh the list.
+     */
     public function deleteSetting(string $id): void
     {
         $setting = ExtensionSetting::withoutGlobalScope('tenant')->findOrFail($id);

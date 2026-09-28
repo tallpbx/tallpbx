@@ -47,9 +47,11 @@ class ConferenceCentersList extends BaseListComponent
      */
     private function loadCenters(): void
     {
-        $this->conferenceCenters = ConferenceCenter::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? ConferenceCenter::withoutGlobalScope('tenant')
+            : ConferenceCenter::query();
+
+        $this->conferenceCenters = $query->orderBy('name')->get();
     }
 
     /** Open the shared confirmation modal for a conference center. */

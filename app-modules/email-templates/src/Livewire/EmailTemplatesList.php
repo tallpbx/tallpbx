@@ -25,21 +25,33 @@ class EmailTemplatesList extends BaseListComponent
 
     private EmailTemplateService $templateService;
 
+    /**
+     * Inject the email template service used by this component.
+     */
     public function boot(EmailTemplateService $templateService): void
     {
         $this->templateService = $templateService;
     }
 
+    /**
+     * Load the template list when the page opens.
+     */
     public function mount(): void
     {
         $this->load();
     }
 
+    /**
+     * Fetch templates ordered by name. Administrators see every
+     * tenant's templates; tenant users only see their own.
+     */
     private function load(): void
     {
-        $this->templates = EmailTemplate::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? EmailTemplate::withoutGlobalScope('tenant')
+            : EmailTemplate::query();
+
+        $this->templates = $query->orderBy('name')->get();
     }
 
     /** Open the shared confirmation modal for an email template. */

@@ -49,9 +49,11 @@ class EmailQueueList extends BaseListComponent
      */
     private function load(): void
     {
-        $this->items = EmailQueueItem::withoutGlobalScope('tenant')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? EmailQueueItem::withoutGlobalScope('tenant')
+            : EmailQueueItem::query();
+
+        $this->items = $query->orderBy('created_at', 'desc')->get();
     }
 
     /** Open the shared confirmation modal for a queued email. */

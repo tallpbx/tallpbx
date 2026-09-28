@@ -20,18 +20,30 @@ class CallBlocksList extends BaseListComponent
 
     public string $pendingDeletionName = '';
 
+    /**
+     * Load the call block list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadBlocks();
     }
 
+    /**
+     * Fetch call blocks ordered by name. Administrators see every
+     * tenant's rules; tenant users only see their own.
+     */
     private function loadBlocks(): void
     {
-        $this->blocks = CallBlock::withoutGlobalScope('tenant')
-            ->orderBy('name')
-            ->get();
+        $query = $this->isAdminGuard()
+            ? CallBlock::withoutGlobalScope('tenant')
+            : CallBlock::query();
+
+        $this->blocks = $query->orderBy('name')->get();
     }
 
+    /**
+     * Delete a call block rule and refresh the list.
+     */
     public function deleteBlock(string $blockId): void
     {
         $block = CallBlock::withoutGlobalScope('tenant')->findOrFail($blockId);

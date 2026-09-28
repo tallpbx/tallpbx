@@ -54,8 +54,12 @@ class SipAccountsList extends BaseListComponent
     /** Render the paginated SIP account list. */
     public function render(): View
     {
+        $query = $this->isAdminGuard()
+            ? SipAccount::withoutGlobalScope('tenant')
+            : SipAccount::query();
+
         return view('sip-accounts::sip-accounts-list', [
-            'accounts' => SipAccount::withoutGlobalScope('tenant')
+            'accounts' => $query
                 ->with('tenantDomain')
                 ->orderBy('auth_username')
                 ->paginate(15),

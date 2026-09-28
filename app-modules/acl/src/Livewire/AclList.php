@@ -44,7 +44,11 @@ class AclList extends BaseListComponent
      */
     private function loadRules(): void
     {
-        $this->rules = AccessControl::withoutGlobalScope('tenant')->withCount('nodes')->orderBy('name')->get();
+        $query = $this->isAdminGuard()
+            ? AccessControl::withoutGlobalScope('tenant')
+            : AccessControl::query();
+
+        $this->rules = $query->withCount('nodes')->orderBy('name')->get();
     }
 
     /**

@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Fax\Livewire;
 
-use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
 use Modules\Fax\Models\FaxInbox as FaxInboxModel;
 use Modules\Fax\Services\FaxServiceInterface;
 
+/**
+ * Livewire component listing received faxes with a delete action.
+ */
 #[Layout('layouts.app')]
-class FaxInbox extends Component
+class FaxInbox extends BaseListComponent
 {
-    use HasOperationalFeedback;
-
     /** @var Collection<int, FaxInboxModel> */
     public Collection $faxes;
 
@@ -28,19 +28,33 @@ class FaxInbox extends Component
 
     private FaxServiceInterface $faxService;
 
+    /**
+     * Inject the fax service used by this component.
+     */
     public function boot(FaxServiceInterface $faxService): void
     {
         $this->faxService = $faxService;
     }
 
+    /**
+     * Load the received fax list when the page opens.
+     */
     public function mount(): void
     {
         $this->loadFaxes();
     }
 
+    /**
+     * Fetch received faxes newest first. Administrators see every
+     * tenant's faxes; tenant users only see their own.
+     */
     private function loadFaxes(): void
     {
-        $this->faxes = FaxInboxModel::withoutGlobalScope('tenant')
+        $query = $this->isAdminGuard()
+            ? FaxInboxModel::withoutGlobalScope('tenant')
+            : FaxInboxModel::query();
+
+        $this->faxes = $query
             ->with('mediaAsset')
             ->orderBy('received_at', 'desc')
             ->get();
@@ -80,6 +94,9 @@ class FaxInbox extends Component
         $this->dispatch('fax-deleted');
     }
 
+    /**
+     * Render the fax inbox view.
+     */
     public function render(): View
     {
         return view('fax::fax-inbox');

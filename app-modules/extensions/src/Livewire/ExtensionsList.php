@@ -44,7 +44,11 @@ class ExtensionsList extends BaseListComponent
      */
     private function loadExtensions(): void
     {
-        $this->extensions = Extension::withoutGlobalScope('tenant')->orderBy('extension_number')->get();
+        $query = $this->isAdminGuard()
+            ? Extension::withoutGlobalScope('tenant')
+            : Extension::query();
+
+        $this->extensions = $query->orderBy('extension_number')->get();
     }
 
     /** Open the shared confirmation modal for an extension. */
