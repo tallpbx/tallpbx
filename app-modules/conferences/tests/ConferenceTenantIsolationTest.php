@@ -103,7 +103,7 @@ it('allows tenant user to create conference for their own tenant', function () {
     Livewire::actingAs($userA, 'web')
         ->test(ConferencesEdit::class)
         ->set('name', 'Team Sync')
-        ->set('profile' , 'sample')
+        ->set('profile', 'sample')
         ->set('pin', '4321')
         ->set('maxMembers', 50)
         ->call('save')

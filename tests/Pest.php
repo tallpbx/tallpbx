@@ -29,7 +29,7 @@ pest()->extend(TestCase::class)
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Feature');
+    ->in('Feature', dirname(__DIR__).'/app-modules');
 
 pest()->extend(TestCase::class)
     ->in('Unit/Jobs');

@@ -67,6 +67,7 @@ class MakeModuleCommand extends Command
             'src/Livewire/      — Livewire component directory',
             'src/Database/Factories/ — model factory directory',
             'resources/views/   — Livewire view directory',
+            'tests/             — Pest tests discovered by the host suite',
         ]);
 
         $this->components->twoColumnDetail('Namespace', $namespace);
@@ -87,6 +88,7 @@ class MakeModuleCommand extends Command
         mkdir("{$moduleDir}/database/migrations", 0755, true);
         mkdir("{$moduleDir}/lang/en", 0755, true);
         mkdir("{$moduleDir}/config", 0755, true);
+        mkdir("{$moduleDir}/tests", 0755, true);
     }
 
     /**

@@ -67,6 +67,7 @@ it('scaffolds modules using current TallPBX conventions', function () {
     expect($modulePath.'/src/Livewire')->toBeDirectory()
         ->and($modulePath.'/src/Database/Factories')->toBeDirectory()
         ->and($modulePath.'/src/Providers/ModuleServiceProvider.php')->toBeFile()
+        ->and($modulePath.'/tests')->toBeDirectory()
         ->and($modulePath.'/composer.json')->toBeFile()
         ->and($modulePath.'/module.json')->toBeFile()
         ->and($modulePath.'/routes/web.php')->not->toBeFile();

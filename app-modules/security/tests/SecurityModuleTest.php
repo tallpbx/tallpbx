@@ -9,6 +9,7 @@ use App\Models\Group;
 use App\Models\Module;
 use App\Models\Permission;
 use App\Services\MenuService;
+use Database\Seeders\AdminSeeder;
 use Livewire\Livewire;
 use Modules\Security\Livewire\SecurityManager;
 
@@ -18,10 +19,9 @@ use Modules\Security\Livewire\SecurityManager;
  * Validates module database presence, permission seeding, menu hierarchy,
  * route authentication/authorization, and initial Livewire component rendering.
  */
-
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');
-    $this->seed(\Database\Seeders\AdminSeeder::class);
+    $this->seed(AdminSeeder::class);
     $this->superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
     $this->admin->groups()->attach($this->superAdminGroup->id);

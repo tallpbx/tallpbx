@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\Tenant;
 use Modules\RingGroups\Models\RingGroup;
-use Modules\RingGroups\Models\RingGroupExtension;
 use Modules\RingGroups\Services\RingGroupServiceInterface;
 
 beforeEach(function () {

@@ -254,4 +254,3 @@ it('disables voicemail mailbox when voicemailEnabled is toggled off', function (
     expect($extension->fresh()->voicemail_enabled)->toBeFalse();
     expect($voicemail->fresh()->enabled)->toBeFalse();
 });
-

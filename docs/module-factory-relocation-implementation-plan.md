@@ -1764,7 +1764,7 @@ git commit -m "feat: rewrite module lifecycle as complete uninstall and restore"
 **Interfaces:**
 - Produces: module tests discovered via `<directory suffix="Test.php">app-modules/*/tests</directory>` in the Feature suite; `pest()->extend(TestCase::class)...->in('Feature', 'app-modules')` binds the Laravel test case and the skip guard to them.
 
-- [ ] **Step 1: Write the one-shot move script**
+- [x] **Step 1: Write the one-shot move script**
 
 ```php
 <?php
@@ -1810,12 +1810,12 @@ if ($errors !== []) {
 echo 'Moved '.count($moved).' module test folders into their modules.'."\n";
 ```
 
-- [ ] **Step 2: Run the move script**
+- [x] **Step 2: Run the move script**
 
 Run: `php scripts/migrate-module-tests.php`
 Expected: `Moved 44 module test folders into their modules.`
 
-- [ ] **Step 3: Wire suite discovery (TDD: tests disappear first, then return)**
+- [x] **Step 3: Wire suite discovery (TDD: tests disappear first, then return)**
 
 Before wiring, run: `php artisan test --compact --parallel --filter=ModuleFactoryIsolationTest` — still passes (central file). Then run: `php artisan test --compact --parallel --filter="extensions"` — the module's tests no longer run (not discovered). That is the red state for this step.
 
@@ -1842,13 +1842,13 @@ pest()->extend(TestCase::class)
 Run again: `php artisan test --compact --parallel --filter="extensions"`
 Expected: the module's tests run again and pass from their new home. Verify paratest and Pest honor the glob at this step; if a framework quirk appears, fall back to explicit module directories in `phpunit.xml`.
 
-- [ ] **Step 4: Scaffold `tests/` in make:module (TDD)**
+- [x] **Step 4: Scaffold `tests/` in make:module (TDD)**
 
 In `tests/Feature/Commands/NativeModuleCommandTest.php` scaffold test add `->and($modulePath.'/tests')->toBeDirectory();` — run: FAIL.
 
 Then in `MakeModuleCommand::createDirectories()` add `mkdir("{$moduleDir}/tests", 0755, true);` and the bullet `'tests/ — Pest tests discovered by the host suite'`. Re-run: PASS.
 
-- [ ] **Step 5: Verify no stragglers and delete the script**
+- [x] **Step 5: Verify no stragglers and delete the script**
 
 Run: `ls tests/Feature/Modules 2>/dev/null || echo "GONE"` — Expected: `GONE`. Delete `scripts/migrate-module-tests.php`.
 
