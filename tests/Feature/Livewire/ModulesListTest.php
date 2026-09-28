@@ -116,49 +116,18 @@ it('prevents disabling required modules', function () {
     ]);
 });
 
-it('prepares an uninstall preview for modules without handlers', function () {
-    $module = Module::create(['name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0', 'enabled' => true]);
-
-    Livewire::actingAs($this->admin, 'admin')
-        ->test(ModulesList::class)
-        ->call('prepareUninstall', $module->id)
-        ->assertSet('pendingUninstallModuleId', $module->id)
-        ->assertSet('uninstallPreview.can_uninstall', false)
-        ->assertSee('This module does not provide an uninstall handler.');
-});
-
-it('reinstalls uninstalled modules from their manifest', function () {
+it('shows a CLI restore hint for uninstalled modules without destructive buttons', function () {
     $module = Module::create([
         'name' => 'extensions',
-        'display_name' => 'Old Extensions',
-        'version' => '0.1',
+        'display_name' => 'Extensions',
+        'version' => '1.0',
         'enabled' => false,
         'status' => Module::StatusUninstalled,
     ]);
 
-    Artisan::shouldReceive('call')
-        ->once()
-        ->with('migrate', [
-            '--path' => base_path('app-modules/extensions/database/migrations'),
-            '--realpath' => true,
-            '--force' => true,
-        ])
-        ->andReturn(0);
-
-    Artisan::shouldReceive('call')
-        ->once()
-        ->with('optimize:clear')
-        ->andReturn(0);
-
     Livewire::actingAs($this->admin, 'admin')
         ->test(ModulesList::class)
-        ->call('reinstallModule', $module->id)
-        ->assertDispatched('module-reinstalled');
-
-    $this->assertDatabaseHas('modules', [
-        'id' => $module->id,
-        'display_name' => 'Extensions',
-        'enabled' => true,
-        'status' => Module::StatusEnabled,
-    ]);
+        ->assertSee('php artisan module:restore extensions')
+        ->assertDontSee('prepareUninstall')
+        ->assertDontSee('reinstallModule');
 });

@@ -2844,7 +2844,7 @@ git commit -m "feat: add module:uninstall and module:restore commands" -m "Add C
 - Consumes: `Module::StatusUninstalled` and the registry marker rows left by Task 4's uninstall.
 - Produces: a Modules List page with only the enable/disable toggle; uninstalled rows show a CLI restore hint.
 
-- [ ] **Step 1: Update the Livewire tests first (red)**
+- [x] **Step 1: Update the Livewire tests first (red)**
 
 In `tests/Feature/Livewire/ModulesListTest.php`:
 - Delete the `prepares an uninstall preview for modules without handlers` and `reinstalls uninstalled modules from their manifest` tests (those flows no longer exist).
@@ -2871,11 +2871,11 @@ it('shows a CLI restore hint for uninstalled modules without destructive buttons
 Run: `php artisan test --compact --parallel --filter=ModulesListTest`
 Expected: FAIL — the old methods still exist and the hint is missing.
 
-- [ ] **Step 2: Simplify the Livewire component**
+- [x] **Step 2: Simplify the Livewire component**
 
 In `app-modules/admin/src/Livewire/ModulesList.php` remove: the `ModuleLifecycleService` boot injection, the `pendingUninstallModuleId` / `uninstallConfirmation` / `uninstallPreview` properties, and the `prepareUninstall()`, `cancelUninstall()`, `uninstallModule()`, `reinstallModule()` methods. Keep `mount()`, `loadModules()`, `toggleEnabled()`, `render()`. Update the class docblock: the page now offers only enable/disable; uninstall and restore run through the CLI.
 
-- [ ] **Step 3: Simplify the view**
+- [x] **Step 3: Simplify the view**
 
 In `app-modules/admin/resources/views/modules-list.blade.php`:
 - Delete the entire `@if($pendingUninstallModuleId)` warning/confirmation block (lines with the modal).
@@ -2907,13 +2907,13 @@ In `app-modules/admin/resources/views/modules-list.blade.php`:
 
 - Remove the now-unused `prepareUninstall` button from the enabled/disabled branch.
 
-- [ ] **Step 4: Update translations**
+- [x] **Step 4: Update translations**
 
 - Add to `lang/en/admin.php`: `'module_restore_hint' => 'Restore over SSH: php artisan module:restore :name'`.
 - Add the same key to `lang/es/admin.php` and `lang/fr/admin.php` with translated text.
 - Remove the now-unused keys from all three languages: `uninstall_module`, `uninstall_module_warning`, `uninstall_module_confirmation`, `confirm_uninstall_module`, `reinstall_module` (verify with `grep -rn "uninstall_module\|reinstall_module" app-modules resources lang` that nothing else references them first).
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `php artisan test --compact --parallel --filter=ModulesListTest`
 Expected: PASS.

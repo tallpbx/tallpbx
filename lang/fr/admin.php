@@ -176,11 +176,7 @@ return [
     'enable_module' => 'Activer',
     'disable_module' => 'Désactiver',
     'uninstalled' => 'Désinstallé',
-    'uninstall_module' => 'Désinstaller',
-    'reinstall_module' => 'Réinstaller',
-    'confirm_uninstall_module' => 'Désinstaller le module',
-    'uninstall_module_warning' => 'Cela supprimera définitivement les données du module et masquera ses routes, menus et permissions.',
-    'uninstall_module_confirmation' => 'Saisissez ":phrase" pour confirmer.',
+    'module_restore_hint' => 'Restaurer via SSH : php artisan module:restore :name',
     'module_required' => 'Les modules requis ne peuvent pas être désactivés.',
     'no_modules_found' => 'Aucun module trouvé.',
 

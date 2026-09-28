@@ -216,11 +216,7 @@ return [
     'enable_module' => 'Enable',
     'disable_module' => 'Disable',
     'uninstalled' => 'Uninstalled',
-    'uninstall_module' => 'Uninstall',
-    'reinstall_module' => 'Reinstall',
-    'confirm_uninstall_module' => 'Uninstall module',
-    'uninstall_module_warning' => 'This will permanently remove module-owned data and hide its routes, menus, and permissions.',
-    'uninstall_module_confirmation' => 'Type ":phrase" to confirm.',
+    'module_restore_hint' => 'Restore over SSH: php artisan module:restore :name',
     'module_required' => 'Required modules cannot be disabled.',
     'no_modules_found' => 'No modules found.',
 
