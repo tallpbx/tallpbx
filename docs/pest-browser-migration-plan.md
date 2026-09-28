@@ -607,6 +607,24 @@ Split into `fix(browser)`, `ci:`, `feat(testing)` (worker cap), `docs(testing):`
 
 ---
 
+## Final Review & Fix Pass
+
+A fresh-context reviewer examined the whole migration range (`3ded562..6d67cf4`, 50 commits) against the Review Focus list. Result: 0 Critical, 1 Important, 1 Minor. Both findings were fixed in one RED→GREEN pass, and the pass surfaced a third determinism defect that was fixed with them.
+
+### Fixed
+
+1. **`--sequential` was ignored by the browser leg (reviewer: Important; re-graded Important).** `runPest()` honored `--sequential` for the feature suite, but `runBrowserTests()` always appended `--parallel --processes=4` — so the users most likely to need sequential execution (memory-starved hosts) silently still got four Chromiums. Fixed via `TestCommand::browserTestArguments(bool $sequential)`; covered by `tests/Unit/Console/TestCommandArgumentsTest.php` (RED `browserTestArguments` missing → GREEN 2/2).
+2. **Full-page gallery captures churned the whole gallery (reviewer: Important).** `DocumentationScreenshotsTest` captured full pages, so images included off-viewport overflow (1632×1416 instead of 1440×900) and every page-length change rewrote every image. Fixed: all 10 gallery captures are `fullPage: false` viewport crops with a geometry guard asserting 1440×900 (RED: captured geometry 1632×1416 vs 1440×900 → GREEN: all 10 images exactly 1440×900).
+3. **Cross-run screenshot churn (found during fix 2's verification).** Unchanged pages still rewrote their images between runs. Diagnosed empirically: same-state double captures and second visits *within one run* are pixel-identical, while separate runs differ only in glyph rasterization weight (Skia per-process warm-up) — no layout shift, no page-state race. Fixed with `settleDocumentationPage()` (freezes transitions/animations, awaits `document.fonts.ready`, pins sidebar scroll after two frames with read-back) plus a perceptual freshness gate `captureVisiblyChanged()` that compares 4×4 block brightness averages and copies only when a block moves by more than 40 levels (measured: cross-run jitter ≤ 19.5; a single changed table label = 112.8). Verified: unchanged re-run copies nothing; a planted single-label change is detected and recopied.
+
+### Rulings
+
+- **Gallery images are rebaselined once** by the viewport-crop switch (intentional; old gallery was itself inconsistent).
+- **Byte-exact screenshot equality across test runs is not achievable** and is no longer the freshness criterion — visible change is. If a UI change is smaller than one 4×4 block of visible brightness (≈ one small glyph), the gallery copy is skipped until the next bigger change; cost is one stale doc image, not a wrong one.
+- **`PanelSmokeTest`'s security-dashboard capture intentionally remains a full-page capture** (it documents the whole page at once); it is excluded from the gallery geometry guard and unchanged by the viewport-crop rule. The reviewer's single Minor (`--sequential` on the browser leg) was re-graded to Important by effect and fixed above, so no deferred minors remain.
+
+---
+
 ## Execution Handoff
 
 Plan complete and saved to [`docs/pest-browser-migration-plan.md`](file:///var/www/tallpbx/docs/pest-browser-migration-plan.md). Please review the plan. Which execution approach would you prefer?
