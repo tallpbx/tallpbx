@@ -53,4 +53,12 @@ class ImpersonationException extends RuntimeException
     {
         return new self('Your admin account has been disabled. Cannot restore admin session.');
     }
+
+    /**
+     * The original admin was deleted while impersonation was active.
+     */
+    public static function adminMissing(): self
+    {
+        return new self('The administrator account that started this impersonation no longer exists.');
+    }
 }

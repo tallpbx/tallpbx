@@ -101,8 +101,9 @@ class ImpersonationService implements ImpersonationServiceInterface
      *
      * Logs the stop action, clears impersonation session data, and
      * re-authenticates as the original admin — unless the admin was
-     * disabled while the impersonation was active, in which case
-     * the stop is logged but re-authentication is blocked.
+     * disabled or deleted while the impersonation was active, in which
+     * case the stop is logged (when possible) but re-authentication is
+     * blocked and the impersonation session is still ended cleanly.
      */
     public function stop(): void
     {
@@ -113,39 +114,54 @@ class ImpersonationService implements ImpersonationServiceInterface
         $adminId = session()->get(self::SESSION_ORIGINAL_ADMIN_ID);
         $userId = session()->get(self::SESSION_TARGET_USER_ID);
 
-        // Verify the original admin still exists
-        $admin = Admin::findOrFail($adminId);
+        // Look the original admin up without failing: the account may have
+        // been removed while the impersonation was active, and that must
+        // not crash the stop flow.
+        $admin = Admin::find($adminId);
         $user = User::find($userId);
         $userEmail = $user?->email;
 
-        DB::transaction(function () use ($admin, $userId, $userEmail) {
-            // Log the impersonation stop with snapshot information
-            ImpersonationLog::create([
-                'admin_id' => $admin->id,
-                'admin_name' => $admin->name,
-                'user_id' => $userId,
-                'user_email' => $userEmail,
-                'action' => 'stop',
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
+        if ($admin instanceof Admin) {
+            DB::transaction(function () use ($admin, $userId, $userEmail) {
+                // Log the impersonation stop with snapshot information
+                ImpersonationLog::create([
+                    'admin_id' => $admin->id,
+                    'admin_name' => $admin->name,
+                    'user_id' => $userId,
+                    'user_email' => $userEmail,
+                    'action' => 'stop',
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
+                ]);
 
-            Log::info(sprintf(
-                'Admin [%s] (ID: %d) stopped impersonating user [%s] (ID: %d) from IP [%s].',
-                $admin->name,
-                $admin->id,
-                $userEmail ?? ('User #'.$userId),
-                $userId,
-                request()->ip() ?? 'unknown'
-            ), [
+                Log::info(sprintf(
+                    'Admin [%s] (ID: %d) stopped impersonating user [%s] (ID: %d) from IP [%s].',
+                    $admin->name,
+                    $admin->id,
+                    $userEmail ?? ('User #'.$userId),
+                    $userId,
+                    request()->ip() ?? 'unknown'
+                ), [
+                    'event' => 'impersonation.stop',
+                    'admin_id' => $admin->id,
+                    'admin_name' => $admin->name,
+                    'user_id' => $userId,
+                    'user_email' => $userEmail,
+                    'ip' => request()->ip(),
+                ]);
+            });
+        } else {
+            // The admin no longer exists: audit rows cascade away with the
+            // admin, so a stop log against the missing id would violate the
+            // foreign key. Record the event in the application log instead.
+            Log::warning('Impersonation stopped after the original admin was deleted.', [
                 'event' => 'impersonation.stop',
-                'admin_id' => $admin->id,
-                'admin_name' => $admin->name,
+                'admin_id' => $adminId,
                 'user_id' => $userId,
                 'user_email' => $userEmail,
                 'ip' => request()->ip(),
             ]);
-        });
+        }
 
         // Clear impersonation session data
         session()->forget([
@@ -156,6 +172,10 @@ class ImpersonationService implements ImpersonationServiceInterface
 
         // Logout the web guard (impersonated user)
         Auth::guard('web')->logout();
+
+        if (! $admin instanceof Admin) {
+            throw ImpersonationException::adminMissing();
+        }
 
         // Prevent re-authentication of a disabled admin
         if (! $admin->enabled) {

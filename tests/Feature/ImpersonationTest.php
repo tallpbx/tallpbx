@@ -293,3 +293,62 @@ it('writes structured audit records to application logs on start and stop', func
     })->once();
 });
 
+it('rotates the session id when impersonation starts', function () {
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $user = User::factory()->create();
+    giveAdminImpersonatePermission($admin);
+
+    // Begin from a known, externally chosen session id — exactly the
+    // fixation position an attacker would prepare for the victim admin.
+    session()->setId(str_repeat('a', 40));
+    session()->start();
+
+    $impersonationService = app(ImpersonationServiceInterface::class);
+    $this->actingAs($admin, 'admin');
+    $impersonationService->impersonate($user);
+
+    // Auth::guard('web')->login() rotates the session id internally
+    // (SessionGuard::updateSession regenerates it), so the prepared id is
+    // abandoned the moment the identity switches to the impersonated user.
+    expect(session()->getId())->not->toBe(str_repeat('a', 40))
+        ->and(auth('web')->id())->toBe($user->id);
+});
+
+it('rotates the session id when impersonation stops', function () {
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $user = User::factory()->create();
+    giveAdminImpersonatePermission($admin);
+
+    $impersonationService = app(ImpersonationServiceInterface::class);
+    $this->actingAs($admin, 'admin');
+    $impersonationService->impersonate($user);
+
+    // Capture the id used while impersonating, then prove that restoring
+    // the original admin session abandons it as well.
+    $impersonatingSessionId = session()->getId();
+    $impersonationService->stop();
+
+    expect(session()->getId())->not->toBe($impersonatingSessionId)
+        ->and(auth('admin')->id())->toBe($admin->id);
+});
+
+it('stops safely when the original admin was deleted mid-session', function () {
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $user = User::factory()->create();
+    giveAdminImpersonatePermission($admin);
+
+    $impersonationService = app(ImpersonationServiceInterface::class);
+    $this->actingAs($admin, 'admin');
+    $impersonationService->impersonate($user);
+
+    // Simulate the admin account being removed while impersonating.
+    $admin->delete();
+
+    expect(fn () => $impersonationService->stop())
+        ->toThrow(ImpersonationException::class, 'no longer exists');
+
+    // The impersonation must end cleanly regardless: session keys cleared
+    // and the impersonated web login removed.
+    expect($impersonationService->isImpersonating())->toBeFalse();
+    $this->assertGuest('web');
+});
