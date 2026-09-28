@@ -23,7 +23,7 @@ beforeEach(function (): void {
     app()->bind(RestoreCommandRunnerInterface::class, SymfonyRestoreCommandRunner::class);
 
     if (! Schema::hasTable('backups')) {
-        foreach (glob(__DIR__.'/../../../../app-modules/backups/database/migrations/*.php') as $file) {
+        foreach (glob(base_path('app-modules/backups/database/migrations/*.php')) as $file) {
             $migration = require $file;
             $migration->up();
         }

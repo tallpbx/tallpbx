@@ -22,7 +22,7 @@ beforeEach(function (): void {
     // Keep the fallback for isolated module tests, but do not rerun a
     // migration that the application test bootstrap has already loaded.
     if (! Schema::hasTable('backups')) {
-        foreach (glob(__DIR__.'/../../../../app-modules/backups/database/migrations/*.php') as $file) {
+        foreach (glob(base_path('app-modules/backups/database/migrations/*.php')) as $file) {
             $migration = require $file;
             $migration->up();
         }
