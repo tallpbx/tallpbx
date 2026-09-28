@@ -12,7 +12,6 @@ use App\Models\User;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
-use Laravel\Dusk\Browser;
 use Modules\FileStores\Enums\MediaAssetStatus;
 use Modules\FileStores\Enums\MediaCategory;
 use Modules\FileStores\Models\FileStore;
@@ -22,17 +21,31 @@ use Modules\FileStores\Services\MediaArchiveDestinationServiceInterface;
 // Create an administrator and two uniquely named destinations for each test so
 // the browser can verify both local-only and remote archive choices safely.
 beforeEach(function (): void {
+    // Every running server has the reserved "Local storage - media"
+    // destination once the File Stores page has been opened; create it up
+    // front so the archive destination selector offers it deterministically
+    // on its first load against the refreshed test database.
+    app(MediaArchiveDestinationServiceInterface::class)->set(
+        FileStore::query()->firstOrCreate(
+            ['name' => 'Local storage - media'],
+            [
+                'provider' => 'local',
+                'settings' => ['root' => config('media-storage.store_root')],
+            ],
+        ),
+    );
+
     $this->admin = Admin::factory()->create(['enabled' => true]);
     $this->group = Group::factory()->system()->create();
 
     $permissions = collect(['file-stores.view', 'file-stores.update', 'admin.notifications.view'])
         ->map(fn (string $name): Permission => Permission::query()->firstOrCreate(
             ['name' => $name],
-            ['module' => 'file-stores', 'description' => 'Dusk permission for '.$name],
+            ['module' => 'file-stores', 'description' => 'Browser test permission for '.$name],
         ));
     $this->group->permissions()->sync($permissions->pluck('id'));
     $this->admin->groups()->attach($this->group);
-    $this->destinationPrefix = 'Dusk media '.Str::uuid();
+    $this->destinationPrefix = 'Browser media '.Str::uuid();
     $this->mediaFixtureRoots = [];
     $this->mediaFixtureAssets = [];
     $this->mediaFixtureStores = [];
@@ -43,14 +56,14 @@ beforeEach(function (): void {
     $this->localDestination = FileStore::query()->create([
         'name' => $this->destinationPrefix.' local',
         'provider' => 'local',
-        'settings' => ['root' => storage_path('framework/dusk-media-archive')],
+        'settings' => ['root' => storage_path('framework/browser-media-archive')],
     ]);
     $this->remoteDestination = FileStore::query()->create([
         'name' => $this->destinationPrefix.' remote',
         'provider' => 'sftp',
         'settings' => [
             'host' => 'archive.example.test',
-            'username' => 'dusk',
+            'username' => 'browser',
             'root' => '/media',
         ],
     ]);
@@ -110,52 +123,63 @@ afterEach(function (): void {
 // Verify that an administrator can keep the reserved local media destination
 // or select a remote archive destination through the panel.
 it('lets a system admin select the reserved local or a remote media archive destination', function (): void {
-    // Exercise the same controls an administrator uses in the File Stores page.
-    $this->browse(function (Browser $browser): void {
-        $browser->loginAs($this->admin, 'admin')
-            ->visit('/panel/file-stores')
-            ->waitFor('#media-archive-file-store', 5)
-            ->assertSee('Media archive destination')
-            ->assertSee('Local storage - media')
-            ->assertSee($this->destinationPrefix.' remote')
-            ->select('#media-archive-file-store', $this->remoteDestination->id)
-            ->press('Save archive destination')
-            ->waitFor("#archive-destination-status[data-archive-destination-id=\"{$this->remoteDestination->id}\"]", 5);
-    });
+    // Authenticate through the fast session bridge, then exercise the same
+    // controls an administrator uses in the File Stores page.
+    $this->loginAs($this->admin, 'admin');
+
+    $page = visit('/panel/file-stores');
+    $page->assertSee('Media archive destination')
+        ->assertSee($this->destinationPrefix.' remote')
+        // The reserved destination is offered inside a <select>, and Playwright
+        // does not report <option> elements as visible, so verify the offered
+        // choice through the DOM instead of assertSee().
+        ->assertScript(<<<'JS'
+            (() => {
+                const select = document.querySelector('#media-archive-file-store');
+                if (!select) return false;
+                return [...select.options].some((option) => option.textContent.includes('Local storage - media'));
+            })()
+            JS)
+        ->assertPresent('#media-archive-file-store')
+        ->select('#media-archive-file-store', $this->remoteDestination->id)
+        ->press('Save archive destination')
+        // The status line only appears with the newly saved destination id once
+        // Livewire re-renders, replacing Dusk's selector-based waitFor().
+        ->assertPresent("#archive-destination-status[data-archive-destination-id=\"{$this->remoteDestination->id}\"]");
 
     expect(app(MediaArchiveDestinationServiceInterface::class)->current()->is($this->remoteDestination))->toBeTrue();
 });
 
 it('streams local recording media to an authorized owning tenant user', function (): void {
-    [$user, $asset] = createDuskMediaFixture($this, MediaCategory::Recording, 'local-announcement.wav', 'local announcement bytes');
+    [$user, $asset] = createMediaFixture($this, MediaCategory::Recording, 'local-announcement.wav', 'local announcement bytes');
 
-    $this->browse(function (Browser $browser) use ($user, $asset): void {
-        $browser->loginAs($user, 'web')->visit('/panel/dashboard');
+    $this->loginAs($user, 'web');
 
-        expect(readDuskMediaResponse($browser, "/panel/media-assets/{$asset->id}/stream"))
-            ->toBe([200, 'audio/wav', 24, 'inline; filename=local-announcement.wav']);
-    });
+    $page = visit('/panel/dashboard');
+
+    expect(readMediaResponse($page, "/panel/media-assets/{$asset->id}/stream"))
+        ->toBe([200, 'audio/wav', 24, 'inline; filename=local-announcement.wav']);
 });
 
 it('streams and downloads an archived call recording from a second local store', function (): void {
-    [$user, $asset] = createDuskMediaFixture($this, MediaCategory::CallRecording, 'archived-call.wav', 'archived call recording bytes', true);
+    [$user, $asset] = createMediaFixture($this, MediaCategory::CallRecording, 'archived-call.wav', 'archived call recording bytes', true);
 
-    $this->browse(function (Browser $browser) use ($user, $asset): void {
-        $browser->loginAs($user, 'web')->visit('/panel/dashboard');
+    $this->loginAs($user, 'web');
 
-        expect(readDuskMediaResponse($browser, "/panel/media-assets/{$asset->id}/stream"))
-            ->toBe([200, 'audio/wav', 29, 'inline; filename=archived-call.wav'])
-            ->and(readDuskMediaResponse($browser, "/panel/media-assets/{$asset->id}/download"))
-            ->toBe([200, 'audio/wav', 29, 'attachment; filename=archived-call.wav']);
-    });
+    $page = visit('/panel/dashboard');
+
+    expect(readMediaResponse($page, "/panel/media-assets/{$asset->id}/stream"))
+        ->toBe([200, 'audio/wav', 29, 'inline; filename=archived-call.wav'])
+        ->and(readMediaResponse($page, "/panel/media-assets/{$asset->id}/download"))
+        ->toBe([200, 'audio/wav', 29, 'attachment; filename=archived-call.wav']);
 });
 
 it('hides foreign and pending media while distinguishing missing permission', function (): void {
-    [$owner, $asset] = createDuskMediaFixture($this, MediaCategory::Recording, 'private-recording.wav', 'private recording bytes');
+    [$owner, $asset] = createMediaFixture($this, MediaCategory::Recording, 'private-recording.wav', 'private recording bytes');
     $foreignTenant = Tenant::factory()->create();
     $foreignUser = User::factory()->create();
     $foreignUser->tenants()->attach($foreignTenant, ['role' => 'admin', 'primary' => true]);
-    grantDuskMediaPermission($foreignUser, $foreignTenant, 'recordings.view', $this);
+    grantMediaPermission($foreignUser, $foreignTenant, 'recordings.view', $this);
     $unprivilegedUser = User::factory()->create();
     $unprivilegedUser->tenants()->attach($owner->tenants()->firstOrFail(), ['role' => 'member', 'primary' => true]);
     $pendingAsset = MediaAsset::withoutGlobalScopes()->create([
@@ -169,23 +193,30 @@ it('hides foreign and pending media while distinguishing missing permission', fu
     $this->mediaFixtureTenants[] = $foreignTenant;
     $this->mediaFixtureAssets[] = $pendingAsset;
 
-    $this->browse(function (Browser $foreignBrowser, Browser $ownerBrowser, Browser $unprivilegedBrowser) use ($foreignUser, $unprivilegedUser, $owner, $asset, $pendingAsset): void {
-        $foreignBrowser->loginAs($foreignUser, 'web')->visit('/panel/dashboard');
-        expect(readDuskMediaResponse($foreignBrowser, "/panel/media-assets/{$asset->id}/stream")[0])->toBe(404)
-            ->and(readDuskMediaResponse($foreignBrowser, "/panel/media-assets/{$asset->id}/download")[0])->toBe(404);
+    // The browser session is shared by the in-process test server, so each
+    // identity below is authenticated and verified one at a time.
 
-        $ownerBrowser->loginAs($owner, 'web')->visit('/panel/dashboard');
-        expect(readDuskMediaResponse($ownerBrowser, "/panel/media-assets/{$pendingAsset->id}/stream")[0])->toBe(404);
+    // A tenant user from another tenant cannot see the media at all.
+    $this->loginAs($foreignUser, 'web');
+    $foreignPage = visit('/panel/dashboard');
+    expect(readMediaResponse($foreignPage, "/panel/media-assets/{$asset->id}/stream")[0])->toBe(404)
+        ->and(readMediaResponse($foreignPage, "/panel/media-assets/{$asset->id}/download")[0])->toBe(404);
 
-        $unprivilegedBrowser->loginAs($unprivilegedUser, 'web')->visit('/panel/dashboard');
-        expect(readDuskMediaResponse($unprivilegedBrowser, "/panel/media-assets/{$asset->id}/stream")[0])->toBe(403);
-    });
+    // The owning tenant user cannot stream an asset that is still pending.
+    $this->loginAs($owner, 'web');
+    $ownerPage = visit('/panel/dashboard');
+    expect(readMediaResponse($ownerPage, "/panel/media-assets/{$pendingAsset->id}/stream")[0])->toBe(404);
+
+    // A tenant user without the media permission is told the request is forbidden.
+    $this->loginAs($unprivilegedUser, 'web');
+    $unprivilegedPage = visit('/panel/dashboard');
+    expect(readMediaResponse($unprivilegedPage, "/panel/media-assets/{$asset->id}/stream")[0])->toBe(403);
 });
 
 it('shows safe archive failure details without exposing storage internals', function (): void {
     DatabaseNotification::query()->create([
         'id' => (string) Str::uuid(),
-        'type' => 'dusk-media-archive-failure',
+        'type' => 'browser-media-archive-failure',
         'notifiable_type' => $this->admin::class,
         'notifiable_id' => $this->admin->id,
         'data' => [
@@ -194,22 +225,21 @@ it('shows safe archive failure details without exposing storage internals', func
             'media_asset_id' => (string) Str::uuid(),
             'category' => 'call-recording',
             'original_filename' => 'customer-call.wav',
-            'staging_path' => '/private/dusk-spool-marker.wav',
+            'staging_path' => '/private/browser-spool-marker.wav',
             'object_key' => 'private-object-key.wav',
             'last_error' => 'provider-secret-error',
         ],
     ]);
 
-    $this->browse(function (Browser $browser): void {
-        $browser->loginAs($this->admin, 'admin')
-            ->visit('/panel/notifications')
-            ->waitForText('Media archive transfer failed', 5)
-            ->assertSee('call-recording')
-            ->assertSee('customer-call.wav')
-            ->assertDontSee('dusk-spool-marker')
-            ->assertDontSee('private-object-key')
-            ->assertDontSee('provider-secret-error');
-    });
+    $this->loginAs($this->admin, 'admin');
+
+    $page = visit('/panel/notifications');
+    $page->assertSee('Media archive transfer failed')
+        ->assertSee('call-recording')
+        ->assertSee('customer-call.wav')
+        ->assertDontSee('browser-spool-marker')
+        ->assertDontSee('private-object-key')
+        ->assertDontSee('provider-secret-error');
 });
 
 /**
@@ -217,18 +247,18 @@ it('shows safe archive failure details without exposing storage internals', func
  *
  * @return array{0: User, 1: MediaAsset}
  */
-function createDuskMediaFixture(object $test, MediaCategory $category, string $filename, string $contents, bool $archive = false): array
+function createMediaFixture(object $test, MediaCategory $category, string $filename, string $contents, bool $archive = false): array
 {
     $tenant = Tenant::factory()->create();
     $user = User::factory()->create();
     $user->tenants()->attach($tenant, ['role' => 'admin', 'primary' => true]);
-    grantDuskMediaPermission($user, $tenant, $category === MediaCategory::CallRecording ? 'call-recordings.view' : 'recordings.view', $test);
-    $root = storage_path('framework/dusk-media-'.Str::uuid());
+    grantMediaPermission($user, $tenant, $category === MediaCategory::CallRecording ? 'call-recordings.view' : 'recordings.view', $test);
+    $root = storage_path('framework/browser-media-'.Str::uuid());
     $objectKey = ($archive ? 'archive/' : 'runtime/').$filename;
     File::ensureDirectoryExists(dirname($root.'/'.$objectKey));
     File::put($root.'/'.$objectKey, $contents);
     $store = FileStore::query()->create([
-        'name' => 'Dusk media store '.Str::uuid(),
+        'name' => 'Browser media store '.Str::uuid(),
         'provider' => 'local',
         'settings' => ['root' => $root],
     ]);
@@ -258,11 +288,11 @@ function createDuskMediaFixture(object $test, MediaCategory $category, string $f
 /**
  * Attach one tenant-scoped media permission to a browser-test user.
  */
-function grantDuskMediaPermission(User $user, Tenant $tenant, string $permissionName, object $test): void
+function grantMediaPermission(User $user, Tenant $tenant, string $permissionName, object $test): void
 {
     $permission = Permission::query()->firstOrCreate(
         ['name' => $permissionName],
-        ['module' => Str::before($permissionName, '.'), 'description' => 'Dusk permission for '.$permissionName],
+        ['module' => Str::before($permissionName, '.'), 'description' => 'Browser test permission for '.$permissionName],
     );
     $group = Group::factory()->forTenant($tenant->id)->create();
     $group->permissions()->sync([$permission->id]);
@@ -271,24 +301,28 @@ function grantDuskMediaPermission(User $user, Tenant $tenant, string $permission
 }
 
 /**
- * Read a same-origin media response because Dusk does not expose streamed response metadata.
+ * Read a same-origin media response because the streamed response metadata
+ * (status, headers, body length) is not exposed by page assertions.
+ *
+ * The script runs as an immediately-invoked expression because Playwright
+ * evaluates script() content as an expression, not a multi-line statement body.
  *
  * @return array{0: int, 1: string|null, 2: int, 3: string|null}
  */
-function readDuskMediaResponse(Browser $browser, string $path): array
+function readMediaResponse(object $page, string $path): array
 {
-    $responses = $browser->script(<<<JS
-        const request = new XMLHttpRequest();
-        request.open('GET', '{$path}', false);
-        request.send();
+    return $page->script(<<<JS
+        (() => {
+            const request = new XMLHttpRequest();
+            request.open('GET', '{$path}', false);
+            request.send();
 
-        return [
-            request.status,
-            request.getResponseHeader('Content-Type'),
-            request.responseText.length,
-            request.getResponseHeader('Content-Disposition'),
-        ];
+            return [
+                request.status,
+                request.getResponseHeader('Content-Type'),
+                request.responseText.length,
+                request.getResponseHeader('Content-Disposition'),
+            ];
+        })()
         JS);
-
-    return $responses[0];
 }
