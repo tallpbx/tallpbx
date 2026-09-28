@@ -654,13 +654,15 @@ it('renders the security manager dashboard', function () {
     ) ?? 2900);
     $page->resize(1920, max(2900, $expandedHeight + 120));
 
-    // Documentation screenshots are refreshed on demand only (DUSK_CAPTURE_DOCS=1)
-    if (getenv('DUSK_CAPTURE_DOCS') === '1') {
+    // Documentation screenshots are refreshed on demand only (TALLPBX_CAPTURE_DOCS=1)
+    if (getenv('TALLPBX_CAPTURE_DOCS') === '1') {
         $imgName = 'security-dashboard-full.png';
-        $src = base_path("tests/Browser/screenshots/{$imgName}");
+        // Pest writes screenshots into tests/Browser/Screenshots/ and prefixes the
+        // directory itself, so pass only the bare filename here.
+        $src = base_path("tests/Browser/Screenshots/{$imgName}");
         $dest = base_path("docs/images/{$imgName}");
 
-        $page->screenshot(filename: $src);
+        $page->screenshot(filename: $imgName);
 
         if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
             copy($src, $dest);

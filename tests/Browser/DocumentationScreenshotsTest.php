@@ -28,8 +28,8 @@ use Pest\Browser\Api\PendingAwaitablePage;
 beforeEach(function (): void {
     // Documentation screenshots are refreshed on demand only: normal browser
     // runs must never rewrite the tracked images under docs/images.
-    if (getenv('DUSK_CAPTURE_DOCS') !== '1') {
-        $this->markTestSkipped('Set DUSK_CAPTURE_DOCS=1 to refresh documentation screenshots.');
+    if (getenv('TALLPBX_CAPTURE_DOCS') !== '1') {
+        $this->markTestSkipped('Set TALLPBX_CAPTURE_DOCS=1 to refresh documentation screenshots.');
     }
 
     // Populate the module registry and seed every registered permission into
