@@ -26,6 +26,9 @@ class Module extends Model
     protected $fillable = [
         'name',
         'composer_package',
+        // Git revision that still held the module's files at uninstall time,
+        // so module:restore can bring them back after the deletion is committed.
+        'source_ref',
         'display_name',
         'version',
         'enabled',

@@ -39,6 +39,7 @@ class ModuleLifecycleService
      *
      * @param  Closure(array<int, string>): bool|null  $composerRunner  test seam that performs Composer operations
      * @param  Closure(array<int, string>): bool|null  $gitRunner  test seam that performs git operations
+     * @param  Closure(): string|null  $gitRevisionResolver  test seam that reports the current git revision
      */
     public function __construct(
         private readonly Application $app,
@@ -46,6 +47,7 @@ class ModuleLifecycleService
         private readonly ?string $basePath = null,
         private readonly ?Closure $composerRunner = null,
         private readonly ?Closure $gitRunner = null,
+        private readonly ?Closure $gitRevisionResolver = null,
     ) {}
 
     // ─── Uninstall ──────────────────────────────────────────────────────
@@ -206,6 +208,18 @@ class ModuleLifecycleService
             $requireEntryRemoved = $this->stripRequireEntry($preview['composer_package']);
         }
 
+        // Surface any cleanup step that did not complete, so a partial
+        // uninstall is never presented to the operator as a clean one.
+        $cleanupWarnings = [];
+
+        if (! $isVendor && ! $moduleDirDeleted) {
+            $cleanupWarnings[] = "The module directory [{$preview['module_dir']}] could not be deleted; please remove it manually.";
+        }
+
+        if (! $isVendor && (! $repositoryEntryRemoved || ! $requireEntryRemoved)) {
+            $cleanupWarnings[] = "The Composer entries in composer.json for [{$preview['composer_package']}] could not be cleaned up automatically; please review composer.json manually.";
+        }
+
         // Keep a minimal registry marker so restore knows what to bring back.
         $this->recordUninstallMarker($name, $preview);
 
@@ -222,7 +236,7 @@ class ModuleLifecycleService
             'permissions_deleted' => $permissionsDeleted,
             'uninstall_ran' => $uninstallRan,
             'restore_hint' => $preview['restore_hint'],
-            'warnings' => $preview['warnings'],
+            'warnings' => array_merge($preview['warnings'], $cleanupWarnings),
         ];
     }
 
@@ -239,6 +253,7 @@ class ModuleLifecycleService
             'can_restore' => false,
             'reason' => null,
             'source' => null,
+            'revision' => null,
             'module_dir' => '',
             'composer_package' => '',
             'registry_row' => false,
@@ -251,9 +266,27 @@ class ModuleLifecycleService
         }
 
         $registryRow = Module::where('name', $name)->first();
-        $isLocal = $this->isLocalModule($name);
 
-        if (! $isLocal && ($registryRow?->composer_package === null || $registryRow?->composer_package === '')) {
+        // Restore only applies to a module that was actually uninstalled.
+        // Touching a module that is still installed would run git restore over
+        // its live working tree (destroying uncommitted work) and force it
+        // back on, so refuse before anything else happens.
+        if ($registryRow !== null && $registryRow->status !== Module::StatusUninstalled) {
+            return array_merge($empty, [
+                'reason' => "Module [{$name}] is still installed; only uninstalled modules can be restored.",
+                'registry_row' => true,
+            ]);
+        }
+
+        if ($registryRow === null && ($this->moduleDir($name) !== null || $this->vendorModuleInfo($name) !== null)) {
+            return array_merge($empty, [
+                'reason' => "Module [{$name}] is still installed; it was never marked uninstalled, so there is nothing to restore.",
+            ]);
+        }
+
+        $revision = $this->localRestoreRevision($name, $registryRow);
+
+        if ($revision === null && ($registryRow?->composer_package === null || $registryRow?->composer_package === '')) {
             return array_merge($empty, [
                 'reason' => "Module [{$name}] is not tracked in this repository and has no recorded Composer package to restore from.",
                 'registry_row' => $registryRow !== null,
@@ -263,13 +296,14 @@ class ModuleLifecycleService
         return [
             'can_restore' => true,
             'reason' => null,
-            'source' => $isLocal ? 'git' : 'composer',
+            'source' => $revision !== null ? 'git' : 'composer',
+            'revision' => $revision,
             'module_dir' => $this->basePath()."/app-modules/{$name}",
-            'composer_package' => $isLocal ? "tallpbx/module-{$name}" : $registryRow->composer_package,
+            'composer_package' => $revision !== null ? "tallpbx/module-{$name}" : $registryRow->composer_package,
             'registry_row' => $registryRow !== null,
-            'items' => $isLocal
+            'items' => $revision !== null
                 ? [
-                    "Restore the module directory (code, migrations, factories, and tests) from git: app-modules/{$name}",
+                    "Restore the module directory (code, migrations, factories, and tests) from git revision {$revision}: app-modules/{$name}",
                     'Re-add the Composer path-repository and require entries',
                     'Re-link the Composer path package so the module classes autoload again',
                 ]
@@ -299,8 +333,11 @@ class ModuleLifecycleService
 
         if ($preview['source'] === 'git') {
             // The module directory contains its code, migrations, factories,
-            // views, AND tests — one restore brings everything back.
-            $restored = $this->runGit(['restore', '--source=HEAD', '--', "app-modules/{$name}"]);
+            // views, AND tests — one restore brings everything back. The
+            // revision is HEAD while the checkout still has the module, or the
+            // revision recorded at uninstall time once the deletion itself has
+            // been committed.
+            $restored = $this->runGit(['restore', '--source='.$preview['revision'], '--', "app-modules/{$name}"]);
 
             if (! $restored) {
                 throw ValidationException::withMessages([
@@ -457,11 +494,46 @@ class ModuleLifecycleService
     }
 
     /**
-     * Whether the module is a first-party module tracked in this git checkout.
+     * Resolve the git revision a local module's files can be restored from.
+     *
+     * Prefers the current checkout (HEAD) so a restore brings back the newest
+     * committed copy, and falls back to the revision recorded at uninstall
+     * time — that keeps restore working even after the deletion itself is
+     * committed to the repository. Returns null when git holds no copy.
      */
-    private function isLocalModule(string $name): bool
+    private function localRestoreRevision(string $name, ?Module $registryRow): ?string
     {
-        return $this->runGit(['cat-file', '-e', "HEAD:app-modules/{$name}/module.json"]);
+        if ($this->runGit(['cat-file', '-e', "HEAD:app-modules/{$name}/module.json"])) {
+            return 'HEAD';
+        }
+
+        $recorded = $registryRow?->source_ref;
+
+        if (is_string($recorded) && $recorded !== ''
+            && $this->runGit(['cat-file', '-e', "{$recorded}:app-modules/{$name}/module.json"])) {
+            return $recorded;
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve the current git revision of the installation, if it is a checkout.
+     *
+     * Only plain hex revisions are returned so the stored value can safely be
+     * handed back to git as a restore source later.
+     */
+    private function currentRevision(): ?string
+    {
+        if ($this->gitRevisionResolver !== null) {
+            $revision = ($this->gitRevisionResolver)();
+        } else {
+            $process = new Process(['git', 'rev-parse', 'HEAD'], $this->basePath());
+            $process->run();
+            $revision = $process->isSuccessful() ? trim($process->getOutput()) : null;
+        }
+
+        return is_string($revision) && preg_match('/^[0-9a-f]{6,40}$/i', $revision) === 1 ? $revision : null;
     }
 
     /**
@@ -643,6 +715,9 @@ class ModuleLifecycleService
             'enabled' => false,
             'status' => Module::StatusUninstalled,
             'composer_package' => $preview['composer_package'],
+            // Record the git revision that still holds the module files so a
+            // restore keeps working after the deletion is committed.
+            'source_ref' => $preview['module_kind'] === 'local' ? $this->currentRevision() : null,
         ];
 
         $registryRow = Module::where('name', $name)->first();
@@ -710,8 +785,17 @@ class ModuleLifecycleService
 
             $deps = $manifest['requirements']['modules'] ?? [];
 
-            if (in_array($name, $deps, true)) {
-                $dependents[] = $manifest['name'];
+            foreach ($deps as $dependency) {
+                // Fail-safe parsing: recognize both the canonical string form
+                // and the legacy object form, so a manifest written against an
+                // older schema can never hide a dependent and silently defeat
+                // the uninstall guard.
+                $dependencyName = is_array($dependency) ? ($dependency['name'] ?? null) : $dependency;
+
+                if ($dependencyName === $name) {
+                    $dependents[] = $manifest['name'];
+                    break;
+                }
             }
         }
 

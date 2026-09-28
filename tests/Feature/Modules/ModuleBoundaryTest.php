@@ -17,7 +17,7 @@ it('declares every cross-module class reference in requirements.modules', functi
         }
 
         $manifest = json_decode((string) file_get_contents($manifestPath), true);
-        $declared = $manifest['requirements']['modules'] ?? [];
+        $declared = dependencyNames($manifest['requirements']['modules'] ?? []);
         $own = Str::studly(str_replace('-', ' ', $name));
 
         foreach (File::allFiles("{$moduleDir}/src") as $file) {
@@ -45,7 +45,7 @@ it('keeps the module dependency graph acyclic', function (): void {
 
     foreach (glob(base_path('app-modules/*/module.json')) ?: [] as $manifestPath) {
         $manifest = json_decode((string) file_get_contents($manifestPath), true);
-        $graph[$manifest['name']] = $manifest['requirements']['modules'] ?? [];
+        $graph[$manifest['name']] = dependencyNames($manifest['requirements']['modules'] ?? []);
     }
 
     $seen = [];
@@ -88,3 +88,25 @@ it('keeps the module dependency graph acyclic', function (): void {
 
     expect($cycles)->toBeEmpty();
 });
+
+/**
+ * Normalize requirements.modules entries to plain module names so dependency
+ * matching works with the canonical string form and with older object shapes.
+ *
+ * @param  array<int, mixed>  $entries
+ * @return array<int, string>
+ */
+function dependencyNames(array $entries): array
+{
+    $names = [];
+
+    foreach ($entries as $entry) {
+        $name = is_array($entry) ? ($entry['name'] ?? null) : $entry;
+
+        if (is_string($name)) {
+            $names[] = $name;
+        }
+    }
+
+    return $names;
+}

@@ -58,9 +58,24 @@ class ModuleUninstallCommand extends Command
             return self::FAILURE;
         }
 
-        $this->components->info("Uninstalled module [{$name}].");
+        // Never present a partial cleanup as a clean uninstall: tell the
+        // operator exactly what still needs manual attention.
+        $cleanupIncomplete = $report['module_kind'] === 'local'
+            && (! $report['module_dir_deleted'] || ! $report['repository_entry_removed'] || ! $report['require_entry_removed']);
+
+        if ($cleanupIncomplete) {
+            $this->components->warn("Uninstalled module [{$name}], but some cleanup steps need manual attention — review the warnings below.");
+        } else {
+            $this->components->info("Uninstalled module [{$name}].");
+        }
+
         $this->components->info($report['restore_hint']);
-        $this->components->warn('The module files are now deleted in the working tree, which the Git updater treats as uncommitted changes. Use module:restore to undo, or commit/stash the deletions before updating.');
+
+        // Only describe deleted working-tree files when they really were
+        // deleted; vendor files are removed by Composer instead.
+        if ($report['module_kind'] === 'local' && $report['module_dir_deleted']) {
+            $this->components->warn('The module files are now deleted in the working tree, which the Git updater treats as uncommitted changes. Use module:restore to undo, or commit/stash the deletions before updating — module:restore keeps working afterwards from the git revision recorded at uninstall time.');
+        }
 
         foreach ($report['warnings'] as $warning) {
             $this->components->warn($warning);

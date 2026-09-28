@@ -286,6 +286,135 @@ it('restores a vendor module through Composer', function (): void {
     ]);
 });
 
+it('refuses to restore a module that is not marked uninstalled', function (string $status): void {
+    // A registry row that is enabled or disabled means the module is still
+    // installed; restoring would overwrite its working tree and force it on.
+    Module::create([
+        'name' => 'demo-module', 'display_name' => 'Demo Module', 'version' => '1.0.0',
+        'enabled' => $status === Module::StatusEnabled, 'status' => $status,
+    ]);
+
+    // Uncommitted local work a stray restore would silently destroy.
+    File::put($this->sandbox.'/app-modules/demo-module/local-work.php', '<?php // local work');
+
+    $preview = $this->service->previewRestore('demo-module');
+
+    expect($preview['can_restore'])->toBeFalse()
+        ->and($preview['reason'])->toContain('still installed');
+
+    expect(fn () => $this->service->restore('demo-module'))
+        ->toThrow(ValidationException::class);
+
+    expect(collect($this->gitCalls)->filter(fn (string $call): bool => str_starts_with($call, 'restore')))->toBeEmpty()
+        ->and(File::exists($this->sandbox.'/app-modules/demo-module/local-work.php'))->toBeTrue();
+})->with([Module::StatusEnabled, Module::StatusDisabled]);
+
+it('refuses to restore a module that was never marked uninstalled', function (): void {
+    // No registry marker exists, so this module was never uninstalled and a
+    // restore here would run git restore over its live working tree.
+    File::put($this->sandbox.'/app-modules/demo-module/local-work.php', '<?php // local work');
+
+    $preview = $this->service->previewRestore('demo-module');
+
+    expect($preview['can_restore'])->toBeFalse()
+        ->and($preview['reason'])->toContain('still installed');
+
+    expect(fn () => $this->service->restore('demo-module'))
+        ->toThrow(ValidationException::class);
+
+    expect(File::exists($this->sandbox.'/app-modules/demo-module/local-work.php'))->toBeTrue();
+});
+
+it('records the git revision at uninstall time so restore survives committed deletions', function (): void {
+    $this->service = sandboxService($this->sandbox, $this->composerCalls, $this->gitCalls, gitTracked: true, headRevision: 'deadbeef1234abcd');
+
+    $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    expect(Module::where('name', 'demo-module')->value('source_ref'))->toBe('deadbeef1234abcd');
+});
+
+it('restores from the revision recorded at uninstall time when HEAD lost the module', function (): void {
+    // Simulate committing the deletion: HEAD no longer contains the module
+    // files, but the revision recorded at uninstall time still does.
+    $this->service = sandboxService(
+        $this->sandbox,
+        $this->composerCalls,
+        $this->gitCalls,
+        gitTracked: false,
+        headRevision: 'deadbeef1234abcd',
+        trackedRevision: 'deadbeef1234abcd',
+    );
+
+    $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    $report = $this->service->restore('demo-module');
+
+    expect($report['source'])->toBe('git')
+        ->and($this->gitCalls)->toContain('restore --source=deadbeef1234abcd -- app-modules/demo-module')
+        ->and(File::exists($this->sandbox.'/app-modules/demo-module/module.json'))->toBeTrue();
+});
+
+it('refuses to uninstall while a dependent declares the requirement in the legacy object shape', function (): void {
+    File::makeDirectory($this->sandbox.'/app-modules/dependent-module', 0755, true);
+    File::put($this->sandbox.'/app-modules/dependent-module/module.json', json_encode([
+        'name' => 'dependent-module', 'version' => '1.0.0',
+        'namespace' => 'Modules\\DependentModule', 'display_name' => 'Dependent Module',
+        'required' => false, 'protected' => false,
+        'requirements' => ['modules' => [['name' => 'demo-module', 'version' => '1.0.0']]],
+    ]));
+
+    // A legacy object-shaped dependency entry must count as a dependent too,
+    // otherwise the uninstall guard is silently bypassed for that manifest.
+    try {
+        $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+        $this->fail('Uninstall should have been refused.');
+    } catch (ValidationException $exception) {
+        expect(collect($exception->errors())->flatten()->first())->toContain('dependent-module');
+    }
+
+    expect(File::exists($this->sandbox.'/app-modules/demo-module'))->toBeTrue();
+});
+
+it('reports a cleanup warning when the module directory cannot be deleted', function (): void {
+    // Simulate a filesystem that refuses to delete (permissions, busy file):
+    // the uninstall report must surface the partial cleanup failure.
+    $stubbornFiles = new class extends Filesystem
+    {
+        /**
+         * Pretend the target directory cannot be removed.
+         */
+        public function deleteDirectory($directory, $preserve = false): bool
+        {
+            return false;
+        }
+    };
+
+    $service = new ModuleLifecycleService(
+        app(),
+        $stubbornFiles,
+        $this->sandbox,
+        fn (array $args): bool => true,
+        fn (array $args): bool => true,
+    );
+
+    $report = $service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    expect($report['module_dir_deleted'])->toBeFalse()
+        ->and(implode(' ', $report['warnings']))->toContain('could not be deleted');
+});
+
+it('reports a cleanup warning when the composer entries cannot be cleaned up', function (): void {
+    // A root composer.json that cannot be parsed leaves the path-repository
+    // and require entries behind; the report must say so.
+    File::put($this->sandbox.'/composer.json', '{ not valid json');
+
+    $report = $this->service->uninstall('demo-module', 'UNINSTALL demo-module');
+
+    expect($report['repository_entry_removed'])->toBeFalse()
+        ->and($report['require_entry_removed'])->toBeFalse()
+        ->and(implode(' ', $report['warnings']))->toContain('could not be cleaned up');
+});
+
 /**
  * Register a module uninstall handler under the tagged binding the
  * lifecycle service resolves at runtime.
@@ -344,12 +473,18 @@ function testDemoUninstaller(): ModuleUninstaller
 /**
  * Build the lifecycle service against the hermetic sandbox, recording
  * every composer and git invocation through the injectable seams.
+ *
+ * The optional revisions simulate what git reports: $headRevision is the
+ * current HEAD, and $trackedRevision is an extra revision that still
+ * contains the module files (used to model a committed deletion).
  */
 function sandboxService(
     string $sandbox,
     array &$composerCalls,
     array &$gitCalls,
     bool $gitTracked,
+    ?string $headRevision = null,
+    ?string $trackedRevision = null,
 ): ModuleLifecycleService {
     return new ModuleLifecycleService(
         app(),
@@ -378,7 +513,7 @@ function sandboxService(
             return true;
         },
         // Record git invocations; simulate a restore by re-creating module files.
-        function (array $args) use (&$gitCalls, $sandbox, $gitTracked): bool {
+        function (array $args) use (&$gitCalls, $sandbox, $gitTracked, $trackedRevision): bool {
             $gitCalls[] = implode(' ', $args);
 
             if ($args[0] === 'restore') {
@@ -396,8 +531,19 @@ function sandboxService(
                 return true;
             }
 
-            return $gitTracked; // answers 'cat-file -e' existence checks
+            // Answer 'cat-file -e <revision>:<path>' existence checks per
+            // revision so tests can simulate HEAD losing the module after
+            // the deletion itself is committed.
+            if ($args[0] === 'cat-file') {
+                $revision = explode(':', $args[2], 2)[0];
+
+                return $revision === 'HEAD' ? $gitTracked : $revision === $trackedRevision;
+            }
+
+            return $gitTracked;
         },
+        // Report the recorded HEAD revision (null means "not a git checkout").
+        fn (): ?string => $headRevision,
     );
 }
 
