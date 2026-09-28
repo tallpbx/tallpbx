@@ -68,11 +68,22 @@ it('scaffolds modules using current TallPBX conventions', function () {
 
     expect($modulePath.'/src/Livewire')->toBeDirectory()
         ->and($modulePath.'/src/Database/Factories')->toBeDirectory()
-        ->and($modulePath.'/src/Providers/ModuleServiceProvider.php')->toBeFile()
         ->and($modulePath.'/tests')->toBeDirectory()
+        ->and($modulePath.'/database/migrations')->toBeDirectory()
+        ->and($modulePath.'/config')->toBeDirectory()
+        ->and($modulePath.'/lang/en')->toBeDirectory()
+        ->and($modulePath.'/resources/views')->toBeDirectory()
+        ->and($modulePath.'/src/Providers/ModuleServiceProvider.php')->toBeFile()
         ->and($modulePath.'/composer.json')->toBeFile()
         ->and($modulePath.'/module.json')->toBeFile()
         ->and($modulePath.'/routes/web.php')->not->toBeFile();
+
+    $manifest = json_decode((string) file_get_contents($modulePath.'/module.json'), true);
+
+    expect($manifest['protected'])->toBeFalse()
+        ->and($manifest['required'])->toBeFalse()
+        ->and($manifest['requirements']['modules'])->toBe([])
+        ->and($manifest['providers'])->toContain('Modules\\NativeCommandTest\\Providers\\ModuleServiceProvider');
 
     $composer = json_decode((string) file_get_contents($modulePath.'/composer.json'), true);
 

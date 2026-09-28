@@ -79,20 +79,10 @@
                 },
                 "modules": {
                     "type": "array",
-                    "description": "Required TallPBX modules.",
+                    "description": "Required TallPBX module machine names (enforced by ModuleBoundaryTest).",
                     "items": {
-                        "type": "object",
-                        "required": ["name", "version"],
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Module machine name."
-                            },
-                            "version": {
-                                "type": "string",
-                                "description": "Version constraint (e.g., >=1.0.0, ~1.0, ^1.0)."
-                            }
-                        }
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_-]*$"
                     }
                 },
                 "packages": {

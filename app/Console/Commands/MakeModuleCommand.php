@@ -68,6 +68,9 @@ class MakeModuleCommand extends Command
             'src/Database/Factories/ — model factory directory',
             'resources/views/   — Livewire view directory',
             'tests/             — Pest tests discovered by the host suite',
+            'database/migrations/ — module migrations',
+            'lang/en/           — translation files',
+            'config/            — module config merged over centralized defaults',
         ]);
 
         $this->components->twoColumnDetail('Namespace', $namespace);

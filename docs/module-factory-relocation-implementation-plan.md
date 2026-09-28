@@ -2933,7 +2933,7 @@ git commit -m "feat: restrict panel module management to enable and disable" -m 
 - Modify: `AGENTS.md` (Modular Architecture section)
 - Modify: `CHANGELOG.md` (Unreleased)
 
-- [ ] **Step 1: Document the conventions in AGENTS.md**
+- [x] **Step 1: Document the conventions in AGENTS.md**
 
 Under `## Modular Architecture`, add after the autoloading bullet:
 
@@ -2943,7 +2943,7 @@ Under `## Modular Architecture`, add after the autoloading bullet:
 - The web panel offers only the non-destructive enable/disable toggle for modules. Complete removal and restoration run from the CLI as root: `php artisan module:uninstall <name>` (exact confirmation phrase required; deletes the module directory — including its in-module tests — Composer entries, permissions, and data while keeping a registry marker) and `php artisan module:restore <name>` (reinstalls from git for first-party modules or Composer for vendor packages; tables return empty, data is not restored). Uninstalling leaves the module's files deleted in the working tree, which the Git updater treats as uncommitted changes — run `module:restore` to undo, or commit/stash the deletions before updating.
 ```
 
-- [ ] **Step 2: Update CHANGELOG.md**
+- [x] **Step 2: Update CHANGELOG.md**
 
 Under `## [Unreleased]` add:
 

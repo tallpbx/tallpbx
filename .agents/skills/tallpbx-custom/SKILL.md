@@ -652,3 +652,16 @@ Run the narrow affected test files first, then `php artisan app:test --smoke` wh
 - Use branch heads and commit SHAs for intermediate work and references.
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
 
+## Module Design Conventions
+
+Apply when creating or modifying an app-modules module. New modules are
+scaffolded with `php artisan make:module <name>` and must keep this shape:
+
+- Code: `src/{Models,Services,Livewire,Support,Database/Factories,Providers}` under `Modules\{Studly}\`.
+- Factories: `src/Database/Factories/`, namespace `Modules\{Studly}\Database\Factories`, resolved by standard HasFactory — never `database/factories/Pbx`, never a `newFactory()` override.
+- Tests: Pest tests inside `app-modules/{name}/tests/` (`*Test.php`), discovered by the phpunit.xml glob. Cross-module tests stay in the central `tests/` tree; the ModuleAwareTestGuard skips them automatically when a referenced module is missing. Annotate URL-only or Dusk tests with `$this->skipWhenModuleUninstalled('<module>');`.
+- Config: ship `config/{name}.php` to override centralized app-level defaults; it merges under the module's key (module values win on conflicts, all other keys survive).
+- Dependencies: declare every cross-module class reference in `module.json` → `requirements.modules` (array of module name strings). ModuleBoundaryTest fails on undeclared references or cycles.
+- Core modules are protected — never uninstallable, never disable-able: extensions, devices, sip-accounts, destinations, dialplans, dialplan-tools, gateways, sip-profiles, inbound-routes, outbound-routes (plus required admin, auth, tenant).
+- Lifecycle: the panel offers enable/disable only. Removal: `php artisan module:uninstall <name>` (typed confirmation; refuses while dependents exist). Restore: `php artisan module:restore <name>` (from git or Composer; database data is not restored).
+
