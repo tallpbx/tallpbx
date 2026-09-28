@@ -57,6 +57,7 @@ class CdrList extends BaseListComponent
     public function confirmCdrDeletion(string $id): void
     {
         $cdr = Cdr::withoutGlobalScope('tenant')->findOrFail($id);
+        $this->assertCanAccessTenantRecord($cdr);
         $this->pendingDeletionId = $cdr->id;
         // Prefer the FreeSWITCH call UUID; both columns are nullable, so fall back to an empty name.
         $this->pendingDeletionName = $cdr->call_uuid ?? $cdr->destination ?? '';
@@ -72,6 +73,7 @@ class CdrList extends BaseListComponent
     public function deleteCdr(): void
     {
         $cdr = Cdr::withoutGlobalScope('tenant')->findOrFail($this->pendingDeletionId);
+        $this->assertCanAccessTenantRecord($cdr);
         $this->cdrService->delete($cdr);
         $this->cancelCdrDeletion();
         $this->loadRecords();

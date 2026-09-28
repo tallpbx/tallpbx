@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Tenant;
+use App\Services\TenantManager;
 use Livewire\Livewire;
 use Modules\XmlCdr\Livewire\CdrDetail;
 use Modules\XmlCdr\Livewire\CdrList;
@@ -10,6 +12,11 @@ use Modules\XmlCdr\Models\Cdr;
 
 beforeEach(function () {
     $this->admin = Admin::factory()->create(['enabled' => true]);
+});
+
+// Clear the tenant context so route tests never leak it into later tests.
+afterEach(function () {
+    app(TenantManager::class)->clear();
 });
 
 it('renders the CDR list component', function () {
@@ -31,6 +38,43 @@ it('renders the CDR detail component', function () {
         ->test(CdrDetail::class, ['cdrId' => $cdr->id])
         ->assertOk()
         ->assertSee($cdr->caller_id);
+});
+
+it('renders the CDR detail page through the panel route', function () {
+    $cdr = Cdr::factory()->create();
+
+    // The page route enforces the xml-cdr view permission, so grant it to
+    // the admin before visiting the detail page.
+    grantAdminPermissions($this->admin, ['xml-cdr.view']);
+
+    $this->actingAs($this->admin, 'admin')
+        ->get('/panel/cdr/'.$cdr->id)
+        ->assertOk()
+        ->assertSee($cdr->caller_id);
+});
+
+it('lets a tenant user open their own tenant\'s call detail record page', function () {
+    $tenant = Tenant::factory()->create();
+    $user = grantTenantUserPermissions($tenant, ['xml-cdr.view']);
+    $cdr = Cdr::factory()->create(['tenant_id' => $tenant->id]);
+
+    $this->actingAs($user, 'web')
+        ->get('/panel/cdr/'.$cdr->id)
+        ->assertOk()
+        ->assertSee($cdr->destination);
+});
+
+it('hides another tenant\'s call detail record from a tenant user', function () {
+    $tenant = Tenant::factory()->create();
+    $otherTenant = Tenant::factory()->create();
+    $user = grantTenantUserPermissions($tenant, ['xml-cdr.view']);
+    $foreignCdr = Cdr::factory()->create(['tenant_id' => $otherTenant->id]);
+
+    // A foreign record must be invisible: the page answers "not found"
+    // instead of disclosing that another tenant owns this record id.
+    $this->actingAs($user, 'web')
+        ->get('/panel/cdr/'.$foreignCdr->id)
+        ->assertNotFound();
 });
 
 it('deletes a CDR record', function () {

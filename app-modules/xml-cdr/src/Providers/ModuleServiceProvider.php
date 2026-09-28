@@ -42,7 +42,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'key' => 'admin.cdr',
                 'label' => 'admin.cdr',
                 'route' => 'panel.cdr.index',
-                'permission' => 'cdr.view',
+                'permission' => 'xml-cdr.view',
                 'icon' => 'heroicon-o-document-text',
                 'parent' => 'pbx.monitoring',
                 'guard' => 'admin',
@@ -57,13 +57,18 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      * These permissions control access to viewing, creating,
      * editing, and deleting records.
      *
+     * Permission names MUST use the module name as their prefix
+     * (xml-cdr.*): the Livewire action-permission resolver derives the
+     * module slug from the component namespace, so a mismatched prefix
+     * such as cdr.* would silently disable action authorization.
+     *
      * @return array<string, string>
      */
     protected function permissions(): array
     {
         return [
-            'cdr.view' => 'View CDR records',
-            'cdr.delete' => 'Delete CDR records',
+            'xml-cdr.view' => 'View CDR records',
+            'xml-cdr.delete' => 'Delete CDR records',
         ];
     }
 }

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\XmlCdr\Livewire;
 
+use App\Services\ImpersonationServiceInterface;
+use App\Services\TenantManager;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Modules\XmlCdr\Models\Cdr;
@@ -30,8 +33,22 @@ class CdrDetail extends Component
      */
     public function render(): View
     {
-        $cdr = Cdr::withoutGlobalScope('tenant')->findOrFail($this->cdrId);
+        // Administrators may open any record; tenant users only see records
+        // of their active tenant, so a foreign id is hidden as "not found"
+        // instead of disclosing another tenant's call detail record.
+        $cdr = Cdr::withoutGlobalScope('tenant')
+            ->when(! $this->isAdminGuard(), fn ($q) => $q->where('tenant_id', app(TenantManager::class)->getTenantId()))
+            ->findOrFail($this->cdrId);
 
         return view('xml-cdr::cdr-detail', ['cdr' => $cdr]);
+    }
+
+    /**
+     * Check whether the current user is authenticated via the admin guard.
+     */
+    protected function isAdminGuard(): bool
+    {
+        return Auth::guard('admin')->check()
+            && ! app(ImpersonationServiceInterface::class)->isImpersonating();
     }
 }
