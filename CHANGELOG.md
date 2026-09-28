@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added progressive disclosure expandable appendices with complete percentile distributions (`p50`, `p90`, `p95`, `p99`, `std_dev`) and multi-run repetitions (`r1–r3`).
   - Added multi-interface comparison analyzing latency differences across public IPv4, private datacenter IPv4, and native dual-stack public IPv6.
   - Empirically proved that scaling physical RAM from 1 GiB to 2 GiB completely eliminates swap activity (0 MiB swap) but leaves dynamic XML throughput (~14–19 req/sec) and call setup capacity (3 CPS clean baseline, 5 CPS saturation boundary) constant, confirming single-core CPU compute saturation.
+- **Reversible Module Lifecycle (`module:uninstall` / `module:restore`)**:
+  - Added the `module:uninstall` and `module:restore` Artisan commands: uninstall completely removes a module — its files (including its in-module tests), Composer entries, permissions, and data (via its uninstall handler when present) — while keeping a registry marker; restore reinstalls it from git (first-party) or Composer (vendor) with empty tables and re-seeded permissions. Data is intentionally not restored.
+  - Added a `composer_package` column to the module registry so vendor modules can be restored after uninstall.
+  - Marked the core PBX modules (`extensions`, `devices`, `sip-accounts`, `destinations`, `dialplans`, `dialplan-tools`, `gateways`, `sip-profiles`, `inbound-routes`, `outbound-routes`) as protected — they can no longer be uninstalled or disabled (FreePBX-style core protection).
+  - Populated `requirements.modules` across all modules from their actual cross-module references and added `ModuleBoundaryTest`, which enforces declared dependencies and an acyclic dependency graph, so `module:uninstall` can refuse removal while installed dependents exist.
 
 ### Removed
 - **Laravel Dusk Infrastructure Removed**:
@@ -60,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed obsolete Windows-hosted VM test warnings and WSL2 load-generator references from `README.md`, `docs/load-testing-guide.md`, and `AGENTS.md`.
 - **Environment B1 July–August 2026 Historical Archive**:
   - Removed superseded prototype benchmark runs from `docs/load-testing-results.md` (tested over high-jitter WAN WireGuard on older prototype software) in favor of the clean September 24, 2026 empirical production dataset.
+- **Panel Soft-Uninstall and Reinstall Actions Removed**: Removed the web panel's soft-uninstall and reinstall actions; the Modules page now offers only enable/disable, with a CLI hint for uninstalled modules.
 
 ### Changed
 - **Browser Testing Workflow Modernized**:
@@ -119,6 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The Rate Limits module is now `event-rate-limits` with the display name **Event Rate Limits**, so it can never be confused with FreeSWITCH's own rate limits (the `sessions-per-second` setting and the `limit` dialplan application, which cap call/session rates). The page moved to `/panel/event-rate-limits`, the permission became `event-rate-limits.view`, and settings keys became `event_rate_limits.*`. Tooltips now explain the difference from FreeSWITCH's rate limits and from the kernel packet firewall.
   - The 2.0 series is unreleased and provides no compatibility with the previous module names: no aliases, redirects, or data migrations are provided, and fresh installs receive the new names automatically.
 - **Major Version Notice Reworded**: The installation guide's compatibility warning no longer implies that every future major version will be incompatible with the previous one. It now explains that TallPBX is still in active, rapid development, so more non-backwards-compatible changes may appear until the platform stabilizes, while the specific 1.x to 2.x clean re-install requirement remains unchanged.
+- **Module Factories Relocated Into Their Modules**: Moved all module model factories out of the root `database/factories/Pbx/` directory into their owning modules (`app-modules/{name}/src/Database/Factories/`) and removed the per-model `newFactory()` overrides so models use Laravel's standard factory resolution.
+- **Module Tests Relocated Into Their Modules**: Moved each module's central test folder into the module itself (`app-modules/{name}/tests/`), discovered through a `phpunit.xml` glob so modules are fully self-contained; tests that reference an uninstalled module are skipped automatically.
+- **Panel Module Page**: The Modules page refuses to disable protected modules (previously only required ones).
 
 ### Security
 - **Cross-Tenant List Scoping Across 31 Panel Lists**: Fixed 30 Livewire list components (plus the Fax inbox) whose list queries bypassed the tenant global scope unconditionally, letting an authenticated tenant user see other tenants' records (extensions, SIP accounts and trunks, gateways, dialplans, call flows, PIN numbers, voicemail messages, received faxes, and more). Every list now follows the established guard pattern: administrators keep the unscoped view, while tenant users (including impersonating admins) are filtered to their active tenant. Writes were already blocked by the tenant mutation guard, so this closes the read exposure. Also fixed an adjacent bug where the call recordings list would crash for tenant users because it resolved a tenant manager alias that was never registered, and added `tests/Feature/PanelListTenantScopeRolloutTest.php`, a self-discovering test that mounts every tenant-scope-bypassing list as a tenant user and fails if any foreign-tenant record is exposed, so new lists are covered automatically.
