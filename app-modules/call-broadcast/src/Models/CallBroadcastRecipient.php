@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\CallBroadcast\Models;
 
-use Database\Factories\Pbx\CallBroadcastRecipientFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,14 +27,6 @@ class CallBroadcastRecipient extends Model
     ];
 
     protected $table = 'call_broadcast_recipients';
-
-    /**
-     * Create a new factory instance for model seeding.
-     */
-    protected static function newFactory(): CallBroadcastRecipientFactory
-    {
-        return CallBroadcastRecipientFactory::new();
-    }
 
     /**
      * Get the attributes that should be cast.

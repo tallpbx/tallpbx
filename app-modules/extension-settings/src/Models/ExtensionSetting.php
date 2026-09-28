@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\ExtensionSettings\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\ExtensionSettingFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,13 +32,5 @@ class ExtensionSetting extends Model
     public function extension(): BelongsTo
     {
         return $this->belongsTo(Extension::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): ExtensionSettingFactory
-    {
-        return ExtensionSettingFactory::new();
     }
 }

@@ -6,7 +6,6 @@ namespace Modules\Dialplans\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\DialplanFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Dialplan extends Model
 {
-    /** @use HasFactory<DialplanFactory> */
+    /** @use HasFactory<Modules\Dialplans\Database\Factories\DialplanFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -49,14 +48,6 @@ class Dialplan extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): DialplanFactory
-    {
-        return DialplanFactory::new();
     }
 
     /**

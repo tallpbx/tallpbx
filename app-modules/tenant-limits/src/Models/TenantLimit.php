@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\TenantLimits\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\TenantLimitFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,13 +33,5 @@ class TenantLimit extends Model
             'soft_limit' => 'integer',
             'hard_limit' => 'integer',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): TenantLimitFactory
-    {
-        return TenantLimitFactory::new();
     }
 }

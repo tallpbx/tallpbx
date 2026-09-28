@@ -6,7 +6,6 @@ namespace Modules\RingGroups\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\RingGroupFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class RingGroup extends Model
 {
-    /** @use HasFactory<RingGroupFactory> */
+    /** @use HasFactory<Modules\RingGroups\Database\Factories\RingGroupFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -68,13 +67,5 @@ class RingGroup extends Model
     public function extensions(): HasMany
     {
         return $this->hasMany(RingGroupExtension::class, 'ring_group_id')->orderBy('position');
-    }
-
-    /**
-     * Create a new factory instance for model seeding.
-     */
-    protected static function newFactory(): RingGroupFactory
-    {
-        return RingGroupFactory::new();
     }
 }

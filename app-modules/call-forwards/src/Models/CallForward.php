@@ -6,7 +6,6 @@ namespace Modules\CallForwards\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\CallForwardFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CallForward extends Model
 {
-    /** @use HasFactory<CallForwardFactory> */
+    /** @use HasFactory<Modules\CallForwards\Database\Factories\CallForwardFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -58,13 +57,5 @@ class CallForward extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): CallForwardFactory
-    {
-        return CallForwardFactory::new();
     }
 }

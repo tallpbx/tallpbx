@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\EmailTemplates\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\EmailTemplateFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,12 +23,4 @@ class EmailTemplate extends Model
     protected $fillable = [
         'tenant_id', 'name', 'subject', 'body',
     ];
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): EmailTemplateFactory
-    {
-        return EmailTemplateFactory::new();
-    }
 }

@@ -6,7 +6,6 @@ namespace Modules\Acl\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\AccessControlFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class AccessControl extends Model
 {
-    /** @use HasFactory<AccessControlFactory> */
+    /** @use HasFactory<Modules\Acl\Database\Factories\AccessControlFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -48,14 +47,6 @@ class AccessControl extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): AccessControlFactory
-    {
-        return AccessControlFactory::new();
     }
 
     /**

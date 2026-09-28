@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Provision\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\ProvisionTemplateFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,13 +28,5 @@ class ProvisionTemplate extends Model
     protected function casts(): array
     {
         return ['enabled' => 'boolean'];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): ProvisionTemplateFactory
-    {
-        return ProvisionTemplateFactory::new();
     }
 }

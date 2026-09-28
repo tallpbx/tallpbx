@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\FileStores\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\MediaAssetFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -103,8 +102,4 @@ class MediaAsset extends Model
     /**
      * Create the dedicated media asset test factory.
      */
-    protected static function newFactory(): MediaAssetFactory
-    {
-        return MediaAssetFactory::new();
-    }
 }

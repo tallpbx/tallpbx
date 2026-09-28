@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\IvrMenus\Models;
 
-use Database\Factories\Pbx\IvrMenuOptionFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class IvrMenuOption extends Model
 {
-    /** @use HasFactory<IvrMenuOptionFactory> */
+    /** @use HasFactory<Modules\IvrMenus\Database\Factories\IvrMenuOptionFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -54,13 +53,5 @@ class IvrMenuOption extends Model
     public function ivrMenu(): BelongsTo
     {
         return $this->belongsTo(IvrMenu::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): IvrMenuOptionFactory
-    {
-        return IvrMenuOptionFactory::new();
     }
 }

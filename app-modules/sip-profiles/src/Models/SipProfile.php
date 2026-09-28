@@ -6,7 +6,6 @@ namespace Modules\SipProfiles\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\SipProfileFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class SipProfile extends Model
 {
-    /** @use HasFactory<SipProfileFactory> */
+    /** @use HasFactory<Modules\SipProfiles\Database\Factories\SipProfileFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -48,14 +47,6 @@ class SipProfile extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): SipProfileFactory
-    {
-        return SipProfileFactory::new();
     }
 
     /**

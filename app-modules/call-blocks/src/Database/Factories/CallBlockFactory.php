@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\CallBlocks\Database\Factories;
+
+use App\Models\Tenant;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\CallBlocks\Models\CallBlock;
+
+/**
+ * @extends Factory<CallBlock>
+ */
+class CallBlockFactory extends Factory
+{
+    protected $model = CallBlock::class;
+
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'tenant_id' => Tenant::factory(),
+            'name' => fake()->unique()->word().' Block',
+            'caller_id_number' => fake()->numerify('##########'),
+            'description' => fake()->optional()->sentence(),
+            'enabled' => true,
+        ];
+    }
+
+    /**
+     * Scope the factory state to a specific tenant.
+     */
+    public function forTenant(int $tenantId): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'tenant_id' => $tenantId,
+        ]);
+    }
+}

@@ -6,7 +6,6 @@ namespace Modules\InboundRoutes\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\InboundRouteFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class InboundRoute extends Model
 {
-    /** @use HasFactory<InboundRouteFactory> */
+    /** @use HasFactory<Modules\InboundRoutes\Database\Factories\InboundRouteFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -63,13 +62,5 @@ class InboundRoute extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): InboundRouteFactory
-    {
-        return InboundRouteFactory::new();
     }
 }

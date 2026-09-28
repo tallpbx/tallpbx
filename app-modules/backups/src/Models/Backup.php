@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Backups\Models;
 
-use Database\Factories\Pbx\BackupFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,19 +35,8 @@ use Modules\FileStores\Models\FileStore;
  */
 class Backup extends Model
 {
-    /** @use HasFactory<BackupFactory> */
+    /** @use HasFactory<Modules\Backups\Database\Factories\BackupFactory> */
     use HasFactory, HasUuids;
-
-    /**
-     * Create a new factory instance for the model.
-     *
-     * Overrides the default HasFactory resolution so tests can use
-     * Backup::factory() regardless of the factory's filesystem location.
-     */
-    protected static function newFactory()
-    {
-        return BackupFactory::new();
-    }
 
     /**
      * The attributes that are mass assignable.

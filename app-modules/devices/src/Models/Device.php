@@ -6,7 +6,6 @@ namespace Modules\Devices\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\DeviceFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -30,7 +29,7 @@ use Modules\SipAccounts\Models\SipAccount;
  */
 class Device extends Model
 {
-    /** @use HasFactory<DeviceFactory> */
+    /** @use HasFactory<Modules\Devices\Database\Factories\DeviceFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -63,14 +62,6 @@ class Device extends Model
     public function sipAccount(): BelongsTo
     {
         return $this->belongsTo(SipAccount::class)->withoutGlobalScope('tenant');
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): DeviceFactory
-    {
-        return DeviceFactory::new();
     }
 
     /**

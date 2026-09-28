@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\CallFlows\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\CallFlowFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -42,13 +41,5 @@ class CallFlow extends Model
         return [
             'enabled' => 'boolean',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): CallFlowFactory
-    {
-        return CallFlowFactory::new();
     }
 }

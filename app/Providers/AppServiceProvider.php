@@ -45,6 +45,7 @@ use App\Support\SystemProcessRunner;
 use App\Support\TestDatabaseSafety;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Events\MigrationEnded;
@@ -55,6 +56,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Modules\Backups\Services\BackupService;
 use Modules\Backups\Services\BackupServiceInterface;
 use Modules\Bridges\Models\Bridge;
@@ -189,6 +191,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Resolve module model factories from each module's own namespace
+        // (Modules\X\Models\Y -> Modules\X\Database\Factories\YFactory) so
+        // models use standard HasFactory resolution without newFactory()
+        // overrides. Everything else keeps the framework's App default.
+        Factory::guessFactoryNamesUsing(function (string $modelName): string {
+            if (preg_match('/^(Modules\\\\[A-Za-z0-9_]+)\\\\Models\\\\([A-Za-z0-9_]+)$/', $modelName, $matches) === 1) {
+                return "{$matches[1]}\\Database\\Factories\\{$matches[2]}Factory";
+            }
+
+            $appNamespace = $this->app->getNamespace();
+
+            $modelName = Str::startsWith($modelName, $appNamespace.'Models\\')
+                ? Str::after($modelName, $appNamespace.'Models\\')
+                : Str::after($modelName, $appNamespace);
+
+            return 'Database\\Factories\\'.$modelName.'Factory';
+        });
+
         Relation::enforceMorphMap([
             'voicemail-message' => VoicemailMessage::class,
             'call-recording' => CallRecording::class,

@@ -146,7 +146,7 @@ Why the module lifecycle and boundary decisions look the way they do — for age
 **Interfaces:**
 - Produces: two tests that must pass after Task 2 and stay green forever after.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```php
 <?php
@@ -201,7 +201,7 @@ it('resolves every module model factory from its own module namespace', function
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `php artisan test --compact --parallel --filter=ModuleFactoryIsolationTest`
 Expected: FAIL — first test lists 49 files containing `Database\Factories`; second test fails because factories resolve to `Database\Factories\Pbx\...`.
@@ -278,7 +278,7 @@ $factoryMap = [
 ];
 ```
 
-- [ ] **Step 1: Write the one-shot migration script**
+- [x] **Step 1: Write the one-shot migration script**
 
 ```php
 <?php
@@ -420,12 +420,12 @@ rmdir($factoryDir);
 echo 'Moved '.count($moved).' factories into their modules.'."\n";
 ```
 
-- [ ] **Step 2: Run the migration script**
+- [x] **Step 2: Run the migration script**
 
 Run: `php scripts/migrate-module-factories.php`
 Expected: `Moved 50 factories into their modules.` — any error means a pattern did not match; fix that file's shape and re-run (already-moved factories no longer have a source file, so remove the missing-file error path if re-running is needed).
 
-- [ ] **Step 3: Update the make:module scaffold (TDD: assertion first)**
+- [x] **Step 3: Update the make:module scaffold (TDD: assertion first)**
 
 In `tests/Feature/Commands/NativeModuleCommandTest.php`, inside the `scaffolds modules using current TallPBX conventions` test, extend the directory assertions:
 
@@ -446,16 +446,16 @@ Then in `app/Console/Commands/MakeModuleCommand.php` `createDirectories()` add:
 
 and add the bullet `'src/Database/Factories/ — model factory directory'` to the `bulletList()` scaffold summary. Re-run the test: PASS.
 
-- [ ] **Step 4: Refresh autoload and caches**
+- [x] **Step 4: Refresh autoload and caches**
 
 Run: `composer dump-autoload` (the backups module uses classmap autoloading; new classes must be discoverable) then `php artisan optimize:clear`.
 
-- [ ] **Step 5: Verify no stragglers**
+- [x] **Step 5: Verify no stragglers**
 
 Run: `grep -r "Database\\\\Factories" app-modules database --include="*.php" || echo "CLEAN"`
 Expected: `CLEAN` (the `database/factories/` root keeps only the 7 app-level factories: Admin, Group, Menu, Permission, Tenant, TenantDomain, User — these do not live under Pbx and are untouched).
 
-- [ ] **Step 6: Run the guard tests and delete the script**
+- [x] **Step 6: Run the guard tests and delete the script**
 
 Run: `php artisan test --compact --parallel --filter=ModuleFactoryIsolationTest`
 Expected: PASS. Then delete `scripts/migrate-module-factories.php`.

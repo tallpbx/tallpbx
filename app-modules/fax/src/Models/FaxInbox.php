@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Fax\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\FaxInboxFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -40,14 +39,6 @@ class FaxInbox extends Model
             'pages' => 'integer',
             'received_at' => 'datetime',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): FaxInboxFactory
-    {
-        return FaxInboxFactory::new();
     }
 
     /**

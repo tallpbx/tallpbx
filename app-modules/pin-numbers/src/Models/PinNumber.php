@@ -6,7 +6,6 @@ namespace Modules\PinNumbers\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\PinNumberFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,7 +25,7 @@ use Illuminate\Support\Carbon;
  */
 class PinNumber extends Model
 {
-    /** @use HasFactory<PinNumberFactory> */
+    /** @use HasFactory<Modules\PinNumbers\Database\Factories\PinNumberFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -56,13 +55,5 @@ class PinNumber extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): PinNumberFactory
-    {
-        return PinNumberFactory::new();
     }
 }

@@ -6,7 +6,6 @@ namespace Modules\Gateways\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\GatewayFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -35,7 +34,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Gateway extends Model
 {
-    /** @use HasFactory<GatewayFactory> */
+    /** @use HasFactory<Modules\Gateways\Database\Factories\GatewayFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -67,14 +66,6 @@ class Gateway extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): GatewayFactory
-    {
-        return GatewayFactory::new();
     }
 
     /**

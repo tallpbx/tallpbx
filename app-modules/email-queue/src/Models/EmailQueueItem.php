@@ -6,7 +6,6 @@ namespace Modules\EmailQueue\Models;
 
 use App\Traits\BelongsToTenant;
 use Carbon\Carbon;
-use Database\Factories\Pbx\EmailQueueItemFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -49,13 +48,5 @@ class EmailQueueItem extends Model
     protected function casts(): array
     {
         return ['sent_at' => 'datetime'];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): EmailQueueItemFactory
-    {
-        return EmailQueueItemFactory::new();
     }
 }

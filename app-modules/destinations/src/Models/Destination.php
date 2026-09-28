@@ -6,7 +6,6 @@ namespace Modules\Destinations\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\DestinationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Destination extends Model
 {
-    /** @use HasFactory<DestinationFactory> */
+    /** @use HasFactory<Modules\Destinations\Database\Factories\DestinationFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -48,14 +47,6 @@ class Destination extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): DestinationFactory
-    {
-        return DestinationFactory::new();
     }
 
     /**

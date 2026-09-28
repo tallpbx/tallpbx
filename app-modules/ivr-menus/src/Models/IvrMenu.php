@@ -6,7 +6,6 @@ namespace Modules\IvrMenus\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\IvrMenuFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,7 +34,7 @@ use Modules\FileStores\Models\MediaAsset;
  */
 class IvrMenu extends Model
 {
-    /** @use HasFactory<IvrMenuFactory> */
+    /** @use HasFactory<Modules\IvrMenus\Database\Factories\IvrMenuFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -84,13 +83,5 @@ class IvrMenu extends Model
     public function mediaAsset(): MorphOne
     {
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): IvrMenuFactory
-    {
-        return IvrMenuFactory::new();
     }
 }

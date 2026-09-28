@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Acl\Models;
 
-use Database\Factories\Pbx\AccessControlNodeFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class AccessControlNode extends Model
 {
-    /** @use HasFactory<AccessControlNodeFactory> */
+    /** @use HasFactory<Modules\Acl\Database\Factories\AccessControlNodeFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -38,14 +37,6 @@ class AccessControlNode extends Model
     public function accessControl(): BelongsTo
     {
         return $this->belongsTo(AccessControl::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): AccessControlNodeFactory
-    {
-        return AccessControlNodeFactory::new();
     }
 
     /**

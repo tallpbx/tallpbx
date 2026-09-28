@@ -6,7 +6,6 @@ namespace Modules\HotDesking\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\HotDeskSessionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -36,19 +35,11 @@ use Modules\Extensions\Models\Extension;
  */
 class HotDeskSession extends Model
 {
-    /** @use HasFactory<HotDeskSessionFactory> */
+    /** @use HasFactory<Modules\HotDesking\Database\Factories\HotDeskSessionFactory> */
     use BelongsToTenant;
 
     use HasFactory;
     use HasUuids;
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): HotDeskSessionFactory
-    {
-        return HotDeskSessionFactory::new();
-    }
 
     protected $fillable = [
         'tenant_id',

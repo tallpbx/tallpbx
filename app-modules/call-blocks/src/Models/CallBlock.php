@@ -6,7 +6,6 @@ namespace Modules\CallBlocks\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\CallBlockFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CallBlock extends Model
 {
-    /** @use HasFactory<CallBlockFactory> */
+    /** @use HasFactory<Modules\CallBlocks\Database\Factories\CallBlockFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -54,13 +53,5 @@ class CallBlock extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): CallBlockFactory
-    {
-        return CallBlockFactory::new();
     }
 }

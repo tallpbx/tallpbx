@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\SipTrunks\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\SipTrunkFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -39,13 +38,5 @@ class SipTrunk extends Model
             'password' => 'encrypted',
             'enabled' => 'boolean',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): SipTrunkFactory
-    {
-        return SipTrunkFactory::new();
     }
 }

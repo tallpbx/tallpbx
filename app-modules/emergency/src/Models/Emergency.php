@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Emergency\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\EmergencyFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -42,12 +41,4 @@ class Emergency extends Model
     protected $fillable = [
         'tenant_id', 'caller_id', 'address', 'latitude', 'longitude',
     ];
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): EmergencyFactory
-    {
-        return EmergencyFactory::new();
-    }
 }

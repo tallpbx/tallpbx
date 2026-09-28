@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\NumberTranslations\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\NumberTranslationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,13 +30,5 @@ class NumberTranslation extends Model
     protected function casts(): array
     {
         return ['enabled' => 'boolean'];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): NumberTranslationFactory
-    {
-        return NumberTranslationFactory::new();
     }
 }

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\XmlCdr\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\CdrFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -48,13 +47,5 @@ class Cdr extends Model
             'answer_stamp' => 'datetime',
             'end_stamp' => 'datetime',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): CdrFactory
-    {
-        return CdrFactory::new();
     }
 }

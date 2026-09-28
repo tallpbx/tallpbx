@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\FollowMe\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\FollowMeFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -63,13 +62,5 @@ class FollowMe extends Model
             'ring_timeout' => 'integer',
             'enabled' => 'boolean',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): FollowMeFactory
-    {
-        return FollowMeFactory::new();
     }
 }

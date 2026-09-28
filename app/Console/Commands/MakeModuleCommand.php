@@ -65,6 +65,7 @@ class MakeModuleCommand extends Command
             'composer.json      — Composer autoloading',
             'src/Providers/     — ModuleServiceProvider',
             'src/Livewire/      — Livewire component directory',
+            'src/Database/Factories/ — model factory directory',
             'resources/views/   — Livewire view directory',
         ]);
 
@@ -81,6 +82,7 @@ class MakeModuleCommand extends Command
         mkdir($moduleDir, 0755, true);
         mkdir("{$moduleDir}/src/Providers", 0755, true);
         mkdir("{$moduleDir}/src/Livewire", 0755, true);
+        mkdir("{$moduleDir}/src/Database/Factories", 0755, true);
         mkdir("{$moduleDir}/resources/views", 0755, true);
         mkdir("{$moduleDir}/database/migrations", 0755, true);
         mkdir("{$moduleDir}/lang/en", 0755, true);

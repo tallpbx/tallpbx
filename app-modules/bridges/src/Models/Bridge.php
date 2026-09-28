@@ -6,7 +6,6 @@ namespace Modules\Bridges\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\BridgeFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +27,7 @@ use Illuminate\Support\Carbon;
  */
 class Bridge extends Model
 {
-    /** @use HasFactory<BridgeFactory> */
+    /** @use HasFactory<Modules\Bridges\Database\Factories\BridgeFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -60,13 +59,5 @@ class Bridge extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): BridgeFactory
-    {
-        return BridgeFactory::new();
     }
 }

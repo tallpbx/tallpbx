@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Speech\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\SpeechConfigFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -52,13 +51,5 @@ class SpeechConfig extends Model
             'rate' => 'decimal:2',
             'enabled' => 'boolean',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): SpeechConfigFactory
-    {
-        return SpeechConfigFactory::new();
     }
 }

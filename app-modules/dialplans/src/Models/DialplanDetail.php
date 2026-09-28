@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Dialplans\Models;
 
-use Database\Factories\Pbx\DialplanDetailFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class DialplanDetail extends Model
 {
-    /** @use HasFactory<DialplanDetailFactory> */
+    /** @use HasFactory<Modules\Dialplans\Database\Factories\DialplanDetailFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -44,14 +43,6 @@ class DialplanDetail extends Model
     public function dialplan(): BelongsTo
     {
         return $this->belongsTo(Dialplan::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): DialplanDetailFactory
-    {
-        return DialplanDetailFactory::new();
     }
 
     /**

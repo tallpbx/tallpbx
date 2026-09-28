@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Conferences\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\ConferenceFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -55,13 +54,5 @@ class Conference extends Model
             'max_members' => 'integer',
             'enabled' => 'boolean',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): ConferenceFactory
-    {
-        return ConferenceFactory::new();
     }
 }

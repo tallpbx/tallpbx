@@ -6,7 +6,6 @@ namespace Modules\OutboundRoutes\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\OutboundRouteFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,7 +30,7 @@ use Modules\Gateways\Models\Gateway;
  */
 class OutboundRoute extends Model
 {
-    /** @use HasFactory<OutboundRouteFactory> */
+    /** @use HasFactory<Modules\OutboundRoutes\Database\Factories\OutboundRouteFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -76,13 +75,5 @@ class OutboundRoute extends Model
     public function gatewayRelation(): BelongsTo
     {
         return $this->belongsTo(Gateway::class, 'gateway_id');
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): OutboundRouteFactory
-    {
-        return OutboundRouteFactory::new();
     }
 }

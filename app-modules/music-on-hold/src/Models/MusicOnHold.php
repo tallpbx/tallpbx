@@ -6,7 +6,6 @@ namespace Modules\MusicOnHold\Models;
 
 use App\Models\Tenant;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\MusicOnHoldFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,7 +28,7 @@ use Modules\FileStores\Models\MediaAsset;
  */
 class MusicOnHold extends Model
 {
-    /** @use HasFactory<MusicOnHoldFactory> */
+    /** @use HasFactory<Modules\MusicOnHold\Database\Factories\MusicOnHoldFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -68,13 +67,5 @@ class MusicOnHold extends Model
     public function mediaAsset(): MorphOne
     {
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): MusicOnHoldFactory
-    {
-        return MusicOnHoldFactory::new();
     }
 }

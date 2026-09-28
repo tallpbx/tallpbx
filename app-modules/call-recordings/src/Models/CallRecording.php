@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\CallRecordings\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\CallRecordingFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -46,14 +45,6 @@ class CallRecording extends Model
         return [
             'duration' => 'integer',
         ];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): CallRecordingFactory
-    {
-        return CallRecordingFactory::new();
     }
 
     /**

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\VoicemailMessages\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\VoicemailMessageFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -68,13 +67,5 @@ class VoicemailMessage extends Model
     public function mediaAsset(): MorphOne
     {
         return $this->morphOne(MediaAsset::class, 'owner')->withoutGlobalScope('tenant');
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): VoicemailMessageFactory
-    {
-        return VoicemailMessageFactory::new();
     }
 }

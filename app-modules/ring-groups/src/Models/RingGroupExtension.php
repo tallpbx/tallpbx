@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\RingGroups\Models;
 
-use Database\Factories\Pbx\RingGroupExtensionFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +24,7 @@ use Modules\Extensions\Models\Extension;
  */
 class RingGroupExtension extends Model
 {
-    /** @use HasFactory<RingGroupExtensionFactory> */
+    /** @use HasFactory<Modules\RingGroups\Database\Factories\RingGroupExtensionFactory> */
     use HasFactory, HasUuids;
 
     protected $fillable = [
@@ -61,13 +60,5 @@ class RingGroupExtension extends Model
     public function extension(): BelongsTo
     {
         return $this->belongsTo(Extension::class, 'extension_uuid');
-    }
-
-    /**
-     * Create a new factory instance for model seeding.
-     */
-    protected static function newFactory(): RingGroupExtensionFactory
-    {
-        return RingGroupExtensionFactory::new();
     }
 }

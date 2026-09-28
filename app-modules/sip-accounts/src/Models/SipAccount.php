@@ -7,7 +7,6 @@ namespace Modules\SipAccounts\Models;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\SipAccountFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,7 +31,7 @@ use Modules\Extensions\Models\Extension;
  */
 class SipAccount extends Model
 {
-    /** @use HasFactory<SipAccountFactory> */
+    /** @use HasFactory<Modules\SipAccounts\Database\Factories\SipAccountFactory> */
     use BelongsToTenant;
 
     use HasFactory, HasUuids;
@@ -75,14 +74,6 @@ class SipAccount extends Model
     public function extension(): BelongsTo
     {
         return $this->belongsTo(Extension::class);
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): SipAccountFactory
-    {
-        return SipAccountFactory::new();
     }
 
     /**

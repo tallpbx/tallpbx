@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Transcribe\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\TranscriptionFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,13 +43,5 @@ class Transcription extends Model
     protected function casts(): array
     {
         return ['confidence' => 'decimal:2'];
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): TranscriptionFactory
-    {
-        return TranscriptionFactory::new();
     }
 }

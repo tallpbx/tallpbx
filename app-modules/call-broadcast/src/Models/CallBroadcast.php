@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\CallBroadcast\Models;
 
 use App\Traits\BelongsToTenant;
-use Database\Factories\Pbx\CallBroadcastFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -32,13 +31,5 @@ class CallBroadcast extends Model
     public function recipients(): HasMany
     {
         return $this->hasMany(CallBroadcastRecipient::class, 'broadcast_id');
-    }
-
-    /**
-     * Create a new factory instance for this model.
-     */
-    protected static function newFactory(): CallBroadcastFactory
-    {
-        return CallBroadcastFactory::new();
     }
 }
