@@ -241,19 +241,23 @@ class TestCommand extends Command
      *
      * The browser tests run against an in-process HTTP server backed by the
      * same in-memory SQLite database as the feature suite, so no dedicated
-     * database, .env swap, or ChromeDriver daemon is required. Browser tests
-     * run in parallel with the worker count capped at four: each worker keeps
-     * its own Chromium instance alive, so an unbounded worker count can
+     * database, .env swap, or ChromeDriver daemon is required. By default the
+     * suite runs in parallel with the worker count capped at four: each worker
+     * keeps its own Chromium instance alive, so an unbounded worker count can
      * starve memory on smaller servers (the feature suite auto-detects the
-     * core count because its workers are far lighter). The generous timeout
-     * covers the full panel smoke suite on modest servers.
+     * core count because its workers are far lighter). Passing --sequential
+     * drops the parallel flags entirely — the safest choice on those same
+     * small servers. The generous timeout covers the full panel smoke suite
+     * on modest servers.
      */
     private function runBrowserTests(): int
     {
-        $this->line('<comment>$ vendor/bin/pest tests/Browser --compact --parallel --processes=4</comment>');
+        $browserArgs = self::browserTestArguments((bool) $this->option('sequential'));
+
+        $this->line('<comment>$ vendor/bin/pest '.implode(' ', $browserArgs).'</comment>');
 
         $process = new Process(
-            [PHP_BINARY, base_path('vendor/bin/pest'), 'tests/Browser', '--compact', '--parallel', '--processes=4'],
+            [PHP_BINARY, base_path('vendor/bin/pest'), ...$browserArgs],
             base_path(),
             $this->cleanTestingEnvironment(),
             null,
@@ -265,5 +269,29 @@ class TestCommand extends Command
         });
 
         return $process->getExitCode() ?? self::FAILURE;
+    }
+
+    /**
+     * Build the Pest arguments for a browser test run.
+     *
+     * Returns the CLI arguments passed to the Pest binary (the binary itself
+     * is added by the caller). Parallel runs are capped at four workers
+     * because each worker keeps a Chromium instance alive; a sequential
+     * request drops the parallel flags altogether instead of silently
+     * ignoring them.
+     *
+     * @param  bool  $sequential  True when --sequential requests no parallelism
+     * @return array<int, string>
+     */
+    public static function browserTestArguments(bool $sequential): array
+    {
+        $args = ['tests/Browser', '--compact'];
+
+        if (! $sequential) {
+            $args[] = '--parallel';
+            $args[] = '--processes=4';
+        }
+
+        return $args;
     }
 }
