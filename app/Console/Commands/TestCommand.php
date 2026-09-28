@@ -13,27 +13,28 @@ use Symfony\Component\Process\Process;
  * Usage:
  *   php artisan app:test              Run feature tests (default, --parallel)
  *   php artisan app:test --smoke      Run critical-path smoke tests only
- *   php artisan app:test --full       Run feature + Dusk browser tests
+ *   php artisan app:test --full       Run feature + browser tests
  *   php artisan app:test --sequential Run without --parallel
  *   php artisan app:test --clear-cache Clear Laravel caches before testing
  *
  * The default mode runs all Pest feature tests in parallel
- * with compact output (~65s for 935 tests). This is the recommended
- * mode for day-to-day development.
+ * with compact output (a few minutes for the full feature
+ * suite). This is the recommended mode for day-to-day
+ * development.
  *
  * --smoke runs a targeted subset covering auth, routing, module
  * integrity, and XML handler correctness (~30s for ~80 tests).
  * Use this for quick verification after small changes.
  *
- * --full runs the default feature suite followed by Dusk browser
- * tests. This takes ~150s total and should be run before commits
+ * --full runs the default feature suite followed by the Pest 4
+ * browser tests (Playwright). This should be run before commits
  * that touch the panel UI or FreeSWITCH integration.
  */
 class TestCommand extends Command
 {
     protected $signature = 'app:test
                             {--smoke : Run only critical-path smoke tests}
-                            {--full : Run feature tests + Dusk browser tests}
+                            {--full : Run feature tests + browser tests}
                             {--sequential : Disable parallel execution}
                             {--clear-cache : Clear Laravel caches before running tests}';
 
@@ -100,11 +101,11 @@ class TestCommand extends Command
     }
 
     /**
-     * Run the full suite — feature tests + Dusk browser tests.
+     * Run the full suite — feature tests + Pest browser tests.
      *
-     * Feature tests run first (in parallel). If they pass, Dusk
-     * browser tests follow. If feature tests fail, Dusk is skipped
-     * to save time.
+     * Feature tests run first (in parallel). If they pass, browser
+     * tests follow. If feature tests fail, browser tests are
+     * skipped to save time.
      */
     private function runFull(): int
     {
@@ -113,14 +114,14 @@ class TestCommand extends Command
         $featureExit = $this->runPest(['--compact']);
 
         if ($featureExit !== 0) {
-            $this->error('Feature tests failed — skipping Dusk browser tests.');
+            $this->error('Feature tests failed — skipping browser tests.');
 
             return $featureExit;
         }
 
-        $this->info('Step 2/2: Running Dusk browser tests…');
+        $this->info('Step 2/2: Running browser tests…');
 
-        return $this->runDusk();
+        return $this->runBrowserTests();
     }
 
     /**
@@ -236,17 +237,26 @@ class TestCommand extends Command
     }
 
     /**
-     * Run Laravel Dusk browser tests.
+     * Run browser tests via Pest 4 and Playwright.
      *
-     * Requires Chromium and ChromeDriver.
+     * The browser tests run against an in-process HTTP server backed by the
+     * same in-memory SQLite database as the feature suite, so no dedicated
+     * database, .env swap, or ChromeDriver daemon is required. The generous
+     * timeout covers the full panel smoke suite on modest servers, where
+     * Chromium memory pressure slows execution.
      */
-    private function runDusk(): int
+    private function runBrowserTests(): int
     {
-        $cmd = 'bash scripts/dusk.sh';
+        $this->line('<comment>$ vendor/bin/pest tests/Browser --compact</comment>');
 
-        $this->line("<comment>\$ {$cmd}</comment>");
-
-        $process = new Process(['bash', base_path('scripts/dusk.sh')], base_path());
+        $process = new Process(
+            [PHP_BINARY, base_path('vendor/bin/pest'), 'tests/Browser', '--compact'],
+            base_path(),
+            $this->cleanTestingEnvironment(),
+            null,
+            null,
+        );
+        $process->setTimeout(900);
         $process->run(function (string $type, string $buffer): void {
             $this->output->write($buffer);
         });
