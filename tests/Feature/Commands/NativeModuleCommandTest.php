@@ -21,6 +21,8 @@ it('exposes native module and modules command names', function () {
         ->and($commands)->toContain('modules:cache')
         ->and($commands)->toContain('modules:clear')
         ->and($commands)->toContain('modules:list')
+        ->and($commands)->toContain('module:uninstall')
+        ->and($commands)->toContain('module:restore')
         ->and($commands)->toContain('make:module');
 });
 

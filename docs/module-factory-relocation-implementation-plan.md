@@ -2485,7 +2485,7 @@ git commit -m "test: skip tests whose referenced modules are uninstalled" -m "Ad
 - Consumes: `ModuleLifecycleService` from Task 4.
 - Produces: Artisan commands `module:uninstall {name} {--confirm=}` and `module:restore {name}`.
 
-- [ ] **Step 1: Write the failing command tests**
+- [x] **Step 1: Write the failing command tests**
 
 In `tests/Feature/Commands/NativeModuleCommandTest.php`, extend the command name assertions:
 
@@ -2611,12 +2611,12 @@ it('restores a previously uninstalled module', function (): void {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `php artisan test --compact --parallel --filter=ModuleUninstallCommandTest`
 Expected: FAIL — `module:uninstall` is not a registered command.
 
-- [ ] **Step 3: Implement the commands**
+- [x] **Step 3: Implement the commands**
 
 `app/Console/Commands/ModuleUninstallCommand.php`:
 
@@ -2818,7 +2818,7 @@ class ModuleRestoreCommand extends Command
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `php artisan test --compact --parallel --filter="ModuleUninstallCommandTest|ModuleRestoreCommandTest|NativeModuleCommandTest"`
 Expected: PASS.
