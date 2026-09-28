@@ -211,8 +211,10 @@ function restoreSidebarScrollPositions() {
 }
 
 function restoreSidebarScrollPositionsAfterNavigation() {
+    // Restore immediately, then retry once the navigated DOM has settled.
+    // The timed retries already cover later frames, so an extra
+    // requestAnimationFrame pass would only repeat the same restore.
     restoreSidebarScrollPositions();
-    requestAnimationFrame(restoreSidebarScrollPositions);
     setTimeout(restoreSidebarScrollPositions, 50);
     setTimeout(restoreSidebarScrollPositions, 250);
 }

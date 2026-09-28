@@ -14,8 +14,10 @@
     $useDataTip = ! empty($tip) && ! $hasContent;
 @endphp
 
+{{-- The tip doubles as the accessible label: the trigger is usually a
+     decorative information icon that screen readers would otherwise skip. --}}
 <div {{ $attributes->merge(['class' => trim('tooltip ' . $positionClass . ' ' . $alignClass)]) }}
-     @if ($useDataTip) data-tip="{{ $tip }}" @endif>
+     @if ($useDataTip) data-tip="{{ $tip }}" aria-label="{{ $tip }}" @endif>
     @if ($hasTrigger)
         {{ $trigger }}
     @elseif ($hasDefaultSlot)

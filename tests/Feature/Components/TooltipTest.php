@@ -10,6 +10,15 @@ test('it renders text tooltip with data-tip attribute', function (): void {
         ->assertSee('tooltip', false);
 });
 
+test('it exposes the tooltip text as an accessible label', function (): void {
+    // The trigger is usually a decorative information icon (the heroicons
+    // render with aria-hidden), so the tooltip text must also become the
+    // accessible label or screen readers cannot perceive the affordance.
+    $view = $this->blade('<x-tooltip tip="Help text" position="right"><x-heroicon-o-information-circle class="w-4 h-4" /></x-tooltip>');
+
+    $view->assertSee('aria-label="Help text"', false);
+});
+
 test('it renders html tooltip with tooltip-content div', function (): void {
     $view = $this->blade(<<<'BLADE'
         <x-tooltip>
