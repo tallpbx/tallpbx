@@ -24,7 +24,7 @@
 | Task 6: Migrate DocumentationScreenshotsTest | ✅ Complete | `test(browser): migrate DocumentationScreenshotsTest` |
 | Task 7: Runner/phpunit.xml updates | ✅ Complete | `feat(testing)` runner + `scripts/test-browser.sh` |
 | Task 8: Remove legacy Dusk infrastructure | ✅ Complete | refactor(testing): remove laravel/dusk + docs: Playwright guidance |
-| Task 9: CI, AGENTS.md, INSTALL.md, CHANGELOG | ⏳ Not started | — |
+| Task 9: CI, AGENTS.md, INSTALL.md, CHANGELOG | ✅ Complete | fix(browser) + ci + feat(testing) + docs(testing) |
 
 ---
 
@@ -565,81 +565,45 @@ Split into `refactor(testing): remove legacy laravel/dusk and dedicated dusk dat
 
 ### Task 9: Update Documentation, Agent Rules, and CI Workflow
 
-**Files:**
-- Modify: [`.github/workflows/tests.yml`](file:///var/www/tallpbx/.github/workflows/tests.yml)
-- Modify: [`AGENTS.md`](file:///var/www/tallpbx/AGENTS.md)
-- Modify: [`INSTALL.md`](file:///var/www/tallpbx/INSTALL.md)
-- Modify: [`CHANGELOG.md`](file:///var/www/tallpbx/CHANGELOG.md)
+**Files (as executed):**
+- Modified: `.github/workflows/tests.yml`, `AGENTS.md`, `INSTALL.md`, `CHANGELOG.md`, `docs/load-testing-guide.md`, `.github/copilot-instructions.md`, `.agents/skills/testing-best-practices/` (+ 8 identical tool mirrors), `app/Console/Commands/TestCommand.php` (worker cap), and both browser suites (capture-flag rename)
 
-**Interfaces:**
-- Consumes: Finalized Pest 4 browser testing workflow.
-- Produces: Updated documentation, CI workflow, and agent instructions.
+- [x] **Step 1: Update GitHub Actions workflow** ✅
 
-- [ ] **Step 1: Update GitHub Actions workflow**
+Added Node.js 24, `npm ci`, and `npx playwright install --with-deps chromium`, followed by a `Run the Pest browser suite` step (`./vendor/bin/pest tests/Browser --compact`) — Playwright setup without a browser step would have been dead weight. `timeout-minutes` raised 15 → 25 to cover both suites, and the header comments document the browser leg.
 
-In [`.github/workflows/tests.yml`](file:///var/www/tallpbx/.github/workflows/tests.yml):
-Add Node.js setup and Playwright installation:
-```yaml
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+- [x] **Step 2: Update `AGENTS.md`** ✅
 
-      - name: Install npm dependencies
-        run: npm ci
+The pre-claim checklist step 3 now runs `./vendor/bin/pest tests/Browser`; the "Dusk Database Isolation" section was replaced by "Playwright Browser Testing" (in-memory SQLite server, `scripts/test-browser.sh`, panel-safe runs, `loginAs()` session semantics, `script()` chaining caveat, capped parallel workers, on-demand screenshots with `TALLPBX_CAPTURE_DOCS=1`). The extension-module checklist and the tiered-runner command examples were updated to match.
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-```
+- [x] **Step 3: Update `INSTALL.md`** ✅
 
-- [ ] **Step 2: Update `AGENTS.md`**
+The "Browser Testing" section describes the Playwright workflow (`npx playwright install --with-deps chromium`, `bash scripts/test-browser.sh`) and the panel-use warning is gone.
+**Guard fix:** `BootstrapInstallerTest` asserts INSTALL.md must not contain developer-only strings (`app:test`, etc.) — the first draft violated it (1 failed / 2394 passed), the section was reworded, and the test now passes 9/9 with `--parallel`.
 
-Replace:
-- `php artisan dusk` in the pre-claim checklist with:
-  ```bash
-  # 3. Pest browser tests must pass (for UI changes)
-  ./vendor/bin/pest tests/Browser
-  ```
-- Replace the "Dusk Database Isolation" section with "Playwright Browser Testing" documenting the in-memory SQLite shared model and `scripts/test-browser.sh`.
+- [x] **Step 4: Update `CHANGELOG.md`** ✅
 
-- [ ] **Step 3: Update `INSTALL.md`**
+`[Unreleased]` gained Added/Removed/Changed entries covering the Playwright migration, the full Dusk removal (including the note that existing installations may drop their leftover `*_dusk` database/user manually), the capture-flag rename, and the panel-safety change.
 
-Update section 5 ("Browser Testing") to describe Pest 4 browser testing with Playwright and remove warnings about `.env` swapping.
-
-- [ ] **Step 4: Update `CHANGELOG.md`**
-
-Add under `## [Unreleased]`:
-```markdown
-### Added
-- Pest 4 native browser testing powered by Playwright (`pestphp/pest-plugin-browser`).
-- Fast test authentication bridge (`/_testing/login/{guard}/{id}`) for sub-10ms browser test logins.
-
-### Changed
-- Converted all browser test suites (`PanelSmokeTest`, `RiskConfirmationBrowserTest`, `MediaStorageBrowserTest`, `DocumentationScreenshotsTest`) to Pest 4 fluent browser syntax.
-- Updated `php artisan app:test --full` to execute browser tests directly via Pest.
-
-### Removed
-- Removed `laravel/dusk` and `facebook/webdriver` dependencies.
-- Deprecated `scripts/dusk.sh`, `App\Support\DuskDatabaseSafety`, and `.env.dusk`.
-- Removed dedicated `_dusk` MariaDB database and user creation from installer scripts.
-```
-
-- [ ] **Step 5: Run optimization and full suite verification**
-
-Run:
-```bash
-php artisan optimize:clear
-php artisan test --compact --parallel
-bash scripts/test-browser.sh
-```
-Expected: Clean pass with zero errors.
-
-- [ ] **Step 6: Commit**
+- [x] **Step 5: Verification** ✅
 
 ```bash
-git add .github/workflows/tests.yml AGENTS.md INSTALL.md CHANGELOG.md
-git commit -m "docs(testing): update documentation and CI for Pest 4 browser testing"
+php artisan app:test --full
+# → feature: 2395 passed (9919 assertions); browser: 1 skipped, 47 passed (213 assertions), 389 s
+
+./vendor/bin/pest tests/Browser --compact --parallel --processes=4
+# → 1 skipped, 47 passed (213 assertions), 354.6 s, memory stable (~1.7 GB free at peak)
 ```
+
+- [x] **Step 6: Commit** ✅
+
+Split into `fix(browser)`, `ci:`, `feat(testing)` (worker cap), `docs(testing):`, and this plan-doc commit.
+
+**Extra work delivered with this task:**
+- Renamed the docs-capture flag `DUSK_CAPTURE_DOCS` → `TALLPBX_CAPTURE_DOCS` (both browser suites + all documentation).
+- Fixed a latent bug in `PanelSmokeTest`'s capture block: it passed an absolute path to `screenshot()`, which Pest always prefixes with `tests/Browser/Screenshots/` — the security-dashboard capture had silently never worked since Task 4. Fixed and verified end-to-end (573 KB screenshot written + freshness copy).
+- Updated the `testing-best-practices` skill (primary `.agents/skills/` + 8 identical tool mirrors) and `.github/copilot-instructions.md` to the Pest browser workflow.
+- **Ruling (user-directed):** browser tests run with parallel workers capped at four (`--parallel --processes=4`) — each worker keeps a Chromium instance alive, so the cap prevents memory starvation on small servers; the feature suite keeps auto-detecting the core count.
 
 ---
 
