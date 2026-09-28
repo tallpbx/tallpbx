@@ -241,16 +241,19 @@ class TestCommand extends Command
      *
      * The browser tests run against an in-process HTTP server backed by the
      * same in-memory SQLite database as the feature suite, so no dedicated
-     * database, .env swap, or ChromeDriver daemon is required. The generous
-     * timeout covers the full panel smoke suite on modest servers, where
-     * Chromium memory pressure slows execution.
+     * database, .env swap, or ChromeDriver daemon is required. Browser tests
+     * run in parallel with the worker count capped at four: each worker keeps
+     * its own Chromium instance alive, so an unbounded worker count can
+     * starve memory on smaller servers (the feature suite auto-detects the
+     * core count because its workers are far lighter). The generous timeout
+     * covers the full panel smoke suite on modest servers.
      */
     private function runBrowserTests(): int
     {
-        $this->line('<comment>$ vendor/bin/pest tests/Browser --compact</comment>');
+        $this->line('<comment>$ vendor/bin/pest tests/Browser --compact --parallel --processes=4</comment>');
 
         $process = new Process(
-            [PHP_BINARY, base_path('vendor/bin/pest'), 'tests/Browser', '--compact'],
+            [PHP_BINARY, base_path('vendor/bin/pest'), 'tests/Browser', '--compact', '--parallel', '--processes=4'],
             base_path(),
             $this->cleanTestingEnvironment(),
             null,
