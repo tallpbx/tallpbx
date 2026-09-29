@@ -34,6 +34,16 @@ interface SecurityBanServiceInterface
     public function unban(string $ip, ?int $adminId = null): bool;
 
     /**
+     * Sever an address's live kernel sessions by flushing its conntrack entries.
+     *
+     * A failed flush is recorded as a visible audit entry and never rolls back
+     * the block itself (new flows stay blocked either way).
+     *
+     * @param  string  $ip  IPv4 or IPv6 address whose sessions must be severed
+     */
+    public function flushConntrack(string $ip): bool;
+
+    /**
      * Determine if an IP address currently has an active ban.
      *
      * @param  string  $ip  IPv4 or IPv6 address to check

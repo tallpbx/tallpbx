@@ -46,6 +46,9 @@ beforeEach(function (): void {
     $executor->shouldReceive('unban')->andReturn(true);
     $executor->shouldReceive('apply')->andReturn(true);
     $executor->shouldReceive('status')->andReturn('');
+    // Blocking an address also severs its live kernel sessions (conntrack
+    // flush); the default mock confirms the call without touching the host.
+    $executor->shouldReceive('flushConntrack')->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $executor);
 
     $generator = Mockery::mock(SecurityConfigGenerator::class);
@@ -162,6 +165,49 @@ it('displays active bans and supports unban, promoteToWhitelist, and promoteToBl
 
     $component->call('promoteToBlacklist', '198.51.100.100');
     expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '198.51.100.100')->exists())->toBeTrue();
+});
+
+it('flushes conntrack entries when blocking an address via blacklist or promotion', function (): void {
+    $flushedIps = [];
+
+    $executor = Mockery::mock(SecurityExecutorInterface::class);
+    $executor->shouldReceive('ban')->andReturn(true);
+    $executor->shouldReceive('unban')->andReturn(true);
+    $executor->shouldReceive('apply')->andReturn(true);
+    $executor->shouldReceive('status')->andReturn('');
+    $executor->shouldReceive('flushConntrack')->andReturnUsing(function (string $ip) use (&$flushedIps): bool {
+        $flushedIps[] = $ip;
+
+        return true;
+    });
+    $this->app->instance(SecurityExecutorInterface::class, $executor);
+
+    // A direct permanent blacklist add must sever the address's sessions.
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('newBlacklistIp', '203.0.113.201')
+        ->set('newBlacklistDescription', 'Conntrack flush probe')
+        ->call('addBlacklistIp')
+        ->assertHasNoErrors();
+
+    expect($flushedIps)->toBe(['203.0.113.201']);
+
+    // Promoting an active ban to the permanent blacklist must do the same.
+    SecurityBan::create([
+        'ip_address' => '198.51.100.201',
+        'vector' => 'sip_auth',
+        'reason' => 'Promotion flush probe',
+        'attempt_count' => 1,
+        'banned_at' => now(),
+        'expires_at' => now()->addHour(),
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('promoteToBlacklist', '198.51.100.201');
+
+    expect($flushedIps)->toBe(['203.0.113.201', '198.51.100.201']);
 });
 
 it('applies a manual IP ban through the modal', function (): void {

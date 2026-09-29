@@ -163,6 +163,84 @@ it('routes bans and unbans for each address family to the matching kernel set', 
         ->and($v4->getErrorOutput())->not->toContain('banned_ips6');
 });
 
+it('validates shell script rejects invalid IP in flush-conntrack command', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // Malformed addresses must be refused before any conntrack operation runs
+    // (exit code 2 = validation failure), exactly like the ban action.
+    $invalidIps = [
+        'malicious;ip',
+        '344.34.34.34',
+        '10.0.0.0/99',
+        '1:::2',
+    ];
+
+    foreach ($invalidIps as $ip) {
+        $process = new Process(['bash', $scriptPath, 'flush-conntrack', $ip]);
+        $process->run();
+
+        expect($process->getExitCode())->toBe(2)
+            ->and($process->getErrorOutput())->toContain('ERROR: Invalid IP address');
+    }
+});
+
+it('reports a missing conntrack utility clearly without crashing', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // Servers without the 'conntrack' package must degrade gracefully: the
+    // helper reports the missing binary plainly so the operator can install
+    // it, instead of failing with an opaque command-not-found error.
+    $process = new Process(
+        ['bash', $scriptPath, 'flush-conntrack', '203.0.113.9'],
+        null,
+        ['TALLPBX_CONNTRACK_BIN' => '/nonexistent/conntrack-binary'],
+    );
+    $process->run();
+
+    expect($process->getExitCode())->toBe(4)
+        ->and($process->getErrorOutput())->toContain('conntrack');
+});
+
+it('routes flush-conntrack by address family with the correct conntrack flag', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // A stub conntrack binary records the arguments the helper passes, so the
+    // test can assert family routing without touching real kernel state.
+    $stubDir = sys_get_temp_dir().'/tallpbx_conntrack_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $stub = $stubDir.'/conntrack';
+    file_put_contents($stub, "#!/bin/bash\necho \"ARGS: \$*\"\n");
+    chmod($stub, 0755);
+
+    try {
+        // IPv4 uses the default family invocation.
+        $v4 = new Process(
+            ['bash', $scriptPath, 'flush-conntrack', '203.0.113.9'],
+            null,
+            ['TALLPBX_CONNTRACK_BIN' => $stub],
+        );
+        $v4->run();
+
+        expect($v4->getExitCode())->toBe(0)
+            ->and($v4->getOutput())->toContain('ARGS: -D -s 203.0.113.9')
+            ->and($v4->getOutput())->not->toContain('-f ipv6');
+
+        // IPv6 must select the ipv6 family explicitly.
+        $v6 = new Process(
+            ['bash', $scriptPath, 'flush-conntrack', '2001:db8::1'],
+            null,
+            ['TALLPBX_CONNTRACK_BIN' => $stub],
+        );
+        $v6->run();
+
+        expect($v6->getExitCode())->toBe(0)
+            ->and($v6->getOutput())->toContain('ARGS: -D -f ipv6 -s 2001:db8::1');
+    } finally {
+        @unlink($stub);
+        @rmdir($stubDir);
+    }
+});
+
 it('validates shell script apply fails when pending file is missing', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 

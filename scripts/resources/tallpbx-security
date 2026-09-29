@@ -7,7 +7,8 @@
 # behalf of the TallPBX web management interface (www-data).
 #
 # Security Architecture:
-# - Strictly bounded interface: Only 'apply', 'validate', 'ban', 'unban', and 'status' are allowed.
+# - Strictly bounded interface: Only 'apply', 'validate', 'ban', 'unban',
+#   'flush-conntrack', 'status', and 'bans' are allowed.
 # - Input validation: IP addresses and durations are rigorously validated with regular
 #   expressions before being passed to nftables, preventing any arbitrary command injection.
 # - Atomic ruleset updates: Pending firewall rulesets are validated with 'nft -c'
@@ -49,6 +50,12 @@ FIREWALL_ACTIVE="${FIREWALL_CONF_DIR}/firewall.nft"
 # TALLPBX_NFT_BIN at a stub binary in a temporary directory. Sudo's env_reset
 # prevents this environment variable from affecting production invocations.
 NFT_BIN="${TALLPBX_NFT_BIN:-/usr/sbin/nft}"
+
+# Path to the conntrack userspace binary (from the optional 'conntrack' Debian
+# package). Defaults to the system location. Automated tests point
+# TALLPBX_CONNTRACK_BIN at a stub binary in a temporary directory; sudo's
+# env_reset prevents this variable from affecting production invocations.
+CONNTRACK_BIN="${TALLPBX_CONNTRACK_BIN:-/usr/sbin/conntrack}"
 
 # Helper function to validate IP addresses
 validate_ip() {
@@ -199,6 +206,32 @@ case "$ACTION" in
         echo "SUCCESS: Unbanned $IP"
         ;;
 
+    flush-conntrack)
+        IP="${2:-}"
+
+        # Validate the IP address parameter with the same strict validator the
+        # ban action uses, so no user input can ever reach the shell unquoted.
+        validate_ip "$IP"
+
+        # The conntrack utility ships in the optional 'conntrack' package.
+        # Report a missing binary plainly so the operator can install it; the
+        # block on NEW connections keeps working either way.
+        if [ ! -x "$CONNTRACK_BIN" ]; then
+            echo "ERROR: conntrack utility not found at $CONNTRACK_BIN. Install the 'conntrack' package to sever live sessions of blocked IPs; blocks on new connections are unaffected." >&2
+            exit 4
+        fi
+
+        # Delete every conntrack entry sourced from this address so its live
+        # sessions die immediately. IPv6 entries require the explicit family
+        # flag because the utility defaults to the IPv4 table.
+        if [[ "$IP" =~ $IPV4_REGEX ]]; then
+            "$CONNTRACK_BIN" -D -s "$IP"
+        else
+            "$CONNTRACK_BIN" -D -f ipv6 -s "$IP"
+        fi
+        echo "SUCCESS: Flushed conntrack entries for $IP"
+        ;;
+
     status)
         # Display the active nftables ruleset or table status
         if "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
@@ -218,7 +251,7 @@ case "$ACTION" in
         ;;
 
     *)
-        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|status|bans}" >&2
+        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|status|bans}" >&2
         exit 1
         ;;
 esac

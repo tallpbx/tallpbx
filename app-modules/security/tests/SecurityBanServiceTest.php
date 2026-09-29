@@ -113,6 +113,7 @@ it('delegates ban execution to SecurityExecutorInterface when provided', functio
         ->once()
         ->with('192.0.2.77', 3600)
         ->andReturn(true);
+    $mockExecutor->shouldReceive('flushConntrack')->andReturn(true);
 
     $banService = new SecurityBanService($mockExecutor);
 
@@ -124,6 +125,42 @@ it('delegates ban execution to SecurityExecutorInterface when provided', functio
     );
 
     expect($ban->is_active)->toBeTrue();
+
+    // The stateful fast path keeps an attacker's live sessions flowing until
+    // its conntrack entries are flushed, so a successful kernel ban must also
+    // sever those sessions (invariant 4).
+    $mockExecutor->shouldHaveReceived('flushConntrack')->once()->with('192.0.2.77');
+});
+
+it('does not flush conntrack entries when the kernel ban fails', function (): void {
+    $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
+    $mockExecutor->shouldReceive('ban')->once()->andReturn(false);
+    $mockExecutor->shouldReceive('flushConntrack')->andReturn(true);
+
+    $banService = new SecurityBanService($mockExecutor);
+
+    $banService->ban('192.0.2.78', 'ssh', 'Executor failure path', 3600);
+
+    // Nothing was blocked in the kernel, so severing sessions would cut off
+    // an address that is not actually banned.
+    $mockExecutor->shouldNotHaveReceived('flushConntrack');
+});
+
+it('records a visible audit entry when the conntrack flush fails', function (): void {
+    $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
+    $mockExecutor->shouldReceive('ban')->once()->andReturn(true);
+    $mockExecutor->shouldReceive('flushConntrack')->once()->andReturn(false);
+
+    $banService = new SecurityBanService($mockExecutor);
+
+    $banService->ban('192.0.2.79', 'sip_auth', 'Flush failure path', 3600);
+
+    // A flush failure is not rolled back (the new-flow block stays active),
+    // but it must be visible to operators — not buried in laravel.log.
+    $this->assertDatabaseHas('security_audit_logs', [
+        'action' => 'conntrack_flush_failed',
+        'ip_address' => '192.0.2.79',
+    ]);
 });
 
 it('unbans an IP, marks active records inactive, and records audit trail', function (): void {

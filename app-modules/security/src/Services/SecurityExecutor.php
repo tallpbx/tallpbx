@@ -55,6 +55,20 @@ class SecurityExecutor implements SecurityExecutorInterface
     }
 
     /**
+     * Sever an address's live kernel sessions by flushing its conntrack entries.
+     *
+     * The blocklists evaluate only new flows (they sit behind the stateful
+     * fast path), so an address that just entered a blocklist keeps its
+     * established calls and connections until these entries are deleted.
+     *
+     * @param  string  $ip  IPv4 or IPv6 address whose sessions must be severed
+     */
+    public function flushConntrack(string $ip): bool
+    {
+        return $this->runCommand(['flush-conntrack', $ip]);
+    }
+
+    /**
      * Atomically validate and apply the pending nftables ruleset.
      */
     public function apply(): bool

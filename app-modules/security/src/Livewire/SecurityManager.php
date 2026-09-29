@@ -379,7 +379,7 @@ class SecurityManager extends Component
     /**
      * Add a new IP or CIDR subnet to the permanent blacklist.
      */
-    public function addBlacklistIp(LockoutGuardService $lockoutGuard): void
+    public function addBlacklistIp(LockoutGuardService $lockoutGuard, SecurityBanServiceInterface $banService): void
     {
         $this->validate([
             'newBlacklistIp' => [
@@ -497,6 +497,10 @@ class SecurityManager extends Component
         $this->checkAdminIpStatus($lockoutGuard);
 
         if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            // The block only filters new flows (blocklists sit behind the
+            // stateful fast path), so sever the address's live sessions now
+            // that its block is live in the kernel (invariant 4).
+            $banService->flushConntrack($ip);
             $this->notifySuccess((string) __('admin.security_ip_added'));
         }
     }
@@ -567,6 +571,9 @@ class SecurityManager extends Component
         }
 
         if ($this->autoApplyFirewallRuleset()) {
+            // Sever the promoted address's live sessions now that its
+            // permanent block is live in the kernel (invariant 4).
+            $banService->flushConntrack($ip);
             $this->notifySuccess((string) __('admin.security_promoted_blacklist'));
         }
     }
@@ -618,6 +625,12 @@ class SecurityManager extends Component
             return;
         }
 
+        // Permanent manual bans are stored in the blacklist rather than as a
+        // timed kernel ban, so remember which path ran: only that path needs
+        // the conntrack flush once the ruleset applies. Timed bans flush
+        // inside SecurityBanService::ban() instead.
+        $permanentBlacklistEntry = $this->manualBanDuration === -1;
+
         if ($this->manualBanDuration === -1) {
             SecurityIpList::updateOrCreate(
                 ['type' => 'blacklist', 'ip_address' => $ip],
@@ -641,6 +654,12 @@ class SecurityManager extends Component
 
         // Report the ban as saved only once the kernel accepted the ruleset.
         if ($this->autoApplyFirewallRuleset()) {
+            // Sever live sessions for a permanent blacklist entry now that
+            // its block is live in the kernel (invariant 4).
+            if ($permanentBlacklistEntry) {
+                $banService->flushConntrack($ip);
+            }
+
             $this->notifySuccess((string) __('admin.security_manual_ban_success'));
         }
     }

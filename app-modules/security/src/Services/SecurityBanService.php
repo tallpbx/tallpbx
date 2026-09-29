@@ -129,19 +129,60 @@ class SecurityBanService implements SecurityBanServiceInterface
         // 4. Delegate to kernel executor to block packets
         if ($this->executor !== null) {
             try {
-                $this->executor->ban($ip, $durationSeconds ?? 0);
+                if ($this->executor->ban($ip, $durationSeconds ?? 0)) {
+                    // 5. Sever the address's live sessions: the blocklists sit
+                    //    behind the stateful fast path, so existing connections
+                    //    keep flowing until their conntrack entries are flushed
+                    //    (invariant 4). A flush failure is audited, never fatal.
+                    $this->flushConntrack($ip);
+                }
             } catch (\Throwable $e) {
                 Log::error("Failed to execute kernel ban for {$ip}: {$e->getMessage()}");
             }
         }
 
-        // 5. Reset Redis sliding-window attempt counters for this IP
+        // 6. Reset Redis sliding-window attempt counters for this IP
         $this->flushRedisAttempts($ip);
 
-        // 6. Broadcast real-time WebSocket alert over Laravel Reverb
+        // 7. Broadcast real-time WebSocket alert over Laravel Reverb
         SecurityBanUpdated::dispatch($ip, 'ban');
 
         return $ban;
+    }
+
+    /**
+     * Sever an address's live kernel sessions by flushing its conntrack entries.
+     *
+     * The flush is the only mechanism that ends a blocked address's in-flight
+     * sessions (invariant 4). A failure never rolls back the block — it stays
+     * active for new flows — but is recorded as a visible security audit entry
+     * so an operator can finish the job by hand.
+     *
+     * @param  string  $ip  IPv4 or IPv6 address whose sessions must be severed
+     */
+    public function flushConntrack(string $ip): bool
+    {
+        if ($this->executor === null) {
+            return false;
+        }
+
+        try {
+            $flushed = $this->executor->flushConntrack($ip);
+        } catch (\Throwable $e) {
+            $flushed = false;
+            Log::error("Failed to flush conntrack entries for {$ip}: {$e->getMessage()}");
+        }
+
+        if (! $flushed) {
+            SecurityAuditLog::record(
+                action: 'conntrack_flush_failed',
+                ipAddress: $ip,
+                description: "Failed to sever live sessions for {$ip}: the conntrack flush did not run. Existing connections keep flowing until their sessions end; new connections are already blocked. Run 'conntrack -D -s {$ip}' manually if needed.",
+                details: ['operation' => 'flush-conntrack', 'ip' => $ip],
+            );
+        }
+
+        return $flushed;
     }
 
     /**

@@ -7,7 +7,9 @@
 # establishes baseline firewall rules for VoIP, SIP, RTP, Web admin, and SSH.
 #
 # What this step changes:
-# 1. Installs the 'nftables' package via Debian/Ubuntu apt package manager.
+# 1. Installs the 'nftables' package plus the 'conntrack' utility (used to
+#    sever the live sessions of blocked IPs) via the Debian/Ubuntu apt package
+#    manager.
 # 2. Creates the shared configuration directory '/etc/tallpbx' with secure setgid
 #    permissions (mode 2775, owned by root:www-data) so the web application can
 #    safely stage validated firewall configuration files.
@@ -49,8 +51,8 @@ cd "$(dirname "$0")"
 # Nftables is the modern Linux kernel packet classification and firewall framework,
 # replacing legacy iptables. It provides zero-daemon automatic kernel timeouts for
 # IP banning and atomic ruleset replacement.
-verbose "Installing nftables and sudo packages"
-apt_get_with_lock_wait install -y nftables sudo
+verbose "Installing nftables, sudo, and conntrack packages"
+apt_get_with_lock_wait install -y nftables sudo conntrack
 
 # ------------------------------------------------------------------------------
 # 2. Setup configuration directory for firewall rulesets
