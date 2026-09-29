@@ -33,6 +33,8 @@ it('generates valid nftables ruleset structure with invariants and default drop 
         ->and($nft)->toContain('set blacklist_ips {')
         ->and($nft)->toContain('set banned_ips {')
         ->and($nft)->toContain('set whitelist_ips {')
+        ->and($nft)->toContain('set threat_feed_ips {')
+        ->and($nft)->toContain('set threat_feed_ips6 {')
         ->and($nft)->toContain('chain input {')
         ->and($nft)->toContain('type filter hook input priority -10; policy drop;')
         ->and($nft)->toContain('iif "lo" accept')
@@ -62,7 +64,7 @@ it('includes blacklist and whitelist elements in generated sets', function (): v
 
     expect($nft)->toContain('45.142.120.0/24')
         ->and($nft)->toContain('192.168.1.0/24')
-        // Loopback trust comes from the STEP 1 `iif "lo"` interface rule,
+        // Loopback trust comes from the STAGE 1 `iif "lo"` interface rule,
         // not from an injected whitelist element.
         ->and($nft)->not->toContain('127.0.0.1')
         ->and($nft)->toContain('iif "lo" accept');
@@ -234,18 +236,95 @@ it('compiles IPv6 lists and bans into parallel ipv6 sets with mirrored pipeline 
     expect($v4Blacklist[1] ?? '')->not->toContain('2001:')
         ->and($v4Whitelist[1] ?? '')->not->toContain('2001:');
 
-    // Pipeline order parity: v6 drops precede the stateful rules and the v6
-    // whitelist accept precedes the IPv6 ICMP invariant.
+    // Pipeline order parity: the v6 whitelist accept precedes the invalid
+    // drop and the stateful fast path, and the v6 blocklists follow the fast
+    // path — the reordered chain (invariants 1–4).
+    $whitelist6 = strpos($nft, 'ip6 saddr @whitelist_ips6 accept');
+    $invalidDrop = strpos($nft, 'ct state invalid drop');
+    $fastPath = strpos($nft, 'ct state established,related accept');
     $blacklist6 = strpos($nft, 'ip6 saddr @blacklist_ips6 drop');
     $banned6 = strpos($nft, 'ip6 saddr @banned_ips6 drop');
-    $ctRules = strpos($nft, 'ct state established,related accept');
-    $whitelist6 = strpos($nft, 'ip6 saddr @whitelist_ips6 accept');
+    $feed6 = strpos($nft, 'ip6 saddr @threat_feed_ips6 counter drop');
     $icmp6 = strpos($nft, 'mld2-listener-report');
 
-    expect($blacklist6)->toBeLessThan($banned6)
-        ->and($banned6)->toBeLessThan($ctRules)
-        ->and($ctRules)->toBeLessThan($whitelist6)
-        ->and($whitelist6)->toBeLessThan($icmp6);
+    expect($whitelist6)->toBeLessThan($invalidDrop)
+        ->and($invalidDrop)->toBeLessThan($fastPath)
+        ->and($fastPath)->toBeLessThan($blacklist6)
+        ->and($blacklist6)->toBeLessThan($banned6)
+        ->and($banned6)->toBeLessThan($feed6)
+        ->and($feed6)->toBeLessThan($icmp6);
+});
+
+it('orders the input chain by the final kernel evaluation stages', function (): void {
+    // A custom rule is required to prove the custom section follows the port
+    // catalog in the generated output.
+    SecurityRule::create([
+        'sequence' => 50,
+        'description' => 'Order probe rule',
+        'source_ip' => '203.0.113.7',
+        'custom_port' => '9443',
+        'custom_protocol' => 'tcp',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    // Walk the final chain in kernel evaluation order: loopback, whitelist,
+    // invalid drop, stateful fast path, blacklist, bans, threat feeds, ICMP,
+    // port catalog, custom rules, default policy.
+    $needles = [
+        'iif "lo" accept',
+        'ip saddr @whitelist_ips accept',
+        'ct state invalid drop',
+        'ct state established,related accept',
+        'ip saddr @blacklist_ips drop',
+        'ip saddr @banned_ips drop',
+        'ip saddr @threat_feed_ips counter drop',
+        'icmp type echo-request',
+        'udp dport { 5060, 5061, 5080 } accept',
+        '# Rule 50: Order probe rule',
+        '# STAGE 12: DEFAULT INBOUND POLICY',
+    ];
+
+    $previous = -1;
+    foreach ($needles as $needle) {
+        $position = strpos($nft, $needle);
+        expect($position)->not->toBeFalse()
+            ->and($position)->toBeGreaterThan($previous);
+        $previous = (int) $position;
+    }
+});
+
+it('declares empty threat feed sets that stay digest-stable and kernel-valid', function (): void {
+    $tempDir = sys_get_temp_dir().'/tallpbx_threat_feed_sets_test_'.uniqid();
+    $generator = new SecurityConfigGenerator($tempDir);
+
+    $nft = $generator->generate();
+
+    // Both families are declared as empty interval sets: the main ruleset
+    // never carries feed elements (threat_feed.nft populates them), so feed
+    // churn can never change the canonical digest.
+    expect($nft)->toContain('set threat_feed_ips {')
+        ->and($nft)->toContain('set threat_feed_ips6 {');
+
+    preg_match('/set threat_feed_ips \{(.*?)\n    \}/s', $nft, $v4Set);
+    expect($v4Set[1] ?? '')
+        ->toContain('flags interval')
+        ->and($v4Set[1] ?? '')->not->toContain('elements');
+
+    // The drop rules reference the sets and carry counters for the panel's
+    // "packets dropped by the feed" metric.
+    expect($nft)->toContain('ip saddr @threat_feed_ips counter drop')
+        ->and($nft)->toContain('ip6 saddr @threat_feed_ips6 counter drop');
+
+    $pending = $generator->writePending();
+    try {
+        expect($generator->validateSyntax($pending))->toBeTrue();
+    } finally {
+        @unlink($pending);
+        @rmdir($tempDir);
+    }
 });
 
 it('keeps the essential IPv6 connectivity invariant without shadowing the ping policy', function (): void {

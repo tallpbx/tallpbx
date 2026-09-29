@@ -55,6 +55,14 @@ class SecurityConfigGenerator
     public function generate(): string
     {
         $firewallEnabled = SecuritySetting::getBoolean('firewall_enabled', true);
+        // The pre-filter pipeline (stages 1–7) is a single on/off unit: when
+        // disabled, every built-in pre-filter stage is skipped while the rest
+        // of the chain keeps running.
+        $prefilterEnabled = SecuritySetting::getBoolean('prefilter_enabled', true);
+        // Global observe mode: every drop verdict is emitted as a counter plus
+        // a rate-limited log with no verdict, so the firewall evaluates and
+        // records exactly what it would block but enforces nothing.
+        $observeMode = SecuritySetting::getBoolean('firewall_observe_mode', false);
         $defaultPolicy = strtolower(trim((string) SecuritySetting::get('firewall_default_policy', 'drop')));
         if (! in_array($defaultPolicy, ['drop', 'accept'], true)) {
             $defaultPolicy = 'drop';
@@ -73,7 +81,7 @@ class SecurityConfigGenerator
         $this->assertCompilableEntries($blacklistIps, $whitelistIps, $activeBans);
 
         // Split every entry into its address family. Loopback trust in both
-        // families is guaranteed by the STEP 1 interface rule
+        // families is guaranteed by the STAGE 1 interface rule
         // (`iif "lo" accept`), not by an injected whitelist element, so the
         // kernel sets mirror the database exactly.
         $blacklistV4 = $this->entriesForFamily($blacklistIps, 'ipv4');
@@ -178,8 +186,28 @@ class SecurityConfigGenerator
         $lines[] = '    }';
         $lines[] = '';
 
-        // 4. Chain Input
-        $chainPolicy = $firewallEnabled ? $defaultPolicy : 'accept';
+        // 7. Automated Public Threat Feed Set (IPv4 interval tree). Declared
+        //    empty here and populated exclusively by threat_feed.nft, so feed
+        //    churn can never change the canonical ruleset digest.
+        $lines[] = '    # 7. Automated Public Threat Feed Set (populated by threat_feed.nft)';
+        $lines[] = '    set threat_feed_ips {';
+        $lines[] = '        type ipv4_addr';
+        $lines[] = '        flags interval';
+        $lines[] = '    }';
+        $lines[] = '';
+
+        // 8. Automated Public Threat Feed Set (IPv6, mirrors set threat_feed_ips)
+        $lines[] = '    # 8. IPv6 Automated Public Threat Feed Set (mirrors set threat_feed_ips)';
+        $lines[] = '    set threat_feed_ips6 {';
+        $lines[] = '        type ipv6_addr';
+        $lines[] = '        flags interval';
+        $lines[] = '    }';
+        $lines[] = '';
+
+        // 4. Chain Input. Observe mode is non-blocking by construction: the
+        //    chain policy is forced to accept so packets that would have hit
+        //    the default drop rule simply fall through.
+        $chainPolicy = ($firewallEnabled && ! $observeMode) ? $defaultPolicy : 'accept';
         $lines[] = '    chain input {';
         $lines[] = "        type filter hook input priority -10; policy {$chainPolicy};";
         $lines[] = '';
@@ -191,36 +219,63 @@ class SecurityConfigGenerator
             $lines[] = '        accept';
             $lines[] = '    }';
         } else {
-            // STEP 1: Loopback interface (unconditional immunity for localhost IPC)
-            $lines[] = '        # STEP 1: BASE INVARIANT: UNCONDITIONAL LOOPBACK ACCESS';
-            $lines[] = '        iif "lo" accept';
-            $lines[] = '';
+            // The pre-filter pipeline (stages 1–7) is a single on/off unit:
+            // turning it off removes every built-in pre-filter rule while the
+            // rest of the chain keeps running, and the administrator may
+            // re-author any of these rules in the custom section (stage 11).
+            if ($prefilterEnabled) {
+                // STAGE 1: Loopback interface (unconditional immunity for localhost IPC)
+                $lines[] = '        # STAGE 1: BASE INVARIANT: UNCONDITIONAL LOOPBACK ACCESS';
+                $lines[] = '        iif "lo" accept';
+                $lines[] = '';
 
-            // STEP 2: Drop blacklisted networks & IPs immediately (both families)
-            $lines[] = '        # STEP 2: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY';
-            $lines[] = '        ip saddr @blacklist_ips drop';
-            $lines[] = '        ip6 saddr @blacklist_ips6 drop';
-            $lines[] = '';
+                // STAGE 2: Accept whitelisted / trusted IPs unconditionally. This
+                // safety net is deliberately evaluated before every drop rule and
+                // before the malformed-packet check, so a trusted source can never
+                // be locked out (invariant 1).
+                $lines[] = '        # STAGE 2: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
+                $lines[] = '        ip saddr @whitelist_ips accept';
+                $lines[] = '        ip6 saddr @whitelist_ips6 accept';
+                $lines[] = '';
 
-            // STEP 3: Drop temporarily banned brute-force attackers (both families)
-            $lines[] = '        # STEP 3: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS';
-            $lines[] = '        ip saddr @banned_ips drop';
-            $lines[] = '        ip6 saddr @banned_ips6 drop';
-            $lines[] = '';
+                // STAGE 3: Invalid packet defense, placed after the whitelist on
+                // purpose so a trusted source is admitted even when it delivers a
+                // malformed or out-of-state packet (invariant 2).
+                $lines[] = '        # STAGE 3: DROP INVALID PACKETS (after the whitelist on purpose)';
+                $lines[] = '        ct state invalid '.$this->dropStatement('invalid', $observeMode);
+                $lines[] = '';
 
-            // STEP 4: Base invariants: established connections & invalid packet defense
-            $lines[] = '        # STEP 4: STATEFUL CONNECTION TRACKING & PACKET DEFENSE';
-            $lines[] = '        ct state established,related accept';
-            $lines[] = '        ct state invalid drop';
-            $lines[] = '';
+                // STAGE 4: Stateful fast path — the bulk of ongoing SIP/RTP media
+                // passes instantly with zero blocklist lookups (invariant 3).
+                $lines[] = '        # STAGE 4: STATEFUL FAST PATH (ONGOING CONNECTIONS PASS INSTANTLY)';
+                $lines[] = '        ct state established,related accept';
+                $lines[] = '';
 
-            // STEP 5: Accept whitelisted / trusted IPs unconditionally (both families)
-            $lines[] = '        # STEP 5: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
-            $lines[] = '        ip saddr @whitelist_ips accept';
-            $lines[] = '        ip6 saddr @whitelist_ips6 accept';
-            $lines[] = '';
+                // STAGE 5: Drop blacklisted networks & IPs immediately (both
+                // families; only new flows reach this stage because of the fast
+                // path above).
+                $lines[] = '        # STAGE 5: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY';
+                $lines[] = '        ip saddr @blacklist_ips '.$this->dropStatement('blacklist', $observeMode);
+                $lines[] = '        ip6 saddr @blacklist_ips6 '.$this->dropStatement('blacklist', $observeMode);
+                $lines[] = '';
 
-            // STEP 6: ICMP Ping Diagnostics (Core System Service)
+                // STAGE 6: Drop temporarily banned brute-force attackers (both families)
+                $lines[] = '        # STAGE 6: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS';
+                $lines[] = '        ip saddr @banned_ips '.$this->dropStatement('bans', $observeMode);
+                $lines[] = '        ip6 saddr @banned_ips6 '.$this->dropStatement('bans', $observeMode);
+                $lines[] = '';
+
+                // STAGE 7: Drop automated public threat feed matches (both
+                // families). The counters feed the Security Center's "packets
+                // dropped by the feed" metric; the sets stay populated across
+                // firewall rebuilds (invariant 5).
+                $lines[] = '        # STAGE 7: DROP AUTOMATED PUBLIC THREAT FEED MATCHES';
+                $lines[] = '        ip saddr @threat_feed_ips '.$this->dropStatement('threat_feeds', $observeMode, true);
+                $lines[] = '        ip6 saddr @threat_feed_ips6 '.$this->dropStatement('threat_feeds', $observeMode, true);
+                $lines[] = '';
+            }
+
+            // STAGE 8: ICMP Ping Diagnostics (Core System Service)
             $icmpService = SecurityService::system()->where('protocol', 'icmp')->first();
             $icmpEnabled = $icmpService ? (bool) $icmpService->enabled : true;
             $icmpSource = trim((string) ($icmpService?->source_ip ?? 'any'));
@@ -254,11 +309,11 @@ class SecurityConfigGenerator
                     $limitClause = "limit rate {$rateLimit}/second{$burstClause} ";
                 }
 
-                $lines[] = '        # STEP 6: ICMP PING DIAGNOSTICS';
+                $lines[] = '        # STAGE 8: ICMP PING DIAGNOSTICS';
                 $lines[] = "        {$icmpPrefixV4}ip protocol icmp icmp type echo-request {$limitClause}accept";
                 $lines[] = "        {$icmpPrefixV6}ip6 nexthdr ipv6-icmp icmpv6 type echo-request {$limitClause}accept";
             } else {
-                $lines[] = '        # STEP 6: ICMP PING DISABLED (STEALTH MODE)';
+                $lines[] = '        # STAGE 8: ICMP PING DISABLED (STEALTH MODE)';
             }
             // Essential IPv6 connectivity invariant: path-MTU discovery
             // (packet-too-big), multicast listener maintenance (MLD), and
@@ -269,8 +324,8 @@ class SecurityConfigGenerator
             $lines[] = '        ip6 nexthdr ipv6-icmp icmpv6 type { packet-too-big, mld-listener-query, mld-listener-report, mld-listener-done, mld2-listener-report, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect } accept';
             $lines[] = '';
 
-            // Step 7: System PBX services from port catalog (excluding icmp which is handled above in step 6)
-            $lines[] = '        # STEP 7: CORE PBX TELEPHONY PORTS';
+            // STAGE 10: System PBX services from port catalog (excluding icmp, which is handled at STAGE 8)
+            $lines[] = '        # STAGE 10: CORE PBX TELEPHONY PORTS';
             $systemServices = SecurityService::system()->active()->where('protocol', '!=', 'icmp')->get();
             foreach ($systemServices as $service) {
                 $lines[] = "        # Service: {$service->name}";
@@ -287,8 +342,8 @@ class SecurityConfigGenerator
             }
             $lines[] = '';
 
-            // Step 8: Custom sequential rules
-            $lines[] = '        # STEP 8: CUSTOM SEQUENTIAL RULES';
+            // STAGE 11: Custom sequential rules
+            $lines[] = '        # STAGE 11: CUSTOM SEQUENTIAL RULES';
             $customRules = SecurityRule::ordered()->active()->with('service')->get();
             foreach ($customRules as $rule) {
                 $lines[] = "        # Rule {$rule->sequence}: {$rule->description}";
@@ -298,7 +353,9 @@ class SecurityConfigGenerator
                     $prefix = "ip saddr {$source} ";
                 }
 
-                $action = (strtolower($rule->action) === 'drop' || strtolower($rule->action) === 'block') ? 'drop' : 'accept';
+                $action = (strtolower($rule->action) === 'drop' || strtolower($rule->action) === 'block')
+                    ? $this->dropStatement('custom', $observeMode)
+                    : 'accept';
 
                 if ($rule->service !== null) {
                     $proto = $rule->service->protocol;
@@ -315,9 +372,10 @@ class SecurityConfigGenerator
             }
             $lines[] = '';
 
-            // Step 9: Default policy enforcement
-            $lines[] = '        # STEP 9: DEFAULT INBOUND POLICY';
-            $lines[] = "        {$defaultPolicy}";
+            // STAGE 12: Default policy enforcement. While observing, the
+            // effective policy is always accept — nothing is dropped.
+            $lines[] = '        # STAGE 12: DEFAULT INBOUND POLICY';
+            $lines[] = '        '.($observeMode ? 'accept' : $defaultPolicy);
             $lines[] = '    }';
         }
 
@@ -596,6 +654,28 @@ class SecurityConfigGenerator
         }
 
         return $port;
+    }
+
+    /**
+     * Build the action statement for a drop stage.
+     *
+     * In the enforcing build this is a plain `drop` (or `counter drop` when
+     * the stage needs a persistent packet counter). In global observe mode it
+     * becomes a counter plus a rate-limited log with NO verdict, so evaluation
+     * and counting still happen — exactly what *would* have been dropped — but
+     * the packet is never blocked.
+     *
+     * @param  string  $stage  Short stage label used in the observe log prefix
+     * @param  bool  $observeMode  Whether the global observe mode is on
+     * @param  bool  $withCounter  Whether the enforcing build also counts packets
+     */
+    private function dropStatement(string $stage, bool $observeMode, bool $withCounter = false): string
+    {
+        if ($observeMode) {
+            return 'counter log prefix "tallpbx-observe:'.$stage.' " limit rate 100/minute';
+        }
+
+        return $withCounter ? 'counter drop' : 'drop';
     }
 
     /**
