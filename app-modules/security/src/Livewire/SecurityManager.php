@@ -29,6 +29,7 @@ use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 use Modules\Security\Services\ThreatFeedIngestionService;
 use Modules\Security\Services\ThreatFeedManager;
+use Modules\Security\Support\SipScannerSignatures;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 #[Layout('layouts.app')]
@@ -257,6 +258,22 @@ class SecurityManager extends Component
     public bool $tftpDefenseEnabled = true;
 
     /**
+     * Whether scanner detections trigger an automatic kernel ban
+     * (per-feature enforcement; ships off for the record-only rollout).
+     */
+    public bool $sipScannerEnforcement = false;
+
+    /**
+     * Ban duration in seconds for scanner bans (0 = permanent).
+     */
+    public int $sipScannerBanSeconds = 86400;
+
+    /**
+     * Input for a new custom scanner signature.
+     */
+    public string $newScannerSignature = '';
+
+    /**
      * Whether the public threat feed blocks traffic in the kernel.
      */
     public bool $feedEnabled = false;
@@ -371,6 +388,10 @@ class SecurityManager extends Component
         $this->prefilterEnabled = SecuritySetting::getBoolean('prefilter_enabled', true);
         $this->firewallObserveMode = SecuritySetting::getBoolean('firewall_observe_mode', false);
         $this->tftpDefenseEnabled = SecuritySetting::getBoolean('tftp_defense_enabled', true);
+        // Scanner enforcement and duration resolve through the signature
+        // registry so the panel and the listener can never disagree.
+        $this->sipScannerEnforcement = SipScannerSignatures::enforcementEnabled();
+        $this->sipScannerBanSeconds = SipScannerSignatures::banSeconds();
         $this->attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true);
         $this->pendingChangesCount = (int) SecuritySetting::get('pending_changes_count', '0');
     }
@@ -813,6 +834,170 @@ class SecurityManager extends Component
         );
 
         $this->notifySuccess((string) __('admin.security_threat_feed_blocks_removed'));
+    }
+
+    /**
+     * Turn the automatic scanner-ban enforcement on or off.
+     *
+     * The toggle gates future bans only — detection and recording are always
+     * on, and no firewall rule changes, so no ruleset re-apply happens here.
+     */
+    public function setSipScannerEnforcement(bool $enabled): void
+    {
+        SecuritySetting::set(SipScannerSignatures::ENFORCEMENT_KEY, $enabled);
+        $this->sipScannerEnforcement = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'sip_scanner_enforcement_enabled' : 'sip_scanner_enforcement_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Automatic SIP scanner bans enabled: high-confidence matches now ban immediately'
+                : 'Automatic SIP scanner bans disabled: matches are recorded and listed without blocking',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        $this->notifySuccess((string) __('admin.security_scanner_saved'));
+    }
+
+    /**
+     * Persist the scanner ban duration from the selector.
+     *
+     * Only the documented choices are accepted (1 hour, 24 hours, 7 days,
+     * or permanent); anything else is refused with an alert and the stored
+     * value stays untouched.
+     */
+    public function setSipScannerBanSeconds(mixed $seconds): void
+    {
+        $candidate = (int) $seconds;
+
+        if (! in_array($candidate, [0, 3600, 86400, 604800], true)) {
+            $this->notifyError((string) __('admin.security_scanner_duration_invalid'));
+
+            return;
+        }
+
+        SecuritySetting::set(SipScannerSignatures::BAN_SECONDS_KEY, $candidate);
+        $this->sipScannerBanSeconds = $candidate;
+
+        SecurityAuditLog::record(
+            action: 'sip_scanner_ban_duration_updated',
+            ipAddress: $this->adminIp,
+            description: $candidate === 0
+                ? 'SIP scanner ban duration set to permanent'
+                : "SIP scanner ban duration set to {$candidate} seconds",
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        $this->notifySuccess((string) __('admin.security_scanner_saved'));
+    }
+
+    /**
+     * Add a custom scanner signature (high-confidence by definition).
+     */
+    public function addScannerSignature(): void
+    {
+        $validated = SipScannerSignatures::validateCustomEntry($this->newScannerSignature);
+
+        if ($validated === null) {
+            $this->addError('newScannerSignature', (string) __('admin.security_scanner_signature_invalid'));
+
+            return;
+        }
+
+        // Case-insensitive dedupe against both the custom list and the
+        // curated base, mirroring the registry's own sanitization.
+        $lower = mb_strtolower($validated);
+        $stored = array_map(static fn (string $entry): string => mb_strtolower($entry), SipScannerSignatures::custom());
+
+        if (in_array($lower, $stored, true) || in_array($lower, SipScannerSignatures::basePatternsLowercased(), true)) {
+            $this->addError('newScannerSignature', (string) __('admin.security_scanner_signature_duplicate'));
+
+            return;
+        }
+
+        SipScannerSignatures::saveCustom(array_merge(SipScannerSignatures::custom(), [$validated]));
+
+        SecurityAuditLog::record(
+            action: 'sip_scanner_signature_added',
+            ipAddress: $this->adminIp,
+            description: "Custom SIP scanner signature added: {$validated}",
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        $this->newScannerSignature = '';
+        $this->notifySuccess((string) __('admin.security_scanner_signature_added'));
+    }
+
+    /**
+     * Remove one stored custom scanner signature.
+     *
+     * Only entries that are actually stored can be removed; the curated
+     * base list is read-only and never touchable from the panel.
+     */
+    public function removeScannerSignature(string $signature): void
+    {
+        $custom = SipScannerSignatures::custom();
+        $lower = mb_strtolower(trim($signature));
+
+        $remaining = array_values(array_filter(
+            $custom,
+            static fn (string $entry): bool => mb_strtolower($entry) !== $lower,
+        ));
+
+        if (count($remaining) === count($custom)) {
+            $this->notifyError((string) __('admin.security_scanner_incident_missing'));
+
+            return;
+        }
+
+        SipScannerSignatures::saveCustom($remaining);
+
+        SecurityAuditLog::record(
+            action: 'sip_scanner_signature_removed',
+            ipAddress: $this->adminIp,
+            description: "Custom SIP scanner signature removed: {$signature}",
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        $this->notifySuccess((string) __('admin.security_scanner_signature_removed'));
+    }
+
+    /**
+     * Add a detected-but-unblocked address to the auto-ban list.
+     *
+     * Delegates to the ban service so the database row, the audit entry,
+     * the kernel set, and the conntrack flush stay consistent.
+     */
+    public function promoteScannerIncident(string $ip, SecurityBanServiceInterface $banService): void
+    {
+        $incident = SecurityBan::where('ip_address', $ip)
+            ->where('vector', 'sip_scanner')
+            ->where('is_active', false)
+            ->first();
+
+        if ($incident === null) {
+            $this->notifyError((string) __('admin.security_scanner_incident_missing'));
+
+            return;
+        }
+
+        $seconds = SipScannerSignatures::banSeconds();
+
+        try {
+            $banService->ban(
+                ip: $ip,
+                vector: 'sip_scanner',
+                reason: (string) $incident->reason,
+                durationSeconds: $seconds === 0 ? null : $seconds,
+            );
+        } catch (\InvalidArgumentException) {
+            // The address is trusted or no longer valid; nothing was blocked.
+            $this->notifyError((string) __('admin.security_scanner_incident_refused'));
+
+            return;
+        }
+
+        $this->notifySuccess((string) __('admin.security_scanner_incident_banned'));
     }
 
     /**
@@ -1868,6 +2053,15 @@ class SecurityManager extends Component
         // running (zero or missing settings fall back to the defaults).
         $tftpLimits = SecurityConfigGenerator::tftpLimits();
 
+        // Detected-but-unblocked scanner incidents: inactive incident rows
+        // whose address is not already covered by an active ban.
+        $scannerIncidents = SecurityBan::where('is_active', false)
+            ->where('vector', 'sip_scanner')
+            ->whereNotIn('ip_address', SecurityBan::active()->pluck('ip_address'))
+            ->orderByDesc('updated_at')
+            ->limit(20)
+            ->get();
+
         return view('security::security-manager', [
             'blacklistIps' => $blacklistIps,
             'whitelistIps' => $whitelistIps,
@@ -1885,6 +2079,13 @@ class SecurityManager extends Component
                 'rate_limit' => $tftpLimits['rate_limit'],
                 'burst' => $tftpLimits['burst'],
                 'counters' => $this->tftpDefenseCounters(),
+            ],
+            'sipScanner' => [
+                'enforcement' => $this->sipScannerEnforcement,
+                'ban_seconds' => $this->sipScannerBanSeconds,
+                'defaults' => SipScannerSignatures::defaults(),
+                'custom' => SipScannerSignatures::custom(),
+                'incidents' => $scannerIncidents,
             ],
         ]);
     }

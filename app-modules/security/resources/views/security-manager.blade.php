@@ -521,6 +521,9 @@
                                 <tr class="hover">
                                     <td class="font-mono font-medium text-error">
                                         {{ $ban->ip_address }}
+                                        {{-- The reason carries the signature that triggered the ban (e.g. sip_scanner · User-Agent: friendly-scanner),
+                                             so a false positive is diagnosable before it becomes a support call. --}}
+                                        <div class="text-xs font-sans font-normal text-base-content/60 max-w-xs truncate" title="{{ $ban->reason }}">{{ $ban->reason }}</div>
                                     </td>
                                     <td>
                                         @php
@@ -528,12 +531,14 @@
                                                 'sip_auth' => __('admin.vector_sip'),
                                                 'web_auth' => __('admin.vector_web'),
                                                 'ssh' => __('admin.vector_ssh'),
+                                                'sip_scanner' => __('admin.security_vector_sip_scanner'),
                                                 default => __('admin.vector_manual'),
                                             };
                                             $vectorBadge = match ($ban->vector) {
                                                 'sip_auth' => 'badge-primary',
                                                 'web_auth' => 'badge-info',
                                                 'ssh' => 'badge-secondary',
+                                                'sip_scanner' => 'badge-warning',
                                                 default => 'badge-neutral',
                                             };
                                         @endphp
@@ -578,6 +583,127 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        {{-- Card: SIP Bot & Scanner Signatures --}}
+        <div class="card bg-base-100 shadow-sm border border-base-200 mt-4">
+            <div class="card-body p-4 space-y-4">
+                <div class="border-b border-base-200 pb-3">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_scanner_title') }}</h2>
+                        <x-tooltip :tip="__('admin.security_scanner_desc')" align="start" position="right">
+                            <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                        </x-tooltip>
+                    </div>
+                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_scanner_desc') }}</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    {{-- Left: enforcement, duration, custom signatures --}}
+                    <div class="space-y-4">
+                        <div>
+                            <label class="label cursor-pointer justify-start gap-2 p-0">
+                                <input wire:click="setSipScannerEnforcement({{ $sipScanner['enforcement'] ? 'false' : 'true' }})"
+                                       type="checkbox" class="toggle toggle-error toggle-sm" @checked($sipScanner['enforcement']) />
+                                <span class="label-text font-medium">{{ __('admin.security_scanner_enforcement') }}</span>
+                            </label>
+                            <p class="text-xs text-base-content/60 mt-1">{{ __('admin.security_scanner_enforcement_help') }}</p>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label justify-start gap-2 pb-1">
+                                <span class="label-text font-medium">{{ __('admin.security_scanner_duration') }}</span>
+                            </label>
+                            <select wire:change="setSipScannerBanSeconds($event.target.value)" class="select select-bordered select-sm w-full max-w-xs">
+                                <option value="3600" @selected($sipScanner['ban_seconds'] === 3600)>{{ __('admin.security_scanner_duration_1h') }}</option>
+                                <option value="86400" @selected($sipScanner['ban_seconds'] === 86400)>{{ __('admin.security_scanner_duration_24h') }}</option>
+                                <option value="604800" @selected($sipScanner['ban_seconds'] === 604800)>{{ __('admin.security_scanner_duration_7d') }}</option>
+                                <option value="0" @selected($sipScanner['ban_seconds'] === 0)>{{ __('admin.security_scanner_duration_permanent') }}</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <span class="text-sm font-medium text-base-content block mb-1.5">{{ __('admin.security_scanner_custom') }}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap mb-2">
+                                @forelse ($sipScanner['custom'] as $signature)
+                                    <span class="badge badge-warning badge-sm gap-1 font-mono">
+                                        {{ $signature }}
+                                        <button type="button" wire:click="removeScannerSignature('{{ $signature }}')" class="cursor-pointer" title="{{ __('client.delete') }}">
+                                            <x-heroicon-s-x-mark class="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                @empty
+                                    <span class="text-xs text-base-content/60">{{ __('admin.security_scanner_custom_empty') }}</span>
+                                @endforelse
+                            </div>
+                            <div class="flex items-start gap-2">
+                                <input wire:model="newScannerSignature" type="text" placeholder="Zoiper"
+                                       class="input input-bordered input-sm font-mono w-full max-w-xs @error('newScannerSignature') input-error @enderror" />
+                                <button wire:click="addScannerSignature" type="button" class="btn btn-outline btn-sm">{{ __('admin.security_scanner_add') }}</button>
+                            </div>
+                            @error('newScannerSignature') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                            <p class="text-xs text-base-content/60 mt-1">{{ __('admin.security_scanner_custom_help') }}</p>
+                        </div>
+                    </div>
+
+                    {{-- Right: the read-only curated tiers --}}
+                    <div class="space-y-3">
+                        <div>
+                            <span class="badge badge-error badge-sm mb-1.5">{{ __('admin.security_scanner_autoban_group') }}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                @foreach ($sipScanner['defaults']['high'] as $entry)
+                                    <span class="badge badge-ghost badge-sm font-mono">{{ $entry['pattern'] }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge badge-warning badge-sm mb-1.5">{{ __('admin.security_scanner_record_group') }}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                @foreach ($sipScanner['defaults']['low'] as $entry)
+                                    <span class="badge badge-ghost badge-sm font-mono">{{ $entry['pattern'] }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                        <p class="text-xs text-base-content/60">{{ __('admin.security_scanner_incidents_help') }}</p>
+                    </div>
+                </div>
+
+                {{-- Detected but not blocked incidents with the one-click enforcement --}}
+                @if ($sipScanner['incidents']->isNotEmpty())
+                    <div class="border-t border-base-200 pt-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-sm font-medium">{{ __('admin.security_scanner_incidents') }}</span>
+                            <span class="badge badge-warning badge-sm font-mono">{{ $sipScanner['incidents']->count() }}</span>
+                        </div>
+                        <div class="overflow-x-auto max-h-60 overflow-y-auto border border-base-200 rounded-box">
+                            <table class="table table-sm table-pin-rows">
+                                <thead>
+                                    <tr>
+                                        <th>{{ __('admin.security_attacker_ip') }}</th>
+                                        <th>{{ __('admin.security_attack_type') }}</th>
+                                        <th>{{ __('admin.security_attempts') }}</th>
+                                        <th class="text-right">{{ __('admin.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($sipScanner['incidents'] as $incident)
+                                        <tr class="hover">
+                                            <td class="font-mono font-medium text-warning">{{ $incident->ip_address }}</td>
+                                            <td class="text-xs text-base-content/70 max-w-md truncate" title="{{ $incident->reason }}">{{ $incident->reason }}</td>
+                                            <td>{{ $incident->attempt_count }}</td>
+                                            <td class="text-right whitespace-nowrap">
+                                                <button wire:click="promoteScannerIncident('{{ $incident->ip_address }}')" type="button" class="btn btn-error btn-xs">
+                                                    {{ __('admin.security_scanner_add_to_ban') }}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     @endif

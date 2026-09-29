@@ -687,21 +687,32 @@ it('renders the security manager dashboard', function () {
 
     $this->loginAs($this->admin, 'admin');
 
-    // Use a tall viewport so the full security dashboard is visible at once
+    // Tab 1 — Block & Allow Lists (the default): the allow/block workbenches
+    // under the page-global status strip.
     $page = visit('/panel/security')->resize(1920, 2400);
     $page->assertSee('Security Center')
         ->assertSee('Firewall Status')
         ->assertSee('Attack Protection')
         ->assertSee('Blacklist')
         ->assertSee('Whitelist')
-        ->assertSee('Blocked Attackers')
         ->assertSee('198.51.100.23')
         ->assertSee('2001:db8:bad::/48')
         ->assertSee('192.0.2.10')
-        ->assertSee('2001:db8:cafe::/64')
+        ->assertSee('2001:db8:cafe::/64');
+
+    // Tab 2 — Attackers: the enforced bans with their vector and reason,
+    // plus the SIP scanner signatures card.
+    visit('/panel/security?tab=attackers')->resize(1920, 2400)
+        ->assertSee('Blocked Attackers')
         ->assertSee('203.0.113.66')
         ->assertSee('2001:db8:1234::88')
-        ->assertSee('Carrier SIP trunk')
+        ->assertSee('Repeated failed SIP registrations')
+        ->assertSee('SIP Bot & Scanner Signatures');
+
+    // Tab 3 — Firewall Rules: the full kernel pipeline, the port catalog,
+    // and the custom sequential rules.
+    $page = visit('/panel/security?tab=firewall-rules')->resize(1920, 2400);
+    $page->assertSee('Carrier SIP trunk')
         ->assertSee('Admin SSH from bastion')
         ->assertSee('Office PBX audio media')
         ->assertSee('Block RDP scanners')
