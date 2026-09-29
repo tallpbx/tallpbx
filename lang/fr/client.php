@@ -51,6 +51,7 @@ return [
     'cancel' => 'Annuler',
     'delete' => 'Supprimer',
     'edit' => 'Modifier',
+    'view' => 'Voir',
     'create' => 'Créer',
     'update' => 'Mettre à Jour',
     'close' => 'Fermer',
