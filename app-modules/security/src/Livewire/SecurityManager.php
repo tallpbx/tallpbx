@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
@@ -40,19 +41,15 @@ class SecurityManager extends Component
     use HasOperationalFeedback;
 
     /**
-     * Active tab for IP management deck ('whitelist' or 'blacklist').
+     * Active tab in the evaluation-ordered tab strip.
+     *
+     * The tabs mirror the kernel evaluation order: the allow/block lists,
+     * the attackers, the threat feeds, and the full firewall pipeline.
+     * Exposed as ?tab= so deep links like /panel/security?tab=threat-feeds
+     * open the matching panel.
      */
-    public string $ipListType = 'whitelist';
-
-    /**
-     * New IP or CIDR to add to the trusted/blocked list.
-     */
-    public string $newIp = '';
-
-    /**
-     * Optional label or note for the new IP entry.
-     */
-    public string $newIpDescription = '';
+    #[Url(as: 'tab')]
+    public string $activeTab = 'block-allow';
 
     /**
      * Search query for filtering IP entries.
@@ -434,6 +431,162 @@ class SecurityManager extends Component
     }
 
     /**
+     * Turn the whole firewall on or off.
+     *
+     * Turning it off makes the generated ruleset fully open (policy accept);
+     * turning it back on runs through the same lockout guard every apply
+     * uses, so the administrator can never enable a ruleset that would drop
+     * their own connection.
+     */
+    public function setFirewallEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
+    {
+        SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->firewallEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'firewall_enabled' : 'firewall_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Host firewall re-enabled from the Security Center'
+                : 'Host firewall disabled from the Security Center; the generated ruleset now accepts all inbound traffic',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_settings_saved'));
+        }
+    }
+
+    /**
+     * Build the ordered pre-filter row descriptors for the Firewall Rules tab.
+     *
+     * Rows follow the stored pre-filter order so the table mirrors what the
+     * kernel will actually evaluate; loopback is pinned first (invariant 1's
+     * floor) and each stage carries its own label, kernel badge, tooltip,
+     * source summary, action, and manage link. Stage keys without a
+     * descriptor yet (the threat feed row) are skipped until their feature
+     * ships its row.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function preFilterRows(): array
+    {
+        $whitelistCount = SecurityIpList::whitelist()->count();
+        $blacklistCount = SecurityIpList::blacklist()->count();
+        $bannedCount = SecurityBan::active()->count();
+
+        $descriptors = [
+            'loopback' => [
+                'label' => __('admin.security_rule_loopback'),
+                'badge' => 'iif "lo"',
+                'tooltip' => __('admin.security_loopback_tooltip'),
+                'invariant' => true,
+                'status_class' => 'bg-success',
+                'action' => 'allow',
+                'source_kind' => 'static',
+                'source_static' => '127.0.0.1/8, ::1',
+                'count' => null,
+                'count_choice' => null,
+                'count_class' => '',
+                'count_pulse' => false,
+                'manage' => null,
+                'pinned' => true,
+            ],
+            'whitelist' => [
+                'label' => __('admin.security_trusted_whitelist'),
+                'badge' => '@whitelist_ips',
+                'tooltip' => null,
+                'invariant' => false,
+                'status_class' => 'bg-success',
+                'action' => 'allow',
+                'source_kind' => 'count',
+                'source_static' => null,
+                'count' => $whitelistCount,
+                'count_choice' => 'admin.security_entries_count',
+                'count_class' => $whitelistCount > 0 ? 'text-success font-semibold' : 'text-base-content/60',
+                'count_pulse' => false,
+                'manage' => ['label' => __('admin.security_manage_whitelist'), 'tab' => 'block-allow', 'class' => 'text-success'],
+                'pinned' => false,
+            ],
+            'invalid' => [
+                'label' => __('admin.security_rule_invalid_packets'),
+                'badge' => 'ct state invalid',
+                'tooltip' => __('admin.security_invalid_tooltip'),
+                'invariant' => true,
+                'status_class' => 'bg-error',
+                'action' => 'drop',
+                'source_kind' => 'anywhere',
+                'source_static' => null,
+                'count' => null,
+                'count_choice' => null,
+                'count_class' => '',
+                'count_pulse' => false,
+                'manage' => null,
+                'pinned' => false,
+            ],
+            'fast_path' => [
+                'label' => __('admin.security_rule_conntrack'),
+                'badge' => 'ct state established,related',
+                'tooltip' => __('admin.security_conntrack_tooltip'),
+                'invariant' => true,
+                'status_class' => 'bg-success',
+                'action' => 'allow',
+                'source_kind' => 'anywhere',
+                'source_static' => null,
+                'count' => null,
+                'count_choice' => null,
+                'count_class' => '',
+                'count_pulse' => false,
+                'manage' => null,
+                'pinned' => false,
+            ],
+            'blacklist' => [
+                'label' => __('admin.security_permanent_blacklist'),
+                'badge' => '@blacklist_ips',
+                'tooltip' => null,
+                'invariant' => false,
+                'status_class' => 'bg-error',
+                'action' => 'drop',
+                'source_kind' => 'count',
+                'source_static' => null,
+                'count' => $blacklistCount,
+                'count_choice' => 'admin.security_entries_count',
+                'count_class' => $blacklistCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
+                'count_pulse' => false,
+                'manage' => ['label' => __('admin.security_manage_blacklist'), 'tab' => 'block-allow', 'class' => 'text-error'],
+                'pinned' => false,
+            ],
+            'banned' => [
+                'label' => __('admin.security_active_attackers'),
+                'badge' => '@banned_ips',
+                'tooltip' => null,
+                'invariant' => false,
+                'status_class' => 'bg-error',
+                'action' => 'drop',
+                'source_kind' => 'count',
+                'source_static' => null,
+                'count' => $bannedCount,
+                'count_choice' => 'admin.security_threats_count',
+                'count_class' => $bannedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
+                'count_pulse' => $bannedCount > 0,
+                'manage' => ['label' => __('admin.security_view_threats'), 'tab' => 'attackers', 'class' => 'text-error'],
+                'pinned' => false,
+            ],
+        ];
+
+        $rows = [];
+        foreach (app(SecurityConfigGenerator::class)->preFilterOrder() as $stageKey) {
+            if (! isset($descriptors[$stageKey])) {
+                continue;
+            }
+
+            $rows[] = ['key' => $stageKey] + $descriptors[$stageKey];
+        }
+
+        return $rows;
+    }
+
+    /**
      * Move a pre-filter stage one position earlier in the evaluation order.
      */
     public function movePreFilterUp(string $stage): void
@@ -576,16 +729,6 @@ class SecurityManager extends Component
     }
 
     /**
-     * Switch between Trusted (whitelist) and Blocked (blacklist) IP list tabs.
-     */
-    public function switchIpListType(string $type): void
-    {
-        if (in_array($type, ['whitelist', 'blacklist'], true)) {
-            $this->ipListType = $type;
-        }
-    }
-
-    /**
      * Add a new IP or CIDR subnet to the permanent blacklist.
      */
     public function addBlacklistIp(LockoutGuardService $lockoutGuard, SecurityBanServiceInterface $banService): void
@@ -668,45 +811,6 @@ class SecurityManager extends Component
 
         $this->newWhitelistIp = '';
         $this->newWhitelistDescription = '';
-        $this->checkAdminIpStatus($lockoutGuard);
-
-        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
-            $this->notifySuccess((string) __('admin.security_ip_added'));
-        }
-    }
-
-    /**
-     * Add a new IP or CIDR subnet to the active list.
-     */
-    public function addIp(LockoutGuardService $lockoutGuard): void
-    {
-        $this->validate([
-            'newIp' => [
-                'required',
-                // Both IPv4 and IPv6 entries (with optional CIDR) are validated
-                // by the shared rule, which also rejects malformed values.
-                new ValidFirewallAddress((string) __('admin.security_ip_format_invalid')),
-            ],
-            'newIpDescription' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $ip = trim($this->newIp);
-
-        // Check for duplicate entries
-        if (SecurityIpList::where('type', $this->ipListType)->where('ip_address', $ip)->exists()) {
-            $this->addError('newIp', 'This IP address is already present in this list.');
-
-            return;
-        }
-
-        SecurityIpList::create([
-            'type' => $this->ipListType,
-            'ip_address' => $ip,
-            'description' => $this->newIpDescription ? trim($this->newIpDescription) : null,
-        ]);
-
-        $this->newIp = '';
-        $this->newIpDescription = '';
         $this->checkAdminIpStatus($lockoutGuard);
 
         if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
@@ -1446,8 +1550,6 @@ class SecurityManager extends Component
             ->orderBy('id', 'desc')
             ->get();
 
-        $ipLists = $this->ipListType === 'blacklist' ? $blacklistIps : $whitelistIps;
-
         $activeBans = $banService->getActiveBans();
 
         $firewallRules = SecurityRule::with('service')
@@ -1464,7 +1566,6 @@ class SecurityManager extends Component
         $blacklistCount = SecurityIpList::blacklist()->count();
 
         return view('security::security-manager', [
-            'ipLists' => $ipLists,
             'blacklistIps' => $blacklistIps,
             'whitelistIps' => $whitelistIps,
             'activeBans' => $activeBans,
@@ -1473,6 +1574,7 @@ class SecurityManager extends Component
             'bannedCount' => $bannedCount,
             'whitelistCount' => $whitelistCount,
             'blacklistCount' => $blacklistCount,
+            'preFilterRows' => $this->preFilterRows(),
         ]);
     }
 }

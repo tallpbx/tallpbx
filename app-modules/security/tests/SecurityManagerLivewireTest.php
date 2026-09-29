@@ -51,10 +51,21 @@ beforeEach(function (): void {
     $executor->shouldReceive('flushConntrack')->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $executor);
 
-    $generator = Mockery::mock(SecurityConfigGenerator::class);
+    // Partial mock: only the file-writing steps are stubbed; the real order
+    // validator runs because the pre-filter row descriptors consult it.
+    $generator = Mockery::mock(SecurityConfigGenerator::class)->makePartial();
     $generator->shouldReceive('writePending')->andReturn(sys_get_temp_dir().'/tallpbx-test-firewall.nft.pending');
     $generator->shouldReceive('validateSyntax')->andReturn(true);
     $this->app->instance(SecurityConfigGenerator::class, $generator);
+
+    // Neutralize the sync verifier: with the real generator reachable it
+    // computes a desired digest and compares it against the host's deployed
+    // sidecar, which would spuriously surface the drift banner in UI tests.
+    $verifier = Mockery::mock(FirewallSyncVerifier::class);
+    $verifier->shouldReceive('verify')->andReturn(
+        FirewallSyncStatus::unknown(['No verified apply record found.'])
+    );
+    $this->app->instance(FirewallSyncVerifier::class, $verifier);
 });
 
 it('mounts and renders the full security command center with plain-English labels', function (): void {
@@ -65,9 +76,11 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Firewall Status')
         ->assertSee('Attack Protection')
         ->assertSee('Blocked Attackers')
+        // The default tab shows the allow/block workbenches...
         ->assertSee('Blacklist IPs')
         ->assertSee('Whitelist IPs')
-        ->assertSee('Firewall Rules')
+        // ...and the full pipeline table lives on the Firewall Rules tab.
+        ->set('activeTab', 'firewall-rules')
         ->assertSee('Standard Services')
         ->assertSee('Protocol')
         ->assertSee('Port')
@@ -84,32 +97,6 @@ it('detects the administrator IP and allows 1-click whitelisting', function (): 
         ->assertSet('isCurrentIpWhitelisted', true);
 
     expect(SecurityIpList::where('type', 'whitelist')->where('ip_address', '127.0.0.1')->exists())->toBeTrue();
-});
-
-it('switches between trusted and blocked IP lists and adds entries with validation', function (): void {
-    $component = Livewire::actingAs($this->admin, 'admin')
-        ->test(SecurityManager::class)
-        ->assertSet('ipListType', 'whitelist')
-        // Add trusted IP
-        ->set('newIp', '192.168.1.0/24')
-        ->set('newIpDescription', 'Headquarters Office')
-        ->call('addIp')
-        ->assertHasNoErrors()
-        ->assertSee('192.168.1.0/24')
-        ->assertSee('Headquarters Office');
-
-    expect(SecurityIpList::where('type', 'whitelist')->where('ip_address', '192.168.1.0/24')->exists())->toBeTrue();
-
-    // Switch to blacklist
-    $component->call('switchIpListType', 'blacklist')
-        ->assertSet('ipListType', 'blacklist')
-        ->set('newIp', '203.0.113.50')
-        ->set('newIpDescription', 'Known scanner')
-        ->call('addIp')
-        ->assertHasNoErrors()
-        ->assertSee('203.0.113.50');
-
-    expect(SecurityIpList::where('type', 'blacklist')->where('ip_address', '203.0.113.50')->exists())->toBeTrue();
 });
 
 it('deletes an IP from the list', function (): void {
@@ -140,6 +127,7 @@ it('displays active bans and supports unban, promoteToWhitelist, and promoteToBl
 
     $component = Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
+        ->set('activeTab', 'attackers')
         ->assertSee('198.51.100.99')
         ->assertSee('Phone (SIP)');
 
@@ -753,16 +741,18 @@ it('reactively updates status upon receiving refresh-security or echo push event
 });
 
 it('renders the unified firewall rules table with pipeline stages and core PBX services', function (): void {
-    Livewire::actingAs($this->admin, 'admin')
+    $component = Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
+        // The allow/block workbenches live on the default tab...
         ->assertSee('Blacklist IPs')
-        ->assertSee('@blacklist_ips')
-        ->assertSee('Blocked Attackers')
-        ->assertSee('@banned_ips')
         ->assertSee('Whitelist IPs')
+        ->assertSee('Blocked Attackers');
+
+    // ...and the full pipeline table lives on the Firewall Rules tab.
+    $component->set('activeTab', 'firewall-rules')
+        ->assertSee('@blacklist_ips')
+        ->assertSee('@banned_ips')
         ->assertSee('@whitelist_ips')
-        ->assertSee('Blacklist')
-        ->assertSee('Whitelist')
         ->assertSee('Custom Rules')
         ->assertSee('Standard Services')
         ->assertSee('Default Inbound Policy')

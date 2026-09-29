@@ -44,7 +44,9 @@ beforeEach(function (): void {
     $this->app->instance(SecurityExecutorInterface::class, $executor);
     $this->executor = $executor;
 
-    $generator = Mockery::mock(SecurityConfigGenerator::class);
+    // Partial mock: only the file-writing steps are stubbed; the real order
+    // validator runs because the pre-filter row descriptors consult it.
+    $generator = Mockery::mock(SecurityConfigGenerator::class)->makePartial();
     $generator->shouldReceive('writePending')->andReturn(sys_get_temp_dir().'/tallpbx-test-firewall.nft.pending');
     $generator->shouldReceive('validateSyntax')->andReturn(true);
     $this->app->instance(SecurityConfigGenerator::class, $generator);

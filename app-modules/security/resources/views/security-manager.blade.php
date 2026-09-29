@@ -60,6 +60,40 @@
         </div>
     @endif
 
+    {{-- Whole-Firewall-Off Banner (unmissable, shown on every tab while off) --}}
+    @if (! $firewallEnabled)
+        <div class="alert alert-error shadow-sm border border-error/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <x-heroicon-o-fire class="w-6 h-6 text-error flex-shrink-0" />
+                <div>
+                    <div class="font-semibold">{{ __('admin.security_firewall_off_banner_title') }}</div>
+                    <div class="text-xs opacity-90">{{ __('admin.security_firewall_off_banner_body') }}</div>
+                </div>
+            </div>
+            <button wire:click="setFirewallEnabled(true)" type="button" class="btn btn-error btn-sm whitespace-nowrap">
+                <x-heroicon-o-shield-check class="w-4 h-4" />
+                {{ __('admin.security_firewall_off_banner_action') }}
+            </button>
+        </div>
+    @endif
+
+    {{-- Observe-Mode Banner (evaluating and recording, nothing is blocked) --}}
+    @if ($firewallObserveMode)
+        <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <x-heroicon-o-eye class="w-6 h-6 text-warning flex-shrink-0" />
+                <div>
+                    <div class="font-semibold">{{ __('admin.security_observe_banner_title') }}</div>
+                    <div class="text-xs opacity-90">{{ __('admin.security_observe_banner_body') }}</div>
+                </div>
+            </div>
+            <button wire:click="setObserveMode(false)" type="button" class="btn btn-warning btn-sm whitespace-nowrap">
+                <x-heroicon-o-shield-check class="w-4 h-4" />
+                {{ __('admin.security_observe_banner_action') }}
+            </button>
+        </div>
+    @endif
+
     {{-- Zone 1: System Status Overview Cards --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {{-- Firewall Status --}}
@@ -169,199 +203,78 @@
         </div>
     </div>
 
-    {{-- Sequential Pipeline Stages 1 & 2: Blacklist, Attackers, and Whitelist --}}
+    {{-- Firewall Switches: page-global operational state, visible on every tab --}}
+    <div class="card bg-base-100 shadow-sm border border-base-200">
+        <div class="card-body p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+                {{-- Whole firewall --}}
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input wire:click="setFirewallEnabled({{ $firewallEnabled ? 'false' : 'true' }})"
+                           @if ($firewallEnabled) wire:confirm="{{ __('admin.security_firewall_off_confirm') }}" @endif
+                           type="checkbox" class="toggle toggle-primary toggle-sm" @checked($firewallEnabled) />
+                    <span class="text-sm font-medium">{{ __('admin.security_toggle_firewall') }}</span>
+                    <x-tooltip :tip="__('admin.security_toggle_firewall_help')" align="start" position="right">
+                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                    </x-tooltip>
+                </label>
+
+                {{-- Built-in pre-filter (stages 1–7) --}}
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input wire:click="setPrefilterEnabled({{ $prefilterEnabled ? 'false' : 'true' }})"
+                           type="checkbox" class="toggle toggle-primary toggle-sm" @checked($prefilterEnabled) />
+                    <span class="text-sm font-medium">{{ __('admin.security_toggle_prefilter') }}</span>
+                    <x-tooltip :tip="__('admin.security_toggle_prefilter_help')" align="start" position="right">
+                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                    </x-tooltip>
+                </label>
+
+                {{-- Global observe mode --}}
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input wire:click="setObserveMode({{ $firewallObserveMode ? 'false' : 'true' }})"
+                           type="checkbox" class="toggle toggle-warning toggle-sm" @checked($firewallObserveMode) />
+                    <span class="text-sm font-medium">{{ __('admin.security_toggle_observe') }}</span>
+                    <x-tooltip :tip="__('admin.security_toggle_observe_help')" align="start" position="right">
+                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                    </x-tooltip>
+                </label>
+            </div>
+
+            @if (! $prefilterEnabled)
+                <span class="text-xs font-medium text-warning">{{ __('admin.security_prefilter_off_badge') }}</span>
+            @endif
+        </div>
+    </div>
+
+    {{-- Evaluation-Ordered Tabs: left to right mirrors the kernel evaluation order --}}
+    <div class="overflow-x-auto">
+        <div role="tablist" class="tabs tabs-lift tabs-sm">
+            <button role="tab" type="button" wire:click="$set('activeTab', 'block-allow')"
+                    class="tab gap-1.5 {{ $activeTab === 'block-allow' ? 'tab-active' : '' }}">
+                <x-heroicon-o-no-symbol class="w-4 h-4" />
+                {{ __('admin.security_tab_block_allow') }}
+            </button>
+            <button role="tab" type="button" wire:click="$set('activeTab', 'attackers')"
+                    class="tab gap-1.5 {{ $activeTab === 'attackers' ? 'tab-active' : '' }}">
+                <x-heroicon-o-shield-exclamation class="w-4 h-4" />
+                {{ __('admin.security_tab_attackers') }}
+            </button>
+            <button role="tab" type="button" wire:click="$set('activeTab', 'threat-feeds')"
+                    class="tab gap-1.5 {{ $activeTab === 'threat-feeds' ? 'tab-active' : '' }}">
+                <x-heroicon-o-globe-alt class="w-4 h-4" />
+                {{ __('admin.security_tab_threat_feeds') }}
+            </button>
+            <button role="tab" type="button" wire:click="$set('activeTab', 'firewall-rules')"
+                    class="tab gap-1.5 {{ $activeTab === 'firewall-rules' ? 'tab-active' : '' }}">
+                <x-heroicon-o-fire class="w-4 h-4" />
+                {{ __('admin.security_tab_firewall_rules') }}
+            </button>
+        </div>
+    </div>
+
+    {{-- Tab Panel: Block & Allow Lists (allow list first, matching the kernel evaluation order) --}}
+    @if ($activeTab === 'block-allow')
     <div class="space-y-6">
-        {{-- Card 1: Blacklist (Stage 1 Permanent Kernel Drop) --}}
-        <div id="blacklist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
-            <div class="card-body p-4 space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_blacklist_ips') }}</h2>
-                            <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
-                            <x-tooltip :tip="__('admin.security_blacklist_desc')" align="start" position="right">
-                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                            </x-tooltip>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
-                <div class="flex flex-col lg:flex-row gap-6 items-start">
-                    {{-- Left Column: Quick-Add Form (Fixed Ergonomic Width) --}}
-                    <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
-                        <form wire:submit="addBlacklistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
-                            <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
-                                <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
-                                <span>{{ __('admin.security_add_to_blacklist') }}</span>
-                            </div>
-                            <div class="space-y-2">
-                                <div>
-                                    <input wire:model="newBlacklistIp" type="text"
-                                           placeholder="{{ __('admin.security_ip_or_cidr') }}"
-                                           class="input input-bordered input-sm w-full font-mono @error('newBlacklistIp') input-error @enderror" />
-                                    @error('newBlacklistIp')
-                                        <span class="text-error text-xs mt-0.5 block">{{ $message }}</span>
-                                    @enderror
-                                </div>
-                                <input wire:model="newBlacklistDescription" type="text"
-                                       placeholder="{{ __('admin.security_ip_description') }}"
-                                       class="input input-bordered input-sm w-full" />
-                                <button type="submit" class="btn btn-error btn-sm w-full gap-1 shadow-xs">
-                                    <x-heroicon-o-plus class="w-4 h-4" />
-                                    <span>{{ __('admin.security_add_to_blacklist') }}</span>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
-                    <div class="w-full lg:flex-1 space-y-3">
-                        <div class="relative">
-                            <input wire:model.live.debounce.250ms="blacklistSearch" type="text"
-                                   placeholder="{{ __('admin.security_search_blacklist') }}"
-                                   class="input input-bordered input-sm w-full pl-9" />
-                            <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
-                        </div>
-
-                        <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
-                            <table class="table table-pin-rows">
-                                <thead>
-                                    <tr>
-                                        <th>{{ __('admin.security_ip_or_cidr') }}</th>
-                                        <th>{{ __('admin.description') }}</th>
-                                        <th class="text-right">{{ __('admin.actions') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse ($blacklistIps as $item)
-                                        <tr class="hover">
-                                            <td class="font-mono font-medium text-error">
-                                                {{ $item->ip_address }}
-                                            </td>
-                                            <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
-                                            <td class="text-right">
-                                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->ip_address" wire:click="deleteIp({{ $item->id }})" class="text-error p-1" />
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="3" class="text-center py-6 text-base-content/60">
-                                                {{ __('admin.security_no_blacklist_found') }}
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- Card 2: Currently Blocked Attackers (Stage 1 Dynamic Drops) --}}
-        <div id="attackers-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
-            <div class="card-body p-4 space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
-                            <span class="badge badge-neutral badge-sm font-mono">{{ $activeBans->count() }}</span>
-                            <x-tooltip :tip="__('admin.security_threats_desc')" align="start" position="right">
-                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                            </x-tooltip>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 self-start sm:self-auto">
-                        <button wire:click="openSettingsDrawer" type="button" class="btn btn-outline btn-sm gap-1">
-                            <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
-                            <span>{{ __('admin.security_protection_settings') }}</span>
-                        </button>
-                        <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1">
-                            <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
-                            <span>{{ __('admin.security_block_manually') }}</span>
-                        </button>
-                    </div>
-                </div>
-
-                {{-- Threat Table --}}
-                <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
-                    <table class="table table-pin-rows">
-                        <thead>
-                            <tr>
-                                <th>{{ __('admin.security_attacker_ip') }}</th>
-                                <th>{{ __('admin.security_attack_type') }}</th>
-                                <th>{{ __('admin.security_attempts') }}</th>
-                                <th>{{ __('admin.security_expires') }}</th>
-                                <th class="text-right">{{ __('admin.actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($activeBans as $ban)
-                                <tr class="hover">
-                                    <td class="font-mono font-medium text-error">
-                                        {{ $ban->ip_address }}
-                                    </td>
-                                    <td>
-                                        @php
-                                            $vectorLabel = match ($ban->vector) {
-                                                'sip_auth' => __('admin.vector_sip'),
-                                                'web_auth' => __('admin.vector_web'),
-                                                'ssh' => __('admin.vector_ssh'),
-                                                default => __('admin.vector_manual'),
-                                            };
-                                            $vectorBadge = match ($ban->vector) {
-                                                'sip_auth' => 'badge-primary',
-                                                'web_auth' => 'badge-info',
-                                                'ssh' => 'badge-secondary',
-                                                default => 'badge-neutral',
-                                            };
-                                        @endphp
-                                        <span class="badge {{ $vectorBadge }} badge-sm">{{ $vectorLabel }}</span>
-                                    </td>
-                                    <td>{{ $ban->attempt_count }}</td>
-                                    <td class="text-base-content/70">
-                                        @if ($ban->expires_at)
-                                            {{ $ban->expires_at->diffForHumans() }}
-                                        @else
-                                            <span class="badge badge-ghost badge-sm">Permanent</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-right whitespace-nowrap">
-                                        <div class="join">
-                                            <button wire:click="unban('{{ $ban->ip_address }}')" type="button"
-                                                    class="btn btn-outline btn-xs join-item"
-                                                    title="{{ __('admin.security_unblock') }}">
-                                                {{ __('admin.security_unblock') }}
-                                            </button>
-                                            <button wire:click="promoteToWhitelist('{{ $ban->ip_address }}')" type="button"
-                                                    class="btn btn-success btn-xs join-item"
-                                                    title="{{ __('admin.security_trust_ip') }}">
-                                                {{ __('admin.security_trust_ip') }}
-                                            </button>
-                                            <button wire:click="promoteToBlacklist('{{ $ban->ip_address }}')" type="button"
-                                                    class="btn btn-error btn-xs join-item"
-                                                    title="{{ __('admin.security_block_permanently') }}">
-                                                {{ __('admin.security_block_permanently') }}
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="text-center py-6 text-base-content/60">
-                                        <x-heroicon-o-shield-check class="w-6 h-6 mx-auto text-success/60 mb-1.5" style="width: 1.5rem; height: 1.5rem;" />
-                                        <div class="text-sm font-medium">{{ __('admin.security_no_attackers') }}</div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        {{-- Card 3: Whitelist (Stage 2 Allowed Bypass) --}}
+        {{-- Card: Whitelist (trusted allow list) --}}
         <div id="whitelist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
             <div class="card-body p-4 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
@@ -472,9 +385,217 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    {{-- Zone 4: Sequential Firewall Rules (Lower Deck) --}}
+        {{-- Card: Blacklist (permanent kernel drop) --}}
+        <div id="blacklist-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
+            <div class="card-body p-4 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_blacklist_ips') }}</h2>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
+                            <x-tooltip :tip="__('admin.security_blacklist_desc')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
+                <div class="flex flex-col lg:flex-row gap-6 items-start">
+                    {{-- Left Column: Quick-Add Form (Fixed Ergonomic Width) --}}
+                    <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
+                        <form wire:submit="addBlacklistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
+                            <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
+                                <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
+                                <span>{{ __('admin.security_add_to_blacklist') }}</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div>
+                                    <input wire:model="newBlacklistIp" type="text"
+                                           placeholder="{{ __('admin.security_ip_or_cidr') }}"
+                                           class="input input-bordered input-sm w-full font-mono @error('newBlacklistIp') input-error @enderror" />
+                                    @error('newBlacklistIp')
+                                        <span class="text-error text-xs mt-0.5 block">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                <input wire:model="newBlacklistDescription" type="text"
+                                       placeholder="{{ __('admin.security_ip_description') }}"
+                                       class="input input-bordered input-sm w-full" />
+                                <button type="submit" class="btn btn-error btn-sm w-full gap-1 shadow-xs">
+                                    <x-heroicon-o-plus class="w-4 h-4" />
+                                    <span>{{ __('admin.security_add_to_blacklist') }}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
+                    <div class="w-full lg:flex-1 space-y-3">
+                        <div class="relative">
+                            <input wire:model.live.debounce.250ms="blacklistSearch" type="text"
+                                   placeholder="{{ __('admin.security_search_blacklist') }}"
+                                   class="input input-bordered input-sm w-full pl-9" />
+                            <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
+                        </div>
+
+                        <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                            <table class="table table-pin-rows">
+                                <thead>
+                                    <tr>
+                                        <th>{{ __('admin.security_ip_or_cidr') }}</th>
+                                        <th>{{ __('admin.description') }}</th>
+                                        <th class="text-right">{{ __('admin.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse ($blacklistIps as $item)
+                                        <tr class="hover">
+                                            <td class="font-mono font-medium text-error">
+                                                {{ $item->ip_address }}
+                                            </td>
+                                            <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
+                                            <td class="text-right">
+                                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->ip_address" wire:click="deleteIp({{ $item->id }})" class="text-error p-1" />
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="3" class="text-center py-6 text-base-content/60">
+                                                {{ __('admin.security_no_blacklist_found') }}
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </div>
+    @endif
+
+    {{-- Tab Panel: Attackers (dynamic bans and the signatures that feed them) --}}
+    @if ($activeTab === 'attackers')
+        {{-- Card: Currently Blocked Attackers (dynamic kernel drops) --}}
+        <div id="attackers-section" class="card bg-base-100 shadow-sm border border-base-200 scroll-mt-6">
+            <div class="card-body p-4 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $activeBans->count() }}</span>
+                            <x-tooltip :tip="__('admin.security_threats_desc')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 self-start sm:self-auto">
+                        <button wire:click="openSettingsDrawer" type="button" class="btn btn-outline btn-sm gap-1">
+                            <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
+                            <span>{{ __('admin.security_protection_settings') }}</span>
+                        </button>
+                        <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1">
+                            <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
+                            <span>{{ __('admin.security_block_manually') }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Threat Table --}}
+                <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                    <table class="table table-pin-rows">
+                        <thead>
+                            <tr>
+                                <th>{{ __('admin.security_attacker_ip') }}</th>
+                                <th>{{ __('admin.security_attack_type') }}</th>
+                                <th>{{ __('admin.security_attempts') }}</th>
+                                <th>{{ __('admin.security_expires') }}</th>
+                                <th class="text-right">{{ __('admin.actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($activeBans as $ban)
+                                <tr class="hover">
+                                    <td class="font-mono font-medium text-error">
+                                        {{ $ban->ip_address }}
+                                    </td>
+                                    <td>
+                                        @php
+                                            $vectorLabel = match ($ban->vector) {
+                                                'sip_auth' => __('admin.vector_sip'),
+                                                'web_auth' => __('admin.vector_web'),
+                                                'ssh' => __('admin.vector_ssh'),
+                                                default => __('admin.vector_manual'),
+                                            };
+                                            $vectorBadge = match ($ban->vector) {
+                                                'sip_auth' => 'badge-primary',
+                                                'web_auth' => 'badge-info',
+                                                'ssh' => 'badge-secondary',
+                                                default => 'badge-neutral',
+                                            };
+                                        @endphp
+                                        <span class="badge {{ $vectorBadge }} badge-sm">{{ $vectorLabel }}</span>
+                                    </td>
+                                    <td>{{ $ban->attempt_count }}</td>
+                                    <td class="text-base-content/70">
+                                        @if ($ban->expires_at)
+                                            {{ $ban->expires_at->diffForHumans() }}
+                                        @else
+                                            <span class="badge badge-ghost badge-sm">Permanent</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-right whitespace-nowrap">
+                                        <div class="join">
+                                            <button wire:click="unban('{{ $ban->ip_address }}')" type="button"
+                                                    class="btn btn-outline btn-xs join-item"
+                                                    title="{{ __('admin.security_unblock') }}">
+                                                {{ __('admin.security_unblock') }}
+                                            </button>
+                                            <button wire:click="promoteToWhitelist('{{ $ban->ip_address }}')" type="button"
+                                                    class="btn btn-success btn-xs join-item"
+                                                    title="{{ __('admin.security_trust_ip') }}">
+                                                {{ __('admin.security_trust_ip') }}
+                                            </button>
+                                            <button wire:click="promoteToBlacklist('{{ $ban->ip_address }}')" type="button"
+                                                    class="btn btn-error btn-xs join-item"
+                                                    title="{{ __('admin.security_block_permanently') }}">
+                                                {{ __('admin.security_block_permanently') }}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center py-6 text-base-content/60">
+                                        <x-heroicon-o-shield-check class="w-6 h-6 mx-auto text-success/60 mb-1.5" style="width: 1.5rem; height: 1.5rem;" />
+                                        <div class="text-sm font-medium">{{ __('admin.security_no_attackers') }}</div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Tab Panel: Threat Feeds (feed controls arrive with the threat-feed release step) --}}
+    @if ($activeTab === 'threat-feeds')
+        <div class="card bg-base-100 shadow-sm border border-base-200">
+            <div class="card-body p-6 text-center">
+                <x-heroicon-o-globe-alt class="w-8 h-8 mx-auto text-base-content/40 mb-2" />
+                <p class="text-sm text-base-content/70">{{ __('admin.security_threat_feeds_placeholder') }}</p>
+            </div>
+        </div>
+    @endif
+
+    {{-- Tab Panel: Firewall Rules (full pipeline summary, last) --}}
+    @if ($activeTab === 'firewall-rules')
+
+    {{-- Zone 4: Sequential Firewall Rules (full evaluation pipeline) --}}
     <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body p-4 space-y-4">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -520,212 +641,112 @@
                                     <div class="flex items-center gap-2">
                                         <span class="uppercase tracking-wider text-xs">{{ __('admin.security_system_invariants_prefilters') }}</span>
                                         <span class="badge badge-ghost badge-sm text-xs font-normal">
-                                            {{ __('admin.security_invariants_rules_count', ['count' => 6]) }}
+                                            {{ __('admin.security_invariants_rules_count', ['count' => count($preFilterRows)]) }}
                                         </span>
                                     </div>
-                                    <div class="flex items-center gap-1.5 text-xs font-medium text-primary">
-                                        <span x-text="showSystemPreFilters ? '{{ __('admin.security_hide_rules') }}' : '{{ __('admin.security_show_rules') }}'"></span>
-                                        <x-heroicon-s-chevron-down class="w-4 h-4 transition-transform duration-200" ::class="showSystemPreFilters ? 'rotate-180' : ''" />
+                                    <div class="flex items-center gap-3">
+                                        {{-- The reset escape hatch always restores a known-safe evaluation order. --}}
+                                        <button wire:click.stop="resetPreFilterOrder" type="button"
+                                                wire:confirm="{{ __('admin.security_prefilter_reset_confirm') }}"
+                                                @disabled(! $prefilterEnabled)
+                                                class="btn btn-ghost btn-xs gap-1 text-base-content/70 normal-case font-medium">
+                                            <x-heroicon-o-arrow-path class="w-3.5 h-3.5" />
+                                            <span>{{ __('admin.security_prefilter_reset') }}</span>
+                                        </button>
+                                        <div class="flex items-center gap-1.5 text-xs font-medium text-primary">
+                                            <span x-text="showSystemPreFilters ? '{{ __('admin.security_hide_rules') }}' : '{{ __('admin.security_show_rules') }}'"></span>
+                                            <x-heroicon-s-chevron-down class="w-4 h-4 transition-transform duration-200" ::class="showSystemPreFilters ? 'rotate-180' : ''" />
+                                        </div>
                                     </div>
                                 </div>
+                                @if (! $prefilterEnabled)
+                                    <div class="text-warning text-[11px] font-normal mt-1 normal-case tracking-normal">{{ __('admin.security_prefilter_disabled_note') }}</div>
+                                @endif
                             </td>
                         </tr>
 
-                        {{-- Base Invariant: Unconditional Loopback Interface --}}
-                        <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
-                            </td>
-                            <td>
-                                {{-- Fixed-width tracks (the name track fits the longest rule name in every supported language) keep the rule name, kernel badge and info icon in dedicated columns so all six pre-filter rows line up vertically. --}}
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_rule_loopback') }}</span>
-                                    <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">iif "lo"</span></span>
-                                    <x-tooltip :tip="__('admin.security_loopback_tooltip')" align="start" position="right">
-                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                                    </x-tooltip>
-                                </div>
-                            </td>
-                            <td class="text-sm font-mono text-base-content/70">
-                                ALL
-                            </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports') }}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm text-base-content/70">127.0.0.1/8, ::1</span>
-                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
-                            </td>
-                        </tr>
-
-                        {{-- Stage 1: Permanent Blacklist --}}
-                        <tr class="hover" x-show="showSystemPreFilters" x-cloak>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error" title="Active"></span>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_permanent_blacklist') }}</span>
-                                    <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@blacklist_ips</span></span>
-                                </div>
-                            </td>
-                            <td class="text-sm font-mono text-base-content/70">
-                                ALL
-                            </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports') }}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm {{ $blacklistCount > 0 ? 'text-error font-semibold' : 'text-base-content/60' }}">
-                                    {{ $blacklistCount }} {{ trans_choice('admin.security_entries_count', $blacklistCount) }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <a href="#blacklist-section" class="btn btn-ghost btn-xs text-error gap-1">
-                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
-                                    <span>{{ __('admin.security_manage_blacklist') }}</span>
-                                </a>
-                            </td>
-                        </tr>
-
-                        {{-- Stage 1: Active Intrusion Bans --}}
-                        <tr class="hover" x-show="showSystemPreFilters" x-cloak>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error {{ $bannedCount > 0 ? 'animate-pulse' : '' }}" title="Active"></span>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_active_attackers') }}</span>
-                                    <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@banned_ips</span></span>
-                                </div>
-                            </td>
-                            <td class="text-sm font-mono text-base-content/70">
-                                ALL
-                            </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports') }}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm {{ $bannedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60' }}">
-                                    {{ $bannedCount }} {{ trans_choice('admin.security_threats_count', $bannedCount) }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <a href="#attackers-section" class="btn btn-ghost btn-xs text-error gap-1">
-                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
-                                    <span>{{ __('admin.security_view_threats') }}</span>
-                                </a>
-                            </td>
-                        </tr>
-
-                        {{-- Base Invariant: Stateful Connection Tracking (Return Fastpath) --}}
-                        <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_rule_conntrack') }}</span>
-                                    <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">ct state established,related</span></span>
-                                    <x-tooltip :tip="__('admin.security_conntrack_tooltip')" align="start" position="right">
-                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                                    </x-tooltip>
-                                </div>
-                            </td>
-                            <td class="text-sm font-mono text-base-content/70">
-                                ALL
-                            </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports') }}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
-                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
-                            </td>
-                        </tr>
-
-                        {{-- Base Invariant: Invalid Packets Defense --}}
-                        <tr class="hover bg-base-200/5" x-show="showSystemPreFilters" x-cloak>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error" title="Active"></span>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_rule_invalid_packets') }}</span>
-                                    <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">ct state invalid</span></span>
-                                    <x-tooltip :tip="__('admin.security_invalid_tooltip')" align="start" position="right">
-                                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                                    </x-tooltip>
-                                </div>
-                            </td>
-                            <td class="text-sm font-mono text-base-content/70">
-                                ALL
-                            </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports') }}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
-                                <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
-                            </td>
-                        </tr>
-
-                        {{-- Stage 2: Trusted Whitelist --}}
-                        <tr class="hover" x-show="showSystemPreFilters" x-cloak>
-                            <td class="text-center">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-success" title="Active"></span>
-                            </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="w-[17.25rem] shrink-0">{{ __('admin.security_trusted_whitelist') }}</span>
-                                    <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">@whitelist_ips</span></span>
-                                </div>
-                            </td>
-                            <td class="text-sm font-mono text-base-content/70">
-                                ALL
-                            </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_ports') }}
-                            </td>
-                            <td>
-                                <span class="font-mono text-sm {{ $whitelistCount > 0 ? 'text-success font-semibold' : 'text-base-content/60' }}">
-                                    {{ $whitelistCount }} {{ trans_choice('admin.security_entries_count', $whitelistCount) }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
-                            </td>
-                            <td class="text-right whitespace-nowrap">
-                                <a href="#whitelist-section" class="btn btn-ghost btn-xs text-success gap-1">
-                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
-                                    <span>{{ __('admin.security_manage_whitelist') }}</span>
-                                </a>
-                            </td>
-                        </tr>
+                        {{-- Pre-Filter Rows (rendered in the stored evaluation order) --}}
+                        @foreach ($preFilterRows as $preFilterRow)
+                            <tr class="hover {{ $preFilterRow['invariant'] ? 'bg-base-200/5' : '' }}" x-show="showSystemPreFilters" x-cloak>
+                                <td class="text-center">
+                                    <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ $preFilterRow['status_class'] }} {{ $preFilterRow['count_pulse'] ? 'animate-pulse' : '' }}" title="Active"></span>
+                                </td>
+                                <td>
+                                    {{-- Fixed-width tracks keep the rule name, kernel badge and info icon aligned across every pre-filter row. --}}
+                                    <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                        <span class="w-[17.25rem] shrink-0">{{ $preFilterRow['label'] }}</span>
+                                        <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">{{ $preFilterRow['badge'] }}</span></span>
+                                        @if ($preFilterRow['tooltip'])
+                                            <x-tooltip :tip="$preFilterRow['tooltip']" align="start" position="right">
+                                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                            </x-tooltip>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="text-sm font-mono text-base-content/70">
+                                    ALL
+                                </td>
+                                <td class="text-sm text-base-content/60">
+                                    {{ __('admin.security_all_ports') }}
+                                </td>
+                                <td>
+                                    @if ($preFilterRow['source_kind'] === 'static')
+                                        <span class="font-mono text-sm text-base-content/70">{{ $preFilterRow['source_static'] }}</span>
+                                        <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                                    @elseif ($preFilterRow['source_kind'] === 'anywhere')
+                                        <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
+                                        <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                                    @else
+                                        <span class="font-mono text-sm {{ $preFilterRow['count_class'] }}">
+                                            {{ $preFilterRow['count'] }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($preFilterRow['action'] === 'allow')
+                                        <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                                    @else
+                                        <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-right whitespace-nowrap">
+                                    <div class="inline-flex items-center gap-1">
+                                        @if ($preFilterRow['pinned'])
+                                            {{-- Pinned first: localhost IPC can never be filtered. --}}
+                                            <x-tooltip :tip="__('admin.security_prefilter_locked_tooltip')" align="end" position="left">
+                                                <span class="inline-flex items-center text-base-content/40 px-1">
+                                                    <x-heroicon-o-lock-closed class="w-3.5 h-3.5" />
+                                                </span>
+                                            </x-tooltip>
+                                            <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                                        @else
+                                            <span class="flex flex-col">
+                                                <button wire:click="movePreFilterUp('{{ $preFilterRow['key'] }}')" type="button"
+                                                        @disabled(! $prefilterEnabled)
+                                                        class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content disabled:opacity-30">
+                                                    <x-heroicon-s-chevron-up class="w-3 h-3" />
+                                                </button>
+                                                <button wire:click="movePreFilterDown('{{ $preFilterRow['key'] }}')" type="button"
+                                                        @disabled(! $prefilterEnabled)
+                                                        class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content disabled:opacity-30">
+                                                    <x-heroicon-s-chevron-down class="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                            @if ($preFilterRow['invariant'])
+                                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                                            @endif
+                                            @if ($preFilterRow['manage'])
+                                                <button wire:click="$set('activeTab', '{{ $preFilterRow['manage']['tab'] }}')" type="button"
+                                                        class="btn btn-ghost btn-xs gap-1 {{ $preFilterRow['manage']['class'] }}">
+                                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
+                                                    <span>{{ $preFilterRow['manage']['label'] }}</span>
+                                                </button>
+                                            @endif
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
 
                         {{-- Standard Services Section Header --}}
                         <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
@@ -943,6 +964,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     {{-- Zone 5: Settings Slide-Over Drawer --}}
     <div x-data="{ open: @entangle('showSettingsDrawer') }"
