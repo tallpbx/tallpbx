@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Security\Providers;
 
 use App\Events\FreeSwitch\CustomEvent;
+use App\Events\FreeSwitch\SipScannerDetected;
 use App\Events\FreeSwitch\SofiaFailedAuth;
 use Illuminate\Auth\Events\Failed;
 use Modules\Security\Console\Commands\SecurityApplyCommand;
@@ -18,9 +19,11 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 use Modules\Security\Listeners\LogFailedLoginListener;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
+use Modules\Security\Listeners\LogSipScannerListener;
 use Modules\Security\Services\SecurityBanService;
 use Modules\Security\Services\SecurityExecutor;
 use Modules\Security\Services\SecurityIncidentService;
+use Modules\Security\Services\SipScannerDialplanContributor;
 use Modules\Security\Services\ThreatFeedIngestionService;
 use Modules\Security\Services\ThreatFeedManager;
 use Modules\Security\Services\VoipblFeedProvider;
@@ -100,6 +103,20 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     ];
 
     /**
+     * Register the module's services.
+     *
+     * Tags the SIP scanner detection service as a dialplan XML contributor
+     * so it renders into every public context ahead of the call-block and
+     * routing rules.
+     */
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->tag(SipScannerDialplanContributor::class, 'dialplan.xml');
+    }
+
+    /**
      * Register permissions for the security module.
      *
      * These permissions control access to viewing the security dashboard,
@@ -131,9 +148,16 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             ],
             CustomEvent::class => [
                 LogFailedSipAuthListener::class,
+                // FreeSWITCH ESL may deliver the scanner detection as the
+                // generic CustomEvent when the typed mapping is unavailable;
+                // the listener's subclass guard keeps both routes safe.
+                LogSipScannerListener::class,
             ],
             SofiaFailedAuth::class => [
                 LogFailedSipAuthListener::class,
+            ],
+            SipScannerDetected::class => [
+                LogSipScannerListener::class,
             ],
         ];
     }

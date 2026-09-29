@@ -179,10 +179,13 @@ it('caches repeated dialplan XML lookups when enabled', function () {
     Cache::store('array')->flush();
 
     $collector = Mockery::mock(DialplanXmlCollector::class);
-    $collector->shouldReceive('collect')
+    $collector->shouldReceive('collectWithMetadata')
         ->once()
         ->with(123, 'tenant_123_internal', '2000')
-        ->andReturn("      <extension name=\"cached_test\"/>\n");
+        ->andReturn([
+            'xml' => "      <extension name=\"cached_test\"/>\n",
+            'has_routing_contribution' => true,
+        ]);
 
     app()->instance(DialplanXmlCollector::class, $collector);
 

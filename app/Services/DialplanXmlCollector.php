@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\ContextWideDialplanXmlContributor;
+use App\Contracts\DialplanGuardXmlContributor;
 use App\Contracts\DialplanXmlContributor;
 use App\Support\RoutingCacheVersion;
 use Illuminate\Support\Facades\Cache;
@@ -54,6 +55,22 @@ class DialplanXmlCollector
      */
     public function collect(int $tenantId, string $context, string $destination): string
     {
+        return $this->collectWithMetadata($tenantId, $context, $destination)['xml'];
+    }
+
+    /**
+     * Collect dialplan XML plus metadata about what produced it.
+     *
+     * `has_routing_contribution` is true only when at least one contributor
+     * that is NOT a guard (see DialplanGuardXmlContributor) produced XML.
+     * The builder uses it for the fail-closed no-route default: security
+     * guards appearing in a context must never make an unrouted call look
+     * like it was routed.
+     *
+     * @return array{xml: string, has_routing_contribution: bool}
+     */
+    public function collectWithMetadata(int $tenantId, string $context, string $destination): array
+    {
         /** @var DialplanXmlContributor[] $contributors */
         $contributors = iterator_to_array(app()->tagged('dialplan.xml'));
 
@@ -64,6 +81,7 @@ class DialplanXmlCollector
         });
 
         $xml = '';
+        $hasRoutingContribution = false;
 
         foreach ($contributors as $contributor) {
             if (! $this->moduleState->isEnabledForClass($contributor)) {
@@ -75,6 +93,10 @@ class DialplanXmlCollector
 
                 if ($fragment !== null && $fragment !== '') {
                     $xml .= $fragment;
+
+                    if (! $contributor instanceof DialplanGuardXmlContributor) {
+                        $hasRoutingContribution = true;
+                    }
                 }
             } catch (\Throwable $e) {
                 // A single contributor must not break the entire dialplan.
@@ -88,7 +110,10 @@ class DialplanXmlCollector
             }
         }
 
-        return $xml;
+        return [
+            'xml' => $xml,
+            'has_routing_contribution' => $hasRoutingContribution,
+        ];
     }
 
     /**

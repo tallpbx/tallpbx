@@ -163,10 +163,13 @@ it('immediately invalidates cached dialplan XML when an extension is updated', f
     $context = app(DialplanContext::class)->public((string) $tenant->id);
 
     $collector = Mockery::mock(DialplanXmlCollector::class);
-    $collector->shouldReceive('collect')
+    $collector->shouldReceive('collectWithMetadata')
         ->twice()
         ->with((int) $tenant->id, $context, '2000')
-        ->andReturn('<extension name="v1"/>', '<extension name="v2"/>');
+        ->andReturn(
+            ['xml' => '<extension name="v1"/>', 'has_routing_contribution' => true],
+            ['xml' => '<extension name="v2"/>', 'has_routing_contribution' => true],
+        );
     app()->instance(DialplanXmlCollector::class, $collector);
 
     // Initial query hits the collector and caches the result

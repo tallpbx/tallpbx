@@ -27,6 +27,7 @@ use App\Events\FreeSwitch\PresenceIn;
 use App\Events\FreeSwitch\RecordStart;
 use App\Events\FreeSwitch\RecordStop;
 use App\Events\FreeSwitch\SessionHeartbeat;
+use App\Events\FreeSwitch\SipScannerDetected;
 use App\Events\FreeSwitch\SofiaExpire;
 use App\Events\FreeSwitch\SofiaFailedAuth;
 use App\Events\FreeSwitch\SofiaRegister;
@@ -196,6 +197,10 @@ class FreeSwitchListenCommand extends Command
 
         if ($eventName === 'CUSTOM' && ($rawEvent['headers']['Event-Subclass'] ?? null) === 'sofia::failed_auth') {
             $eventClass = SofiaFailedAuth::class;
+        }
+
+        if ($eventName === 'CUSTOM' && ($rawEvent['headers']['Event-Subclass'] ?? null) === 'tallpbx::sip_scanner_detected') {
+            $eventClass = SipScannerDetected::class;
         }
 
         $laravelEvent = new $eventClass(

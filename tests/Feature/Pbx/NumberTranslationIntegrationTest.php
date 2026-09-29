@@ -66,7 +66,7 @@ it('rewrites an inbound DID before routing decisions', function (): void {
     // so the translation's observable effect is the destination handed to
     // the collector.
     $collector = Mockery::mock(DialplanXmlCollector::class);
-    $collector->shouldReceive('collect')->once()->with((int) $tenant->id, $context, '15551230000')->andReturn('');
+    $collector->shouldReceive('collectWithMetadata')->once()->with((int) $tenant->id, $context, '15551230000')->andReturn(['xml' => '', 'has_routing_contribution' => false]);
     app()->instance(DialplanXmlCollector::class, $collector);
 
     numberTranslationDialplan($context, '8005551212')->assertOk();
@@ -88,7 +88,7 @@ it('leaves outbound rules inert on the public context', function (): void {
     // Outbound rules never apply to public-context requests: the collector
     // receives the original destination unchanged.
     $collector = Mockery::mock(DialplanXmlCollector::class);
-    $collector->shouldReceive('collect')->once()->with((int) $tenant->id, $context, '8005551212')->andReturn('');
+    $collector->shouldReceive('collectWithMetadata')->once()->with((int) $tenant->id, $context, '8005551212')->andReturn(['xml' => '', 'has_routing_contribution' => false]);
     app()->instance(DialplanXmlCollector::class, $collector);
 
     numberTranslationDialplan($context, '8005551212')->assertOk();
@@ -109,7 +109,7 @@ it('keeps the request healthy when a rule has an invalid regex', function (): vo
 
     // The broken rule is skipped: the destination passes through unchanged.
     $collector = Mockery::mock(DialplanXmlCollector::class);
-    $collector->shouldReceive('collect')->once()->with((int) $tenant->id, $context, '8005551212')->andReturn('');
+    $collector->shouldReceive('collectWithMetadata')->once()->with((int) $tenant->id, $context, '8005551212')->andReturn(['xml' => '', 'has_routing_contribution' => false]);
     app()->instance(DialplanXmlCollector::class, $collector);
 
     numberTranslationDialplan($context, '8005551212')->assertOk();
@@ -122,7 +122,7 @@ it('picks up translation changes immediately through the dialplan cache', functi
     $context = app(DialplanContext::class)->public((string) $tenant->id);
 
     $collector = Mockery::mock(DialplanXmlCollector::class);
-    $collector->shouldReceive('collect')->once()->with((int) $tenant->id, $context, '8005551212')->andReturn('');
+    $collector->shouldReceive('collectWithMetadata')->once()->with((int) $tenant->id, $context, '8005551212')->andReturn(['xml' => '', 'has_routing_contribution' => false]);
     app()->instance(DialplanXmlCollector::class, $collector);
 
     // Cache the untranslated routing for the DID.
@@ -141,7 +141,7 @@ it('picks up translation changes immediately through the dialplan cache', functi
         'enabled' => true,
     ]);
 
-    $collector->shouldReceive('collect')->once()->with((int) $tenant->id, $context, '15551230000')->andReturn('');
+    $collector->shouldReceive('collectWithMetadata')->once()->with((int) $tenant->id, $context, '15551230000')->andReturn(['xml' => '', 'has_routing_contribution' => false]);
     numberTranslationDialplan($context, '8005551212')->assertOk();
 });
 

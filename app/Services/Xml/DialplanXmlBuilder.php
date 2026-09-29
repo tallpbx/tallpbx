@@ -102,9 +102,14 @@ class DialplanXmlBuilder
             // dialplan rules so that specific feature extensions (ring groups,
             // voicemail, conferences, etc.) take priority over generic catch-all
             // rules like local_extension which matches any 3-5 digit number.
-            $contributorXml = $this->dialplanXmlCollector->collect(
+            //
+            // The metadata distinguishes routing contributions from guard
+            // contributions (security filters): only a routing contribution
+            // may suppress the fail-closed no-route default below.
+            $collected = $this->dialplanXmlCollector->collectWithMetadata(
                 (int) $tenantId, $context, $destination,
             );
+            $contributorXml = $collected['xml'];
 
             if ($contributorXml !== '') {
                 $xml .= '      <!-- Feature module dialplan contributions -->'."\n";
@@ -119,10 +124,12 @@ class DialplanXmlBuilder
 
             $xml .= $standardDialplanXml['xml'];
 
-            // Default no-route only when both standard dialplans and
-            // contributor XML are empty — never skip contributors just
-            // because no base dialplan row exists.
-            if (! $standardDialplanXml['has_dialplans'] && $contributorXml === '') {
+            // Default no-route only when neither standard dialplans nor any
+            // ROUTING contributor produced rules — never skip contributors
+            // just because no base dialplan row exists, and never let a
+            // guard contribution (e.g. SIP scanner detection) make an
+            // unrouted call look routed.
+            if (! $standardDialplanXml['has_dialplans'] && ! $collected['has_routing_contribution']) {
                 $xml .= '      <extension name="default_not_found">'."\n";
                 $xml .= '        <condition field="destination_number" expression="^(.*)$">'."\n";
                 $xml .= '          <action application="hangup" data="NO_ROUTE_DESTINATION"/>'."\n";
