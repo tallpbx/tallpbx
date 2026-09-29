@@ -99,3 +99,11 @@ it('validates that visiting extension and desk extension must be different', fun
         ->call('save')
         ->assertHasErrors(['extensionId' => 'different']);
 });
+
+it('translates the unknown fallback used for sessions without an extension', function (): void {
+    // The list falls back to admin.unknown when an extension relation is
+    // missing; the key must translate instead of leaking the raw key.
+    App::setLocale('en');
+
+    expect(__('admin.unknown'))->not->toBe('admin.unknown');
+});

@@ -10,6 +10,7 @@ return [
     'email' => 'Adresse Email',
     'password' => 'Mot de Passe',
     'password_visibility' => 'Afficher ou masquer le mot de passe',
+    'unknown' => 'Inconnu',
     'remember_me' => 'Se souvenir de moi',
     'authenticating' => 'Authentification...',
     'logout' => 'Déconnexion',
