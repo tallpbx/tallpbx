@@ -255,3 +255,46 @@ it('fails when average latency exceeds its configured threshold', function () {
 
     expect($failures)->toContain('Average latency 125 ms exceeded allowed 100 ms.');
 });
+
+it('writes the report to an absolute path without doubling the base path', function () {
+    $this->artisan('pbx:load-test:seed', [
+        '--tenant' => 'load-test-dialplan',
+        '--domain' => 'dialplan-load.test',
+        '--extensions' => '4',
+        '--start' => '4100',
+        '--output' => PBX_DIALPLAN_LOAD_TEST_COMMAND_CSV_PATH,
+    ])->assertSuccessful();
+
+    Http::fake(function (Request $request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+        $context = $query['Caller-Context'] ?? 'missing';
+
+        return Http::response(
+            '<document type="freeswitch/xml"><section name="dialplan"><context name="'.$context.'"></context></section></document>',
+            200,
+            ['Content-Type' => 'application/xml'],
+        );
+    });
+
+    $absoluteReport = storage_path('framework/testing/load-tests/absolute-report.json');
+    // The buggy behaviour concatenated base_path() onto the absolute path.
+    $doubledReport = base_path($absoluteReport);
+
+    File::delete($absoluteReport);
+    File::delete($doubledReport);
+
+    $this->artisan('pbx:load-test:dialplan', [
+        '--tenant' => 'load-test-dialplan',
+        '--url' => 'https://pbx.test/api/v1/xml-handler',
+        '--requests' => '3',
+        '--concurrency' => '1',
+        '--scenario' => 'mixed',
+        '--report' => $absoluteReport,
+    ])->assertSuccessful();
+
+    expect(File::exists($absoluteReport))->toBeTrue()
+        ->and(File::exists($doubledReport))->toBeFalse();
+
+    File::delete($absoluteReport);
+    File::delete($doubledReport);
+});

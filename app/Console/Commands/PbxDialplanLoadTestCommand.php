@@ -123,7 +123,7 @@ class PbxDialplanLoadTestCommand extends Command
                 ['Fastest ms', (string) $report['latency_ms']['min']],
                 ['Slowest ms', (string) $report['latency_ms']['max']],
                 ['Passed thresholds', $report['passed'] ? 'yes' : 'no'],
-                ['Report', base_path($reportPath)],
+                ['Report', $this->resolveReportPath($reportPath)],
             ],
         );
 
@@ -535,7 +535,7 @@ class PbxDialplanLoadTestCommand extends Command
      */
     private function writeReport(string $path, array $report): void
     {
-        $absolutePath = base_path($path);
+        $absolutePath = $this->resolveReportPath($path);
         $directory = dirname($absolutePath);
 
         if (! is_dir($directory)) {
@@ -543,6 +543,17 @@ class PbxDialplanLoadTestCommand extends Command
         }
 
         file_put_contents($absolutePath, json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL);
+    }
+
+    /**
+     * Resolve the report path against the application root.
+     *
+     * Absolute paths (for example /var/backups/report.json) are used as-is;
+     * relative paths are resolved from the application root.
+     */
+    private function resolveReportPath(string $path): string
+    {
+        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : base_path($path);
     }
 
     /**
