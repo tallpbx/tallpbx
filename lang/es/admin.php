@@ -1236,6 +1236,8 @@ return [
     'security_manual_ban_success' => 'Dirección IP bloqueada con éxito.',
     'security_cannot_ban_whitelisted' => 'La dirección IP :ip está en la lista blanca y no se puede bloquear. Elimínela de la sección Lista Blanca si realmente debe bloquearse.',
     'security_cannot_blacklist_whitelisted' => 'La dirección IP :ip está en la lista blanca y no se puede añadir a la lista negra. Elimínela de la sección Lista Blanca si realmente debe bloquearse.',
+    'security_prefilter_lockout_refused' => 'Desactivar el pre-filtro bloquearía su conexión actual: la dirección :ip sería descartada por la política de entrada predeterminada al eliminar las reglas del pre-filtro integrado. Añada primero su dirección a la Lista de Confianza y después desactive el pre-filtro.',
+    'security_observe_restore_lockout_refused' => 'Desactivar el modo de observación restablecería la aplicación de reglas y su conexión actual desde :ip no está cubierta por la Lista de Confianza ni por una regla ALLOW explícita. Añada primero su dirección a la Lista de Confianza y después salga del modo de observación.',
     'security_ip_format_invalid' => 'Introduzca una dirección IPv4 o IPv6 válida, por ejemplo 203.0.113.50 o 2001:db8::1, o un rango CIDR como 10.0.0.0/24 o 2001:db8::/64.',
     'security_ban_ip_format_invalid' => 'Introduzca una dirección IPv4 o IPv6 válida para el bloqueo, por ejemplo 203.0.113.50 o 2001:db8::1.',
     'vector_sip' => 'Teléfono (SIP)',

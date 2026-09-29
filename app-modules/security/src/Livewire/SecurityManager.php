@@ -234,6 +234,23 @@ class SecurityManager extends Component
 
     public bool $firewallEnabled = true;
 
+    /**
+     * Whether the built-in pre-filter pipeline (stages 1–7) is running.
+     *
+     * When off, every pre-filter stage is skipped while the rest of the
+     * firewall chain keeps running; the administrator may re-author any of
+     * the removed rules in the custom rules section.
+     */
+    public bool $prefilterEnabled = true;
+
+    /**
+     * Whether the global observe mode is running.
+     *
+     * While observing, every drop rule evaluates, counts, and logs but
+     * nothing is blocked, and the default policy is forced to accept.
+     */
+    public bool $firewallObserveMode = false;
+
     public bool $attackProtectionEnabled = true;
 
     /**
@@ -325,6 +342,8 @@ class SecurityManager extends Component
         $this->protectSsh = SecuritySetting::getBoolean('protect_ssh', true);
         $this->firewallDefaultPolicy = SecuritySetting::get('firewall_default_policy', 'drop') ?? 'drop';
         $this->firewallEnabled = SecuritySetting::getBoolean('firewall_enabled', true);
+        $this->prefilterEnabled = SecuritySetting::getBoolean('prefilter_enabled', true);
+        $this->firewallObserveMode = SecuritySetting::getBoolean('firewall_observe_mode', false);
         $this->attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true);
         $this->pendingChangesCount = (int) SecuritySetting::get('pending_changes_count', '0');
     }
@@ -340,6 +359,77 @@ class SecurityManager extends Component
         // Report success only when the kernel actually accepted the ruleset.
         if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
             $this->notifySuccess((string) __('admin.security_ip_protected_success'));
+        }
+    }
+
+    /**
+     * Turn the built-in pre-filter pipeline (stages 1–6 plus the feed drops)
+     * on or off.
+     *
+     * Turning it off is the one switch that removes the whitelist accept rule
+     * itself, so the administrator's own connection is verified first: if
+     * their address would be dropped by the remaining ruleset, the change is
+     * refused outright — with an alert explaining exactly why — and nothing
+     * is persisted or applied. The fix is to add the address to the Trusted
+     * List and try again.
+     */
+    public function setPrefilterEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
+    {
+        // Enabling is purely protective: it can never lock anyone out.
+        if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy)) {
+            $this->notifyError((string) __('admin.security_prefilter_lockout_refused', ['ip' => $this->adminIp]));
+
+            return;
+        }
+
+        SecuritySetting::updateOrCreate(['key' => 'prefilter_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->prefilterEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'prefilter_enabled' : 'prefilter_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Built-in pre-filter pipeline re-enabled from the Security Center'
+                : 'Built-in pre-filter pipeline disabled from the Security Center; stages 1–7 are removed from the pending ruleset',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_settings_saved'));
+        }
+    }
+
+    /**
+     * Turn the global observe mode on or off.
+     *
+     * Observe mode itself is permissive, so turning it on needs no guard.
+     * Turning it OFF restores enforcement — the dangerous direction — so the
+     * administrator's address is verified against the restored policy first
+     * and the change is refused with an explanatory alert when it would
+     * sever their own connection.
+     */
+    public function setObserveMode(bool $enabled, LockoutGuardService $lockoutGuard): void
+    {
+        if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy)) {
+            $this->notifyError((string) __('admin.security_observe_restore_lockout_refused', ['ip' => $this->adminIp]));
+
+            return;
+        }
+
+        SecuritySetting::updateOrCreate(['key' => 'firewall_observe_mode'], ['value' => $enabled ? '1' : '0']);
+        $this->firewallObserveMode = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'observe_mode_enabled' : 'observe_mode_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Global observe mode enabled: the firewall now evaluates and logs every match without blocking'
+                : 'Global observe mode disabled: enforcement restored',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_settings_saved'));
         }
     }
 
@@ -420,6 +510,10 @@ class SecurityManager extends Component
         $this->checkAdminIpStatus($lockoutGuard);
 
         if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            // The block only filters new flows (blocklists sit behind the
+            // stateful fast path), so sever the address's live sessions now
+            // that its block is live in the kernel (invariant 4).
+            $banService->flushConntrack($ip);
             $this->notifySuccess((string) __('admin.security_ip_added'));
         }
     }
@@ -497,10 +591,6 @@ class SecurityManager extends Component
         $this->checkAdminIpStatus($lockoutGuard);
 
         if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
-            // The block only filters new flows (blocklists sit behind the
-            // stateful fast path), so sever the address's live sessions now
-            // that its block is live in the kernel (invariant 4).
-            $banService->flushConntrack($ip);
             $this->notifySuccess((string) __('admin.security_ip_added'));
         }
     }
