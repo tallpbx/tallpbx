@@ -41,9 +41,19 @@ afterEach(function () {
 it('blocks a tenant user from deleting another tenant\'s extension', function () {
     $foreignExtension = Extension::factory()->create(['tenant_id' => $this->tenantB->id]);
 
+    // Opening the confirmation must already refuse the foreign record so
+    // its details can never be shown in the modal.
     Livewire::actingAs($this->user, 'web')
         ->test(ExtensionsList::class)
         ->call('confirmExtensionDeletion', $foreignExtension->id)
+        ->assertForbidden();
+
+    // Replaying the deletion with the pending id set is refused as well.
+    // Livewire cannot chain a second call after an aborted response, so the
+    // delete step runs in its own component instance.
+    Livewire::actingAs($this->user, 'web')
+        ->test(ExtensionsList::class)
+        ->set('pendingDeletionId', $foreignExtension->id)
         ->call('deleteExtension')
         ->assertForbidden();
 

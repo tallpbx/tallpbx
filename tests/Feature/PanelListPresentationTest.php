@@ -24,14 +24,18 @@ it('uses the shared table presentation for every table-backed panel list', funct
 
 /**
  * Keep the File Stores list actions at the same compact size as Groups actions.
+ *
+ * Icon-only actions render through the shared x-icon-button component
+ * (btn btn-ghost btn-xs with an accessible label), while the inline test
+ * connection button keeps its explicit classes.
  */
 it('uses the shared compact action presentation on the file stores list', function (): void {
     $contents = file_get_contents(base_path('app-modules/file-stores/resources/views/file-stores-list.blade.php'));
 
     expect($contents)
         ->toContain('class="btn btn-ghost btn-xs"')
-        ->toContain('class="btn btn-ghost btn-xs text-error"')
+        ->toContain('<x-icon-button icon="heroicon-o-trash"')
+        ->toContain('class="text-error"')
         ->toContain('<x-heroicon-o-signal class="w-4 h-4" />')
-        ->toContain('<x-heroicon-o-pencil-square class="w-4 h-4" />')
-        ->toContain('<x-heroicon-o-trash class="w-4 h-4" />');
+        ->toContain('<x-icon-button icon="heroicon-o-pencil-square"');
 });
