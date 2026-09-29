@@ -54,14 +54,8 @@
                             </td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ route('panel.voicemails.edit', $voicemail->id) }}"
-                                       class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </a>
-                                    <button wire:click="confirmVoicemailDeletion('{{ $voicemail->id }}')"
-                                            class="btn btn-ghost btn-xs text-error">
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.voicemails.edit', $voicemail->id)" />
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$voicemail->voicemail_id" wire:click="confirmVoicemailDeletion('{{ $voicemail->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>
