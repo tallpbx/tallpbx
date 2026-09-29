@@ -105,6 +105,15 @@ class SecurityServiceSeeder extends Seeder
                 'enabled' => true,
                 'source_ip' => 'any',
             ],
+            [
+                'name' => 'TFTP Provisioning',
+                'description' => 'Read-only TFTP file serving for phone auto-provisioning, protected by the Hardened TFTP Defense Profile',
+                'protocol' => 'udp',
+                'port_range' => '69',
+                'is_system' => true,
+                'enabled' => true,
+                'source_ip' => 'any',
+            ],
         ];
 
         foreach ($standardServices as $service) {

@@ -38,6 +38,27 @@ class SecurityConfigGenerator
     ];
 
     /**
+     * File-name prefixes the hardened TFTP defense refuses outright.
+     *
+     * Read requests (opcode 1) whose file name starts with one of these
+     * strings are malicious probing or directory traversal. The list is
+     * merged with the reserved `tftp_defense_custom_patterns` setting so a
+     * future release can add administrator-defined patterns without
+     * touching the emission code.
+     */
+    private const TFTP_BASE_READ_PATTERNS = [
+        '../',
+        '/x',
+    ];
+
+    /**
+     * Upper bound applied to the administrator-configurable TFTP flood rate
+     * limit and burst, so an extreme value cannot effectively disable the
+     * flood meter.
+     */
+    private const TFTP_FLOOD_MAX = 10000;
+
+    /**
      * Directory path where TallPBX firewall configuration files are stored.
      */
     private string $firewallDir;
@@ -78,6 +99,11 @@ class SecurityConfigGenerator
         // a rate-limited log with no verdict, so the firewall evaluates and
         // records exactly what it would block but enforces nothing.
         $observeMode = SecuritySetting::getBoolean('firewall_observe_mode', false);
+        // The hardened TFTP defense profile defaults to on. Its flood meters
+        // are administrator-tunable because a single office NAT doing a
+        // power-cut reboot storm can legitimately exceed the default rate.
+        $tftpDefenseEnabled = SecuritySetting::getBoolean('tftp_defense_enabled', true);
+        $tftpLimits = self::tftpLimits();
         $defaultPolicy = strtolower(trim((string) SecuritySetting::get('firewall_default_policy', 'drop')));
         if (! in_array($defaultPolicy, ['drop', 'accept'], true)) {
             $defaultPolicy = 'drop';
@@ -219,6 +245,30 @@ class SecurityConfigGenerator
         $lines[] = '    }';
         $lines[] = '';
 
+        // 9/10. TFTP flood meters. These are memory-bounded dynamic sets: the
+        //       `timeout` ages idle source entries out and `size` caps the
+        //       table, so a spoofed-source flood cannot grow kernel memory
+        //       without limit (a bare meter statement never evicts).
+        if ($tftpDefenseEnabled) {
+            $lines[] = '    # 9. TFTP Flood Meter (IPv4, bounded: idle sources age out)';
+            $lines[] = '    set tftp_flood4 {';
+            $lines[] = '        type ipv4_addr';
+            $lines[] = '        flags dynamic,timeout';
+            $lines[] = '        timeout 1m';
+            $lines[] = '        size 65535';
+            $lines[] = '    }';
+            $lines[] = '';
+
+            $lines[] = '    # 10. TFTP Flood Meter (IPv6, mirrors set tftp_flood4)';
+            $lines[] = '    set tftp_flood6 {';
+            $lines[] = '        type ipv6_addr';
+            $lines[] = '        flags dynamic,timeout';
+            $lines[] = '        timeout 1m';
+            $lines[] = '        size 65535';
+            $lines[] = '    }';
+            $lines[] = '';
+        }
+
         // 4. Chain Input. Observe mode is non-blocking by construction: the
         //    chain policy is forced to accept so packets that would have hit
         //    the default drop rule simply fall through.
@@ -300,6 +350,37 @@ class SecurityConfigGenerator
             // stealth mode, and source restrictions all apply).
             $lines[] = '        ip6 nexthdr ipv6-icmp icmpv6 type { packet-too-big, mld-listener-query, mld-listener-report, mld-listener-done, mld2-listener-report, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, nd-redirect } accept';
             $lines[] = '';
+
+            // STAGE 9: Hardened TFTP defense profile. These rules must be
+            // emitted BEFORE the port catalog's `udp dport 69 accept` below —
+            // a drop placed after an accept rule never fires. Deep packet
+            // inspection inherently only sees new flows (established TFTP
+            // transfers already passed the stateful fast path), which is
+            // exactly what provisioning abuse looks like.
+            if ($tftpDefenseEnabled) {
+                $lines[] = '        # STAGE 9: HARDENED TFTP DEFENSE PROFILE (BEFORE THE PORT CATALOG ON PURPOSE)';
+                $tftpVerdict = $this->dropStatement('tftp', $observeMode, true);
+
+                // 1. Write requests (opcode 2) are refused outright:
+                //    provisioning is strictly read-only.
+                $lines[] = "        udp dport 69 @th,64,16 0x0002 {$tftpVerdict}";
+
+                // 2/3 (+ future custom patterns): read requests (opcode 1)
+                //    whose file name starts with a malicious prefix, matched
+                //    at payload offset 80 bits (right after the 2-byte opcode
+                //    plus the 8-byte fixed header). One comparison per
+                //    pattern byte count keeps the merge point generic.
+                foreach ($this->tftpReadPatterns() as $pattern) {
+                    $bitLength = strlen($pattern) * 8;
+                    $lines[] = "        udp dport 69 @th,64,16 0x0001 @th,80,{$bitLength} 0x".bin2hex($pattern)." {$tftpVerdict}";
+                }
+
+                // 4. Per-IP flood meters, one per address family. The meter
+                //    elements live in the bounded sets declared above.
+                $lines[] = "        udp dport 69 update @tftp_flood4 { ip saddr limit rate over {$tftpLimits['rate_limit']}/minute burst {$tftpLimits['burst']} packets } {$tftpVerdict}";
+                $lines[] = "        udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over {$tftpLimits['rate_limit']}/minute burst {$tftpLimits['burst']} packets } {$tftpVerdict}";
+                $lines[] = '';
+            }
 
             // STAGE 10: System PBX services from port catalog (excluding icmp, which is handled at STAGE 8)
             $lines[] = '        # STAGE 10: CORE PBX TELEPHONY PORTS';
@@ -792,6 +873,58 @@ class SecurityConfigGenerator
         }
 
         return $withCounter ? 'counter drop' : 'drop';
+    }
+
+    /**
+     * The administrator-facing TFTP flood limits, clamped to sane bounds.
+     *
+     * Zero, negative, or missing values fall back to the recommended
+     * defaults (10 requests per minute, burst 20); extreme values are capped
+     * so the meter keeps meaning something. The Security Center reads the
+     * same helper so the panel can never display a value the kernel is not
+     * actually running.
+     *
+     * @return array{rate_limit: int, burst: int}
+     */
+    public static function tftpLimits(): array
+    {
+        $rateLimit = (int) SecuritySetting::get('tftp_defense_rate_limit', '10');
+        $burst = (int) SecuritySetting::get('tftp_defense_burst', '20');
+
+        if ($rateLimit <= 0) {
+            $rateLimit = 10;
+        }
+
+        if ($burst <= 0) {
+            $burst = 20;
+        }
+
+        return [
+            'rate_limit' => min($rateLimit, self::TFTP_FLOOD_MAX),
+            'burst' => min($burst, self::TFTP_FLOOD_MAX),
+        ];
+    }
+
+    /**
+     * The merged TFTP read-pattern list (base patterns + reserved custom).
+     *
+     * The reserved `tftp_defense_custom_patterns` setting ships empty and has
+     * no UI or validation path yet — only this merge point exists, so the
+     * eventual custom-pattern feature needs no emission changes. Entries are
+     * plain byte strings converted to hexadecimal payload comparisons.
+     *
+     * @return array<int, string>
+     */
+    private function tftpReadPatterns(): array
+    {
+        $raw = SecuritySetting::get('tftp_defense_custom_patterns', '[]');
+        $decoded = json_decode((string) $raw, true);
+
+        $custom = is_array($decoded)
+            ? array_values(array_filter($decoded, static fn (mixed $pattern): bool => is_string($pattern) && $pattern !== ''))
+            : [];
+
+        return array_merge(self::TFTP_BASE_READ_PATTERNS, $custom);
     }
 
     /**

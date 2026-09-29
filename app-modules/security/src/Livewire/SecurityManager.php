@@ -252,6 +252,11 @@ class SecurityManager extends Component
     public bool $firewallObserveMode = false;
 
     /**
+     * Whether the hardened TFTP defense profile is active.
+     */
+    public bool $tftpDefenseEnabled = true;
+
+    /**
      * Whether the public threat feed blocks traffic in the kernel.
      */
     public bool $feedEnabled = false;
@@ -365,6 +370,7 @@ class SecurityManager extends Component
         $this->firewallEnabled = SecuritySetting::getBoolean('firewall_enabled', true);
         $this->prefilterEnabled = SecuritySetting::getBoolean('prefilter_enabled', true);
         $this->firewallObserveMode = SecuritySetting::getBoolean('firewall_observe_mode', false);
+        $this->tftpDefenseEnabled = SecuritySetting::getBoolean('tftp_defense_enabled', true);
         $this->attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true);
         $this->pendingChangesCount = (int) SecuritySetting::get('pending_changes_count', '0');
     }
@@ -452,6 +458,78 @@ class SecurityManager extends Component
         if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
             $this->notifySuccess((string) __('admin.security_settings_saved'));
         }
+    }
+
+    /**
+     * Turn the hardened TFTP defense profile on or off.
+     *
+     * Neither direction can lock the administrator out (TFTP provisioning
+     * is not the management path), so no lockout guard is needed: turning
+     * the profile off simply removes the defensive rules while the port
+     * catalog keeps TFTP reachable, and turning it on re-arms them.
+     */
+    public function setTftpDefense(bool $enabled, LockoutGuardService $lockoutGuard): void
+    {
+        SecuritySetting::updateOrCreate(['key' => 'tftp_defense_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->tftpDefenseEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'tftp_defense_enabled' : 'tftp_defense_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Hardened TFTP Defense Profile enabled: write uploads, traversal probes, and floods are blocked before the port catalog'
+                : 'Hardened TFTP Defense Profile disabled: TFTP provisioning is accepted without the defensive rules',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_tftp_defense_saved'));
+        }
+    }
+
+    /**
+     * Read the per-rule TFTP defense counters from the live kernel ruleset.
+     *
+     * Returns one entry per documented counter category — uploads, traversal
+     * attempts, scan probes, and flood drops (both address families summed).
+     * A category reads as null when the helper cannot report the ruleset or
+     * the rule is absent, so the panel can render a dash instead of
+     * pretending the count is zero.
+     *
+     * @return array{uploads: int|null, traversal: int|null, probes: int|null, flood: int|null}
+     */
+    public function tftpDefenseCounters(): array
+    {
+        $status = app(SecurityExecutorInterface::class)->status();
+
+        $counters = [
+            'uploads' => null,
+            'traversal' => null,
+            'probes' => null,
+            'flood' => null,
+        ];
+
+        if ($status === '') {
+            return $counters;
+        }
+
+        // Match the live listed form of each rule (the kernel normalizes
+        // `counter drop` to `counter packets N bytes M drop`).
+        $extract = static function (string $pattern) use ($status): ?int {
+            return preg_match($pattern, $status, $matches) === 1 ? (int) $matches[1] : null;
+        };
+
+        $counters['uploads'] = $extract('/@th,64,16 0x0002 counter packets (\d+)/');
+        $counters['traversal'] = $extract('/@th,80,24 0x2e2e2f counter packets (\d+)/');
+        $counters['probes'] = $extract('/@th,80,16 0x2f78 counter packets (\d+)/');
+
+        $floodV4 = $extract('/@tftp_flood4 .* counter packets (\d+)/');
+        $floodV6 = $extract('/@tftp_flood6 .* counter packets (\d+)/');
+        $counters['flood'] = ($floodV4 === null && $floodV6 === null)
+            ? null
+            : (int) (($floodV4 ?? 0) + ($floodV6 ?? 0));
+
+        return $counters;
     }
 
     /**
@@ -1786,6 +1864,10 @@ class SecurityManager extends Component
         $whitelistCount = SecurityIpList::whitelist()->count();
         $blacklistCount = SecurityIpList::blacklist()->count();
 
+        // The panel displays the same clamped limits the kernel is actually
+        // running (zero or missing settings fall back to the defaults).
+        $tftpLimits = SecurityConfigGenerator::tftpLimits();
+
         return view('security::security-manager', [
             'blacklistIps' => $blacklistIps,
             'whitelistIps' => $whitelistIps,
@@ -1798,6 +1880,12 @@ class SecurityManager extends Component
             'preFilterRows' => $this->preFilterRows(),
             'threatFeed' => SecurityThreatFeed::where('provider', 'voipbl')->first(),
             'feedDropCounter' => $this->feedDropCounter(),
+            'tftpDefense' => [
+                'enabled' => $this->tftpDefenseEnabled,
+                'rate_limit' => $tftpLimits['rate_limit'],
+                'burst' => $tftpLimits['burst'],
+                'counters' => $this->tftpDefenseCounters(),
+            ],
         ]);
     }
 }

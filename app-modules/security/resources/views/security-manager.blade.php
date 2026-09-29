@@ -901,6 +901,51 @@
                                             </x-tooltip>
                                         @endif
                                     </div>
+                                    @if ($service->protocol === 'udp' && trim((string) $service->port_range) === '69')
+                                        {{-- Hardened TFTP Defense Profile: one shield badge for the
+                                             office manager, expandable per-rule counters for the
+                                             engineer (progressive depth). --}}
+                                        <div class="mt-1.5" x-data="{ tftpCountersOpen: false }">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <button type="button" @click="tftpCountersOpen = ! tftpCountersOpen"
+                                                        class="badge badge-warning badge-sm gap-1 cursor-pointer">
+                                                    <x-heroicon-o-shield-check class="w-3.5 h-3.5" />
+                                                    <span>{{ __('admin.security_tftp_defense_label') }}</span>
+                                                    <x-heroicon-s-chevron-down class="w-3 h-3 transition-transform" x-bind:class="tftpCountersOpen ? 'rotate-180' : ''" />
+                                                </button>
+                                                <x-tooltip :tip="__('admin.security_tftp_defense_tooltip')" align="start" position="right">
+                                                    <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/60 cursor-help" />
+                                                </x-tooltip>
+                                                <label class="label cursor-pointer gap-1.5 p-0">
+                                                    <input wire:click="setTftpDefense({{ $tftpDefense['enabled'] ? 'false' : 'true' }})"
+                                                           type="checkbox" class="toggle toggle-warning toggle-xs" @checked($tftpDefense['enabled']) />
+                                                    <span class="label-text text-xs">{{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}</span>
+                                                </label>
+                                            </div>
+                                            <div x-show="tftpCountersOpen" x-cloak
+                                                 class="mt-1.5 p-2 rounded-box bg-base-200/50 border border-base-200 text-xs space-y-1 max-w-xs">
+                                                <div class="text-base-content/60">
+                                                    {{ __('admin.security_tftp_defense_rate_value', ['rate' => $tftpDefense['rate_limit'], 'burst' => $tftpDefense['burst']]) }}
+                                                </div>
+                                                <div class="flex items-center justify-between gap-4">
+                                                    <span class="text-base-content/60">{{ __('admin.security_tftp_counter_uploads') }}</span>
+                                                    <span class="font-mono font-semibold">{{ $tftpDefense['counters']['uploads'] ?? '—' }}</span>
+                                                </div>
+                                                <div class="flex items-center justify-between gap-4">
+                                                    <span class="text-base-content/60">{{ __('admin.security_tftp_counter_traversal') }}</span>
+                                                    <span class="font-mono font-semibold">{{ $tftpDefense['counters']['traversal'] ?? '—' }}</span>
+                                                </div>
+                                                <div class="flex items-center justify-between gap-4">
+                                                    <span class="text-base-content/60">{{ __('admin.security_tftp_counter_probes') }}</span>
+                                                    <span class="font-mono font-semibold">{{ $tftpDefense['counters']['probes'] ?? '—' }}</span>
+                                                </div>
+                                                <div class="flex items-center justify-between gap-4">
+                                                    <span class="text-base-content/60">{{ __('admin.security_tftp_counter_flood') }}</span>
+                                                    <span class="font-mono font-semibold">{{ $tftpDefense['counters']['flood'] ?? '—' }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </td>
                                 <td class="font-mono text-sm font-semibold text-base-content/80">
                                     {{ $service->protocol === 'both' ? 'TCP/UDP' : strtoupper($service->protocol) }}
