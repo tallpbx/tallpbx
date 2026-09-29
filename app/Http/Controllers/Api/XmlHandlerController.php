@@ -11,6 +11,7 @@ use App\Services\DialplanXmlCollector;
 use App\Services\TenantIdentityResolverInterface;
 use App\Services\TenantManager;
 use App\Support\AclConfigurationCache;
+use App\Support\Concerns\EscapesXml;
 use App\Support\RoutingCacheVersion;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
@@ -66,6 +67,8 @@ use Modules\TenantLimits\Models\TenantLimit;
  */
 class XmlHandlerController extends Controller
 {
+    use EscapesXml;
+
     /**
      * Extension setting keys that are safe to export as directory variables.
      *
@@ -1621,14 +1624,6 @@ class XmlHandlerController extends Controller
         if (config('freeswitch.xml_handler.log_requests', false) === true) {
             Log::debug($message, $context);
         }
-    }
-
-    /**
-     * Escape special XML characters in a string.
-     */
-    private function escapeXml(string $value): string
-    {
-        return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
     }
 
     /**
