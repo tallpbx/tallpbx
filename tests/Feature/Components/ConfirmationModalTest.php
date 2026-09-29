@@ -37,3 +37,13 @@ it('escapes required text containing a single quote', function (): void {
         ->toContain("'O\\u0027Brien Corp'")
         ->not->toContain("'O'Brien Corp'");
 });
+
+it('disables the confirm button and shows a spinner while the action runs', function (): void {
+    $html = Blade::render(
+        '<x-confirmation-modal :open="true" title="Delete?" message="Sure?" confirm-label="Delete" confirm-action="deleteRecord()" cancel-action="cancel" />'
+    );
+
+    expect($html)
+        ->toContain('wire:loading.attr="disabled"')
+        ->toContain('loading loading-spinner');
+});

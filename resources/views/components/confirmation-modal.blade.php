@@ -43,8 +43,16 @@
                 @endif
                 <div class="mt-6 flex justify-center gap-3">
                     <button type="button" class="btn" wire:click="{{ $cancelAction }}">{{ __('admin.modal_cancel') }}</button>
+                    {{-- While the confirmed action is in flight the button disables itself
+                         and shows a spinner, so slow operations (backups, restores) cannot
+                         be double-submitted. wire:model on the typed input is deferred in
+                         Livewire 4, so no requests fire while the user types. --}}
                     <button type="button" class="btn btn-error" wire:click="{{ $confirmAction }}"
-                            @if ($requiredText !== '') :disabled="typed.trim() !== @js($requiredText)" @endif>{{ $confirmLabel }}</button>
+                            wire:loading.attr="disabled"
+                            @if ($requiredText !== '') :disabled="typed.trim() !== @js($requiredText)" @endif>
+                        <span wire:loading class="loading loading-spinner loading-sm"></span>
+                        {{ $confirmLabel }}
+                    </button>
                 </div>
             @endif
         </div>
