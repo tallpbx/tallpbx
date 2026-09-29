@@ -49,25 +49,20 @@
                             <td>
                                 <div class="flex gap-2">
                                     <x-tooltip :tip="__('admin.edit_user')">
-                                        <a href="{{ route('panel.users.edit', $user->id) }}"
-                                           class="btn btn-ghost btn-xs">
-                                            <x-heroicon-o-pencil class="w-4 h-4" />
-                                        </a>
+                                        <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.users.edit', $user->id)" />
                                     </x-tooltip>
                                     <x-tooltip :tip="__('admin.impersonate_tooltip')">
                                         <form method="POST" action="{{ route('panel.users.impersonate', $user) }}" class="inline">
                                             @csrf
                                             <button type="submit"
-                                                    class="btn btn-ghost btn-xs text-info">
+                                                    class="btn btn-ghost btn-xs text-info"
+                                                    aria-label="{{ __('admin.impersonate_tooltip') }}">
                                                 <x-heroicon-o-arrow-right-on-rectangle class="w-4 h-4" />
                                             </button>
                                         </form>
                                     </x-tooltip>
                                     <x-tooltip :tip="__('admin.delete_user_tooltip')">
-                                        <button wire:click="confirmUserDeletion({{ $user->id }})"
-                                                class="btn btn-ghost btn-xs text-error">
-                                            <x-heroicon-o-trash class="w-4 h-4" />
-                                        </button>
+                                        <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$user->name" wire:click="confirmUserDeletion({{ $user->id }})" class="text-error" />
                                     </x-tooltip>
                                 </div>
                             </td>

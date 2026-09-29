@@ -51,16 +51,10 @@
                             <td>
                                 <div class="flex gap-2">
                                     <x-tooltip :tip="__('admin.edit_tenant')">
-                                        <a href="{{ route('panel.tenants.edit', $tenant->id) }}"
-                                           class="btn btn-ghost btn-xs">
-                                            <x-heroicon-o-pencil class="w-4 h-4" />
-                                        </a>
+                                        <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.tenants.edit', $tenant->id)" />
                                     </x-tooltip>
                                     <x-tooltip :tip="__('admin.delete_tenant_tooltip')">
-                                        <button wire:click="confirmTenantDeletion({{ $tenant->id }})"
-                                                class="btn btn-ghost btn-xs text-error">
-                                            <x-heroicon-o-trash class="w-4 h-4" />
-                                        </button>
+                                        <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$tenant->name" wire:click="confirmTenantDeletion({{ $tenant->id }})" class="text-error" />
                                     </x-tooltip>
                                 </div>
                             </td>

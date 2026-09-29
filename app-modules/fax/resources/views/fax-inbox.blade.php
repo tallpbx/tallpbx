@@ -32,20 +32,17 @@
                             <td>{{ $fax->received_at?->format('M j, Y g:i A') }}</td>
                             <td>
                                 <div class="flex items-center gap-1">
-                                    <a href="{{ $fax->mediaAsset !== null ? route('panel.media-assets.stream', $fax->mediaAsset) : asset('storage/' . $fax->document_path) }}" target="_blank" class="btn btn-ghost btn-sm">
+                                    {{-- Media links keep wire:navigate off: viewing/downloading the
+                                         fax document must hit the asset URL directly. --}}
+                                    <a href="{{ $fax->mediaAsset !== null ? route('panel.media-assets.stream', $fax->mediaAsset) : asset('storage/' . $fax->document_path) }}" target="_blank" class="btn btn-ghost btn-sm" aria-label="{{ __('client.view') }}">
                                         <x-heroicon-o-eye class="w-4 h-4" />
                                     </a>
                                     @if ($fax->mediaAsset !== null)
-                                        <a href="{{ route('panel.media-assets.download', $fax->mediaAsset) }}" class="btn btn-ghost btn-sm">
+                                        <a href="{{ route('panel.media-assets.download', $fax->mediaAsset) }}" class="btn btn-ghost btn-sm" aria-label="{{ __('client.download') }}">
                                             <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
                                         </a>
                                     @endif
-                                    <button
-                                        wire:click="confirmFaxDeletion('{{ $fax->id }}')"
-                                        class="btn btn-ghost btn-sm text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$fax->caller_id" wire:click="confirmFaxDeletion('{{ $fax->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

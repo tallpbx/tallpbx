@@ -241,11 +241,7 @@
                                             </td>
                                             <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
                                             <td class="text-right">
-                                                <button wire:click="deleteIp({{ $item->id }})" type="button"
-                                                        class="btn btn-ghost btn-xs text-error p-1"
-                                                        title="{{ __('admin.delete') }}">
-                                                    <x-heroicon-o-trash class="w-4 h-4" />
-                                                </button>
+                                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->ip_address" wire:click="deleteIp({{ $item->id }})" class="text-error p-1" />
                                             </td>
                                         </tr>
                                     @empty
@@ -459,11 +455,7 @@
                                             </td>
                                             <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
                                             <td class="text-right">
-                                                <button wire:click="deleteIp({{ $item->id }})" type="button"
-                                                        class="btn btn-ghost btn-xs text-error p-1"
-                                                        title="{{ __('admin.delete') }}">
-                                                    <x-heroicon-o-trash class="w-4 h-4" />
-                                                </button>
+                                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->ip_address" wire:click="deleteIp({{ $item->id }})" class="text-error p-1" />
                                             </td>
                                         </tr>
                                     @empty
@@ -799,9 +791,7 @@
                                     @endif
                                 </td>
                                 <td class="text-right whitespace-nowrap">
-                                    <button wire:click="openEditSystemServiceModal({{ $service->id }})" type="button" class="btn btn-ghost btn-xs text-primary" title="{{ __('admin.security_edit_service') }}">
-                                        <x-heroicon-o-pencil-square class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-pencil-square" :label="__('admin.security_edit_service')" wire:click="openEditSystemServiceModal({{ $service->id }})" class="text-primary" />
                                 </td>
                             </tr>
                         @endforeach
@@ -887,12 +877,8 @@
                                                 <x-heroicon-s-chevron-down class="w-3 h-3" />
                                             </button>
                                         </span>
-                                        <button wire:click="openCustomRuleModal({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs">
-                                            <x-heroicon-o-pencil-square class="w-4 h-4" />
-                                        </button>
-                                        <button wire:click="deleteRule({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs text-error">
-                                            <x-heroicon-o-trash class="w-4 h-4" />
-                                        </button>
+                                        <x-icon-button icon="heroicon-o-pencil-square" :label="__('client.edit').' '.$rule->source_ip" wire:click="openCustomRuleModal({{ $rule->id }})" />
+                                        <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$rule->source_ip" wire:click="deleteRule({{ $rule->id }})" class="text-error" />
                                     </div>
                                 </td>
                             </tr>

@@ -73,11 +73,13 @@
                                 <div class="flex gap-1">
                                     <x-tooltip :tip="__('admin.backup_run_now')">
                                         <button wire:click="confirmRunNow('{{ $backup->id }}')"
-                                            class="btn btn-ghost btn-xs">▶</button>
+                                            class="btn btn-ghost btn-xs"
+                                            aria-label="{{ __('admin.backup_run_now') }}">▶</button>
                                     </x-tooltip>
                                     <x-tooltip :tip="__('admin.delete')">
                                         <button wire:click="confirmBackupDeletion('{{ $backup->id }}')"
-                                            class="btn btn-ghost btn-xs text-error">✕</button>
+                                            class="btn btn-ghost btn-xs text-error"
+                                            aria-label="{{ __('client.delete').' '.$backup->name }}">✕</button>
                                     </x-tooltip>
                                 </div>
                             </td>

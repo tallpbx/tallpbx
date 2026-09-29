@@ -86,14 +86,8 @@
                                 <td><span class="badge badge-ghost">{{ $setting->type }}</span></td>
                                 <td>
                                     <div class="flex gap-2">
-                                        <button wire:click="editSetting({{ $setting->id }})"
-                                                class="btn btn-ghost btn-xs">
-                                            <x-heroicon-o-pencil class="w-4 h-4" />
-                                        </button>
-                                        <button wire:click="confirmSettingDeletion({{ $setting->id }})"
-                                                class="btn btn-ghost btn-xs text-error">
-                                            <x-heroicon-o-trash class="w-4 h-4" />
-                                        </button>
+                                        <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" wire:click="editSetting({{ $setting->id }})" />
+                                        <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$setting->key" wire:click="confirmSettingDeletion({{ $setting->id }})" class="text-error" />
                                     </div>
                                 </td>
                             </tr>
