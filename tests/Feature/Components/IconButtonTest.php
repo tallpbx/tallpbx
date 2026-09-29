@@ -43,8 +43,20 @@ it('refuses to render without an accessible label', function (): void {
 
 it('every locale defines the client action labels', function (): void {
     foreach (['en', 'es', 'fr'] as $locale) {
+        // These keys back the aria-labels on list action buttons and the
+        // play/download media links the labeling sweep introduced.
         $labels = require base_path("lang/{$locale}/client.php");
 
-        expect($labels)->toHaveKeys(['delete', 'edit', 'view']);
+        expect($labels)->toHaveKeys(['delete', 'edit', 'view', 'play', 'download']);
+    }
+});
+
+it('every locale defines the admin action labels', function (): void {
+    foreach (['en', 'es', 'fr'] as $locale) {
+        // These keys back the unknown-value fallbacks and the password
+        // visibility toggles the labeling sweep introduced.
+        $labels = require base_path("lang/{$locale}/admin.php");
+
+        expect($labels)->toHaveKeys(['unknown', 'password_visibility']);
     }
 });
