@@ -5,7 +5,7 @@ All notable changes to TallPBX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-09-29
 
 ### Added
 - **Pest 4 Native Browser Testing (Playwright)**:
@@ -164,6 +164,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sudoers Runas Pinned to Root**: The sudoers drop-in for the bounded host security helper now grants `NOPASSWD` access strictly as `root` (`www-data ALL=(root) NOPASSWD: /usr/local/sbin/tallpbx-security`), preventing the web user from invoking the helper as any other system account.
 - **Firewall Restore Preflight Validation**: When the helper restores the active ruleset after finding the kernel firewall table missing (for example after a reboot), it now validates the file with `nft -c` before loading it. A corrupt active ruleset fails loudly with a clear syntax error instead of being silently skipped.
 - **Restrictive Helper Umask**: The bounded host security helper now runs with `umask 027`, so every file it creates defaults to `0640` and is never world-readable, even if a future change forgets an explicit permission repair.
+
+## [Unreleased]
 
 ## [1.1.4] - 2026-09-23
 
