@@ -434,6 +434,125 @@ class SecurityManager extends Component
     }
 
     /**
+     * Move a pre-filter stage one position earlier in the evaluation order.
+     */
+    public function movePreFilterUp(string $stage): void
+    {
+        $this->movePreFilterStage($stage, -1);
+    }
+
+    /**
+     * Move a pre-filter stage one position later in the evaluation order.
+     */
+    public function movePreFilterDown(string $stage): void
+    {
+        $this->movePreFilterStage($stage, 1);
+    }
+
+    /**
+     * Reset the stored pre-filter order to the recommended default.
+     *
+     * The escape hatch that always restores a known-safe evaluation order,
+     * mirroring the custom-rule reordering flow: persist, audit, apply.
+     */
+    public function resetPreFilterOrder(): void
+    {
+        $order = SecurityConfigGenerator::DEFAULT_PRE_FILTER_ORDER;
+
+        DB::transaction(function () use ($order): void {
+            SecuritySetting::updateOrCreate(['key' => 'pre_filter_order'], ['value' => json_encode($order)]);
+        });
+
+        SecurityAuditLog::record(
+            action: 'pre_filter_order_reset',
+            ipAddress: $this->adminIp,
+            description: 'Pre-filter order reset to the recommended default: '.implode(', ', $order),
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_rule_reordered'));
+        }
+    }
+
+    /**
+     * Swap a pre-filter stage with its neighbour, validating the result first.
+     *
+     * Mirrors the custom-rule reordering ergonomics: the pinned loopback row
+     * refuses with an explanation, an unsafe result is rejected with the
+     * validator's plain-language reason, and a successful move persists the
+     * order, records an audit entry, and re-applies the ruleset.
+     *
+     * @param  string  $stage  Stage key to move (fixed vocabulary)
+     * @param  int  $direction  -1 moves earlier, +1 moves later
+     */
+    private function movePreFilterStage(string $stage, int $direction): void
+    {
+        // The loopback stage is pinned first — it is how the server talks to
+        // its own database, cache, and phone engine.
+        if ($stage === 'loopback') {
+            $this->notifyError((string) __('admin.security_prefilter_loopback_pinned'));
+
+            return;
+        }
+
+        $generator = app(SecurityConfigGenerator::class);
+
+        try {
+            $order = $generator->preFilterOrder();
+        } catch (\RuntimeException $e) {
+            $this->notifyError($e->getMessage());
+
+            return;
+        }
+
+        $index = array_search($stage, $order, true);
+        if ($index === false) {
+            $this->notifyError((string) __('admin.security_prefilter_stage_unknown', ['stage' => $stage]));
+
+            return;
+        }
+
+        $previousOrder = $order;
+        $target = $index + $direction;
+        if ($target < 0 || $target >= count($order)) {
+            // Already at the edge of the list: nothing to do.
+            return;
+        }
+
+        [$order[$index], $order[$target]] = [$order[$target], $order[$index]];
+        $order = array_values($order);
+
+        try {
+            $generator->assertValidPreFilterOrder($order);
+        } catch (\RuntimeException $e) {
+            $this->notifyError($e->getMessage());
+
+            return;
+        }
+
+        DB::transaction(function () use ($order): void {
+            SecuritySetting::updateOrCreate(['key' => 'pre_filter_order'], ['value' => json_encode($order)]);
+        });
+
+        SecurityAuditLog::record(
+            action: 'pre_filter_reordered',
+            ipAddress: $this->adminIp,
+            description: 'Pre-filter order changed from ['
+                .implode(', ', $previousOrder)
+                .'] to ['
+                .implode(', ', $order)
+                .']',
+            details: ['before' => $previousOrder, 'after' => $order],
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __('admin.security_rule_reordered'));
+        }
+    }
+
+    /**
      * Real-time push-event listener and status updater.
      */
     // Subscribe to the private security alerts channel over Laravel Echo.

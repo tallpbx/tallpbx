@@ -1237,6 +1237,8 @@ return [
     'security_cannot_blacklist_whitelisted' => 'L\'adresse IP :ip est en liste blanche et ne peut pas être ajoutée à la liste noire. Retirez-la d\'abord de la section Liste Blanche si elle doit vraiment être bloquée.',
     'security_prefilter_lockout_refused' => 'Désactiver le pré-filtre bloquerait votre connexion actuelle : l\'adresse :ip serait rejetée par la politique d\'entrée par défaut dès que les règles du pré-filtre intégré sont supprimées. Ajoutez d\'abord votre adresse à la Liste de Confiance, puis désactivez le pré-filtre.',
     'security_observe_restore_lockout_refused' => 'Désactiver le mode observation rétablirait l\'application des règles et votre connexion actuelle depuis :ip n\'est couverte ni par la Liste de Confiance ni par une règle ALLOW explicite. Ajoutez d\'abord votre adresse à la Liste de Confiance, puis quittez le mode observation.',
+    'security_prefilter_loopback_pinned' => 'L\'étape loopback est toujours évaluée en premier pour que le serveur puisse communiquer avec sa propre base de données et sa téléphonie — elle ne peut pas être déplacée.',
+    'security_prefilter_stage_unknown' => 'Étape de pré-filtre inconnue : :stage.',
     'security_ip_format_invalid' => 'Saisissez une adresse IPv4 ou IPv6 valide, par exemple 203.0.113.50 ou 2001:db8::1, ou une plage CIDR comme 10.0.0.0/24 ou 2001:db8::/64.',
     'security_ban_ip_format_invalid' => 'Saisissez une adresse IPv4 ou IPv6 valide pour le blocage, par exemple 203.0.113.50 ou 2001:db8::1.',
     'vector_sip' => 'Téléphone (SIP)',

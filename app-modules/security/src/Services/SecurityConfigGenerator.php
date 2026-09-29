@@ -23,6 +23,21 @@ use Symfony\Component\Process\Process;
 class SecurityConfigGenerator
 {
     /**
+     * The recommended pre-filter evaluation order — the default the Security
+     * Center resets to. These keys are a fixed vocabulary shared with the
+     * `pre_filter_order` setting; administrator input is never an identifier.
+     */
+    public const DEFAULT_PRE_FILTER_ORDER = [
+        'loopback',
+        'whitelist',
+        'invalid',
+        'fast_path',
+        'blacklist',
+        'banned',
+        'threat_feeds',
+    ];
+
+    /**
      * Directory path where TallPBX firewall configuration files are stored.
      */
     private string $firewallDir;
@@ -223,56 +238,18 @@ class SecurityConfigGenerator
             // turning it off removes every built-in pre-filter rule while the
             // rest of the chain keeps running, and the administrator may
             // re-author any of these rules in the custom section (stage 11).
+            // Within the unit, the stored pre-filter order decides the exact
+            // evaluation sequence; an unsafe stored order refuses compilation
+            // instead of leaking through to the kernel.
             if ($prefilterEnabled) {
-                // STAGE 1: Loopback interface (unconditional immunity for localhost IPC)
-                $lines[] = '        # STAGE 1: BASE INVARIANT: UNCONDITIONAL LOOPBACK ACCESS';
-                $lines[] = '        iif "lo" accept';
-                $lines[] = '';
-
-                // STAGE 2: Accept whitelisted / trusted IPs unconditionally. This
-                // safety net is deliberately evaluated before every drop rule and
-                // before the malformed-packet check, so a trusted source can never
-                // be locked out (invariant 1).
-                $lines[] = '        # STAGE 2: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY';
-                $lines[] = '        ip saddr @whitelist_ips accept';
-                $lines[] = '        ip6 saddr @whitelist_ips6 accept';
-                $lines[] = '';
-
-                // STAGE 3: Invalid packet defense, placed after the whitelist on
-                // purpose so a trusted source is admitted even when it delivers a
-                // malformed or out-of-state packet (invariant 2).
-                $lines[] = '        # STAGE 3: DROP INVALID PACKETS (after the whitelist on purpose)';
-                $lines[] = '        ct state invalid '.$this->dropStatement('invalid', $observeMode);
-                $lines[] = '';
-
-                // STAGE 4: Stateful fast path — the bulk of ongoing SIP/RTP media
-                // passes instantly with zero blocklist lookups (invariant 3).
-                $lines[] = '        # STAGE 4: STATEFUL FAST PATH (ONGOING CONNECTIONS PASS INSTANTLY)';
-                $lines[] = '        ct state established,related accept';
-                $lines[] = '';
-
-                // STAGE 5: Drop blacklisted networks & IPs immediately (both
-                // families; only new flows reach this stage because of the fast
-                // path above).
-                $lines[] = '        # STAGE 5: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY';
-                $lines[] = '        ip saddr @blacklist_ips '.$this->dropStatement('blacklist', $observeMode);
-                $lines[] = '        ip6 saddr @blacklist_ips6 '.$this->dropStatement('blacklist', $observeMode);
-                $lines[] = '';
-
-                // STAGE 6: Drop temporarily banned brute-force attackers (both families)
-                $lines[] = '        # STAGE 6: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS';
-                $lines[] = '        ip saddr @banned_ips '.$this->dropStatement('bans', $observeMode);
-                $lines[] = '        ip6 saddr @banned_ips6 '.$this->dropStatement('bans', $observeMode);
-                $lines[] = '';
-
-                // STAGE 7: Drop automated public threat feed matches (both
-                // families). The counters feed the Security Center's "packets
-                // dropped by the feed" metric; the sets stay populated across
-                // firewall rebuilds (invariant 5).
-                $lines[] = '        # STAGE 7: DROP AUTOMATED PUBLIC THREAT FEED MATCHES';
-                $lines[] = '        ip saddr @threat_feed_ips '.$this->dropStatement('threat_feeds', $observeMode, true);
-                $lines[] = '        ip6 saddr @threat_feed_ips6 '.$this->dropStatement('threat_feeds', $observeMode, true);
-                $lines[] = '';
+                $stageLines = $this->preFilterStageLines($observeMode);
+                foreach ($this->preFilterOrder() as $position => $stageKey) {
+                    foreach ($stageLines[$stageKey] as $stageLine) {
+                        // Stage numbers follow the actual evaluation order so
+                        // a reordered build renumbers its comments honestly.
+                        $lines[] = str_replace('{n}', (string) ($position + 1), $stageLine);
+                    }
+                }
             }
 
             // STAGE 8: ICMP Ping Diagnostics (Core System Service)
@@ -654,6 +631,145 @@ class SecurityConfigGenerator
         }
 
         return $port;
+    }
+
+    /**
+     * Resolve the stored pre-filter order, validating it before use.
+     *
+     * A missing setting falls back to DEFAULT_PRE_FILTER_ORDER; a stored
+     * order that violates the safety constraints refuses compilation with a
+     * plain-language error instead of emitting an unsafe ruleset.
+     *
+     * @return array<int, string>
+     */
+    public function preFilterOrder(): array
+    {
+        $raw = SecuritySetting::get('pre_filter_order');
+
+        if ($raw === null || trim((string) $raw) === '') {
+            return self::DEFAULT_PRE_FILTER_ORDER;
+        }
+
+        $order = json_decode((string) $raw, true);
+
+        if (! is_array($order) || $order === []) {
+            throw new \RuntimeException(
+                'The stored pre-filter order is not a valid list. Reset it to the recommended order in the Security Center and try again.'
+            );
+        }
+
+        $order = array_values(array_map(
+            static fn (mixed $entry): string => is_string($entry) ? $entry : '',
+            $order
+        ));
+        $this->assertValidPreFilterOrder($order);
+
+        return $order;
+    }
+
+    /**
+     * Assert that a proposed pre-filter order preserves every safety rule.
+     *
+     * Refuses (with a precise plain-language reason) when the order is not
+     * exactly the seven known stages, does not start with loopback, or places
+     * any drop stage above the whitelist — the constraints that keep the
+     * "you can never be locked out" guarantee while the pre-filter is on.
+     *
+     * @param  array<int, string>  $order  Proposed stage order
+     */
+    public function assertValidPreFilterOrder(array $order): void
+    {
+        $known = self::DEFAULT_PRE_FILTER_ORDER;
+        $sortedOrder = array_values($order);
+        sort($sortedOrder);
+        $sortedKnown = $known;
+        sort($sortedKnown);
+
+        if ($sortedOrder !== $sortedKnown) {
+            throw new \RuntimeException(
+                'The pre-filter order must contain each of the seven known stages exactly once: '
+                .implode(', ', $known)
+                .'. Correct it in the Security Center and try again.'
+            );
+        }
+
+        if ($order[0] !== 'loopback') {
+            throw new \RuntimeException(
+                'The pre-filter order must start with the loopback stage so localhost services can never be filtered. Correct it in the Security Center and try again.'
+            );
+        }
+
+        $whitelistPosition = (int) array_search('whitelist', $order, true);
+        foreach (['invalid', 'blacklist', 'banned', 'threat_feeds'] as $dropStage) {
+            if ((int) array_search($dropStage, $order, true) < $whitelistPosition) {
+                throw new \RuntimeException(
+                    "The pre-filter order must not place the {$dropStage} stage above the whitelist: that reintroduces the administrator lockout risk the chain exists to prevent. Correct it in the Security Center and try again."
+                );
+            }
+        }
+    }
+
+    /**
+     * Build the emitted rule lines for each of the seven pre-filter stages,
+     * keyed by the stage vocabulary stored in the pre-filter order.
+     *
+     * Stage-number placeholders ({n}) are substituted at emission time so the
+     * comments always report the actual evaluation position, including after
+     * an administrator reorders the stages.
+     *
+     * @return array<string, array<int, string>> Stage key → template lines
+     */
+    private function preFilterStageLines(bool $observeMode): array
+    {
+        return [
+            // Unconditional immunity for localhost IPC (invariant 1's floor).
+            'loopback' => [
+                '        # STAGE {n}: BASE INVARIANT: UNCONDITIONAL LOOPBACK ACCESS',
+                '        iif "lo" accept',
+                '',
+            ],
+            // The administrator safety net: deliberately evaluated before
+            // every drop rule and before the malformed-packet check.
+            'whitelist' => [
+                '        # STAGE {n}: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY',
+                '        ip saddr @whitelist_ips accept',
+                '        ip6 saddr @whitelist_ips6 accept',
+                '',
+            ],
+            // Invalid packet defense, kept below the whitelist on purpose so
+            // a trusted source is never turned away (invariant 2).
+            'invalid' => [
+                '        # STAGE {n}: DROP INVALID PACKETS (after the whitelist on purpose)',
+                '        ct state invalid '.$this->dropStatement('invalid', $observeMode),
+                '',
+            ],
+            // Passes the bulk of ongoing SIP/RTP media with zero set lookups.
+            'fast_path' => [
+                '        # STAGE {n}: STATEFUL FAST PATH (ONGOING CONNECTIONS PASS INSTANTLY)',
+                '        ct state established,related accept',
+                '',
+            ],
+            'blacklist' => [
+                '        # STAGE {n}: DROP BLACKLISTED NETWORKS & IPs IMMEDIATELY',
+                '        ip saddr @blacklist_ips '.$this->dropStatement('blacklist', $observeMode),
+                '        ip6 saddr @blacklist_ips6 '.$this->dropStatement('blacklist', $observeMode),
+                '',
+            ],
+            'banned' => [
+                '        # STAGE {n}: DROP TEMPORARILY BANNED BRUTE-FORCE ATTACKERS',
+                '        ip saddr @banned_ips '.$this->dropStatement('bans', $observeMode),
+                '        ip6 saddr @banned_ips6 '.$this->dropStatement('bans', $observeMode),
+                '',
+            ],
+            // The counters feed the Security Center's "packets dropped by
+            // the feed" metric; the sets stay populated across rebuilds.
+            'threat_feeds' => [
+                '        # STAGE {n}: DROP AUTOMATED PUBLIC THREAT FEED MATCHES',
+                '        ip saddr @threat_feed_ips '.$this->dropStatement('threat_feeds', $observeMode, true),
+                '        ip6 saddr @threat_feed_ips6 '.$this->dropStatement('threat_feeds', $observeMode, true),
+                '',
+            ],
+        ];
     }
 
     /**

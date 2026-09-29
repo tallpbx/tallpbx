@@ -1340,6 +1340,8 @@ return [
     'security_cannot_blacklist_whitelisted' => 'The IP address :ip is whitelisted and cannot be blacklisted. Remove it from the Whitelist section first if it needs to be blocked.',
     'security_prefilter_lockout_refused' => 'Turning off the pre-filter would block your current connection: the address :ip would be dropped by the default inbound policy once the built-in pre-filter rules are removed. Add your address to the Trusted List first, then turn the pre-filter off.',
     'security_observe_restore_lockout_refused' => 'Turning off observe mode would restore enforcement and your current connection from :ip is not covered by the Trusted List or an explicit ALLOW rule. Add your address to the Trusted List first, then leave observe mode.',
+    'security_prefilter_loopback_pinned' => 'The loopback stage is always evaluated first so the server can talk to its own database and phone service — it cannot be moved.',
+    'security_prefilter_stage_unknown' => 'Unknown pre-filter stage: :stage.',
     'security_ip_format_invalid' => 'Enter a valid IPv4 or IPv6 address, for example 203.0.113.50 or 2001:db8::1, or a CIDR range such as 10.0.0.0/24 or 2001:db8::/64.',
     'security_ban_ip_format_invalid' => 'Enter a valid IPv4 or IPv6 address for the ban, for example 203.0.113.50 or 2001:db8::1.',
     'vector_sip' => 'Phone (SIP)',
