@@ -180,91 +180,65 @@ The generator never emits an unsafe order and never silently reorders one — a 
 
 ---
 
-## Firewall Disable & Troubleshooting Bypass Modes
+## Two On/Off Switches
 
-"Turn the firewall off" is really **two different intentions** that need two different affordances, and conflating them is what produces outages:
+The firewall's behavior is controlled by **exactly two independent on/off switches**, giving administrators maximum flexibility without forcing them through a multi-stage toggle UI:
 
-| | Persistent off | Temporary troubleshooting bypass |
+1. **`firewall_enabled`** (existing) — Whole firewall on/off. When off, no firewall rules apply at all. The existing setting, typed confirmation, persistent red banner, and Zone 1 status card behavior stay unchanged.
+2. **`prefilter_enabled`** (new) — Pre-populated pre-filter on/off. When off, the seven pre-populated pre-filter stages (loopback, whitelist, invalid packet drop, fast path, blacklist, bans, threat feeds) are skipped entirely. The rest of the chain (ICMP, TFTP defense, port catalog, custom rules, default policy) still runs.
+
+**Independence:** The two switches are independent. The prefilter switch only matters when the whole firewall is on. If the firewall is off, the prefilter switch has no effect.
+
+| `firewall_enabled` | `prefilter_enabled` | Result |
 |---|---|---|
-| Intent | "I don't want a firewall on this server" | "Is the firewall what is breaking this call?" |
-| Duration | Until someone changes it | Bounded, automatically reverting |
-| Surface | A settings toggle | A **Pause protection** button |
-| Banner | Persistent red, on every Security page | Amber with a live countdown |
-| Failure mode | Long-term exposure nobody notices | A forgotten open window |
+| OFF | (any) | No firewall rules apply |
+| ON | ON | Default — the full chain runs |
+| ON | OFF | Stages 1–7 skipped; stages 8–12 still run |
 
-### What already exists — reuse it, do not rebuild it
+### Maximum Flexibility Through the Custom Rules Section
 
-The security module already carries most of the vocabulary needed. Any new work must extend these rather than introduce parallel switches:
+The custom rules section (STAGE 11) is always active when the firewall is on, regardless of the prefilter switch. This is what delivers the maximum customizability the design calls for:
 
-| Capability | Existing setting / class | Notes |
-|---|---|---|
-| Disable the whole firewall | `firewall_enabled` | Already emits an open ruleset (`policy accept`) and has a generator test |
-| Default inbound policy | `firewall_default_policy` | Guarded by `LockoutGuardService` |
-| Zero-lockout protection | `LockoutGuardService` | `assertSafe()`, `whitelistIp()` auto-whitelist, plus the try-and-rollback policy change pattern in `SecurityManager` |
-| Global intrusion detection | `intrusion_detection_enabled` | |
-| Per-protocol intrusion protection | `protect_web`, `protect_sip`, `protect_ssh` | Read through `SecurityIncidentService::isVectorProtected()` — this is already per-section disabling |
-| Attack protection | `attack_protection_enabled` | |
-| Per-rule / per-service / per-protocol toggles | `SecurityRule.enabled`, `SecurityService.enabled`, ICMP enabled | Existing `toggleRule()` and friends |
-| TFTP defense toggle | `tftp_defense_enabled` (§2.2) | Planned |
-| Per-threat-feed toggle | `SecurityThreatFeed.enabled` (§1.5) | Planned |
+- **Recreate any pre-filter rule as a custom rule, then turn off the prefilter.** For example, to keep only the malformed-packet drop:
+  1. Add `ct state invalid drop` to the custom rules section.
+  2. Turn off the prefilter.
+  3. Now only your custom rule applies; the rest of the prefilter stages are gone.
 
-So "individual sections" is **largely already solved** at the intrusion-detection and service layer. What is missing is the *temporary, self-reverting* dimension and a couple of targeted escape hatches.
+- **Recreate the entire prefilter manually.** Turn off the prefilter, then add `iif "lo" accept`, the whitelist logic, the blocklist drops, and so on to the custom section. The generator never inserts placeholders or auto-migrates built-in rules — the custom section is the administrator's own space.
 
-### What is genuinely missing
+- **Layer on top of the prefilter.** Leave the prefilter on and add custom rules to extend or override built-in behavior (for example, a custom rule that drops additional countries, or a custom allow rule that takes precedence over a built-in drop). The custom section runs after the prefilter, so additions and overrides both work.
 
-1. **A bounded bypass that restores itself.** Today, turning the firewall off is a sticky state. If an administrator disables it at 22:00 to debug a registration and forgets, the PBX is open to the internet all night — SIP scanners, toll-fraud dialing, the lot. This is the single most valuable addition.
-2. **Observe-only (shadow) mode.** A blunt disable answers "does it work without the firewall?" but not *why*. Evaluating every check and **recording without dropping** answers the real question while traffic flows normally.
-3. **An escape hatch for `ct state invalid drop`.** It is the one hard-coded pipeline stage with no switch anywhere, and it is a genuine real-world troubleshooting target — SIP ALGs and asymmetric routing routinely produce packets conntrack classifies as invalid, showing up as one-way audio or failed registrations.
-4. **Ban accumulation during a bypass.** If intrusion detection keeps auto-banning while the firewall is bypassed, restoring it suddenly applies a backlog of bans the administrator never saw. Experienced as "the firewall randomly broke my phones".
+- **Author nothing.** Turn off the prefilter and leave the custom section empty to get a minimal firewall: only ICMP, TFTP defense (when enabled), the port catalog, and the default policy. This is a deliberate consequence of the flexibility — the administrator has chosen this configuration.
 
-### The design: one control, two dimensions
+### Safety Considerations
 
-A single **Pause protection** button pinned beside the Zone 1 status cards opens a small dialog with exactly two choices — a mode and a scope — behind an "Advanced" disclosure so the office manager sees one button and the engineer sees the dial:
+- **LockoutGuardService still applies at save time.** When `prefilter_enabled` is turned off, the lockout guard checks the resulting ruleset: if the administrator's current IP would be dropped by the default policy and no whitelist or custom rule covers it, the save is refused with the existing one-click auto-whitelist prompt. The bounded helper never lets the panel report a healthy firewall while the administrator is locked out.
+- **No minimum-set guarantee.** Turning off the prefilter does not silently re-add any of its rules. If the administrator wants loopback, the whitelist, or any other prefilter behavior back, the design assumes they will author it in the custom section — that is the explicit trade-off for the flexibility.
+- **`firewall_default_policy` still matters.** With the prefilter off and the default policy set to `DROP`, only rules the administrator authors (in custom) or that ship in the port catalog will accept traffic. This is intentional and visible: the policy is the same setting, the chain around it is just smaller.
+- **Reordering still applies when the prefilter is on.** The chevron buttons from *Pre-Filter Stage Reordering* continue to reorder the seven prefilter stages within their safety constraints. When the prefilter is off, those stages are not running, so ordering is moot for that configuration.
+- **Threat-feed sets still reload after every firewall rebuild (invariant 5).** Turning off the prefilter does not affect feed syncing; only the drop rule that references the feed set is omitted. The set stays populated and ready, so flipping the prefilter back on brings full protection back immediately.
 
-**Mode**
-- **Observe only (recommended)** — every check evaluates and logs; nothing is dropped. Traffic flows normally and the panel shows exactly what *would* have been blocked, by which stage.
-- **Enforce off** — the selected stages stop dropping entirely.
+### Banner System
 
-**Scope**
-- **Everything** (all blocking: blacklist, bans, threat feeds, TFTP defense, invalid-packet drop)
-- **Blocking lists only** (blacklist + bans + threat feeds)
-- **Malformed packets only** (`ct state invalid drop`)
-- **Auto-ban only** — maps onto the existing `intrusion_detection_enabled`, not a new mechanism
+Only the persistent red banner for `firewall_enabled = false` is shown. Toggling `prefilter_enabled` does **not** trigger any banner — it is just a configured state, visible in the Security Manager UI like any other setting. There is no countdown, no overdue escalation, and no auto-revert: the prefilter switch is a simple on/off, not a timed pause.
 
-Scope is expressed as stage keys from `pre_filter_order` (the previous section), so ordering and bypassing share one vocabulary and neither needs a second schema.
+### Storage
 
-### Safety rails (all modes)
-
-- **Bounded by default.** The duration picker offers 10 min *(recommended)* / 30 min / 1 hour / *Until I turn it back on*. Only the last requires a typed confirmation. Automatic restore runs on the scheduler (see the deployment note below).
-- **A reason field is required** and stored in `security_audit_logs` alongside who, what, when, and the auto-revert deadline. A bypass is an operational decision worth a sentence.
-- **Loopback and the whitelist are never affected.** They are the floor of the system and remain outside every bypass scope, consistent with invariant 1 and the STAGE 1 loopback rule in §1.3. No bypass mode can sever the administrator's access.
-- **The dangerous moment is re-enabling, not disabling.** Entering a bypass is permissive and cannot lock anyone out; *restoring* a `DROP` policy can, especially if the administrator's current IP was never whitelisted. The restore path therefore runs `LockoutGuardService::assertSafe()` and offers the existing `whitelistIp()` one-click auto-whitelist before applying. This must be tested explicitly — it is the failure this whole section exists to prevent.
-- **Ban accumulation is suspended while bypassed.** Auto-bans that *would* have been issued are recorded as incidents flagged `bypassed`, and are presented in the restore summary for an approve-or-discard decision rather than landing silently on restore.
-- **Restore summary.** On restore the panel reports what the window let through: count by stage, top source addresses, and the pending bans awaiting a decision. This is the diagnostic payload that makes observe-only mode worth choosing over a blunt disable.
-- **Overdue detection.** Auto-revert depends on the scheduler being healthy. If the deadline passes without a restore, the banner escalates to red and says plainly that protection is still off and the automatic restore did not run — never let a silent scheduler failure hide an open firewall.
-
-### Persistent "no firewall" deployments
-
-Some servers legitimately sit behind a hardware firewall and want no host filtering at all. That stays the existing `firewall_enabled = false`, but the surface needs to be unmissable rather than a quiet toggle:
-
-- Turning it off requires a typed confirmation that names the consequence in plain language: *"This server will accept all inbound traffic from the internet, including SIP registration attempts and call setup from unknown callers."*
-- A persistent red banner sits at the top of **every** Security page (not only the Firewall Rules tab) while it is off, with a one-click **Turn firewall back on**.
-- The Zone 1 firewall status card reflects it as `Off`, not `Idle`, so a screenshot or a casual glance is never ambiguous.
-- The same ban-accumulation rule applies: intrusion detection may keep *recording*, but nothing accumulates into a backlog to be applied later.
+`firewall_enabled` already exists in `security_settings`. `prefilter_enabled` is a new boolean in `security_settings`, defaulting to `true` to preserve current behavior. `SecurityConfigGenerator::DEFAULT_PRE_FILTER_ENABLED = true` declares the default in code so an application update can extend the surface without a migration. `assertValidPreFilterToggle(mixed $value): bool` is a thin validator — only `true` or `false` is accepted; any other input is rejected at save time with a plain-language message.
 
 ### Testing
 
-- `SecurityBypassModeTest`:
-  - Observe-only generates rules that count and log but do not drop, for every stage in scope.
-  - Each scope option touches exactly its own stages — "Malformed packets only" leaves the blocklist drops intact, and vice versa.
-  - Loopback and whitelist rules are byte-identical across every bypass mode and scope.
-  - An expired bypass restores automatically; an overdue one is reported as such.
-  - Bans are not accumulated during a bypass and appear as `bypassed` incidents in the restore summary.
-- `LockoutGuardServiceRestoreTest` (the important one):
-  - Restoring enforcement from an unwhitelisted administrator IP throws `LockoutException` rather than silently locking them out.
-  - The offered `whitelistIp()` path makes the same restore succeed.
-  - Restoring with `firewall_default_policy = accept` never blocks the restore.
-- `SecurityManagerBypassTest`: the required-reason validation, the typed confirmation for *Until I turn it back on*, banner state per mode, and the persistent-off banner rendering on every Security page.
+- `SecurityConfigGeneratorTwoSwitchesTest`:
+  - When `firewall_enabled = false`, no firewall rules are generated (existing behavior, unchanged).
+  - When `firewall_enabled = true` and `prefilter_enabled = true`, the full default chain is generated (existing behavior, unchanged).
+  - When `firewall_enabled = true` and `prefilter_enabled = false`, stages 1–7 are omitted from the generated ruleset and stages 8–12 are unchanged.
+  - The threat-feed set is still reloaded after every firewall rebuild regardless of `prefilter_enabled` (invariant 5).
+  - A build with no `prefilter_enabled` key is byte-identical to one with `prefilter_enabled = true`, so the fallback and the default cannot drift.
+- `SecurityManagerTwoSwitchesTest`:
+  - Each toggle persists to `security_settings`, regenerates the ruleset, and applies via `autoApplyFirewallRuleset()`.
+  - Toggling `prefilter_enabled` off calls `LockoutGuardService::assertSafe()` and refuses the save with the auto-whitelist prompt when the administrator's IP would be dropped by the resulting ruleset.
+  - Setting `firewall_enabled = false` does not require `prefilter_enabled` to be in any particular state.
+- `SecurityConfigGeneratorTest` continues to assert the full default chain is present when both switches are in their default state, so the existing coverage stays intact.
 
 ---
 
@@ -576,7 +550,6 @@ This feature set changes code that lives **outside the git working tree**, so a 
 - **Permissions.** Threat-feed settings, ban management, and signature management are **system-wide administrator features with no tenant-user exposure**. Reuse the existing `security.*` keys where they fit and add `security.threat-feeds.manage` for the feed controls; verify with the `module:sync --only-local` + `AdminSeeder` convention in `AGENTS.md`.
 - **CHANGELOG.md.** `### Added` for the three features, `### Security` for the chain reorder, the bounded helper changes, and the new Linux package. Note the FreeSWITCH dialplan change explicitly — it invalidates the dialplan XML cache, which the render path already handles through its TTL.
 - **Cache clearing.** `php artisan optimize:clear` after every change per `AGENTS.md`: the dialplan XML, routes, Blade, and config are all cached.
-- **Scheduler required for bypass auto-revert.** The bounded bypass restores itself on the Laravel scheduler (`tallpbx-scheduler.service`). Note in `CHANGELOG.md` that a bypass cannot be relied upon to expire if the scheduler is stopped, and keep the overdue-banner behaviour (see *Firewall Disable & Troubleshooting Bypass Modes*) as the compensating control.
 
 ---
 
@@ -602,7 +575,7 @@ This feature set changes code that lives **outside the git working tree**, so a 
    - Helper test: `flush-conntrack` rejects malformed addresses and dual-stack mismatches, invokes `/usr/sbin/conntrack` with the correct family flag (`-f ipv6` for v6), and reports a missing `conntrack` binary clearly.
    - `SecurityBanServiceTest` and blacklist add tests: the flush is invoked after ban/blacklist add; feed-sync tests assert no flush occurs; a flush failure raises a `security_audit_logs` entry.
    - Pre-filter ordering (`SecurityConfigGeneratorPreFilterOrderTest`, `SecurityManagerPreFilterOrderTest`) — see *Pre-Filter Stage Reordering*. The permutation/validator test is the one that protects invariant 1 from being quietly relaxed.
-   - Bypass modes (`SecurityBypassModeTest`, `LockoutGuardServiceRestoreTest`, `SecurityManagerBypassTest`) — see *Firewall Disable & Troubleshooting Bypass Modes*. The restore-side lockout test is the one that matters most.
+   - Two switches (`SecurityConfigGeneratorTwoSwitchesTest`, `SecurityManagerTwoSwitchesTest`) — see *Two On/Off Switches*. The lockout-guard test is the one that protects administrators from accidentally cutting off their own access when the prefilter is off.
 5. **Mandatory Full Verification** (per `AGENTS.md`, in this order):
    ```bash
    php artisan optimize:clear
