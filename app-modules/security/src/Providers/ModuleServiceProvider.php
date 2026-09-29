@@ -20,6 +20,9 @@ use Modules\Security\Listeners\LogFailedSipAuthListener;
 use Modules\Security\Services\SecurityBanService;
 use Modules\Security\Services\SecurityExecutor;
 use Modules\Security\Services\SecurityIncidentService;
+use Modules\Security\Services\ThreatFeedIngestionService;
+use Modules\Security\Services\ThreatFeedManager;
+use Modules\Security\Services\VoipblFeedProvider;
 
 /**
  * Service provider for the security module.
@@ -78,6 +81,21 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         SecurityIncidentServiceInterface::class => SecurityIncidentService::class,
         SecurityBanServiceInterface::class => SecurityBanService::class,
         SecurityExecutorInterface::class => SecurityExecutor::class,
+    ];
+
+    /**
+     * Container singletons registered by this module.
+     *
+     * The threat feed manager, its drivers, and the ingestion pipeline are
+     * singletons so a scheduled run and a panel-triggered sync share one
+     * registry of providers.
+     *
+     * @var array<class-string, class-string>
+     */
+    public $singletons = [
+        ThreatFeedManager::class => ThreatFeedManager::class,
+        VoipblFeedProvider::class => VoipblFeedProvider::class,
+        ThreatFeedIngestionService::class => ThreatFeedIngestionService::class,
     ];
 
     /**
