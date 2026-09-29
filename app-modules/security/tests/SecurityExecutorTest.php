@@ -65,6 +65,7 @@ it('returns false gracefully when helper script does not exist', function (): vo
     expect($executor->ban('192.0.2.1', 3600))->toBeFalse()
         ->and($executor->unban('192.0.2.1'))->toBeFalse()
         ->and($executor->apply())->toBeFalse()
+        ->and($executor->updateThreatFeed())->toBeFalse()
         ->and($executor->status())->toBe('');
 });
 
@@ -237,6 +238,124 @@ it('routes flush-conntrack by address family with the correct conntrack flag', f
             ->and($v6->getOutput())->toContain('ARGS: -D -f ipv6 -s 2001:db8::1');
     } finally {
         @unlink($stub);
+        @rmdir($stubDir);
+    }
+});
+
+it('self-reports the helper capability version marker', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // PHP refuses threat-feed actions against helpers older than version 2,
+    // so the script must self-report what it supports.
+    $process = new Process(['bash', $scriptPath, 'version']);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(0)
+        ->and($process->getOutput())->toContain('tallpbx-helper-version: 2');
+});
+
+it('update-threat-feed requires the canonical pending file', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_exec_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'update-threat-feed'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(1)
+            ->and($process->getErrorOutput())->toContain('Pending threat feed file not found');
+    } finally {
+        @rmdir($isolatedDir);
+    }
+});
+
+it('update-threat-feed ignores any path argument and only reads the canonical file', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // The helper contract is a NO-argument action: even when an argument is
+    // supplied, the promoted and loaded file must be the canonical pending
+    // path inside the configuration directory — never the argument.
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_helper_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/threat_feed.nft.pending', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'update-threat-feed', '/tmp/evil-path.nft'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toContain("NFT: -c -f {$isolatedDir}/threat_feed.nft.pending")
+            ->and($process->getOutput())->toContain("NFT: -f {$isolatedDir}/threat_feed.nft")
+            ->and($process->getOutput())->not->toContain('/tmp/evil-path.nft')
+            ->and(file_exists($isolatedDir.'/threat_feed.nft'))->toBeTrue()
+            ->and(file_exists($isolatedDir.'/threat_feed.nft.pending'))->toBeFalse();
+    } finally {
+        @unlink($isolatedDir.'/threat_feed.nft');
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
+it('reloads the last good threat feed file after every successful apply', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // The main ruleset loads with `flush ruleset`, which empties the feed
+    // sets — so a successful apply must re-load the last good feed file
+    // (invariant 5) right after the main ruleset.
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_apply_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/firewall.nft.pending', "#!/usr/sbin/nft -f\n# main ruleset\n");
+    file_put_contents($isolatedDir.'/threat_feed.nft', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+
+        $output = $process->getOutput();
+        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
+        $feedCheck = strpos($output, "NFT: -c -f {$isolatedDir}/threat_feed.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/threat_feed.nft");
+
+        expect($mainLoad)->not->toBeFalse()
+            ->and($feedCheck)->not->toBeFalse()
+            ->and($feedLoad)->not->toBeFalse()
+            ->and($mainLoad)->toBeLessThan($feedCheck)
+            ->and($feedCheck)->toBeLessThan($feedLoad);
+    } finally {
+        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
         @rmdir($stubDir);
     }
 });

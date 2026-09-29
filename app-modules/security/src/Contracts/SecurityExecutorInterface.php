@@ -39,6 +39,15 @@ interface SecurityExecutorInterface
     public function flushConntrack(string $ip): bool;
 
     /**
+     * Promote and load the pending threat feed set-element file.
+     *
+     * The bounded helper reads only its canonical pending file (no path
+     * argument); a helper older than the capability version refuses with a
+     * logged plain-language error instead of an opaque usage message.
+     */
+    public function updateThreatFeed(): bool;
+
+    /**
      * Atomically compile and apply pending nftables ruleset.
      */
     public function apply(): bool;

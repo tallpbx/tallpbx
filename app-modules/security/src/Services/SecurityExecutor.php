@@ -69,6 +69,65 @@ class SecurityExecutor implements SecurityExecutorInterface
     }
 
     /**
+     * Capability version of the helper that introduced threat feed updates.
+     */
+    private const REQUIRED_HELPER_VERSION = 2;
+
+    /**
+     * Promote and load the pending threat feed set-element file.
+     *
+     * Existing installs may still carry the previous helper build, which
+     * cannot touch the feed sets — the refusal is a plain-language log line
+     * telling the operator to re-run the installer's security step, instead
+     * of the helper's opaque usage error.
+     */
+    public function updateThreatFeed(): bool
+    {
+        $version = $this->helperVersion();
+
+        if ($version === null || $version < self::REQUIRED_HELPER_VERSION) {
+            Log::warning(
+                'The security helper on this server is out of date (version '.($version ?? 'unknown')
+                .'); re-run the installer\'s security step to enable threat feed updates.'
+            );
+
+            return false;
+        }
+
+        return $this->runCommand(['update-threat-feed']);
+    }
+
+    /**
+     * Read the helper's self-reported capability version.
+     *
+     * Returns null when the helper is missing, cannot execute (automated
+     * test runs never touch the privileged helper), or does not understand
+     * the 'version' action — all of which mean "too old" for every
+     * capability-gated action.
+     */
+    private function helperVersion(): ?int
+    {
+        // Same safety contract as runCommand: never execute the privileged
+        // helper during automated test runs.
+        if (app()->runningUnitTests() || ! file_exists($this->helperPath)) {
+            return null;
+        }
+
+        $process = $this->createProcess(['version']);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            return null;
+        }
+
+        if (preg_match('/tallpbx-helper-version:\s*(\d+)/', $process->getOutput(), $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        return null;
+    }
+
+    /**
      * Atomically validate and apply the pending nftables ruleset.
      */
     public function apply(): bool

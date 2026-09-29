@@ -8,7 +8,11 @@
 #
 # Security Architecture:
 # - Strictly bounded interface: Only 'apply', 'validate', 'ban', 'unban',
-#   'flush-conntrack', 'status', and 'bans' are allowed.
+#   'flush-conntrack', 'update-threat-feed', 'version', 'status', and 'bans'
+#   are allowed.
+# - Capability version: the 'version' action self-reports the marker below.
+#   TallPBX refuses threat-feed actions against helpers older than version 2.
+#   tallpbx-helper-version: 2
 # - Input validation: IP addresses and durations are rigorously validated with regular
 #   expressions before being passed to nftables, preventing any arbitrary command injection.
 # - Atomic ruleset updates: Pending firewall rulesets are validated with 'nft -c'
@@ -23,6 +27,9 @@ set -euo pipefail
 # be world-readable. A restrictive umask makes 0640 the default for every new
 # file, so even a future edit that forgets an explicit chmod stays private.
 umask 027
+
+# Capability marker PHP reads back through the 'version' action.
+HELPER_VERSION=2
 
 ACTION="${1:-}"
 
@@ -45,6 +52,12 @@ SECONDS_REGEX="^[0-9]{1,9}$"
 FIREWALL_CONF_DIR="${TALLPBX_FIREWALL_CONF_DIR:-/etc/tallpbx}"
 FIREWALL_PENDING="${FIREWALL_CONF_DIR}/firewall.nft.pending"
 FIREWALL_ACTIVE="${FIREWALL_CONF_DIR}/firewall.nft"
+
+# Canonical threat feed files. The web application writes the pending file;
+# this helper promotes and loads it (update-threat-feed) and re-loads the
+# active file after every firewall rebuild (apply).
+THREAT_FEED_PENDING="${FIREWALL_CONF_DIR}/threat_feed.nft.pending"
+THREAT_FEED_ACTIVE="${FIREWALL_CONF_DIR}/threat_feed.nft"
 
 # Path to the nftables binary. Defaults to system binary. Automated tests point
 # TALLPBX_NFT_BIN at a stub binary in a temporary directory. Sudo's env_reset
@@ -106,7 +119,21 @@ case "$ACTION" in
         # Step 5: Load the validated configuration into the Linux kernel atomically
         "$NFT_BIN" -f "$FIREWALL_ACTIVE"
 
-        # Step 6: Post-apply verification and authoritative sidecar creation
+        # Step 6: Re-load the threat feed elements. The main ruleset loads
+        # with 'flush ruleset', which empties every set — without this step
+        # the feed sets would stay empty until the next scheduled sync (up to
+        # a full day of lost protection). A corrupt feed file is skipped with
+        # a warning instead of failing the apply: a degraded feed gate beats
+        # a broken firewall.
+        if [ -f "$THREAT_FEED_ACTIVE" ]; then
+            if "$NFT_BIN" -c -f "$THREAT_FEED_ACTIVE"; then
+                "$NFT_BIN" -f "$THREAT_FEED_ACTIVE"
+            else
+                echo "WARNING: threat feed file failed validation and was not re-loaded" >&2
+            fi
+        fi
+
+        # Step 7: Post-apply verification and authoritative sidecar creation
         DECLARED_POLICY="$(sed -n 's/^# tallpbx-policy:[[:space:]]*\([a-z]*\).*/\1/p' "$FIREWALL_ACTIVE")"
         RULESET_DIGEST="$(sed -n 's/^# tallpbx-digest:[[:space:]]*\(sha256:[0-9a-f]\{64\}\).*/\1/p' "$FIREWALL_ACTIVE")"
         LIVE_CHAIN="$("$NFT_BIN" list chain inet tallpbx_filter input 2>/dev/null || true)"
@@ -232,6 +259,45 @@ case "$ACTION" in
         echo "SUCCESS: Flushed conntrack entries for $IP"
         ;;
 
+    version)
+        # Self-report the capability marker PHP uses to refuse stale helpers.
+        echo "tallpbx-helper-version: $HELPER_VERSION"
+        ;;
+
+    update-threat-feed)
+        # Promote and load the pending threat feed set-element file. This
+        # action takes NO path argument by contract: the web user must never
+        # be able to point a root-owned helper at an arbitrary file, so only
+        # the canonical pending path written by the application is read.
+        if [ ! -f "$THREAT_FEED_PENDING" ]; then
+            echo "ERROR: Pending threat feed file not found: $THREAT_FEED_PENDING" >&2
+            exit 1
+        fi
+
+        # Ensure the table and both feed sets exist before touching elements;
+        # restore the active ruleset if the kernel lost it (the same recovery
+        # pattern the ban action uses), so 'flush set' can never fail against
+        # a missing set.
+        if ! "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
+            if [ -f "$FIREWALL_ACTIVE" ]; then
+                "$NFT_BIN" -c -f "$FIREWALL_ACTIVE"
+                "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
+            fi
+        fi
+
+        # Preflight the set-element statements before promoting anything, so
+        # a malformed compile never replaces the last good feed file.
+        "$NFT_BIN" -c -f "$THREAT_FEED_PENDING"
+
+        # Promote atomically, then load. The flush and add-element statements
+        # travel in one file, so the kernel sees one transaction.
+        mv "$THREAT_FEED_PENDING" "$THREAT_FEED_ACTIVE"
+        chown root:www-data "$THREAT_FEED_ACTIVE" 2>/dev/null || true
+        chmod 0640 "$THREAT_FEED_ACTIVE" 2>/dev/null || true
+        "$NFT_BIN" -f "$THREAT_FEED_ACTIVE"
+        echo "SUCCESS: Threat feed elements loaded"
+        ;;
+
     status)
         # Display the active nftables ruleset or table status
         if "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
@@ -251,7 +317,7 @@ case "$ACTION" in
         ;;
 
     *)
-        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|status|bans}" >&2
+        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|update-threat-feed|version|status|bans}" >&2
         exit 1
         ;;
 esac
