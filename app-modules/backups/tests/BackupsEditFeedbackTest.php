@@ -78,3 +78,9 @@ it('queues the backup run after modal confirmation', function (): void {
     Queue::assertPushed(BackupRunner::class);
     expect($backup->fresh()->status)->toBe('pending');
 });
+
+it('shows a loading state on the save button while the backup is created', function (): void {
+    Livewire::test(BackupsEdit::class)
+        ->assertSee('wire:target="save"', false)
+        ->assertSee('loading loading-spinner', false);
+});

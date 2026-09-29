@@ -91,3 +91,10 @@ it('limits a single batch to one thousand extensions', function () {
         ->call('save')
         ->assertHasErrors('endExtension');
 });
+
+it('shows a loading state on the save button while extensions are created', function () {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ExtensionsBulkCreate::class)
+        ->assertSee('wire:target="save"', false)
+        ->assertSee('loading loading-spinner', false);
+});

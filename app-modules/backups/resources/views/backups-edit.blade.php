@@ -91,7 +91,10 @@
 
         {{-- Submit --}}
         <div class="flex gap-3 pt-2">
-            <button type="submit" class="btn btn-primary">
+            {{-- While the save action is in flight the button disables itself and
+                 shows a spinner, so slow backup creation cannot be double-submitted. --}}
+            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="save">
+                <span wire:loading wire:target="save" class="loading loading-spinner loading-sm"></span>
                 {{ $backupId ? __('client.save') : __('admin.backup_create') }}
             </button>
             <a href="{{ route('panel.backups.index') }}" class="btn btn-ghost" wire:navigate>
