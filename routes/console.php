@@ -75,3 +75,9 @@ Schedule::command('security:verify')
 Schedule::command('security:reconcile')
     ->everyFifteenMinutes()
     ->withoutOverlapping();
+
+// The hourly tick is cheap for feeds configured with longer intervals: the
+// command itself honours each feed's own sync_interval and skips the rest.
+Schedule::command('security:sync-threat-feeds')
+    ->hourly()
+    ->withoutOverlapping();

@@ -95,6 +95,17 @@ class ThreatFeedIngestionService
     }
 
     /**
+     * Compile an empty set-element file that flushes both feed sets.
+     *
+     * Used when a feed is switched off: its elements must leave the kernel
+     * immediately instead of waiting for the next sync to rewrite the file.
+     */
+    public function clear(): void
+    {
+        $this->compileSetElementFile([], []);
+    }
+
+    /**
      * Parse the downloaded list line by line and compile the set-element file.
      *
      * Streaming line reads keep PHP memory flat regardless of list size;

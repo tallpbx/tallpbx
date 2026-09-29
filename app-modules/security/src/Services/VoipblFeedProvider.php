@@ -66,15 +66,20 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
      * Run one full sync and persist the outcome on the feed row.
      *
      * Metadata discipline: only a successful download replaces the entry
-     * count, rejected count, and cache validators; only a successful or
-     * not-modified check refreshes the staleness clock, so a feed failing
-     * forever also eventually surfaces as stale.
+     * count, rejected count, and cache validators; the attempt timestamp
+     * refreshes on every run so staleness means exactly one thing — no
+     * sync attempts are happening at all.
      */
     public function sync(SecurityThreatFeed $feed, bool $force = false): ThreatFeedSyncResult
     {
         $result = $this->ingestion->ingest($feed, $this->fetchUrl($feed), $force);
 
+        // last_sync_at is the last ATTEMPT timestamp: it refreshes on every
+        // run (including failures) so the staleness alert means "no sync
+        // attempts are happening at all" (a dead scheduler), never a feed
+        // that fails loudly on schedule.
         $updates = [
+            'last_sync_at' => now(),
             'last_status' => $result->status,
             'last_error' => $result->error,
         ];
@@ -84,10 +89,6 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
             $updates['last_rejected_lines'] = $result->rejectedLines;
             $updates['etag'] = $result->etag ?? $feed->etag;
             $updates['last_modified_header'] = $result->lastModified ?? $feed->last_modified_header;
-        }
-
-        if (in_array($result->status, ['success', 'not_modified'], true)) {
-            $updates['last_sync_at'] = now();
         }
 
         $feed->update($updates);
