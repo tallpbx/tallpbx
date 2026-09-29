@@ -101,17 +101,9 @@
                                         </button>
                                     @endif
 
-                                    <a href="{{ route('panel.hot-desking.edit', $session->id) }}" class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </a>
+                                    <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.hot-desking.edit', $session->id)" />
 
-                                    <button
-                                        wire:click="confirmSessionDeletion('{{ $session->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                        title="{{ __('admin.delete') }}"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.($session->extension?->extension_number ?? __('admin.unknown'))" wire:click="confirmSessionDeletion('{{ $session->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

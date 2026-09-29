@@ -35,12 +35,7 @@
                             </td>
                             <td class="text-sm">{{ $item->sent_at?->format('Y-m-d H:i') ?? '-' }}</td>
                             <td>
-                                <button
-                                    wire:click="confirmItemDeletion('{{ $item->id }}')"
-                                    class="btn btn-ghost btn-xs text-error"
-                                >
-                                    <x-heroicon-o-trash class="w-4 h-4" />
-                                </button>
+                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->subject" wire:click="confirmItemDeletion('{{ $item->id }}')" class="text-error" />
                             </td>
                         </tr>
                     @empty

@@ -39,20 +39,17 @@
                             </td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ $message->mediaAsset !== null ? route('panel.media-assets.stream', $message->mediaAsset) : asset('storage/' . $message->file_path) }}" target="_blank" class="btn btn-ghost btn-xs">
+                                    {{-- Media links keep wire:navigate off: playback/download must
+                                         hit the asset URL directly, so they receive labels in place. --}}
+                                    <a href="{{ $message->mediaAsset !== null ? route('panel.media-assets.stream', $message->mediaAsset) : asset('storage/' . $message->file_path) }}" target="_blank" class="btn btn-ghost btn-xs" aria-label="{{ __('client.play') }}">
                                         <x-heroicon-o-play class="w-4 h-4" />
                                     </a>
                                     @if ($message->mediaAsset !== null)
-                                        <a href="{{ route('panel.media-assets.download', $message->mediaAsset) }}" class="btn btn-ghost btn-xs">
+                                        <a href="{{ route('panel.media-assets.download', $message->mediaAsset) }}" class="btn btn-ghost btn-xs" aria-label="{{ __('client.download') }}">
                                             <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
                                         </a>
                                     @endif
-                                    <button
-                                        wire:click="confirmMessageDeletion('{{ $message->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$message->caller_id_name" wire:click="confirmMessageDeletion('{{ $message->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

@@ -27,12 +27,7 @@
                             <td>{{ $trans->language ?? '-' }}</td>
                             <td class="text-sm">{{ $trans->created_at->format('Y-m-d H:i') }}</td>
                             <td>
-                                <button
-                                    wire:click="confirmTranscriptionDeletion('{{ $trans->id }}')"
-                                    class="btn btn-ghost btn-xs text-error"
-                                >
-                                    <x-heroicon-o-trash class="w-4 h-4" />
-                                </button>
+                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$trans->id" wire:click="confirmTranscriptionDeletion('{{ $trans->id }}')" class="text-error" />
                             </td>
                         </tr>
                     @empty

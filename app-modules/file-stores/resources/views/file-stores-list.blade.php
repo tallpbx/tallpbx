@@ -131,19 +131,15 @@
                             <td>
                                 <div class="flex gap-2">
                                     <x-tooltip tip="Test connection">
-                                        <button type="button" class="btn btn-ghost btn-xs" wire:click="testConnection('{{ $fileStore->id }}')">
+                                        <button type="button" class="btn btn-ghost btn-xs" aria-label="Test connection" wire:click="testConnection('{{ $fileStore->id }}')">
                                             <x-heroicon-o-signal class="w-4 h-4" />
                                         </button>
                                     </x-tooltip>
                                     <x-tooltip tip="Edit file store">
-                                        <a href="{{ route('panel.file-stores.edit', $fileStore->id) }}" class="btn btn-ghost btn-xs" wire:navigate>
-                                            <x-heroicon-o-pencil-square class="w-4 h-4" />
-                                        </a>
+                                        <x-icon-button icon="heroicon-o-pencil-square" :label="__('client.edit')" :href="route('panel.file-stores.edit', $fileStore->id)" />
                                     </x-tooltip>
                                     <x-tooltip tip="Delete file store">
-                                        <button type="button" class="btn btn-ghost btn-xs text-error" wire:click="confirmFileStoreDeletion('{{ $fileStore->id }}')">
-                                            <x-heroicon-o-trash class="w-4 h-4" />
-                                        </button>
+                                        <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$fileStore->name" wire:click="confirmFileStoreDeletion('{{ $fileStore->id }}')" class="text-error" />
                                     </x-tooltip>
                                 </div>
                             </td>

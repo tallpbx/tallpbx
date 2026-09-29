@@ -35,15 +35,8 @@
                             <td>{{ $record->start_stamp?->format('M j, Y g:i A') }}</td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ route('panel.cdr.detail', $record->id) }}" class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-eye class="w-4 h-4" />
-                                    </a>
-                                    <button
-                                        wire:click="confirmCdrDeletion('{{ $record->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-eye" :label="__('client.view')" :href="route('panel.cdr.detail', $record->id)" />
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$record->caller_id_name" wire:click="confirmCdrDeletion('{{ $record->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>
