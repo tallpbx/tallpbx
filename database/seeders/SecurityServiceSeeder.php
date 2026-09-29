@@ -134,6 +134,13 @@ class SecurityServiceSeeder extends Seeder
             'protect_sip' => 'true',
             'protect_web' => 'true',
             'protect_ssh' => 'true',
+            // SIP scanner detection ships in record-only mode: every match is
+            // recorded and shown, but nothing is auto-banned until the
+            // administrator switches enforcement on.
+            'sip_scanner_enforcement_enabled' => 'false',
+            'sip_scanner_ban_seconds' => '86400',
+            'sip_scanner_window_seconds' => '300',
+            'sip_scanner_signatures' => '[]',
         ];
 
         foreach ($defaultSettings as $key => $val) {

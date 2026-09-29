@@ -70,7 +70,13 @@ it('seeds default security settings into security_settings', function (): void {
         ->and(SecuritySetting::getInt('max_retry'))->toBe(5)
         ->and(SecuritySetting::getBoolean('protect_sip'))->toBeTrue()
         ->and(SecuritySetting::getBoolean('protect_web'))->toBeTrue()
-        ->and(SecuritySetting::getBoolean('protect_ssh'))->toBeTrue();
+        ->and(SecuritySetting::getBoolean('protect_ssh'))->toBeTrue()
+        // SIP scanner detection ships in record-only mode: enforcement off,
+        // 24-hour bans, five-minute escalation window, no custom signatures.
+        ->and(SecuritySetting::getBoolean('sip_scanner_enforcement_enabled'))->toBeFalse()
+        ->and(SecuritySetting::getInt('sip_scanner_ban_seconds'))->toBe(86400)
+        ->and(SecuritySetting::getInt('sip_scanner_window_seconds'))->toBe(300)
+        ->and(SecuritySetting::get('sip_scanner_signatures'))->toBe('[]');
 });
 
 it('supports SecurityService model scopes and relations', function (): void {
