@@ -44,15 +44,8 @@
                             </td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ route('panel.call-flows.edit', $flow->id) }}" class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </a>
-                                    <button
-                                        wire:click="confirmCallFlowDeletion('{{ $flow->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.call-flows.edit', $flow->id)" />
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$flow->name" wire:click="confirmCallFlowDeletion('{{ $flow->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

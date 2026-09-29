@@ -31,20 +31,17 @@
                             <td>{{ $recording->created_at->format('M j, Y g:i A') }}</td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ $recording->mediaAsset !== null ? route('panel.media-assets.stream', $recording->mediaAsset) : asset('storage/' . $recording->file_path) }}" target="_blank" class="btn btn-ghost btn-xs">
+                                    {{-- Media links keep wire:navigate off: playback/download must
+                                         hit the asset URL directly, so they receive labels in place. --}}
+                                    <a href="{{ $recording->mediaAsset !== null ? route('panel.media-assets.stream', $recording->mediaAsset) : asset('storage/' . $recording->file_path) }}" target="_blank" class="btn btn-ghost btn-xs" aria-label="{{ __('client.play') }}">
                                         <x-heroicon-o-play class="w-4 h-4" />
                                     </a>
                                     @if ($recording->mediaAsset !== null)
-                                        <a href="{{ route('panel.media-assets.download', $recording->mediaAsset) }}" class="btn btn-ghost btn-xs">
+                                        <a href="{{ route('panel.media-assets.download', $recording->mediaAsset) }}" class="btn btn-ghost btn-xs" aria-label="{{ __('client.download') }}">
                                             <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
                                         </a>
                                     @endif
-                                    <button
-                                        wire:click="confirmRecordingDeletion('{{ $recording->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$recording->caller_id_name" wire:click="confirmRecordingDeletion('{{ $recording->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

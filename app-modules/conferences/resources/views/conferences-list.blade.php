@@ -48,15 +48,8 @@
                             </td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ route('panel.conferences.edit', $conference->id) }}" class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </a>
-                                    <button
-                                        wire:click="confirmConferenceDeletion('{{ $conference->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.conferences.edit', $conference->id)" />
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$conference->name" wire:click="confirmConferenceDeletion('{{ $conference->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

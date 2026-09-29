@@ -56,12 +56,7 @@
                                             class="btn btn-primary btn-xs"
                                         >{{ __('admin.send_call_broadcast') }}</button>
                                     @endif
-                                    <button
-                                        wire:click="confirmBroadcastDeletion('{{ $broadcast->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$broadcast->name" wire:click="confirmBroadcastDeletion('{{ $broadcast->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

@@ -64,6 +64,7 @@ return [
     'send' => 'Send',
     'upload' => 'Upload',
     'download' => 'Download',
+    'play' => 'Play',
     'enable' => 'Enable',
     'disable' => 'Disable',
     'enabled' => 'Enabled',

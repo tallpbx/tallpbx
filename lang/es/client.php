@@ -64,6 +64,7 @@ return [
     'send' => 'Enviar',
     'upload' => 'Subir',
     'download' => 'Descargar',
+    'play' => 'Reproducir',
     'enable' => 'Habilitar',
     'disable' => 'Deshabilitar',
     'enabled' => 'Habilitado',

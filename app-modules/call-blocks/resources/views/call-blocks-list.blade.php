@@ -36,15 +36,8 @@
                             </td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ route('panel.call-blocks.edit', $block->id) }}" class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </a>
-                                    <button
-                                        wire:click="confirmBlockDeletion('{{ $block->id }}')"
-                                        class="btn btn-ghost btn-xs text-error"
-                                    >
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.call-blocks.edit', $block->id)" />
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$block->name" wire:click="confirmBlockDeletion('{{ $block->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

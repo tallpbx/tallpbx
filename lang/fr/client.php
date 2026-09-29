@@ -64,6 +64,7 @@ return [
     'send' => 'Envoyer',
     'upload' => 'Télécharger',
     'download' => 'Télécharger',
+    'play' => 'Lire',
     'enable' => 'Activer',
     'disable' => 'Désactiver',
     'enabled' => 'Activé',
