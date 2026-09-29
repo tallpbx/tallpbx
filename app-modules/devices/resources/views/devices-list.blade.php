@@ -38,14 +38,8 @@
                             </td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="{{ route('panel.devices.edit', $device->id) }}"
-                                       class="btn btn-ghost btn-xs">
-                                        <x-heroicon-o-pencil class="w-4 h-4" />
-                                    </a>
-                                    <button wire:click="confirmDeviceDeletion('{{ $device->id }}')"
-                                            class="btn btn-ghost btn-xs text-error">
-                                        <x-heroicon-o-trash class="w-4 h-4" />
-                                    </button>
+                                    <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.devices.edit', $device->id)" />
+                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$device->mac_address" wire:click="confirmDeviceDeletion('{{ $device->id }}')" class="text-error" />
                                 </div>
                             </td>
                         </tr>

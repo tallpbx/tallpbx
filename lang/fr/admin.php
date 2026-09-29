@@ -9,6 +9,7 @@ return [
     'sign_in' => 'Se Connecter',
     'email' => 'Adresse Email',
     'password' => 'Mot de Passe',
+    'password_visibility' => 'Afficher ou masquer le mot de passe',
     'remember_me' => 'Se souvenir de moi',
     'authenticating' => 'Authentification...',
     'logout' => 'Déconnexion',

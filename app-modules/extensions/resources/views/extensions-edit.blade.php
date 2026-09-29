@@ -78,6 +78,8 @@
                         <button type="button"
                                 @click="show = !show"
                                 class="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/50 hover:text-base-content"
+                                aria-label="{{ __('admin.password_visibility') }}"
+                                :aria-pressed="show"
                                 tabindex="-1">
                             <x-heroicon-o-eye x-show="!show" class="w-5 h-5" />
                             <x-heroicon-o-eye-slash x-show="show" x-cloak class="w-5 h-5" />
@@ -190,6 +192,8 @@
                             <button type="button"
                                     @click="show = !show"
                                     class="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/50 hover:text-base-content"
+                                    aria-label="{{ __('admin.password_visibility') }}"
+                                    :aria-pressed="show"
                                     tabindex="-1">
                                 <x-heroicon-o-eye x-show="!show" class="w-5 h-5" />
                                 <x-heroicon-o-eye-slash x-show="show" x-cloak class="w-5 h-5" />

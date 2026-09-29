@@ -9,6 +9,7 @@ return [
     'sign_in' => 'Iniciar Sesión',
     'email' => 'Correo Electrónico',
     'password' => 'Contraseña',
+    'password_visibility' => 'Mostrar u ocultar contraseña',
     'remember_me' => 'Recordarme',
     'authenticating' => 'Autenticando...',
     'logout' => 'Cerrar Sesión',

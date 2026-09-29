@@ -9,6 +9,7 @@ return [
     'sign_in' => 'Sign In to Portal',
     'email' => 'Email Address',
     'password' => 'Password',
+    'password_visibility' => 'Show or hide password',
     'remember_me' => 'Remember me',
     'authenticating' => 'Authenticating...',
     'logout' => 'Logout',

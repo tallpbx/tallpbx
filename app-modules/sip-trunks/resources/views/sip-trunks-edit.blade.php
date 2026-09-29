@@ -55,7 +55,7 @@
                                data-bwignore="true"
                                data-form-type="other"
                                class="input input-bordered w-full pr-10" />
-                        <button type="button" @click="show = !show" class="btn btn-ghost btn-xs btn-circle absolute right-2 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content" tabindex="-1">
+                        <button type="button" @click="show = !show" class="btn btn-ghost btn-xs btn-circle absolute right-2 top-1/2 -translate-y-1/2 text-base-content/60 hover:text-base-content" aria-label="{{ __('admin.password_visibility') }}" :aria-pressed="show" tabindex="-1">
                             <x-heroicon-o-eye x-show="!show" class="w-4 h-4" />
                             <x-heroicon-o-eye-slash x-show="show" class="w-4 h-4" x-cloak />
                         </button>
