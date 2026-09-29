@@ -29,13 +29,14 @@ beforeEach(function (): void {
     SecuritySetting::set('threat_feed_min_entries', '3');
 
     $this->ingestion = new ThreatFeedIngestionService($this->firewallDir, $this->tempDir);
-    $this->provider = new VoipblFeedProvider($this->ingestion);
 
     // Keep the privileged helper out of the test run; the command's kernel
     // step is observable through this mock.
     $this->executor = Mockery::mock(SecurityExecutorInterface::class);
     $this->executor->shouldReceive('updateThreatFeed')->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $this->executor);
+
+    $this->provider = new VoipblFeedProvider($this->ingestion, $this->executor);
 
     $this->app->instance(ThreatFeedIngestionService::class, $this->ingestion);
     $this->app->instance(ThreatFeedManager::class, new ThreatFeedManager($this->provider));

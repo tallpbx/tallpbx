@@ -6,6 +6,8 @@ namespace Tests\Feature\Modules\Security;
 
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Mockery;
+use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Services\ThreatFeedIngestionService;
@@ -27,8 +29,11 @@ beforeEach(function (): void {
 
     SecuritySetting::set('threat_feed_min_entries', '3');
 
+    $this->executor = Mockery::mock(SecurityExecutorInterface::class);
+    $this->executor->shouldReceive('updateThreatFeed')->andReturn(true);
+
     $ingestion = new ThreatFeedIngestionService($this->firewallDir, $this->tempDir);
-    $this->provider = new VoipblFeedProvider($ingestion);
+    $this->provider = new VoipblFeedProvider($ingestion, $this->executor);
 });
 
 afterEach(function (): void {
@@ -107,6 +112,9 @@ it('compiles a successful download into chunked set-element statements', functio
     foreach ($addLines as $line) {
         expect(substr_count($line, ',') + 1)->toBeLessThanOrEqual(256);
     }
+
+    // A successful compile is pushed into the kernel through the helper.
+    $this->executor->shouldHaveReceived('updateThreatFeed')->once();
 });
 
 it('updates only the check timestamp when the server reports not modified', function (): void {
@@ -174,6 +182,9 @@ it('fails open and keeps the previous list when the download fails', function ()
         ->and($feed->entries_count)->toBe(99999);
 
     expect(file_get_contents($pending))->toBe("OLD GOOD LIST\n");
+
+    // A failed download never touches the kernel either.
+    $this->executor->shouldNotHaveReceived('updateThreatFeed');
 });
 
 it('treats rate limiting as a failed sync that keeps the loaded list', function (): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Security\Services;
 
+use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\ThreatFeedProviderInterface;
 use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Support\ThreatFeedSyncResult;
@@ -21,9 +22,11 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
      * Create the provider instance.
      *
      * @param  ThreatFeedIngestionService  $ingestion  Shared download/compile pipeline
+     * @param  SecurityExecutorInterface  $executor  Bounded helper executor (loads compiled elements)
      */
     public function __construct(
         private readonly ThreatFeedIngestionService $ingestion,
+        private readonly SecurityExecutorInterface $executor,
     ) {}
 
     /**
@@ -89,6 +92,11 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
             $updates['last_rejected_lines'] = $result->rejectedLines;
             $updates['etag'] = $result->etag ?? $feed->etag;
             $updates['last_modified_header'] = $result->lastModified ?? $feed->last_modified_header;
+
+            // Push the freshly compiled elements into the kernel through the
+            // bounded helper; stale helpers and missing files fail safely
+            // inside the executor with a plain-language log line.
+            $this->executor->updateThreatFeed();
         }
 
         $feed->update($updates);

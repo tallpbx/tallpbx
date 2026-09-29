@@ -77,9 +77,9 @@ it('shows only the selected tab panel', function (): void {
         ->assertSee('iif "lo"')
         ->assertSee(__('admin.security_core_services_title'));
 
-    // Threat Feeds shows its placeholder panel.
+    // Threat Feeds shows the feed controls panel.
     $component->set('activeTab', 'threat-feeds')
-        ->assertSee(__('admin.security_threat_feeds_placeholder'))
+        ->assertSee(__('admin.security_threat_feeds_title'))
         ->assertDontSee('iif "lo"');
 });
 

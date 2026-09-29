@@ -516,6 +516,8 @@ it('reverts the persisted default inbound policy when the firewall apply fails',
     // Force the privileged helper step to report failure.
     $executorMock = Mockery::mock(SecurityExecutorInterface::class);
     $executorMock->shouldReceive('apply')->once()->andReturnFalse();
+    // Rendering also reads the live ruleset for the feed drop counter.
+    $executorMock->shouldReceive('status')->andReturn('');
     app()->instance(SecurityExecutorInterface::class, $executorMock);
 
     Livewire::actingAs($this->admin, 'admin')
@@ -535,6 +537,8 @@ it('reverts the persisted default inbound policy when the firewall apply fails',
 it('reports the firewall apply failure when saving drawer settings instead of masking it', function (): void {
     $executorMock = Mockery::mock(SecurityExecutorInterface::class);
     $executorMock->shouldReceive('apply')->once()->andReturnFalse();
+    // Rendering also reads the live ruleset for the feed drop counter.
+    $executorMock->shouldReceive('status')->andReturn('');
     app()->instance(SecurityExecutorInterface::class, $executorMock);
 
     Livewire::actingAs($this->admin, 'admin')
@@ -715,6 +719,8 @@ it('reports the apply failure instead of a success message when toggling a rule'
 it('applies firewall changes atomically via executor when lockout safe', function (): void {
     $executorMock = Mockery::mock(SecurityExecutorInterface::class);
     $executorMock->shouldReceive('apply')->once()->andReturn(true);
+    // Rendering also reads the live ruleset for the feed drop counter.
+    $executorMock->shouldReceive('status')->andReturn('');
     app()->instance(SecurityExecutorInterface::class, $executorMock);
 
     // Whitelist admin IP first so lockout preflight passes

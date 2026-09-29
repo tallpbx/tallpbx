@@ -112,6 +112,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         return [
             'security.view' => 'View security dashboard, firewall rules, and blocked IP lists',
             'security.edit' => 'Manage firewall rules, trusted/blocked IP lists, and protection settings',
+            'security.threat-feeds.manage' => 'Manage public threat feed sources and their kernel block lists',
         ];
     }
 

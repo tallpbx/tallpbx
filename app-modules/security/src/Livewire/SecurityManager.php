@@ -22,10 +22,13 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Rules\ValidFirewallAddress;
 use Modules\Security\Services\FirewallSyncVerifier;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\ThreatFeedIngestionService;
+use Modules\Security\Services\ThreatFeedManager;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 #[Layout('layouts.app')]
@@ -248,6 +251,26 @@ class SecurityManager extends Component
      */
     public bool $firewallObserveMode = false;
 
+    /**
+     * Whether the public threat feed blocks traffic in the kernel.
+     */
+    public bool $feedEnabled = false;
+
+    /**
+     * Country filtering mode for the feed ('all', 'blacklist', 'whitelist').
+     */
+    public string $feedCountryMode = 'all';
+
+    /**
+     * Comma-separated country codes input for the feed's country filtering.
+     */
+    public string $feedCountriesInput = '';
+
+    /**
+     * How often the feed refreshes ('hourly', '4_hours', '12_hours', 'daily').
+     */
+    public string $feedSyncInterval = 'daily';
+
     public bool $attackProtectionEnabled = true;
 
     /**
@@ -258,6 +281,7 @@ class SecurityManager extends Component
         $this->adminIp = request()->ip() ?? '127.0.0.1';
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
+        $this->loadFeedState();
         $this->refreshLiveFirewallPolicy();
         $this->refreshFirewallSyncState();
     }
@@ -474,6 +498,7 @@ class SecurityManager extends Component
         $whitelistCount = SecurityIpList::whitelist()->count();
         $blacklistCount = SecurityIpList::blacklist()->count();
         $bannedCount = SecurityBan::active()->count();
+        $threatFeedCount = (int) (SecurityThreatFeed::where('provider', 'voipbl')->value('entries_count') ?? 0);
 
         $descriptors = [
             'loopback' => [
@@ -572,18 +597,212 @@ class SecurityManager extends Component
                 'manage' => ['label' => __('admin.security_view_threats'), 'tab' => 'attackers', 'class' => 'text-error'],
                 'pinned' => false,
             ],
+            'threat_feeds' => [
+                'label' => __('admin.security_threat_feeds_title'),
+                'badge' => '@threat_feed_ips',
+                'tooltip' => null,
+                'invariant' => false,
+                'status_class' => 'bg-error',
+                'action' => 'drop',
+                'source_kind' => 'count',
+                'source_static' => null,
+                'count' => $threatFeedCount,
+                'count_choice' => 'admin.security_entries_count',
+                'count_class' => $threatFeedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
+                'count_pulse' => false,
+                'manage' => ['label' => __('admin.security_threat_feed_manage'), 'tab' => 'threat-feeds', 'class' => 'text-error'],
+                'pinned' => false,
+            ],
         ];
 
         $rows = [];
         foreach (app(SecurityConfigGenerator::class)->preFilterOrder() as $stageKey) {
-            if (! isset($descriptors[$stageKey])) {
-                continue;
+            // A stage key without a descriptor yet is skipped so a future
+            // stage can ship its row in a later release without breaking
+            // the table here.
+            if (isset($descriptors[$stageKey])) {
+                $rows[] = ['key' => $stageKey] + $descriptors[$stageKey];
             }
-
-            $rows[] = ['key' => $stageKey] + $descriptors[$stageKey];
         }
 
         return $rows;
+    }
+
+    /**
+     * Load the threat feed configuration into the form properties.
+     *
+     * A feed row that has never been saved yet shows the defaults; the row
+     * itself is only created on the first write, so merely viewing the tab
+     * never touches the database.
+     */
+    public function loadFeedState(): void
+    {
+        $feed = SecurityThreatFeed::where('provider', 'voipbl')->first();
+
+        $this->feedEnabled = $feed?->enabled ?? false;
+        $this->feedCountryMode = $feed?->country_mode ?? 'all';
+        $this->feedCountriesInput = implode(', ', $feed?->countries ?? []);
+        $this->feedSyncInterval = $feed?->sync_interval ?? 'daily';
+    }
+
+    /**
+     * Persist the threat feed configuration from the tab form.
+     *
+     * Country codes are normalized to uppercase two-letter ISO values and
+     * capped at 50 entries; any malformed token refuses the whole save with
+     * an inline error instead of storing a half-parsed list.
+     */
+    public function saveFeedSettings(): void
+    {
+        $this->ensureFeedManagePermission();
+
+        $this->validate([
+            'feedCountryMode' => ['required', 'in:all,blacklist,whitelist'],
+            'feedSyncInterval' => ['required', 'in:hourly,4_hours,12_hours,daily'],
+        ]);
+
+        $countries = $this->parseCountryCodes($this->feedCountriesInput);
+
+        if ($countries === null) {
+            $this->addError('feedCountriesInput', (string) __('admin.security_threat_feed_countries_invalid'));
+
+            return;
+        }
+
+        $feed = $this->voipblFeed();
+        $feed->update([
+            'enabled' => $this->feedEnabled,
+            'country_mode' => $this->feedCountryMode,
+            'countries' => $countries,
+            'sync_interval' => $this->feedSyncInterval,
+        ]);
+
+        SecurityAuditLog::record(
+            action: 'threat_feed_updated',
+            ipAddress: $this->adminIp,
+            description: "Threat feed '{$feed->name}' settings updated (mode: {$feed->country_mode}, interval: {$feed->sync_interval}, ".($feed->enabled ? 'enabled' : 'disabled').').',
+            details: ['provider' => $feed->provider, 'countries' => $countries],
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        $this->notifySuccess((string) __('admin.security_threat_feed_saved'));
+    }
+
+    /**
+     * Run an immediate forced sync of the public feed and report the result.
+     */
+    public function syncThreatFeedNow(): void
+    {
+        $this->ensureFeedManagePermission();
+
+        $feed = $this->voipblFeed();
+        $result = app(ThreatFeedManager::class)->sync($feed, force: true);
+
+        match ($result->status) {
+            'success' => $this->notifySuccess((string) __('admin.security_threat_feed_sync_success', ['count' => $result->entriesCount])),
+            'not_modified' => $this->notifySuccess((string) __('admin.security_threat_feed_sync_uptodate')),
+            default => $this->notifyError((string) __('admin.security_threat_feed_sync_failed', ['error' => (string) $result->error])),
+        };
+
+        $this->loadFeedState();
+    }
+
+    /**
+     * Flush the feed's kernel elements without disabling the feed.
+     *
+     * The documented escape hatch for the day a feed ships a false positive
+     * that blocks a real provider: the sets empty immediately through the
+     * helper, the feed configuration stays untouched, and the next sync
+     * repopulates the elements.
+     */
+    public function removeAllFeedBlocks(): void
+    {
+        $this->ensureFeedManagePermission();
+
+        app(ThreatFeedIngestionService::class)->clear();
+
+        if (! app(SecurityExecutorInterface::class)->updateThreatFeed()) {
+            $this->notifyError((string) __('admin.security_threat_feed_remove_blocks_failed'));
+
+            return;
+        }
+
+        SecurityAuditLog::record(
+            action: 'threat_feed_blocks_removed',
+            ipAddress: $this->adminIp,
+            description: 'All threat feed kernel elements removed from the Security Center; the feed configuration was left enabled.',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        $this->notifySuccess((string) __('admin.security_threat_feed_blocks_removed'));
+    }
+
+    /**
+     * Read the STAGE 7 drop counter from the live kernel ruleset.
+     *
+     * Returns null when the helper cannot report the ruleset (unprivileged
+     * runs, tests, butler unavailable) or the rule is absent — the panel
+     * renders a dash instead of pretending the count is zero.
+     */
+    public function feedDropCounter(): ?int
+    {
+        $status = app(SecurityExecutorInterface::class)->status();
+
+        if ($status === '' || preg_match('/ip saddr @threat_feed_ips counter packets (\d+)/', $status, $matches) !== 1) {
+            return null;
+        }
+
+        return (int) $matches[1];
+    }
+
+    /**
+     * The VoIPBL feed configuration row, created lazily on first write.
+     */
+    private function voipblFeed(): SecurityThreatFeed
+    {
+        return SecurityThreatFeed::firstOrCreate(
+            ['provider' => 'voipbl'],
+            ['name' => 'VoIPBL'],
+        );
+    }
+
+    /**
+     * Parse the comma-separated country-code input.
+     *
+     * Returns an uppercase two-letter list (maximum 50 entries), or null
+     * when any token is malformed — the caller reports the inline error.
+     *
+     * @return array<int, string>|null
+     */
+    private function parseCountryCodes(string $input): ?array
+    {
+        $tokens = preg_split('/[\s,]+/', trim($input)) ?: [];
+        $tokens = array_values(array_filter($tokens, static fn (string $token): bool => $token !== ''));
+
+        $codes = [];
+        foreach ($tokens as $token) {
+            $code = strtoupper($token);
+
+            if (preg_match('/^[A-Z]{2}$/', $code) !== 1) {
+                return null;
+            }
+
+            $codes[] = $code;
+        }
+
+        $codes = array_values(array_unique($codes));
+
+        return count($codes) > 50 ? null : $codes;
+    }
+
+    /**
+     * Refuse feed mutations without the dedicated manage permission.
+     */
+    private function ensureFeedManagePermission(): void
+    {
+        $actor = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+
+        abort_unless($actor !== null && $actor->hasPermission('security.threat-feeds.manage'), 403);
     }
 
     /**
@@ -720,6 +939,7 @@ class SecurityManager extends Component
         $lockoutGuard ??= app(LockoutGuardService::class);
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
+        $this->loadFeedState();
 
         // Livewire maps one handler per event name, so the observed-kernel
         // refresh rides along here to keep the drift banner current on every
@@ -1399,6 +1619,7 @@ class SecurityManager extends Component
     public function openSettingsDrawer(): void
     {
         $this->loadSettings();
+        $this->loadFeedState();
         $this->showSettingsDrawer = true;
     }
 
@@ -1575,6 +1796,8 @@ class SecurityManager extends Component
             'whitelistCount' => $whitelistCount,
             'blacklistCount' => $blacklistCount,
             'preFilterRows' => $this->preFilterRows(),
+            'threatFeed' => SecurityThreatFeed::where('provider', 'voipbl')->first(),
+            'feedDropCounter' => $this->feedDropCounter(),
         ]);
     }
 }
