@@ -6,6 +6,8 @@ This document specifies the architecture and implementation roadmap for three in
 2. **Phase 2: Hardened TFTP Defense Profile (Native `nftables`)** — Multi-layered TFTP packet filtering on UDP port 69 blocking Write Requests (WRQ), directory traversal (`../` $\rightarrow$ `0x2e2e2f`), known malware probes (`/x` $\rightarrow$ `0x2f78`), and stateful per-IP rate limiting via bounded kernel meters (default 10/min sustained, burst 20, both administrator-configurable). The rules are emitted **before** the TFTP accept rule in the port catalog so they are actually reachable.
 3. **Phase 3: SIP Bot String Filtering & Instant Kernel Auto-Ban** — Deep packet inspection in FreeSWITCH (early dialplan regex) for known scanning bots (`sipvicious`, `friendly-scanner`, `VaxSIPUserAgent`, `sipcli`, `Ozeki`, plus custom administrator strings). Matches trigger Event Socket Layer (ESL) security events that invoke the bounded host helper to lock the offending IP in kernel RAM (`@banned_ips`) for a configurable duration (default 24 hours). Signatures are split into **high-confidence** (auto-ban) and **low-confidence** (recorded, never banned) tiers, so a generic string such as `User-Agent: SIP Call` can never cost a legitimate phone system its service. Detection happens when a request reaches the FreeSWITCH dialplan — not literally on the attacker's first packet — and the listener is idempotent so a scanner flood cannot amplify database or process work.
 
+The plan also restructures the Security Command Center into evaluation-ordered tabs, makes the pre-filter pipeline reorderable, and introduces three firewall controls — a whole-firewall on/off, a pre-filter on/off, and a global observe mode — described under *Firewall On/Off Switches and Global Observe Mode*.
+
 ---
 
 ## Architectural Principles & Invariants
@@ -19,6 +21,9 @@ This document specifies the architecture and implementation roadmap for three in
 > 4. Because the blocklists sit behind the fast path, offender removal is achieved at **ban time, not per packet**: when an IP enters `@blacklist_ips` or `@banned_ips`, the bounded helper flushes the IP's conntrack entries (`conntrack -D -s <ip>`), severing its live sessions instantly. **This flush is the only mechanism that ends an attacker's in-flight sessions** (stated for the default rule order — see *Pre-Filter Stage Reordering*) — so every code path that adds an address to a blocklist must flush, and a flush failure must raise a visible `security_audit_logs` entry (not merely a log line), since without it only the new-flow block is active.
 > 5. **A firewall rebuild must never leave the threat-feed sets empty.** The full ruleset loads with `flush ruleset`, so `apply` re-loads `/etc/tallpbx/threat_feed.nft` immediately after the main ruleset (see §1.3). Feed elements live in that separate file, so the ruleset digest and the drift reconciler never see them.
 > 6. **Threat-feed syncs are fail-open to the last good list.** A failed, partial, or empty download keeps the previously loaded list; disabling a feed clears its kernel elements immediately.
+
+> [!NOTE]
+> **When invariants 1–2 do not apply**: the chain above describes the default configuration (pre-filter on, observe mode off). Turning the pre-filter off is an explicit administrator action guarded by the lockout guard, and global observe mode is a non-blocking state in which every drop is logged instead of enforced — see *Firewall On/Off Switches and Global Observe Mode*.
 
 > [!IMPORTANT]
 > **Bounded Host Helper Execution**:
@@ -56,7 +61,7 @@ Think of the firewall as the reception desk of a busy building:
 
 When the chain is implemented, port this explanation into the administrator-facing surfaces:
 
-- `docs/operations.md`: add a short "How the Firewall Decides" subsection (reusing the reception-desk analogy) near the `nftables` row of the services table.
+- `docs/operations.md`: add a short "How the Firewall Decides" subsection (reusing the reception-desk analogy) near the `nftables` row of the services table. The analogy describes the default configuration (pre-filter on, observe mode off); note alongside it that the pre-filter can be switched off and its rules re-authored in the custom section, and that observe mode makes every rule evaluate and record without blocking.
 - Panel tooltips: the Firewall Rules tab's pre-filter rows get a one-line tooltip each (e.g. the established/related row: "Ongoing calls and connections are waved through without re-checking the lists, which keeps audio flowing at full speed").
 - Whitelist card helper text: note that trusted addresses are admitted before every other check, so the list must stay short and curated ("Trusted addresses always get in first — no other rule, not even the broken-packet check, can turn them away").
 
@@ -71,7 +76,8 @@ The Security Command Center (`/panel/security`) reorganizes from a single long p
 Page-global operational state stays pinned above the tabs and remains visible on every tab:
 
 - Zone 1 system status cards (firewall status, attack protection, blocked attackers, administrator connection)
-- Lockout warning banner and firewall drift banner
+- Lockout warning banner, firewall drift banner, and the observe-mode amber banner
+- The whole-firewall toggle (`firewall_enabled`) and the global observe-mode toggle (`firewall_observe_mode`) — page-global operational state, visible on every tab
 - The protection-settings slide-over drawer and its trigger (thresholds are protection policy, not a pipeline stage)
 
 ### Tab Order (Left → Right)
@@ -81,9 +87,9 @@ Page-global operational state stays pinned above the tabs and remains visible on
 | 1 | **Block & Allow Lists** | Stage 2 — `@whitelist_ips` (bypass) then Stage 5 — `@blacklist_ips` (permanent drop) | Whitelist card first, blacklist card second — both always visible with their own quick-add forms, no switcher (existing Cards 3 + 1) |
 | 2 | **Attackers** | Stage 6 — `@banned_ips` (dynamic drop) | Instant-ban toggle, SIP bot signatures, then the active bans table (existing Card 2) |
 | 3 | **Threat Feeds** | Stage 7 — `@threat_feed_ips` (feed drop) | VoIPBL status, country mode, sync interval, metrics, Sync Now |
-| 4 | **Firewall Rules** | Full pipeline (last) | Sequential rules table, PBX port catalog, TFTP defense toggle, custom rules, default policy |
+| 4 | **Firewall Rules** | Full pipeline (last) | Pre-filter on/off toggle, sequential rules table, PBX port catalog, TFTP defense toggle, custom rules, default policy |
 
-Kernel stages 1 (loopback), 3 (invalid packets), and 4 (stateful fast path) are non-configurable invariants with no workbench of their own; they appear only as rows inside the Firewall Rules tab. The whitelist and blacklist share one tab because the reordered chain (see §1.3) makes them adjacent modulo the two invariant checks between them, and because admins frequently check both lists together.
+Kernel stages 1 (loopback), 3 (invalid packets), and 4 (stateful fast path) have no workbench of their own — no per-stage toggles or editors — but the entire pre-filter section (stages 1–7) can be switched off with a single toggle; see *Firewall On/Off Switches and Global Observe Mode*. The whitelist and blacklist share one tab because the reordered chain (see §1.3) makes them adjacent modulo the two invariant checks between them, and because admins frequently check both lists together.
 
 ### Ordering Within Tabs
 
@@ -130,7 +136,7 @@ The interaction deliberately mirrors the existing custom-rules reordering (`move
 | Dynamic bans | `banned` | Freely orderable within the blocklist group | as above |
 | Threat feeds | `threat_feeds` | Freely orderable within the blocklist group | as above |
 
-Stages 8–12 (ICMP, TFTP defense, port catalog, custom rules, default policy) are **not** part of this feature and keep their fixed order. In particular TFTP defense must remain immediately before the port catalog's `udp dport 69 accept` (§2.1), and custom rules keep their own independent reordering exactly as today.
+Stages 8–12 (ICMP, TFTP defense, port catalog, custom rules, default policy) are **not** part of this feature and keep their fixed order. In particular TFTP defense must remain immediately before the port catalog's `udp dport 69 accept` (§2.1), and custom rules keep their own independent reordering exactly as today. While the pre-filter is switched off (`prefilter_enabled = false`), the stored `pre_filter_order` is retained untouched but has no runtime effect — the stages are not running. The chevron controls render disabled with a one-line note, so an administrator's ordering work is never lost and reapplies the moment the pre-filter is switched back on.
 
 Two facts make the mental model smaller than it looks:
 
@@ -180,20 +186,36 @@ The generator never emits an unsafe order and never silently reorders one — a 
 
 ---
 
-## Two On/Off Switches
+## Firewall On/Off Switches and Global Observe Mode
 
-The firewall's behavior is controlled by **exactly two independent on/off switches**, giving administrators maximum flexibility without forcing them through a multi-stage toggle UI:
+The firewall's behavior is controlled by **two independent on/off switches plus one global observe mode**, giving administrators maximum flexibility without forcing them through a multi-stage toggle UI:
 
 1. **`firewall_enabled`** (existing) — Whole firewall on/off. When off, no firewall rules apply at all. The existing setting, typed confirmation, persistent red banner, and Zone 1 status card behavior stay unchanged.
 2. **`prefilter_enabled`** (new) — Pre-populated pre-filter on/off. When off, the seven pre-populated pre-filter stages (loopback, whitelist, invalid packet drop, fast path, blacklist, bans, threat feeds) are skipped entirely. The rest of the chain (ICMP, TFTP defense, port catalog, custom rules, default policy) still runs.
+3. **`firewall_observe_mode`** (new) — Global observe mode on/off. When on, the firewall evaluates every rule and logs what *would* have been blocked, but nothing is actually dropped. A simple on/off like the other two — no timers, no auto-revert, no scopes. Full design in *Global Observe Mode* below.
 
-**Independence:** The two switches are independent. The prefilter switch only matters when the whole firewall is on. If the firewall is off, the prefilter switch has no effect.
+**Independence:** The three switches are independent. The prefilter and observe switches only matter when the whole firewall is on. If the firewall is off, neither has any effect.
 
-| `firewall_enabled` | `prefilter_enabled` | Result |
-|---|---|---|
-| OFF | (any) | No firewall rules apply |
-| ON | ON | Default — the full chain runs |
-| ON | OFF | Stages 1–7 skipped; stages 8–12 still run |
+| `firewall_enabled` | `prefilter_enabled` | `firewall_observe_mode` | Result |
+|---|---|---|---|
+| OFF | (any) | (any) | No firewall rules apply |
+| ON | ON | OFF | Default — the full chain runs and drops are enforced |
+| ON | OFF | OFF | Stages 1–7 skipped; stages 8–12 still run and drops are enforced |
+| ON | (any) | ON | The full ruleset evaluates and logs; nothing is dropped (see below) |
+
+### Global Observe Mode
+
+A blunt "turn the firewall off" answers "does it work without the firewall?" but not *why*. Observe mode answers the real question — "is the firewall what is breaking this call?" — while traffic flows normally. It exists because an administrator who wants simple on/off switches still needs the diagnostic power of seeing what *would* have been blocked, with evidence, before deciding what to change.
+
+**Semantics (decision-complete):**
+- Observe mode is a **generation-time transform, not a new kernel mechanism**: every `drop` and `reject` verdict in the generated ruleset — built-in stages *and* custom rules — is emitted as a rule with no verdict (`counter log prefix "tallpbx-observe:<stage> "`), so evaluation, set lookups, and counters all still happen; only the drop is withheld. Accept rules (loopback, whitelist, fast path, port catalog) are emitted unchanged.
+- The log statements carry a `limit rate` (e.g. `limit rate 100/minute` per rule) so a flood of would-be drops cannot swamp the kernel ring buffer. **Counters are never rate-limited** and remain the authoritative "would have blocked" surface in the panel.
+- The default inbound policy is **forced to `accept`** while observing, so the policy itself cannot drop anything. The panel shows the effective policy as *Accept (observing)* and restores the configured policy when observe mode is turned off.
+- Scope is the **entire firewall** — there are no per-stage or per-section scopes, no durations, and no auto-revert. This keeps the control surface consistent with the two on/off switches: three booleans, no dialogs.
+- **Bans keep recording but stop severing sessions.** `SecurityBanService::ban()` still writes the `security_bans` row and the kernel set element — so `FirewallBanReconciler` never reports drift and bans take effect the moment observe mode is turned off — but the conntrack flush is **suppressed** while observing, because severing a live session is enforcement and observe mode enforces nothing. Documented trade-off: an attacker's in-flight sessions survive until observe mode is turned off, at which point new flows are blocked; sessions of IPs banned during observe are severed on their next ban-time flush (an optional hardening — flushing all active bans on observe exit — is noted as a follow-up).
+- Threat-feed syncing, TFTP defense generation, and the port catalog are unaffected; their drop rules simply observe.
+- Turning observe mode on or off is a firewall configuration change: it regenerates the ruleset, runs the normal Apply confirmation, and writes a `security_audit_logs` entry. Turning it **off** also runs `LockoutGuardService::assertSafe()` against the restored policy and blocklists before applying.
+- **Banner**: while observe mode is on, a persistent **amber banner** appears at the top of every Security page: *"Observe mode is on — the firewall is evaluating and recording, but nothing is being blocked."* There is no countdown and no auto-revert; the administrator turns it off when done.
 
 ### Maximum Flexibility Through the Custom Rules Section
 
@@ -212,7 +234,7 @@ The custom rules section (STAGE 11) is always active when the firewall is on, re
 
 ### Safety Considerations
 
-- **LockoutGuardService still applies at save time.** When `prefilter_enabled` is turned off, the lockout guard checks the resulting ruleset: if the administrator's current IP would be dropped by the default policy and no whitelist or custom rule covers it, the save is refused with the existing one-click auto-whitelist prompt. The bounded helper never lets the panel report a healthy firewall while the administrator is locked out.
+- **Never allow a change that would block the administrator making it.** When `prefilter_enabled` is turned off, `LockoutGuardService::assertSafe()` evaluates the resulting ruleset against the administrator's current IP. If that IP would be dropped by any remaining rule or the default policy, the save is **refused outright** with an informative alert naming the blocking stage — for example: *"Turning off the pre-filter would block your current connection: your IP address would be dropped by the default inbound policy. Add your address to the allow list first, then turn the pre-filter off."* The alert offers the existing one-click `whitelistIp()` auto-whitelist as the fix; the change is never applied silently and never applied half-way. The same guard runs when observe mode is turned off, against the restored policy and blocklists.
 - **No minimum-set guarantee.** Turning off the prefilter does not silently re-add any of its rules. If the administrator wants loopback, the whitelist, or any other prefilter behavior back, the design assumes they will author it in the custom section — that is the explicit trade-off for the flexibility.
 - **`firewall_default_policy` still matters.** With the prefilter off and the default policy set to `DROP`, only rules the administrator authors (in custom) or that ship in the port catalog will accept traffic. This is intentional and visible: the policy is the same setting, the chain around it is just smaller.
 - **Reordering still applies when the prefilter is on.** The chevron buttons from *Pre-Filter Stage Reordering* continue to reorder the seven prefilter stages within their safety constraints. When the prefilter is off, those stages are not running, so ordering is moot for that configuration.
@@ -220,11 +242,16 @@ The custom rules section (STAGE 11) is always active when the firewall is on, re
 
 ### Banner System
 
-Only the persistent red banner for `firewall_enabled = false` is shown. Toggling `prefilter_enabled` does **not** trigger any banner — it is just a configured state, visible in the Security Manager UI like any other setting. There is no countdown, no overdue escalation, and no auto-revert: the prefilter switch is a simple on/off, not a timed pause.
+Two banners are added by this design, both persistent while their state is active, neither timed:
+
+- **Red banner** for `firewall_enabled = false` — the firewall is fully off.
+- **Amber banner** for `firewall_observe_mode = true` — *"Observe mode is on — the firewall is evaluating and recording, but nothing is being blocked."*
+
+Toggling `prefilter_enabled` does **not** trigger any banner — it is just a configured state, visible in the Security Manager UI like any other setting. There is no countdown, no overdue escalation, and no auto-revert anywhere in this design: every control is a simple on/off.
 
 ### Storage
 
-`firewall_enabled` already exists in `security_settings`. `prefilter_enabled` is a new boolean in `security_settings`, defaulting to `true` to preserve current behavior. `SecurityConfigGenerator::DEFAULT_PRE_FILTER_ENABLED = true` declares the default in code so an application update can extend the surface without a migration. `assertValidPreFilterToggle(mixed $value): bool` is a thin validator — only `true` or `false` is accepted; any other input is rejected at save time with a plain-language message.
+`firewall_enabled` already exists in `security_settings`. `prefilter_enabled` (default `true`) and `firewall_observe_mode` (default `false`) are new booleans in `security_settings`, preserving current behavior. `SecurityConfigGenerator::DEFAULT_PRE_FILTER_ENABLED = true` and `SecurityConfigGenerator::DEFAULT_OBSERVE_MODE = false` declare the defaults in code so an application update can extend the surface without a migration. `assertValidFirewallSwitch(mixed $value): bool` is a thin validator — only `true` or `false` is accepted; any other input is rejected at save time with a plain-language message.
 
 ### Testing
 
@@ -233,12 +260,19 @@ Only the persistent red banner for `firewall_enabled = false` is shown. Toggling
   - When `firewall_enabled = true` and `prefilter_enabled = true`, the full default chain is generated (existing behavior, unchanged).
   - When `firewall_enabled = true` and `prefilter_enabled = false`, stages 1–7 are omitted from the generated ruleset and stages 8–12 are unchanged.
   - The threat-feed set is still reloaded after every firewall rebuild regardless of `prefilter_enabled` (invariant 5).
-  - A build with no `prefilter_enabled` key is byte-identical to one with `prefilter_enabled = true`, so the fallback and the default cannot drift.
+  - A build with no `prefilter_enabled` or `firewall_observe_mode` key is byte-identical to one carrying the defaults (`true` / `false`), so the fallback and the defaults cannot drift.
+- `SecurityConfigGeneratorObserveModeTest`:
+  - Every `drop` and `reject` verdict — built-in stages and custom rules alike — is emitted as a counter + rate-limited log with no verdict and a per-stage `tallpbx-observe:` prefix; accept rules are byte-identical to the non-observing build.
+  - The default inbound policy is forced to `accept` in observe mode and restored on exit.
+  - Counters are never rate-limited; only the log statements carry `limit rate`.
 - `SecurityManagerTwoSwitchesTest`:
   - Each toggle persists to `security_settings`, regenerates the ruleset, and applies via `autoApplyFirewallRuleset()`.
-  - Toggling `prefilter_enabled` off calls `LockoutGuardService::assertSafe()` and refuses the save with the auto-whitelist prompt when the administrator's IP would be dropped by the resulting ruleset.
-  - Setting `firewall_enabled = false` does not require `prefilter_enabled` to be in any particular state.
-- `SecurityConfigGeneratorTest` continues to assert the full default chain is present when both switches are in their default state, so the existing coverage stays intact.
+  - Toggling `prefilter_enabled` off from an IP that would be dropped by the resulting ruleset is **refused with the informative alert naming the blocking stage**, and no ruleset change reaches the kernel.
+  - The same save succeeds after the offered auto-whitelist (`whitelistIp()`), and a re-attempt from a now-safe IP applies normally.
+  - Toggling `firewall_observe_mode` on shows the amber banner on every Security page; turning it off runs `assertSafe()` against the restored policy and blocklists before applying.
+  - Setting `firewall_enabled = false` does not require `prefilter_enabled` or `firewall_observe_mode` to be in any particular state.
+- `SecurityBanServiceObserveTest`: during observe mode, bans still write the `security_bans` row and kernel set element but the conntrack flush is suppressed; the reconciler reports no drift.
+- `SecurityConfigGeneratorTest` continues to assert the full default chain is present when all three switches are in their default state, so the existing coverage stays intact.
 
 ---
 
@@ -359,6 +393,7 @@ Because the blocklists evaluate only new flows (they sit behind the fast path), 
 - **Bounded Helper Action**: add `flush-conntrack <ip>` to `/usr/local/sbin/tallpbx-security`, following the existing pattern: strict dual-stack IP validation (same validator as `ban`), hardcoded binary path, `set -euo pipefail`, and family-aware invocation — `conntrack -D -s <ip>` for IPv4, `conntrack -D -f ipv6 -s <ip>` for IPv6.
 - **Call sites**: `SecurityBanService::ban()` is the single entry point for bans — it writes the `security_bans` row and the audit entry and then delegates to `SecurityExecutor` for the kernel mutation. The SIP-scanner listener (§3.3) **must call `SecurityBanService::ban()`, not `SecurityExecutor::ban()`**; invoking the executor directly would leave the database and `FirewallBanReconciler` disagreeing with the kernel set. The blacklist add paths (`addBlacklistIp`, `promoteToBlacklist`) also invoke the flush. Threat-feed sync does **not** flush (flushing per-CIDR for ~100k entries is pointless; feeds gate new flows only).
 - **Order & failure tolerance**: set mutation first, flush second. If the flush fails, the operation is not rolled back — the new-flow block is still active. But because invariant 4 makes the flush the only thing that ends in-flight sessions, the failure **must** be raised as a `security_audit_logs` entry with a visible reason so an operator can finish the job by hand (`conntrack -D -s <ip>`), rather than being buried in `laravel.log`.
+- **Prefilter-off and observe-mode interactions**: when the pre-filter is switched off, bans still write the `security_bans` row and the kernel set element, and the flush still fires — the set stays populated and ready so switching the pre-filter back on immediately blocks new flows from banned IPs, and the flush means no stale established session survives that switch-over. During global observe mode the flush is **suppressed** (severing sessions is enforcement, and observe mode enforces nothing); ban rows and set elements are still written so `FirewallBanReconciler` never reports drift. See *Firewall On/Off Switches and Global Observe Mode*.
 
 ### 1.4 Database Schema (`security_threat_feeds`)
 Migration `2026_09_22_000010_create_security_threat_feeds_table.php`:
@@ -524,12 +559,12 @@ In the **Attackers** tab of `/panel/security`:
 - **SIP Bot & Scanner Signatures** card:
   - Toggle: *Instant Kernel Ban on Scanner Detection* — **ships off by default**; detection and recording are always on, only the automatic ban is opt-in (see the rollout note below).
   - Ban duration selector: *1 hour* / *24 hours (recommended)* / *7 days* / *Permanent*, persisted as `sip_scanner_ban_seconds`.
-  - Default signatures tag list (read-only base, curated and versioned with the app), rendered as two visibly distinct groups — **Auto-ban** and **Observe only** — so an administrator can see at a glance which strings can cost someone their phone service.
+  - Default signatures tag list (read-only base, curated and versioned with the app), rendered as two visibly distinct groups — **Auto-ban** and **Record only** — so an administrator can see at a glance which strings can cost someone their phone service.
   - Custom signatures input list (add/remove custom user-agents or from-usernames), each explicitly labelled as auto-banning on match.
   - Persisted in `security_settings` key `sip_scanner_signatures`, with the curated base kept in code (`Modules\Security\Support\SipScannerSignatures::defaults()`, returning a versioned array) so an application update can ship new defaults without touching administrator data.
 - **Bans table enhancement:** every auto-ban row shows its `vector` and `reason` (for example `sip_scanner · User-Agent: friendly-scanner`) alongside an **Unban** action, so a false positive is diagnosable and reversible in seconds. A day-long network-wide ban with no visible cause is an unrecoverable support call.
 
-**Rollout note (why the enforcement toggle ships off):** ship detection in observe-only mode for the first release — every match is recorded and displayed, nothing is banned — and let administrators switch enforcement on once they have watched a week of their own traffic. A security feature that is demonstrably safe gets left enabled; one that bans a customer on day one gets disabled permanently.
+**Rollout note (why the enforcement toggle ships off):** ship detection in record-only mode for the first release — every match is recorded and displayed, nothing is banned — and let administrators switch enforcement on once they have watched a week of their own traffic. A security feature that is demonstrably safe gets left enabled; one that bans a customer on day one gets disabled permanently. This is a per-feature enforcement default and is distinct from the global observe mode described under *Firewall On/Off Switches and Global Observe Mode*, which makes the entire firewall non-blocking.
 
 **Custom signature semantics (decision-complete):**
 - Custom entries are treated as **literal substrings**, not regex. The renderer escapes each entry (`preg_quote`) before splicing it into the FreeSWITCH dialplan condition, so an admin typing `.` or `|` can never change the matching semantics.
@@ -548,7 +583,7 @@ This feature set changes code that lives **outside the git working tree**, so a 
 - **`conntrack` package.** Existing servers do not have `/usr/sbin/conntrack`. Document `apt install conntrack` in `CHANGELOG.md` under `### Security`, and make the `flush-conntrack` action detect a missing binary and report it clearly rather than crashing — live-session severing degrades gracefully until the package is installed (invariant 4 then applies only to new flows).
 - **Translations.** Every new string ships in `lang/en/admin.php`, `lang/es/admin.php`, and `lang/fr/admin.php` in the same change. Tab labels, tier labels, tooltip text, and validation errors are all administrator-facing copy.
 - **Permissions.** Threat-feed settings, ban management, and signature management are **system-wide administrator features with no tenant-user exposure**. Reuse the existing `security.*` keys where they fit and add `security.threat-feeds.manage` for the feed controls; verify with the `module:sync --only-local` + `AdminSeeder` convention in `AGENTS.md`.
-- **CHANGELOG.md.** `### Added` for the three features, `### Security` for the chain reorder, the bounded helper changes, and the new Linux package. Note the FreeSWITCH dialplan change explicitly — it invalidates the dialplan XML cache, which the render path already handles through its TTL.
+- **CHANGELOG.md.** `### Added` for the three features plus the firewall switch model (`prefilter_enabled`, `firewall_observe_mode`) and the Security UI restructure; `### Security` for the chain reorder, the bounded helper changes, and the new Linux package. Note the FreeSWITCH dialplan change explicitly — it invalidates the dialplan XML cache, which the render path already handles through its TTL.
 - **Cache clearing.** `php artisan optimize:clear` after every change per `AGENTS.md`: the dialplan XML, routes, Blade, and config are all cached.
 
 ---
@@ -575,7 +610,7 @@ This feature set changes code that lives **outside the git working tree**, so a 
    - Helper test: `flush-conntrack` rejects malformed addresses and dual-stack mismatches, invokes `/usr/sbin/conntrack` with the correct family flag (`-f ipv6` for v6), and reports a missing `conntrack` binary clearly.
    - `SecurityBanServiceTest` and blacklist add tests: the flush is invoked after ban/blacklist add; feed-sync tests assert no flush occurs; a flush failure raises a `security_audit_logs` entry.
    - Pre-filter ordering (`SecurityConfigGeneratorPreFilterOrderTest`, `SecurityManagerPreFilterOrderTest`) — see *Pre-Filter Stage Reordering*. The permutation/validator test is the one that protects invariant 1 from being quietly relaxed.
-   - Two switches (`SecurityConfigGeneratorTwoSwitchesTest`, `SecurityManagerTwoSwitchesTest`) — see *Two On/Off Switches*. The lockout-guard test is the one that protects administrators from accidentally cutting off their own access when the prefilter is off.
+   - Firewall switches and observe mode (`SecurityConfigGeneratorTwoSwitchesTest`, `SecurityManagerTwoSwitchesTest`, `SecurityConfigGeneratorObserveModeTest`, `SecurityBanServiceObserveTest`) — see *Firewall On/Off Switches and Global Observe Mode*. The refusal and lockout-guard tests are the ones that protect administrators from accidentally cutting off their own access.
 5. **Mandatory Full Verification** (per `AGENTS.md`, in this order):
    ```bash
    php artisan optimize:clear
@@ -593,3 +628,6 @@ This feature set changes code that lives **outside the git working tree**, so a 
 - Ban a live test IP and verify `conntrack -L -s <ip>` returns no entries and its established session dies immediately.
 - Trigger a low-confidence signature (e.g. `User-Agent: SIP Call`) from a test endpoint and confirm it is **recorded but not banned**; then trigger a high-confidence signature with enforcement off and confirm the same; then enable enforcement and confirm the ban, its visible reason, and that Unban clears both the kernel set and the conntrack entries.
 - Verify the Security Manager UI renders the new Threat Feeds tab, the threat-feed pre-filter row inside the Firewall Rules tab, and the TFTP protection toggles cleanly, and that every new string renders in `en`, `es`, and `fr`.
+- Turn the pre-filter off and confirm stages 1–7 vanish from the live ruleset while stages 8–12 and custom rules still run; add `ct state invalid drop` as a custom rule and confirm it applies.
+- Attempt to turn the pre-filter off from an unwhitelisted IP whose address would be dropped by the default policy, and confirm the save is refused with the informative alert and never applied.
+- Turn observe mode on and confirm every drop rule becomes log-only: send a would-be-blocked packet, watch the stage counter increment while the packet is delivered; confirm the default policy shows *Accept (observing)*, the amber banner appears on every Security page, and banning an IP records without severing its sessions. Turn observe mode off and confirm enforcement resumes.
