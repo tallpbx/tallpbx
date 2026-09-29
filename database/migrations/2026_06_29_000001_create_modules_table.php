@@ -16,6 +16,12 @@ return new class extends Migration
         Schema::create('modules', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('name')->unique();
+            // Composer package the module was installed from, kept so module:restore
+            // can reinstall vendor modules after an uninstall.
+            $table->string('composer_package')->nullable();
+            // Git revision that still held the module's files at uninstall time,
+            // so module:restore can bring them back after the deletion is committed.
+            $table->string('source_ref')->nullable();
             $table->string('display_name');
             $table->string('version');
             $table->boolean('enabled')->default(true);
