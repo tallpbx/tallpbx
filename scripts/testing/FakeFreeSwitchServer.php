@@ -315,6 +315,10 @@ class FakeFreeSwitchServer
         return match ($cmdName) {
             'sofia' => $this->sofiaStatusResponse($command),
             'show' => $this->showResponse($command),
+            // Test-only introspection: reports the raw tokens the client sent
+            // in its last "event plain" subscription so tests can assert the
+            // exact subscription order (CUSTOM followed by its subclasses).
+            'fake_subscribed_events' => ['body' => implode(' ', $this->subscribedEvents)."\n"],
             'status' => ['body' => "UP 0 years, 0 days, 1 hour, 23 minutes, 45 seconds\n0 session(s) since startup\n0 session(s) - 0 out of max 1000 sessions\n"],
             'version' => ['body' => "FreeSWITCH Version 1.10.12-release~64bit\n"],
             'uptime' => ['body' => "1 hour 23 minutes 45 seconds\n"],

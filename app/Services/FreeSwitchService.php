@@ -161,16 +161,51 @@ class FreeSwitchService implements FreeSwitchServiceInterface
             return;
         }
 
-        $eventTypes = config('freeswitch.subscribe', []);
-        $eventList = implode(' ', $eventTypes);
-        $this->writeLine("event plain {$eventList}");
+        $this->writeLine('event plain '.$this->eventSubscriptionArgument());
 
         // Consume the subscription response
         $this->readUntilBlankLine();
 
         $this->logMessage('info', 'FreeSWITCH ESL subscribed to events.', [
-            'events' => $eventTypes,
+            'events' => config('freeswitch.subscribe', []),
+            'subclasses' => config('freeswitch.subscribe_subclasses', []),
         ]);
+    }
+
+    /**
+     * Build the argument list for the ESL "event plain" subscription command.
+     *
+     * mod_event_socket parses every token placed after the CUSTOM token as a
+     * CUSTOM subclass — never as an event type — and it only delivers a
+     * subclassed CUSTOM event to a listener that registered that exact
+     * subclass. The command is therefore ordered in two parts: every plain
+     * event name first, then the CUSTOM token followed by the configured
+     * subclasses (the scanner detections and Sofia failed-auth events the
+     * listeners depend on). An event name placed after CUSTOM would be
+     * stored as a never-matching subclass, silently killing that
+     * subscription.
+     *
+     * @param  array<int, string>|null  $eventTypes  Event names to subscribe (defaults to the configured list)
+     */
+    private function eventSubscriptionArgument(?array $eventTypes = null): string
+    {
+        $eventTypes ??= (array) config('freeswitch.subscribe', []);
+
+        $parts = array_values(array_filter(
+            $eventTypes,
+            static fn (string $type): bool => $type !== 'CUSTOM',
+        ));
+
+        if (in_array('CUSTOM', $eventTypes, true)) {
+            $subclasses = array_values(array_filter(
+                (array) config('freeswitch.subscribe_subclasses', []),
+            ));
+
+            $parts[] = 'CUSTOM';
+            $parts = array_merge($parts, $subclasses);
+        }
+
+        return implode(' ', $parts);
     }
 
     /**
@@ -423,13 +458,14 @@ class FreeSwitchService implements FreeSwitchServiceInterface
         }
 
         $currentEvents = config('freeswitch.subscribe', []);
-        $filtered = array_filter($currentEvents, fn (string $e): bool => $e !== $eventType);
+        $filtered = array_values(array_filter($currentEvents, fn (string $e): bool => $e !== $eventType));
 
         $this->writeLine('noevents');
 
         if ($filtered !== []) {
-            $eventList = implode(' ', $filtered);
-            $this->writeLine("event plain {$eventList}");
+            // Re-subscribe through the shared builder so the CUSTOM token and
+            // its subclasses always stay at the end of the command.
+            $this->writeLine('event plain '.$this->eventSubscriptionArgument($filtered));
         }
     }
 

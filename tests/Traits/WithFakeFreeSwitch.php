@@ -134,6 +134,22 @@ trait WithFakeFreeSwitch
     }
 
     /**
+     * Return the raw tokens the fake server recorded from the last
+     * "event plain" subscription command, in the order the client sent them.
+     *
+     * The fake server exposes them through its test-only
+     * "fake_subscribed_events" api command so tests can assert the exact
+     * subscription composition (plain event names first, then the CUSTOM
+     * token followed by its subclasses).
+     *
+     * @return array<int, string>
+     */
+    protected function fakeSubscribedEvents(FreeSwitchService $fs): array
+    {
+        return array_values(array_filter(explode(' ', trim($fs->api('fake_subscribed_events')))));
+    }
+
+    /**
      * Automatically stop the fake server after each test.
      *
      * @after

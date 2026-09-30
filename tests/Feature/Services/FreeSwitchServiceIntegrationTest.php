@@ -174,6 +174,39 @@ it('subscribes, unsubscribes, and re-subscribes to events successfully', functio
     expect($fs->isConnected())->toBeTrue();
 });
 
+it('orders the CUSTOM token last and registers the required CUSTOM subclasses', function () {
+    $this->startFakeFreeSwitch();
+    $fs = $this->newFreeSwitchService();
+    $fs->connect();
+
+    $fs->subscribeToEvents();
+
+    $subscribed = $this->fakeSubscribedEvents($fs);
+
+    // Plain event names keep working as event types.
+    expect($subscribed)->toContain('CHANNEL_CREATE')
+        ->and($subscribed)->toContain('SOFIA_REGISTER');
+
+    $customIndex = array_search('CUSTOM', $subscribed, true);
+
+    expect($customIndex)->not->toBeFalse();
+
+    $afterCustom = array_slice($subscribed, $customIndex + 1);
+
+    // mod_event_socket parses every token after the CUSTOM token as a CUSTOM
+    // subclass, never as an event type: an event name placed after CUSTOM
+    // would silently never be subscribed.
+    expect($afterCustom)->not->toContain('HEARTBEAT')
+        ->and($afterCustom)->not->toContain('DTMF')
+        ->and($afterCustom)->not->toContain('SOFIA_REGISTER');
+
+    // A subclassed CUSTOM event is delivered only to listeners that
+    // registered that exact subclass after the CUSTOM token. Without these
+    // tokens the scanner detections and failed-auth events never arrive.
+    expect($afterCustom)->toContain('tallpbx::sip_scanner_detected')
+        ->and($afterCustom)->toContain('sofia::failed_auth');
+});
+
 // ═══════════════════════════════════════════════════════════════════
 //  SEND EVENT
 // ═══════════════════════════════════════════════════════════════════

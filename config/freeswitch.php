@@ -148,6 +148,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | CUSTOM Event Subclasses
+    |--------------------------------------------------------------------------
+    |
+    | mod_event_socket only delivers a CUSTOM event that carries a subclass
+    | to a listener that registered that exact subclass — a bare CUSTOM
+    | subscription never receives it. The listener subscribes to these
+    | subclasses after the CUSTOM token on the same "event plain" command.
+    |
+    |   tallpbx::sip_scanner_detected — SIP scanner signature matches from
+    |       the dialplan guard (feeds automatic bans via the ESL listener).
+    |   sofia::failed_auth — Sofia authentication failures (feeds the
+    |       security incident pipeline).
+    |
+    */
+    'subscribe_subclasses' => [
+        'tallpbx::sip_scanner_detected',
+        'sofia::failed_auth',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | FreeSWITCH Runtime Database
     |--------------------------------------------------------------------------
     |
