@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-30
+
 ### Added
 - **Public Threat Feeds (VoIPBL)**:
   - The Security Center gains a **Threat Feeds** tab that blocks networks from an automatically updated public blocklist of known VoIP fraud and scanning sources, with a country filter (only listed countries, or all except yours), a refresh schedule, per-rule kernel drop counters, an on-demand "Sync Now", and a prominent "Remove all feed blocks" escape hatch for provider false positives.
