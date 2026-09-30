@@ -14,16 +14,46 @@
 - **Recovery runbooks + agent safety rules**: `docs/operations.md` "Recovering from a Firewall Lockout" (shell-only commands that work when `php artisan` is unreachable), `docs/security-architecture.md` §9.3 emergency recovery, `INSTALL.md` troubleshooting entry, `AGENTS.md` live-firewall safety rules.
 - **Helper fix**: `flush-conntrack` treats an idle flush ("0 flow entries have been deleted") as success instead of a false failure audit.
 
-### Background: the two production lockouts (2026-09-29)
-1. Applying a pre-filter-off ruleset removed the loopback accept → MariaDB/Redis unreachable.
-2. A live `nft` probe chain left with `policy drop` dropped all inbound traffic.
-Operator rulings: (a) refuse — never silently override — firewall changes that would cut the server's own loopback services; (b) refusals surface as DaisyUI toast alerts; (c) no live-kernel verification on this server — remaining live checks move to a disposable staging host.
+### Incident record: the two production lockouts (2026-09-29)
+
+This record is deliberately self-contained: the local execution ledger was the working record during implementation, but this document is what survives in the repository history — keep the incident details here so deleting the ledger (or this document) later never destroys the record.
+
+**Incident 1 — applying a pre-filter-off ruleset (root cause: no local-services check).**
+- **Context**: live manual verification of the new firewall on/off switches during Task 17.
+- **Action taken**: `prefilter_enabled` was set to `false`, then `php artisan security:apply` was run on the production host.
+- **What failed**: the pre-filter pipeline is what emits the unconditional loopback accept (`iif "lo" accept`) and the `ct state established,related accept` fast path. With the pre-filter off, loopback traffic to services that are *not* in the port catalog — MariaDB (`127.0.0.1:3306`) and Redis (`127.0.0.1:6379`) — fell through to the DROP default policy. Every PHP page and Artisan command hung (the apply itself died mid-verification on its post-apply database write), and the agent connection was lost.
+- **Confusing symptom**: SSH kept working (port 22 is a stateless catalog rule) while the web panel appeared dead — HTTP was not port-dropped; PHP-FPM (unix socket) simply could not reach its database.
+- **Evidence**: the regenerated failed ruleset showed 0 loopback accepts, 0 established accepts, `policy drop`, and no accept rule covering 3306/6379.
+- **Recovery**: the operator ran `nft flush ruleset` (kernel fully open). `prefilter_enabled` was restored to `true`, and the stale on-disk `/etc/tallpbx/firewall.nft` — still the pre-filter-off build, which the helper's restore path would have re-loaded on the next ban (the ESL listener is active) or feed call — was replaced with a freshly generated, `nft -c`-validated safe build (loopback accept + TFTP defense stage present).
+
+**Incident 2 — a live `nft` probe chain (root cause: unsafe verification method).**
+- **Context**: verifying the in-place chain-policy-change command for the operator's future reference.
+- **Action taken**: a probe table with a chain hooked to `input` was created and its policy was deliberately set to DROP as the "verification" step; cleanup was deferred to a separate, later command.
+- **What failed**: between the two commands the probe chain was the only `input`-hooked chain (the kernel had been flushed after Incident 1), so with `policy drop` it silently dropped ALL inbound traffic. Second connection loss; the operator recovered with `nft flush ruleset` again. No TallPBX files or settings were involved.
+- **Lesson encoded in `AGENTS.md`**: kernel-mutating verification must be atomic and self-reverting within one invocation, a `policy drop` chain must never be left live — not even briefly, not even as a probe — and verification is done with `nft -c` dry runs, mocked-executor tests, or disposable hosts.
+
+**Operator requirements (binding).**
+- The application must **refuse** — never silently override — firewall changes that would cut the server's own loopback services.
+- Refusals must surface as DaisyUI toast alerts explaining why the change was refused.
+- No live-kernel verification on the production server; remaining live checks move to a disposable staging host.
+
+**Prevention shipped (committed 2026-09-30).**
+- `LockoutGuardService::wouldDropLocalServices()` / `assertLocalServicesSafe()` refuse the unsafe combination (firewall on ∧ observe off ∧ blocking policy ∧ pre-filter off); the Security Center refuses the dangerous direction of the pre-filter switch, observe mode, and the default-policy form with plain-language toast alerts (three messages × en/es/fr); `autoApplyFirewallRuleset()` and `security:apply` enforce the same check as backstops, bypassed only by an explicit `--force` from the local console.
+- Recovery runbooks that work without PHP: `docs/operations.md` → "Recovering from a Firewall Lockout"; `docs/security-architecture.md` §9.3 → "Emergency Recovery: Panel and `php artisan` Unreachable"; `INSTALL.md` → "Server Unreachable After a Firewall Change".
+- Agent safety rules: `AGENTS.md` → "CRITICAL — Live Firewall Safety".
+- Recovery command reference (the same four commands are in the runbooks above):
+  1. Restore loopback, keeping every other rule: `nft insert rule inet tallpbx_filter input iif "lo" accept`
+  2. Restore one operator address: `nft insert rule inet tallpbx_filter input ip saddr <your-ip> accept`
+  3. Flip the chain policy in place, keeping its rules: `nft 'chain inet tallpbx_filter input { policy accept; }'`
+  4. Last resort — removes every table and rule (server fully open until re-applied): `nft flush ruleset`
+  After any recovery, re-apply from the Security Center (or `php artisan security:apply`) so the saved configuration and the kernel agree again, then reconcile the on-disk `/etc/tallpbx/firewall.nft` with the intended safe build.
+- Verification after the prevention shipped: full suite 2601 passed / 1 skipped; browser suite 47 passed / 1 skipped; final-review Critical/Important findings fixed test-first (boot feed reload, helper restore reload, scanner audit throttle, firewall-switch rollback, failed kernel-load reporting). No live kernel work since Incident 2.
 
 ### Final review (2026-09-30) and closure
 - One CodeReview pass over `v2.0.0..HEAD` found 1 Critical + 4 Important + 2 Minor; all Critical/Important findings were fixed with failing-test-first proof (boot feed reload, helper restore reload, scanner audit throttle, firewall-switch rollback, failed kernel-load reporting). Full suite green: 2601 passed / 1 skipped; Pint clean.
 - Verification complete: full feature suite ✔ · Pest browser suite ✔ (47 passed / 1 skipped) · no live kernel work at any point.
 - Open user decision: the disposable staging host was rebuilt (SSH access revoked), so the deferred live checklist items (pre-filter-off / observe-mode walkthrough, TFTP counters, live scanner ban, clean-install feed sync) need a re-provisioned host or new access — everything they cover is asserted by the automated suites.
-- Task 17 is complete. The execution ledger (`.superpowers/sdd/threat-feeds-and-bot-defense-implementation-plan/progress.md`) holds the full record (including the two lockout incidents) and stays until the user decides to delete this plan workspace.
+- Task 17 is complete. The incident record above is self-contained on purpose — the execution ledger (`.superpowers/sdd/threat-feeds-and-bot-defense-implementation-plan/progress.md`) was the working record during implementation, and this document is what survives in repository history if the ledger (or this document) is deleted later.
 
 ## Executive Summary
 This document specifies the architecture and implementation roadmap for three integrated security enhancements in TallPBX:
