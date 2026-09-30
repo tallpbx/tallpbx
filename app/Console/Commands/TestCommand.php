@@ -275,9 +275,11 @@ class TestCommand extends Command
      * Build the Pest arguments for a browser test run.
      *
      * Returns the CLI arguments passed to the Pest binary (the binary itself
-     * is added by the caller). Parallel runs are capped at four workers
-     * because each worker keeps a Chromium instance alive; a sequential
-     * request drops the parallel flags altogether instead of silently
+     * is added by the caller). Parallel runs are capped at two workers
+     * because each worker keeps a multi-process Chromium instance alive (~5–6 OS
+     * processes per worker); capping at two prevents CPU starvation and memory
+     * thrashing on 4-vCPU hosts, leaving capacity for host PBX and database processes.
+     * A sequential request drops the parallel flags altogether instead of silently
      * ignoring them.
      *
      * @param  bool  $sequential  True when --sequential requests no parallelism
@@ -289,7 +291,7 @@ class TestCommand extends Command
 
         if (! $sequential) {
             $args[] = '--parallel';
-            $args[] = '--processes=4';
+            $args[] = '--processes=2';
         }
 
         return $args;

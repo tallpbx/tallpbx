@@ -38,3 +38,4 @@ Homestead.yaml
 Thumbs.db
 app-modules/backups/backups
 tests/Browser/Screenshots/
+/storage/framework/browser-media*

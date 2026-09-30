@@ -9,11 +9,13 @@ use App\Services\TenantManager;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Browser\Concerns\InteractsWithAuthentication;
+use Tests\Browser\Concerns\SeedsSmokeAdmin;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->use(InteractsWithAuthentication::class)
+    ->use(SeedsSmokeAdmin::class)
     ->in('Browser');
 
 /*

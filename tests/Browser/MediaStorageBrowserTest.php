@@ -201,17 +201,20 @@ it('hides foreign and pending media while distinguishing missing permission', fu
     // A tenant user from another tenant cannot see the media at all.
     $this->loginAs($foreignUser, 'web');
     $foreignPage = visit('/panel/dashboard');
+    $foreignPage->assertPathIs('/panel/dashboard');
     expect(readMediaResponse($foreignPage, "/panel/media-assets/{$asset->id}/stream")[0])->toBe(404)
         ->and(readMediaResponse($foreignPage, "/panel/media-assets/{$asset->id}/download")[0])->toBe(404);
 
     // The owning tenant user cannot stream an asset that is still pending.
     $this->loginAs($owner, 'web');
     $ownerPage = visit('/panel/dashboard');
+    $ownerPage->assertPathIs('/panel/dashboard');
     expect(readMediaResponse($ownerPage, "/panel/media-assets/{$pendingAsset->id}/stream")[0])->toBe(404);
 
     // A tenant user without the media permission is told the request is forbidden.
     $this->loginAs($unprivilegedUser, 'web');
     $unprivilegedPage = visit('/panel/dashboard');
+    $unprivilegedPage->assertPathIs('/panel/dashboard');
     expect(readMediaResponse($unprivilegedPage, "/panel/media-assets/{$asset->id}/stream")[0])->toBe(403);
 });
 
