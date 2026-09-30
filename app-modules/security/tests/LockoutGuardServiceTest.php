@@ -8,6 +8,7 @@ use Database\Seeders\SecurityServiceSeeder;
 use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
+use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\LockoutGuardService;
 
 /**
@@ -124,4 +125,79 @@ it('correctly reports blacklisted status', function (): void {
 
     expect($guard->isBlacklisted('198.51.100.88'))->toBeTrue()
         ->and($guard->isBlacklisted('198.51.100.89'))->toBeFalse();
+});
+
+it('reports local services safe while the pre-filter stays on', function (): void {
+    $guard = new LockoutGuardService;
+
+    // The pre-filter's unconditional loopback accept is what keeps the
+    // panel's own database and cache connections reachable; with it on,
+    // nothing local is ever at risk.
+    expect($guard->wouldDropLocalServices())->toBeFalse();
+});
+
+it('flags local services at risk when the pre-filter would be off and the policy blocks', function (): void {
+    $guard = new LockoutGuardService;
+
+    // The exact outage pattern this guard exists for: removing the pre-filter
+    // also removes the loopback accept, so the server's own database and
+    // cache connections fall through to the blocking default policy.
+    expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeTrue();
+
+    // Same verdict once the switch is already off and nothing changes it.
+    SecuritySetting::set('prefilter_enabled', false);
+
+    expect($guard->wouldDropLocalServices())->toBeTrue()
+        // Re-enabling the pre-filter restores the loopback guarantee.
+        ->and($guard->wouldDropLocalServices(proposedPrefilterEnabled: true))->toBeFalse();
+});
+
+it('reports local services safe when the default policy allows', function (): void {
+    SecuritySetting::set('firewall_default_policy', 'accept');
+
+    $guard = new LockoutGuardService;
+
+    expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeFalse();
+
+    // The proposed (not yet stored) allow policy also protects local services
+    // while the stored policy still blocks.
+    SecuritySetting::set('firewall_default_policy', 'drop');
+
+    expect($guard->wouldDropLocalServices(proposedDefaultPolicy: 'accept', proposedPrefilterEnabled: false))->toBeFalse();
+});
+
+it('reports local services safe in observe mode', function (): void {
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    $guard = new LockoutGuardService;
+
+    // While observing, the chain policy is forced to accept — nothing drops.
+    expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeFalse();
+
+    // Entering observe mode in the same change is safe for the same reason.
+    SecuritySetting::set('firewall_observe_mode', false);
+
+    expect($guard->wouldDropLocalServices(proposedObserveMode: true, proposedPrefilterEnabled: false))->toBeFalse();
+});
+
+it('reports local services safe when the firewall is disabled', function (): void {
+    SecuritySetting::set('firewall_enabled', false);
+
+    $guard = new LockoutGuardService;
+
+    // A disabled firewall emits a fully open ruleset — no default drop.
+    expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeFalse();
+});
+
+it('throws a local service safety alert when the pre-filter is off and the policy blocks', function (): void {
+    $guard = new LockoutGuardService;
+
+    expect(fn () => $guard->assertLocalServicesSafe(proposedPrefilterEnabled: false))
+        ->toThrow(LockoutException::class, 'Local service safety alert');
+});
+
+it('keeps assertLocalServicesSafe quiet when local services stay protected', function (): void {
+    $guard = new LockoutGuardService;
+
+    expect(fn () => $guard->assertLocalServicesSafe())->not->toThrow(LockoutException::class);
 });

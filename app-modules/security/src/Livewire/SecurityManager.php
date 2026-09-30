@@ -430,6 +430,16 @@ class SecurityManager extends Component
             return;
         }
 
+        // Removing the pre-filter also removes the unconditional loopback
+        // accept that the server's own database, cache, and phone services
+        // rely on; combined with a blocking default policy that would sever
+        // them, so the change is refused before anything is persisted.
+        if (! $enabled && $lockoutGuard->wouldDropLocalServices(proposedPrefilterEnabled: false)) {
+            $this->notifyError((string) __('admin.security_prefilter_local_services_refused'));
+
+            return;
+        }
+
         SecuritySetting::updateOrCreate(['key' => 'prefilter_enabled'], ['value' => $enabled ? '1' : '0']);
         $this->prefilterEnabled = $enabled;
 
@@ -460,6 +470,15 @@ class SecurityManager extends Component
     {
         if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy)) {
             $this->notifyError((string) __('admin.security_observe_restore_lockout_refused', ['ip' => $this->adminIp]));
+
+            return;
+        }
+
+        // Leaving observe mode restores enforcement; with the pre-filter off
+        // and a blocking default policy, the server's own loopback services
+        // would hit the default drop, so the change is refused up front.
+        if (! $enabled && $lockoutGuard->wouldDropLocalServices(proposedObserveMode: false)) {
+            $this->notifyError((string) __('admin.security_observe_local_services_refused'));
 
             return;
         }
@@ -1804,10 +1823,16 @@ class SecurityManager extends Component
         $generator ??= app(SecurityConfigGenerator::class);
         $executor ??= app(SecurityExecutorInterface::class);
 
-        // 1. Zero-lockout preflight validation
-        if (! $force && $this->adminIp !== null && $this->adminIp !== '') {
+        // 1. Zero-lockout preflight validation: the administrator's own
+        //    connection AND the server's loopback services (database, cache)
+        //    must both survive the ruleset that is about to be applied.
+        if (! $force) {
             try {
-                $lockoutGuard->assertSafe($this->adminIp, $this->firewallDefaultPolicy);
+                if ($this->adminIp !== null && $this->adminIp !== '') {
+                    $lockoutGuard->assertSafe($this->adminIp, $this->firewallDefaultPolicy);
+                }
+
+                $lockoutGuard->assertLocalServicesSafe();
             } catch (LockoutException $e) {
                 $this->notifyError($e->getMessage());
 
@@ -1921,6 +1946,17 @@ class SecurityManager extends Component
         $this->validate([
             'firewallDefaultPolicy' => ['required', 'in:drop,accept'],
         ]);
+
+        // Persisting a blocking policy while the pre-filter is off would cut
+        // the server's own loopback services (database, cache), so the change
+        // is refused before anything is written; the dialog stays open so the
+        // administrator can pick Allow All instead.
+        if ($this->firewallDefaultPolicy === 'drop'
+            && app(LockoutGuardService::class)->wouldDropLocalServices(proposedDefaultPolicy: 'drop')) {
+            $this->notifyError((string) __('admin.security_default_policy_local_services_refused'));
+
+            return;
+        }
 
         // Remember the persisted policy so a refused apply can be rolled back.
         $previousPolicy = SecuritySetting::get('firewall_default_policy', 'drop') ?? 'drop';

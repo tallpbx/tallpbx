@@ -9,6 +9,7 @@ use Mockery;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Exceptions\LockoutException;
+use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 
@@ -80,11 +81,50 @@ it('blocks security:apply when lockout check fails without --force', function ()
 it('bypasses lockout safety check when --force is passed to security:apply', function (): void {
     $mockGuard = Mockery::mock(LockoutGuardService::class);
     $mockGuard->shouldNotReceive('assertSafe');
+    $mockGuard->shouldNotReceive('assertLocalServicesSafe');
 
     $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
     $mockExecutor->shouldReceive('apply')->once()->andReturn(true);
 
     $this->app->instance(LockoutGuardService::class, $mockGuard);
+    $this->app->instance(SecurityExecutorInterface::class, $mockExecutor);
+
+    $this->artisan('security:apply', ['--force' => true])
+        ->assertSuccessful();
+});
+
+it('blocks security:apply when the stored settings would drop local service traffic', function (): void {
+    // Pre-filter off plus the seeded blocking policy is exactly the
+    // combination that severed the server's own loopback connections.
+    SecuritySetting::set('prefilter_enabled', false);
+
+    $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
+    $mockExecutor->shouldNotReceive('apply');
+    $this->app->instance(SecurityExecutorInterface::class, $mockExecutor);
+
+    $this->artisan('security:apply')
+        ->expectsOutputToContain('Local service safety alert')
+        ->assertFailed();
+});
+
+it('applies the ruleset when the pre-filter is off but the default policy allows', function (): void {
+    SecuritySetting::set('prefilter_enabled', false);
+    SecuritySetting::set('firewall_default_policy', 'accept');
+
+    $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
+    $mockExecutor->shouldReceive('apply')->once()->andReturn(true);
+    $this->app->instance(SecurityExecutorInterface::class, $mockExecutor);
+
+    $this->artisan('security:apply')
+        ->expectsOutputToContain('SUCCESS: Host firewall ruleset applied atomically.')
+        ->assertSuccessful();
+});
+
+it('bypasses the local service safety check when --force is passed', function (): void {
+    SecuritySetting::set('prefilter_enabled', false);
+
+    $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
+    $mockExecutor->shouldReceive('apply')->once()->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $mockExecutor);
 
     $this->artisan('security:apply', ['--force' => true])

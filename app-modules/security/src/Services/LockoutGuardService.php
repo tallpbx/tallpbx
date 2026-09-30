@@ -73,6 +73,74 @@ class LockoutGuardService
     }
 
     /**
+     * Determine whether a proposed change would cut the server's own loopback connections.
+     *
+     * The ingress pre-filter is the stage that emits the unconditional loopback
+     * accept; with it off, loopback traffic to local-only services (the database
+     * and cache, which are not part of the service port catalog) falls through to
+     * the default policy. A blocking default policy plus a disabled pre-filter is
+     * exactly the outage this check exists to prevent — the server's own PHP pages
+     * and Artisan commands hang because they can no longer reach MariaDB or Redis.
+     *
+     * @param  bool|null  $proposedPrefilterEnabled  Proposed pre-filter state (defaults to the stored setting)
+     * @param  string|null  $proposedDefaultPolicy  Proposed 'drop'/'accept' policy (defaults to the stored setting)
+     * @param  bool|null  $proposedObserveMode  Proposed observe-mode state (defaults to the stored setting)
+     * @return bool True when the proposed state would drop local service traffic
+     */
+    public function wouldDropLocalServices(
+        ?bool $proposedPrefilterEnabled = null,
+        ?string $proposedDefaultPolicy = null,
+        ?bool $proposedObserveMode = null,
+    ): bool {
+        // A disabled firewall emits a fully open ruleset — nothing can drop.
+        if (! SecuritySetting::getBoolean('firewall_enabled', true)) {
+            return false;
+        }
+
+        // Observe mode forces the chain policy to accept — nothing can drop.
+        $observeMode = $proposedObserveMode ?? SecuritySetting::getBoolean('firewall_observe_mode', false);
+        if ($observeMode) {
+            return false;
+        }
+
+        // With an allowing default policy, unmatched traffic (including local
+        // loopback connections) falls through — nothing can drop.
+        $policy = strtolower(trim((string) ($proposedDefaultPolicy ?? SecuritySetting::get('firewall_default_policy', 'drop'))));
+        if ($policy === 'accept') {
+            return false;
+        }
+
+        // The pre-filter is the only stage that guarantees the loopback accept;
+        // with it off and a blocking policy, the server's own connections die.
+        $prefilterEnabled = $proposedPrefilterEnabled ?? SecuritySetting::getBoolean('prefilter_enabled', true);
+
+        return ! $prefilterEnabled;
+    }
+
+    /**
+     * Assert that a configuration cannot cut the server's own loopback services.
+     *
+     * @param  bool|null  $proposedPrefilterEnabled  Proposed pre-filter state
+     * @param  string|null  $proposedDefaultPolicy  Proposed default policy
+     * @param  bool|null  $proposedObserveMode  Proposed observe-mode state
+     *
+     * @throws LockoutException When the database/cache loopback connections would be dropped
+     */
+    public function assertLocalServicesSafe(
+        ?bool $proposedPrefilterEnabled = null,
+        ?string $proposedDefaultPolicy = null,
+        ?bool $proposedObserveMode = null,
+    ): void {
+        if ($this->wouldDropLocalServices($proposedPrefilterEnabled, $proposedDefaultPolicy, $proposedObserveMode)) {
+            throw new LockoutException(
+                'Local service safety alert: with the ingress pre-filters off and the default policy set to DROP, '
+                .'the loopback connections that the panel, database, and cache rely on would be dropped, locking you out of the server. '
+                .'Set the default policy to ALLOW first, or keep the pre-filters on.'
+            );
+        }
+    }
+
+    /**
      * Automatically add an IP address to the Trusted whitelist to guarantee ongoing access.
      *
      * @param  string  $ip  IP address to add to the whitelist

@@ -44,10 +44,14 @@ class SecurityApplyCommand extends Command
     ): int {
         $this->info('TallPBX Security: Compiling host firewall ruleset...');
 
-        // 1. Zero-lockout preflight check (unless --force is passed)
+        // 1. Zero-lockout preflight check (unless --force is passed): the
+        //    server's own loopback services are verified alongside the
+        //    administrator connection, because a pre-filter-off ruleset with a
+        //    blocking policy severs the database/cache local connections.
         if (! $this->option('force')) {
             try {
                 $lockoutGuard->assertSafe('127.0.0.1');
+                $lockoutGuard->assertLocalServicesSafe();
             } catch (LockoutException $e) {
                 $this->error($e->getMessage());
                 $this->warn('Use --force to override this safety check if running strictly from the local host console.');
