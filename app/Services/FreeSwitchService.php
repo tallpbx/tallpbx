@@ -254,6 +254,23 @@ class FreeSwitchService implements FreeSwitchServiceInterface
      */
     public function api(string $command): string
     {
+        // Safety: never send state-mutating commands to the live FreeSWITCH
+        // from an automated test run (unit, feature, or Pest browser tests).
+        // On a host where FreeSWITCH runs locally, the reload jobs dispatched
+        // by test fixtures would otherwise hammer the real switch — a single
+        // feature-suite run has been observed reloading the live XML dozens of
+        // times in one minute. The guard fires only when the service targets
+        // the configured ESL endpoint, so protocol tests against a fake ESL
+        // server on a random port keep working (the same pattern as
+        // SecurityExecutor's helper guard).
+        if ($this->isTestRun() && $this->targetsConfiguredEslEndpoint() && $this->isLiveMutationCommand($command)) {
+            $this->logMessage('warning', 'Blocked FreeSWITCH ESL mutation during a test run', [
+                'command' => $command,
+            ]);
+
+            return '';
+        }
+
         if (! $this->isConnected()) {
             $this->logMessage('warning', 'FreeSWITCH ESL: api() called without connection.', [
                 'command' => $command,
@@ -279,6 +296,16 @@ class FreeSwitchService implements FreeSwitchServiceInterface
      */
     public function bgapi(string $command): string
     {
+        // Mirror the api() test-run guard so background jobs cannot mutate a
+        // live FreeSWITCH from automated tests either.
+        if ($this->isTestRun() && $this->targetsConfiguredEslEndpoint() && $this->isLiveMutationCommand($command)) {
+            $this->logMessage('warning', 'Blocked FreeSWITCH ESL mutation during a test run', [
+                'command' => $command,
+            ]);
+
+            return '';
+        }
+
         if (! $this->isConnected()) {
             $this->logMessage('warning', 'FreeSWITCH ESL: bgapi() called without connection.', [
                 'command' => $command,
@@ -298,6 +325,64 @@ class FreeSwitchService implements FreeSwitchServiceInterface
         }
 
         return '';
+    }
+
+    /**
+     * Determine whether an ESL command mutates live FreeSWITCH state.
+     *
+     * Reload, rescan, restart, and gateway commands change the running
+     * switch; read-only status commands (sofia status, show channels,
+     * conference list, and so on) are allowed through the test-run guard.
+     */
+    private function isLiveMutationCommand(string $command): bool
+    {
+        $normalized = strtolower(trim($command));
+
+        return in_array($normalized, ['reloadxml', 'reloadacl'], true)
+            || str_starts_with($normalized, 'sofia profile');
+    }
+
+    /**
+     * Whether the current process is an automated test run.
+     *
+     * The framework's Application exposes runningUnitTests(), but the bare
+     * container used by some isolated unit tests does not — the phpunit.xml
+     * APP_ENV=testing value is the reliable signal in that context, so both
+     * are checked. Bare unit tests construct the service with unreachable
+     * sockets, so a false reading there would never be a live risk anyway.
+     */
+    private function isTestRun(): bool
+    {
+        $app = app();
+
+        if (method_exists($app, 'runningUnitTests') && $app->runningUnitTests()) {
+            return true;
+        }
+
+        return method_exists($app, 'environment') && $app->environment('testing');
+    }
+
+    /**
+     * Whether this instance targets the configured live ESL endpoint.
+     *
+     * Only connections aimed at the real configured FreeSWITCH are live
+     * risks during test runs. Protocol tests that start a fake ESL server
+     * on a random port construct the service with that port, so they fall
+     * outside this check and can still exercise the api()/bgapi() wire
+     * format. Bare-container unit tests have no config repository — without
+     * config there is no live endpoint to protect, so the check allows the
+     * command through.
+     */
+    private function targetsConfiguredEslEndpoint(): bool
+    {
+        try {
+            $esl = (array) config('freeswitch.esl', []);
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $this->host === ($esl['host'] ?? null)
+            && $this->port === (int) ($esl['port'] ?? 0);
     }
 
     /**

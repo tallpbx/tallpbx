@@ -3,9 +3,15 @@
 declare(strict_types=1);
 
 use App\Services\FreeSwitchService;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
-    // Use an unreachable port so auto-connect fails fast (1-second timeout)
+    // Point the configured ESL endpoint at an unreachable port FIRST, so the
+    // live-mutation guard tests can match it without ever risking the real
+    // switch. The service then targets that same (unreachable) endpoint.
+    config()->set('freeswitch.esl.host', '127.0.0.1');
+    config()->set('freeswitch.esl.port', 19999);
+
     $this->service = new FreeSwitchService(
         host: '127.0.0.1',
         port: 19999,
@@ -112,4 +118,70 @@ it('decodes url-encoded header values in plain event payloads', function () {
         ->and($parsed['headers']['Attacker-IP'])->toBe('127.0.0.1')
         ->and($parsed['headers']['Caller-Caller-ID-Name'])->toBe('John Doe, Jr.')
         ->and($parsed['headers']['Channel-Name'])->toBe('sofia/external/scanner@159.203.57.100');
+});
+
+// ─── Live-Mutation Guard During Test Runs ───────────────────────
+
+it('blocks reloadxml against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('reloadxml');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'reloadxml');
+});
+
+it('blocks reloadacl against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('reloadacl');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'reloadacl');
+});
+
+it('blocks sofia profile restarts against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('sofia profile external restart');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'sofia profile external restart');
+});
+
+it('blocks sofia profile rescans against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('sofia profile internal rescan');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'sofia profile internal rescan');
+});
+
+it('allows read-only ESL commands during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('sofia status');
+
+    // The read command must pass the mutation guard and reach the normal
+    // connection flow (which fails against the unreachable test port).
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'FreeSWITCH ESL: api() called without connection.'
+            && ($context['command'] ?? null) === 'sofia status');
+
+    Log::shouldNotHaveReceived('warning', fn (string $message) => str_contains($message, 'Blocked FreeSWITCH ESL mutation'));
 });

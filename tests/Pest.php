@@ -37,6 +37,13 @@ pest()->extend(TestCase::class)
 pest()->extend(TestCase::class)
     ->in('Unit/Jobs');
 
+// The FreeSwitchService live-mutation guard tests need the real Application
+// container so facades (Log) resolve and runningUnitTests() reports a test
+// run. Scoped to the single file because the sibling bare-container tests in
+// Unit/Services must stay fast and isolated from real service providers.
+pest()->extend(TestCase::class)
+    ->in('Unit/Services/FreeSwitchServiceTest.php');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations
