@@ -10,3 +10,22 @@
  * that contains these class names as literals, forcing their inclusion.
  */
 @source "../views/components/tooltip-safelist.blade.php";
+
+/*
+ * DaisyUI "lift" tabs border visibility.
+ *
+ * The tabs-lift style draws its borders with --tab-border-color, which
+ * DaisyUI defaults to --color-base-300. That shade is so close to the
+ * panel background that the lifted border shape disappears completely.
+ * Mixing in a share of the content color darkens the border in the light
+ * theme (and lightens it in the dark theme) so the tab outline stays
+ * clearly visible on either background.
+ *
+ * This rule is intentionally NOT wrapped in @layer: DaisyUI registers its
+ * component styles in the utilities layer, and by layer order any rule in
+ * the earlier components layer would lose the cascade. An unlayered rule
+ * always wins, guaranteeing the darker border is applied.
+ */
+.tabs-lift > .tab {
+  --tab-border-color: color-mix(in oklab, var(--color-base-300) 75%, var(--color-base-content) 25%);
+}
