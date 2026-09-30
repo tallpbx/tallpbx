@@ -250,12 +250,25 @@ case "$ACTION" in
 
         # Delete every conntrack entry sourced from this address so its live
         # sessions die immediately. IPv6 entries require the explicit family
-        # flag because the utility defaults to the IPv4 table.
+        # flag because the utility defaults to the IPv4 table. conntrack
+        # exits non-zero when nothing matched — "0 flow entries have been
+        # deleted" is the desired end state for an idle address, not a
+        # failure — so the exit code is captured and only a genuine error
+        # aborts the script with the utility's own message.
+        DELETE_EXIT=0
         if [[ "$IP" =~ $IPV4_REGEX ]]; then
-            "$CONNTRACK_BIN" -D -s "$IP"
+            DELETE_OUTPUT="$("$CONNTRACK_BIN" -D -s "$IP" 2>&1)" || DELETE_EXIT=$?
         else
-            "$CONNTRACK_BIN" -D -f ipv6 -s "$IP"
+            DELETE_OUTPUT="$("$CONNTRACK_BIN" -D -f ipv6 -s "$IP" 2>&1)" || DELETE_EXIT=$?
         fi
+
+        printf '%s\n' "$DELETE_OUTPUT"
+
+        if [ "$DELETE_EXIT" -ne 0 ] && ! printf '%s' "$DELETE_OUTPUT" | grep -q "0 flow entries have been deleted"; then
+            echo "ERROR: conntrack flush failed for $IP: $DELETE_OUTPUT" >&2
+            exit 5
+        fi
+
         echo "SUCCESS: Flushed conntrack entries for $IP"
         ;;
 

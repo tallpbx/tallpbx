@@ -242,6 +242,64 @@ it('routes flush-conntrack by address family with the correct conntrack flag', f
     }
 });
 
+it('treats an idle flush as success when conntrack deletes nothing', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // The real conntrack utility exits non-zero with "0 flow entries have
+    // been deleted" when the address has no live sessions — that is the
+    // desired end state, not a failure. Banning an idle address must not
+    // produce a false 'conntrack flush failed' audit entry.
+    $stubDir = sys_get_temp_dir().'/tallpbx_conntrack_idle_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $stub = $stubDir.'/conntrack';
+    file_put_contents($stub, "#!/bin/bash\necho 'conntrack v1.4.8 (conntrack-tools): 0 flow entries have been deleted.'\nexit 1\n");
+    chmod($stub, 0755);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'flush-conntrack', '203.0.113.9'],
+            null,
+            ['TALLPBX_CONNTRACK_BIN' => $stub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toContain('0 flow entries have been deleted')
+            ->and($process->getOutput())->toContain('SUCCESS: Flushed conntrack entries');
+    } finally {
+        @unlink($stub);
+        @rmdir($stubDir);
+    }
+});
+
+it('fails loudly when the conntrack flush really fails', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // A genuine failure (kernel interface missing, permissions) must not be
+    // mistaken for an idle flush: the helper exits non-zero and surfaces the
+    // utility's error text so the operator can act on it.
+    $stubDir = sys_get_temp_dir().'/tallpbx_conntrack_fail_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $stub = $stubDir.'/conntrack';
+    file_put_contents($stub, "#!/bin/bash\necho 'conntrack: Operation not permitted' >&2\nexit 1\n");
+    chmod($stub, 0755);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'flush-conntrack', '203.0.113.9'],
+            null,
+            ['TALLPBX_CONNTRACK_BIN' => $stub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(5)
+            ->and($process->getErrorOutput())->toContain('Operation not permitted');
+    } finally {
+        @unlink($stub);
+        @rmdir($stubDir);
+    }
+});
+
 it('self-reports the helper capability version marker', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
