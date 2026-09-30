@@ -467,6 +467,16 @@ it('resolves a saved SignalWire token before asking for a new one', function ():
         ->and($resolvePosition)->toBeLessThan($promptPosition);
 });
 
+it('points to re-running the installer instead of a repository file when the SignalWire token is rejected', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    // The rejection guidance must stay actionable for operators. The old
+    // wording told them to edit config.sh — a repository file that git pulls
+    // overwrite — instead of simply re-running the installer with a new token.
+    expect($script)->toContain('Re-run the installer and enter a new Personal Access Token')
+        ->and($script)->not->toContain('Update switch_token in config.sh');
+});
+
 it('deploys the cloned FreeSwitchPBX application before installing dependencies', function (): void {
     $script = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
     $deploymentPosition = strpos($script, 'Installing FreeSwitchPBX application source');

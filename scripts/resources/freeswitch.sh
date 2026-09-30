@@ -786,7 +786,7 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
     # If the keyring file is empty, the token was rejected
     if [ ! -s /usr/share/keyrings/signalwire-freeswitch-repo.gpg ]; then
         error "SignalWire authentication failed. The saved Personal Access Token may be invalid."
-        error "Update switch_token in config.sh or run the installer again to enter a new token."
+        error "Re-run the installer and enter a new Personal Access Token when asked (get one free at: https://signalwire.com)."
         # Clear invalid durable state so the default configuration prompts once.
         set_secure_env_value "$INSTALLER_STATE_FILE" SWITCH_TOKEN ""
         exit 1
