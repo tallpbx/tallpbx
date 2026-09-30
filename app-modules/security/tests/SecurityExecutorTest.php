@@ -418,6 +418,91 @@ it('reloads the last good threat feed file after every successful apply', functi
     }
 });
 
+it('reloads the last good threat feed file when ban restores a missing ruleset', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    // Restoring a missing kernel table from the active file is a full ruleset
+    // load (`flush ruleset`), so the feed elements file must be re-loaded
+    // right after it — exactly like the apply path (invariant 5).
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\nif [ \"\$1\" = \"list\" ]; then exit 1; fi\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_ban_restore_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/firewall.nft', "#!/usr/sbin/nft -f\n# main ruleset\n");
+    file_put_contents($isolatedDir.'/threat_feed.nft', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'ban', '198.51.100.9', '3600'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+
+        $output = $process->getOutput();
+        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/threat_feed.nft");
+
+        expect($mainLoad)->not->toBeFalse()
+            ->and($feedLoad)->not->toBeFalse()
+            ->and($mainLoad)->toBeLessThan($feedLoad);
+    } finally {
+        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
+it('reloads the last good threat feed file when unban restores a missing ruleset', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\nif [ \"\$1\" = \"list\" ]; then exit 1; fi\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_unban_restore_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/firewall.nft', "#!/usr/sbin/nft -f\n# main ruleset\n");
+    file_put_contents($isolatedDir.'/threat_feed.nft', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'unban', '198.51.100.10'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+
+        $output = $process->getOutput();
+        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/threat_feed.nft");
+
+        expect($mainLoad)->not->toBeFalse()
+            ->and($feedLoad)->not->toBeFalse()
+            ->and($mainLoad)->toBeLessThan($feedLoad);
+    } finally {
+        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
 it('validates shell script apply fails when pending file is missing', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 

@@ -252,3 +252,22 @@ it('ships the local-services refusal translations in English, Spanish, and Frenc
         expect($missing)->toBe([], 'Missing keys in '.$locale.': '.implode(', ', $missing));
     }
 });
+
+it('rolls back the master firewall switch when the guard refuses the change', function (): void {
+    // Enabling passes the same lockout guard as every apply; when it is
+    // refused the stored switch must snap back to disabled — otherwise the
+    // panel would claim the firewall is on while the kernel still runs the
+    // fully open ruleset, and a later CLI apply would enforce a drop policy.
+    SecuritySetting::set('firewall_enabled', false);
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('adminIp', '203.0.113.10')
+        ->call('setFirewallEnabled', true)
+        ->assertSet('firewallEnabled', false);
+
+    expect($component->get('operationalMessageType'))->toBe('error')
+        ->and(SecuritySetting::getBoolean('firewall_enabled', true))->toBeFalse();
+
+    $this->executor->shouldNotHaveReceived('apply');
+});

@@ -38,14 +38,17 @@ afterEach(function (): void {
 });
 
 /**
- * Remove the Redis escalation keys so tests never leak window state.
+ * Remove the Redis escalation and audit-throttle keys so tests never leak
+ * window state between runs.
  */
 function clearLowSignatureKeys(): void
 {
-    $keys = Redis::keys('tallpbx:security:sip_scanner_low:*');
+    foreach (['tallpbx:security:sip_scanner_low:*', 'tallpbx:security:sip_scanner_audited:*'] as $pattern) {
+        $keys = Redis::keys($pattern);
 
-    if (! empty($keys)) {
-        Redis::del($keys);
+        if (! empty($keys)) {
+            Redis::del($keys);
+        }
     }
 }
 
@@ -265,4 +268,37 @@ it('truncates an over-long attacker-controlled signature value', function (): vo
     expect($incident)->not->toBeNull()
         ->and($incident->is_active)->toBeFalse()
         ->and(mb_strlen($incident->reason))->toBeLessThanOrEqual(255);
+});
+
+it('writes only one audit entry when the same address floods detections', function (): void {
+    SecuritySetting::set('sip_scanner_enforcement_enabled', false);
+
+    $this->banService->shouldNotReceive('ban');
+
+    // Record-only mode has no ban to short-circuit on, so the audit write
+    // itself must be throttled: a flood from one address grows the audit
+    // trail by at most one row per minute, while the incident row still
+    // counts every hit.
+    event(scannerEvent('203.0.113.20', 'friendly-scanner', 'high'));
+    event(scannerEvent('203.0.113.20', 'friendly-scanner', 'high'));
+
+    expect(SecurityAuditLog::where('action', 'sip_scanner_detected')->where('ip_address', '203.0.113.20')->count())->toBe(1);
+
+    $incident = SecurityBan::where('ip_address', '203.0.113.20')->first();
+
+    expect($incident)->not->toBeNull()
+        ->and($incident->attempt_count)->toBe(2);
+});
+
+it('keeps the audit throttle scoped per address', function (): void {
+    SecuritySetting::set('sip_scanner_enforcement_enabled', false);
+
+    $this->banService->shouldNotReceive('ban');
+
+    event(scannerEvent('203.0.113.21', 'friendly-scanner', 'high'));
+    event(scannerEvent('203.0.113.22', 'friendly-scanner', 'high'));
+
+    expect(SecurityAuditLog::where('action', 'sip_scanner_detected')
+        ->whereIn('ip_address', ['203.0.113.21', '203.0.113.22'])
+        ->count())->toBe(2);
 });

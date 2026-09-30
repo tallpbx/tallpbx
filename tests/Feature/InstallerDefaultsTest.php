@@ -967,3 +967,18 @@ it('configures default XML handler cache TTL in tall.sh', function (): void {
 
     expect($tallScript)->toContain('FS_XML_HANDLER_CACHE_TTL=5');
 });
+
+it('loads the threat feed elements file at boot alongside the main ruleset', function (): void {
+    $securityScript = (string) file_get_contents(base_path('scripts/resources/security.sh'));
+
+    // The main ruleset starts with `flush ruleset`, so the boot loader must
+    // include the feed elements file as well — otherwise every reboot
+    // silently empties the feed sets until the next scheduled sync, while
+    // the panel keeps reporting a healthy, fully populated feed (invariant 5).
+    expect($securityScript)->toContain('include "/etc/tallpbx/firewall.nft"')
+        ->and($securityScript)->toContain('include "/etc/tallpbx/threat_feed.nft"')
+        // An nft `include` of a missing file aborts the whole boot load, so
+        // the feed file placeholder must be created before the configuration
+        // is written (the application fills it on the first feed sync).
+        ->and($securityScript)->toContain('install -m 0640 -o root -g www-data /dev/null /etc/tallpbx/threat_feed.nft');
+});

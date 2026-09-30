@@ -234,3 +234,26 @@ it('routes sync requests to the registered provider through the manager', functi
     expect($result->status)->toBe('failed')
         ->and((string) $result->error)->toContain('mystery');
 });
+
+it('marks the sync as failed when the kernel refuses to load the compiled list', function (): void {
+    // A successful download that never reaches the kernel (for example when
+    // the bounded helper is missing or out of date) must not leave the feed
+    // row reporting a healthy active feed while nothing is blocked.
+    $body = "203.0.113.1/32\n203.0.113.2/32\n203.0.113.3/32";
+    Http::fake(['www.voipbl.org/*' => Http::response($body, 200)]);
+
+    $executor = Mockery::mock(SecurityExecutorInterface::class);
+    $executor->shouldReceive('updateThreatFeed')->once()->andReturn(false);
+    $provider = new VoipblFeedProvider(new ThreatFeedIngestionService($this->firewallDir, $this->tempDir), $executor);
+
+    $feed = SecurityThreatFeed::factory()->create(['enabled' => true]);
+    $result = $provider->sync($feed);
+
+    // The download itself succeeded; the persisted status must tell the
+    // truth about the kernel gate.
+    expect($result->status)->toBe('success');
+
+    $feed->refresh();
+    expect($feed->last_status)->toBe('failed')
+        ->and((string) $feed->last_error)->toContain('kernel');
+});

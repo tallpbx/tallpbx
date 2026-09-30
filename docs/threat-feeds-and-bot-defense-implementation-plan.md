@@ -19,10 +19,11 @@
 2. A live `nft` probe chain left with `policy drop` dropped all inbound traffic.
 Operator rulings: (a) refuse — never silently override — firewall changes that would cut the server's own loopback services; (b) refusals surface as DaisyUI toast alerts; (c) no live-kernel verification on this server — remaining live checks move to a disposable staging host.
 
-### Remaining to close Task 17
-1. Full feature suite (`php artisan test --compact --parallel`) and browser suite (`bash scripts/test-browser.sh`) after this commit set.
-2. Live checklist leftovers — disposable staging host ONLY (pre-filter-off / observe-mode walkthrough, TFTP counters, live scanner ban, feed sync on a clean install).
-3. Mark Task 17 complete in the ledger, then finish the plan per the executing-plans skill (final review, workspace cleanup).
+### Final review (2026-09-30) and closure
+- One CodeReview pass over `v2.0.0..HEAD` found 1 Critical + 4 Important + 2 Minor; all Critical/Important findings were fixed with failing-test-first proof (boot feed reload, helper restore reload, scanner audit throttle, firewall-switch rollback, failed kernel-load reporting). Full suite green: 2601 passed / 1 skipped; Pint clean.
+- Verification complete: full feature suite ✔ · Pest browser suite ✔ (47 passed / 1 skipped) · no live kernel work at any point.
+- Open user decision: the disposable staging host was rebuilt (SSH access revoked), so the deferred live checklist items (pre-filter-off / observe-mode walkthrough, TFTP counters, live scanner ban, clean-install feed sync) need a re-provisioned host or new access — everything they cover is asserted by the automated suites.
+- Task 17 is complete. The execution ledger (`.superpowers/sdd/threat-feeds-and-bot-defense-implementation-plan/progress.md`) holds the full record (including the two lockout incidents) and stays until the user decides to delete this plan workspace.
 
 ## Executive Summary
 This document specifies the architecture and implementation roadmap for three integrated security enhancements in TallPBX:

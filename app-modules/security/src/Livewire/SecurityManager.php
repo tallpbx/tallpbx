@@ -582,6 +582,10 @@ class SecurityManager extends Component
      */
     public function setFirewallEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
     {
+        // Remember the persisted switch so a refused apply can be rolled back
+        // (in that case the kernel is still running the previous ruleset).
+        $previous = SecuritySetting::getBoolean('firewall_enabled', true);
+
         SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => $enabled ? '1' : '0']);
         $this->firewallEnabled = $enabled;
 
@@ -594,9 +598,17 @@ class SecurityManager extends Component
             adminId: Auth::guard('admin')->id(),
         );
 
-        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
-            $this->notifySuccess((string) __('admin.security_settings_saved'));
+        if (! $this->autoApplyFirewallRuleset($lockoutGuard)) {
+            // The guard, the syntax preflight, or the helper refused the
+            // change: snap the stored switch back so the panel never reports
+            // a state the kernel is not actually running.
+            SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => $previous ? '1' : '0']);
+            $this->firewallEnabled = $previous;
+
+            return;
         }
+
+        $this->notifySuccess((string) __('admin.security_settings_saved'));
     }
 
     /**

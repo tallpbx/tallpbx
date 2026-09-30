@@ -38,8 +38,10 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * Safety nets: addresses that fail address validation are discarded
  * outright (the value arrives from a FreeSWITCH channel variable and is
  * treated as untrusted input), trusted-list addresses are never banned, and
- * an existing active ban short-circuits the whole handler so a scanner
- * flood cannot amplify database or process work.
+ * a scanner flood cannot amplify database or process work: an existing
+ * active ban short-circuits the whole handler, and in record-only mode the
+ * audit write is throttled to one entry per address per minute while the
+ * incident row still counts every hit.
  *
  * Registered-device protection: a device's contact network address is not
  * reliably available inside the ESL event loop (querying Sofia would interleave
@@ -177,7 +179,9 @@ class LogSipScannerListener
      *
      * Repeated detections from the same address update the existing
      * incident record (attempt count and latest reason) instead of creating
-     * duplicate rows; the first detection time is preserved.
+     * duplicate rows; the first detection time is preserved. The audit entry
+     * is throttled to one write per address per minute so a scanner flood
+     * during record-only mode cannot grow the audit trail without bound.
      */
     private function recordIncident(string $ip, string $reason, string $type, string $value, string $confidence): void
     {
@@ -201,6 +205,23 @@ class LogSipScannerListener
                 'expires_at' => null,
                 'is_active' => false,
             ]);
+        }
+
+        // Flood guard: while enforcement is off no ban exists to
+        // short-circuit on, so the audit write itself is throttled — one
+        // entry per address per minute. A Redis outage degrades to
+        // always-audit: visibility beats silence.
+        try {
+            $throttleKey = "tallpbx:security:sip_scanner_audited:{$ip}";
+
+            if ((bool) Redis::exists($throttleKey)) {
+                return;
+            }
+
+            Redis::set($throttleKey, '1');
+            Redis::expire($throttleKey, 60);
+        } catch (\Throwable $e) {
+            Log::warning("Failed to apply the SIP scanner audit throttle for {$ip}: {$e->getMessage()}");
         }
 
         SecurityAuditLog::record(

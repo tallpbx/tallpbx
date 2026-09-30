@@ -94,9 +94,13 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
             $updates['last_modified_header'] = $result->lastModified ?? $feed->last_modified_header;
 
             // Push the freshly compiled elements into the kernel through the
-            // bounded helper; stale helpers and missing files fail safely
-            // inside the executor with a plain-language log line.
-            $this->executor->updateThreatFeed();
+            // bounded helper. A refused load (stale helper, missing pending
+            // file) must surface as a failed sync: reporting a healthy feed
+            // while the kernel blocks nothing would mislead the operator.
+            if (! $this->executor->updateThreatFeed()) {
+                $updates['last_status'] = 'failed';
+                $updates['last_error'] = 'The threat feed list was downloaded but could not be loaded into the kernel (the security helper is missing or out of date).';
+            }
         }
 
         $feed->update($updates);
