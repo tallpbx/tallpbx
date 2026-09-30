@@ -834,6 +834,20 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
 
     install_freeswitch_hiredis_package
 
+    # The package ships its default configuration under
+    # /usr/share/freeswitch/conf/vanilla and copies it into /etc/freeswitch
+    # only when that directory does not exist yet. A failed earlier run (for
+    # example a rejected SignalWire token) can create parts of the directory
+    # first, after which the package skips its seeding and FreeSWITCH starts
+    # with no freeswitch.xml — crash-looping while this step still reports
+    # success. Seed the missing base tree here so a re-run always repairs it.
+    conf_dir="$(freeswitch_conf_dir)"
+
+    if [ ! -e "${conf_dir}/freeswitch.xml" ] && [ -d /usr/share/freeswitch/conf/vanilla ]; then
+        verbose "Seeding the default FreeSWITCH configuration"
+        cp -a /usr/share/freeswitch/conf/vanilla/. "${conf_dir}/"
+    fi
+
     sound_languages="${FSPBX_SOUND_LANGUAGES:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_SOUND_LANGUAGES)}"
     sound_languages="${sound_languages:-en}"
     conf_dir="$(freeswitch_conf_dir)"
@@ -878,7 +892,23 @@ if [ -f /lib/systemd/system/freeswitch.service ]; then
     systemctl daemon-reload
     systemctl enable freeswitch
     systemctl unmask freeswitch.service 2>/dev/null || true
-    systemctl start freeswitch
+
+    # A failed start must fail this step: continuing would leave a broken
+    # phone engine behind while the installer reports a healthy installation.
+    if ! systemctl start freeswitch; then
+        error "FreeSWITCH failed to start. Check: journalctl -u freeswitch -n 50"
+        exit 1
+    fi
+
+    # ...and a crash right after startup must fail it too, because every
+    # later configuration step is applied through the running engine's
+    # command interface.
+    sleep 2
+
+    if ! systemctl is-active --quiet freeswitch; then
+        error "FreeSWITCH stopped right after startup. Check: journalctl -u freeswitch -n 50; tail -50 /var/log/freeswitch/freeswitch.log"
+        exit 1
+    fi
 fi
 
 configure_freeswitch_switch_defaults

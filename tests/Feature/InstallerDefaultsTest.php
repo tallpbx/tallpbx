@@ -477,6 +477,30 @@ it('points to re-running the installer instead of a repository file when the Sig
         ->and($script)->not->toContain('Update switch_token in config.sh');
 });
 
+it('seeds the default FreeSWITCH configuration when an earlier failed run left a partial tree', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    // The SignalWire package seeds /etc/freeswitch only when the directory
+    // does not exist yet. A failed earlier run (for example a rejected token)
+    // can create parts of it first, after which the package skips its seeding
+    // and FreeSWITCH starts with no freeswitch.xml — crash-looping while the
+    // installer still reports success. The step must seed the missing base
+    // tree itself so a re-run always repairs the damage.
+    expect($script)->toContain('/usr/share/freeswitch/conf/vanilla')
+        ->and($script)->toContain('Seeding the default FreeSWITCH configuration');
+});
+
+it('fails the FreeSWITCH step when the service does not stay running', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    // A silent startup crash must fail the step instead of being reported as
+    // a healthy installation (observed on a fresh-install test run: the
+    // installer finished with "Installation Complete!" while FreeSWITCH
+    // crash-looped with a missing freeswitch.xml).
+    expect($script)->toContain('if ! systemctl start freeswitch; then')
+        ->and($script)->toContain('systemctl is-active --quiet freeswitch');
+});
+
 it('deploys the cloned FreeSwitchPBX application before installing dependencies', function (): void {
     $script = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
     $deploymentPosition = strpos($script, 'Installing FreeSwitchPBX application source');
