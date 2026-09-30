@@ -598,3 +598,21 @@ nano /etc/pbx/installer.env   # update the SWITCH_TOKEN line
 ### Git Conflicts During Upgrade
 
 See [If Git Will Not Pull the Update](#if-git-will-not-pull-the-update) above.
+
+### Server Unreachable After a Firewall Change
+
+If the web panel and `php artisan` commands hang after changing firewall or pre-filter
+settings, the server's own connections to its database and cache are being dropped. Recover
+from an SSH session — these plain Linux commands need no PHP and no database (run them as
+root — prefix with `sudo` if needed):
+
+```bash
+# Restore the server's own connections (usually enough on its own)
+nft insert rule inet tallpbx_filter input iif "lo" accept
+
+# Last resort: remove every firewall rule (the server is open until you re-apply)
+nft flush ruleset
+```
+
+Then open the Security Center and press **Apply** to restore the saved configuration.
+The full runbook is in [docs/operations.md](docs/operations.md#recovering-from-a-firewall-lockout).

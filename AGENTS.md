@@ -55,6 +55,40 @@ Rules:
 - Browser tests (Pest 4 + Playwright) follow the same convention inside `beforeEach` — `loginAs()` only establishes the session, it does not grant permissions.
 - For tests needing a *curated* subset, use `AdminSeeder`'s "Administrators" group or the `grantAdminPermissions()` helper in `tests/Pest.php`.
 
+## CRITICAL — Live Firewall Safety (Never Touch Live `nftables` State)
+
+NEVER mutate live `nftables` state on a running server — not even as a "probe", test, or
+command demonstration. Two production outages were caused this way:
+
+1. Applying a pre-filter-off ruleset removed the loopback accept (`iif "lo" accept`), so the
+   server's own MariaDB (3306) and Redis (6379) loopback connections fell through to the
+   default DROP policy; every PHP page and Artisan command hung until the ruleset was flushed.
+2. A probe chain left hooked to `input` with `policy drop` (only a counter rule, no accepts)
+   dropped ALL inbound traffic while it existed.
+
+**Rules:**
+- No raw `nft add`, `nft insert`, `nft chain`, `nft delete`, or `nft flush` commands against a
+  live kernel. All firewall changes flow through the application pipeline
+  (`php artisan security:apply` or the Security Center), which enforces the lockout and
+  local-services guards, or through the bounded helper.
+- Verification is done with `nft -c -f <file>` (check-only, never commits), unit tests with
+  mocked executors, or a disposable virtual machine. Creating kernel state on the live host to
+  "see what happens" is forbidden.
+- A base chain with `policy drop` and no matching accept rules drops EVERYTHING that reaches
+  it. Never create such a chain live, and never defer its cleanup to a later command.
+- When the firewall is managed by TallPBX, the database/`.env` settings plus
+  `/etc/tallpbx/firewall.nft` are the source of truth; runtime `nft` edits are overwritten by
+  the next apply. Always reconcile through the application.
+
+**Recovery reference** (use only during an actual lockout; full runbooks for humans:
+`docs/operations.md` → Recovering from a Firewall Lockout, `docs/security-architecture.md` → 9.3):
+- Restore loopback instantly, keeping every other rule: `nft insert rule inet tallpbx_filter input iif "lo" accept`
+- Restore one operator address: `nft insert rule inet tallpbx_filter input ip saddr <admin-ip> accept`
+- Flip the chain's policy in place without flushing its rules: `nft 'chain inet tallpbx_filter input { policy accept; }'`
+- Last resort, removes every table and rule: `nft flush ruleset`
+- After any recovery, reload the application's ruleset from the Security Center (or
+  `php artisan security:apply`) so the panel and the kernel agree again.
+
 ## SIP Load Testing & Multi-Host Reproducibility Guidelines
 
 When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `scripts/pbx-sipp-validate.sh`, or `scripts/run-cache-sweep.sh`), agents must follow these operational rules:

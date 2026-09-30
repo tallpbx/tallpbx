@@ -5,6 +5,45 @@ All notable changes to TallPBX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Public Threat Feeds (VoIPBL)**:
+  - The Security Center gains a **Threat Feeds** tab that blocks networks from an automatically updated public blocklist of known VoIP fraud and scanning sources, with a country filter (only listed countries, or all except yours), a refresh schedule, per-rule kernel drop counters, an on-demand "Sync Now", and a prominent "Remove all feed blocks" escape hatch for provider false positives.
+  - The feed pipeline is provider-extensible (one driver ships in this release) and fail-open by contract: a failed download, a truncated body, or a malformed list always keeps the previously loaded addresses in place instead of leaving the server unprotected; every rejection is recorded, and a scheduler that stops running is flagged as **Stale** instead of failing silently.
+  - Scheduled sync: `php artisan security:sync-threat-feeds {--feed=} {--force}` runs hourly and honours each feed's own interval; `--force` bypasses only the HTTP cache, never the fail-open checks.
+  - New permission `security.threat-feeds.manage` gates the feed controls; run `php artisan db:seed --class=AdminSeeder` (or grant it in the panel) so administrator groups keep access.
+- **Firewall On/Off Switch Model and Global Observe Mode**:
+  - The built-in pre-filter pipeline (trusted list, malformed-packet drop, fast path, blocklists, bans, and threat feeds) can now be switched off as one unit, leaving the ICMP, TFTP defense, port catalog, custom rules, and default policy active — for testing or a deliberately minimal firewall.
+  - Global observe mode makes the whole firewall non-blocking: every rule still evaluates and counts, every would-be drop is logged, and nothing is blocked. An amber banner appears on every Security page while it is active.
+  - Both switches run through the zero-lockout guard: the panel refuses the change with a plain-language alert when it would cut off the administrator's own connection, and records every switch in the audit trail.
+- **Pre-Filter Stage Reordering**:
+  - The evaluation order of the seven pre-filter stages is now administrator-reorderable from the Firewall Rules tab (chevrons per row), with a "Reset to recommended order" action; the pinned loopback rule always stays first, the stored order is validated before it is compiled, and the stage numbers in the generated ruleset follow the actual evaluation order. The stored order survives switching the pre-filter off.
+- **Evaluation-Ordered Security Center Tabs**:
+  - The Security Center is restructured into four tabs that mirror the kernel's evaluation order — **Block & Allow Lists**, **Attackers**, **Threat Feeds**, and **Firewall Rules** — with the switches and recovery banners pinned above the strip; the active tab is deep-linkable via `?tab=` and the pipeline's manage links switch to the matching tab.
+- **Hardened TFTP Defense Profile**:
+  - The port catalog gains a **TFTP Provisioning (UDP 69)** row with a shield badge and on/off toggle. When enabled, phone provisioning is hardened at the kernel level: file uploads (WRQ), directory traversal (`../`), and `/x` scan probes are dropped before the provisioning accept rule, and per-IP flood attempts are rate-limited through memory-bounded kernel meters (bounded by size and an idle timeout, so a spoofed flood cannot exhaust kernel memory).
+  - The flood rate limit and burst are administrator-tunable and clamped to sensible bounds; expanding the badge shows live per-rule counters (uploads blocked, traversal attempts, scan probes, flood drops). The rule set is generated from a merged base + custom pattern list — the custom list ships empty with no UI (a future release), so today's output is the fixed profile.
+- **SIP Bot & Scanner Filtering (Record-Only by Default)**:
+  - Public call contexts now match incoming requests against a curated, versioned signature registry before any routing rule runs: named scanners (sipvicious, friendly-scanner, VaxSIPUserAgent, sipcli, Ozeki) are rejected with 403 and hung up, while a low-confidence generic phrase (`SIP Call`) is only recorded. Scanners can never hide behind a fake From/Via header: detections always carry the true socket peer address.
+  - Detections flow into the new **SIP Bot & Scanner Signatures** card in the Attackers tab: an "Instant kernel ban on scanner detection" toggle (**ships off** — detection and recording are always on), a ban duration selector (1 hour / 24 hours / 7 days / permanent), the curated base list rendered as two visibly distinct tiers (**Auto-ban on match** / **Record only**), and custom signatures (literal text, validated, additive-only) that always auto-ban on match.
+  - With automatic banning off, matches appear as detected-but-unblocked incidents with a one-click **"Add to auto-ban list"** action. With it on, high-confidence matches ban immediately, and two or more distinct low-confidence signatures from one address inside a five-minute window escalate to a ban.
+  - The Attackers table now shows each ban's reason and a dedicated **SIP Scanner** vector badge, so a false positive is diagnosable and reversible in seconds. Blocking is always by network address: every phone behind the same NAT shares one public address, so a ban can cut off an office — the panel says so plainly.
+- All new administrator-facing strings ship in English, Spanish, and French.
+
+### Fixed
+- **Fail-closed dialplan stays fail-closed with security conditions present**: inbound calls that match no route still receive the explicit `NO_ROUTE_DESTINATION` hangup now that the scanner detection conditions render in every public context; security guard conditions can no longer make an unrouted call look routed.
+- **Idle session cleanup is no longer reported as a failure**: when a ban or blocklist change finds no live sessions to sever, the security helper now records success instead of an error, so the audit trail tells the truth about what actually happened.
+
+### Security
+- **Firewall chain reordered to the hardened default**: loopback, trusted list, malformed packets, established fast path, permanent blocklist, active bans, and then the public threat feeds — so whitelisted traffic is admitted before any drop rule, and blocklists only ever see new flows. Existing installs keep their stored pre-filter order if an administrator reordered it.
+- **Bounded helper gains threat-feed and session-severing actions**: `/usr/local/sbin/tallpbx-security` now exposes `update-threat-feed` (no path argument — it reads only the canonical pending file, validates with `nft -c`, and promotes it atomically) and `flush-conntrack <ip>` (dual-stack validation, hardcoded binary), plus a self-reported version marker. The application refuses the new actions with a plain-language "the security helper on this server is out of date" message instead of the helper's opaque usage text.
+- **Blocking an address now severs its live sessions**: bans and permanent blocklist additions flush the address's conntrack entries, so an offender's established calls and registrations die immediately instead of surviving until the connection ends. A flush failure is recorded in the audit trail with the manual command to finish the job. This requires the `conntrack` package (`apt install conntrack`); without it, new connections are still blocked and the panel explains the degradation.
+- **FreeSWITCH dialplan change**: public contexts now include the scanner detection conditions ahead of the routing rules. The dialplan XML cache invalidates automatically (TTL/versioning), so a FreeSWITCH XML reload picks the change up without manual steps.
+- **Firewall lockout recovery runbooks**: step-by-step `nftables` recovery commands — usable directly over an SSH session even when the web panel and `php artisan` are both unreachable because the database connection has been cut — are now documented in the operations guide, the installation troubleshooting section, and the security architecture reference, together with the rule that firewall changes always flow through the application pipeline.
+- **Firewall changes that would cut the server's own services are refused**: the panel and `security:apply` now verify the loopback connections that the database, cache, and phone services rely on. Turning the ingress pre-filters off, switching the default policy to Block Unknown, or leaving observe mode while that combination would silently drop those connections is refused with a plain-language alert naming the safe alternative — instead of cutting everyone off the server.
+- **Database migrations**: this release adds the `security_threat_feeds` table and widens `security_bans.vector` so SIP scanner bans can be stored — run `php artisan migrate`, then re-run `php artisan db:seed --class=SecurityServiceSeeder` to add the TFTP Provisioning row and the scanner defaults.
+
 ## [2.0.0] - 2026-09-29
 
 ### Added
@@ -164,8 +203,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sudoers Runas Pinned to Root**: The sudoers drop-in for the bounded host security helper now grants `NOPASSWD` access strictly as `root` (`www-data ALL=(root) NOPASSWD: /usr/local/sbin/tallpbx-security`), preventing the web user from invoking the helper as any other system account.
 - **Firewall Restore Preflight Validation**: When the helper restores the active ruleset after finding the kernel firewall table missing (for example after a reboot), it now validates the file with `nft -c` before loading it. A corrupt active ruleset fails loudly with a clear syntax error instead of being silently skipped.
 - **Restrictive Helper Umask**: The bounded host security helper now runs with `umask 027`, so every file it creates defaults to `0640` and is never world-readable, even if a future change forgets an explicit permission repair.
-
-## [Unreleased]
 
 ## [1.1.4] - 2026-09-23
 

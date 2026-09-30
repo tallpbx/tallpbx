@@ -372,6 +372,36 @@ sudo nft -f /etc/tallpbx/firewall.nft
 sudo systemctl status nftables
 ```
 
+#### Emergency Recovery: Panel and `php artisan` Unreachable
+
+When a misapplied ruleset cuts the server's own network services, both the web panel and every `php artisan` command hang, because the application can no longer reach MariaDB (port 3306) or Redis (port 6379) over the loopback interface. SSH access usually still works — it is a direct port rule in the same ruleset. Recovery is done entirely in the shell: these commands are plain Linux `nftables` operations and need no PHP, no Laravel, and no database.
+
+Work through the steps in order and stop as soon as the panel responds again:
+
+1. **Restore the server's own connections first** (keeping every other rule). This is nearly always the whole fix, because the loopback interface is what a misapplied ruleset cuts first:
+   ```bash
+   sudo nft insert rule inet tallpbx_filter input iif "lo" accept
+   ```
+2. **Restore your operator address** (for example your office or VPN address), keeping every other rule:
+   ```bash
+   sudo nft insert rule inet tallpbx_filter input ip saddr <your-ip> accept
+   ```
+3. **Switch the chain to allow-by-default without discarding its rules**, so they can be inspected and re-applied properly from the panel:
+   ```bash
+   sudo nft 'chain inet tallpbx_filter input { policy accept; }'
+   ```
+4. **Last resort** — removes every table and rule. The server accepts all inbound traffic until the firewall is applied again:
+   ```bash
+   sudo nft flush ruleset
+   ```
+
+If step 1 reports `No such file or directory`, the TallPBX table is not loaded in the kernel (for example after a reboot or a full flush) — list what is present with `sudo nft list tables` before continuing.
+
+> [!WARNING]
+> Do **not** simply reload `/etc/tallpbx/firewall.nft` if it is the file that caused the lockout — reloading it re-applies the same problem. Fix the configuration first, then apply.
+
+After recovery, re-apply from the Security Center (or `php artisan security:apply`) so the saved configuration and the kernel agree again. The application refuses to apply configurations that would cut the server's own loopback services — if an apply is refused with that warning, resolve the named setting first (keep the ingress pre-filters on, or set the default policy to ALLOW). The recovery rules inserted above disappear at the next apply. The same runbook lives in [operations.md](operations.md#recovering-from-a-firewall-lockout).
+
 > [!IMPORTANT]
 > **Understanding Direct CLI Edits vs. Two-Tier Persistence**:
 > When you modify `nftables` directly using `nft add/delete element`, the change is active in the Linux kernel RAM **instantly**. However, because **MariaDB is the authoritative source of truth** for reboot persistence and UI management, rebooting the server or clicking "Save" in the web UI will recompile the ruleset from MariaDB into `/etc/tallpbx/firewall.nft`.

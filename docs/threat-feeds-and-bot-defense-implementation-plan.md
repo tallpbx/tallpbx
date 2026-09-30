@@ -1,5 +1,29 @@
 # Threat Feeds, Hardened TFTP Defense, and SIP Bot Filtering Implementation Plan
 
+## Current Status — Updated 2026-09-30 (guard complete; Task 17 closing)
+
+> Full execution record: `.superpowers/sdd/threat-feeds-and-bot-defense-implementation-plan/progress.md`.
+
+### Done and committed — Tasks 1–16
+- Tasks 1–11 (helper actions, threat feed provider/ingestion, TFTP rules, scanner signature registry): commits `106df5c` … `ce03c6c`.
+- Task 12 Threat Feeds tab (`5fa33ff`) · Task 13 TFTP defense (`4bee8a3`) · Task 14 scanner registry (`3fe1cb1`) · Task 15 dialplan + ESL listener (`2e56f65`) · Task 16 Attackers tab (`7373718`).
+
+### Done — 2026-09-30 (committed in this batch: guard, docs, helper fix)
+- **Local-services safety guard** (the operator's "bulletproof" requirement): `LockoutGuardService::wouldDropLocalServices()` / `assertLocalServicesSafe()`; panel refusals with DaisyUI toast alerts in `setPrefilterEnabled` (off), `setObserveMode` (off), and `saveDefaultPolicy` (block); backstops in `autoApplyFirewallRuleset()` and `security:apply` (both bypassed only with `--force`); three new translation keys × en/es/fr. Tests: `LockoutGuardServiceTest` matrix, `SecurityManagerTwoSwitchesTest` refusal rewrite, `SecurityCommandsTest` CLI cover — security module suite 296 passed.
+- **Generator-assertion reconciliation** (test-side): the port catalog emits `tcp dport { 80, 443 }` (HTTP is TCP, not UDP), and the drop-rule counter now excludes the STAGE 12 bare verdict line; an `->or->toContain()` chain (Pest `InvalidExpectationValue`) was replaced with an explicit authored-drop assertion.
+- **Recovery runbooks + agent safety rules**: `docs/operations.md` "Recovering from a Firewall Lockout" (shell-only commands that work when `php artisan` is unreachable), `docs/security-architecture.md` §9.3 emergency recovery, `INSTALL.md` troubleshooting entry, `AGENTS.md` live-firewall safety rules.
+- **Helper fix**: `flush-conntrack` treats an idle flush ("0 flow entries have been deleted") as success instead of a false failure audit.
+
+### Background: the two production lockouts (2026-09-29)
+1. Applying a pre-filter-off ruleset removed the loopback accept → MariaDB/Redis unreachable.
+2. A live `nft` probe chain left with `policy drop` dropped all inbound traffic.
+Operator rulings: (a) refuse — never silently override — firewall changes that would cut the server's own loopback services; (b) refusals surface as DaisyUI toast alerts; (c) no live-kernel verification on this server — remaining live checks move to a disposable staging host.
+
+### Remaining to close Task 17
+1. Full feature suite (`php artisan test --compact --parallel`) and browser suite (`bash scripts/test-browser.sh`) after this commit set.
+2. Live checklist leftovers — disposable staging host ONLY (pre-filter-off / observe-mode walkthrough, TFTP counters, live scanner ban, feed sync on a clean install).
+3. Mark Task 17 complete in the ledger, then finish the plan per the executing-plans skill (final review, workspace cleanup).
+
 ## Executive Summary
 This document specifies the architecture and implementation roadmap for three integrated security enhancements in TallPBX:
 1. **Phase 1: VoIPBL Threat Feed & Extensible Threat Intelligence Architecture** — Scheduled ingestion of ~100,000 bad actor subnets from `voipbl.org` using country filtering, HTTP conditional caching (`ETag` / `304 Not Modified`), streaming file processing, and atomic Linux `nftables` interval set swapping (`@threat_feed_ips`). Built on an extensible provider driver pattern (`ThreatFeedProviderInterface`). The feed set is re-applied after every firewall rebuild, and syncs are fail-open to the last good list (invariants 5 and 6).

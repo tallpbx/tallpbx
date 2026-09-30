@@ -75,7 +75,88 @@ To benchmark telephony lookup latency, verify Redis hit rates, and ensure PHP-FP
    ```
    See [docs/load-testing-guide.md](load-testing-guide.md) for full instructions and topology, and [docs/load-testing-results.md](load-testing-results.md) for benchmark measurements and hardware sizing.
 
+## How the Firewall Decides
+
+The host firewall evaluates every incoming connection in a fixed order — like a
+reception desk handing each visitor through a short series of checks:
+
+1. **Is this the building itself?** (loopback) — the server's own services always pass.
+2. **Is this visitor on the trusted list?** — trusted phones, offices, and VPNs are admitted immediately, before any drop rule runs.
+3. **Is the visitor's paperwork malformed?** — connections in a broken state are discarded.
+4. **Have we already met?** — established calls and registrations pass instantly; this keeps call audio flowing with zero lookups.
+5. **Is this visitor on the permanent block list?** — dropped.
+6. **Is this visitor a known attacker?** — machines banned after repeated failed attempts are dropped.
+7. **Is this visitor on a public threat feed?** — networks from the automatically updated blocklists are dropped.
+8. **Ping and IPv6 basics** — diagnostics traffic is accepted at a controlled rate.
+9. **TFTP hardening** — phone provisioning requests are checked for upload attempts, directory traversal, and scan probes before any file is served.
+10. **The phone system's own services** — SIP, media, the web panel, SSH, and the rest of the port catalog are accepted.
+11. **Your custom rules** — anything you authored runs here.
+12. **Anything left** — receives the default inbound policy (drop).
+
+Two switches sit above the tabs in the Security Center because they shape this
+whole pipeline. **Turning the built-in pre-filter off** (steps 1–7) is for
+testing or for a deliberately minimal firewall: the server is then protected
+only by steps 8–12, and the panel refuses the change when it would cut off
+your own connection. **Global observe mode** keeps every rule evaluating and
+counting but removes every block verdict, so you can watch what *would* have
+been dropped before enforcing it; an amber banner appears on every Security
+page while it is active.
+
+Three automated layers keep the drop rules current, all managed from the
+Security Center: **public threat feeds** refresh on their own schedule from
+the curated blocklist sources, **TFTP defense** hardens phone provisioning
+against abuse, and **SIP scanner detection** records known scanning tools
+(and, once you switch automatic banning on, blocks them) the moment they
+announce themselves. See [docs/security-architecture.md](security-architecture.md)
+for the kernel-level detail behind each stage.
+
 ## Troubleshooting
+
+### Recovering from a Firewall Lockout
+
+If a firewall change leaves the server unreachable — the phone system still runs but the
+web panel, database, or cache stop responding, and `php artisan` commands hang or time out
+as well — recover from an SSH session. The commands below are plain Linux firewall
+(`nftables`) operations: they need no PHP, no database, and no web panel, which is exactly
+why they still work in this situation. Run them in order and stop as soon as the panel
+responds again (run them as root — prefix with `sudo` if your SSH session is not root):
+
+1. **Restore connections to the server's own services** (keeps every other rule running).
+   This instantly returns the internal database, cache, and web connections on the loopback
+   interface, which is what a misapplied ruleset cuts first:
+   ```bash
+   nft insert rule inet tallpbx_filter input iif "lo" accept
+   ```
+2. **Restore one operator address** (for example your office or VPN address), keeping
+   every other rule:
+   ```bash
+   nft insert rule inet tallpbx_filter input ip saddr <your-ip> accept
+   ```
+3. **Switch the firewall to allow-by-default** without discarding its rules, so you can
+   inspect them and re-apply properly from the panel:
+   ```bash
+   nft 'chain inet tallpbx_filter input { policy accept; }'
+   ```
+4. **Last resort** — removes every table and rule (the server accepts all inbound traffic
+   until the firewall is applied again from the Security Center):
+   ```bash
+   nft flush ruleset
+   ```
+
+If the first command reports `No such file or directory`, the TallPBX firewall table is not
+loaded in the kernel (for example after a reboot) — check what is present with
+`nft list tables` before continuing.
+
+After recovering, open the Security Center and press **Apply** (or run
+`php artisan security:apply`) so the saved settings and the kernel agree again. The panel
+refuses configurations that would cut the server's own loopback services; if an apply is
+refused with that warning, fix the named setting first (keep the ingress pre-filters on, or
+set the default policy to ALLOW). Runtime `nft` edits are temporary — the next application
+apply regenerates the ruleset from the saved configuration and replaces the recovery rules
+added above.
+
+For the complete kernel-level command reference, see
+[security-architecture.md](security-architecture.md#93-method-3-direct-linux-nftables-commands).
 
 ### Web Panel Shows 502 or 504 Error
 
