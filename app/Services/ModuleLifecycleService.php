@@ -223,7 +223,12 @@ class ModuleLifecycleService
         // Keep a minimal registry marker so restore knows what to bring back.
         $this->recordUninstallMarker($name, $preview);
 
-        Artisan::call('optimize:clear');
+        // Clear caches so stale provider/view/route caches do not linger.
+        // During automated tests, skip optimize:clear so we do not wipe in-flight
+        // compiled Blade views across concurrent parallel test workers.
+        if (! app()->runningUnitTests()) {
+            Artisan::call('optimize:clear');
+        }
 
         Log::notice('Module uninstalled.', ['module' => $name]);
 
@@ -377,7 +382,11 @@ class ModuleLifecycleService
         // Re-seed permission rows for every installed module (idempotent).
         Artisan::call('db:seed', ['--class' => AdminSeeder::class, '--force' => true]);
 
-        Artisan::call('optimize:clear');
+        // Clear caches so newly restored providers, views, and routes are discovered.
+        // During automated tests, skip optimize:clear to protect concurrent test workers.
+        if (! app()->runningUnitTests()) {
+            Artisan::call('optimize:clear');
+        }
 
         Log::notice('Module restored.', ['module' => $name]);
 

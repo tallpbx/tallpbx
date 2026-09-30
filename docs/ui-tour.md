@@ -93,14 +93,14 @@ Users can toggle their preferred language instantly via the topbar language drop
 
 ## 4. Security Command Center & Host Firewall
 
-The **Security Command Center** provides system administrators with real-time visibility into the Linux kernel `nftables` host firewall, automated intrusion detection, and sequential packet filtering pipelines.
+The **Security Command Center** (`/panel/security`) provides system administrators with real-time control and visibility over the Linux kernel `nftables` host firewall, automated intrusion detection, public threat intelligence feeds, and telephony bot defense.
 
-* **Reactive Live Updates**: Connected directly to Laravel Reverb WebSockets — active threat counters, ban expirations, and rule changes update instantaneously across sessions without manual page refreshes.
-* **Dedicated IP Management Sections**: Dedicated cards for the Permanent Blacklist, Temporarily Blocked Attackers (with 1-click unban and threshold controls), and Whitelist IPs with administrator self-protection.
-* **Living Kernel Ruleset**: Displays base system invariants and pre-filters in an interactive collapsible section (unconditional loopback access, blacklist IP drops, active banned attacker drops, stateful connection tracking, invalid packet defense, and whitelist bypass) alongside configurable core PBX services (starting with ICMP ping diagnostics with rate limiting) and custom sequential rules.
-* **Zero-Lockout Protection**: Automatic preflight safety testing prevents administrators from inadvertently dropping or blocking their own connection IP.
+* **Reactive Live Updates**: Connected directly to **Laravel Reverb WebSockets** via **Laravel Echo** — active threat counters, ban expirations, feed sync status, and rule changes update reactively without requiring page refreshes.
+* **Master Operational Switches & Zero-Lockout**: Pinned controls for the Firewall Master Switch, Built-in Pre-Filters Switch, and Global Observe Mode (non-blocking observation banner), protected by automated preflight guards that ensure the administrator's connection and local database/cache services can never be severed.
+* **Four Evaluation-Ordered Tabs**:
+  - **Block & Allow Lists**: Permanent CIDR-aware Blacklist and Trusted Whitelist with 1-click self-protection for administrator IPs.
+  - **Attackers**: Active intrusion bans with vector badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, auto-ban toggle, and live conntrack session termination).
+  - **Threat Feeds**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
+  - **Firewall Rules**: Interactive, reorderable 7-stage pre-filter pipeline, PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69), custom sequential rules, and fallback default policy.
 
 ![TallPBX Security Command Center](images/security-dashboard-full.png)
-
-
-
