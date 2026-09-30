@@ -1338,13 +1338,25 @@ class SecurityManager extends Component
     public function deleteIp(int $id, LockoutGuardService $lockoutGuard): void
     {
         $entry = SecurityIpList::findOrFail($id);
+
+        // Remember the entry so a refused apply can be rolled back: removing
+        // the administrator's own trusted address while the default policy
+        // blocks would lock them out, so the guard refuses the apply — and
+        // the panel must not then claim the address is gone while the kernel
+        // still trusts it.
+        $attributes = $entry->only(['type', 'ip_address', 'description']);
+
         $entry->delete();
 
         $this->checkAdminIpStatus($lockoutGuard);
 
-        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
-            $this->notifySuccess((string) __('admin.security_ip_deleted'));
+        if (! $this->autoApplyFirewallRuleset($lockoutGuard)) {
+            SecurityIpList::create($attributes);
+
+            return;
         }
+
+        $this->notifySuccess((string) __('admin.security_ip_deleted'));
     }
 
     /**

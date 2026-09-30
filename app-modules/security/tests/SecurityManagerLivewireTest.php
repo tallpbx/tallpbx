@@ -114,6 +114,26 @@ it('deletes an IP from the list', function (): void {
     expect(SecurityIpList::find($ip->id))->toBeNull();
 });
 
+it('restores a deleted Trusted entry when the lockout guard refuses the apply', function (): void {
+    // The administrator's own connection comes from a whitelisted address:
+    // deleting that entry would lock them out, so the guard refuses the
+    // apply — and the deletion must then be rolled back so the panel never
+    // claims an address is untrusted while the kernel still trusts it.
+    $ip = SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.10',
+        'description' => 'Admin uplink',
+    ]);
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('adminIp', '203.0.113.10')
+        ->call('deleteIp', $ip->id);
+
+    expect($component->get('operationalMessageType'))->toBe('error')
+        ->and(SecurityIpList::where('type', 'whitelist')->where('ip_address', '203.0.113.10')->exists())->toBeTrue();
+});
+
 it('displays active bans and supports unban, promoteToWhitelist, and promoteToBlacklist', function (): void {
     $ban = SecurityBan::create([
         'ip_address' => '198.51.100.99',
