@@ -331,10 +331,42 @@ case "$ACTION" in
         ;;
 
     status)
-        # Display the active nftables ruleset or table status
-        if "$NFT_BIN" list table inet tallpbx_filter &>/dev/null; then
-            "$NFT_BIN" list table inet tallpbx_filter
+        # Display the active firewall status for the web panel (read-only).
+        #
+        # Why this does not simply run 'nft list table': that command also
+        # prints every element of every set, which becomes megabytes and
+        # several seconds of work once the threat feed is loaded. The panel
+        # only reads the chain headers (hook and policy) and the rules (with
+        # their packet counters), so this action lists just the chains and
+        # their rules instead — the same information without the set dumps.
+        #
+        # Step 1: find the chain names that belong to the TallPBX table.
+        # 'nft list chains' prints a small summary of every table's chains;
+        # the awk filter keeps only the chain names inside the
+        # 'table inet tallpbx_filter { ... }' block.
+        CHAIN_NAMES="$( { "$NFT_BIN" list chains 2>/dev/null || true; } | awk '
+            /^table inet tallpbx_filter \{/ { in_table = 1; next }
+            in_table && /^\}/ { in_table = 0 }
+            in_table && $1 == "chain" { print $2 }
+        ')"
+
+        if [ -n "$CHAIN_NAMES" ]; then
+            # Step 2: print each chain's rules. Every listing repeats the
+            # 'table inet tallpbx_filter' header and the hook/policy line,
+            # so the panel's existing parsing keeps working unchanged.
+            while read -r CHAIN; do
+                # Defensive: ignore any unexpected chain name instead of
+                # handing it to nft as an argument.
+                case "$CHAIN" in
+                    *[!A-Za-z0-9_.-]*) continue ;;
+                esac
+                # A chain that disappeared between the two calls is skipped.
+                "$NFT_BIN" list chain inet tallpbx_filter "$CHAIN" || true
+            done <<< "$CHAIN_NAMES"
         else
+            # Step 3: the TallPBX table is not loaded. Keep the historical
+            # full ruleset listing so the panel can report the firewall as
+            # absent (its output contains no 'table inet tallpbx_filter').
             "$NFT_BIN" list ruleset
         fi
         ;;

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Security\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
  * Executes bounded host security operations via /usr/local/sbin/tallpbx-security.
@@ -74,6 +76,17 @@ class SecurityExecutor implements SecurityExecutorInterface
     private const REQUIRED_HELPER_VERSION = 2;
 
     /**
+     * Cache key holding the latest kernel status snapshot.
+     */
+    private const STATUS_CACHE_KEY = 'security.executor.status';
+
+    /**
+     * How long a kernel status snapshot is reused before the helper runs again
+     * (seconds). Firewall mutations invalidate the snapshot immediately.
+     */
+    private const STATUS_CACHE_SECONDS = 15;
+
+    /**
      * Promote and load the pending threat feed set-element file.
      *
      * Existing installs may still carry the previous helper build, which
@@ -137,17 +150,70 @@ class SecurityExecutor implements SecurityExecutorInterface
 
     /**
      * Query the active nftables ruleset status.
+     *
+     * The helper query touches the live kernel firewall and is the slowest
+     * read on the Security Center page, while several places consume its
+     * output per interaction. The snapshot is therefore cached for a few
+     * seconds and dropped after every successful firewall mutation.
+     * Returns an empty string when the helper is missing, blocked during a
+     * test run, or fails to answer.
      */
     public function status(): string
     {
+        // Safety: never execute the privileged system helper from an
+        // automated test run (the same contract as runCommand()). Custom
+        // stub helpers on test-owned paths stay executable so protocol and
+        // parsing tests can exercise the output contract without privileges.
+        if ($this->blockedByTestGuard()) {
+            return '';
+        }
+
         if (! file_exists($this->helperPath)) {
             return '';
         }
 
-        $process = $this->createProcess(['status']);
-        $process->run();
+        $snapshot = Cache::remember(
+            self::STATUS_CACHE_KEY,
+            now()->addSeconds(self::STATUS_CACHE_SECONDS),
+            function (): string {
+                try {
+                    $process = $this->createProcess(['status']);
+                    $process->run();
+                } catch (Throwable) {
+                    // A stuck or timed-out helper must degrade to "unknown"
+                    // instead of breaking the page that asked for the status.
+                    return '';
+                }
 
-        return $process->isSuccessful() ? $process->getOutput() : '';
+                return $process->isSuccessful() ? $process->getOutput() : '';
+            }
+        );
+
+        return (string) $snapshot;
+    }
+
+    /**
+     * Drop the cached kernel status snapshot so the next read is fresh.
+     *
+     * Called automatically after successful firewall mutations; exposed so
+     * callers can also force a fresh read explicitly.
+     */
+    public function clearStatusCache(): void
+    {
+        Cache::forget(self::STATUS_CACHE_KEY);
+    }
+
+    /**
+     * Whether the test-run guard must block execution of this helper.
+     *
+     * Only the installed system helper (/usr/local/sbin/...) is blocked during
+     * automated tests: test-owned stub scripts on custom paths must keep
+     * running so the suite can verify the helper's command and output
+     * contract without ever touching privileged host state.
+     */
+    private function blockedByTestGuard(): bool
+    {
+        return app()->runningUnitTests() && str_starts_with($this->helperPath, '/usr/local/sbin/');
     }
 
     /**
@@ -157,6 +223,12 @@ class SecurityExecutor implements SecurityExecutorInterface
      */
     public function bans(): array
     {
+        // Same test-run safety contract as status(): never execute the
+        // privileged system helper from an automated test run.
+        if ($this->blockedByTestGuard()) {
+            return [];
+        }
+
         if (! file_exists($this->helperPath)) {
             return [];
         }
@@ -264,6 +336,10 @@ class SecurityExecutor implements SecurityExecutorInterface
 
             return false;
         }
+
+        // A successful mutation changed live kernel state: drop the cached
+        // status snapshot so the next panel render reflects reality at once.
+        $this->clearStatusCache();
 
         return true;
     }

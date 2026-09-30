@@ -1003,3 +1003,171 @@ it('parses structured kernel bans in SecurityExecutor::bans()', function (): voi
         @rmdir($isolatedDir);
     }
 });
+
+it('never executes the installed system helper during a test run', function (): void {
+    // Safety contract: automated tests must never spawn the privileged
+    // /usr/local/sbin helper. On a host where the helper is installed this
+    // call used to run real nftables queries (seconds of work per call);
+    // it must short-circuit exactly like SecurityExecutor::runCommand() does.
+    // Custom stub helpers (test-owned scripts) stay executable so protocol
+    // and parsing tests keep exercising the output contract.
+    $executor = new SecurityExecutor('/usr/local/sbin/tallpbx-security');
+
+    expect($executor->status())->toBe('')
+        ->and($executor->bans())->toBe([]);
+});
+
+it('caches repeated kernel status reads and re-reads after invalidation', function (): void {
+    // Stub helper that counts how often the kernel status is really queried.
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_security_status_cache_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    $counterFile = $isolatedDir.'/runs.log';
+    $stubHelper = $isolatedDir.'/stub-helper';
+    file_put_contents(
+        $stubHelper,
+        "#!/bin/bash\n".
+        "if [ \"\$1\" = \"status\" ]; then\n".
+        "    echo run >> {$counterFile}\n".
+        "    echo 'table inet tallpbx_filter {'\n".
+        "    exit 0\n".
+        "fi\n".
+        "exit 1\n"
+    );
+    chmod($stubHelper, 0755);
+
+    try {
+        $executor = new SecurityExecutor($stubHelper);
+        $runs = static fn (): int => substr_count((string) file_get_contents($counterFile), 'run');
+
+        // Repeated reads inside the cache window share one kernel query.
+        expect($executor->status())->toContain('table inet tallpbx_filter')
+            ->and($executor->status())->toContain('table inet tallpbx_filter')
+            ->and($runs())->toBe(1);
+
+        // After invalidation the next read queries the kernel again.
+        $executor->clearStatusCache();
+
+        $executor->status();
+
+        expect($runs())->toBe(2);
+    } finally {
+        @unlink($stubHelper);
+        @unlink($counterFile);
+        @rmdir($isolatedDir);
+    }
+});
+
+it('reads kernel status chain-by-chain without dumping the full table', function (): void {
+    // The panel only parses chain rules and the input-hook policy. Dumping
+    // the whole table also dumps every threat-feed set element, which costs
+    // seconds and megabytes on a live PBX. The status action must therefore
+    // list the chain headers and per-chain rules only.
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_nft_status_stub_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    $callsFile = $isolatedDir.'/nft-calls.log';
+    $stubNft = $isolatedDir.'/nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "echo \"\$*\" >> {$callsFile}\n".
+        "case \"\$*\" in\n".
+        "    'list chains')\n".
+        "        printf 'table inet tallpbx_filter {\\n\\tchain input {\\n\\t\\ttype filter hook input priority filter - 10; policy drop;\\n\\t}\\n\\tchain output {\\n\\t\\ttype filter hook output priority filter; policy accept;\\n\\t}\\n}\\n'\n".
+        "        ;;\n".
+        "    'list chain inet tallpbx_filter input')\n".
+        "        printf 'table inet tallpbx_filter {\\n\\tchain input {\\n\\t\\ttype filter hook input priority filter - 10; policy drop;\\n\\t\\tip saddr @threat_feed_ips counter packets 7 bytes 0 drop\\n\\t\\tudp dport 69 @th,64,16 0x0002 counter packets 3 bytes 0 drop\\n\\t\\tudp dport 69 @th,80,24 0x2e2e2f counter packets 2 bytes 0 drop\\n\\t\\tudp dport 69 @th,80,16 0x2f78 counter packets 1 bytes 0 drop\\n\\t\\tudp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter packets 5 bytes 0 drop\\n\\t\\tudp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter packets 4 bytes 0 drop\\n\\t}\\n}\\n'\n".
+        "        ;;\n".
+        "    'list chain inet tallpbx_filter output')\n".
+        "        printf 'table inet tallpbx_filter {\\n\\tchain output {\\n\\t\\ttype filter hook output priority filter; policy accept;\\n\\t}\\n}\\n'\n".
+        "        ;;\n".
+        "    *)\n".
+        "        exit 1\n".
+        "        ;;\n".
+        "esac\n"
+    );
+    chmod($stubNft, 0755);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'status'],
+            null,
+            ['TALLPBX_NFT_BIN' => $stubNft, 'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+        );
+        $process->run();
+
+        $calls = (string) file_get_contents($callsFile);
+
+        expect($process->getExitCode())->toBe(0)
+            // Every output contract the PHP parsers depend on survives…
+            ->and($process->getOutput())->toContain('table inet tallpbx_filter')
+            ->and($process->getOutput())->toContain('type filter hook input priority filter - 10; policy drop;')
+            ->and($process->getOutput())->toContain('ip saddr @threat_feed_ips counter packets 7')
+            ->and($process->getOutput())->toContain('@th,64,16 0x0002 counter packets 3')
+            ->and($process->getOutput())->toContain('@th,80,24 0x2e2e2f counter packets 2')
+            ->and($process->getOutput())->toContain('@th,80,16 0x2f78 counter packets 1')
+            ->and($process->getOutput())->toContain('@tftp_flood4')
+            ->and($process->getOutput())->toContain('@tftp_flood6')
+            // …while the megabyte-scale dumps never run.
+            ->and($calls)->toContain('list chains')
+            ->and($calls)->toContain('list chain inet tallpbx_filter input')
+            ->and($calls)->toContain('list chain inet tallpbx_filter output')
+            ->and($calls)->not->toContain('list table')
+            ->and($calls)->not->toContain('list ruleset');
+    } finally {
+        @unlink($stubNft);
+        @unlink($callsFile);
+        @rmdir($isolatedDir);
+    }
+});
+
+it('falls back to the full ruleset listing when the TallPBX table is missing', function (): void {
+    // Behavior preservation: when the TallPBX firewall table is not loaded,
+    // the panel still needs a (non-empty) kernel listing that does NOT contain
+    // 'table inet tallpbx_filter' so it can report the firewall as absent.
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_nft_fallback_stub_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    $callsFile = $isolatedDir.'/nft-calls.log';
+    $stubNft = $isolatedDir.'/nft';
+    file_put_contents(
+        $stubNft,
+        "#!/bin/bash\n".
+        "echo \"\$*\" >> {$callsFile}\n".
+        "case \"\$*\" in\n".
+        "    'list chains')\n".
+        "        printf 'table inet some_other_table {\\n\\tchain input {\\n\\t}\\n}\\n'\n".
+        "        ;;\n".
+        "    'list ruleset')\n".
+        "        printf 'table inet some_other_table {\\n\\tchain input {\\n\\t}\\n}\\n'\n".
+        "        ;;\n".
+        "    *)\n".
+        "        exit 1\n".
+        "        ;;\n".
+        "esac\n"
+    );
+    chmod($stubNft, 0755);
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'status'],
+            null,
+            ['TALLPBX_NFT_BIN' => $stubNft, 'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
+        );
+        $process->run();
+
+        $calls = (string) file_get_contents($callsFile);
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toContain('table inet some_other_table')
+            ->and($process->getOutput())->not->toContain('table inet tallpbx_filter')
+            ->and($calls)->toContain('list ruleset')
+            ->and($calls)->not->toContain('list chain inet tallpbx_filter');
+    } finally {
+        @unlink($stubNft);
+        @unlink($callsFile);
+        @rmdir($isolatedDir);
+    }
+});
