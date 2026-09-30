@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: versioning and release strategy (Laravel versioned series model, SemVer, unreleased 2.0 modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts)."
+description: "Invoke when working on TallPBX-specific patterns: versioning and release strategy (Laravel versioned series model, SemVer, unreleased 2.0 modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
 license: MIT
 metadata:
   author: tallpbx
@@ -51,7 +51,7 @@ TallPBX bridges two historically opposed worlds in business communications:
    - Must never feel intimidated, confused, or overwhelmed.
    - All user-facing interfaces, web panel forms, CLI prompts, tooltips, and headline documentation must use plain, descriptive language (e.g., "spoken greetings", "business hours", "average/fastest/slowest call setup") with clearly designated recommended defaults (Option 1).
 2. **The Telecom Architect, Developer & VoIP Veteran** (coming from FusionPBX or FreePBX®):
-   - Must immediately recognize the project's sophisticated foundation: FreeSWITCH 1.11, Sofia SIP engine, ESL event sockets, dynamic `mod_xml_curl` dialplan rendering, Redis keyspace caching, atomic kernel firewalling (`nftables`), and comprehensive test suites (Pest + Dusk).
+   - Must immediately recognize the project's sophisticated foundation: FreeSWITCH 1.11, Sofia SIP engine, ESL event sockets, dynamic `mod_xml_curl` dialplan rendering, Redis keyspace caching, atomic kernel firewalling (`nftables`), and comprehensive test suites (Pest, including Playwright browser tests).
    - Detailed statistical percentiles (`p50`, `p90`, `p95`, `p99`, `std_dev`), SIPp scenario traces, and packet flow architectures must be preserved and easily accessible.
 
 ### Concrete Rules for AI Agents:
@@ -90,6 +90,65 @@ TallPBX enforces a strict two-tier policy for running host Linux commands to pre
   3. Strict Regex Whitelisting: Reject all unexpected arguments. Every parameter (IP address, duration, operation UUID) MUST be validated against strict regular expressions before calling underlying utilities.
   4. Non-Interactive: Run with `set -euo pipefail` and hardcoded absolute paths (`/usr/sbin/nft`). Never call pagers, editors, or utilities with interactive escape vectors (GTFOBins).
   5. Preflight Syntax Checks: Validate pending state atomically (`nft -c -f <pending>`) before replacing active configuration, ensuring system integrity and zero lockout.
+
+## Live Firewall Safety & Lockout Prevention
+
+**Mandatory for any change that touches firewall behavior, the security helper, ruleset
+generation, or the security switches.** Two production lockouts on 2026-09-29 drove these
+rules; the full incident record is in `docs/threat-feeds-and-bot-defense-implementation-plan.md`
+and the runbooks in `docs/operations.md`.
+
+### The two failure modes that must never recur
+
+1. **A pre-filter-off ruleset with a blocking default policy cuts the server's own loopback
+   services.** The pre-filter pipeline is what emits `iif "lo" accept` and the
+   `ct state established,related accept` fast path. Without it, loopback traffic to services
+   that are *not* in the port catalog — MariaDB (`127.0.0.1:3306`) and Redis
+   (`127.0.0.1:6379`) — falls through to the DROP policy. Every PHP page and Artisan command
+   hangs (the apply itself dies on its post-apply database write) while SSH keeps working,
+   because port 22 is a stateless catalog rule. The web panel looks dead even though HTTP is
+   not port-dropped — PHP-FPM (unix socket) simply cannot reach its database.
+2. **Raw `nft` mutations on a live kernel.** A probe chain left hooked to `input` with
+   `policy drop` silently dropped ALL inbound traffic between two commands. Never create,
+   change, or defer cleanup of kernel state on a live host.
+
+### Absolute rules for agents
+
+- **No raw `nft` add/insert/chain/delete/flush against a live kernel — not even as a probe,
+  test, or command demonstration.** All firewall changes flow through the application
+  pipeline (`security:apply`, the Security Center) or the bounded helper.
+- **Verification only via** `nft -c -f <file>` dry runs (check-only, never commits),
+  mocked-executor tests, or a disposable host. Any kernel-mutating test must be atomic and
+  self-reverting in ONE invocation, and a chain with `policy drop` must never be left live —
+  not even briefly.
+- **Every firewall-affecting switch keeps both guards** before persisting anything:
+  1. `LockoutGuardService::assertSafe()` — the administrator's own connection.
+  2. `LockoutGuardService::assertLocalServicesSafe()` — the server's loopback services.
+  The unsafe state is exactly *firewall enabled ∧ observe off ∧ blocking default policy ∧
+  pre-filter off*; refuse it — never silently override the policy.
+- **Refusals surface through the toast** (`notifyError()` → Pattern 3
+  `<x-operational-toast>`, already rendered on the Security pages) with plain-language
+  messages in en/es/fr that name the remedy ("set the default policy to Allow All first, or
+  keep the pre-filters on").
+- **Backstops**: `autoApplyFirewallRuleset()` and `security:apply` run
+  `assertLocalServicesSafe()` (bypassed only by an explicit `--force` from the local
+  console). Any new apply path must add it. Switch changes persist only after the guard
+  passes — roll the stored value back when the apply is refused (see `setFirewallEnabled()`
+  and `saveDefaultPolicy()` for the pattern).
+
+### Lockout recovery (panel and `php artisan` unreachable)
+
+Work over SSH; no PHP, database, or panel needed. Stop as soon as the panel responds —
+step 1 alone usually fixes it by restoring the database/cache connection:
+1. `nft insert rule inet tallpbx_filter input iif "lo" accept`
+2. `nft insert rule inet tallpbx_filter input ip saddr <your-ip> accept`
+3. `nft 'chain inet tallpbx_filter input { policy accept; }'`
+4. `nft flush ruleset` — last resort; the server is fully open until re-applied.
+
+After recovery, re-apply from the Security Center (or `php artisan security:apply`) so the
+saved configuration and the kernel agree again. Full runbooks: `docs/operations.md` →
+"Recovering from a Firewall Lockout"; `docs/security-architecture.md` §9.3; `AGENTS.md` →
+"Live Firewall Safety".
 
 ## x-tooltip Component
 
@@ -300,7 +359,7 @@ server request).
 
 - **Avoid Staging Friction**: Never force users into multi-step "stage changes, then click Save & Apply" flows when atomic application is safe.
 - **Immediate Subsystem Synchronization**: When an administrator toggles a rule, updates sensitivity, adds an IP, or reorders priorities, persist to the DB and apply to the kernel (`nftables`) or FreeSWITCH immediately.
-- **Atomic Preflight Safety**: Always run `LockoutGuardService::assertSafe()` and preflight syntax checks (`nft -c`) before applying. On failure, notify via toast alert and preserve active configuration.
+- **Atomic Preflight Safety**: Always run both guards — `LockoutGuardService::assertSafe()` (the administrator's connection) and `assertLocalServicesSafe()` (the server's loopback database/cache connections) — plus preflight syntax checks (`nft -c`) before applying. On failure, refuse, notify via toast alert, and preserve the active configuration (see "Live Firewall Safety & Lockout Prevention").
 
 ## UI Alert & Feedback Patterns (Three Standard Patterns)
 
@@ -536,6 +595,8 @@ database name.
 | Module provider double-load in parallel tests | Run tests sequentially with `--filter` or accept as known sandbox issue |
 | Tests fail with `no such table: tenants` everywhere | Schema never built: `PrimaryDatabaseSafety` must not treat `:memory:` as the protected primary (see Database Safety Guards) |
 | `migrate:fresh` says "prohibited from running in this environment" | The active DB name equals `app.primary_database` — keep the `:memory:` guard in `shouldProtectConnection()` |
+| Raw `nft` command against a live kernel | Forbidden — use the app pipeline (`security:apply`/panel) or `nft -c -f` dry runs (see "Live Firewall Safety & Lockout Prevention") |
+| Firewall switch/policy change without the local-services guard | Refuse via `assertLocalServicesSafe()` before persisting anything (see "Live Firewall Safety & Lockout Prevention") |
 
 ## Auth & Tenancy
 

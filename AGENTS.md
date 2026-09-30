@@ -8,7 +8,7 @@
 
 ## Project Skills
 
-- Follow the project skills under `.agents/skills/` whenever a task matches their scope, and check them at the start of applicable work before writing code. Available skills: `laravel-best-practices` (all Laravel PHP code), `freeswitch-development` (FreeSWITCH/PBX behavior), `livewire-development` (Livewire components and reactivity), `tailwindcss-development` (Tailwind/UI classes), `tallpbx-custom` (TallPBX-specific patterns such as authentication guards, tenant isolation, group permissions, and dual-event binding), `testing-best-practices` (Laravel test design, coverage, and review), and `echo-development` (Laravel Echo real-time broadcasting and WebSockets). Applicable skills take precedence over generic habits for matching work.
+- Follow the project skills under `.agents/skills/` whenever a task matches their scope, and check them at the start of applicable work before writing code. Available skills: `laravel-best-practices` (all Laravel PHP code), `freeswitch-development` (FreeSWITCH/PBX behavior), `livewire-development` (Livewire components and reactivity), `tailwindcss-development` (Tailwind/UI classes), `tallpbx-custom` (TallPBX-specific patterns such as authentication guards, tenant isolation, group permissions, dual-event binding, and live-firewall safety/lockout prevention), `testing-best-practices` (Laravel test design, coverage, and review), and `echo-development` (Laravel Echo real-time broadcasting and WebSockets). Applicable skills take precedence over generic habits for matching work.
 
 ## CRITICAL — Cache Clearing After Code Changes
 
