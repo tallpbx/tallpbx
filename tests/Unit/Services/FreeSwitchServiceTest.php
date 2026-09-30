@@ -94,3 +94,22 @@ it('keeps a trailing event body separate from its parsed headers', function () {
         ->and($parsed['headers']['Event-Subclass'])->toBe('test::event')
         ->and($parsed['body'])->toBe("payload-line-1\npayload-line-2");
 });
+
+it('decodes url-encoded header values in plain event payloads', function () {
+    // mod_event_socket's plain format url-encodes header values on the wire, so
+    // a subclass arrives as tallpbx%3A%3Asip_scanner_detected. Without decoding,
+    // the subclass comparisons in the listener command never match and every
+    // scanner / failed-auth CUSTOM event is silently misclassified.
+    $payload = "Event-Name: CUSTOM\n".
+        "Event-Subclass: tallpbx%3A%3Asip_scanner_detected\n".
+        "Attacker-IP: 127.0.0.1\n".
+        "Caller-Caller-ID-Name: John%20Doe%2C%20Jr.\n".
+        "Channel-Name: sofia%2Fexternal%2Fscanner%40159.203.57.100\n\n";
+
+    $parsed = $this->service->parseEventPayload($payload);
+
+    expect($parsed['headers']['Event-Subclass'])->toBe('tallpbx::sip_scanner_detected')
+        ->and($parsed['headers']['Attacker-IP'])->toBe('127.0.0.1')
+        ->and($parsed['headers']['Caller-Caller-ID-Name'])->toBe('John Doe, Jr.')
+        ->and($parsed['headers']['Channel-Name'])->toBe('sofia/external/scanner@159.203.57.100');
+});

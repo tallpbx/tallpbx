@@ -412,10 +412,16 @@ class FreeSwitchService implements FreeSwitchServiceInterface
         foreach (explode("\n", $headerBlock) as $line) {
             if (str_contains($line, ': ')) {
                 [$key, $value] = explode(': ', $line, 2);
-                $headers[$key] = $value;
+
+                // Plain-format ESL payloads url-encode header values on the
+                // wire (e.g. tallpbx%3A%3Asip_scanner_detected), so every
+                // value is decoded with rawurldecode — the inverse of the
+                // switch_url_encode encoder, which encodes spaces as %20 and
+                // leaves literal '+' characters untouched.
+                $headers[$key] = rawurldecode($value);
 
                 if ($key === 'Event-Name') {
-                    $eventName = $value;
+                    $eventName = $headers[$key];
                 }
             }
         }
