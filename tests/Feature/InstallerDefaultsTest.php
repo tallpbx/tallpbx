@@ -946,6 +946,41 @@ it('pins the security helper sudoers rule to the root runas user', function (): 
         ->and($sudoers)->not->toContain('(ALL)');
 });
 
+it('keeps the service sandboxes compatible with the bounded privileged helpers', function (): void {
+    $listener = (string) file_get_contents(base_path('scripts/freeswitch-listener.service'));
+    $scheduler = (string) file_get_contents(base_path('scripts/tallpbx-scheduler.service'));
+    $queue = (string) file_get_contents(base_path('scripts/tallpbx-queue.service'));
+    $reverb = (string) file_get_contents(base_path('scripts/tallpbx-reverb.service'));
+
+    // The listener and scheduler execute the bounded sudoers helper
+    // (tallpbx-security) for kernel firewall operations. NoNewPrivileges
+    // blocks that sudo elevation outright, so those two units must not set
+    // it - with it, scanner bans and scheduled feed syncs never reach the
+    // kernel while the panel still reports them as applied.
+    expect($listener)->not->toContain('NoNewPrivileges=yes')
+        ->and($scheduler)->not->toContain('NoNewPrivileges=yes');
+
+    // The helper's root-side writes land under /etc/tallpbx (ruleset
+    // promotion, sidecar, feed file). Under ProtectSystem=strict that path
+    // must be granted read-write or every helper action fails in the sandbox.
+    expect($listener)->toContain('ReadWritePaths=')->toContain('/etc/tallpbx')
+        ->and($scheduler)->toContain('ReadWritePaths=')->toContain('/etc/tallpbx');
+
+    // Every service boots Laravel, which rebuilds the package manifest at
+    // bootstrap/cache/packages.php when optimize:clear removed it. Without
+    // write access there, the service crash-loops until an unsandboxed
+    // process (web request or CLI boot) recreates the file.
+    foreach ([$listener, $scheduler, $queue, $reverb] as $unit) {
+        expect($unit)->toContain('/var/www/tallpbx/bootstrap/cache');
+    }
+
+    // The remaining hardening that never conflicts with the app must stay.
+    expect($listener)->toContain('PrivateTmp=yes')
+        ->and($scheduler)->toContain('ProtectSystem=strict')
+        ->and($queue)->toContain('ProtectSystem=strict')
+        ->and($reverb)->toContain('ProtectSystem=strict');
+});
+
 it('prompts interactively for initial admin mode until setup is completed', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 

@@ -24,12 +24,19 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=tallpbx-freeswitch-listener
 
-# Security hardening
-NoNewPrivileges=yes
+# Security hardening.
+#
+# NoNewPrivileges is intentionally NOT set: this service executes the bounded
+# sudoers helper (/usr/local/sbin/tallpbx-security) for kernel firewall bans,
+# and that elevation requires the setuid transition systemd would otherwise
+# block. For the same reason /etc/tallpbx (the helper's ruleset, sidecar, and
+# threat feed files) stays read-write inside the ProtectSystem=strict sandbox,
+# and bootstrap/cache must stay writable so the service can rebuild the package
+# manifest after `php artisan optimize:clear`.
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media
+ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/www/tallpbx/bootstrap/cache /etc/tallpbx
 ReadOnlyPaths=/var/www/tallpbx
 
 # Environment (adjust APP_ENV as needed)

@@ -29,7 +29,9 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/tallpbx/storage
+# bootstrap/cache stays writable so the server can rebuild the package
+# manifest after `php artisan optimize:clear` instead of crash-looping.
+ReadWritePaths=/var/www/tallpbx/storage /var/www/tallpbx/bootstrap/cache
 ReadOnlyPaths=/var/www/tallpbx
 
 # Environment (adjust APP_ENV as needed)

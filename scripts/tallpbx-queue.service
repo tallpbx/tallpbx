@@ -31,8 +31,10 @@ ProtectSystem=strict
 ProtectHome=yes
 # The queue runs backup archives, restore staging, and writes privileged
 # restore request files, so the backup and restore roots must be writable
-# in addition to the app storage and media roots.
-ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/lib/tallpbx/backups /var/lib/tallpbx/restore-requests
+# in addition to the app storage and media roots. bootstrap/cache stays
+# writable so the worker can rebuild the package manifest after
+# `php artisan optimize:clear` instead of crash-looping.
+ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/lib/tallpbx/backups /var/lib/tallpbx/restore-requests /var/www/tallpbx/bootstrap/cache
 ReadOnlyPaths=/var/www/tallpbx
 
 # Environment (adjust APP_ENV as needed)
