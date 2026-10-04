@@ -8,7 +8,6 @@ use App\Models\Permission;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantManager;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -131,11 +130,10 @@ it('cannot delete another actors notification', function (): void {
         'data' => '[]',
     ]);
 
-    $this->expectException(ModelNotFoundException::class);
-
     Livewire::actingAs($this->admin, 'admin')
         ->test(NotificationsList::class)
-        ->call('deleteNotification', $foreign->id);
+        ->call('deleteNotification', $foreign->id)
+        ->assertNotFound();
 
     $this->assertDatabaseHas('notifications', ['id' => $foreign->id]);
 });
@@ -150,11 +148,10 @@ it('cannot mark another actors notification as read', function (): void {
         'data' => '[]',
     ]);
 
-    $this->expectException(ModelNotFoundException::class);
-
     Livewire::actingAs($this->admin, 'admin')
         ->test(NotificationsList::class)
-        ->call('markAsRead', $foreign->id);
+        ->call('markAsRead', $foreign->id)
+        ->assertNotFound();
 
     $this->assertDatabaseHas('notifications', ['id' => $foreign->id, 'read_at' => null]);
 });

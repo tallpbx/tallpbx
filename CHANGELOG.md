@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-04
+
 ### Changed
-- **Plain-Language Security Documentation**: Updated `README.md`, `docs/parity-comparison.md`, `docs/security-architecture.md`, and `docs/ui-tour.md` to replace technical "multi-vector defense" terminology with intuitive, plain-language equivalents ("Real-Time Intrusion Defense (Phones, Web & Server)" and "Entry-Point Threat Protection") that clearly communicate how the system guards telephone extensions, web logins, and server management simultaneously.
+- **Plain-Language Documentation & Standards Alignment**:
+  - Aligned documentation across `README.md`, `docs/parity-comparison.md`, `docs/security-architecture.md`, `docs/ui-tour.md`, `docs/load-testing-guide.md`, and `docs/pbx-hello-world.md` with project-wide plain-language telephony and operational standards.
+  - Replaced technical "multi-vector defense" terminology with intuitive, plain-language equivalents ("Real-Time Intrusion Defense (Phones, Web & Server)" and "Entry-Point Threat Protection") to clearly convey how the platform protects telephone extensions, web logins, and server management simultaneously.
+  - Added a **Tenant Isolation & Phone Provisioning** reference table to `README.md` defining phone registration workflows across Single Company (Default Tenant), Domain-Per-Tenant, and Shared IP multi-tenant deployment modes.
+  - Streamlined descriptions of multi-level Redis caching, dynamic FreeSWITCH XML handler performance, and automatic dialplan cache invalidation without internal jargon.
+  - Clarified testing workflows and the relationship between `php artisan app:test` and `php artisan test`, emphasizing in-memory SQLite isolation and live database safety.
+  - Modernized module scaffolding and directory layout documentation to reflect self-contained test suites and database factory structures.
+
+### Fixed
+- **Notifications Test Suite Assertion Compatibility**: In `NotificationsListTest`, updated unauthorized notification deletion and read-marking assertions to verify HTTP 404 (`assertNotFound()`) rather than expecting unhandled `ModelNotFoundException`, matching Livewire's action exception handling.
 
 ## [2.1.0] - 2026-09-30
 
