@@ -181,12 +181,12 @@ From an IT administrator's perspective, configuring a desk phone depends on your
 
 | Deployment Mode | Server Address on Phone | Extension on Phone | Login (Auth Username) | How Separation Works |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Single Company (Default Tenant)** | `x.x.x.x` (or company domain) | `101` | `101` | **No separation needed.** Everything lives in the Default tenant with standard 3-digit extensions. |
+| **1. Single Company (Default Tenant)** | `x.x.x.x` (or company domain) | `101` | `101` | **No separation needed.** Everything lives in the Default tenant with standard internal extensions (e.g., 3- to 6-digit extensions). |
 | **2. Multi-Tenant by Domain** | `acme.yourpbx.com` vs. `beta.yourpbx.com` | `101` | `101` | **Separated by Domain.** Each company has its own subdomain, so both can use plain `101` for both extension and login. |
 | **3. Multi-Tenant on Shared IP / Domain** | `x.x.x.x` (identical for all) | `101` | `acme_101` vs. `beta_101` | **Separated by Username.** A tenant prefix on the login ID guarantees unique device authentication on the shared IP, while the phone still displays `101`. |
 
 **Behind the Scenes (Context-Based Routing):**  
-Once a phone registers under **any** of these three modes, TallPBX locks that device into that tenant's private internal routing partition (`tenant_{id}_internal`). Employees dial clean 3-digit extensions (`101`, `102`), and FreeSWITCH strictly isolates all call flows, transfers, and voicemails from other organizations.
+Once a phone registers under **any** of these three modes, TallPBX locks that device into that tenant's private internal routing partition (`tenant_{id}_internal`). Employees dial clean internal extensions (`101`, `1001`), and FreeSWITCH strictly isolates all call flows, transfers, and voicemails from other organizations.
 
 ### XML Handler Performance Knobs
 
