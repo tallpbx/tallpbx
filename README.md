@@ -442,7 +442,7 @@ In `static` mode, all workers remain initialized and ready for FreeSWITCH XML ha
 
 ### Telephony XML Cache Tuning & Hit Rate Sweep
 
-TallPBX uses a tiered in-memory caching architecture backed by Redis to keep dialplan lookups fast and protect MariaDB during high-frequency call bursts:
+TallPBX caches phone routing data in Redis at multiple levels—from complete call responses down to individual routing rules. This keeps lookups instant and protects the database from overload during call spikes:
 
 - **Master XML Cache (`FS_XML_HANDLER_CACHE_TTL=5`)**: Sets the default TTL across all telephony XML caches.
 - **Granular Overrides**:
