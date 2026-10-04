@@ -22,7 +22,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme; no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no native dark mode) |
 | **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Intrusion Defense (Phones, Web & Server)** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Delayed log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
-| **Automated Testing** | **2,337 Pest tests + 44 Dusk browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **2,400+ Pest tests incl. browser tests via Playwright** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 | Metric / Feature Category | TallPBX | FusionPBX Equivalent | FreePBX Equivalent | Parity Assessment |
