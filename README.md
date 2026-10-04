@@ -231,7 +231,7 @@ FS_XML_HANDLER_CACHE_STORE=redis
 # FS_XML_HANDLER_ACL_CACHE_STORE=redis
 ```
 
-Redis is the recommended cache and session backend for this project because the XML handler is a hot path, control-panel sessions should not depend on local disk, and file/database stores add avoidable I/O under concurrent calls. Simple local development can temporarily use `CACHE_STORE=file` and `SESSION_DRIVER=file` if Redis is not installed.
+Redis is the recommended cache and session backend because it keeps data in lightning-fast memory (RAM). Storing live call-routing queries and control-panel sessions in memory prevents disk bottlenecks when multiple calls occur at the same time. For simple local testing without Redis, you can temporarily set `CACHE_STORE=file` and `SESSION_DRIVER=file`.
 
 Fresh installs enable Redis automatically. For an existing server, install and enable Redis before switching these `.env` values:
 
