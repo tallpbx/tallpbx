@@ -390,7 +390,7 @@ php artisan pbx:load-test:dialplan \
 
 Use `--scenario=cache-hit` to repeat one exact dialplan lookup and isolate XML cache-hit behavior. Use `--scenario=mixed` for a more realistic blend of internal, inbound, and outbound requests.
 
-For concurrency testing, prefer Redis or another memory-backed store for `FS_XML_HANDLER_CACHE_STORE`. After changing cache-related env values, run `php artisan optimize:clear` followed by `php artisan optimize` before load testing the real PHP-FPM endpoint. Avoid running `optimize:clear` while traffic is active; PHP-FPM workers can briefly fail if they request bootstrap cache files while those files are being rebuilt.
+For concurrency testing, use Redis for `FS_XML_HANDLER_CACHE_STORE`. After changing cache-related env values, run `php artisan optimize:clear` followed by `php artisan optimize` before load testing the real PHP-FPM endpoint. Avoid running `optimize:clear` while traffic is active; PHP-FPM workers can briefly fail if they request bootstrap cache files while those files are being rebuilt.
 
 Useful tiers:
 
