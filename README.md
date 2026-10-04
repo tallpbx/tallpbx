@@ -130,12 +130,14 @@ app-modules/call-forwarding/
 ├── database/migrations/   # Database migrations
 ├── lang/en/               # English translations
 ├── resources/views/       # Blade views (namespace: call-forwarding::)
+├── tests/                 # Pest tests (auto-discovered by host test suite)
 └── src/
+    ├── Database/Factories/# Model factories (HasFactory auto-resolution)
     ├── Livewire/          # Livewire components
     └── Providers/         # ModuleServiceProvider
 ```
 
-The generated provider extends `App\Support\ModuleServiceProvider`, which auto-registers standard views, migrations, routes, Livewire components, menu items, and permissions. Create a `routes/web.php` file only when the module needs custom routes beyond the standard panel list/create/edit conventions.
+The generated provider extends `App\Support\ModuleServiceProvider`, which auto-registers standard views, migrations, routes, Livewire components, menu items, model factories, and permissions. Tests placed under `tests/` are automatically discovered and executed by Pest during host test suite runs (`php artisan test`). Create a `routes/web.php` file only when the module needs custom routes beyond the standard panel list/create/edit conventions.
 
 After scaffolding, add a Composer path repository in root `composer.json` and run `composer update` to register the module. First-party modules use `app-modules/*` path repositories; third-party modules may be installed from GitHub or private Composer repositories.
 
