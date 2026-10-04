@@ -466,7 +466,7 @@ redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
 ```
 
 Recommended settings in `.env`:
-- **Standard Office**: `FS_XML_HANDLER_CACHE_TTL=5` (default: optimal balance between high burst throughput and low memory footprint; web panel changes invalidate active caches immediately via atomic per-tenant versioning).
+- **Standard Office**: `FS_XML_HANDLER_CACHE_TTL=5` (default: optimal balance between high burst throughput and low memory footprint; web panel changes invalidate active caches immediately).
 - **High-Density Call Center**: `FS_XML_HANDLER_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
 - **Development**: `FS_XML_HANDLER_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
 
