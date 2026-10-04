@@ -94,7 +94,6 @@ those individual choices for an unattended install. [Full installation guide →
   - **Storage**: 40GB storage
   - **RAM**: 4GB RAM
   - **Swap**: 2GB swap
-  *(Recommended for running Vite frontend compilation, Pest test suites in parallel, and Playwright browser testing).*
 - **Minimum Hardware (Production)**:
   - **CPU**: 1 vCPU (2+ vCPUs recommended for active PBX workloads)
   - **Storage**: 25 GB disk space (40 GB+ recommended for local call recordings and voicemail storage)
