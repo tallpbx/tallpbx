@@ -102,8 +102,8 @@ class GitUpdateService
             } elseif (
                 $lower === 'stable'
                 || str_starts_with($lower, 'release/')
-                // Version branches such as "2.0" count as stable release series.
-                || preg_match('/^v?\d+(\.\d+)+(-stable)?$/i', $branch) === 1
+                // Version branches such as "3.x", "2.0", "1.1" count as stable release series.
+                || preg_match('/^v?\d+(\.x|(\.\d+)+)(-stable)?$/i', $branch) === 1
             ) {
                 $stable[] = $branch;
             } else {
@@ -120,7 +120,10 @@ class GitUpdateService
                 return 1;
             }
 
-            return version_compare(ltrim($b, 'v'), ltrim($a, 'v'));
+            $normA = preg_replace('/\.x$/i', '.99999', ltrim($a, 'v'));
+            $normB = preg_replace('/\.x$/i', '.99999', ltrim($b, 'v'));
+
+            return version_compare($normB, $normA);
         });
 
         return [

@@ -17,9 +17,9 @@ it('keeps the bootstrap safe for piped one-line installs', function (): void {
 
     expect($bootstrap)->toContain('set -euo pipefail')
         ->and($bootstrap)->toContain('The TallPBX bootstrap must run as root')
-        ->and($bootstrap)->toContain('requested_ref="2.0"')
+        ->and($bootstrap)->toContain('requested_ref="3.x"')
         ->and($bootstrap)->toContain('requested_ref="$2"')
-        ->and($bootstrap)->toContain('TallPBX 2.x is not backwards compatible with 1.x')
+        ->and($bootstrap)->toContain('TallPBX 3.x is not backwards compatible with earlier release branches')
         ->and($bootstrap)->toContain('git ls-remote --exit-code')
         ->and($bootstrap)->toContain('git -C "$application_root" merge --ff-only')
         ->and($bootstrap)->toContain('git -C "$application_root" status --porcelain')
@@ -181,7 +181,7 @@ it('refuses to touch a folder that is not a git working copy', function (): void
 it('presents the one-line install as the primary method', function (): void {
     $install = (string) file_get_contents(base_path('INSTALL.md'));
 
-    expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash')
+    expect($install)->toContain('wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash')
         ->and($install)->not->toContain('curl -fsSL')
         ->and($install)->not->toContain('sha256sum')
         ->and($install)->not->toContain('Verified Installation')
@@ -200,9 +200,9 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->not->toContain('systemctl status <name>')
         ->and($install)->not->toContain('app:test')
         ->and($install)->toContain('To customize the installation, add options after `-s --`')
-        ->and($install)->toContain('# Pin the stable 1.1 release branch instead of the default 2.0:')
-        ->and($install)->toContain('bash -s -- --ref 1.1')
-        ->and($install)->toContain('TallPBX 2.x is **not 100% backwards compatible** with the 1.x release')
+        ->and($install)->toContain('# Pin the stable 2.0 release branch instead of the default 3.x:')
+        ->and($install)->toContain('bash -s -- --ref 2.0')
+        ->and($install)->toContain('TallPBX 3.x is **not 100% backwards compatible** with earlier release')
         ->and($install)->toContain('rapid development, so future releases may include more changes')
         ->and($install)->toContain('will eventually stabilize as the platform matures')
         ->and($install)->toContain('will require a clean re-install')

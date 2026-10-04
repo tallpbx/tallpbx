@@ -100,8 +100,8 @@ class GitUpdate extends Component
         $this->currentVersion = $this->gitService->currentVersion();
         $this->remoteUrl = $this->gitService->remoteUrl();
         $this->isClean = $this->gitService->isClean();
-        // Default the target: stay on the current branch, else the top stable series, else the 2.0 line.
-        $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '2.0');
+        // Default the target: stay on the current branch, else the top stable series, else the 3.x line.
+        $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '3.x');
 
         $status = $this->gitService->getStatus();
         if (($status['running'] ?? false) === true) {

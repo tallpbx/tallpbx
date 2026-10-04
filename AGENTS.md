@@ -4,7 +4,7 @@
 
 - Keep durable project guidance in this `AGENTS.md` file or in the generic `.agents/skills/` directory.
 - Do not store project instructions in tool-specific memory locations such as `.opencode/memory/`; those files are local to one agent runtime and are not portable across humans or other AI agents.
-- **Branching & Versioning Strategy**: This repository uses the [Laravel framework versioned-series branch model](https://laravel.com/docs/releases#versioning-scheme) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`MAJOR.MINOR.PATCH`). Active development occurs directly on the `2.0` series branch (there is NO `main` or `master` branch). Always check `git branch --show-current`. See [Branching & Release Strategy (Laravel Model)](#branching--release-strategy-laravel-model) below.
+- **Branching & Versioning Strategy**: This repository uses the [Laravel framework versioned-series branch model](https://laravel.com/docs/releases#versioning-scheme) and [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`MAJOR.MINOR.PATCH`). Active development occurs directly on the `3.x` series branch (there is NO `main` or `master` branch). Always check `git branch --show-current`. See [Branching & Release Strategy (Laravel Model)](#branching--release-strategy-laravel-model) below.
 
 ## Project Skills
 
@@ -132,21 +132,22 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 - When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
 
 ### Branching & Release Strategy (Laravel Model)
-- TallPBX follows the **[Laravel framework versioned-branch model](https://laravel.com/docs/releases#versioning-scheme)** (e.g. `1.0`, `1.1`, `2.0`) and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`).
-- **Active Branch Confirmation**: Run `git branch --show-current` before starting work. Active development occurs directly on the current major/series branch (`2.0`). There is no perpetual `main` or `master` branch; never attempt to branch off or merge into `main`. All new features, modernizations, and architectural improvements are committed directly to `2.0` or merged into it.
-- **No Backwards Compatibility for Unreleased Series Branches**: Because major series branch `2.0` is currently unreleased (no `v2.0.0` tag exists yet) and is explicitly not backwards compatible with the 1.x series, do not introduce or retain backward-compatibility fallbacks, deprecated aliases, transitional shims, or migration bridges for 1.x or unreleased 2.0 iterations. Write all configuration, schema, routes, services, and tests directly in their modern canonical form. Backwards compatibility guarantees apply strictly to maintenance releases after a production tag (`v2.0.0`) is cut.
+- TallPBX follows the **[Laravel framework versioned-branch model](https://laravel.com/docs/releases#versioning-scheme)** (e.g. `1.1`, `2.0`, `3.x`) and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`).
+- **Active Branch Confirmation**: Run `git branch --show-current` before starting work. Active development occurs directly on the current major/series branch (`3.x`). There is no perpetual `main` or `master` branch; never attempt to branch off or merge into `main`. All new features, modernizations, and architectural improvements are committed directly to `3.x` or merged into it.
+- **No Backwards Compatibility for Unreleased Series Branches**: Because major series branch `3.x` is currently unreleased (no `v3.0.0` tag exists yet) and is explicitly not backwards compatible with the 2.x/1.x series, do not introduce or retain backward-compatibility fallbacks, deprecated aliases, transitional shims, or migration bridges for 2.x or unreleased 3.x iterations. Write all configuration, schema, routes, services, and tests directly in their modern canonical form. Backwards compatibility guarantees apply strictly to maintenance releases after a production tag (`v3.0.0`) is cut.
 - **Numbered Release Series Branches**:
   - `1.0`: Frozen maintenance branch for 1.0.x (critical security/bug fixes only). Never push new feature work to `1.0`.
   - `1.1`: Maintenance release series for 1.1.x deployments.
-  - `2.0`: Current primary development branch for 2.x features and releases.
-- **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`2.0`) or maintenance branches when backporting fixes for existing releases.
-- **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.\d+)+`) as stable release series, sorting them in reverse version order so `2.0` is the top/default target.
+  - `2.0`: Maintenance release series for 2.x deployments (latest stable: `v2.1.1`).
+  - `3.x`: Current primary development branch for 3.x features and releases.
+- **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`3.x`) or maintenance branches when backporting fixes for existing releases.
+- **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.x|(\.\d+)+)`) as stable release series, sorting them in reverse version order so `3.x` is the top/default target.
 - **Documentation**: User-facing versioning details are in [`README.md#versioning--release-strategy`](README.md#versioning--release-strategy), installation notes in [`INSTALL.md`](INSTALL.md), and release logs in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Tagging Best Practices (Do NOT Tag Every Commit)
 - **Never tag individual commits or task completions.**
-- Tags (`v1.0.0`, `v1.1.0`, `v2.0.0`, etc.) are reserved strictly for official, finished production releases.
-- Tags are created directly on their respective series branch heads (`1.0`, `1.1`, `2.0`).
+- Tags (`v1.0.0`, `v1.1.0`, `v2.0.0`, `v2.1.0`, `v2.1.1`, `v3.0.0`, etc.) are reserved strictly for official, finished production releases.
+- Tags are created directly on their respective series branch heads (`1.0`, `1.1`, `2.0`, `3.x`).
 - Use branch heads and commit SHAs for intermediate work and references.
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
 

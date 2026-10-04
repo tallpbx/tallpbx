@@ -90,6 +90,8 @@ it('categorizes branches into stable, development, and other', function (): void
         'stable',
         '1.0',
         'v1.1',
+        '2.0',
+        '3.x',
         'release/2.0',
         'feature/cool-stuff',
         'codex/branch',
@@ -98,8 +100,10 @@ it('categorizes branches into stable, development, and other', function (): void
     $categorized = $service->categorizeBranches($branches);
 
     expect($categorized['development'])->toContain('main', 'master')
-        ->and($categorized['stable'])->toContain('stable', '1.0', 'v1.1', 'release/2.0')
-        ->and($categorized['other'])->toContain('feature/cool-stuff', 'codex/branch');
+        ->and($categorized['stable'])->toContain('stable', '3.x', '2.0', '1.0', 'v1.1', 'release/2.0')
+        ->and($categorized['other'])->toContain('feature/cool-stuff', 'codex/branch')
+        ->and($categorized['stable'][0])->toBe('stable')
+        ->and($categorized['stable'][1])->toBe('3.x');
 });
 
 it('returns incoming commits parsed correctly', function (): void {

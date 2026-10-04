@@ -107,7 +107,7 @@ ip addr show <interface>
 Install TallPBX with a single command:
 
 ```bash
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash
 ```
 
 The command downloads a small bootstrap script and runs it. The bootstrap
@@ -118,24 +118,24 @@ Re-running the command is safe within the same release series — the installer 
 run repeatedly without affecting existing data, and it updates TallPBX in place. See
 [Upgrading TallPBX](#upgrading-tallpbx) for details.
 Use the same `--ref` value every time: without it, the re-run switches the
-working copy to `2.0`.
+working copy to `3.x`.
 
 > [!WARNING]
-> **Major Version Notice (2.x vs 1.x Compatibility)**:
-> TallPBX is still in active, rapid development, so future releases may include more changes that are **not backwards compatible** with earlier versions. This will eventually stabilize as the platform matures. For the current transition, TallPBX 2.x is **not 100% backwards compatible** with the 1.x release branches (`1.0`, `1.1`), and updating an existing installation from 1.x to 2.x is **not supported via in-place updates** and **will require a clean re-install**.
-> If you are operating an existing 1.x deployment, remain on your `1.x` release series branch (e.g. `--ref 1.1`) or back up your data before performing a fresh 2.0 installation.
+> **Major Version Notice (3.x vs Earlier Versions Compatibility)**:
+> TallPBX is still in active, rapid development, so future releases may include more changes that are **not backwards compatible** with earlier versions. This will eventually stabilize as the platform matures. For the current transition, TallPBX 3.x is **not 100% backwards compatible** with earlier release branches (`2.0`, `1.1`), and updating an existing installation from earlier versions to 3.x is **not supported via in-place updates** and **will require a clean re-install**.
+> If you are operating an existing 2.x deployment, remain on your `2.0` release series branch (e.g. `--ref 2.0`) or back up your data before performing a fresh 3.x installation.
 
 To customize the installation, add options after `-s --`:
 
 ```bash
-# Pin the stable 1.1 release branch instead of the default 2.0:
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --ref 1.1
+# Pin the stable 2.0 release branch instead of the default 3.x:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --ref 2.0
 
 # Skip the demo-data question (recommended for production):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --no-demo
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --no-demo
 
 # Install without demo data or development tooling (recommended for production):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
 ```
 
 ### First Administrator Setup
@@ -470,10 +470,10 @@ For a certificate from another provider, place `fullchain.pem` and
 > safest recovery path.
 
 > [!WARNING]
-> **Major Version Notice (Upgrading from 1.x to 2.x Requires a Re-install)**:
-> TallPBX 2.x is **not 100% backwards compatible** with the 1.x release series (`1.0`, `1.1`).
-> In-place updates across major version boundaries (e.g. attempting to update a 1.x system to 2.x via the web panel Git updater or CLI fast-forward pull) are **not supported** and will cause breaking incompatibilities.
-> Upgrading an existing system from 1.x to 2.x **requires a clean re-install**. Routine in-place updates are intended strictly for maintenance releases within the same series (e.g. updating within `1.1.x`, or updating within `2.0.x`).
+> **Major Version Notice (Upgrading to 3.x Requires a Re-install)**:
+> TallPBX 3.x is **not 100% backwards compatible** with earlier release series (`2.0`, `1.1`).
+> In-place updates across major version boundaries (e.g. attempting to update a 1.x or 2.x system to 3.x via the web panel Git updater or CLI fast-forward pull) are **not supported** and will cause breaking incompatibilities.
+> Upgrading an existing system from 1.x or 2.x **requires a clean re-install**. Routine in-place updates are intended strictly for maintenance releases within the same series (e.g. updating within `1.1.x`, `2.x`, or `3.x`).
 
 ### Updating from the Web Panel (Recommended)
 
@@ -504,11 +504,11 @@ database migrations, and preserves all your existing configuration, accounts,
 and recordings:
 
 ```bash
-# Update on the default 2.0 branch:
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash
+# Update on the default 3.x branch:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash
 
-# Or update on a specific release branch (such as 1.1):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/2.0/scripts/bootstrap.sh | bash -s -- --ref 1.1
+# Or update on a specific release branch (such as 2.0 or 1.1):
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --ref 2.0
 ```
 
 Use the same `--ref` value you used during initial installation so the working
@@ -520,8 +520,8 @@ To update manually step by step, take a backup first, then run from `/var/www/ta
 
 ```bash
 # 1. Pull the latest code from the branch you installed
-#    (such as 2.0, or a maintenance release branch such as 1.1).
-git pull --ff-only origin 2.0
+#    (such as 3.x, or a maintenance release branch such as 2.0 or 1.1).
+git pull --ff-only origin 3.x
 
 # 2. Install PHP dependencies and rebuild browser files.
 composer install --no-dev --optimize-autoloader
