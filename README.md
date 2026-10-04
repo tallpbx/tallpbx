@@ -162,7 +162,7 @@ php artisan module:clear
 php artisan module:list
 ```
 
-Composer is responsible for PHP autoloading and Laravel package discovery. The module cache stores TallPBX module metadata, not a separate PHP autoloader.
+Standard PHP tools (Composer) handle loading code files automatically. The `module:cache` command simply stores module details (names, versions, and menus) so the web panel loads faster.
 
 ## Telephony Integration (mod_xml_curl)
 
