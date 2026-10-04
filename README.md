@@ -105,7 +105,7 @@ those individual choices for an unattended install. [Full installation guide →
 This project is built using a modular architecture with modules in the `app-modules/` directory:
 
 - Modules reside under `app-modules/ModuleName/`
-- PSR-4 namespaces map to the module's `src/` directory: `Modules\ModuleName\` → `app-modules/ModuleName/src/`
+- Core PHP code is stored in the module's `src/` folder
 - Each module registers its own routes, views, migrations, menus, and permissions via its `ModuleServiceProvider`
 - Modules are auto-discovered through Composer path repositories and Laravel package discovery
 
