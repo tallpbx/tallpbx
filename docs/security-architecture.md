@@ -251,7 +251,7 @@ Pinned directly above the tab strip for immediate visibility:
 * **Trusted Whitelist**: IP addresses and subnets exempt from all packet filtering (`@whitelist_ips` / `@whitelist_ips6`). Includes a 1-click self-protection button to automatically whitelist the current administrator's connection IP.
 
 #### Tab 2: Attackers (`?tab=attackers`)
-* **Active Intrusion Bans Table**: Real-time display of currently banned IPs, remaining hardware countdown timers, attack vectors (`SIP`, `Web`, `SSH`, `SIP Scanner`), and 1-click unban buttons.
+* **Active Intrusion Bans Table**: Real-time display of currently banned IPs, remaining hardware countdown timers, entry points / attack types (`SIP`, `Web`, `SSH`, `SIP Scanner`), and 1-click unban buttons.
 * **SIP Bot & Scanner Signatures Card**:
   - **Instant Kernel Ban Toggle**: When turned on, detected SIP scanners are banned in the kernel immediately. (Ships off by default: scanners are blocked with 403 hangup and recorded without an IP ban).
   - **Ban Duration Selector**: 1 hour, 24 hours, 7 days, or permanent.

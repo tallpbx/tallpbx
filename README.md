@@ -36,7 +36,7 @@ Built to eliminate the steep learning curve and dated interfaces of legacy PBX p
 | **User Impersonation** | **1-Click Native Impersonation** (Instant tenant user perspective, persistent recovery banner & audit trail) | Limited (Domain switching only, no direct user session impersonation) | None (Separate UCP logins, no multi-tenant user impersonation) |
 | **Multi-Language Support** | **Native Multi-Lingual** (English, Spanish, French with instant topbar switcher, locale routing & user preference) | Partial / Community arrays (`app_languages.php`) | Partial gettext / PO files (often incomplete, English-centric) |
 | **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme, no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no dark mode) |
-| **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Multi-Vector Defense** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
+| **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Intrusion Defense (Phones, Web & Server)** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
 | **Automated Testing** | **2,400+ Pest tests incl. Pest 4 browser tests via Playwright** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
@@ -244,7 +244,8 @@ TallPBX includes a first-party Security module (`app-modules/security`) that rep
 - **All-or-Nothing (Atomic) Preflight Verification**: Proposed firewall rules are compiled to `/etc/tallpbx/firewall.nft.pending` and verified using `nft -c -f` before replacing the active ruleset, preventing syntax errors or broken rules from taking down host networking.
 - **Critical Protocol Safeguards**: IPv6 Neighbor Discovery (`ip6 nexthdr icmpv6 accept`) and standard ICMP echo requests are explicitly allowed so DNS resolution and network diagnostics never stall.
 
-### 2. Multi-Vector Real-Time Intrusion Prevention
+### 2. Real-Time Intrusion Defense (Phones, Web & Server)
+- **Entry-Point Threat Protection**: Automatic defense across all doorways into the PBX—blocking attacks on phone extensions, web logins, and server connections simultaneously.
 - **FreeSWITCH SIP Auth Scanning**: FreeSWITCH Event Socket Layer (ESL) captures `sofia::failed_auth` events as they happen, blocking SIP registration brute-force attackers in sub-seconds.
 - **Web Control Panel Brute-Force**: In-process interception of Laravel authentication failures (`Illuminate\Auth\Events\Failed`), blocking web brute-force attacks before they exhaust server resources.
 - **Sliding-Window Rate Limiting**: Redis-backed incident tracking evaluates configurable retry limits (`max_retry`), time windows (`find_time`), and ban durations (`ban_time`).

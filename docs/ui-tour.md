@@ -99,7 +99,7 @@ The **Security Command Center** (`/panel/security`) provides system administrato
 * **Master Operational Switches & Zero-Lockout**: Pinned controls for the Firewall Master Switch, Built-in Pre-Filters Switch, and Global Observe Mode (non-blocking observation banner), protected by automated preflight guards that ensure the administrator's connection and local database/cache services can never be severed.
 * **Four Evaluation-Ordered Tabs**:
   - **Block & Allow Lists**: Permanent CIDR-aware Blacklist and Trusted Whitelist with 1-click self-protection for administrator IPs.
-  - **Attackers**: Active intrusion bans with vector badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, auto-ban toggle, and live conntrack session termination).
+  - **Attackers**: Active intrusion bans with entry-point badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, auto-ban toggle, and live conntrack session termination).
   - **Threat Feeds**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
   - **Firewall Rules**: Interactive, reorderable 7-stage pre-filter pipeline, PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69), custom sequential rules, and fallback default policy.
 
