@@ -174,7 +174,19 @@ Instead of generating static XML configurations on disk, this system serves dyna
 - **Default Tenant Baseline**: Non-demo fresh installs create a single **Default tenant**—ideal for standard single-company setups where multi-tenancy is not needed, while allowing administrators to add separate isolated tenants whenever required. The installer separately creates the first administrator during installation or through `/panel/setup`; demo mode is the sole creator of sample tenants, extensions, SIP accounts, trunks, routes, voicemail boxes, and other callable PBX data.
 - **Spoken Voice Prompts & Music-on-Hold**: Voice recordings for voicemail, call menus (IVRs), conferences, and system greetings use English (Callie) by default, with optional Spanish (Mario) and French (June) sound packs installable during setup or via `php artisan pbx:sounds`. Packaged music-on-hold files are included and served automatically (`local_stream://moh`).
 - **Audio & Media Storage**: Media payloads such as call recordings, uploaded recordings, voicemails, and fax files are stored on disk. The database stores paths and metadata only.
-- **Context-Based Tenant Routing**: For tenant routing, TallPBX prefers tenant-specific call contexts over domain names. A domain name can still be used as a fallback, but domains are not treated as the only way to identify a tenant. This allows multiple tenants to share the same SIP domain when the deployment needs that.
+
+### Tenant Isolation & Phone Provisioning (Three Modes)
+
+From an IT administrator's perspective, configuring a desk phone depends on your deployment architecture. TallPBX supports three flexible models:
+
+| Deployment Mode | Server Address on Phone | Extension on Phone | Login (Auth Username) | How Separation Works |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Single Company (Default Tenant)** | `x.x.x.x` (or company domain) | `101` | `101` | **No separation needed.** Everything lives in the Default tenant with standard 3-digit extensions. |
+| **2. Multi-Tenant by Domain** | `acme.yourpbx.com` vs. `beta.yourpbx.com` | `101` | `101` | **Separated by Domain.** Each company has its own subdomain, so both can use plain `101` for both extension and login. |
+| **3. Multi-Tenant on Shared IP / Domain** | `x.x.x.x` (identical for all) | `101` | `acme_101` vs. `beta_101` | **Separated by Username.** A tenant prefix on the login ID guarantees unique device authentication on the shared IP, while the phone still displays `101`. |
+
+**Behind the Scenes (Context-Based Routing):**  
+Once a phone registers under **any** of these three modes, TallPBX locks that device into that tenant's private internal routing partition (`tenant_{id}_internal`). Employees dial clean 3-digit extensions (`101`, `102`), and FreeSWITCH strictly isolates all call flows, transfers, and voicemails from other organizations.
 
 ### XML Handler Performance Knobs
 
