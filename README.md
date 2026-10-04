@@ -347,9 +347,14 @@ php artisan app:test --sequential
 php artisan app:test --smoke --clear-cache
 ```
 
-The `app:test` command applies `--parallel` and `--compact` automatically. Both `php artisan app:test` and `php artisan test` use an in-memory SQLite database and temporary array-backed cache and session stores, so test data cannot use the server's MariaDB database. The recommended `app:test` command also removes inherited `.env` values before it starts Pest. A second check stops a test process if it is configured with anything other than in-memory SQLite. Run smoke after small changes, default before committing, and full before pushing.
+### Choosing Between `app:test` and `test`
 
-The smoke tier includes a tiny seeded PBX XML-handler repeat check that makes sure internal, inbound, outbound, and generated-cache dialplan responses continue to work without running external SIPp traffic or high-volume load.
+- **`php artisan app:test` (Recommended)**: A custom wrapper around Laravel's test command. It automatically enables parallel execution with compact output and adds tiered speed options: run `--smoke` (~20s) after small changes, default (~65s) before committing, and `--full` before pushing.
+- **`php artisan test` (Standard Laravel)**: Laravel's underlying built-in test runner, best used directly when targeting an individual test file or class (`--filter=AdminAuthTest`).
+
+**Live Database Safety:** Whichever command you choose, all tests execute strictly inside an isolated in-memory SQLite database and temporary cache. Automated tests will **never touch or alter your live MariaDB database** or active phone calls.
+
+The smoke tier includes a quick PBX XML-handler check to verify internal, inbound, outbound, and cached dialplan routing without needing external SIP traffic or heavy load.
 
 ## PBX Dialplan Load Testing
 
