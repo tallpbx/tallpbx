@@ -188,9 +188,13 @@ From an IT administrator's perspective, configuring a desk phone depends on your
 **Behind the Scenes (Context-Based Routing):**  
 Once a phone registers under **any** of these three modes, TallPBX locks that device into that tenant's private internal routing partition (`tenant_{id}_internal`). Employees dial clean internal extensions (`101`, `1001`), and FreeSWITCH strictly isolates all call flows, transfers, and voicemails from other organizations.
 
-### XML Handler Performance Knobs
+### XML Handler Performance & Caching
 
-The XML handler is a hot path: FreeSWITCH can call it during directory lookup, dialplan routing, and configuration requests. The app keeps successful per-request XML handler logging off by default, uses short-lived generated dialplan XML caching to avoid rebuilding identical tenant/context/destination responses during call bursts, and caches context-wide standard dialplan fragments so mixed-destination bursts do not repeatedly query the same base dialplans.
+Every time a phone connects, registers, or dials a number, FreeSWITCH asks TallPBX in real time how to handle the call. Because this pipeline handles constant live traffic, it must be lightning-fast so callers never experience delays.
+
+To ensure instant call setup under heavy load:
+- **Debug logging is off by default**: Prevents the server from wasting disk speed recording every routine successful lookup.
+- **Short-term memory caching**: Reuses call-routing rules for a few seconds so bursts of simultaneous calls do not repeatedly query the database.
 
 Relevant `.env` settings:
 
