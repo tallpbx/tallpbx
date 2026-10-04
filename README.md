@@ -169,7 +169,7 @@ Standard PHP tools (Composer) handle loading code files automatically. The `modu
 Instead of generating static XML configurations on disk, this system serves dynamic configs to FreeSWITCH on demand over HTTP using `mod_xml_curl`:
 
 - Dynamic directories, dialplans, and configurations are handled via the XML Handler API (`/api/v1/xml-handler`).
-- Events are captured using a persistent ESL connection running under `php artisan freeswitch:listen`.
+- Live phone events (call connections, hangups, and security alerts) are streamed in real time through FreeSWITCH's Event Socket Layer (ESL) via `php artisan freeswitch:listen`.
 - Fresh installs install and enable the default PBX runtime modules: `mod_sofia` for SIP profiles, `mod_callcenter` for queues, `mod_dptools` for core dialplan applications, `mod_local_stream` and `mod_sndfile` for packaged media/MOH, and `mod_xml_curl` for app-served XML. The installer also writes `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` with the generated XML handler token automatically and adds a systemd drop-in so FreeSWITCH starts after Nginx, PHP-FPM, MariaDB, and Redis.
 - Non-demo fresh installs seed the Default tenant only. The installer separately
   creates the first administrator during installation or through `/panel/setup`;
