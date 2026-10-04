@@ -1259,7 +1259,7 @@ echo " Cache sweep completed. Production defaults restored (TTL=5s)."
 
 ### Optimizations Already In Place
 
-The current hot path includes these measured optimizations:
+The real-time call routing pipeline includes these measured optimizations:
 
 - successful XML handler debug logs are disabled by default;
 - normal-path outbound legacy gateway INFO logging was removed;

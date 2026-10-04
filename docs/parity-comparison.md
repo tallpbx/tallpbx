@@ -135,7 +135,7 @@ This document provides a detailed feature-by-feature and architectural compariso
    - Built on **Laravel 13**, **Livewire 4**, and **Tailwind CSS v4** with clean architectural boundaries (`App\Support\ModuleServiceProvider`, `BaseListComponent`, `BaseEditComponent`).
    - FusionPBX and FreePBX are 15–20 year-old procedural PHP codebases with deeply nested global state, direct SQL string concatenation, and minimal test coverage.
 2. **Quality & Test Automation**:
-   - **2,337 automated Pest tests** and **44 Dusk browser tests** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
+   - **2,400+ Pest tests incl. browser tests via Playwright** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
 3. **Multi-Tenant Security Model**:
    - Multi-tenant defense-in-depth:
      - `TenantMutationGuard` enforces data boundary checks on model lifecycle events.

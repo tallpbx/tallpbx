@@ -99,6 +99,9 @@ Open your softphone application (e.g. **MicroSIP** or **Linphone**).
    - **Transport**: `UDP`
 3. Click **Use**.
 
+> [!NOTE]
+> This example uses the standard Default Tenant (Single Company) configuration. If configuring phones for a separate tenant sharing this server's IP address, your **Login (Auth Username)** will include the tenant prefix (e.g., `acme_1001`), while the extension number stays `1001`. See [Tenant Isolation & Phone Provisioning](../README.md#tenant-isolation--phone-provisioning-three-modes).
+
 ---
 
 ## Step 3: Verify SIP Registration
