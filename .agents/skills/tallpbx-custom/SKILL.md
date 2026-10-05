@@ -1,12 +1,23 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: versioning and release strategy (Laravel versioned series model, SemVer, unreleased 2.0 modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
+description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 3.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
 license: MIT
 metadata:
   author: tallpbx
 ---
 
 # TallPBX Custom Frontend Patterns
+
+## Laravel Boost MCP Tool Priority
+
+Laravel Boost runs as an active Model Context Protocol (MCP) server for this workspace (`php artisan boost:mcp`).
+Agents MUST prefer Boost tools over shell commands, Tinker scripts, or manual file grepping:
+- **Introspection**: Call `application-info` on new tasks/chats to inspect PHP version, Laravel framework version, database engine, and installed package catalog.
+- **Database Schema**: Use `database-schema` to inspect table definitions, columns, and foreign keys before writing migrations or Eloquent models.
+- **Database Queries**: Use `database-query` for read-only database queries instead of running raw SQL in Tinker.
+- **Documentation**: Use `search-docs` to check official Laravel, Livewire, Pest, and Tailwind documentation before writing version-sensitive APIs.
+- **Error & Log Inspection**: Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces instead of parsing `storage/logs/laravel.log`.
+- **Browser Diagnostics**: Use `browser-logs` to inspect browser console diagnostics during frontend/Livewire testing.
 
 ## Installer And Resource Scripts
 

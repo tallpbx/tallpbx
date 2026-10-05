@@ -3,6 +3,15 @@
 ## Agent Documentation Source of Truth
 Consult [`AGENTS.md`](../AGENTS.md) and [`.agents/skills/`](../.agents/skills/) (especially `tallpbx-custom`, `laravel-best-practices`, `freeswitch-development`) for authoritative project rules and patterns.
 
+## Laravel Boost MCP Priority
+Laravel Boost is active as an MCP server (`php artisan boost:mcp`). **Prefer Boost MCP tools over shell commands or manual file reads:**
+- Use `application-info` to inspect PHP, Laravel, database engine, and installed package versions.
+- Use `database-schema` to inspect table definitions, columns, and foreign keys before writing migrations or Eloquent models.
+- Use `database-query` for read-only database queries instead of running SQL in Tinker.
+- Use `search-docs` to check official Laravel, Livewire, and Tailwind v4 documentation.
+- Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces.
+- Use `browser-logs` to inspect browser console diagnostics during UI testing.
+
 ## Versioning & Git Release Strategy (Laravel Model)
 - TallPBX follows the **[Laravel framework versioned-branch model](https://laravel.com/docs/releases#versioning-scheme)** (e.g. `1.1`, `2.0`, `3.x`) and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`).
 - **No `main` or `master` Branch**: Active development occurs directly on the current major release series branch (`3.x`). Confirm with `git branch --show-current`. Never attempt to merge into or reference `main`.

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The `2.0` branch is transitioned to a stable maintenance line for the 2.x release series (latest stable: `v2.1.1`).
   - Enhanced `GitUpdateService` branch classification to recognize `MAJOR.x` version series branches (e.g. `3.x`) alongside existing numbered series, sorting them in reverse version order so the latest series is top.
   - Updated bootstrap installer (`scripts/bootstrap.sh`) and deployment documentation to target `3.x` by default while maintaining release pin support for earlier branches (`--ref 2.0`, `--ref 1.1`).
+- **Laravel Boost MCP Integration & Agent Priority**:
+  - Elevated Laravel Boost Model Context Protocol (MCP) tooling priority across all agent configurations (`AGENTS.md`, `.cursorrules`, `.github/copilot-instructions.md`, `CLAUDE.md`, and `.agents/skills/tallpbx-custom/SKILL.md`).
+  - Standardized instructions across all harnesses (Antigravity, Cursor, GitHub Copilot, Claude Code, and OpenCode) to prefer Boost MCP tools (`application-info`, `database-schema`, `database-query`, `search-docs`, `last-error`, `browser-logs`) over raw shell commands, manual file grepping, or Tinker scripts.
 
 ## [2.1.1] - 2026-10-04
 
