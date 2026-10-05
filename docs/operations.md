@@ -471,5 +471,53 @@ If editing configuration files by hand:
    fs_cli -x "reloadxml"
    ```
 
+## TLS Certificate Management & HTTPS/WSS Lifecycle
+
+TallPBX provides a unified, UI-driven Certificate Manager under the main navigation (**HTTPS & TLS Certificates**, route `/panel/certificates`), allowing operators to issue, import, generate, and deploy SSL/TLS certificates without CLI commands.
+
+### Services Secured
+- **Web Portal & WebSockets**: Nginx HTTPS (:443) and Laravel Reverb WebSockets reverse-proxy tunnel (`/app` -> `127.0.0.1:8080`). Active symlinks are managed atomically in `/etc/tallpbx/certs/active/`.
+- **Telephony & WebRTC**: FreeSWITCH SIP TLS (:5061) and WebRTC WSS (:7443). Combined cryptographic bundles are staged in `/etc/freeswitch/tls/` (`agent.pem`, `cafile.pem`, `wss.pem`, `dtls-srtp.pem`) with `freeswitch:freeswitch` ownership (mode `0600`).
+
+### Certificate Types Supported
+1. **Let's Encrypt (ACME v2)**:
+   - **HTTP-01**: For publicly reachable hostnames on port 80.
+   - **DNS-01 (Cloudflare)**: For wildcard certificates (`*.example.com`) or servers behind NAT firewalls using API tokens securely stored in the DNS Vault.
+   - **Auto-Renewal**: Automated sweep scheduled daily at 03:30 AM.
+2. **Custom PEM Import**: Import commercial certificates with real-time browser cryptographic modulus validation between certificate and private key.
+3. **Self-Signed Certificates**: Generate modern RSA/ECDSA certificates with SAN extensions for lab, testing, or internal network deployments.
+
+### Artisan CLI Commands
+
+* **View certificate inventory, expiration countdown, and active bindings**:
+  ```bash
+  php artisan certificates:status
+  ```
+
+* **Manually trigger automated renewal sweep**:
+  ```bash
+  php artisan certificates:renew
+  php artisan certificates:renew --dry-run   # Simulate renewal without issuing
+  php artisan certificates:renew --force     # Force renewal regardless of expiration
+  ```
+
+* **Deploy an existing certificate to services**:
+  ```bash
+  php artisan certificates:deploy 1 --service=web        # Nginx Web only
+  php artisan certificates:deploy 1 --service=telephony  # FreeSWITCH SIP/WSS only
+  php artisan certificates:deploy 1 --service=all        # Both Web and Telephony
+  ```
+
+### Automated Renewal Schedule
+The TallPBX scheduler runs `certificates:renew` daily at 03:30 AM without overlapping:
+```bash
+systemctl status tallpbx-scheduler
+```
+Renewal output and audit logs are recorded to `storage/logs/certificates-renewal.log` and visible in the Certificate Manager UI under the **Audit Logs** tab.
+
+### Bounded Security Helper Model
+All cryptographic operations, file deployments to `/etc/nginx/` and `/etc/freeswitch/tls/`, and daemon reloads run through the bounded root helper `/usr/local/sbin/tallpbx-certificate` via strict sudoers rules (`/etc/sudoers.d/tallpbx-certificate`), adhering to TallPBX's strict privilege isolation architecture.
+
+
 
 

@@ -1456,4 +1456,20 @@ return [
     'security_rate_limit_pps' => 'Tasa máx. (paquetes/seg)',
     'security_rate_burst_packets' => 'Tolerancia de ráfaga (paquetes)',
     'security_icmp_dual_stack_note' => 'Se aplica a solicitudes de eco ICMP IPv4 e IPv6. El descubrimiento de vecinos IPv6 esencial (ND) y los anuncios de enrutador siempre se conservan.',
+
+    // ─── Certificates Module ─────────────────────────────────────────────
+    'certificates' => 'Certificados HTTPS y TLS',
+    'certificates_title' => 'Gestor de Certificados',
+    'certificates_description' => 'Gestione el cifrado SSL/TLS para portales web, señalización SIP y telefonía WebRTC.',
+    'certificates_inventory' => 'Inventario',
+    'certificates_lets_encrypt' => 'Let\'s Encrypt',
+    'certificates_custom' => 'Importación Personalizada',
+    'certificates_self_signed' => 'Autofirmado',
+    'certificates_dnsvault' => 'Bóveda DNS',
+    'certificates_audit_logs' => 'Registros de Auditoría',
+    'certificates_active_web' => 'Portal Web (HTTPS :443)',
+    'certificates_active_telephony' => 'Telefonía (SIP TLS y WebRTC)',
+    'certificates_active_badge' => 'Activo',
+    'certificates_no_certificates' => 'No hay certificados instalados todavía.',
 ];
+

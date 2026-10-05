@@ -1,0 +1,21 @@
+{
+    "$schema": "../../resources/schemas/module.json",
+    "name": "certificates",
+    "version": "1.0.0",
+    "namespace": "Modules\\Certificates",
+    "display_name": "Certificates",
+    "description": "HTTPS, SIP TLS, and WebRTC WSS certificate management",
+    "category": "System",
+    "required": false,
+    "protected": false,
+    "priority": 0,
+    "providers": [
+        "Modules\\Certificates\\Providers\\ModuleServiceProvider"
+    ],
+    "requirements": {
+        "php": ">=8.3",
+        "laravel": ">=13.0",
+        "modules": [],
+        "packages": []
+    }
+}

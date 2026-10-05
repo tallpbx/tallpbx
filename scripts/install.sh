@@ -817,6 +817,11 @@ fi
 # traffic remains fully operational.
 run_step "Security & Firewall (nftables)" resources/security.sh
 
+# Configure host-level certificate directories, the bounded certificate helper,
+# and sudoers permissions for TLS management across Web (Nginx) and Telephony (FreeSWITCH).
+run_step "Certificate Management & TLS" resources/certificates.sh
+
+
 # Reconcile source and generated-file permissions after installer re-runs.
 if [ -f /var/www/tallpbx/artisan ]; then
     (cd /var/www/tallpbx && php artisan permissions:repair --scope=full)

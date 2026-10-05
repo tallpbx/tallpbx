@@ -1,0 +1,24 @@
+{
+    "name": "tallpbx/module-certificates",
+    "type": "tallpbx-module",
+    "description": "",
+    "require": {
+        "php": ">=8.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Certificates\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\Certificates\\Providers\\ModuleServiceProvider"
+            ]
+        },
+        "tallpbx": {
+            "module": "certificates"
+        }
+    },
+    "version": "1.0.0"
+}

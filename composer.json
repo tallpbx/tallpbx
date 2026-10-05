@@ -72,6 +72,10 @@
         },
         {
             "type": "path",
+            "url": "app-modules/certificates"
+        },
+        {
+            "type": "path",
             "url": "app-modules/click-to-call"
         },
         {
@@ -272,6 +276,7 @@
         "tallpbx/module-call-flows": "*",
         "tallpbx/module-call-forwards": "*",
         "tallpbx/module-call-recordings": "*",
+        "tallpbx/module-certificates": "*",
         "tallpbx/module-click-to-call": "*",
         "tallpbx/module-conference-centers": "*",
         "tallpbx/module-conferences": "*",

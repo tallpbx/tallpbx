@@ -1,0 +1,479 @@
+#!/bin/bash
+# ==============================================================================
+# TallPBX Bounded Host Certificate Management Helper
+#
+# Purpose:
+# Executes privileged PKI operations on behalf of the TallPBX web management
+# interface (www-data): Let's Encrypt ACME challenges, OpenSSL certificate
+# generation, atomic Nginx SSL symlink deployment, and FreeSWITCH TLS bundle builds.
+#
+# Security Architecture:
+# - Strictly bounded interface: Only 'issue-letsencrypt-http', 'issue-letsencrypt-dns',
+#   'renew-letsencrypt', 'import-custom', 'generate-self-signed', 'deploy-web',
+#   'deploy-telephony', 'deploy-all', 'delete', 'version', and 'status' are allowed.
+# - Input validation: Domain names, storage identifiers, email addresses, and durations
+#   are rigorously validated with regular expressions before any command execution.
+# - Atomic deployment with automatic rollback: Nginx configuration is verified with
+#   'nginx -t' BEFORE reloading Nginx; symlinks are reverted immediately if syntax checks fail.
+# - Least Privilege: Private keys and certificates are stored under /etc/tallpbx/certs/
+#   with restrictive permissions (0600 keys, 0640 certs, 0750 directories).
+# ==============================================================================
+set -euo pipefail
+
+# Restrictive umask makes 0640 default for files, 0750 for directories
+umask 027
+
+HELPER_VERSION=1
+
+ACTION="${1:-}"
+
+# Strict regular expression matching valid FQDNs and wildcard domains
+DOMAIN_REGEX="^(\*\.)?([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
+
+# Strict regular expression matching safe storage identifiers (alphanumeric, dash, underscore)
+STORAGE_ID_REGEX="^[a-zA-Z0-9_-]{1,64}$"
+
+# Strict regular expression matching email addresses
+EMAIL_REGEX="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+
+# Strict regular expression matching positive integers (days)
+DAYS_REGEX="^[0-9]{1,5}$"
+
+# Base configuration paths
+CERTS_BASE_DIR="${TALLPBX_CERTS_DIR:-/etc/tallpbx/certs}"
+ACTIVE_CERT_DIR="${CERTS_BASE_DIR}/active"
+FREESWITCH_TLS_DIR="${TALLPBX_FS_TLS_DIR:-/etc/freeswitch/tls}"
+NGINX_SITE_CONF="${TALLPBX_NGINX_CONF:-/etc/nginx/sites-available/pbx}"
+
+# System binaries
+CERTBOT_BIN="${TALLPBX_CERTBOT_BIN:-/usr/bin/certbot}"
+OPENSSL_BIN="${TALLPBX_OPENSSL_BIN:-/usr/bin/openssl}"
+NGINX_BIN="${TALLPBX_NGINX_BIN:-/usr/sbin/nginx}"
+
+validate_domain() {
+    local domain="$1"
+    if [[ ! "$domain" =~ $DOMAIN_REGEX ]]; then
+        echo "ERROR: Invalid domain format: '$domain'" >&2
+        exit 2
+    fi
+}
+
+validate_storage_id() {
+    local id="$1"
+    if [[ ! "$id" =~ $STORAGE_ID_REGEX ]]; then
+        echo "ERROR: Invalid storage identifier format: '$id'" >&2
+        exit 2
+    fi
+}
+
+validate_email() {
+    local email="$1"
+    if [[ ! "$email" =~ $EMAIL_REGEX ]]; then
+        echo "ERROR: Invalid email format: '$email'" >&2
+        exit 2
+    fi
+}
+
+ensure_certs_dir() {
+    if [ ! -d "$CERTS_BASE_DIR" ]; then
+        mkdir -p "$CERTS_BASE_DIR"
+        chown root:www-data "$CERTS_BASE_DIR"
+        chmod 0750 "$CERTS_BASE_DIR"
+    fi
+}
+
+case "$ACTION" in
+    version)
+        echo "tallpbx-cert-helper-version: $HELPER_VERSION"
+        ;;
+
+    issue-letsencrypt-http)
+        DOMAIN="${2:-}"
+        EMAIL="${3:-}"
+        STAGING="${4:-false}"
+
+        validate_domain "$DOMAIN"
+        validate_email "$EMAIL"
+
+        ensure_certs_dir
+        TARGET_DIR="${CERTS_BASE_DIR}/${DOMAIN}"
+        mkdir -p "$TARGET_DIR"
+
+        CERTBOT_ARGS=(
+            certonly
+            --non-interactive
+            --agree-tos
+            --email "$EMAIL"
+            -d "$DOMAIN"
+        )
+
+        if [ "$STAGING" = "true" ] || [ "$STAGING" = "1" ]; then
+            CERTBOT_ARGS+=(--test-cert)
+        fi
+
+        # Use webroot challenge pointing to /var/www/html/.well-known/acme-challenge
+        mkdir -p /var/www/html/.well-known/acme-challenge
+        CERTBOT_ARGS+=(--webroot -w /var/www/html)
+
+        "$CERTBOT_BIN" "${CERTBOT_ARGS[@]}"
+
+        # Copy issued certificate files into target storage identifier
+        LE_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+        if [ -f "${LE_LIVE_DIR}/fullchain.pem" ] && [ -f "${LE_LIVE_DIR}/privkey.pem" ]; then
+            cp -L "${LE_LIVE_DIR}/fullchain.pem" "${TARGET_DIR}/fullchain.pem"
+            cp -L "${LE_LIVE_DIR}/privkey.pem" "${TARGET_DIR}/privkey.pem"
+            cp -L "${LE_LIVE_DIR}/cert.pem" "${TARGET_DIR}/cert.pem" 2>/dev/null || true
+            cp -L "${LE_LIVE_DIR}/chain.pem" "${TARGET_DIR}/chain.pem" 2>/dev/null || true
+
+            chown -R root:www-data "$TARGET_DIR"
+            chmod 0750 "$TARGET_DIR"
+            chmod 0640 "${TARGET_DIR}"/*.pem
+            chmod 0600 "${TARGET_DIR}/privkey.pem"
+
+            echo "SUCCESS: Issued Let's Encrypt certificate for $DOMAIN"
+        else
+            echo "ERROR: Certificate files not found in ${LE_LIVE_DIR} after certbot run" >&2
+            exit 3
+        fi
+        ;;
+
+    issue-letsencrypt-dns)
+        DOMAIN="${2:-}"
+        EMAIL="${3:-}"
+        CREDS_FILE="${4:-}"
+        WILDCARD="${5:-false}"
+        STAGING="${6:-false}"
+
+        validate_domain "$DOMAIN"
+        validate_email "$EMAIL"
+
+        if [ ! -f "$CREDS_FILE" ]; then
+            echo "ERROR: DNS credentials file not found: '$CREDS_FILE'" >&2
+            exit 4
+        fi
+
+        ensure_certs_dir
+        TARGET_DIR="${CERTS_BASE_DIR}/${DOMAIN}"
+        mkdir -p "$TARGET_DIR"
+
+        CERTBOT_ARGS=(
+            certonly
+            --non-interactive
+            --agree-tos
+            --email "$EMAIL"
+            --dns-cloudflare
+            --dns-cloudflare-credentials "$CREDS_FILE"
+            --dns-cloudflare-propagation-seconds 30
+        )
+
+        if [ "$WILDCARD" = "true" ] || [ "$WILDCARD" = "1" ]; then
+            CERTBOT_ARGS+=(-d "$DOMAIN" -d "*.$DOMAIN")
+        else
+            CERTBOT_ARGS+=(-d "$DOMAIN")
+        fi
+
+        if [ "$STAGING" = "true" ] || [ "$STAGING" = "1" ]; then
+            CERTBOT_ARGS+=(--test-cert)
+        fi
+
+        "$CERTBOT_BIN" "${CERTBOT_ARGS[@]}"
+
+        # Remove temporary credentials file for security
+        rm -f "$CREDS_FILE" 2>/dev/null || true
+
+        LE_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+        if [ -f "${LE_LIVE_DIR}/fullchain.pem" ] && [ -f "${LE_LIVE_DIR}/privkey.pem" ]; then
+            cp -L "${LE_LIVE_DIR}/fullchain.pem" "${TARGET_DIR}/fullchain.pem"
+            cp -L "${LE_LIVE_DIR}/privkey.pem" "${TARGET_DIR}/privkey.pem"
+            cp -L "${LE_LIVE_DIR}/cert.pem" "${TARGET_DIR}/cert.pem" 2>/dev/null || true
+            cp -L "${LE_LIVE_DIR}/chain.pem" "${TARGET_DIR}/chain.pem" 2>/dev/null || true
+
+            chown -R root:www-data "$TARGET_DIR"
+            chmod 0750 "$TARGET_DIR"
+            chmod 0640 "${TARGET_DIR}"/*.pem
+            chmod 0600 "${TARGET_DIR}/privkey.pem"
+
+            echo "SUCCESS: Issued Let's Encrypt DNS certificate for $DOMAIN"
+        else
+            echo "ERROR: Certificate files not found in ${LE_LIVE_DIR} after certbot run" >&2
+            exit 3
+        fi
+        ;;
+
+    renew-letsencrypt)
+        DOMAIN="${2:-}"
+        validate_domain "$DOMAIN"
+
+        "$CERTBOT_BIN" renew --cert-name "$DOMAIN" --non-interactive
+
+        TARGET_DIR="${CERTS_BASE_DIR}/${DOMAIN}"
+        LE_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+        if [ -d "$TARGET_DIR" ] && [ -f "${LE_LIVE_DIR}/fullchain.pem" ]; then
+            cp -L "${LE_LIVE_DIR}/fullchain.pem" "${TARGET_DIR}/fullchain.pem"
+            cp -L "${LE_LIVE_DIR}/privkey.pem" "${TARGET_DIR}/privkey.pem"
+            chmod 0640 "${TARGET_DIR}"/*.pem
+            chmod 0600 "${TARGET_DIR}/privkey.pem"
+            echo "SUCCESS: Renewed Let's Encrypt certificate for $DOMAIN"
+        else
+            echo "ERROR: Target directory or live renewal directory not found for $DOMAIN" >&2
+            exit 5
+        fi
+        ;;
+
+    import-custom)
+        STORAGE_ID="${2:-}"
+        PENDING_CERT="${3:-}"
+        PENDING_KEY="${4:-}"
+        PENDING_CHAIN="${5:-}"
+
+        validate_storage_id "$STORAGE_ID"
+
+        if [ ! -f "$PENDING_CERT" ] || [ ! -f "$PENDING_KEY" ]; then
+            echo "ERROR: Pending certificate or key file not found" >&2
+            exit 6
+        fi
+
+        # Verify cryptographic modulus match before moving
+        CERT_MOD="$("$OPENSSL_BIN" x509 -noout -modulus -in "$PENDING_CERT" 2>/dev/null || true)"
+        KEY_MOD="$("$OPENSSL_BIN" rsa -noout -modulus -in "$PENDING_KEY" 2>/dev/null || true)"
+
+        if [ -z "$CERT_MOD" ] || [ -z "$KEY_MOD" ] || [ "$CERT_MOD" != "$KEY_MOD" ]; then
+            echo "ERROR: Certificate public key does not match private key modulus" >&2
+            exit 7
+        fi
+
+        ensure_certs_dir
+        TARGET_DIR="${CERTS_BASE_DIR}/${STORAGE_ID}"
+        mkdir -p "$TARGET_DIR"
+
+        mv "$PENDING_CERT" "${TARGET_DIR}/fullchain.pem"
+        mv "$PENDING_KEY" "${TARGET_DIR}/privkey.pem"
+
+        if [ -n "$PENDING_CHAIN" ] && [ -f "$PENDING_CHAIN" ]; then
+            mv "$PENDING_CHAIN" "${TARGET_DIR}/chain.pem"
+            # Append intermediate chain to fullchain if not already appended
+            cat "${TARGET_DIR}/chain.pem" >> "${TARGET_DIR}/fullchain.pem"
+        fi
+
+        chown -R root:www-data "$TARGET_DIR"
+        chmod 0750 "$TARGET_DIR"
+        chmod 0640 "${TARGET_DIR}"/*.pem
+        chmod 0600 "${TARGET_DIR}/privkey.pem"
+
+        echo "SUCCESS: Imported custom certificate as $STORAGE_ID"
+        ;;
+
+    generate-self-signed)
+        STORAGE_ID="${2:-}"
+        COMMON_NAME="${3:-}"
+        DAYS="${4:-365}"
+        SAN_CSV="${5:-}"
+
+        validate_storage_id "$STORAGE_ID"
+        validate_domain "$COMMON_NAME"
+
+        if [[ ! "$DAYS" =~ $DAYS_REGEX ]]; then
+            echo "ERROR: Invalid days duration: '$DAYS'" >&2
+            exit 8
+        fi
+
+        ensure_certs_dir
+        TARGET_DIR="${CERTS_BASE_DIR}/${STORAGE_ID}"
+        mkdir -p "$TARGET_DIR"
+
+        # Generate OpenSSL config with SANs
+        CONF_TMP="$(mktemp /tmp/tallpbx-openssl-XXXXXX.cnf)"
+        cat > "$CONF_TMP" <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = $COMMON_NAME
+O = TallPBX Self-Signed
+OU = PBX Telephony
+
+[v3_req]
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = $COMMON_NAME
+EOF
+
+        # Add optional SAN entries from CSV
+        if [ -n "$SAN_CSV" ]; then
+            INDEX=2
+            IFS=',' read -ra SANS <<< "$SAN_CSV"
+            for SAN in "${SANS[@]}"; do
+                SAN="$(echo "$SAN" | xargs)"
+                if [[ "$SAN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    echo "IP.$INDEX = $SAN" >> "$CONF_TMP"
+                elif [[ "$SAN" =~ $DOMAIN_REGEX ]]; then
+                    echo "DNS.$INDEX = $SAN" >> "$CONF_TMP"
+                fi
+                INDEX=$((INDEX + 1))
+            done
+        fi
+
+        "$OPENSSL_BIN" req -x509 -nodes -days "$DAYS" -newkey rsa:2048 \
+            -keyout "${TARGET_DIR}/privkey.pem" \
+            -out "${TARGET_DIR}/fullchain.pem" \
+            -config "$CONF_TMP" 2>/dev/null
+
+        rm -f "$CONF_TMP"
+
+        cp "${TARGET_DIR}/fullchain.pem" "${TARGET_DIR}/cert.pem" 2>/dev/null || true
+
+        chown -R root:www-data "$TARGET_DIR"
+        chmod 0750 "$TARGET_DIR"
+        chmod 0640 "${TARGET_DIR}"/*.pem
+        chmod 0600 "${TARGET_DIR}/privkey.pem"
+
+        echo "SUCCESS: Generated self-signed certificate for $COMMON_NAME in $STORAGE_ID"
+        ;;
+
+    deploy-web)
+        STORAGE_ID="${2:-}"
+        validate_storage_id "$STORAGE_ID"
+
+        TARGET_DIR="${CERTS_BASE_DIR}/${STORAGE_ID}"
+        if [ ! -f "${TARGET_DIR}/fullchain.pem" ] || [ ! -f "${TARGET_DIR}/privkey.pem" ]; then
+            echo "ERROR: Certificate files missing in $TARGET_DIR" >&2
+            exit 9
+        fi
+
+        ensure_certs_dir
+
+        # Record previous symlink target for atomic rollback
+        PREV_TARGET=""
+        if [ -L "$ACTIVE_CERT_DIR" ]; then
+            PREV_TARGET="$(readlink "$ACTIVE_CERT_DIR")"
+        fi
+
+        # Atomically update symlink via temporary symlink
+        TMP_LINK="${ACTIVE_CERT_DIR}.tmp.$$"
+        ln -sfn "$TARGET_DIR" "$TMP_LINK"
+        mv -Tf "$TMP_LINK" "$ACTIVE_CERT_DIR"
+
+        # Validate Nginx syntax
+        if ! "$NGINX_BIN" -t 2>/dev/null; then
+            echo "WARNING: Nginx configuration test failed with new certificate. Rolling back..." >&2
+            if [ -n "$PREV_TARGET" ]; then
+                ln -sfn "$PREV_TARGET" "$TMP_LINK"
+                mv -Tf "$TMP_LINK" "$ACTIVE_CERT_DIR"
+            else
+                rm -f "$ACTIVE_CERT_DIR"
+            fi
+            echo "ERROR: Nginx syntax check failed. Certificate was NOT deployed." >&2
+            exit 10
+        fi
+
+        # Reload Nginx
+        systemctl reload nginx 2>/dev/null || true
+
+        # Ensure secure cookie in .env
+        ENV_FILE="/var/www/tallpbx/.env"
+        if [ -f "$ENV_FILE" ]; then
+            if grep -q "^SESSION_SECURE_COOKIE=" "$ENV_FILE"; then
+                sed -i 's/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=true/' "$ENV_FILE"
+            else
+                echo "SESSION_SECURE_COOKIE=true" >> "$ENV_FILE"
+            fi
+        fi
+
+        echo "SUCCESS: Deployed certificate $STORAGE_ID to Nginx Web"
+        ;;
+
+    deploy-telephony)
+        STORAGE_ID="${2:-}"
+        validate_storage_id "$STORAGE_ID"
+
+        TARGET_DIR="${CERTS_BASE_DIR}/${STORAGE_ID}"
+        if [ ! -f "${TARGET_DIR}/fullchain.pem" ] || [ ! -f "${TARGET_DIR}/privkey.pem" ]; then
+            echo "ERROR: Certificate files missing in $TARGET_DIR" >&2
+            exit 9
+        fi
+
+        mkdir -p "$FREESWITCH_TLS_DIR"
+
+        # FreeSWITCH agent.pem is combined cert + privkey
+        AGENT_TMP="${FREESWITCH_TLS_DIR}/agent.pem.tmp.$$"
+        cat "${TARGET_DIR}/fullchain.pem" "${TARGET_DIR}/privkey.pem" > "$AGENT_TMP"
+        mv -f "$AGENT_TMP" "${FREESWITCH_TLS_DIR}/agent.pem"
+
+        # cafile.pem is chain or fullchain
+        if [ -f "${TARGET_DIR}/chain.pem" ]; then
+            cp "${TARGET_DIR}/chain.pem" "${FREESWITCH_TLS_DIR}/cafile.pem"
+        else
+            cp "${TARGET_DIR}/fullchain.pem" "${FREESWITCH_TLS_DIR}/cafile.pem"
+        fi
+
+        # wss.pem and dtls-srtp.pem
+        cp -f "${FREESWITCH_TLS_DIR}/agent.pem" "${FREESWITCH_TLS_DIR}/wss.pem"
+        cp -f "${FREESWITCH_TLS_DIR}/agent.pem" "${FREESWITCH_TLS_DIR}/dtls-srtp.pem"
+
+        chown -R freeswitch:freeswitch "$FREESWITCH_TLS_DIR" 2>/dev/null || true
+        chmod 0750 "$FREESWITCH_TLS_DIR" 2>/dev/null || true
+        chmod 0600 "${FREESWITCH_TLS_DIR}"/*.pem 2>/dev/null || true
+
+        # Reload Sofia SIP profiles if FreeSWITCH is running
+        if command -v fs_cli >/dev/null 2>&1; then
+            fs_cli -x "sofia profile internal restart" 2>/dev/null || true
+            fs_cli -x "sofia profile external restart" 2>/dev/null || true
+        fi
+
+        echo "SUCCESS: Deployed certificate $STORAGE_ID to FreeSWITCH Telephony"
+        ;;
+
+    deploy-all)
+        STORAGE_ID="${2:-}"
+        "$0" deploy-web "$STORAGE_ID"
+        "$0" deploy-telephony "$STORAGE_ID"
+        echo "SUCCESS: Deployed certificate $STORAGE_ID to all services"
+        ;;
+
+    delete)
+        STORAGE_ID="${2:-}"
+        validate_storage_id "$STORAGE_ID"
+
+        TARGET_DIR="${CERTS_BASE_DIR}/${STORAGE_ID}"
+        if [ ! -d "$TARGET_DIR" ]; then
+            echo "ERROR: Certificate directory not found: $TARGET_DIR" >&2
+            exit 11
+        fi
+
+        # Prevent deleting actively deployed web certificate
+        if [ -L "$ACTIVE_CERT_DIR" ]; then
+            ACTIVE_TARGET="$(readlink "$ACTIVE_CERT_DIR" 2>/dev/null || true)"
+            if [ "$ACTIVE_TARGET" = "$TARGET_DIR" ]; then
+                echo "ERROR: Cannot delete certificate actively serving Nginx Web. Switch active certificate first." >&2
+                exit 12
+            fi
+        fi
+
+        rm -rf "$TARGET_DIR"
+        echo "SUCCESS: Deleted certificate $STORAGE_ID"
+        ;;
+
+    status)
+        ACTIVE_WEB=""
+        if [ -L "$ACTIVE_CERT_DIR" ]; then
+            ACTIVE_WEB="$(basename "$(readlink "$ACTIVE_CERT_DIR")")"
+        fi
+
+        TELEPHONY_ACTIVE=false
+        if [ -f "${FREESWITCH_TLS_DIR}/agent.pem" ] && [ -f "${FREESWITCH_TLS_DIR}/wss.pem" ]; then
+            TELEPHONY_ACTIVE=true
+        fi
+
+        printf '{"active_web":"%s","telephony_active":%s}\n' "$ACTIVE_WEB" "$TELEPHONY_ACTIVE"
+        ;;
+
+    *)
+        echo "Usage: $0 {version|issue-letsencrypt-http|issue-letsencrypt-dns|renew-letsencrypt|import-custom|generate-self-signed|deploy-web|deploy-telephony|deploy-all|delete|status}" >&2
+        exit 1
+        ;;
+esac

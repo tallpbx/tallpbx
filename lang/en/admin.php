@@ -1558,4 +1558,20 @@ return [
     'security_rate_limit_pps' => 'Max Rate (packets/sec)',
     'security_rate_burst_packets' => 'Burst Allowance (packets)',
     'security_icmp_dual_stack_note' => 'Applies to IPv4 and IPv6 ICMP echo-requests. Essential IPv6 Neighbor Discovery (ND) and Router Advertisements are always preserved.',
+
+    // ─── Certificates Module ─────────────────────────────────────────────
+    'certificates' => 'HTTPS & TLS Certificates',
+    'certificates_title' => 'Certificate Manager',
+    'certificates_description' => 'Manage SSL/TLS encryption for web portals, SIP signaling, and WebRTC telephony.',
+    'certificates_inventory' => 'Inventory',
+    'certificates_lets_encrypt' => 'Let\'s Encrypt',
+    'certificates_custom' => 'Custom Import',
+    'certificates_self_signed' => 'Self-Signed',
+    'certificates_dnsvault' => 'DNS Vault',
+    'certificates_audit_logs' => 'Audit Logs',
+    'certificates_active_web' => 'Web Portal (HTTPS :443)',
+    'certificates_active_telephony' => 'Telephony (SIP TLS & WebRTC)',
+    'certificates_active_badge' => 'Active',
+    'certificates_no_certificates' => 'No certificates installed yet.',
 ];
+

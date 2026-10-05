@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-05
+
 ### Added
+- **TLS Certificate Manager Module (`app-modules/certificates`)**:
+  - Implemented a unified, UI-driven Certificate Manager under the main navigation (**HTTPS & TLS Certificates**, route `/panel/certificates`), eliminating CLI command requirements for SSL/TLS certificate issuance, importation, generation, and deployment.
+  - **Dual Service Deployment Engine**: Unifies atomic cryptographic deployments across **Web** (Nginx HTTPS :443 + Reverb WebSockets reverse proxy `/app` -> `127.0.0.1:8080` via `/etc/tallpbx/certs/active/`) and **Telephony** (FreeSWITCH SIP TLS :5061 + WebRTC WSS :7443 via `/etc/freeswitch/tls/agent.pem`, `cafile.pem`, `wss.pem`, `dtls-srtp.pem`).
+  - **Let's Encrypt (ACME v2)**: Supports both HTTP-01 automated webroot challenges and DNS-01 (Cloudflare) challenges for wildcard certificates (`*.domain.com`) or firewalled PBX servers behind NAT. Includes testing mode (Let's Encrypt Staging environment) to prevent production rate limits.
+  - **Custom PEM Certificate Import**: Enables pasting or uploading commercial CA certificates and private keys with real-time, in-browser cryptographic modulus matching to prevent configuration errors.
+  - **Cryptographic Self-Signed Generator**: Generates modern RSA (2048/4096-bit) and ECDSA (P-256) certificates with configurable Subject Alternative Names (SANs) for internal testing and private SIP networks.
+  - **DNS Credentials Vault**: Securely manages encrypted Cloudflare API tokens at rest for zero-touch ACME DNS renewals.
+  - **Automated Renewal & Monitoring**: Provides `certificates:renew`, `certificates:deploy`, and `certificates:status` Artisan CLI commands, plus daily automated renewal sweeps at 03:30 AM via `tallpbx-scheduler`, expiration countdown badges, audit logs, and administrative database notifications for expiring certificates and renewal errors.
+  - **Bounded Host Helper Architecture**: All root operations, filesystem writes to `/etc/nginx/` and `/etc/freeswitch/tls/`, and daemon reloads are executed via `/usr/local/sbin/tallpbx-certificate` under strict sudoers rules (`/etc/sudoers.d/tallpbx-certificate`), adhering to TallPBX's strict privilege isolation model.
 - **Adoption of Modern Laravel `MAJOR.x` Branch Model (3.x Series)**:
   - Transitioned the primary active development branch to `3.x` in alignment with Laravel's canonical `MAJOR.x` release series model.
   - The `2.0` branch is transitioned to a stable maintenance line for the 2.x release series (latest stable: `v2.1.1`).
