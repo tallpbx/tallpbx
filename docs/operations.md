@@ -380,3 +380,53 @@ fs_cli -x "load mod_say_es"
 fs_cli -x "reloadxml"
 ```
 
+## FreeSWITCH Session Rate (Capacity Tuning)
+
+FreeSWITCH limits the rate of new session creation via the `sessions-per-second` setting. This protects server CPU and MariaDB from sudden call bursts, dialing storms, or denial-of-service traffic:
+
+* **Default**: `60` sessions per second.
+* **Call setup impact**: An internal extension-to-extension call or bridged outbound call uses two legs (inbound and outbound), meaning `60` sessions/second accommodates roughly 30 concurrent call initiations per second.
+* **Symptoms when throttled**: When call attempt rates exceed the configured limit, FreeSWITCH deliberately rejects new sessions with `SIP/2.0 503 Maximum Calls In Progress`.
+
+### 1. Change the Session Rate Permanently (Recommended)
+
+In TallPBX, core FreeSWITCH switch parameters (`switch.conf.xml`) are served dynamically via Laravel's XML handler (`mod_xml_curl`):
+
+1. Edit `/var/www/tallpbx/.env` and configure `FS_SESSIONS_PER_SECOND`:
+   ```dotenv
+   FS_SESSIONS_PER_SECOND=120
+   ```
+
+2. Clear application caches and reload the FreeSWITCH XML configuration:
+   ```bash
+   cd /var/www/tallpbx
+   php artisan optimize:clear && php artisan optimize
+   fs_cli -x "reloadxml"
+   ```
+
+> [!NOTE]
+> If you maintain static FreeSWITCH XML files on disk instead of `mod_xml_curl`, update `/etc/freeswitch/autoload_configs/switch.conf.xml`:
+> ```xml
+> <param name="sessions-per-second" value="120"/>
+> ```
+
+### 2. Change the Session Rate Dynamically (Without Restart)
+
+You can check and adjust the session rate immediately at runtime via `fs_cli` without dropping active calls or restarting FreeSWITCH:
+
+* **Check current rate and peak utilization**:
+  ```bash
+  fs_cli -x "fsctl sps"
+  ```
+  Or check real-time session statistics:
+  ```bash
+  fs_cli -x "status" | grep -i "sessions per sec"
+  ```
+
+* **Change the rate immediately**:
+  ```bash
+  fs_cli -x "fsctl sps 120"
+  ```
+  *(Note: Dynamic `fsctl sps` adjustments take effect instantly in memory. To ensure the new rate persists across service restarts, also update `FS_SESSIONS_PER_SECOND` in `.env`.)*
+
+

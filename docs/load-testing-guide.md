@@ -732,6 +732,11 @@ capacity-tuning change and retest with CPU, memory, network counters, and
 SIPp failure reasons captured. A higher value removes the safety throttle
 but does not create more CPU.
 
+To adjust the session rate limit:
+- **Permanently in `.env`**: Configure `FS_SESSIONS_PER_SECOND=120` in `/var/www/tallpbx/.env`, then run `php artisan optimize:clear && php artisan optimize` and `fs_cli -x "reloadxml"`.
+- **Dynamically during test runs**: Set it immediately in memory without restart using `fs_cli -x "fsctl sps 120"`.
+- See [docs/operations.md](operations.md#freeswitch-session-rate-capacity-tuning) for full details.
+
 ## Seed Data
 
 Both tests use the same synthetic tenant tool, with different options. The
@@ -922,6 +927,7 @@ FS_HIREDIS_LIMIT_ENABLED=false
 FS_HIREDIS_LIMIT_MAX=100000
 FS_HIREDIS_MARKER_ENABLED=false
 FS_LOG_LEVEL=debug
+FS_SESSIONS_PER_SECOND=60
 ```
 
 What each setting does:
@@ -966,6 +972,9 @@ What each setting does:
 - `FS_LOG_LEVEL=debug` keeps detailed FreeSWITCH logs while
   the PBX is still being validated. Lower it at runtime for measured
   capacity runs (see the FreeSWITCH log-level experiments).
+- `FS_SESSIONS_PER_SECOND=60` sets FreeSWITCH's core new-session creation cap
+  (allowing roughly 30 two-leg calls/sec). Raise this to 120 or higher when load
+  testing higher call setup rates (or adjust dynamically with `fs_cli -x "fsctl sps <value>"`).
 - Redis is the recommended default cache and session store. File cache or
   session drivers can become part of the measured latency under
   concurrency, and database-backed cache or sessions add DB traffic to the
@@ -1573,7 +1582,7 @@ Findings from empirical datacenter and lab benchmark runs:
 - **Dedicated CPU Headroom (>4x Multiplier)**: Moving to 4 dedicated vCPUs with 24 pre-forked static workers completely eliminates worker starvation, multiplying throughput to 65+ req/sec, capping tail latency under 450 ms, and enabling 15–20 calls/sec sustained (bursting cleanly to 30 CPS with zero drops across 2,110 calls).
 - **Memory Scaling**: Memory alone does not raise throughput on single-core instances (1 vCPU / 2 GiB performed similarly to 1 vCPU / 1 GiB), while adding dedicated compute cores provides immediate linear scaling.
 - **FreeSWITCH Switch Logging**: Lowering FreeSWITCH switch logging from `debug` to `notice` reduces setup latency and prevents log-disk I/O bottlenecks during high-throughput runs.
-- **FreeSWITCH `sessions-per-second`**: For high-rate SIPp runs, always configure FreeSWITCH `sessions-per-second=60` (or higher) to prevent the default safety cap (`30`) from dropping two-leg calls near 15 calls/sec.
+- **FreeSWITCH `sessions-per-second`**: For high-rate SIPp runs, always configure FreeSWITCH `sessions-per-second=60` (or higher via `FS_SESSIONS_PER_SECOND` in `.env` or `fs_cli -x "fsctl sps <val>"`) to prevent the stock safety cap (`30`) from dropping two-leg calls near 15 calls/sec.
 
 For current benchmark runs, keep metrics collection simple and repeatable: use
 the JSON report from the XML test plus the host sampler instead of
@@ -2146,8 +2155,10 @@ For beta or release candidates:
 - Direct SIPp load mostly stresses FreeSWITCH and network behavior; it does
   not isolate Laravel XML handler performance the way the XML test does.
 - For high-rate SIPp capacity runs, confirm FreeSWITCH `sessions-per-second`
-  before interpreting failures. The project default is `60`; the stock
-  FreeSWITCH default of `30` can reject two-leg extension calls near 15
+  before interpreting failures. The project default is `60` (configured via
+  `FS_SESSIONS_PER_SECOND` in `.env` or dynamically via `fs_cli -x "fsctl sps <val>"`;
+  see [docs/operations.md](operations.md#freeswitch-session-rate-capacity-tuning));
+  the stock FreeSWITCH default of `30` can reject two-leg extension calls near 15
   offered calls/sec with `SIP/2.0 503 Maximum Calls In Progress`.
 - The XML test intentionally isolates Laravel dialplan XML generation from
   FreeSWITCH SIP/media handling; its requests/sec result does not say how

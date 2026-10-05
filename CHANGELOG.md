@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Elevated Laravel Boost Model Context Protocol (MCP) tooling priority across all agent configurations (`AGENTS.md`, `.cursorrules`, `.github/copilot-instructions.md`, `CLAUDE.md`, and `.agents/skills/tallpbx-custom/SKILL.md`).
   - Standardized instructions across all harnesses (Antigravity, Cursor, GitHub Copilot, Claude Code, and OpenCode) to prefer Boost MCP tools (`application-info`, `database-schema`, `database-query`, `search-docs`, `last-error`, `browser-logs`) over raw shell commands, manual file grepping, or Tinker scripts.
 
+- **FreeSWITCH Session Rate Capacity Tuning Guide**:
+  - Added a dedicated operations guide in `docs/operations.md` explaining how to check and adjust FreeSWITCH's `sessions-per-second` limit both permanently via `FS_SESSIONS_PER_SECOND` in `.env` and dynamically at runtime via `fs_cli` (`fsctl sps`), with cross-linking from `INSTALL.md`.
+
 ### Changed
 - **Installation Guide Streamlining (`INSTALL.md`)**:
   - Removed redundant standalone "Demo Data and Development Tooling" section, consolidating the development environment behavior and production clean-data flags directly into the CLI options block.

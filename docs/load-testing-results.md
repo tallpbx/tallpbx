@@ -158,7 +158,7 @@ FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. 
 - **Do not size calls from XML numbers.** A complete call adds SIP signaling, a second call leg, FreeSWITCH state, and teardown work that the XML test never touches.
 - **Empirical call-rate expectations:** 1 vCPU ≈ 3 calls/sec sustained; 2 vCPU / 2 GiB ≈ 5–8 calls/sec sustained (10 CPS burst ceiling); 4 vCPU Dedicated / 16 GiB ≈ 15–20 calls/sec sustained (30 CPS burst ceiling with 100% completion across 2,110 calls).
 - **Plan for headroom.** The measured ceilings were reached at 95–98% CPU busy. If a tier runs above roughly 90% CPU, do not plan production capacity at that tier.
-- **Check `sessions-per-second` before blaming hardware.** The project default of 60 allows roughly 30 two-leg calls/sec; a stock value of 30 rejects calls near 15 two-leg calls/sec with `503 Maximum Calls In Progress`.
+- **Check `sessions-per-second` before blaming hardware.** The project default of 60 allows roughly 30 two-leg calls/sec; a stock value of 30 rejects calls near 15 two-leg calls/sec with `503 Maximum Calls In Progress`. Adjust it permanently via `FS_SESSIONS_PER_SECOND` in `.env` or dynamically using `fs_cli -x "fsctl sps <value>"` (see [docs/operations.md](operations.md#freeswitch-session-rate-capacity-tuning)).
 - **Media capacity is separate.** These numbers cover call setup, answer, and teardown. Continuous RTP audio quality and media capacity need a dedicated RTP-enabled concurrent-call test.
 - **Re-run the hardware ladder with new test data before quoting numbers to customers.** The values in this document are empirical references kept for review.
 

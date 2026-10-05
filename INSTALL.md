@@ -250,9 +250,14 @@ values in `.env`, run `php artisan optimize:clear && php artisan optimize`.
 ### FreeSWITCH Session Rate
 
 Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per
-second. This is a safety limit suitable for most servers; change it only after
-load testing shows that this specific limit is holding back a server with
-enough CPU, memory, and network capacity.
+second. This is a safety throttle suitable for most servers (allowing roughly
+30 two-leg calls per second); change it only after load testing shows that
+this specific limit is holding back a server with enough CPU, memory, and
+network capacity.
+
+To change the session rate permanently via `.env` or dynamically at runtime
+with `fs_cli`, see [FreeSWITCH Session Rate](docs/operations.md#freeswitch-session-rate-capacity-tuning)
+in the Operations guide.
 
 ### PHP-FPM Worker Sizing
 
