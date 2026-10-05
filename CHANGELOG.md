@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Standardized instructions across all harnesses (Antigravity, Cursor, GitHub Copilot, Claude Code, and OpenCode) to prefer Boost MCP tools (`application-info`, `database-schema`, `database-query`, `search-docs`, `last-error`, `browser-logs`) over raw shell commands, manual file grepping, or Tinker scripts.
 
 - **FreeSWITCH Session Rate Capacity Tuning Guide**:
-  - Added a dedicated operations guide in `docs/operations.md` explaining how to check and adjust FreeSWITCH's `sessions-per-second` limit both permanently via `FS_SESSIONS_PER_SECOND` in `.env` and dynamically at runtime via `fs_cli` (`fsctl sps`), with cross-linking from `INSTALL.md`.
+  - Added a dedicated operations guide in `docs/operations.md` explaining how to check and adjust FreeSWITCH's `sessions-per-second` limit both permanently via `FS_SESSIONS_PER_SECOND` in `.env` and dynamically at runtime via `fs_cli` (`fsctl sps`), clarifying that disk edits to `switch.conf.xml` are ignored due to TallPBX's dynamic XML handler (`mod_xml_curl`), with cross-linking from `INSTALL.md`.
 
 ### Changed
 - **Installation Guide Streamlining (`INSTALL.md`)**:

@@ -405,10 +405,7 @@ In TallPBX, core FreeSWITCH switch parameters (`switch.conf.xml`) are served dyn
    ```
 
 > [!NOTE]
-> If you maintain static FreeSWITCH XML files on disk instead of `mod_xml_curl`, update `/etc/freeswitch/autoload_configs/switch.conf.xml`:
-> ```xml
-> <param name="sessions-per-second" value="120"/>
-> ```
+> Do not edit `/etc/freeswitch/autoload_configs/switch.conf.xml` directly. Disk changes are ignored because TallPBX uses dynamic XML (`mod_xml_curl`) to generate and serve `switch.conf` directly from Laravel using `.env` settings.
 
 ### 2. Change the Session Rate Dynamically (Without Restart)
 
