@@ -131,10 +131,11 @@ To customize the installation, add options after `-s --`:
 # Pin the stable 2.0 release branch instead of the default 3.x:
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --ref 2.0
 
-# Skip the demo-data question (recommended for production):
+# Skip the demo-data question and install clean data (recommended for production):
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --no-demo
 
-# Install without demo data or development tooling (recommended for production):
+# Standard production install without demo data or development packages:
+# (Development mode configures APP_ENV=local and installs test/debug utilities)
 wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
 ```
 
@@ -192,18 +193,6 @@ mariadb tallpbx -e "UPDATE admins SET password = '$(php -r 'echo password_hash("
 > ```bash
 > mariadb tallpbx -e "SELECT id, name, email FROM admins;"
 > ```
-
-### Demo Data and Development Tooling
-
-The installer asks about two initial setup choices. For data, choose **Option 1 (Clean)**
-for an empty system ready for production, or **Option 2 (Demo)** to include sample
-extensions and call flows for testing. For system role, choose **Option 1 (Production)**
-for a standard phone system, or **Option 2 (Development)** if you are developing TallPBX itself.
-
-When it finishes, the installer prints the panel address. Open it in a browser
-and sign in with your administrator account. Development tooling also switches
-TallPBX to Laravel's local development mode; without it, production mode is
-used automatically.
 
 ### FreeSWITCH Sound Prompt Languages
 
