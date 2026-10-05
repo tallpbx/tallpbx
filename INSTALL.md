@@ -246,6 +246,9 @@ Keep `redis-server` running in production: if Redis is temporarily down the PBX
 keeps working, but dynamic login and ban counters pause until it returns — the
 kernel firewall and manual bans remain active. After changing cache or session
 values in `.env`, run `php artisan optimize:clear && php artisan optimize`.
+For XML gateway authentication and token configuration (`FS_XML_HANDLER_TOKEN`),
+see [FreeSWITCH XML Gateway Token](docs/operations.md#freeswitch-xml-gateway--security-token-mod_xml_curl)
+in the Operations guide.
 
 ### FreeSWITCH Session Rate
 
@@ -363,16 +366,8 @@ program first; your database and recordings are untouched.
 **Package install (recommended for most servers).** Faster to install and
 update, and installs the modules TallPBX needs for phones, voicemail,
 recordings, queues, music, and dynamic configuration. It requires a free
-SignalWire Personal Access Token — create one at https://signalwire.com under
-**Personal Access Tokens** (repo access). The installer configures FreeSWITCH
-to fetch its phone directory and call routing from the application. If you
-change `FS_XML_HANDLER_TOKEN` later, re-apply the configuration:
-
-```bash
-cd /var/www/tallpbx
-bash scripts/resources/freeswitch.sh --configure-only
-systemctl restart freeswitch
-```
+SignalWire Personal Access Token (PAT) for APT repository access — create one at
+https://signalwire.com under **Personal Access Tokens** (repo access).
 
 **Source build.** Only when you need to change FreeSWITCH itself or cannot use
 the SignalWire packages. No token is required, but compilation takes much

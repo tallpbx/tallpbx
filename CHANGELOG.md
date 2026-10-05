@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **FreeSWITCH Session Rate Capacity Tuning Guide**:
   - Added a dedicated operations guide in `docs/operations.md` explaining how to check and adjust FreeSWITCH's `sessions-per-second` limit both permanently via `FS_SESSIONS_PER_SECOND` in `.env` and dynamically at runtime via `fs_cli` (`fsctl sps`), clarifying that disk edits to `switch.conf.xml` are ignored due to TallPBX's dynamic XML handler (`mod_xml_curl`), with cross-linking from `INSTALL.md`.
+- **FreeSWITCH XML Gateway Token Documentation (`FS_XML_HANDLER_TOKEN`)**:
+  - Added dedicated documentation in `docs/operations.md` detailing the role, security function, and server storage locations of `FS_XML_HANDLER_TOKEN` (`/var/www/tallpbx/.env` and `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`), providing both automated helper and manual cut-and-paste rotation steps.
+  - Cleaned up Section 6 in `INSTALL.md` to remove the misplaced XML handler token snippet, keeping it focused on SignalWire APT repository tokens.
 
 ### Changed
 - **Installation Guide Streamlining (`INSTALL.md`)**:

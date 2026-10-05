@@ -426,4 +426,50 @@ You can check and adjust the session rate immediately at runtime via `fs_cli` wi
   ```
   *(Note: Dynamic `fsctl sps` adjustments take effect instantly in memory. To ensure the new rate persists across service restarts, also update `FS_SESSIONS_PER_SECOND` in `.env`.)*
 
+## FreeSWITCH XML Gateway & Security Token (mod_xml_curl)
+
+FreeSWITCH fetches its user directory (phone extensions, SIP passwords), dialplans (call routing), and core switch configuration dynamically from Laravel via `mod_xml_curl`. To prevent unauthorized HTTP access to phone credentials or dialplans, every lookup must include the shared secret token (`FS_XML_HANDLER_TOKEN`).
+
+### Where the Token is Stored on the Server
+
+The token is synchronized between two locations:
+
+1. **Laravel Application Configuration**:
+   * File: `/var/www/tallpbx/.env`
+   * Line: `FS_XML_HANDLER_TOKEN=<64-character-hex-secret>`
+
+2. **FreeSWITCH Dynamic XML Gateway Configuration**:
+   * File: `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`
+   * Line:
+     ```xml
+     <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
+     ```
+
+### Updating or Rotating the Token
+
+If you generate a new token or change `FS_XML_HANDLER_TOKEN` in `.env`:
+
+#### Option 1: Automated Configuration Helper (Recommended)
+
+Update the token in `/var/www/tallpbx/.env`, then run the resource configuration script to automatically update `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`:
+
+```bash
+cd /var/www/tallpbx
+php artisan optimize:clear
+bash scripts/resources/freeswitch.sh --configure-only
+systemctl restart freeswitch
+```
+
+#### Option 2: Manual Cut-and-Paste
+
+If editing configuration files by hand:
+1. Copy the secret token string from `FS_XML_HANDLER_TOKEN` in `/var/www/tallpbx/.env`.
+2. Edit `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and paste the token into the `gateway-url` parameter query string (`?token=YOUR_TOKEN`).
+3. Clear Laravel application caches and reload FreeSWITCH:
+   ```bash
+   php artisan optimize:clear
+   fs_cli -x "reloadxml"
+   ```
+
+
 
