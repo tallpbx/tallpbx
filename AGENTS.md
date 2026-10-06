@@ -98,7 +98,7 @@ command demonstration. Two production outages were caused this way:
 **Recovery reference** (use only during an actual lockout; full runbooks for humans:
 `docs/operations.md` → Recovering from a Firewall Lockout, `docs/security-architecture.md` → 9.3):
 - Restore loopback instantly, keeping every other rule: `nft insert rule inet tallpbx_filter input iif "lo" accept`
-- Restore one operator address: `nft insert rule inet tallpbx_filter input ip saddr <admin-ip> accept`
+- Restore one administrator address: `nft insert rule inet tallpbx_filter input ip saddr <admin-ip> accept`
 - Flip the chain's policy in place without flushing its rules: `nft 'chain inet tallpbx_filter input { policy accept; }'`
 - Last resort, removes every table and rule: `nft flush ruleset`
 - After any recovery, reload the application's ruleset from the Security Center (or

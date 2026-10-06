@@ -1,6 +1,6 @@
 # PBX SIP Load Testing & Benchmark Results
 
-Clear, real-world capacity guidance for administrators. This document records empirical results from the September 2026 cloud datacenter VPS benchmarks and provides hardware sizing guidance for system administrators.
+Clear, real-world capacity guidance for administrators. This document records benchmark results from cloud datacenter VPS tests and provides hardware sizing recommendations.
 
 > [!NOTE]
 > For the operational manual, lab topology setup, seeding instructions, and test runner options, see the companion **[SIP Load Testing Guide](load-testing-guide.md)**.
@@ -8,8 +8,8 @@ Clear, real-world capacity guidance for administrators. This document records em
 ## Contents
 
 - [Executive Summary & Hardware Sizing Matrix for Administrators](#executive-summary--hardware-sizing-matrix-for-administrators)
-  - [Empirical Datacenter Telephony Capacity Comparison (September 2026 Series)](#empirical-datacenter-telephony-capacity-comparison-september-2026-series)
-  - [Empirical Dialplan XML Handler Bottleneck Comparison](#empirical-dialplan-xml-handler-bottleneck-comparison)
+  - [Datacenter Telephony Capacity Comparison (September 2026)](#datacenter-telephony-capacity-comparison-september-2026)
+  - [Dialplan XML Routing Performance Comparison](#dialplan-xml-routing-performance-comparison)
   - [Production Sizing & Configuration Matrix](#production-sizing--configuration-matrix)
 - [Production Recommendations: XML Caching & PHP-FPM Worker Tuning](#production-recommendations-xml-caching--php-fpm-worker-tuning)
 - [Planning Rules](#planning-rules)
@@ -19,7 +19,7 @@ Clear, real-world capacity guidance for administrators. This document records em
   - [Cloud VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)](#cloud-vps-memory-scaled-1-vcpu--2-gib-ram)
   - [Cloud VPS: Dual-Core (2 vCPU / 2 GiB RAM)](#cloud-vps-dual-core-2-vcpu--2-gib-ram)
   - [Dedicated Cloud Node (4 vCPU / 16 GiB RAM Dedicated)](#dedicated-cloud-node-4-vcpu--16-gib-ram-dedicated)
-- [Live Call Capacity & Telephony Feature Parity (SIP Signaling)](#live-call-capacity--telephony-feature-parity-sip-signaling)
+- [Live Call Capacity & Feature Validation (SIP Signaling)](#live-call-capacity--feature-validation-sip-signaling)
   - [Cloud Datacenter VPS: Entry Baseline (1 vCPU / 1 GiB RAM)](#cloud-datacenter-vps-1-vcpu--1-gib-ram-baseline)
   - [Cloud Datacenter VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)](#cloud-datacenter-vps-memory-scaled-1-vcpu--2-gib-ram)
   - [Cloud Datacenter VPS: Dual-Core (2 vCPU / 2 GiB RAM)](#cloud-datacenter-vps-dual-core-2-vcpu--2-gib-ram)
@@ -29,26 +29,26 @@ Clear, real-world capacity guidance for administrators. This document records em
 
 ## Executive Summary & Hardware Sizing Matrix for Administrators
 
-### Empirical Datacenter Telephony Capacity Comparison (September 2026 Series)
+### Datacenter Telephony Capacity Comparison (September 2026)
 
-The table below summarizes empirical live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the September 2026 datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`FS_XML_HANDLER_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
+The table below summarizes live call capacity, setup latencies, and saturation limits across all four cloud VPS configurations evaluated in the datacenter benchmarking series. All live call signaling benchmarks were conducted under the recommended **Production Baseline cache policy** (`FS_XML_HANDLER_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile (`www.conf`) | Cache Policy (`.env`) | Sustained Call Setup Rate | Call Setup Latency (`p50` / `p95`) | Peak Call Capacity / Concurrency | Recommended Production Role |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic` (5 max) | Production (`TTL: 5s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 CPS saturation boundary) | Micro / Edge (1–10 extensions) |
+| **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic` (5 max) | Production (`TTL: 5s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 calls/sec saturation boundary) | Micro / Edge (1–10 extensions) |
 | **1 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 3 calls/sec | 276 ms / ~2.2s | 0 MiB swap; single-core compute bound | Small Branch (1–15 extensions) |
-| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 3–5 calls/sec<br>*(up to 8–10 CPS burst)* | ~1.1s (at 2 CPS)<br>~4.0s / ~9.5s (at 5 CPS)* | 10 CPS burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
-| **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Production (`TTL: 5s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 CPS burst ceiling (100% completion across 2,110 calls, 0 drops)** | **Mid-Market / Call Center (150–400+ extensions)** |
+| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 5s`) | 3–5 calls/sec<br>*(up to 8–10 calls/sec burst)* | ~1.1s (at 2 calls/sec)<br>~4.0s / ~9.5s (at 5 calls/sec)* | 10 calls/sec burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
+| **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Production (`TTL: 5s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 calls/sec burst ceiling (100% completion across 2,110 calls, 0 drops)** | **Mid-Market / Call Center (150–400+ extensions)** |
 
 > [!NOTE]
 > **Understanding 2 vCPU Latency**:
-> At baseline call arrival rates (2–3 CPS), call setup latency on the 2 vCPU instance is sub-second to ~1.1s (fastest 580 ms). The ~4.0s p50 and ~9.5s p95 figures reflect queueing delay under heavy 5 CPS load where 25 in-flight call setups simultaneously compete for 6 static PHP-FPM workers.
+> At baseline call arrival rates (2–3 calls/sec), call setup latency on the 2 vCPU instance is sub-second to ~1.1s (fastest 580 ms). The ~4.0s p50 and ~9.5s p95 figures reflect queueing delay under heavy 5 calls/sec load where 25 in-flight call setups simultaneously compete for 6 static PHP-FPM workers.
 
 ---
 
-### Empirical Dialplan XML Handler Bottleneck Comparison
+### Dialplan XML Routing Performance Comparison
 
-The table below summarizes empirical XML throughput and latency across moderate burst (**`100 x 5`**: 100 total requests at 5 concurrency), heavy concurrency (**`500 x 25`**: 500 total requests at 25 concurrency), sustained burst ceilings (**`1,000 x 25`**: 1,000 total requests at 25 concurrency), and caching extremes (uncached database execution vs. pure memory hits). Because each call requires 2–3 dynamic XML queries (directory auth, dialplan context, and destination location), XML handler throughput directly determines telephony call-setup throughput:
+The table below summarizes XML throughput and latency across moderate bursts (**`100 x 5`**: 100 total requests at 5 concurrency), high concurrency (**`500 x 25`**: 500 total requests at 25 concurrency), sustained burst ceilings (**`1,000 x 25`**: 1,000 total requests at 25 concurrency), and caching extremes (uncached database execution vs. pure memory hits). Because each call requires 2–3 dynamic XML queries (directory auth, dialplan context, and destination location), XML handler throughput directly determines telephony call-setup throughput:
 
 > [!NOTE]
 > **Understanding the `<Requests> x <Concurrency>` Notation & Test Parameters**:
@@ -63,16 +63,16 @@ The table below summarizes empirical XML throughput and latency across moderate 
 >   - **1 vCPU & 2 vCPU / 2 GiB RAM**: `pm = static`, `pm.max_children = 6` (pre-forked dedicated pool to eliminate dynamic process-spawning jitter).
 >   - **4 vCPU / 16 GiB RAM**: `pm = static`, `pm.max_children = 24` (enterprise pre-forked static pool providing 24 concurrent worker processes).
 > - **Cache Policy Profiles (`.env` with Redis 7.0 & OPcache enabled)**:
->   - **Throughput & Concurrency Ladders (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`FS_XML_HANDLER_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
+>   - **Throughput & Concurrency Tests (`100 x 5`, `500 x 25`, `1,000 x 25`)**: **Production Baseline** (`FS_XML_HANDLER_CACHE_TTL=5`). Balances high concurrency protection with a 5-second window for admin panel updates.
 >   - **Uncached MariaDB Baseline (`TTL: 0s`)**: **Caching Disabled** (`FS_XML_HANDLER_CACHE_TTL=0`). Bypasses Redis to measure raw MariaDB SQL query execution and XML template compilation cost.
 >   - **Pure Memory Ceiling (`cache-hit`)**: **Memory Cache Hit** (`cache-hit` scenario with pre-warmed Redis memory, 0 database queries). Isolates the upper PHP-FPM / Redis memory serialization ceiling.
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Configuration (`www.conf`) | Cache Settings (`.env`) | Moderate Burst (`100 x 5`) | High Burst (`500 x 25`) | Sustained Ceiling (`1,000 x 25`) | Peak Tail Latency (`Max`) | Uncached MariaDB (`100 x 5`) | Pure Memory Ceiling (`100 x 5`) |
 | :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic`<br>`max_children = 5` | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 15.6 req/sec (289 ms) | 14.9 req/sec (990 ms) | 16.0 req/sec (923 ms) | 2,298 ms | 8.4 req/sec (565 ms) | 17.4 req/sec (262 ms) |
-| **1 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static`<br>`max_children = 6` | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 14.3 req/sec (327 ms) | 13.7 req/sec (1,109 ms) | 13.8 req/sec (1,099 ms) | 3,091 ms | 9.9 req/sec (487 ms) | 14.8 req/sec (315 ms) |
-| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static`<br>`max_children = 6` | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 14.4 req/sec (288 ms) | 16.1 req/sec (923 ms) | 14.5 req/sec (1,013 ms) | 2,756 ms | 10.2 req/sec (421 ms) | 19.5 req/sec (219 ms) |
-| **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static`<br>`max_children = 24`** | **Ladders:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | **57.3 req/sec (77 ms)** | **65.0 req/sec (333 ms)** | **65.3 req/sec (327 ms)** | **448 ms** | **41.1 req/sec (108 ms)** | **72.5 req/sec (61 ms)** |
+| **1 vCPU, 1 GiB RAM** | Shared vCPU | `pm = dynamic`<br>`max_children = 5` | **Baseline:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 15.6 req/sec (289 ms) | 14.9 req/sec (990 ms) | 16.0 req/sec (923 ms) | 2,298 ms | 8.4 req/sec (565 ms) | 17.4 req/sec (262 ms) |
+| **1 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static`<br>`max_children = 6` | **Baseline:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 14.3 req/sec (327 ms) | 13.7 req/sec (1,109 ms) | 13.8 req/sec (1,099 ms) | 3,091 ms | 9.9 req/sec (487 ms) | 14.8 req/sec (315 ms) |
+| **2 vCPU, 2 GiB RAM** | Shared vCPU | `pm = static`<br>`max_children = 6` | **Baseline:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | 14.4 req/sec (288 ms) | 16.1 req/sec (923 ms) | 14.5 req/sec (1,013 ms) | 2,756 ms | 10.2 req/sec (421 ms) | 19.5 req/sec (219 ms) |
+| **4 vCPU, 16 GiB RAM** | **Dedicated CPU** | **`pm = static`<br>`max_children = 24`** | **Baseline:** Prod (`TTL 5s`)<br>**Uncached:** `TTL 0s`<br>**Memory:** `cache-hit` | **57.3 req/sec (77 ms)** | **65.0 req/sec (333 ms)** | **65.3 req/sec (327 ms)** | **448 ms** | **41.1 req/sec (108 ms)** | **72.5 req/sec (61 ms)** |
 
 <details>
 <summary>Key Bottleneck Observations & Architectural Takeaways</summary>
@@ -90,7 +90,7 @@ The table below summarizes empirical XML throughput and latency across moderate 
 
 ### Production Sizing & Configuration Matrix
 
-Use the summary table below as a quick reference for choosing baseline hardware, configuring PHP-FPM pools, and setting Redis cache policies. These recommendations synthesize findings from empirical cloud datacenter benchmarks across multiple hardware tiers:
+Use the summary table below as a quick reference for choosing baseline hardware, configuring PHP-FPM pools, and setting Redis cache policies. These recommendations synthesize findings from cloud datacenter benchmarks across multiple hardware tiers:
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | --- | --- | --- | --- | --- | ---: | ---: | --- |
@@ -112,7 +112,7 @@ Use the summary table below as a quick reference for choosing baseline hardware,
 
 ## Production Recommendations: XML Caching & PHP-FPM Worker Tuning
 
-Based on empirical datacenter 5-tier cache sweeps and concurrency ladder benchmarks, apply the following tuning policies for production deployments:
+Based on datacenter cache tests and concurrency benchmarks, apply the following tuning policies for production deployments:
 
 ### 1. Telephony XML Cache Policy (`.env`)
 
@@ -154,13 +154,13 @@ FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. 
 ## Planning Rules
 
 - **XML requests per second scale with CPU count, not memory.** Memory alone did not help: the 1 vCPU / 2 GiB profile was slower than the 1 vCPU / 1 GiB profile under the same conditions. Adding a second vCPU roughly doubled XML burst throughput (about 19 req/sec to about 30 req/sec at `500 x 25`) and cut the slowest response from about 1.7 seconds to about 0.4 seconds. Moving to dedicated cores (4 vCPU Dedicated) eliminated the shared-core ceiling entirely, delivering 65+ req/sec sustained with sub-450ms tail latency.
-- **Empirical XML burst expectations:** 1 vCPU ≈ 14–16 req/sec sustained; 2 vCPU / 2 GiB ≈ 14–16 req/sec (shared CPU limit); 4 vCPU Dedicated / 16 GiB ≈ 57–65 req/sec sustained (72 req/sec pure memory ceiling).
+- **Expected XML burst throughput:** 1 vCPU ≈ 14–16 req/sec sustained; 2 vCPU / 2 GiB ≈ 14–16 req/sec (shared CPU limit); 4 vCPU Dedicated / 16 GiB ≈ 57–65 req/sec sustained (72 req/sec pure memory ceiling).
 - **Do not size calls from XML numbers.** A complete call adds SIP signaling, a second call leg, FreeSWITCH state, and teardown work that the XML test never touches.
-- **Empirical call-rate expectations:** 1 vCPU ≈ 3 calls/sec sustained; 2 vCPU / 2 GiB ≈ 5–8 calls/sec sustained (10 CPS burst ceiling); 4 vCPU Dedicated / 16 GiB ≈ 15–20 calls/sec sustained (30 CPS burst ceiling with 100% completion across 2,110 calls).
+- **Expected call-rate capacity:** 1 vCPU ≈ 3 calls/sec sustained; 2 vCPU / 2 GiB ≈ 5–8 calls/sec sustained (10 calls/sec burst ceiling); 4 vCPU Dedicated / 16 GiB ≈ 15–20 calls/sec sustained (30 calls/sec burst ceiling with 100% completion across 2,110 calls).
 - **Plan for headroom.** The measured ceilings were reached at 95–98% CPU busy. If a tier runs above roughly 90% CPU, do not plan production capacity at that tier.
 - **Check `sessions-per-second` before blaming hardware.** The project default of 60 allows roughly 30 two-leg calls/sec; a stock value of 30 rejects calls near 15 two-leg calls/sec with `503 Maximum Calls In Progress`. Adjust it permanently via `FS_SESSIONS_PER_SECOND` in `.env` or dynamically using `fs_cli -x "fsctl sps <value>"` (see [docs/operations.md](operations.md#freeswitch-session-rate-capacity-tuning)).
 - **Media capacity is separate.** These numbers cover call setup, answer, and teardown. Continuous RTP audio quality and media capacity need a dedicated RTP-enabled concurrent-call test.
-- **Re-run the hardware ladder with new test data before quoting numbers to customers.** The values in this document are empirical references kept for review.
+- **Re-run hardware benchmarks with fresh test data before quoting numbers to customers.** The values in this document are benchmark references kept for review.
 
 ---
 
@@ -212,7 +212,7 @@ Before reviewing the benchmark tables, understand the standard testing notation 
 
 #### Plain-Language Guide to Performance Metrics & Statistics
 
-To make benchmark reports accessible to everyone—from telephony engineers to non-technical PBX and office administrators—here is what each measured statistic means in plain terms:
+To make benchmark reports accessible to all readers—from technical specialists to non-technical PBX and office administrators—here is what each measured statistic means in plain terms:
 
 | Statistic | Plain-Language Meaning | Real-World PBX Example |
 | :--- | :--- | :--- |
@@ -256,10 +256,10 @@ The entry-level cloud test server (`x.x.x.200`) is a datacenter virtual private 
 The September 24, 2026 benchmark series executed the full progression directly against the production Nginx and PHP 8.5-FPM stack (`pm = dynamic`, maximum 5 workers). Dialplan endpoints were fully authenticated using composite database indexes and Redis fragment caching against tenant `load-test-beta` (seeded with 20 extensions and dynamic call routing).
 
 > [!NOTE]
-> **Complete Empirical Telemetry**:
+> **Complete Benchmark Telemetry**:
 > All cloud datacenter benchmarks capture complete granular telemetry—including **p50 Median**, **p90**, **p95**, **p99**, and **Standard Deviation** alongside complete raw sample datasets. For everyday administrators, the primary headline tables present clear, plain-language summaries (**Average**, **Fastest**, and **Slowest**). Detailed percentile distributions and standard deviations are accessible in the expandable details sections.
 
-#### Single-Server XML Throughput Ladder (September 24, 2026)
+#### Single-Server XML Throughput Tests (September 24, 2026)
 
 Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero failed XML responses:
 
@@ -304,9 +304,9 @@ Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero fa
 
 </details>
 
-#### Cache Optimization and Hit Rate Sweep (September 24, 2026)
+#### Cache Optimization and Hit Rate Tests (September 24, 2026)
 
-The 5-run cache optimization sweep on the cloud datacenter PBX evaluated performance across cache policies from raw database execution to the pure memory hit ceiling:
+The 5-run cache optimization test on the cloud datacenter PBX evaluated performance across cache policies from raw database execution to the pure memory hit ceiling:
 
 | Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Redis Hit Rate | Key Observation |
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
@@ -332,7 +332,7 @@ The 5-run cache optimization sweep on the cloud datacenter PBX evaluated perform
 </details>
 
 <details>
-<summary>Cache Sweep Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
+<summary>Cache Test Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
 
 | Configuration | Requests/sec | Average | Fastest | Slowest | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -369,7 +369,7 @@ As a sanity check, baseline `100 x 5` tests were executed across all three avail
 
 > [!TIP]
 > **Network Interface Observation**:
-> Private IPv4 delivered approximately 18% lower average latency and higher throughput compared to the public IPv4 interface by bypassing external cloud provider routing hops and firewall state tables. Public IPv6 performed with near-parity to private IPv4, demonstrating efficient native IPv6 stack performance in Debian 13.
+> Private IPv4 delivered approximately 18% lower average latency and higher throughput compared to the public IPv4 interface by bypassing external cloud provider routing hops and firewall state tables. Public IPv6 performed almost identically to private IPv4, demonstrating efficient native IPv6 stack performance in Debian 13.
 
 Host telemetry during these runs: Linux 6.12 amd64, 1 vCPU, 967 MiB RAM (340 MiB available), swap utilization remained steady at 121 MiB with zero OOM events.
 
@@ -383,9 +383,9 @@ The cloud test server was resized in place to 1 vCPU and 1,973 MiB RAM, rebooted
 
 > [!NOTE]
 > **Key Finding: Memory Scaling vs. CPU Sizing**:
-> Doubling memory from 1 GiB to 2 GiB increased available system memory to ~1,211 MiB and completely eliminated swap usage (0 MiB swap used throughout all runs). However, dynamic XML dialplan throughput remained steady at ~13.7–14.5 req/sec (matching the 1 vCPU / 1 GiB baseline). This empirically confirms **Planning Rule #1**: dynamic XML generation is compute/serialization bound by CPU clock and core count, not memory.
+> Doubling memory from 1 GiB to 2 GiB increased available system memory to ~1,211 MiB and completely eliminated swap usage (0 MiB swap used throughout all runs). However, dynamic XML dialplan throughput remained steady at ~13.7–14.5 req/sec (matching the 1 vCPU / 1 GiB baseline). This confirms **Planning Rule #1**: dynamic XML generation is compute/serialization bound by CPU clock and core count, not memory.
 
-#### Single-Server XML Throughput Ladder (September 24, 2026)
+#### Single-Server XML Throughput Tests (September 24, 2026)
 
 Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero failed XML responses:
 
@@ -430,9 +430,9 @@ Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero fa
 
 </details>
 
-#### Cache Optimization and Hit Rate Sweep (September 24, 2026)
+#### Cache Optimization and Hit Rate Tests (September 24, 2026)
 
-The 5-run cache optimization sweep on the resized 2 GiB cloud VPS evaluated performance across cache policies with 6 static PHP-FPM workers:
+The 5-run cache optimization test on the resized 2 GiB cloud VPS evaluated performance across cache policies with 6 static PHP-FPM workers:
 
 | Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Redis Hit Rate | Key Observation |
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
@@ -458,7 +458,7 @@ The 5-run cache optimization sweep on the resized 2 GiB cloud VPS evaluated perf
 </details>
 
 <details>
-<summary>Cache Sweep Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
+<summary>Cache Test Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
 
 | Configuration | Requests/sec | Average | Fastest | Slowest | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -503,7 +503,7 @@ Artifacts: `storage/app/load-tests/capacity/datacenter-1c-2g-20260924T193809Z/` 
 
 The cloud test server was resized in place to 2 vCPUs and 1,973 MiB RAM, testing the impact of adding a second compute core while retaining the same PHP-FPM static-6 profile (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, and 0 MiB swap usage. This benchmark series was executed on September 24, 2026 across two direct cloud datacenter nodes in the same datacenter without VPN encapsulation overhead.
 
-#### Single-Server XML Throughput Ladder (September 24, 2026)
+#### Single-Server XML Throughput Tests (September 24, 2026)
 
 Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero failed XML responses across 2,225 requests:
 
@@ -545,9 +545,9 @@ Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero fa
 
 </details>
 
-#### Cache Optimization and Hit Rate Sweep (September 24, 2026)
+#### Cache Optimization and Hit Rate Tests (September 24, 2026)
 
-The 5-run cache optimization sweep on the resized 2 vCPU / 2 GiB cloud VPS evaluated performance across cache policies with 6 static PHP-FPM workers:
+The 5-run cache optimization test on the resized 2 vCPU / 2 GiB cloud VPS evaluated performance across cache policies with 6 static PHP-FPM workers:
 
 | Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Redis Hit Rate | Key Observation |
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
@@ -558,7 +558,7 @@ The 5-run cache optimization sweep on the resized 2 vCPU / 2 GiB cloud VPS evalu
 | **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 19.496 | 218.5 ms | 101.7 ms | 372.5 ms | 42.9% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling. |
 
 <details>
-<summary>Cache Sweep Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
+<summary>Cache Test Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
 
 | Configuration | Requests/sec | Average | Fastest | Slowest | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -582,7 +582,7 @@ The dedicated-CPU 4 vCPU / 16 GiB profile represents the high-density multi-tena
 
 The cloud test server was provisioned with 4 dedicated compute cores and 15,999 MiB RAM (15,090 MiB available), Linux 6.12 amd64, and configured with the production static worker pool (`pm = static`, `pm.max_children = 24`), MariaDB 10.11, Redis 7.0, and 0 MiB swap usage. Benchmarks were executed on September 24, 2026 across two direct cloud datacenter nodes in the same datacenter.
 
-#### Single-Server XML Throughput Ladder (September 24, 2026)
+#### Single-Server XML Throughput Tests (September 24, 2026)
 
 Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero failed XML responses across 2,225 requests:
 
@@ -625,9 +625,9 @@ Controlled runs, all `mixed` scenario against public IPv4 (`x.x.x.200`), zero fa
 
 </details>
 
-#### Cache Optimization and Hit Rate Sweep (September 24, 2026)
+#### Cache Optimization and Hit Rate Tests (September 24, 2026)
 
-The 5-run cache optimization sweep on the 4 vCPU Dedicated / 16 GiB node evaluated performance across cache policies with 24 static PHP-FPM workers:
+The 5-run cache optimization test on the 4 vCPU Dedicated / 16 GiB node evaluated performance across cache policies with 24 static PHP-FPM workers:
 
 | Run Configuration | Scenario | Target Requests | Requests/sec | Average Latency | Fastest (Min) | Slowest (Max) | Redis Hit Rate | Key Observation |
 | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- |
@@ -638,7 +638,7 @@ The 5-run cache optimization sweep on the 4 vCPU Dedicated / 16 GiB node evaluat
 | **5. Pure Memory Ceiling** | `cache-hit` | `100 x 5` | 72.519 | 61.1 ms | 47.7 ms | 113.5 ms | 30.5% | Zero MariaDB queries; demonstrates PHP-FPM / Redis memory serialization ceiling at 72.5 req/sec. |
 
 <details>
-<summary>Cache Sweep Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
+<summary>Cache Test Detailed Statistics Breakdown (p50, p90, p95, p99, Std Dev)</summary>
 
 | Configuration | Requests/sec | Average | Fastest | Slowest | Median (`p50`) | 90th (`p90`) | 95th (`p95`) | 99th (`p99`) | Jitter (`std_dev`) |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -656,9 +656,9 @@ Artifacts: `storage/app/load-tests/capacity/datacenter-4c16g-dedicated-20260924T
 
 ---
 
-## Live Call Capacity & Telephony Feature Parity (SIP Signaling)
+## Live Call Capacity & Feature Validation (SIP Signaling)
 
-Live SIP call benchmarks evaluate complete telephony call setup, bidirectional audio flows, and feature parity. While the single-server XML tests measure the raw speed of the database and PHP-FPM routing layer, these live call benchmarks measure real-world PBX capacity: FreeSWITCH SIP signaling state machines, Sofia user authentication, RTP media proxying, and bridge teardown across two machines (a PBX under test and a dedicated load generator).
+Live SIP call benchmarks evaluate complete telephony call setup, bidirectional audio flows, and feature validation. While single-server XML tests measure the raw speed of the database and routing layer, these live call benchmarks measure real-world PBX capacity: SIP signaling, user authentication, live two-way audio streams, and call teardown across two machines (a PBX under test and a dedicated load generator).
 
 Call-setup latency is measured from the caller's first `INVITE` to the destination's `200 OK`. "Achieved calls/sec" compares the first and last successful answer, revealing when call setup queues behind the offered rate.
 
@@ -666,14 +666,14 @@ Call-setup latency is measured from the caller's first `INVITE` to the destinati
 
 ### Cloud Datacenter VPS (1 vCPU / 1 GiB RAM Baseline)
 
-Empirical benchmark and validation series executed on September 24, 2026 across two cloud datacenter nodes in the same datacenter:
+Benchmark and validation series executed across two cloud datacenter nodes in the same datacenter:
 - **Target PBX VPS**: 1 vCPU, 967 MiB RAM, 2.0 GiB swap. Debian 13, Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 5`), MariaDB 10.11, Redis 7.0, FreeSWITCH 1.11. Public IPv4 `x.x.x.200`, Private IPv4 `10.124.0.2`, Public IPv6 `2604:a880:...9b49:0`.
 - **Dedicated Load Generator**: 2 vCPU, 2048 MiB RAM. Debian 13, SIPp 3.7.3. Public IPv4 `x.x.x.173`, Private IPv4 `10.124.0.3`, Public IPv6 `2604:a880:...9b53:9000`.
 - **Network**: Direct datacenter interface routing; SIP signalling and RTP media exchange over direct public IP interfaces without VPN tunneling overhead.
 
-#### End-to-End Functional & Media Parity Matrix (September 24, 2026)
+#### End-to-End Functional & Media Feature Matrix (September 24, 2026)
 
-Full 14-scenario parity test suite executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`):
+Full 14-scenario feature validation test suite executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`):
 
 | Test Scenario | Destination / Feature | Off / Limit / Count | Result | Operational Verification |
 | --- | --- | ---: | --- | --- |
@@ -726,9 +726,9 @@ Behaviors these tests enforce in the application and runtime:
 - Announcement-only IVR dialplans play and hang up without waiting for digit input;
 - SIPp media-flow scenarios use RTP echo so playback can advance in this synthetic setup.
 
-#### Server-to-Server Capacity & Call Rate Ladder (September 24, 2026)
+#### Server-to-Server Capacity & Call Rate Tests (September 24, 2026)
 
-Sustained extension-to-extension capacity ladder with SIP authentication and XML dialplan resolution. Each row represents the median of 3 measured runs (warmup executed prior to recording):
+Sustained extension-to-extension capacity tests with SIP authentication and XML dialplan routing. Each row represents the median of 3 measured runs (warmup executed prior to recording):
 
 | Offered Calls/sec | Attempted Calls | Achieved Calls/sec | Successful Calls | Failed Calls | Average Setup | Fastest (Min) | Slowest (Max) | Capacity Assessment |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -785,10 +785,10 @@ Sustained extension-to-extension capacity ladder with SIP authentication and XML
 
 *Artifact directory: `storage/app/load-tests/capacity/datacenter-b1-sipp-20260924T1849Z` (contains raw `uac_rtt.csv`, `uac_stats.csv`, error logs, and JSON summaries for every repetition).*
 
-#### Key Engineering Insights (1 vCPU / 1 GiB Cloud VPS Baseline)
+#### Key Performance Insights (1 vCPU / 1 GiB Cloud VPS Baseline)
 
 1. **PHP-FPM Worker Pool Sizing & Concurrency 25 Saturation**:
-   These results empirically prove the architectural guidance documented in **Planning Rule #9**: Debian's default dynamic PHP-FPM pool (`pm.max_children = 5`) saturates when concurrency reaches 25.
+   These results demonstrate the guidance documented in **Planning Rule #9**: Debian's default dynamic PHP-FPM pool (`pm.max_children = 5`) saturates when concurrency reaches 25.
    - Each authenticated extension-to-extension call requires **three discrete XML HTTP requests**: (1) caller auth digest challenge verification in `directory`, (2) dialplan context lookup in `dialplan`, and (3) destination extension location in `directory`.
    - At **3 CPS**, the incoming XML arrival rate is ~9 req/sec. The 5 PHP-FPM workers process these requests in ~250 ms without queueing, delivering a median call setup latency of **244 ms** and 100% success.
    - At **5+ CPS**, XML arrival exceeds 15 req/sec (matching the single-core CPU XML throughput limit measured above). Requests queue up in the PHP-FPM listen backlog. When queued request delay exceeds FreeSWITCH `mod_xml_curl`'s 5.0-second HTTP timeout, Sofia fails the authentication lookup and issues `403 Forbidden`.
@@ -798,14 +798,14 @@ Sustained extension-to-extension capacity ladder with SIP authentication and XML
 
 ### Cloud Datacenter VPS: Memory-Scaled (1 vCPU / 2 GiB RAM)
 
-Empirical benchmark and validation series executed on September 24, 2026 on the resized cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
+Benchmark and validation series executed on the resized cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
 - **Target PBX VPS**: 1 vCPU, 1,973 MiB RAM, 2.0 GiB swap (0 MiB used). Debian 13, Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, FreeSWITCH 1.11. Public IPv4 `x.x.x.200`.
 - **Dedicated Load Generator**: 2 vCPU, 2048 MiB RAM. Debian 13, SIPp 3.7.3. Public IPv4 `x.x.x.173`.
 - **Network**: Direct datacenter interface routing; SIP signaling and RTP media exchange over direct public IP interfaces.
 
-#### End-to-End Functional & Media Parity Matrix (September 24, 2026)
+#### End-to-End Functional & Media Feature Matrix (September 24, 2026)
 
-Full 14-scenario parity test suite executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`):
+Full 14-scenario feature validation test suite executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`):
 
 | Test Scenario | Destination / Feature | Off / Limit / Count | Result | Operational Verification |
 | --- | --- | ---: | --- | --- |
@@ -849,9 +849,9 @@ Full 14-scenario parity test suite executed via `scripts/pbx-sipp-validate.sh` (
 
 *Artifact directory: `storage/app/load-tests/sipp-e2e-20260924-195535` (all PCAPs, error logs, and scenario counts preserved).*
 
-#### Server-to-Server Capacity & Call Rate Ladder (September 24, 2026)
+#### Server-to-Server Capacity & Call Rate Tests (September 24, 2026)
 
-Sustained extension-to-extension capacity ladder with SIP authentication and XML dialplan resolution. Each rate was executed across repetitions with the static-6 worker pool:
+Sustained extension-to-extension capacity tests with SIP authentication and XML dialplan routing. Each rate was executed across repetitions with the static-6 worker pool:
 
 | Offered Calls/sec | Attempted Calls | Achieved Calls/sec | Successful Calls | Failed Calls | Average Setup | Fastest (Min) | Slowest (Max) | Capacity Assessment |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -907,7 +907,7 @@ Sustained extension-to-extension capacity ladder with SIP authentication and XML
 
 *Artifact directory: `storage/app/load-tests/capacity/datacenter-1c2g-sipp-20260924T2004Z`.*
 
-#### Key Engineering Insights (1 vCPU / 2 GiB Memory-Scaled VPS)
+#### Key Performance Insights (1 vCPU / 2 GiB Memory-Scaled VPS)
 
 1. **Memory Headroom vs. Compute Ceiling**:
    Doubling physical memory to 2 GiB completely eliminated swap activity (0 MiB swap used throughout all runs) and provided ~1.2 GiB of free RAM buffer. However, telephony call setup capacity remained strictly bound to the single CPU core.
@@ -922,14 +922,14 @@ Sustained extension-to-extension capacity ladder with SIP authentication and XML
 
 ### Cloud Datacenter VPS: Dual-Core (2 vCPU / 2 GiB RAM)
 
-Empirical benchmark and capacity validation series executed on September 24, 2026 on the resized cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
+Benchmark and capacity validation series executed on the resized cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
 - **Target PBX VPS**: 2 vCPUs, 1,973 MiB RAM, 2.0 GiB swap (0 MiB used). Debian 13, Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, FreeSWITCH 1.11. Public IPv4 `x.x.x.200`.
 - **Dedicated Load Generator**: 2 vCPUs, 2,048 MiB RAM. Debian 13, SIPp 3.7.3. Public IPv4 `x.x.x.173`.
 - **Network**: Direct datacenter interface routing; SIP signaling and RTP media exchange over direct public IP interfaces without VPN encapsulation overhead.
 
-#### Server-to-Server Capacity & Call Rate Ladder (September 24, 2026)
+#### Server-to-Server Capacity & Call Rate Tests (September 24, 2026)
 
-Sustained extension-to-extension capacity ladder with SIP digest authentication, dynamic XML dialplan resolution, and immediate connection teardown (`uac-extension-capacity.xml`):
+Sustained extension-to-extension capacity tests with SIP digest authentication, dynamic XML dialplan routing, and immediate connection teardown (`uac-extension-capacity.xml`):
 
 | Offered Calls/sec | Attempted Calls | Concurrency Limit | Answered Calls | Failed / Timed Out | Average Setup | Fastest (Min) | Slowest (Max) | Capacity Assessment |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -971,7 +971,7 @@ Sustained extension-to-extension capacity ladder with SIP digest authentication,
 
 *Artifact directory: `storage/app/load-tests/capacity/datacenter-2c2g-sipp-20260924T2141Z` (contains raw `uac_rtt.csv`, error logs, and JSON summaries).*
 
-#### Key Engineering Insights (2 vCPU / 2 GiB Dual-Core VPS)
+#### Key Performance Insights (2 vCPU / 2 GiB Dual-Core VPS)
 
 1. **Multi-Core Throughput Scaling (10 CPS Capacity Burst)**:
    Adding a second vCPU unlocked a substantial leap in call-handling concurrency over the 1-vCPU profiles:
@@ -991,14 +991,14 @@ Sustained extension-to-extension capacity ladder with SIP digest authentication,
 
 ### Dedicated Cloud Node Pair (4 vCPU / 16 GiB RAM Dedicated)
 
-Empirical benchmark and capacity validation series executed on September 24, 2026 on the 4 vCPU Dedicated / 16 GiB cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
+Benchmark and capacity validation series executed on the 4 vCPU Dedicated / 16 GiB cloud test PBX (`x.x.x.200`) from the dedicated load generator (`x.x.x.173`):
 - **Target PBX VPS**: 4 vCPUs (Dedicated CPU), 15,999 MiB RAM, 2.0 GiB swap (0 MiB used). Debian 13, Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 24`), MariaDB 10.11, Redis 7.0, FreeSWITCH 1.11. Public IPv4 `x.x.x.200`.
 - **Dedicated Load Generator**: 2 vCPUs, 2,048 MiB RAM. Debian 13, SIPp 3.7.3. Public IPv4 `x.x.x.173`.
 - **Network**: Direct datacenter interface routing; SIP signaling and RTP media exchange over direct public IP interfaces without VPN encapsulation overhead.
 
-#### Server-to-Server Capacity & Call Rate Ladder (September 24, 2026)
+#### Server-to-Server Capacity & Call Rate Tests (September 24, 2026)
 
-Sustained extension-to-extension capacity ladder with SIP digest authentication, dynamic XML dialplan resolution, and immediate connection teardown (`uac-extension-capacity.xml`). Across 2,110 total calls spanning 2 to 30 CPS, the system achieved a **100% completion rate with ZERO failed calls**:
+Sustained extension-to-extension capacity tests with SIP digest authentication, dynamic XML dialplan resolution, and immediate connection teardown (`uac-extension-capacity.xml`). Across 2,110 total calls spanning 2 to 30 calls/sec, the system achieved a **100% completion rate with ZERO failed calls**:
 
 | Offered Calls/sec | Attempted Calls | Concurrency Limit | Answered Calls | Failed Calls | Average Setup | Fastest (Min) | Slowest (Max) | Capacity Assessment |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -1044,9 +1044,9 @@ Sustained extension-to-extension capacity ladder with SIP digest authentication,
 
 *Artifact directory: `storage/app/load-tests/capacity/datacenter-4c16g-sipp-20260924T2211Z` (contains raw `uac_rtt.csv`, error logs, and JSON summaries).*
 
-#### Key Engineering Insights (4 vCPU Dedicated / 16 GiB RAM Enterprise Node)
+#### Key Performance Insights (4 vCPU Dedicated / 16 GiB RAM Enterprise Node)
 
-1. **Enterprise Telephony Parity & Zero Call Failure**:
+1. **Enterprise Feature Validation & Zero Call Failure**:
    The transition from shared virtual vCPUs to 4 dedicated CPU cores with 24 static PHP-FPM workers delivered flawless stability:
    - Across **2,110 total calls** executed from 2 CPS up to 30 CPS with concurrency up to 75 in-flight calls, **zero calls failed** (100% completion rate).
    - Up through **15 CPS**, call setup was virtually instantaneous: **median setup latency was 148–180 ms**, and the 95th percentile remained under 472 ms.

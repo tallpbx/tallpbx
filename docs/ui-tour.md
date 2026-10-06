@@ -18,7 +18,7 @@ The public landing page is localized (`/en`, `/es`, `/fr`) and provides direct s
 
 ### Theme Comparison: Light vs. Dark Themes in TallPBX
 
-TallPBX is engineered for versatile operational environments ranging from daylight corporate offices to 24/7 dark-room network operations centers (NOCs):
+TallPBX is designed for versatile operational environments ranging from daylight corporate offices to 24/7 dark-room network operations centers (NOCs):
 
 | Dimension | Light Theme | Dark Theme | System Theme (Auto-Detection) |
 | :--- | :--- | :--- | :--- |
@@ -30,7 +30,7 @@ TallPBX is engineered for versatile operational environments ranging from daylig
 
 #### Parity Comparison with Traditional PBX Systems (FusionPBX & FreePBX)
 - **FusionPBX**: Relies on monolithic procedural PHP templates linked to static CSS stylesheets. Changing visual appearance requires server-side template file modification or installing external CSS skins; it provides no client-side runtime switcher, no native dark mode, and no OS preference synchronization.
-- **FreePBX®**: Built on a legacy procedural framework with a static, hardcoded light theme. Operators working in dark rooms or dispatch centers cannot switch to dark mode without unsupported browser extensions or custom stylesheet overrides.
+- **FreePBX®**: Built on a legacy procedural framework with a static, hardcoded light theme. Administrators working in dark rooms or dispatch centers cannot switch to dark mode without unsupported browser extensions or custom stylesheet overrides.
 - **TallPBX Advantage**: TallPBX provides built-in, 1-click theme switching across both public guest pages (`/`, `/login`) and the authenticated unified control panel (`/panel/`). Users can toggle their preference from any view, enjoying instantaneous zero-flicker client caching and cross-device database synchronization.
 
 ---

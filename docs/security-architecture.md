@@ -345,7 +345,7 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, thr
 
 ### Zero-Lockout Protections
 Before any restrictive policy or rule change is applied, [LockoutGuardService](../app-modules/security/src/Services/LockoutGuardService.php) enforces two distinct safety checks:
-1. **Operator Connection Guard (`assertSafe()`)**: Checks the current administrator's active connection IP against the proposed ruleset. If a change would disconnect the active administrator, the change is rejected immediately with a descriptive warning.
+1. **Administrator Connection Guard (`assertSafe()`)**: Checks the current administrator's active connection IP against the proposed ruleset. If a change would disconnect the active administrator, the change is rejected immediately with a descriptive warning.
 2. **Local Services Guard (`assertLocalServicesSafe()`)**: Strictly forbids disabling pre-filters while the default policy is set to Block Unknown without an explicit loopback allow rule, guaranteeing that server processes (PHP-FPM, MariaDB, Redis) can never be severed from one another.
 
 ---
@@ -468,7 +468,7 @@ Work through the steps in order and stop as soon as the panel responds again:
    ```bash
    sudo nft insert rule inet tallpbx_filter input iif "lo" accept
    ```
-2. **Restore your operator address** (for example your office or VPN address), keeping every other rule:
+2. **Restore your administrator address** (for example your office or VPN address), keeping every other rule:
    ```bash
    sudo nft insert rule inet tallpbx_filter input ip saddr <your-ip> accept
    ```

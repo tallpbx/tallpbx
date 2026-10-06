@@ -1,16 +1,15 @@
 # SIP Load Testing Guide
 
-Authoritative load testing guide (September 2026). This document consolidates
-and replaces all legacy load and call testing documents into one unified, self-contained guide.
-
-The measurements and sizing recommendations in this guide represent freshly executed benchmarks from the
-September 2026 cloud datacenter benchmarking campaign across dedicated and shared VPS configurations.
+Authoritative load testing guide (September 2026). The measurements and sizing
+recommendations in this guide represent freshly executed benchmarks from the
+cloud datacenter benchmarking campaign across dedicated and shared VPS
+configurations.
 
 ## Audience
 
-This guide is written for both engineers and automated test harnesses.
+This guide is written for both administrators and automated test harnesses.
 
-- Engineers and administrators should be able to skim the purpose, quick
+- Administrators should be able to skim the purpose, quick
   commands, expected results, capacity figures, and troubleshooting notes
   without needing to understand every SIP detail.
 - Automated harnesses, AI agents, and test runners should use the exact
@@ -18,12 +17,12 @@ This guide is written for both engineers and automated test harnesses.
   running or debugging the tests.
 
 The first half explains what the two tests measure and what their results
-mean. The later sections are deliberately more detailed so an engineer or
-operator can reproduce the exact lab setup, runs, and checks.
+mean. The later sections are deliberately more detailed so an administrator
+can reproduce the exact lab setup, runs, and checks.
 
 ## Reproducibility Guide & AI Agent Checklist
 
-To ensure other AI agents and engineers can reproduce these tests end-to-end
+To ensure other AI agents and administrators can reproduce these tests end-to-end
 without rediscovering and fixing subtle environment traps, follow this checklist:
 
 1. **Obfuscate Public IP Addresses**: In all public documentation, test summaries,
@@ -75,25 +74,24 @@ without rediscovering and fixing subtle environment traps, follow this checklist
 
 ## How This Document Is Organized
 
-This guide focuses strictly on the operational methodology, tools, and procedures for executing telephony benchmarks:
+This guide focuses on testing methods, tools, and procedures for evaluating PBX performance:
 
 1. **Test Methodology**: What the two tests measure, how to read the numbers, the hardware progression, and the campaign plan.
 2. **Lab Setup & Seeding**: Prerequisites, runtime state, and synthetic test data creation.
 3. **Execution Guides**: Detailed step-by-step procedures for running Test 1 (dynamic dialplan XML) and Test 2 (SIPp end-to-end calls).
-4. **Analysis & Diagnostics**: Bottleneck hunting, troubleshooting runbooks, recovery steps, and scenario references.
-5. **Results & Sizing Reference**: All empirical benchmark measurements, latency statistics, cache hit-rate sweeps, and administrative hardware sizing recommendations are maintained in the companion document: **[docs/load-testing-results.md](load-testing-results.md)**.
+4. **Analysis & Diagnostics**: Bottleneck troubleshooting, recovery steps, and scenario references.
+5. **Results & Sizing Reference**: All benchmark measurements, latency statistics, cache test results, and hardware sizing recommendations are maintained in the companion document: **[docs/load-testing-results.md](load-testing-results.md)**.
 
 ## The Two Tests
 
-There are two primary benchmark tests that evaluate performance at different
-layers of the telephony stack, supplemented by essential optimization sweeps
-(such as cache hit-rate testing and worker pool tuning). Their results answer
-different questions and must never be mixed up:
+There are two main benchmark tests that evaluate performance at different
+layers of the system, along with cache and worker tuning. Each test answers
+a different question:
 
 1. **Dynamic Dialplan XML (requests per second).** Measures how quickly
-   Laravel can generate call-routing XML. This includes **Cache Optimization
-   & Hit Rate Sweeps** to verify memory caching efficiency and determine
-   optimal TTL settings. One "request" is one HTTP question sent to the
+   Laravel can generate call-routing XML. This includes cache testing
+   to verify Redis caching efficiency and determine the best cache
+   lifetime (TTL). One "request" is one HTTP question sent to the
    application, not a phone call. Tool:
    `php artisan pbx:load-test:dialplan`.
 2. **End-to-end calls (calls per second).** Measures how many complete
@@ -108,7 +106,7 @@ different questions and must never be mixed up:
 | Test | What it answers | What it does not answer |
 | --- | --- | --- |
 | Dialplan XML requests/sec | How many Laravel XML routing answers can be generated each second? | How many complete SIP calls can connect, carry media, and hang up each second? |
-| Cache optimization & hit rate sweep | What percentage of XML lookups are served directly from Redis memory without database hits, and what is the optimal TTL window? | Overall SIP signaling latency or FreeSWITCH bridging limits. |
+| Cache optimization & hit rate testing | What percentage of XML lookups are served directly from Redis without querying the database, and what is the best cache lifetime (TTL)? | Overall SIP signaling latency or FreeSWITCH bridging limits. |
 | End-to-end calls/sec | How many complete call attempts per second can the whole PBX handle at an acceptable success rate and setup time? | Which individual component caused a slowdown without additional measurements. |
 | Concurrent-call checks (part of the SIPp scenarios) | How many calls can remain active at the same time? | How quickly new calls can be established during a burst. |
 
@@ -311,28 +309,28 @@ that same order:
    between two machines: one PBX server under test and one dedicated SIPp load
    generator in the same datacenter region.
 
-The campaign executes single-server XML throughput ladders and 5-tier cache sweeps first,
-followed by server-to-server capacity and parity ladders across cloud VPS hardware tiers.
-The "Campaign Plan" section below defines the setups, roles, execution order, and gates;
-the fresh-install procedure lives in "Fresh Install Validation (Install Script Test)".
+Testing runs in two stages: first evaluating single-server performance and caching,
+followed by live call testing across different server sizes. The "Campaign Plan" section
+below outlines the test plan and server configurations, while "Fresh Install Validation
+(Install Script Test)" covers setup on a fresh server.
 
 **Single-Server Dialplan XML Bottleneck Testing (Requests Per Second):**
 
 | Hardware Configuration | CPU Allocation | Specification | Benchmark Status |
 | :--- | :--- | :--- | :--- |
-| **1 vCPU / 1 GiB RAM** | Shared vCPU | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
-| **1 vCPU / 2 GiB RAM** | Shared vCPU | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
-| **2 vCPU / 2 GiB RAM** | Shared vCPU | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server ladder and 5-tier cache sweep completed September 24, 2026 |
-| **4 vCPU / 16 GiB RAM** | Dedicated CPU | 4 vCPU Dedicated, 16 GiB RAM | Complete: single-server ladder (65+ req/sec sustained) and 5-tier cache sweep completed September 24, 2026 |
+| **1 vCPU / 1 GiB RAM** | Shared vCPU | 1 vCPU, 967 MiB RAM, 2.0 GiB swap | Complete: single-server benchmarks and cache tests completed September 24, 2026 |
+| **1 vCPU / 2 GiB RAM** | Shared vCPU | 1 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server benchmarks and cache tests completed September 24, 2026 |
+| **2 vCPU / 2 GiB RAM** | Shared vCPU | 2 vCPU, 1973 MiB RAM, 2.0 GiB swap | Complete: single-server benchmarks and cache tests completed September 24, 2026 |
+| **4 vCPU / 16 GiB RAM** | Dedicated CPU | 4 vCPU Dedicated, 16 GiB RAM | Complete: single-server benchmarks (65+ req/sec sustained) and cache tests completed September 24, 2026 |
 
 **Server-to-Server Live SIP Call Capacity Testing (Calls Per Second):**
 
 | Hardware Configuration | PBX Architecture | Dedicated Load Generator | Benchmark Status |
 | :--- | :--- | :--- | :--- |
-| **1 vCPU / 1 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: 14-scenario parity suite and capacity ladder completed September 24, 2026 |
-| **1 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: capacity ladder completed September 24, 2026 |
-| **2 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: capacity ladder (5–10 CPS ceiling) completed September 24, 2026 |
-| **4 vCPU / 16 GiB RAM** | Dedicated CPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: full 2–30 CPS capacity ladder (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
+| **1 vCPU / 1 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: 14-scenario feature validation suite and capacity test completed September 24, 2026 |
+| **1 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: capacity test completed September 24, 2026 |
+| **2 vCPU / 2 GiB RAM** | Shared vCPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: capacity test (5–10 calls/sec ceiling) completed September 24, 2026 |
+| **4 vCPU / 16 GiB RAM** | Dedicated CPU Cloud VPS | Dedicated cloud node in the same datacenter | Complete: full 2–30 calls/sec capacity test (2,110 calls, 100% completion, 0 drops) completed September 24, 2026 |
 
 Server-to-server topology:
 
@@ -351,14 +349,14 @@ Notes:
 - Datacenter server-to-server tests cross the datacenter network fabric. Record idle round-trip latency before
   every measured run; raw latency values include network latency.
 - After each resize, reboot and confirm the new values with `lscpu`,
-  `free -h`, and `swapon --show` before running the benchmark ladders.
+  `free -h`, and `swapon --show` before running benchmark tests.
 
 ## Campaign Plan
 
-The campaign executes single-server bottleneck tests first, followed by
-server-to-server call testing, and every run uses new test data created from
-scratch. This section defines the campaign hardware tiers, roles, and order; the
-fresh-install procedure is in "Fresh Install Validation (Install Script Test)"
+Testing begins with single-server performance and caching checks, followed by
+server-to-server call testing, using fresh test data created from scratch.
+This section outlines server hardware tiers, test roles, and execution order;
+clean installation steps are covered in "Fresh Install Validation (Install Script Test)"
 in Test Lab Setup.
 
 ### Infrastructure Roles
@@ -381,24 +379,24 @@ The load generator coordinates the campaign:
 
 1. Install the target PBX from scratch by running `scripts/install.sh`, then complete the fresh-install validation checklist over SSH.
 2. Create the new test data (seed on PBX) and copy the CSVs back to the load generator.
-3. Single-server XML throughput ladder:
+3. Single-server performance tests:
    - Shared-CPU tiers (1 vCPU / 1 GiB, 1 vCPU / 2 GiB, 2 vCPU / 2 GiB)
    - Dedicated-CPU tier (4 vCPU / 16 GiB Dedicated)
-4. Server-to-server SIP signaling benchmarks:
-   - 1 vCPU / 1 GiB Cloud VPS: 14-scenario telephony feature parity and 3 CPS baseline
+4. Server-to-server live call tests:
+   - 1 vCPU / 1 GiB Cloud VPS: 14-scenario telephony feature validation and 3 calls/sec baseline
    - 2 vCPU / 2 GiB Cloud VPS: Concurrency scaling and saturation boundary
-   - 4 vCPU / 16 GiB Dedicated Node: Complete 2–30 CPS capacity ladder (full enterprise load)
+   - 4 vCPU / 16 GiB Dedicated Node: Complete 2–30 calls/sec capacity test (full enterprise load)
 5. Refresh the results tables in `docs/load-testing-results.md` with the new measurements, and record findings in the changelog.
 
 ### Benchmark Evaluation Matrix
 
 | Hardware Tier | Benchmark Category | Workload Profile | Configuration Variables Evaluated |
 | :--- | :--- | :--- | :--- |
-| **Shared-CPU Cloud VPS** (1–2 vCPU) | Single-Server XML Throughput | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM dynamic vs. static worker pool; 5-tier cache sweep |
-| **Dedicated-CPU Cloud VPS** (4 vCPU / 16 GiB) | Single-Server XML Throughput | XML tiers (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM static 24-worker pool; 5-tier cache sweep |
-| **Server-to-Server Pairs** (1, 2, 4 vCPU) | Live SIP Signaling & Parity | 1 vCPU: 14-scenario parity suite and 3 CPS baseline.<br>2 vCPU & 4 vCPU: 2–30 CPS capacity ladder, zero stuck channels | FreeSWITCH log level (`notice`) and PHP-FPM per tier |
+| **Shared-CPU Cloud VPS** (1–2 vCPU) | Single-Server XML Throughput | XML test levels (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM dynamic vs. static worker pool; cache tests |
+| **Dedicated-CPU Cloud VPS** (4 vCPU / 16 GiB) | Single-Server XML Throughput | XML test levels (`100 x 5`, `500 x 25`, `1,000 x 25`), three repetitions each | PHP-FPM static 24-worker pool; cache tests |
+| **Server-to-Server Pairs** (1, 2, 4 vCPU) | Live Call Signaling & Features | 1 vCPU: 14-scenario feature validation suite and 3 calls/sec baseline.<br>2 vCPU & 4 vCPU: 2–30 calls/sec capacity test, zero stuck channels | FreeSWITCH log level (`notice`) and PHP-FPM per tier |
 
-The concurrent-call ladder and the RTP media capacity test need new SIPp
+The concurrent-call test and the RTP media capacity test need new SIPp
 scenarios; see the open items below.
 
 ### New Test Data
@@ -411,17 +409,16 @@ record them with the campaign notes. Seed commands are in "Seed Data"; the
 generator-side CSV copy and authentication column are described in Test 2
 and the recovery runbook.
 
-### Gates And Stop Conditions
+### Quality Requirements and Stop Conditions
 
 - The fresh-install validation checklist must pass fully before benchmarking.
-- XML throughput benchmarks: advance a tier only when the previous tier had zero failed
-  responses; stop escalating per the stop conditions in "Per-Run Record,
-  Benchmark Tiers, And Stop Conditions".
-- Server-to-server call benchmarks: correctness (basic, media, extended) passes before the
-  capacity ladder; each capacity tier must end with zero stuck channels
-  after teardown; a tier fails when the success rate or setup time degrades
-  beyond the recorded thresholds.
-- Record medians of at least three repetitions per comparison tier (see
+- Single-server XML benchmarks: advance to higher load only when the previous level had zero failed
+  responses; stop escalating if any stop conditions in "Per-Run Record, Benchmark Tiers, And Stop Conditions" occur.
+- Server-to-server call benchmarks: feature validation (basic, media, extended) must pass before running
+  higher capacity tests; each test level must end with zero stuck channels
+  after teardown; a test level fails when call success rate or setup time degrades
+  beyond acceptable thresholds.
+- Record the median of at least three repetitions per hardware configuration (see
   "How Results Are Recorded").
 
 ### Recording And Artifacts
@@ -436,7 +433,7 @@ results sections with the new measurements in place.
 
 - Choose the new test-data values (tenant, realm, extension range,
   password, CSV names).
-- Implement the two new SIPp scenarios (concurrent-call hold ladder and
+- Implement the two new SIPp scenarios (concurrent-call capacity test and
   RTP media capacity) plus the recording assertion for the media runner,
   per "Additional Tests To Add To The Campaign" in Test 2.
 - Choose the datacenter provider and region for the target PBX hardware tiers and load generator; record
@@ -987,7 +984,7 @@ What each setting does:
   `optimize:clear` while PHP-FPM is serving test traffic; workers can
   briefly fail while bootstrap cache files are rebuilt.
 
-### Cache Optimization and Hit Rate Sweep Testing
+### Cache Optimization and Hit Rate Testing
 
 FreeSWITCH requests dynamic dialplan routing XML through `mod_xml_curl` on
 every inbound and outbound call attempt. In an uncached deployment, every call
@@ -1110,9 +1107,9 @@ redis-cli --scan --pattern "*xml-handler*" | wc -l
 redis-cli ttl "$(redis-cli --scan --pattern "*xml-handler:dialplan:*" | head -n 1)"
 ```
 
-#### The 5-Run Cache Sweep Procedure
+#### The 5-Configuration Cache Test Procedure
 
-The cache sweep runs 5 distinct configurations to map performance across the
+The cache test evaluates 5 distinct configurations to map performance across the
 entire spectrum, from bare database reads to 100% in-memory cache hits:
 
 | Run | Name | Cache Configuration | Scenario | Target Requests | Expected Hit Rate | Purpose |
@@ -1507,17 +1504,16 @@ with the call answered and ended by the expected side.
 
 ### Additional Tests To Add To The Campaign
 
-Four tests are specified here but are not yet first-class runner modes.
-They close the gaps the source documents themselves call out.
+Four tests are planned to expand test coverage:
 
 1. **Concurrent-call capacity test.** This guide lists "how many calls can
    remain active at the same time?" as a capacity question, but no current
-   scenario measures it: the calls-per-second ladders hold calls only
-   seconds and score setup speed. Ramp simultaneous calls with a longer
+   scenario measures it: the calls-per-second tests hold calls for only a few
+   seconds to measure setup speed. Ramp simultaneous calls with a longer
    hold time (for example 60–120 seconds each) until the success rate or
    setup time degrades, then record peak simultaneous calls, peak
    FreeSWITCH channels, CPU and memory, and confirm zero stuck channels
-   after teardown. Run it on each server-to-server hardware tier after the signaling ladder.
+   after teardown. Run it on each server-to-server hardware tier after the call signaling test.
 2. **RTP-enabled media capacity test.** The signaling capacity runs carry
    no continuous audio. Add a media scenario that plays real RTP (pcap
    playback) for a fixed duration at increasing concurrency, and record
@@ -1538,23 +1534,23 @@ They close the gaps the source documents themselves call out.
 
 ## Results & Benchmark Data
 
-All empirical benchmark measurements, latency statistics, cache hit-rate sweeps, and hardware sizing recommendations have been consolidated into the dedicated companion reference:
+All benchmark measurements, latency statistics, cache test results, and hardware sizing recommendations have been consolidated into the dedicated companion reference:
 
 👉 **[docs/load-testing-results.md](load-testing-results.md)**
 
 ### Quick Reference: Production Hardware Sizing
 
-For capacity planning, use this baseline matrix synthesized from the September 2026 cloud datacenter VPS stress runs:
+For capacity planning, use this baseline matrix based on the cloud datacenter VPS benchmark tests:
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
-| --- | --- | --- | --- | --- | ---: | ---: | --- |
+| :--- | :--- | :--- | :--- | :--- | ---: | ---: | --- |
 | **Micro / Edge** | 1 vCPU, 1–2 GiB RAM | `pm = dynamic`<br>`pm.max_children = 5` | 5 seconds | 13–19 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
 | **Standard SMB** | 2–4 vCPU, 4 GiB RAM | `pm = static`<br>`pm.max_children = 12` | 5 seconds | 19–28 req/sec | 5–8 calls/sec | 50–100 concurrent | Small-to-medium business (10–75 phones) |
 | **Mid-Market** | 4–8 vCPU, 8 GiB RAM | `pm = static`<br>`pm.max_children = 24` | 5–15 seconds | 35–50 req/sec | 12–18 calls/sec | 150–300 concurrent | Multi-department office (75–250 phones) |
 | **Call Center** | 8+ vCPU, 16 GiB RAM | `pm = static`<br>`pm.max_children = 32–48` | 15–30 seconds | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
 | **Enterprise / Multi-Tenant** | 16+ vCPU, 32 GiB RAM | `pm = static`<br>`pm.max_children = 64` | 30 seconds | 100–150+ req/sec | 45–60+ calls/sec | 1,000+ concurrent | Multi-tenant cloud hosted PBX |
 
-For full details on the single-server XML throughput ladder, the 5-tier cache sweep, the 14-scenario telephony validation suite, SIPp calls-per-second capacity ladders, and FreeSWITCH/PHP-FPM configuration experiments, consult **[docs/load-testing-results.md](load-testing-results.md)**.
+For full details on single-server performance tests, cache tests, telephony feature validation, call capacity benchmarks, and server tuning experiments, consult **[docs/load-testing-results.md](load-testing-results.md)**.
 
 ## How To Look For Bottlenecks
 
@@ -1576,10 +1572,10 @@ isolated database benchmark faster.
 | SIPp/load generator | SIPp CPU high, failed sends, outbound congestion, or achieved rate below target while the PBX has headroom. | Move SIPp to a stronger/separate host, raise file descriptors/ports, or lower local logging. |
 | Network/WireGuard | Retransmissions, packet loss, high RTT, or NAT/WireGuard endpoint churn. | Test from the same datacenter, or fix the tunnel/UDP path before trusting the numbers. |
 
-Findings from empirical datacenter and lab benchmark runs:
+Key findings from datacenter and lab benchmark runs:
 
-- **Shared-CPU Bottleneck (14–16 req/sec)**: On 1-core and 2-core shared-CPU instances, dynamic XML generation hits a hard compute ceiling between 14 and 16 requests/second under burst concurrency (`500 x 25` and `1,000 x 25`). Because PHP-FPM workers compete with the Linux network stack and Sofia SIP threads for shared host CPU cycles, requests queue in buffers, pushing peak tail latency past 2.2–3.0 seconds and limiting sustained call capacity to 3–8 calls/sec.
-- **Dedicated CPU Headroom (>4x Multiplier)**: Moving to 4 dedicated vCPUs with 24 pre-forked static workers completely eliminates worker starvation, multiplying throughput to 65+ req/sec, capping tail latency under 450 ms, and enabling 15–20 calls/sec sustained (bursting cleanly to 30 CPS with zero drops across 2,110 calls).
+- **Shared-CPU Bottleneck (14–16 req/sec)**: On 1-core and 2-core shared-CPU instances, dynamic XML generation hits a compute ceiling between 14 and 16 requests/second under burst concurrency (`500 x 25` and `1,000 x 25`). Because PHP-FPM workers compete with the Linux network stack and Sofia SIP threads for shared host CPU cycles, requests queue in buffers, pushing peak tail latency past 2.2–3.0 seconds and limiting sustained call capacity to 3–8 calls/sec.
+- **Dedicated CPU Headroom (>4x Multiplier)**: Moving to 4 dedicated vCPUs with 24 pre-forked static workers completely eliminates worker starvation, multiplying throughput to 65+ req/sec, capping tail latency under 450 ms, and enabling 15–20 calls/sec sustained (bursting cleanly to 30 calls/sec with zero drops across 2,110 calls).
 - **Memory Scaling**: Memory alone does not raise throughput on single-core instances (1 vCPU / 2 GiB performed similarly to 1 vCPU / 1 GiB), while adding dedicated compute cores provides immediate linear scaling.
 - **FreeSWITCH Switch Logging**: Lowering FreeSWITCH switch logging from `debug` to `notice` reduces setup latency and prevents log-disk I/O bottlenecks during high-throughput runs.
 - **FreeSWITCH `sessions-per-second`**: For high-rate SIPp runs, always configure FreeSWITCH `sessions-per-second=60` (or higher via `FS_SESSIONS_PER_SECOND` in `.env` or `fs_cli -x "fsctl sps <val>"`) to prevent the stock safety cap (`30`) from dropping two-leg calls near 15 calls/sec.
@@ -1953,7 +1949,7 @@ the real call to fail with `503 NORMAL_TEMPORARY_FAILURE`.
 
 ### 7. Prove One Complete Call Before Any Capacity Run
 
-Do not run a capacity ladder until this one-call proof succeeds:
+Do not run full capacity tests until this one-call proof succeeds:
 
 ```bash
 ssh root@<GENERATOR_IP> \
@@ -2014,7 +2010,7 @@ ssh root@<GENERATOR_IP> \
    echo "artifacts=$OUT"; exit "$rc"'
 ```
 
-The short diagnostic proof verifies that SIP INVITE dialogs complete with zero SIPp UDP send/receive/congestion errors. Treat short test runs as a diagnostic check, not a replacement for the full capacity ladder.
+The short diagnostic proof verifies that SIP INVITE dialogs complete with zero SIPp UDP send/receive/congestion errors. Treat short test runs as a diagnostic check, not a replacement for full capacity testing.
 
 ## Artifacts
 
@@ -2041,7 +2037,7 @@ FreeSWITCH application was executing.
 
 ## Extended Parity Scenarios
 
-All eight extended parity scenarios were validated against the live PBX. They cover every context-wide dialplan contributor module not already exercised by the basic runner:
+All eight extended feature scenarios were validated against the live PBX, covering key telephony features (such as ring groups, voicemail, conference bridges, and call forwarding) not exercised by the basic test runner:
 
 | Scenario | Destination | SIPp XML | Result |
 | --- | --- | --- | --- |
@@ -2070,7 +2066,7 @@ configuration, a call block rule, and an `*98` voicemail feature code.
 
 ### Bugs Discovered and Resolved During Parity Testing
 
-Extended parity validation revealed several FreeSWITCH dialplan and bridging bugs that were resolved prior to release:
+Extended feature validation revealed several FreeSWITCH dialplan and bridging bugs that were resolved prior to release:
 
 | Bug Discovered | Impact | Resolution / Files Changed |
 | --- | --- | --- |
@@ -2084,22 +2080,22 @@ Extended parity validation revealed several FreeSWITCH dialplan and bridging bug
 
 ## Per-Run Record, Benchmark Tiers, And Stop Conditions
 
-### Benchmark Run Ladders (XML Test)
+### Benchmark Test Levels (XML Test)
 
-Start small and increase only after the prior tier is stable:
+Start small and increase load only after the previous level is stable:
 
-| Tier | Dialplan Requests | Concurrency | Goal |
+| Level | Dialplan Requests | Concurrency | Goal |
 | --- | ---: | ---: | --- |
 | Baseline | 25 | 1 | Confirm XML handler health and report output. |
 | Small office burst | 100 | 5 | Confirm correct contexts, auth, XML shape, and no failed responses. |
-| Moderate office burst | 500 | 10–25 | Catch PHP-FPM, MariaDB, Redis, and contributor problems that appear under practical load. |
+| Moderate office burst | 500 | 10–25 | Catch PHP-FPM, MariaDB, Redis, and fragment cache issues under practical load. |
 | Optional medium stability | 1,000 | 25 | Confirm a longer small/medium burst stays stable after meaningful changes. |
 
-Avoid heavier tiers such as `10,000 x 100` on the test VM unless the goal is
-deliberately destructive stress testing. For real capacity claims, repeat
-the harness on representative hardware and record the server shape.
+Avoid heavier test levels such as `10,000 x 100` on the test VM unless the goal is
+deliberately destructive stress testing. For realistic capacity planning, repeat
+the tests on representative hardware and note the server specifications.
 
-Stop escalation when any of these appear:
+Stop increasing load if any of these occur:
 
 - XML handler latency spikes or returns non-2xx;
 - MariaDB shows lock or connection pressure;

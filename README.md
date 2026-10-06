@@ -312,11 +312,11 @@ bash scripts/fix-generated-permissions.sh
 
 ### Panel Navigation, Layout Modes & Switchable Themes
 
-The unified control panel provides flexible navigation layouts and color themes designed to maximize screen real estate for wide data tables (CDRs, routing rules, active calls, extensions) and optimize operator ergonomics:
+The unified control panel provides flexible navigation layouts and color themes designed to maximize screen real estate for wide data tables (CDRs, routing rules, active calls, extensions) and optimize administrator ergonomics:
 
 - **Switchable Color Themes (Light, Dark, System):** Instant runtime switching between Light mode, Dark mode, and automatic System preference detection (`prefers-color-scheme`). Preferences are cached synchronously in browser `localStorage` and executed by an inline `<head>` script prior to HTML render, guaranteeing zero flash-of-unstyled-theme (FOUC), while being persisted asynchronously to the user's profile in the database.
 - **Collapsible Sidebar (Mini "Icon Rail"):** On desktop, users can collapse the vertical sidebar from its standard expanded width (`256px`) down to a compact `64px` icon rail with centered icons, hover tooltips, and flyout popover submenus for grouped PBX categories. A toggle button is pinned at the bottom of the sidebar (`[«]` / `[»]`) and accessible via the desktop header toggle.
-- **Horizontal Header Navigation:** Users can switch to a full-width top-bar layout with standard dropdown menus (`menu menu-horizontal`), familiar to operators migrating from FusionPBX or classic PBX systems.
+- **Horizontal Header Navigation:** Users can switch to a full-width top-bar layout with standard dropdown menus (`menu menu-horizontal`), familiar to administrators migrating from FusionPBX or classic PBX systems.
 - **Mobile Responsive Fallback:** Regardless of the chosen layout mode, viewports below `1024px` automatically fall back to an accessible slide-over mobile drawer.
 - **Scroll Preservation:** Panel navigation uses Livewire `wire:navigate.preserve-scroll` with persisted scroll containers in `resources/views/layouts/app.blade.php`. The sidebar drawer and nav keep `data-panel-sidebar-scroll`, and nested menu sections, including PBX → Advanced, preserve the recursive `persistedNavigation` flag in `resources/views/components/sidebar-menu-item.blade.php` so navigating between pages never resets scroll position.
 
@@ -417,9 +417,9 @@ scripts/pbx-sipp-validate.sh
 The SIPp runner registers seeded users, starts an auto-answer registered endpoint, starts an outbound-route UAS, places extension-to-extension and outbound-route calls, and writes artifacts under `storage/app/load-tests/sipp-e2e-*`.
 
 - Add `MEDIA_FLOW=1` for live media RTP echo validation of recording (`*732`), music-on-hold (`load_test_moh`), and IVR announcements (`load_test_announcement`).
-- Add `EXTENDED=1` to run all 8 extended telephony parity scenarios: ring groups (`2400`), voicemail (`2003`), conferences (`2500`), loopback call forwarding (`2001` -> `2000`), time conditions (`2401`), follow-me (`2002`), emergency (`911`), and call blocking.
+- Add `EXTENDED=1` to run all 8 extended telephony feature validation scenarios: ring groups (`2400`), voicemail (`2003`), conferences (`2500`), loopback call forwarding (`2001` -> `2000`), time conditions (`2401`), follow-me (`2002`), emergency (`911`), and call blocking.
 
-Expected basic SIPp result: the script exits `0`, `summary.md` shows all scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`, and empirical benchmark measurements are in `docs/load-testing-results.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
+Expected basic SIPp result: the script exits `0`, `summary.md` shows all scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`, and benchmark measurements are in `docs/load-testing-results.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
 
 ### PHP-FPM Load-Test Tuning
 
@@ -440,7 +440,7 @@ If the log repeatedly shows `server reached pm.max_children`, requests are queue
 
 In `static` mode, all workers remain initialized and ready for FreeSWITCH XML handler bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored. Use `INSTALL.md` for larger server sizing guidance (e.g. `24` workers for 8 GB+). More workers are not automatically faster: tune PHP-FPM while watching CPU load, memory, MariaDB, and XML handler latency.
 
-### Telephony XML Cache Tuning & Hit Rate Sweep
+### Telephony XML Cache Tuning & Hit Rate Tests
 
 TallPBX caches phone routing data in Redis at multiple levels—from complete call responses down to individual routing rules. This keeps lookups instant and protects the database from overload during call spikes:
 
@@ -457,7 +457,7 @@ To benchmark all 5 standard cache configurations and calculate Redis hit rates o
 bash scripts/run-cache-sweep.sh
 ```
 
-The script runs a standardized 5-tier sweep (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling), reporting requests/sec, average latency, and Redis keyspace hit rates, and automatically restores production defaults upon completion.
+The script runs a standardized 5-tier test (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling), reporting requests/sec, average latency, and Redis keyspace hit rates, and automatically restores production defaults upon completion.
 
 Check active Redis cache hit statistics at any time:
 

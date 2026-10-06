@@ -54,7 +54,7 @@ To benchmark telephony lookup latency, verify Redis hit rates, and ensure PHP-FP
    redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
    ```
 
-2. **Run XML Handler Cache Sweep**:
+2. **Run XML Handler Cache Tests**:
    Benchmark all 5 standard cache configurations (cold baseline, contributor cache, default 5s burst, 30s call-center profile, and memory hit ceiling) and calculate hit rates on your hardware:
    ```bash
    bash scripts/run-cache-sweep.sh
@@ -127,7 +127,7 @@ responds again (run them as root — prefix with `sudo` if your SSH session is n
    ```bash
    nft insert rule inet tallpbx_filter input iif "lo" accept
    ```
-2. **Restore one operator address** (for example your office or VPN address), keeping
+2. **Restore one administrator address** (for example your office or VPN address), keeping
    every other rule:
    ```bash
    nft insert rule inet tallpbx_filter input ip saddr <your-ip> accept
@@ -473,7 +473,7 @@ If editing configuration files by hand:
 
 ## TLS Certificate Management & HTTPS/WSS Lifecycle
 
-TallPBX provides a unified, UI-driven Certificate Manager under the main navigation (**HTTPS & TLS Certificates**, route `/panel/certificates`), allowing operators to issue, import, generate, and deploy SSL/TLS certificates without CLI commands.
+TallPBX provides a unified, UI-driven Certificate Manager under the main navigation (**HTTPS & TLS Certificates**, route `/panel/certificates`), allowing administrators to issue, import, generate, and deploy SSL/TLS certificates without CLI commands.
 
 ### Services Secured
 - **Web Portal & WebSockets**: Nginx HTTPS (:443) and Laravel Reverb WebSockets reverse-proxy tunnel (`/app` -> `127.0.0.1:8080`). Active symlinks are managed atomically in `/etc/tallpbx/certs/active/`.
