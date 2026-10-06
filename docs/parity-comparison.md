@@ -4,7 +4,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 
 - **FusionPBX Baseline**: [github.com/fusionpbx/fusionpbx](https://github.com/fusionpbx/fusionpbx) (FreeSWITCH-based, multi-tenant)
 - **FreePBX Baseline**: [github.com/FreePBX](https://github.com/FreePBX) (Asterisk-based, traditionally single-tenant)
-- **TallPBX Baseline**: Core application + 59 first-party modules under `app-modules/` (FreeSWITCH® 1.11, multi-tenant, Laravel 13, Livewire 4)
+- **TallPBX Baseline**: Core application + 60 first-party modules under `app-modules/` (FreeSWITCH® 1.11, multi-tenant, Laravel 13, Livewire 4)
 
 ---
 
@@ -22,14 +22,14 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme; no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no native dark mode) |
 | **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Intrusion Defense (Phones, Web & Server)** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Delayed log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
-| **Automated Testing** | **2,400+ Pest tests incl. browser tests via Playwright** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **2,600+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 | Metric / Feature Category | TallPBX | FusionPBX Equivalent | FreePBX Equivalent | Parity Assessment |
 | :--- | :--- | :--- | :--- | :---: |
-| **Total Analyzed Feature Areas** | **59** | **57** | **53** | High Convergence |
-| **Functional / Feature Parity** | **57 (96.6%)** | 57 (100%) | 50 (94.3%) | 🟢 **Core Parity Met** |
-| **Architecturally Superior in TallPBX** | **10 capabilities** (OAuth, Limits, Event Rate Limits, Backups, Local Spooling, Security Firewall, Bounded CLI Security, Layouts & Themes) | Legacy PHP scripts | Commercial closed modules | 🚀 **Substantial Advantage** |
+| **Total Analyzed Feature Areas** | **60** | **58** | **54** | High Convergence |
+| **Functional / Feature Parity** | **58 (96.7%)** | 58 (100%) | 51 (94.4%) | 🟢 **Core Parity Met** |
+| **Architecturally Superior in TallPBX** | **11 capabilities** (OAuth, Limits, Event Rate Limits, Backups, Local Spooling, Security Firewall, Bounded CLI Security, Layouts & Themes, TLS Certificate Management) | Legacy PHP scripts | Commercial closed modules | 🚀 **Substantial Advantage** |
 | **Intentionally Excluded (Security)** | **2 modules** (Web DB client, Web shell) | Exposes `app/database`, `app/exec` | None in core | 🛡️ **Superior Security** |
 
 ---
@@ -124,6 +124,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Multi-Language (i18n)** | Core localization (`en`, `es`, `fr` dictionaries, topbar switcher, locale routing) | Monolithic `app_languages.php` | Gettext PO/MO files (often untranslated) | 🚀 **Superior in TallPBX** |
 | **Tenant Limits** | `tenant-limits` (soft & hard resource capping per tenant) | Dialplan limits only | *Not applicable* | 🚀 **Superior in TallPBX** |
 | **Firewall & Threat Defense** | `security` (Native Linux kernel `nftables`, dynamic kernel sets, real-time SIP ESL `sofia::failed_auth` & Web login rate limiting, zero-lockout protection) | Fail2ban log scraper + `iptables` rules | `firewall` / `sysadmin` (commercial) + Fail2ban | 🚀 **Superior in TallPBX** |
+| **TLS Certificate Management** | `certificates` (Let's Encrypt HTTP-01/DNS-01 ACME, custom PEM modulus match, self-signed CA, dual Nginx & FreeSWITCH TLS/WSS auto-deploy) | Manual CLI / certbot scripts (no unified Sofia/Nginx deployer) | `certman` (Certificate Manager, Let's Encrypt / custom) | 🚀 **Superior in TallPBX** |
 | **Privileged Host Execution** | Core Architecture: Dedicated bounded helper (`/usr/local/sbin/tallpbx-security`), strict regex whitelisting, non-interactive, discrete argument arrays, zero wildcard sudoers | Unhardened: direct shell commands, web shell (`app/exec`), raw SQL runner (`app/database`) | Unhardened: Asterisk/Apache sudo access, shell scripts with variable interpolation | 🛡️ **Superior Security** |
 | **Dangerous Tools** | *Intentionally Omitted* | `app/database` (raw SQL web runner), `app/exec` (web shell) | *None in core* | 🛡️ **Intentionally excluded for security** |
 
@@ -135,7 +136,7 @@ This document provides a detailed feature-by-feature and architectural compariso
    - Built on **Laravel 13**, **Livewire 4**, and **Tailwind CSS v4** with clean architectural boundaries (`App\Support\ModuleServiceProvider`, `BaseListComponent`, `BaseEditComponent`).
    - FusionPBX and FreePBX are 15–20 year-old procedural PHP codebases with deeply nested global state, direct SQL string concatenation, and minimal test coverage.
 2. **Quality & Test Automation**:
-   - **2,400+ Pest tests incl. browser tests via Playwright** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
+   - **2,600+ Pest tests incl. Pest Browser tests** run in CI and locally. Any regression in tenant isolation, routing, or XML generation is caught immediately before deployment.
 3. **Multi-Tenant Security Model**:
    - Multi-tenant defense-in-depth:
      - `TenantMutationGuard` enforces data boundary checks on model lifecycle events.
@@ -166,3 +167,6 @@ This document provides a detailed feature-by-feature and architectural compariso
     - Web application processes run under the unprivileged `www-data` user. Privileged host mutations are strictly encapsulated in a dedicated root-owned helper script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`, so the web user can execute but never modify the script), with matching sudoers drop-in `/etc/sudoers.d/tallpbx-security`.
     - The helper validates every parameter against strict regular expressions, runs non-interactively (`set -euo pipefail`), invokes hardcoded absolute paths, and contains zero subshell or interactive escape vectors.
     - All unprivileged CLI commands utilize discrete argument arrays (`new Process(['git', '-C', $path, 'status'])`), eliminating shell injection vectors.
+11. **Unified TLS Certificate Lifecycle Engine (Web HTTPS & Telephony SIP/WSS)**:
+    - Unlike legacy platforms where web server SSL and PBX telephony TLS are managed in isolation through manual configuration edits, TallPBX provides a unified, UI-driven Certificate Manager (`app-modules/certificates/`).
+    - A single certificate can be issued via Let's Encrypt (HTTP-01 or DNS-01 Cloudflare for wildcards) or imported with real-time browser modulus validation, and simultaneously deployed to both Nginx (HTTPS :443, Reverb WebSockets :8080) and FreeSWITCH (SIP TLS :5061, WebRTC WSS :7443) with atomic syntax validation and zero downtime. Dedicated Artisan commands (`certificates:renew`, `deploy`, `status`) and scheduled daily sweeps automate certificate maintenance end-to-end.

@@ -104,3 +104,16 @@ The **Security Command Center** (`/panel/security`) provides system administrato
   - **Firewall Rules**: Interactive, reorderable 7-stage pre-filter pipeline, PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69), custom sequential rules, and fallback default policy.
 
 ![TallPBX Security Command Center](images/security-dashboard-full.png)
+
+---
+
+## 5. HTTPS & TLS Certificate Management
+
+The **Certificate Manager** (`/panel/certificates`) provides a unified, web-native interface for securing both administrative web traffic (Nginx HTTPS and Reverb WebSockets) and VoIP telephony signaling (FreeSWITCH SIP TLS :5061 and WebRTC Secure WebSockets :7443) without touching the Linux command line.
+
+* **Unified Certificate Inventory**: Track all active certificates, domain coverage (SANs), issuers, and real-time expiration badges across Web and Telephony services.
+* **Automated Let's Encrypt (ACME v2)**: Issue and automatically renew certificates via standard HTTP-01 webroot challenges or DNS-01 challenges using Cloudflare API credentials stored securely in the encrypted DNS Vault (enabling wildcard `*.domain.com` certificates).
+* **Custom PEM Import**: Upload or paste commercial certificates with live, client-side cryptographic modulus matching between certificates and private keys before submission.
+* **Self-Signed Certificate Generator**: Instantly generate RSA/ECDSA certificates with SAN extensions for lab testing, development environments, and internal deployments.
+* **Zero-Downtime Atomic Swaps**: Validates cryptographic modulus alignment and Nginx configuration syntax atomically before executing service reloads, preventing web server lockouts or FreeSWITCH crashes.
+

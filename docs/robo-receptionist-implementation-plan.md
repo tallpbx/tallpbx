@@ -2261,12 +2261,18 @@ git commit -m "feat: add robo receptionist dialplan stub contributor"
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Group;
+use Database\Seeders\AdminSeeder;
 use Livewire\Livewire;
 use Modules\RoboReceptionist\Livewire\AiProvidersList;
 use Modules\RoboReceptionist\Models\AiProviderConfig;
 
 beforeEach(function () {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin->groups()->attach($superAdminGroup->id);
 });
 
 it('renders the AI providers list', function () {
@@ -2305,13 +2311,19 @@ it('shows empty state when no providers exist', function () {
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Group;
 use App\Models\Tenant;
+use Database\Seeders\AdminSeeder;
 use Livewire\Livewire;
 use Modules\RoboReceptionist\Livewire\AiProvidersEdit;
 use Modules\RoboReceptionist\Models\AiProviderConfig;
 
 beforeEach(function () {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin->groups()->attach($superAdminGroup->id);
 });
 
 it('creates a provider config with tenant assignments', function () {
@@ -2838,12 +2850,18 @@ git commit -m "feat: add AI provider config pages for robo receptionist module"
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Group;
+use Database\Seeders\AdminSeeder;
 use Livewire\Livewire;
 use Modules\RoboReceptionist\Livewire\RoboReceptionistList;
 use Modules\RoboReceptionist\Models\RoboReceptionist;
 
 beforeEach(function () {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin->groups()->attach($superAdminGroup->id);
 });
 
 it('renders the receptionist list', function () {
@@ -2882,15 +2900,21 @@ it('shows empty state when no receptionists exist', function () {
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Group;
 use App\Models\Tenant;
 use App\Services\DestinationResolver;
+use Database\Seeders\AdminSeeder;
 use Livewire\Livewire;
 use Modules\RoboReceptionist\Models\AiProviderConfig;
 use Modules\RoboReceptionist\Models\RoboReceptionist;
 use Modules\RoboReceptionist\Livewire\RoboReceptionistEdit;
 
 beforeEach(function () {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin->groups()->attach($superAdminGroup->id);
     $this->tenant = Tenant::factory()->create();
 });
 
@@ -3699,15 +3723,15 @@ grep -c "robo_receptionist" lang/en/admin.php
 
 Expected: 6 routes in `route:list`, all tests green, grep count ≥ 20.
 
-- [ ] **Step 7: Optional Dusk smoke test (UI changes are present)**
+- [ ] **Step 7: Optional Pest Browser smoke test (UI changes are present)**
 
-If the environment supports it per `scripts/dusk.sh`, run the browser suite and confirm the new pages render:
+If the environment supports it per `scripts/test-browser.sh`, run the browser suite and confirm the new pages render:
 
 ```bash
-bash scripts/dusk.sh
+bash scripts/test-browser.sh
 ```
 
-If Dusk coverage for this module is desired, add a smoke visit of `/panel/robo-receptionist` and `/panel/robo-receptionist/providers` in the existing Dusk smoke test — otherwise note the gap in the task report.
+If Pest Browser coverage for this module is desired, add a smoke visit of `/panel/robo-receptionist` and `/panel/robo-receptionist/providers` in tests/Browser — otherwise note the gap in the task report.
 
 - [ ] **Step 8: Commit**
 
@@ -3722,4 +3746,4 @@ git commit -m "feat: expose robo receptionist as inbound route destination"
 
 - **Spec coverage:** AI-provider subscription with admin API keys → Tasks 3, 4, 8 (system-wide configs assignable to tenants). Voice prompts/voice type config → receptionist fields (Tasks 2, 5, 9). IVR-style route configuration → intent-phrase routes with resolver kinds (Tasks 2, 5, 9). Pluggable provider with one first implementation → Task 3. Config-plane complete with transport stubbed → Tasks 6, 7. Reachability as destination → Tasks 6, 10.
 - **Type consistency:** service method names (`create(array $data, array $routes)`, `assignedToTenant()`, `syncRoutes()`) and model column names are identical across schema, services, Livewire components, and tests. Registry key `openai_realtime` matches the factory default and registry tests.
-- **Known deferrals (intentional, documented in the spec):** live media transport, provider-side call handling, ES/fr locales for new keys (en is authoritative here), and Dusk coverage are out of scope for this plan.
+- **Known deferrals (intentional, documented in the spec):** live media transport, provider-side call handling, ES/fr locales for new keys (en is authoritative here), and Pest Browser coverage are out of scope for this plan.

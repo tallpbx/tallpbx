@@ -87,16 +87,29 @@ function grantAdminPermissions(?Admin $admin = null, array $permissions = ['pane
 
     $group = Group::factory()->system()->create(['name' => 'Test Permissions Group']);
 
-    foreach ($permissions as $name) {
-        $module = explode('.', $name)[0] ?? 'test';
-        $perm = Permission::firstOrCreate(
-            ['name' => $name],
-            [
-                'module' => $module,
-                'description' => fake()->sentence(),
-            ]
-        );
-        $group->permissions()->attach($perm);
+    if (! empty($permissions)) {
+        $existing = Permission::whereIn('name', $permissions)->pluck('id', 'name')->all();
+        $missing = array_diff($permissions, array_keys($existing));
+
+        if (! empty($missing)) {
+            $now = now();
+            $rows = [];
+            foreach ($missing as $name) {
+                $module = explode('.', $name)[0] ?? 'test';
+                $rows[] = [
+                    'id' => (string) Str::uuid(),
+                    'name' => $name,
+                    'module' => $module,
+                    'description' => 'Permission '.$name,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            Permission::insert($rows);
+            $existing = Permission::whereIn('name', $permissions)->pluck('id', 'name')->all();
+        }
+
+        $group->permissions()->syncWithoutDetaching(array_values($existing));
     }
 
     $admin->groups()->syncWithoutDetaching([$group->id]);
@@ -138,18 +151,28 @@ function grantTenantUserPermissions(Tenant $tenant, array $permissions = [], ?Us
             'name' => 'Test Tenant Group '.Str::random(6),
         ]);
 
-        foreach ($permissions as $name) {
-            $module = explode('.', $name)[0] ?? 'test';
-            $perm = Permission::firstOrCreate(
-                ['name' => $name],
-                [
+        $existing = Permission::whereIn('name', $permissions)->pluck('id', 'name')->all();
+        $missing = array_diff($permissions, array_keys($existing));
+
+        if (! empty($missing)) {
+            $now = now();
+            $rows = [];
+            foreach ($missing as $name) {
+                $module = explode('.', $name)[0] ?? 'test';
+                $rows[] = [
+                    'id' => (string) Str::uuid(),
+                    'name' => $name,
                     'module' => $module,
-                    'description' => fake()->sentence(),
-                ]
-            );
-            $group->permissions()->attach($perm);
+                    'description' => 'Permission '.$name,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            Permission::insert($rows);
+            $existing = Permission::whereIn('name', $permissions)->pluck('id', 'name')->all();
         }
 
+        $group->permissions()->syncWithoutDetaching(array_values($existing));
         $user->groups()->syncWithoutDetaching([$group->id]);
     }
 

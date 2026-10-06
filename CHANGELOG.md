@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-05
+
+### Changed
+- **Documentation Audit & Maintenance**:
+  - Removed completed and historical implementation documents from `docs/` (`docs/audit-v1.1.2-to-2.0.md`, `docs/certificate-manager-implementation-plan.md`, `docs/threat-feeds-and-bot-defense-implementation-plan.md`, and `docs/test-suite-optimization-plan.md`), preserving active operational runbooks in `docs/operations.md` and kernel architecture in `docs/security-architecture.md`.
+  - Updated `docs/parity-comparison.md` and `README.md` to reflect all 60 PBX modules (incorporating `app-modules/certificates` and parity with FreePBX `certman`) and current test suite counts (2,600+ tests).
+  - Updated `docs/ui-tour.md` to include Section 5 showcasing the unified Certificate Manager UI.
+  - Corrected local repository links in `docs/security-architecture.md`, purged deprecated Dusk references in favor of Pest Browser in `docs/robo-receptionist-implementation-plan.md`, and updated test setup fixtures with standard `AdminSeeder` permission conventions.
+- **Test Suite Performance Optimization & Domain Consolidation**:
+  - Optimized permission testing helpers in `tests/Pest.php` (`grantAdminPermissions()` and `grantTenantUserPermissions()`) to batch lookup, batch insert missing permissions, and execute single `syncWithoutDetaching()` calls, eliminating Faker string generation in tight test loops and saving ~17.5s across the full parallel test suite (2,687 tests).
+  - Implemented the Standard 2-File Module Pattern across 10 core telephony modules (`gateways`, `inbound-routes`, `outbound-routes`, `voicemails`, `conferences`, `ring-groups`, `sip-trunks`, `dialplans`, `call-centers`, and `extensions`), consolidating 47 micro-files down to 20 cohesive files (`[Module]ComponentTest.php` and `[Module]ServiceAndIsolationTest.php`) using Pest `describe()` lexical blocks while preserving 100% test count (2,687 tests) and assertion parity.
+
 ## [3.0.0] - 2026-10-05
 
 ### Added

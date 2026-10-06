@@ -106,8 +106,7 @@ TallPBX enforces a strict two-tier policy for running host Linux commands to pre
 
 **Mandatory for any change that touches firewall behavior, the security helper, ruleset
 generation, or the security switches.** Two production lockouts on 2026-09-29 drove these
-rules; the full incident record is in `docs/threat-feeds-and-bot-defense-implementation-plan.md`
-and the runbooks in `docs/operations.md`.
+rules; see the recovery runbooks in `docs/operations.md` and `docs/security-architecture.md` §9.3.
 
 ### The two failure modes that must never recur
 

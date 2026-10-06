@@ -38,10 +38,10 @@ Built to eliminate the steep learning curve and dated interfaces of legacy PBX p
 | **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme, no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no dark mode) |
 | **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Intrusion Defense (Phones, Web & Server)** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
 | **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
-| **Automated Testing** | **2,400+ Pest tests incl. browser tests via Playwright** | Minimal / community scripts | Minimal unit tests |
+| **Automated Testing** | **2,600+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
-See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 59 PBX modules (Extensions, Routing, PBX Features, Media, Operations, Security, and Administration).
+See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 60 PBX modules (Extensions, Routing, PBX Features, Media, Operations, Security, and Administration).
 
 👉 **[Explore the Security Architecture & Packet Flow Guide (Firewall, Intrusion Defense & Flow Diagrams) →](docs/security-architecture.md)**
 
@@ -480,7 +480,7 @@ TallPBX follows the **[Laravel framework versioning model](https://laravel.com/d
   - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
   - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
 - **Active Release Branches**:
-  - **`3.x`**: Current primary development branch for 3.x features and releases (currently unreleased).
+  - **`3.x`**: Current primary development branch for 3.x features and releases (latest stable: `v3.0.1`).
   - **`2.0`**: Maintenance release series for 2.x deployments (latest stable: `v2.1.1`).
   - **`1.1`**: Maintenance release series for 1.1.x deployments.
   - **`1.0`**: Frozen maintenance branch for critical security fixes only.
