@@ -197,17 +197,17 @@ sequenceDiagram
 
 ---
 
-## 5. Security Command Center Interface
+## 5. Security Center Interface
 
-The **Security Command Center** (`/panel/security`) provides an evaluation-ordered, four-tab interface mirroring the kernel packet filtering pipeline:
+The **Security Center** (`/panel/security`) provides an evaluation-ordered, four-tab interface mirroring the kernel packet filtering pipeline:
 
-![TallPBX Security Command Center](images/security-dashboard-full.png)
+![TallPBX Security Center](images/security-dashboard-full.png)
 
 ### Master Operational Switches (Top Banner)
 Pinned directly above the tab strip for immediate visibility:
 1. **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules.
 2. **Pre-Filter Pipeline Switch**: Enables or disables stages 1–7 as a single unit. Guarded by `LockoutGuardService::assertLocalServicesSafe()`—refuses to disable pre-filters if the default policy would drop loopback database/cache traffic.
-3. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops, but nothing is blocked. A prominent amber banner displays across all Security pages while active.
+3. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops, but nothing is blocked. A prominent amber banner displays across all Security Center tabs while active.
 
 ---
 
@@ -245,7 +245,7 @@ Pinned directly above the tab strip for immediate visibility:
 
 ## 6. Understanding Sequential Firewall Rules: "Top to Bottom"
 
-Firewall rules in the **Security Command Center** are evaluated sequentially from top to bottom.
+Firewall rules in the **Security Center** are evaluated sequentially from top to bottom.
 
 ### How It Works: First Match Wins
 1. When traffic arrives, the firewall tests Rule #1 at the top.

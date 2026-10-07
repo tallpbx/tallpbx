@@ -83,9 +83,9 @@ Users can toggle their preferred language instantly via the topbar language drop
 
 ---
 
-## 4. Security Command Center & Host Firewall
+## 4. Security Center & Host Firewall
 
-The **Security Command Center** (`/panel/security`) provides system administrators with real-time control and visibility over the Linux kernel `nftables` host firewall, automated intrusion detection, public threat intelligence feeds, and telephony bot defense.
+The **Security Center** (`/panel/security`) provides system administrators with real-time control and visibility over the Linux kernel `nftables` host firewall, automated intrusion detection, public threat intelligence feeds, and telephony bot defense.
 
 * **Reactive Live Updates**: Connected directly to **Laravel Reverb WebSockets** via **Laravel Echo** — active threat counters, ban expirations, feed sync status, and rule changes update reactively without requiring page refreshes.
 * **Master Operational Switches & Zero-Lockout**: Pinned controls for the Firewall Master Switch, Built-in Pre-Filters Switch, and Global Observe Mode (non-blocking observation banner), protected by automated preflight guards that ensure the administrator's connection and local database/cache services can never be severed.
@@ -95,7 +95,7 @@ The **Security Command Center** (`/panel/security`) provides system administrato
   - **Threat Feeds**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
   - **Firewall Rules**: Interactive, reorderable 7-stage pre-filter pipeline, PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69), custom sequential rules, and fallback default policy.
 
-![TallPBX Security Command Center](images/security-dashboard-full.png)
+![TallPBX Security Center](images/security-dashboard-full.png)
 
 ---
 

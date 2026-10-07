@@ -75,7 +75,7 @@ The host firewall evaluates incoming connections sequentially through a 12-stage
 3. **Invalid Packet State**: Corrupted or malformed packets are discarded immediately.
 4. **Established / Related**: Active phone calls and existing sessions pass via fast-path connection tracking.
 5. **Permanent Blacklist**: Forbidden IPs and CIDR blocks are dropped at line rate.
-6. **Active Intruder Bans**: Attackers banned for failed logins or SIP registration floods are dropped with auto-expiring timeouts.
+6. **Active Intruder Bans**: Attackers banned for failed authentication attempts across SIP, Web, or SSH are dropped with auto-expiring timeouts.
 7. **Public Threat Feeds**: Known scanner networks and VoIP fraud IPs (VoIPBL) are blocked.
 8. **Diagnostic Ping & IPv6**: Rate-limited ICMP ping and IPv6 neighbor discovery traffic.
 9. **TFTP Defense (UDP 69)**: Hardened profile blocking upload attempts (WRQ) and directory traversal probes.
@@ -84,8 +84,9 @@ The host firewall evaluates incoming connections sequentially through a 12-stage
 12. **Default Inbound Policy**: Fallback verdict (typically `drop`).
 
 ### Master Control Switches
-Two switches at the top of the Security Center control global behavior:
-- **Pre-Filter Pipeline Toggle**: Toggles stages 1–7. Guarded against accidental lockout; the panel refuses changes that would sever loopback services.
+Three master operational switches pinned at the top of the Security Center control global behavior:
+- **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules.
+- **Built-in Pre-Filters Switch**: Enables or disables stages 1–7 as a single unit. Guarded against accidental lockout; the panel refuses changes that would sever loopback database and cache services.
 - **Global Observe Mode**: Keeps all rules active and counting, but changes drop verdicts to log-only so you can test policies safely before enforcing them.
 
 For complete packet flow diagrams and kernel-level specifications, see [docs/security-architecture.md](security-architecture.md).

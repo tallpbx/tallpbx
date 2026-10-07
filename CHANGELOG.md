@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Preserved standalone certificate automation scripts under `### Headless CLI Helper Scripts (Terminal Fallback)`.
   - In `README.md`:
     - Introduced Artisan in Section 4 (*Modular Architecture*).
+- **Security Center and Operational Documentation Harmonization**:
+  - Harmonized terminology from "Security Command Center" to canonical "Security Center" across `docs/security-architecture.md` and `docs/ui-tour.md`, matching the web UI title and `INSTALL.md`.
+  - Updated `docs/operations.md` to document all three pinned master operational switches (Firewall Master Switch, Built-in Pre-Filters Switch, and Global Observe Mode).
+  - Unified automated intrusion detection coverage across all three core vectors (SIP authentication, web login, and SSH brute force) across `README.md`, `docs/operations.md`, and `docs/parity-comparison.md`.
 
 ## [3.0.2] - 2026-10-06
 

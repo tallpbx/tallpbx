@@ -12,7 +12,7 @@ TallPBX is a self-hosted business phone system named after its foundation on the
 - Deliver voicemail notifications, password resets, and system alerts via standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft 365, or custom providers).
 - Operate one or more customer or business tenants from the same system.
 - Keep backups and restore approved backup operations.
-- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP and web vectors, automatic ban management, and zero-lockout protection ([Security Architecture & Flow Guide →](docs/security-architecture.md)).
+- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP, Web, and SSH vectors, automatic ban management, and zero-lockout protection ([Security Architecture & Flow Guide →](docs/security-architecture.md)).
 
 TallPBX is the phone-system software, not a telephone carrier. You need a SIP
 trunk or gateway from a provider if you want to place or receive public phone
@@ -137,11 +137,11 @@ Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails w
 TallPBX includes a first-party Security module (`app-modules/security`) providing defense across telephony, web, and network layers:
 
 - **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@blacklist_ips`, `@banned_ips`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
-- **Real-Time Intrusion Defense**: Scans FreeSWITCH SIP authentication failures in real time via the Event Socket Layer (ESL), intercepts web login brute-force attempts, and enforces temporary rate-based bans in Redis.
+- **Real-Time Intrusion Defense**: Scans FreeSWITCH SIP authentication failures in real time via the Event Socket Layer (ESL), intercepts web login and SSH brute-force attempts, and enforces temporary rate-based bans in Redis.
 - **Zero-Lockout Safety Guard**: Prevents administrators from locking themselves out by verifying remote IP, active sessions, and local loopback services (database and Redis connections) before restrictive policies apply.
 - **Hardened System Architecture**: Web processes run under the restricted web user (`www-data`). Privileged firewall operations run through a dedicated root helper (`/usr/local/sbin/tallpbx-security`) with strict input validation.
 
-Manage security from the web panel or directly from the terminal:
+Manage security from the web panel's **Security Center** or directly from the terminal:
 
 ```bash
 php artisan security:status              # Check firewall status, active sets, and banned IPs
