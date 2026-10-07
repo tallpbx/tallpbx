@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Accurately clarified PHP-FPM worker sizing based on detected host RAM, detailing `dynamic` (1 GB RAM) vs. `static` (2 GB+ RAM) mode trade-offs.
     - Aligned intrusion detection terminology with the web panel's **Security Center**, covering SIP authentication, web login, and SSH brute force protection.
     - Streamlined the explanation of the firewall root helper (`/usr/local/sbin/tallpbx-security`) without unnecessary privilege jargon.
+    - Relocated upgrade git conflict handling directly into Troubleshooting, removing the redundant cross-reference stub.
   - In `docs/operations.md`:
     - Introduced Artisan in Section 2 (*Health Checks and Testing*).
     - Preserved standalone certificate automation scripts under `### Headless CLI Helper Scripts (Terminal Fallback)`.

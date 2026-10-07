@@ -378,25 +378,6 @@ After upgrading, confirm that the panel opens, FreeSWITCH is running, and a
 test call works. If an upgrade fails, restore the backup. Database updates move
 forward and should not be rolled back casually.
 
-### If Git Will Not Pull the Update
-
-Git may refuse the update when the server has local changes that conflict with
-the new code. Do not delete those changes — save them, update, then restore:
-
-```bash
-# Save local changes, including new files.
-git stash push --include-untracked -m "before TallPBX upgrade"
-
-# Download the straightforward update.
-git pull --ff-only origin 3.x
-
-# Put the saved local changes back after the update.
-git stash pop
-```
-
-If the final command reports a conflict, resolve it before continuing. The
-saved change remains available as a Git stash until it is applied successfully.
-
 ## Troubleshooting
 
 ### Installer Fails at "Installing Composer"
@@ -433,7 +414,22 @@ nano /etc/pbx/installer.env   # update the SWITCH_TOKEN line
 
 ### Git Conflicts During Upgrade
 
-See [If Git Will Not Pull the Update](#if-git-will-not-pull-the-update) above.
+Git may refuse the update when the server has local changes that conflict with
+the new code. Do not delete those changes — save them, update, then restore:
+
+```bash
+# Save local changes, including new files:
+git stash push --include-untracked -m "before TallPBX upgrade"
+
+# Download the straightforward update:
+git pull --ff-only origin 3.x
+
+# Put the saved local changes back after the update:
+git stash pop
+```
+
+If the final command reports a conflict, resolve it before continuing. The
+saved change remains available as a Git stash until it is applied successfully.
 
 ### Server Unreachable After a Firewall Change
 
