@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-10-06
+
 ### Changed
-- **Documentation Overhaul & Simplification**:
+- **Comprehensive Documentation Overhaul & Simplification**:
   - Streamlined and consolidated user-facing documentation across `README.md`, `INSTALL.md`, and all guides in `docs/`, removing over 2,900 lines (-49.3%) of redundant copy, historical campaign notes, and telephony/developer jargon while preserving 100% of technical depth, empirical benchmarks, and operational procedures.
   - Consolidated duplicate benchmarking metrics and scenarios in `docs/load-testing-results.md` and `docs/load-testing-guide.md` into unified reference matrices with a single canonical glossary.
-  - Streamlined `README.md` and `INSTALL.md` with concise architecture overviews, fixed release branch references (`3.x`), and focused hardware/capacity guidance.
+  - Streamlined `README.md` and `INSTALL.md` with concise architecture overviews, fixed release branch references (`3.x`), clear Quick Start onboarding, accurate FreeSWITCH dialplan context terminology, and plain-language caching explanations.
   - Simplified operational runbooks in `docs/operations.md`, `docs/security-architecture.md`, `docs/parity-comparison.md`, and `docs/ui-tour.md`.
   - Relocated internal agent developer specification `docs/robo-receptionist-implementation-plan.md` to `.agents/plans/` to keep `docs/` strictly focused on user documentation.
 
