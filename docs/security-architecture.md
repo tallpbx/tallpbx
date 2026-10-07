@@ -299,6 +299,13 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, thr
    - The systemd boot loader `/etc/nftables.conf` includes `/etc/tallpbx/firewall.nft`.
    - When the Linux server reboots, systemd's `nftables.service` executes `/etc/nftables.conf` before networking starts, instantly restoring all rules, trusted IPs, threat feeds, and temporary attacker bans with their remaining expiration times intact.
 
+### Privilege Separation: Installer Secrets vs. Runtime Assets
+
+TallPBX enforces a strict privilege separation boundary between root installer state and web-managed assets:
+
+- **`/etc/default/tallpbx` (`0600 root:root`)**: Stored in Debian's standard `/etc/default/` location. Contains root installer credentials and tokens that the unprivileged web application (`www-data`) cannot read, modify, or delete.
+- **`/etc/tallpbx/` (`2775 root:www-data`)**: Holds the active firewall rules (`firewall.nft`, `threat_feed.nft`) and certificates. The web panel stages `.pending` changes here, which the root helper validates and promotes.
+
 > [!NOTE]
 > **Atomic Swaps & Safety Checks**:
 > All ruleset updates are atomic (all-or-nothing). TallPBX tests proposed rules with `nft -c` and runs zero-lockout guards before applying. If any check fails, the transaction is aborted and the existing active firewall continues uninterrupted. You are never left with broken or half-applied rules.

@@ -21,6 +21,17 @@ TallPBX runs as systemd services. Check or restart any of them with
 Handy checks: `redis-cli ping` (expects `PONG`) and `php artisan security:status`
 (firewall state and active bans).
 
+### Configuration Paths & Permissions
+
+TallPBX enforces a strict privilege boundary across its configuration paths using standard Debian conventions:
+
+| Path | Mode & Owner | Purpose |
+| :--- | :--- | :--- |
+| `/etc/default/tallpbx` | `0600 root:root` | Root installer state, database passwords, and package tokens. Unreadable by web processes. |
+| `/etc/tallpbx/` | `2775 root:www-data` | Runtime firewall rules (`firewall.nft`, `threat_feed.nft`) and SSL/TLS certificates (`certs/`). |
+| `/var/www/tallpbx/` | `0755 root:www-data` | Web application source code, Artisan CLI commands, and web UI. |
+| `/var/lib/tallpbx/media/` | `2775 www-data:www-data` | Call recordings, voicemail audio, and tenant media files. |
+
 ## Health Checks and Testing
 
 Commands run via `php artisan` use Laravel's built-in command-line tool, **Artisan**, which includes custom commands for telephony, sound prompt management, and security. Always execute Artisan commands from the project directory (`cd /var/www/tallpbx`).

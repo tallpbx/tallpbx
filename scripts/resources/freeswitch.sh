@@ -599,7 +599,7 @@ SYSTEMD
 
 freeswitch_install_method="${FSPBX_FREESWITCH_INSTALL_METHOD:-}"
 previous_freeswitch_install_method="${FSPBX_PREVIOUS_FREESWITCH_INSTALL_METHOD:-}"
-INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/pbx/installer.env}"
+INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/default/tallpbx}"
 if [ -z "$freeswitch_install_method" ]; then
     if [ "$switch_source" = "true" ]; then
         freeswitch_install_method=source
@@ -720,7 +720,7 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
     fi
     # Reuse durable installer state. The existing APT auth file provides a
     # migration path for servers installed before secure state was introduced.
-    INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/pbx/installer.env}"
+    INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/default/tallpbx}"
     # The main installer gathers this secret before work begins. A direct run
     # still accepts the configured, saved, or interactively entered token.
     switch_token=$(resolve_signalwire_token \

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Consolidated Installer State to Canonical Debian Path (`/etc/default/tallpbx`)**:
+  - Replaced legacy `/etc/pbx/installer.env` with `/etc/default/tallpbx` (mode `0600 root:root`), eliminating the redundant `/etc/pbx` directory while maintaining complete privilege isolation from unprivileged web processes (`www-data`).
+  - Documented the Debian privilege separation pattern (`/etc/default/tallpbx` for root installer state vs. `/etc/tallpbx/` for runtime firewall and certificate assets) across `INSTALL.md`, `docs/operations.md`, and `docs/security-architecture.md`.
 - **Installation and Operations Documentation Refinements**:
   - In `INSTALL.md`:
     - Cleaned up post-installation next steps by linking directly to `docs/operations.md` and moving legacy standalone TLS/certificate script instructions into `docs/operations.md#headless-cli-helper-scripts-terminal-fallback`.

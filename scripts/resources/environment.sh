@@ -110,7 +110,9 @@ set_secure_env_value () {
     local env_directory
 
     env_directory=$(dirname "$env_file")
-    install -d -m 700 "$env_directory"
+    if [ ! -d "$env_directory" ]; then
+        install -d -m 755 "$env_directory"
+    fi
 
     if [ ! -f "$env_file" ]; then
         install -m 600 /dev/null "$env_file"

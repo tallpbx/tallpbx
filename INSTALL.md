@@ -259,6 +259,13 @@ sudo php artisan permissions:repair --scope=full
 
 Never run broad `chown` or `chmod` commands across the repository. If Laravel cannot boot, use the emergency fallback script: `sudo bash scripts/repair-application-permissions.sh`.
 
+#### Configuration Files & Privilege Separation
+
+TallPBX separates root installer credentials from runtime application files using standard Debian paths:
+
+- **`/etc/default/tallpbx` (file, `0600 root:root`)**: Stores root-level installer settings and credentials (database setup passwords and package tokens). It lives in Debian's standard `/etc/default/` directory and is restricted to `root` so the web server (`www-data`) can never read, modify, or delete installer secrets.
+- **`/etc/tallpbx/` (directory, `2775 root:www-data`)**: Holds runtime firewall rules (`firewall.nft`, `threat_feed.nft`) and SSL/TLS certificates (`certs/`). The web process needs group write access here so the Security Center can stage pending firewall updates and deploy certificates.
+
 ### Firewall (nftables)
 
 The installer configures the Linux kernel firewall for these services by default:
@@ -409,7 +416,7 @@ token may have expired or been revoked. Re-run the installer — it will ask for
 a new token. You can also update the token directly:
 
 ```bash
-nano /etc/pbx/installer.env   # update the SWITCH_TOKEN line
+nano /etc/default/tallpbx   # update the SWITCH_TOKEN line
 ```
 
 ### Git Conflicts During Upgrade

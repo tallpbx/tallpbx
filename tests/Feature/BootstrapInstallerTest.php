@@ -202,10 +202,7 @@ it('presents the one-line install as the primary method', function (): void {
         ->and($install)->toContain('To customize the installation, add options after `-s --`')
         ->and($install)->toContain('# Pin the stable 2.0 release branch instead of the default 3.x:')
         ->and($install)->toContain('bash -s -- --ref 2.0')
-        ->and($install)->toContain('TallPBX 3.x is **not 100% backwards compatible** with earlier release')
-        ->and($install)->toContain('rapid development, so future releases may include more changes')
-        ->and($install)->toContain('will eventually stabilize as the platform matures')
-        ->and($install)->toContain('will require a clean re-install')
+        ->and($install)->toContain('Upgrading across major version boundaries (such as 2.x to 3.x) requires a clean re-install')
         ->and($install)->not->toContain('bootstrap.sh.example')
         ->and($install)->not->toContain('(Roadmap)')
         ->and($install)->not->toContain('bash ./scripts/install.sh --no-demo');

@@ -893,7 +893,7 @@ it('stops headless installs before prompting for administrator credentials', fun
 
     expect($guardPosition)->not->toBeFalse()
         ->and($promptPosition)->not->toBeFalse()
-        ->and($installer)->toContain('Pre-seed /etc/pbx/installer.env with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD')
+        ->and($installer)->toContain('Pre-seed /etc/default/tallpbx with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD')
         ->and($guardPosition)->toBeLessThan($promptPosition);
 });
 

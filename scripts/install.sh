@@ -427,7 +427,7 @@ validate_config_value "database_host" "$database_host"
 # Ask every installer question before changing packages, services, or database
 # data. If a later step fails, the selected values are already stored in the
 # root-only state file, so the next run can continue without asking again.
-INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/pbx/installer.env}"
+INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/default/tallpbx}"
 
 # Reuse the database password whenever it is already known. A new installation
 # can either create a random password or accept a password typed by the person
@@ -658,7 +658,7 @@ if [ "$FSPBX_INITIAL_ADMIN_MODE" = installer ] \
         # guidance instead of hanging.
         if [ ! -t 0 ]; then
             error "A non-interactive install cannot ask for administrator credentials."
-            error "Pre-seed /etc/pbx/installer.env with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD, or choose FSPBX_INITIAL_ADMIN_MODE=activation-code."
+            error "Pre-seed /etc/default/tallpbx with FSPBX_ADMIN_USERNAME and FSPBX_ADMIN_PASSWORD, or choose FSPBX_INITIAL_ADMIN_MODE=activation-code."
             exit 1
         fi
 
