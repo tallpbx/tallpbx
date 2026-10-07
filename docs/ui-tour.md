@@ -16,22 +16,14 @@ The public landing page is localized (`/en`, `/es`, `/fr`) and provides direct s
 ### Dark Theme
 ![TallPBX Landing Page — Dark Theme](images/landing-dark.png)
 
-### Theme Comparison: Light vs. Dark Themes in TallPBX
+### Color Themes
 
-TallPBX is designed for versatile operational environments ranging from daylight corporate offices to 24/7 dark-room network operations centers (NOCs):
+TallPBX supports instantaneous switching between **Light**, **Dark**, and **System** themes:
+- **Light Theme**: High-contrast, crisp layout designed for brightly lit offices.
+- **Dark Theme**: Low-glare dark surfaces reducing eye strain during night shifts or in low-light environments.
+- **System Theme**: Automatically mirrors your operating system preference (`prefers-color-scheme`).
 
-| Dimension | Light Theme | Dark Theme | System Theme (Auto-Detection) |
-| :--- | :--- | :--- | :--- |
-| **Visual Palette** | High-contrast DaisyUI `light` tokens with crisp slate text on clean white/light-gray backgrounds | Deep slate and charcoal `dark` surfaces with subdued border contrasts and vibrant accent highlights | Dynamically mirrors OS-level `prefers-color-scheme` via `window.matchMedia` |
-| **Primary Use Case** | Well-lit office environments, configuration audits, and administrative reporting | 24/7 NOC monitoring, telecom server rooms, night-shift dispatch consoles, and multi-monitor setups | Laptops and mobile workstations transitioning between daylight and evening hours |
-| **Optical Ergonomics** | Maximum text sharpness and reading speed under natural sunlight or overhead fluorescent lighting | Substantially reduced glare, minimal blue-light eye strain, and lower power draw on OLED displays | Automatic diurnal adjustment without requiring manual intervention |
-| **Persistence Model** | Saved instantly to browser `localStorage` & asynchronously synced to `users` / `admins` database profile | Saved instantly to browser `localStorage` & asynchronously synced to `users` / `admins` database profile | Dynamically recomputed on OS change; preference key preserved across sessions |
-| **FOUC Prevention** | Synchronous inline script in document `<head>` evaluates theme before paint — zero white/dark flash | Synchronous inline script in document `<head>` evaluates theme before paint — zero white/dark flash | Seamless initial paint matching system preference prior to Livewire hydration |
-
-#### Parity Comparison with Traditional PBX Systems (FusionPBX & FreePBX)
-- **FusionPBX**: Relies on monolithic procedural PHP templates linked to static CSS stylesheets. Changing visual appearance requires server-side template file modification or installing external CSS skins; it provides no client-side runtime switcher, no native dark mode, and no OS preference synchronization.
-- **FreePBX®**: Built on a legacy procedural framework with a static, hardcoded light theme. Administrators working in dark rooms or dispatch centers cannot switch to dark mode without unsupported browser extensions or custom stylesheet overrides.
-- **TallPBX Advantage**: TallPBX provides built-in, 1-click theme switching across both public guest pages (`/`, `/login`) and the authenticated unified control panel (`/panel/`). Users can toggle their preference from any view, enjoying instantaneous zero-flicker client caching and cross-device database synchronization.
+Preferences are cached in your browser for instant loading and synchronized to your user profile in the database.
 
 ---
 

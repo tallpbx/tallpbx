@@ -24,26 +24,23 @@ TallPBX is a community-first project, released under the [Apache 2.0 license](ht
 
 ## Parity with FusionPBX & FreePBX®
 
-Built to eliminate the steep learning curve and dated interfaces of legacy PBX platforms without compromising the raw carrier power of FreeSWITCH®, TallPBX delivers feature and function parity with established open-source systems on a modern Laravel 13, Livewire 4, and Tailwind CSS architecture with comprehensive automated test coverage:
+Built to eliminate the steep learning curve and dated interfaces of legacy PBX platforms without compromising the raw carrier power of FreeSWITCH®, TallPBX delivers feature and function parity with established open-source systems on a modern Laravel 13, Livewire 4, and Tailwind CSS architecture:
 
-| Metric / Dimension | TallPBX | FusionPBX | FreePBX® |
+| Feature | TallPBX | FusionPBX | FreePBX® |
 | :--- | :--- | :--- | :--- |
-| **Telephony Engine** | **FreeSWITCH 1.11** (`mod_sofia`, `mod_callcenter`) | **FreeSWITCH 1.11** | **Asterisk 20+** (PJSIP, chan_sip) |
-| **Core Web Stack** | **Laravel 13, Livewire 4, Tailwind v4** | Custom procedural/OOP PHP (legacy) | BMO (custom procedural PHP framework) |
-| **Database Support** | **MariaDB / MySQL** (SQLite in testing) | PostgreSQL / SQLite / MariaDB | MariaDB / MySQL |
-| **Configuration Model** | **Dynamic `mod_xml_curl`** (No static XML on disk) | Dynamic `mod_xml_curl` (PHP scripts) | Static `.conf` files written to disk (`#include`) |
-| **Multi-Tenancy** | **Native Multi-Tenant** (Isolated contexts, domains, data) | **Native Multi-Tenant** (Domain-based) | **Single-Tenant Core** (Multi-tenant requires commercial PBXact) |
-| **User Impersonation** | **1-Click Native Impersonation** (Instant tenant user perspective, persistent recovery banner & audit trail) | Limited (Domain switching only, no direct user session impersonation) | None (Separate UCP logins, no multi-tenant user impersonation) |
-| **Multi-Language Support** | **Native Multi-Lingual** (English, Spanish, French with instant topbar switcher, locale routing & user preference) | Partial / Community arrays (`app_languages.php`) | Partial gettext / PO files (often incomplete, English-centric) |
-| **User Interface & Themes** | **Dual Layouts & Switchable Themes**: Collapsible mini-rail sidebar (`w-16` / `w-64`), horizontal topbar dropdowns, and instant switchable Light/Dark/System themes with per-user database persistence & zero-flicker client caching | Fixed top navbar (legacy procedural HTML, static light theme, no dynamic dark mode) | Fixed top navbar (classic FreePBX theme, static light theme, no dark mode) |
-| **Firewall & Intrusion Defense** | **Native `nftables` Kernel Engine + Real-Time Intrusion Defense (Phones, Web & Server)** (Kernel sets, ESL SIP auth hook, zero-lockout protection) | Fail2ban / `iptables` scripts (Legacy log scraping, prone to desync) | Basic `iptables` / Fail2ban (Requires commercial System Admin for advanced features) |
-| **Host Command & CLI Security** | **Strict Bounded Sudoers Architecture** (Discrete argument arrays, non-interactive root helpers, zero web shells or raw SQL runners) | Vulnerable (`app/exec` web shell, `app/database` raw SQL runner, unescaped shell strings) | Complex sudoers entries for Asterisk/Apache, historical CWE-78 vulnerabilities |
-| **Automated Testing** | **2,600+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Telephony Engine** | **FreeSWITCH 1.11** (`mod_sofia`, `mod_callcenter`) | **FreeSWITCH 1.11** | Asterisk 20+ (PJSIP, chan_sip) |
+| **Web Architecture** | **Laravel 13, Livewire 4, Tailwind v4** | Custom procedural/OOP PHP | BMO (custom procedural PHP) |
+| **Database** | **MariaDB / MySQL** (SQLite in testing) | PostgreSQL / SQLite / MariaDB | MariaDB / MySQL |
+| **Configuration** | **Dynamic `mod_xml_curl`** (zero static XML on disk) | Dynamic `mod_xml_curl` (PHP scripts) | Static `.conf` files on disk |
+| **Multi-Tenancy** | **Native Multi-Tenant** (isolated contexts or domains) | Native Multi-Tenant (domain only) | Single-Tenant Core |
+| **User Impersonation** | **1-Click Native Impersonation** (audit trail & banner) | Limited (domain switching only) | None |
+| **Multi-Lingual** | **Native English, Spanish, French** (instant switcher) | Partial / community arrays | Partial gettext / PO files |
+| **Firewall & Defense** | **In-Kernel `nftables` + Real-Time Threat Defense** | Fail2ban / iptables scripts | Basic iptables / Fail2ban |
+| **Host Security** | **Hardened Bounded Sudoers** (zero web shells or raw SQL) | Web shell (`app/exec`) & raw SQL | Sudoers entries for Asterisk/Apache |
+| **Automated Tests** | **2,600+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
-See the [Feature and Function Parity Guide](docs/parity-comparison.md) for the complete domain-by-domain breakdown across all 60 PBX modules (Extensions, Routing, PBX Features, Media, Operations, Security, and Administration).
-
-👉 **[Explore the Security Architecture & Packet Flow Guide (Firewall, Intrusion Defense & Flow Diagrams) →](docs/security-architecture.md)**
+See the [Feature and Function Parity Guide](docs/parity-comparison.md) for a domain-by-domain breakdown across all 60 PBX modules, and the [Security Architecture & Packet Flow Guide](docs/security-architecture.md) for network defense details.
 
 ## User Interface & Visual Tour
 
@@ -55,7 +52,7 @@ TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, 
 
 ### Unified Panel & Flexible Navigation Layouts
 
-The single unified panel (`/panel/`) adapts to administrator preference with instant theme and layout toggles persisted to the database:
+The single unified panel (`/panel/`) adapts to administrator preference with instant theme and layout toggles:
 
 | Full Sidebar (`w-64`) | Mini Icon Rail (`w-16`) | Horizontal Topbar |
 | :---: | :---: | :---: |
@@ -65,53 +62,39 @@ The single unified panel (`/panel/`) adapts to administrator preference with ins
 
 ## Quick Start
 
-1. Prepare a Debian 13 server with at least 1 GB RAM, 2 GiB swap, 1 CPU core,
-   and 25 GB disk space.
-2. Follow the [installation guide](INSTALL.md). It walks through server setup,
-   the installer, and the first login.
-3. Open the server's IP address in a browser and sign in with the administrator
-   email and password chosen during installation. If you selected a browser
-   setup option, open `/panel/setup` first instead.
-4. Follow the [PBX "Hello World" Guide](docs/pbx-hello-world.md) to create your
-   first extension, register a softphone (MicroSIP, Linphone, or desk phone),
-   and place an audio loopback echo test call (`*9196`).
+1. Prepare a Debian 13 server with at least 1 GB RAM, 2 GiB swap, 1 CPU core, and 25 GB disk space.
+2. Follow the [installation guide](INSTALL.md). It walks through server setup, the installer, and the first login.
+3. Open the server's IP address in a browser and sign in with the administrator email and password chosen during installation.
+4. Follow the [PBX "Hello World" Guide](docs/pbx-hello-world.md) to create your first extension, register a softphone (MicroSIP, Linphone, or desk phone), and place an audio loopback echo test call (`*9196`).
+5. Consult the [Operations Guide](docs/operations.md) for production configuration, including sound prompt languages, email notifications, capacity tuning, and backups.
 
-The installer installs TallPBX, FreeSWITCH, the web server, database, and other
-required services. It is safe to run again after an interrupted installation;
-it preserves existing application data and saved installation choices.
-
-For a normal PBX server, choose **No** when the installer asks about demo data
-and development tooling. The `--no-demo` and `--no-development` flags skip
-those individual choices for an unattended install. [Full installation guide →](INSTALL.md)
+The installer configures TallPBX, FreeSWITCH, Nginx, MariaDB, and Redis. It is safe to re-run at any time without touching existing data. [Full installation guide →](INSTALL.md)
 
 ## Prerequisites & Hardware Requirements
 
 - **Operating System**: Debian 13 server (64-bit)
 - **Access**: Root / sudo access
 - **Network**: Internet connectivity with static IP or bridged network adapter
-- **Recommended Minimum Hardware (Development)**:
-  - **CPU**: 4 CPUs or vCPUs
-  - **Storage**: 40GB storage
-  - **RAM**: 4GB RAM
-  - **Swap**: 2GB swap
 - **Minimum Hardware (Production)**:
   - **CPU**: 1 vCPU (2+ vCPUs recommended for active PBX workloads)
-  - **Storage**: 25 GB disk space (40 GB+ recommended for local call recordings and voicemail storage)
+  - **Storage**: 25 GB disk space (40 GB+ recommended for call recordings and voicemail)
   - **RAM**: 1 GB RAM
+  - **Swap**: 2 GB swap
+- **Recommended Hardware (Development / High-Volume)**:
+  - **CPU**: 4 vCPUs
+  - **Storage**: 40 GB storage
+  - **RAM**: 4 GB RAM
   - **Swap**: 2 GB swap
 
 ## Modular Architecture
 
-This project is built using a modular architecture with modules in the `app-modules/` directory:
+TallPBX uses a modular architecture where features reside in `app-modules/`:
 
-- Modules reside under `app-modules/ModuleName/`
-- Core PHP code is stored in the module's `src/` folder
-- Each module registers its own routes, views, migrations, menus, and permissions via its `ModuleServiceProvider`
-- Modules are auto-discovered through Composer path repositories and Laravel package discovery
+- Core PHP code, migrations, views, routes, and translations are encapsulated within each module directory (`app-modules/<ModuleName>/`).
+- Modules register themselves via `App\Support\ModuleServiceProvider`.
+- Modules are auto-discovered through Composer path repositories and Laravel package discovery.
 
-### Creating a New Module
-
-Scaffold a new module with the `make:module` command:
+Scaffold a new module with Artisan:
 
 ```bash
 php artisan make:module call-forwarding \
@@ -120,173 +103,53 @@ php artisan make:module call-forwarding \
     --category="PBX Features"
 ```
 
-This creates the full directory structure:
-
-```
-app-modules/call-forwarding/
-├── composer.json          # PSR-4 autoloading + Composer discovery
-├── module.json            # Module manifest (version, namespace, requirements)
-├── config/                # Module-specific config files
-├── database/migrations/   # Database migrations
-├── lang/en/               # English translations
-├── resources/views/       # Blade views (namespace: call-forwarding::)
-├── tests/                 # Pest tests (auto-discovered by host test suite)
-└── src/
-    ├── Database/Factories/# Model factories (HasFactory auto-resolution)
-    ├── Livewire/          # Livewire components
-    └── Providers/         # ModuleServiceProvider
-```
-
-The generated provider extends `App\Support\ModuleServiceProvider`, which auto-registers standard views, migrations, routes, Livewire components, menu items, model factories, and permissions. Tests placed under `tests/` are automatically discovered and executed by Pest during host test suite runs (`php artisan test`). Create a `routes/web.php` file only when the module needs custom routes beyond the standard panel list/create/edit conventions.
-
-After scaffolding, add a Composer path repository in root `composer.json` and run `composer update` to register the module. First-party modules use `app-modules/*` path repositories; third-party modules may be installed from GitHub or private Composer repositories.
-
-### Module Commands
-
-TallPBX provides first-party Artisan commands for module discovery and registry maintenance:
+Manage modules from the command line:
 
 ```bash
-# Sync module.json manifests into the database module registry
-php artisan module:sync
-
-# Sync only first-party modules under app-modules/
-php artisan module:sync --only-local
-
-# Build the TallPBX module manifest cache
-php artisan module:cache
-
-# Clear generated module manifest caches
-php artisan module:clear
-
-# List modules known to the registry
-php artisan module:list
+php artisan module:list            # List installed modules and their status
+php artisan module:sync            # Sync module manifests into the database registry
+php artisan module:cache           # Build the module manifest cache for fast loading
 ```
-
-Standard PHP tools (Composer) handle loading code files automatically. The `module:cache` command simply stores module details (names, versions, and menus) so the web panel loads faster.
 
 ## Telephony Integration (mod_xml_curl)
 
-Instead of generating static XML configurations on disk, this system serves dynamic configs to FreeSWITCH on demand over HTTP using `mod_xml_curl`:
+Instead of generating static XML files on disk, TallPBX serves dynamic configurations to FreeSWITCH on demand over HTTP using `mod_xml_curl`:
 
-- **Dynamic Configuration Delivery**: Dynamic directories, dialplans, and configurations are handled via the XML Handler API (`/api/v1/xml-handler`).
-- **Real-Time Telephony Events**: Live phone events (call connections, hangups, and security alerts) are streamed in real time through FreeSWITCH's Event Socket Layer (ESL) via `php artisan freeswitch:listen`.
-- **Core FreeSWITCH Modules**: Fresh installs install and enable the default PBX runtime modules: `mod_sofia` for SIP profiles, `mod_callcenter` for queues, `mod_dptools` for core dialplan applications, `mod_local_stream` and `mod_sndfile` for packaged media/MOH, and `mod_xml_curl` for app-served XML. The installer also writes `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` with the generated XML handler token automatically and adds a systemd drop-in so FreeSWITCH starts after Nginx, PHP-FPM, MariaDB, and Redis.
-- **Default Tenant Baseline**: Non-demo fresh installs create a single **Default tenant**—ideal for standard single-company setups where multi-tenancy is not needed, while allowing administrators to add separate isolated tenants whenever required. The installer separately creates the first administrator during installation or through `/panel/setup`; demo mode is the sole creator of sample tenants, extensions, SIP accounts, trunks, routes, voicemail boxes, and other callable PBX data.
-- **Spoken Voice Prompts & Music-on-Hold**: Voice recordings for voicemail, call menus (IVRs), conferences, and system greetings use English (Callie) by default, with optional Spanish (Mario) and French (June) sound packs installable during setup or via `php artisan pbx:sounds`. Packaged music-on-hold files are included and served automatically (`local_stream://moh`).
-- **Audio & Media Storage**: Media payloads such as call recordings, uploaded recordings, voicemails, and fax files are stored on disk. The database stores paths and metadata only.
+- **Dynamic Configuration Delivery**: Extension directories, dialplans, and configurations are generated via the XML Handler API (`/api/v1/xml-handler`).
+- **Real-Time Telephony Events**: Call states, connections, and security alerts stream in real time via FreeSWITCH's Event Socket Layer (`php artisan freeswitch:listen`).
+- **Redis XML Caching**: Routing lookups are cached in Redis (`FS_XML_HANDLER_CACHE_TTL=5`), protecting the database and ensuring sub-millisecond call setup under heavy load. Web panel changes invalidate active caches immediately.
+- **Audio & Media Storage**: Call recordings, voicemails, and greetings are stored on disk under `/var/lib/tallpbx/media/` while metadata remains in the database.
 
-### Tenant Isolation & Phone Provisioning (Three Modes)
+### Tenant Isolation & Phone Provisioning
 
-From an IT administrator's perspective, configuring a desk phone depends on your deployment architecture. TallPBX supports three flexible models:
+Configuring a desk phone or softphone adapts to your deployment model:
 
 | Deployment Mode | Server Address on Phone | Extension on Phone | Login (Auth Username) | How Separation Works |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Single Company (Default Tenant)** | `x.x.x.x` (or company domain) | `101` | `101` | **No separation needed.** Everything lives in the Default tenant with standard internal extensions (e.g., 3- to 6-digit extensions). |
-| **2. Multi-Tenant by Domain** | `acme.yourpbx.com` vs. `beta.yourpbx.com` | `101` | `101` | **Separated by Domain.** Each company has its own subdomain, so both can use plain `101` for both extension and login. |
-| **3. Multi-Tenant on Shared IP / Domain** | `x.x.x.x` (identical for all) | `101` | `acme_101` vs. `beta_101` | **Separated by Username.** A tenant prefix on the login ID guarantees unique device authentication on the shared IP, while the phone still displays `101`. |
+| **1. Single Company (Default Tenant)** | `x.x.x.x` (or domain) | `101` | `101` | **No separation needed.** All phones register in the Default tenant with clean internal extensions. |
+| **2. Multi-Tenant by Domain** | `acme.yourpbx.com` | `101` | `101` | **Separated by Domain.** Each tenant has its own subdomain, allowing duplicate extension numbers across companies. |
+| **3. Multi-Tenant on Shared IP** | `x.x.x.x` (shared IP) | `101` | `acme_101` | **Separated by Username.** A tenant prefix on the login ID ensures unique authentication while the phone displays `101`. |
 
-**Behind the Scenes (Context-Based Routing):**  
-Once a phone registers under **any** of these three modes, TallPBX locks that device into that tenant's private internal routing partition (`tenant_{id}_internal`). Employees dial clean internal extensions (`101`, `1001`), and FreeSWITCH strictly isolates all call flows, transfers, and voicemails from other organizations.
-
-### XML Handler Performance & Caching
-
-Every time a phone connects, registers, or dials a number, FreeSWITCH asks TallPBX in real time how to handle the call. Because this pipeline handles constant live traffic, it must be lightning-fast so callers never experience delays.
-
-To ensure instant call setup under heavy load:
-- **Debug logging is off by default**: Prevents the server from wasting disk speed recording every routine successful lookup.
-- **Short-term memory caching**: Reuses call-routing rules for a few seconds so bursts of simultaneous calls do not repeatedly query the database.
-
-Relevant `.env` settings:
-
-```bash
-# Keep auth enabled outside tightly controlled local testing.
-FS_XML_HANDLER_AUTH=true
-FS_XML_HANDLER_TOKEN=generated-by-installer
-
-# Successful request debug logging is intentionally opt-in.
-FS_XML_HANDLER_LOG_REQUESTS=false
-
-# Master XML cache duration in seconds. Sets the default for dialplan,
-# contributor, directory, and ACL caches.
-FS_XML_HANDLER_CACHE_TTL=5
-
-# Optional granular overrides:
-# FS_XML_HANDLER_DIALPLAN_CACHE_TTL=5
-# FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=5
-# FS_XML_HANDLER_DIRECTORY_CACHE_TTL=5
-# FS_XML_HANDLER_ACL_CACHE_TTL=5
-
-# Production default. Use file only for simple local installs without Redis.
-CACHE_STORE=redis
-
-# Production default. Use file only for simple local installs without Redis.
-SESSION_DRIVER=redis
-SESSION_CONNECTION=cache
-
-# Master cache store for all XML handler caches. Defaults to CACHE_STORE.
-FS_XML_HANDLER_CACHE_STORE=redis
-# Optional granular overrides:
-# FS_XML_HANDLER_DIALPLAN_CACHE_STORE=redis
-# FS_XML_HANDLER_DIRECTORY_CACHE_STORE=redis
-# FS_XML_HANDLER_ACL_CACHE_STORE=redis
-```
-
-Redis is the recommended cache and session backend because it keeps data in lightning-fast memory (RAM). Storing live call-routing queries and control-panel sessions in memory prevents disk bottlenecks when multiple calls occur at the same time. For simple local testing without Redis, you can temporarily set `CACHE_STORE=file` and `SESSION_DRIVER=file`.
-
-Fresh installs enable Redis automatically. For an existing server, install and enable Redis before switching these `.env` values:
-
-```bash
-apt-get install -y redis-server redis-tools php8.5-redis
-systemctl enable --now redis-server
-redis-cli ping
-```
-
-After changing these settings, clear and rebuild Laravel caches:
-
-```bash
-php artisan optimize:clear
-php artisan optimize
-```
+Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails within each tenant's private dialplan context (`tenant_{id}_internal`).
 
 ## Integrated Security & Threat Defense
 
-TallPBX includes a first-party Security module (`app-modules/security`) that replaces legacy log scrapers (like Fail2ban) with native Linux kernel packet filtering and real-time application intrusion defense:
+TallPBX includes a first-party Security module (`app-modules/security`) providing defense across telephony, web, and network layers:
 
-### 1. Linux Kernel Firewall (nftables)
-- **High-Performance Kernel Sets**: Fast in-kernel lookups with `@whitelist_ips`, `@blacklist_ips`, and `@banned_ips` (supporting dynamic kernel timeouts).
-- **All-or-Nothing (Atomic) Preflight Verification**: Proposed firewall rules are compiled to `/etc/tallpbx/firewall.nft.pending` and verified using `nft -c -f` before replacing the active ruleset, preventing syntax errors or broken rules from taking down host networking.
-- **Critical Protocol Safeguards**: IPv6 Neighbor Discovery (`ip6 nexthdr icmpv6 accept`) and standard ICMP echo requests are explicitly allowed so DNS resolution and network diagnostics never stall.
+- **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@blacklist_ips`, `@banned_ips`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
+- **Real-Time Intrusion Defense**: Scans FreeSWITCH SIP authentication failures in real time via the Event Socket Layer (ESL), intercepts web login brute-force attempts, and enforces temporary rate-based bans in Redis.
+- **Zero-Lockout Safety Guard**: Prevents administrators from locking themselves out by verifying remote IP, active sessions, and local loopback services (database and Redis connections) before restrictive policies apply.
+- **Hardened System Architecture**: Web processes run under the restricted web user (`www-data`). Privileged firewall operations run through a dedicated root helper (`/usr/local/sbin/tallpbx-security`) with strict input validation.
 
-### 2. Real-Time Intrusion Defense (Phones, Web & Server)
-- **Entry-Point Threat Protection**: Automatic defense across all doorways into the PBX—blocking attacks on phone extensions, web logins, and server connections simultaneously.
-- **FreeSWITCH SIP Auth Scanning**: FreeSWITCH Event Socket Layer (ESL) captures `sofia::failed_auth` events as they happen, blocking SIP registration brute-force attackers in sub-seconds.
-- **Web Control Panel Brute-Force**: In-process interception of Laravel authentication failures (`Illuminate\Auth\Events\Failed`), blocking web brute-force attacks before they exhaust server resources.
-- **Sliding-Window Rate Limiting**: Redis-backed incident tracking evaluates configurable retry limits (`max_retry`), time windows (`find_time`), and ban durations (`ban_time`).
-
-### 3. Zero-Lockout Safety Guard
-- **Pre-Flight Protection**: The system inspects the administrator's current remote IP, session context, and local network subnets before applying restrictive default `DROP` firewall policies.
-- **Bypass Protection**: Banning services refuse to block whitelisted IPs, subnets, or loopback addresses, preventing accidental administrative lockouts.
-
-### 4. Hardened Linux CLI Execution & Jailbreak Defense
-TallPBX enforces a strict two-tier execution policy to prevent command injection (CWE-78) and root privilege escalation:
-- **Unprivileged Execution**: The web application and PHP-FPM run under the unprivileged `www-data` user with zero direct access to root shells or general system utilities.
-- **Bounded Sudoers Architecture**: Privileged operations (firewall compilation, kernel set ban/unban) are encapsulated in a dedicated root-owned script (`/usr/local/sbin/tallpbx-security`, mode `0750 root:www-data`, so the web user can execute but never modify the script).
-- **Strict Parameter Whitelisting**: The sudoers drop-in (`/etc/sudoers.d/tallpbx-security`) permits execution exclusively for that single binary. The script strictly regex-validates all parameters (IPs, CIDRs, actions) and runs non-interactively (`set -euo pipefail`) without subshell escape vectors.
-- **Zero Dangerous Web Tools**: Dangerous legacy utilities like web shells (`app/exec`) and raw SQL runners (`app/database`) present in older PBX platforms are intentionally excluded from TallPBX.
-
-### 5. CLI Management Commands
-Administrators can inspect and manage security directly from the terminal:
+Manage security from the web panel or directly from the terminal:
 
 ```bash
-# Check firewall status, active kernel sets, and banned attackers
-php artisan security:status
-
-# Safely recompile and apply pending firewall rules (all-or-nothing)
-php artisan security:apply
-
-# Unban an IP address and remove it from the kernel
-php artisan security:unban 198.51.100.25
+php artisan security:status              # Check firewall status, active sets, and banned IPs
+php artisan security:apply               # Atomically recompile and apply pending firewall rules
+php artisan security:unban <IP_ADDRESS>  # Immediately unban an IP address
 ```
+
+For packet flow diagrams and architecture details, see [docs/security-architecture.md](docs/security-architecture.md).
 
 ## Running the Application
 
@@ -298,29 +161,21 @@ php artisan serve
 npm run dev
 ```
 
-In production, Nginx serves the application — the installer configures this automatically. After making code changes, clear caches:
+In production, Nginx serves the application automatically. After making code changes, clear application caches:
 
 ```bash
 php artisan optimize:clear
 ```
 
-Generated files in `bootstrap/cache` and `public/build` must be readable by PHP-FPM/Nginx (`www-data`). Artisan commands repair generated permissions automatically, and `npm run build` runs a post-build repair script. If assets or cache files are generated manually as `root`, run:
+### Panel Navigation & Switchable Themes
 
-```bash
-bash scripts/fix-generated-permissions.sh
-```
+The unified control panel provides flexible ergonomics designed for wide PBX data tables (CDRs, routing rules, extensions):
 
-### Panel Navigation, Layout Modes & Switchable Themes
-
-The unified control panel provides flexible navigation layouts and color themes designed to maximize screen real estate for wide data tables (CDRs, routing rules, active calls, extensions) and optimize administrator ergonomics:
-
-- **Switchable Color Themes (Light, Dark, System):** Instant runtime switching between Light mode, Dark mode, and automatic System preference detection (`prefers-color-scheme`). Preferences are cached synchronously in browser `localStorage` and executed by an inline `<head>` script prior to HTML render, guaranteeing zero flash-of-unstyled-theme (FOUC), while being persisted asynchronously to the user's profile in the database.
-- **Collapsible Sidebar (Mini "Icon Rail"):** On desktop, users can collapse the vertical sidebar from its standard expanded width (`256px`) down to a compact `64px` icon rail with centered icons, hover tooltips, and flyout popover submenus for grouped PBX categories. A toggle button is pinned at the bottom of the sidebar (`[«]` / `[»]`) and accessible via the desktop header toggle.
-- **Horizontal Header Navigation:** Users can switch to a full-width top-bar layout with standard dropdown menus (`menu menu-horizontal`), familiar to administrators migrating from FusionPBX or classic PBX systems.
-- **Mobile Responsive Fallback:** Regardless of the chosen layout mode, viewports below `1024px` automatically fall back to an accessible slide-over mobile drawer.
-- **Scroll Preservation:** Panel navigation uses Livewire `wire:navigate.preserve-scroll` with persisted scroll containers in `resources/views/layouts/app.blade.php`. The sidebar drawer and nav keep `data-panel-sidebar-scroll`, and nested menu sections, including PBX → Advanced, preserve the recursive `persistedNavigation` flag in `resources/views/components/sidebar-menu-item.blade.php` so navigating between pages never resets scroll position.
-
-**Tooltips:** Hover over items in the control panel or the ⓘ icon to see more information.
+- **Switchable Themes (Light, Dark, System)**: Instant toggle between Light, Dark, or System preference, saved per-user.
+- **Collapsible Sidebar (Mini Rail)**: Collapse the vertical navigation down to a compact 64px icon rail to maximize table viewing space.
+- **Horizontal Header Navigation**: Optional topbar dropdown layout for administrators accustomed to traditional PBX interfaces.
+- **Mobile Responsive Drawer**: Viewports below 1024px automatically switch to an accessible slide-over mobile drawer.
+- **Scroll Preservation**: Navigation preserves exact scroll positions across page transitions.
 
 ## Running Tests
 
@@ -333,142 +188,26 @@ php artisan app:test --smoke
 # Default — all feature tests, parallel by default (~65s)
 php artisan app:test
 
-# Full — features + Pest 4 browser tests via Playwright (~10 min on a 4 GB
-# server; no system browser needed — see INSTALL.md, section "Browser Testing")
+# Full — features + Pest 4 browser tests via Playwright
 php artisan app:test --full
 
-# Filter a specific test file
+# Filter a specific test file or class
 php artisan test --filter=AdminAuthTest
-
-# Sequential debugging (no --parallel)
-php artisan app:test --sequential
-
-# Optional: clear Laravel caches before testing
-php artisan app:test --smoke --clear-cache
 ```
 
-### Choosing Between `app:test` and `test`
+All automated tests execute inside an isolated in-memory SQLite database and temporary cache, **never touching your live MariaDB database** or active calls.
 
-- **`php artisan app:test` (Recommended)**: A custom wrapper around Laravel's test command. It automatically enables parallel execution with compact output and adds tiered speed options: run `--smoke` (~20s) after small changes, default (~65s) before committing, and `--full` before pushing.
-- **`php artisan test` (Standard Laravel)**: Laravel's underlying built-in test runner, best used directly when targeting an individual test file or class (`--filter=AdminAuthTest`).
+## Performance & Load Testing
 
-**Live Database Safety:** Whichever command you choose, all tests execute strictly inside an isolated in-memory SQLite database and temporary cache. Automated tests will **never touch or alter your live MariaDB database** or active phone calls.
+TallPBX is capable of handling high-concurrency telephony workloads. When calls or registrations occur, FreeSWITCH requests user extension accounts (directory) and call routing rules (dialplans) dynamically over HTTP via `mod_xml_curl`. After the initial database query, Redis caches the result in memory. Because simultaneous calls and in-call transfers frequently re-query the same extension and routing data, serving repeated lookups directly from memory avoids querying MariaDB again, delivering sub-millisecond response times.
 
-The smoke tier includes a quick PBX XML-handler check to verify internal, inbound, outbound, and cached dialplan routing without needing external SIP traffic or heavy load.
+- **Dialplan Benchmarks**: Built-in test tooling (`php artisan pbx:load-test:dialplan`) measures XML handler throughput, concurrency, and latency across synthetic workloads.
+- **End-to-End SIP Validation**: The test harness (`scripts/pbx-sipp-validate.sh`) verifies SIP registrations, outbound routing, RTP media echo, call forwarding, ring groups, and voicemail.
+- **Hardware Sizing**: Tested to sustain 25+ calls/sec and 250+ concurrent channels on standard 4 GB instances.
 
-## PBX Dialplan Load Testing
-
-The primary PBX performance test is the Laravel-generated dialplan XML path, not direct SIP traffic to FreeSWITCH. Direct SIP tests mostly measure FreeSWITCH; `pbx:load-test:dialplan` measures the app path that FreeSWITCH reaches through `mod_xml_curl`.
-
-Seed repeatable synthetic PBX data:
-
-```bash
-php artisan pbx:load-test:seed \
-  --tenant=load-test-beta \
-  --domain=load.test.local \
-  --extensions=100 \
-  --start=2000 \
-  --password='LoadTest1234' \
-  --reset
-```
-
-Run against the real Nginx/PHP-FPM endpoint, not `php artisan serve`:
-
-```bash
-php artisan pbx:load-test:dialplan \
-  --tenant=load-test-beta \
-  --url=http://PBX_HOST/api/v1/xml-handler \
-  --scenario=mixed \
-  --requests=100 \
-  --concurrency=5 \
-  --token="$FS_XML_HANDLER_TOKEN" \
-  --label="small-office-smoke" \
-  --max-failure-rate=0 \
-  --max-average-ms=1000 \
-  --report=storage/app/load-tests/dialplan-smoke.json
-```
-
-Use `--scenario=cache-hit` to repeat one exact dialplan lookup and isolate XML cache-hit behavior. Use `--scenario=mixed` for a more realistic blend of internal, inbound, and outbound requests.
-
-For concurrency testing, use Redis for `FS_XML_HANDLER_CACHE_STORE`. After changing cache-related env values, run `php artisan optimize:clear` followed by `php artisan optimize` before load testing the real PHP-FPM endpoint. Avoid running `optimize:clear` while traffic is active; PHP-FPM workers can briefly fail if they request bootstrap cache files while those files are being rebuilt.
-
-Useful tiers:
-
-| Tier | Requests | Concurrency | Purpose |
-|---|---:|---:|---|
-| Baseline | 25 | 1 | Confirm endpoint health and cold/warm latency. |
-| Smoke | 100 | 5 | Catch auth, XML, routing, and moderate queueing issues. |
-| Practical repeat check | 500 | 10-25 | Expose PHP-FPM, DB, Redis, and contributor problems that may return on small/medium workloads. |
-| Optional stability | 1,000 | 25 | Use after meaningful code/config changes to confirm a longer burst stays stable. |
-
-The command writes JSON reports under `storage/app/load-tests/`. Reports include run labels, Git commit state, load-generator environment details, scenario counts, success/failure rates, latency sample counts, threshold settings, and pass/fail reasons. The detailed operational guide is in `docs/load-testing-guide.md`, and authoritative benchmark measurements and hardware sizing tables are in `docs/load-testing-results.md`.
-
-Report terms: `req/sec` is completed XML handler responses per second. `average` is the mean response time across all requests. `min` is the fastest response, and `max` is the slowest single response in the run.
-
-For SIPp end-to-end validation, run the load generator from a separate Linux host or VM when possible:
-
-```bash
-PBX_HOST=PBX_HOST \
-LOAD_GENERATOR_IP=LOAD_GENERATOR_IP \
-FORCE_SEED=1 \
-scripts/pbx-sipp-validate.sh
-```
-
-The SIPp runner registers seeded users, starts an auto-answer registered endpoint, starts an outbound-route UAS, places extension-to-extension and outbound-route calls, and writes artifacts under `storage/app/load-tests/sipp-e2e-*`.
-
-- Add `MEDIA_FLOW=1` for live media RTP echo validation of recording (`*732`), music-on-hold (`load_test_moh`), and IVR announcements (`load_test_announcement`).
-- Add `EXTENDED=1` to run all 8 extended telephony feature validation scenarios: ring groups (`2400`), voicemail (`2003`), conferences (`2500`), loopback call forwarding (`2001` -> `2000`), time conditions (`2401`), follow-me (`2002`), emergency (`911`), and call blocking.
-
-Expected basic SIPp result: the script exits `0`, `summary.md` shows all scenarios passed, and each SIPp log shows successful calls equal to the requested count with zero failed calls. The unified load testing guide is in `docs/load-testing-guide.md`, and benchmark measurements are in `docs/load-testing-results.md`. It explains the topology, manual commands, artifacts, expected results, and how to interpret failures.
-
-### PHP-FPM Load-Test Tuning
-
-Inspect active PHP-FPM worker limits:
-
-```bash
-php-fpm8.5 -tt 2>&1 | grep -E 'pm\.max_children|pm\.start_servers|pm\.min_spare_servers|pm\.max_spare_servers|pm\.max_requests'
-tail -n 50 /var/log/php8.5-fpm.log
-```
-
-If the log repeatedly shows `server reached pm.max_children`, requests are queueing behind PHP-FPM. The installer automatically detects system RAM and configures `/etc/php/8.5/fpm/pool.d/www.conf`:
-
-| Server Size | Process Mode (`pm`) | Workers (`pm.max_children`) | Notes |
-|---|---|---:|---|
-| **1 GB RAM** (Minimal) | `dynamic` | `5` | Conserves memory on constrained instances. |
-| **2 GB RAM** (Small) | `static` | `6` | Pre-forked pool eliminates fork latency for small office bursts. |
-| **4 GB+ RAM** (Standard) | `static` | `12` | Recommended baseline (validated for 25+ calls/sec, leaves >2.5 GiB free RAM). |
-
-In `static` mode, all workers remain initialized and ready for FreeSWITCH XML handler bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored. Use `INSTALL.md` for larger server sizing guidance (e.g. `24` workers for 8 GB+). More workers are not automatically faster: tune PHP-FPM while watching CPU load, memory, MariaDB, and XML handler latency.
-
-### Telephony XML Cache Tuning & Hit Rate Tests
-
-TallPBX caches phone routing data in Redis at multiple levels—from complete call responses down to individual routing rules. This keeps lookups instant and protects the database from overload during call spikes:
-
-- **Master XML Cache (`FS_XML_HANDLER_CACHE_TTL=5`)**: Sets the default TTL across all telephony XML caches.
-- **Granular Overrides**:
-  1. **Full Dialplan XML Cache (`FS_XML_HANDLER_DIALPLAN_CACHE_TTL=5`)**: Stores the complete compiled XML response per tenant, context, and destination. Eliminates dialplan rebuilding for repeat calls within the TTL window, with automatic immediate invalidation upon any telephony or routing change.
-  2. **Contributor Cache (`FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=5`)**: Caches individual dialplan contributor query fragments (extensions, ring groups, call forwards, IVRs) across calls to different destinations.
-  3. **Directory Cache (`FS_XML_HANDLER_DIRECTORY_CACHE_TTL=5`)**: Caches SIP authentication and registration lookups.
-  4. **ACL Cache (`FS_XML_HANDLER_ACL_CACHE_TTL=5`)**: Caches access control list XML.
-
-To benchmark all 5 standard cache configurations and calculate Redis hit rates on your hardware:
-
-```bash
-bash scripts/run-cache-sweep.sh
-```
-
-The script runs a standardized 5-tier test (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling), reporting requests/sec, average latency, and Redis keyspace hit rates, and automatically restores production defaults upon completion.
-
-Check active Redis cache hit statistics at any time:
-
-```bash
-redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'
-```
-
-Recommended settings in `.env`:
-- **Standard Office**: `FS_XML_HANDLER_CACHE_TTL=5` (default: optimal balance between high burst throughput and low memory footprint; web panel changes invalidate active caches immediately).
-- **High-Density Call Center**: `FS_XML_HANDLER_CACHE_TTL=30` (achieves ~99% cache hit rate and maximum request concurrency).
-- **Development**: `FS_XML_HANDLER_CACHE_TTL=0` (disables XML response caching for instant inspection of dialplan changes).
+For complete benchmarking instructions, PHP-FPM pool sizing, and empirical performance metrics across hardware tiers:
+- 👉 **[Load Testing Guide (docs/load-testing-guide.md)](docs/load-testing-guide.md)** — Operational runbook for running dialplan and SIPp tests.
+- 👉 **[Benchmark Results & Hardware Sizing (docs/load-testing-results.md)](docs/load-testing-results.md)** — Empirical measurements, latency percentiles, and production hardware recommendations.
 
 ## Versioning & Release Strategy
 

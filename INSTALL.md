@@ -121,9 +121,8 @@ Use the same `--ref` value every time: without it, the re-run switches the
 working copy to `3.x`.
 
 > [!WARNING]
-> **Major Version Notice (3.x vs Earlier Versions Compatibility)**:
-> TallPBX is still in active, rapid development, so future releases may include more changes that are **not backwards compatible** with earlier versions. This will eventually stabilize as the platform matures. For the current transition, TallPBX 3.x is **not 100% backwards compatible** with earlier release branches (`2.0`, `1.1`), and updating an existing installation from earlier versions to 3.x is **not supported via in-place updates** and **will require a clean re-install**.
-> If you are operating an existing 2.x deployment, remain on your `2.0` release series branch (e.g. `--ref 2.0`) or back up your data before performing a fresh 3.x installation.
+> **Major Version Notice (3.x vs Earlier Versions)**:
+> TallPBX 3.x is not backwards-compatible with earlier release branches (`2.0`, `1.1`). Updating an existing 1.x or 2.x system to 3.x is not supported via in-place updates and requires a clean re-install. If operating an existing 2.x deployment, remain on your release series branch (e.g., `--ref 2.0`). Routine in-place updates are supported within the same release series.
 
 To customize the installation, add options after `-s --`:
 
@@ -233,81 +232,44 @@ Demo data is added only when selected and never removed by later runs. If you
 switch FreeSWITCH between packages and a source build, the installer removes
 the old program first; that does not touch your database or recordings.
 
-### Redis Cache And Session Storage
+### Redis Cache & Session Storage
 
-Redis is TallPBX's in-memory storage for sessions, cache, dynamic intrusion bans,
-and FreeSWITCH XML handler caching. New installs configure it automatically.
-The telephony XML handler utilizes Redis to cache compiled dialplans, query contributors,
-and directory lookups (`FS_XML_HANDLER_CACHE_TTL=5`), protecting MariaDB during call bursts.
-Granular overrides (`FS_XML_HANDLER_DIALPLAN_CACHE_TTL`, `FS_XML_HANDLER_DIRECTORY_CACHE_TTL`, etc.)
-are available in `.env` if individual subsystems require different durations.
-You can run `bash scripts/run-cache-sweep.sh` to benchmark cache hit rates across configurations.
-Keep `redis-server` running in production: if Redis is temporarily down the PBX
-keeps working, but dynamic login and ban counters pause until it returns — the
-kernel firewall and manual bans remain active. After changing cache or session
-values in `.env`, run `php artisan optimize:clear && php artisan optimize`.
-For XML gateway authentication and token configuration (`FS_XML_HANDLER_TOKEN`),
-see [FreeSWITCH XML Gateway Token](docs/operations.md#freeswitch-xml-gateway--security-token-mod_xml_curl)
-in the Operations guide.
+Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=5`), protecting MariaDB during call bursts. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `.env`, run `php artisan optimize:clear && php artisan optimize`.
 
 ### FreeSWITCH Session Rate
 
-Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per
-second. This is a safety throttle suitable for most servers (allowing roughly
-30 two-leg calls per second); change it only after load testing shows that
-this specific limit is holding back a server with enough CPU, memory, and
-network capacity.
-
-To change the session rate permanently via `.env` or dynamically at runtime
-with `fs_cli`, see [FreeSWITCH Session Rate](docs/operations.md#freeswitch-session-rate-capacity-tuning)
-in the Operations guide.
+Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per second (roughly 30 two-leg calls/sec). This is a safe baseline for most servers; adjust it only after load testing proves the server has excess capacity. See [docs/operations.md](docs/operations.md#freeswitch-session-rate-capacity-tuning).
 
 ### PHP-FPM Worker Sizing
 
-PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. During installation,
-the installer automatically detects host RAM and tunes `/etc/php/8.5/fpm/pool.d/www.conf`
-to static worker pools to eliminate process-fork latency during simultaneous call bursts:
+PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer detects host RAM and configures `/etc/php/8.5/fpm/pool.d/www.conf` to a static worker pool to eliminate process-fork latency during simultaneous call bursts:
 
-| Server size | Auto-configured `pm` | Sizing (`pm.max_children`) | Notes |
-| --- | --- | --- | --- |
-| Minimum, 1 GB RAM | `dynamic` | `5` | Conserves memory on small servers. |
-| Small, 2 GB RAM | `static` | `6` | Balanced for small office bursts. |
-| Standard, 4 GB RAM | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
-| Larger, 8 GB+ RAM | `static` | `24` | For higher concurrency call centers. |
-| High-volume | `static` | Measure first | Tune from real traffic benchmarks. |
+| Server Size | Process Mode (`pm`) | Workers (`pm.max_children`) | Notes |
+| :--- | :--- | :---: | :--- |
+| **1 GB RAM** | `dynamic` | `5` | Conserves memory on minimal servers. |
+| **2 GB RAM** | `static` | `6` | Balanced for small office bursts. |
+| **4 GB RAM** | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
+| **8 GB+ RAM** | `static` | `24` | For higher-concurrency call centers. |
 
-In `static` mode, all workers remain initialized and ready for FreeSWITCH XML handler
-bursts; `pm.start_servers`, `pm.min_spare_servers`, and `pm.max_spare_servers` are ignored.
-Leave `pm.max_requests` at `0`. Always leave memory for FreeSWITCH, MariaDB, Redis,
-Nginx, recordings, and the operating system, and check `/var/log/php8.5-fpm.log` for worker-limit warnings.
+In `static` mode, all workers remain initialized and ready for call bursts. Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases.
 
 ### File Permissions
 
-The installer applies correct ownership and permissions automatically. After a
-manual deployment, Composer update, or permission error, restore them with:
+The installer sets file ownership and permissions automatically. After a manual deployment, Composer update, or permission issue, restore them with:
 
 ```bash
 cd /var/www/tallpbx
 sudo php artisan permissions:repair --scope=full
 ```
 
-Do not run recursive `chown` or `chmod` commands over the application
-directory; they can make the source writable by the web server or break helper
-scripts. If Laravel itself will not boot, use the emergency fallback
-`sudo bash scripts/repair-application-permissions.sh`.
-
-Recordings, faxes, and voicemail under `/var/lib/tallpbx/media` are set up
-automatically too. If you use a custom `TALLPBX_MEDIA_ROOT`, add that path to
-the `ReadWritePaths` line of the `freeswitch-listener` and `tallpbx-queue`
-systemd units, then run
-`systemctl daemon-reload && systemctl restart freeswitch-listener tallpbx-queue`.
+Never run broad `chown` or `chmod` commands across the repository. If Laravel cannot boot, use the emergency fallback script: `sudo bash scripts/repair-application-permissions.sh`.
 
 ### Firewall (nftables)
 
-The installer configures the kernel firewall for these services:
+The installer configures the Linux kernel firewall for these services:
 
 | Service | Port / Protocol |
-| --- | --- |
+| :--- | :--- |
 | SSH | `22/tcp` |
 | HTTP / HTTPS | `80/tcp`, `443/tcp` |
 | SIP internal | `5060/udp,tcp` |
@@ -315,40 +277,15 @@ The installer configures the kernel firewall for these services:
 | SIP external (carriers) | `5080/udp,tcp` |
 | RTP media | `16384-32768/udp` |
 
-Intrusion defense runs automatically: SIP authentication scanning, web login
-rate limits, and dynamic kernel bans. Manage it from the panel's Security
-pages, or from the terminal:
+Intrusion defense runs automatically: SIP authentication scanning, web login rate limiting, and dynamic kernel bans. Manage security from the web panel or terminal:
 
 ```bash
-php artisan security:status              # firewall state, sets, and bans
-php artisan security:unban <IP_ADDRESS>  # lift a ban immediately
-sudo nft flush ruleset                   # emergency: clear all rules if locked out
+php artisan security:status              # Check firewall state, sets, and bans
+php artisan security:unban <IP_ADDRESS>  # Lift a ban immediately
+sudo nft flush ruleset                   # Emergency: clear all rules if locked out
 ```
 
-Privileged firewall changes run through the bounded helper
-`/usr/local/sbin/tallpbx-security` (mode `0750 root:www-data`, so the web
-user can execute but never modify the script); the web user never receives
-general sudo access.
-
-### Browser Testing
-
-Browser tests are optional developer tooling. They run on Pest 4 with
-Playwright against an in-memory SQLite database, fully isolated from the
-installed application — the web panel stays safe to use while they run, and
-no test database or `.env` change is required.
-
-First-time setup downloads Playwright's own Chromium build (no system
-browser package is needed):
-
-```bash
-cd /var/www/tallpbx
-npx playwright install --with-deps chromium
-```
-
-Run the browser suite with `bash scripts/test-browser.sh`. Documentation
-screenshots are refreshed on demand only
-(`TALLPBX_CAPTURE_DOCS=1 bash scripts/test-browser.sh`); see `AGENTS.md` for
-the full workflow.
+Privileged firewall changes run through a hardened root helper (`/usr/local/sbin/tallpbx-security`), keeping web processes strictly unprivileged.
 
 ## 6. FreeSWITCH Installation Choice
 
@@ -454,15 +391,7 @@ For a certificate from another provider, place `fullchain.pem` and
 ## Upgrading TallPBX
 
 > [!CAUTION]
-> Always take a full backup before upgrading. Database updates move forward and
-> cannot be easily reversed. If an upgrade fails, restoring the backup is the
-> safest recovery path.
-
-> [!WARNING]
-> **Major Version Notice (Upgrading to 3.x Requires a Re-install)**:
-> TallPBX 3.x is **not 100% backwards compatible** with earlier release series (`2.0`, `1.1`).
-> In-place updates across major version boundaries (e.g. attempting to update a 1.x or 2.x system to 3.x via the web panel Git updater or CLI fast-forward pull) are **not supported** and will cause breaking incompatibilities.
-> Upgrading an existing system from 1.x or 2.x **requires a clean re-install**. Routine in-place updates are intended strictly for maintenance releases within the same series (e.g. updating within `1.1.x`, `2.x`, or `3.x`).
+> Always take a full backup before upgrading. In-place updates are supported strictly within the same release series (e.g., updating within `3.x` or within `2.0`). Upgrading across major version boundaries (such as 2.x to 3.x) requires a clean re-install.
 
 ### Updating from the Web Panel (Recommended)
 
@@ -541,7 +470,7 @@ the new code. Do not delete those changes — save them, update, then restore:
 git stash push --include-untracked -m "before TallPBX upgrade"
 
 # Download the straightforward update.
-git pull --ff-only origin main
+git pull --ff-only origin 3.x
 
 # Put the saved local changes back after the update.
 git stash pop
