@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Installation and Operations Documentation Refinements**:
+  - In `INSTALL.md`:
+    - Cleaned up post-installation next steps by linking directly to `docs/operations.md` and moving legacy standalone TLS/certificate script instructions into `docs/operations.md#headless-cli-helper-scripts-terminal-fallback`.
+    - Introduced Artisan (`php artisan`) with plain-language explanation of built-in and TallPBX custom CLI commands.
+    - Simplified installer re-run, data preservation, and FreeSWITCH package/source switching instructions.
+    - Accurately clarified PHP-FPM worker sizing based on detected host RAM, detailing `dynamic` (1 GB RAM) vs. `static` (2 GB+ RAM) mode trade-offs.
+    - Aligned intrusion detection terminology with the web panel's **Security Center**, covering SIP authentication, web login, and SSH brute force protection.
+    - Streamlined the explanation of the firewall root helper (`/usr/local/sbin/tallpbx-security`) without unnecessary privilege jargon.
+  - In `docs/operations.md`:
+    - Introduced Artisan in Section 2 (*Health Checks and Testing*).
+    - Preserved standalone certificate automation scripts under `### Headless CLI Helper Scripts (Terminal Fallback)`.
+  - In `README.md`:
+    - Introduced Artisan in Section 4 (*Modular Architecture*).
+
 ## [3.0.2] - 2026-10-06
 
 ### Changed

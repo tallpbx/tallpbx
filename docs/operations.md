@@ -23,6 +23,8 @@ Handy checks: `redis-cli ping` (expects `PONG`) and `php artisan security:status
 
 ## Health Checks and Testing
 
+Commands run via `php artisan` use Laravel's built-in command-line tool, **Artisan**, which includes custom commands for telephony, sound prompt management, and security. Always execute Artisan commands from the project directory (`cd /var/www/tallpbx`).
+
 After installation — and at any time — run the smoke check to confirm the
 application is healthy:
 
@@ -403,6 +405,38 @@ TallPBX provides a unified, UI-driven Certificate Manager under the main navigat
   php artisan certificates:deploy 1 --service=telephony  # FreeSWITCH SIP/WSS only
   php artisan certificates:deploy 1 --service=all        # Both Web and Telephony
   ```
+
+### Headless CLI Helper Scripts (Terminal Fallback)
+
+For terminal-only or headless environments without web panel access, standalone helper scripts remain available under `scripts/resources/`:
+
+#### 1. Let's Encrypt (Single Domain HTTP-01)
+Requires port 80 to be open and reachable from the internet:
+```bash
+cd /var/www/tallpbx/scripts/resources
+
+bash letsencrypt.sh                                        # interactive
+bash letsencrypt.sh --domain pbx.example.com --email admin@example.com
+bash letsencrypt.sh --domain pbx.example.com --staging     # staging test, no rate limits
+```
+
+#### 2. Wildcard Certificate (Cloudflare DNS-01)
+Use a wildcard certificate (`*.example.com`) when hosting multiple tenants across subdomains or when port 80 is blocked by a restrictive firewall or carrier NAT:
+```bash
+cd /var/www/tallpbx/scripts/resources
+
+# 1. Save and verify your Cloudflare API token (needs Zone:Read and DNS:Edit):
+bash cloudflare-dns.sh
+
+# 2. Issue the wildcard certificate:
+bash letsencrypt.sh --wildcard --domain pbx.example.com
+```
+
+#### 3. Manual Commercial Certificate Placement
+For certificates purchased from a third-party CA, place `fullchain.pem` and `privkey.pem` under `/etc/letsencrypt/live/<domain>/` and reload Nginx:
+```bash
+nginx -t && systemctl reload nginx
+```
 
 ### Automated Renewal Schedule
 The TallPBX scheduler runs `certificates:renew` daily at 03:30 AM without overlapping:

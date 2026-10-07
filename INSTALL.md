@@ -1,6 +1,6 @@
 # Installation Guide
  
-A guided setup experience for general IT staff, pre-configured with production-hardened telephony defaults. This guide explains how to set up TallPBX on a new Debian 13 server. The main install is one command; the sections after it cover optional configuration, maintenance, and tuning.
+A guided setup experience for administrators, pre-configured with reasonable defaults. This guide explains how to set up TallPBX on a new Debian 13 server. The main install is one command; the sections after it cover optional configuration, maintenance, and tuning.
 
 TallPBX is a web-managed phone system that runs on your own server. After
 installing, you'll have a working web panel ready for phones, extensions, call
@@ -165,7 +165,9 @@ If you forgot your password or need to change it from the Linux command line:
 
 **Using Artisan (recommended):**
 
-Run the password command interactively (it will prompt for the email and new password):
+TallPBX uses Laravel's built-in command-line tool, **Artisan** (`php artisan`), for system management. It provides both standard Laravel utilities and custom commands designed specifically for TallPBX.
+
+To change a password interactively (it will prompt for the email and new password):
 
 ```bash
 cd /var/www/tallpbx
@@ -211,22 +213,13 @@ Once the installation finishes, complete these initial setup steps:
 1. **Access the Web Panel**: Open the panel address printed by the installer in
    your browser (e.g., `http://<your-server-ip>/panel`) and log in with your
    administrator account.
-2. **Configure HTTPS**: Secure your web connection with Let's Encrypt or your
-   own SSL certificate (see [Section 7: HTTPS Certificates](#7-https-certificates-optional)).
-3. **Configure Outgoing Mail (Email Connector)**: In the web panel, navigate to
-   **Email Connector** to set up SMTP or OAuth 2.0 (Google Workspace or Microsoft
-   365) so password resets, voicemail notifications, and system alerts are
-   delivered. See [docs/operations.md](docs/operations.md#outgoing-mail--notifications-email-connector)
-   for connector details and queue worker monitoring.
-4. **Connect Carriers & Trunks**: Add SIP gateways under **PBX > Gateways** for
-   outbound calling and configure inbound DIDs under **PBX > Inbound Routes**.
+2. **Configure HTTPS & TLS**: Secure web access and SIP/WebRTC encryption using Let's Encrypt or your own SSL certificates (see [docs/operations.md](docs/operations.md#tls-certificate-management--httpswss-lifecycle)).
+3. **Configure Outgoing Mail (Email Connector)**: In the web panel, navigate to **Email Connector** to set up SMTP or OAuth 2.0 (Google Workspace or Microsoft 365) so password resets, voicemail notifications, and system alerts are delivered (see [docs/operations.md](docs/operations.md#outgoing-mail--notifications-email-connector)).
+4. **Connect Carriers & Trunks**: Add SIP gateways under **PBX > Gateways** for outbound calling and configure inbound DIDs under **PBX > Inbound Routes**.
 
-### Running the Installer Again
+### Re-Running the Installer
 
-It is safe to run the installer again at any time. It keeps existing call data,
-users, settings, and recordings, reuses saved passwords and choices, keeps the
-application key, applies only missing database updates, and renews the
-TallPBX-to-FreeSWITCH connection and media permissions.
+It is safe to re-run the installer at any time. It preserves all existing accounts, settings, and recordings while safely applying any missing database updates and repairing service permissions.
 
 Demo data is added only when selected and never removed by later runs. If you
 switch FreeSWITCH between packages and a source build, the installer removes
@@ -242,7 +235,7 @@ Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per second
 
 ### PHP-FPM Worker Sizing
 
-PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer detects host RAM and configures `/etc/php/8.5/fpm/pool.d/www.conf` to a static worker pool to eliminate process-fork latency during simultaneous call bursts:
+PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer detects host RAM and automatically tunes the PHP-FPM worker pool in `/etc/php/8.5/fpm/pool.d/www.conf` for optimal performance:
 
 | Server Size | Process Mode (`pm`) | Workers (`pm.max_children`) | Notes |
 | :--- | :--- | :---: | :--- |
@@ -250,6 +243,8 @@ PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer det
 | **2 GB RAM** | `static` | `6` | Balanced for small office bursts. |
 | **4 GB RAM** | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
 | **8 GB+ RAM** | `static` | `24` | For higher-concurrency call centers. |
+
+In `dynamic` mode, workers are created on demand and shut down when idle to preserve memory on smaller servers. The trade-off is that constantly spawning and terminating workers adds CPU overhead and minor latency during traffic spikes.
 
 In `static` mode, all workers remain initialized and ready for call bursts. Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases.
 
@@ -266,7 +261,7 @@ Never run broad `chown` or `chmod` commands across the repository. If Laravel ca
 
 ### Firewall (nftables)
 
-The installer configures the Linux kernel firewall for these services:
+The installer configures the Linux kernel firewall for these services by default:
 
 | Service | Port / Protocol |
 | :--- | :--- |
@@ -277,7 +272,7 @@ The installer configures the Linux kernel firewall for these services:
 | SIP external (carriers) | `5080/udp,tcp` |
 | RTP media | `16384-32768/udp` |
 
-Intrusion defense runs automatically: SIP authentication scanning, web login rate limiting, and dynamic kernel bans. Manage security from the web panel or terminal:
+Automated intrusion detection protects against failed authentication attempts across SIP, Web, and SSH by applying dynamic kernel bans to offending IP addresses. You can monitor status and manage active bans from the web panel's **Security Center** or the terminal:
 
 ```bash
 php artisan security:status              # Check firewall state, sets, and bans
@@ -285,13 +280,14 @@ php artisan security:unban <IP_ADDRESS>  # Lift a ban immediately
 sudo nft flush ruleset                   # Emergency: clear all rules if locked out
 ```
 
-Privileged firewall changes run through a hardened root helper (`/usr/local/sbin/tallpbx-security`), keeping web processes strictly unprivileged.
+All firewall changes pass through a secure helper script (`/usr/local/sbin/tallpbx-security`), so the web panel never needs direct root access.
 
 ## 6. FreeSWITCH Installation Choice
 
 The installer asks whether to install FreeSWITCH from packages or from source
-code, and remembers the choice. Switching later removes the old FreeSWITCH
-program first; your database and recordings are untouched.
+code, and remembers the choice. Switching later by re-running the installer
+removes the old FreeSWITCH installation first; your database and recordings are
+untouched.
 
 | | Packages (recommended) | Source build |
 |---|---|---|
@@ -301,92 +297,14 @@ program first; your database and recordings are untouched.
 | Best for | Most servers | Custom FreeSWITCH development |
 
 **Package install (recommended for most servers).** Faster to install and
-update, and installs the modules TallPBX needs for phones, voicemail,
-recordings, queues, music, and dynamic configuration. It requires a free
-SignalWire Personal Access Token (PAT) for APT repository access — create one at
-https://signalwire.com under **Personal Access Tokens** (repo access).
+update. It requires a free SignalWire Personal Access Token (PAT) for APT
+repository access — create one at https://signalwire.com under **Personal
+Access Tokens** (repo access).
 
 **Source build.** Only when you need to change FreeSWITCH itself or cannot use
 the SignalWire packages. No token is required, but compilation takes much
 longer and updates require rebuilding. On later runs, the installer asks
 whether to rebuild the source installation.
-
-## 7. HTTPS Certificates (Optional)
-
-Helper scripts cover free Let's Encrypt certificates and Cloudflare DNS. Run
-them after the main install, once a public domain name points at the server.
-
-> [!IMPORTANT]
-> Before requesting a certificate, make sure your domain name's DNS A record
-> points to this server's public IP address. Let's Encrypt verifies ownership
-> by connecting to your server over the internet on port 80.
-
-### Let's Encrypt (Single Domain)
-
-```bash
-cd /var/www/tallpbx/scripts/resources
-
-bash letsencrypt.sh                                        # interactive
-bash letsencrypt.sh --domain pbx.example.com --email admin@example.com
-bash letsencrypt.sh --domain pbx.example.com --staging     # test, no rate limits
-```
-
-Nginx must be running, and the internet must be able to reach port 80. The
-script switches Nginx to HTTPS.
-
-### Wildcard Certificate (Cloudflare DNS)
-
-A wildcard certificate (`*.example.com`) secures your base domain and all
-possible subdomains under a single certificate.
-
-**When to use a wildcard certificate:**
-- **Multi-Tenant Hosting**: If you host multiple tenants using subdomains
-  (e.g., `tenant1.pbx.example.com` and `tenant2.pbx.example.com`), a wildcard
-  certificate covers all current and future subdomains automatically without
-  requesting a new certificate for each tenant.
-- **Port 80 Inaccessible**: Standard single-domain certificates require inbound
-  HTTP access on port 80 for Let's Encrypt verification. If your server is behind
-  a restrictive firewall, NAT, or carrier CGNAT where port 80 cannot be opened,
-  the wildcard script uses the DNS-01 challenge via Cloudflare's API instead —
-  verifying domain ownership entirely through DNS records.
-
-```bash
-cd /var/www/tallpbx/scripts/resources
-
-# 1. Save and verify your Cloudflare API token:
-bash cloudflare-dns.sh
-
-# 2. Issue the wildcard certificate:
-bash letsencrypt.sh --wildcard --domain pbx.example.com
-```
-
-The Cloudflare token needs `Zone:Zone:Read` and `Zone:DNS:Edit` permissions
-(create one at https://dash.cloudflare.com/profile/api-tokens).
-
-### Automatic Certificate Renewal
-
-Certificates issued through Let's Encrypt renew automatically:
-
-- **Frequency**: The `certbot.timer` systemd background service runs twice daily.
-- **Renewal window**: Certbot checks all installed certificates and only renews those within **30 days of expiration** (Let's Encrypt certificates are valid for 90 days). If a certificate is not yet due for renewal, no action is taken.
-- **Web server reload**: Upon successful renewal, Nginx reloads automatically so the updated certificate takes effect immediately without downtime.
-
-To check the timer status or test renewal:
-
-```bash
-# Verify the renewal timer is running:
-systemctl status certbot.timer
-
-# Test renewal without affecting live certificates:
-certbot renew --dry-run
-```
-
-### Other Certificates
-
-For a certificate from another provider, place `fullchain.pem` and
-`privkey.pem` under `/etc/letsencrypt/live/<domain>/` and run
-`nginx -t && systemctl reload nginx`. Tenant domains are added under
-**Admin → Domains** and issued with the same `letsencrypt.sh` command.
 
 ## Upgrading TallPBX
 
