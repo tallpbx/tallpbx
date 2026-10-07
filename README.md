@@ -219,8 +219,8 @@ TallPBX follows the **[Laravel framework versioning model](https://laravel.com/d
   - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
   - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
 - **Active Release Branches**:
-  - **`3.x`**: Current primary development branch for 3.x features and releases (latest stable: `v3.0.2`).
-  - **`2.0`**: Maintenance release series for 2.x deployments (latest stable: `v2.1.1`).
+  - **`3.x`**: Current primary development branch for 3.x features and releases.
+  - **`2.0`**: Maintenance release series for 2.x deployments.
   - **`1.1`**: Maintenance release series for 1.1.x deployments.
   - **`1.0`**: Frozen maintenance branch for critical security fixes only.
 - **In-Place Updates**: In-place updates via the web updater panel (**System Settings → Updates**) and CLI (`scripts/update.sh`) are supported within the same release series branch. For detailed deployment notes, see [INSTALL.md](INSTALL.md), and for a complete historical record of releases, see [CHANGELOG.md](CHANGELOG.md).

@@ -153,8 +153,8 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 - **Numbered Release Series Branches**:
   - `1.0`: Frozen maintenance branch for 1.0.x (critical security/bug fixes only). Never push new feature work to `1.0`.
   - `1.1`: Maintenance release series for 1.1.x deployments.
-  - `2.0`: Maintenance release series for 2.x deployments (latest stable: `v2.1.1`).
-  - `3.x`: Current primary development branch for 3.x features and releases (latest stable: `v3.0.2`).
+  - `2.0`: Maintenance release series for 2.x deployments.
+  - `3.x`: Current primary development branch for 3.x features and releases.
 - **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`3.x`) or maintenance branches when backporting fixes for existing releases.
 - **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.x|(\.\d+)+)`) as stable release series, sorting them in reverse version order so `3.x` is the top/default target.
 - **Documentation**: User-facing versioning details are in [`README.md#versioning--release-strategy`](README.md#versioning--release-strategy), installation notes in [`INSTALL.md`](INSTALL.md), and release logs in [`CHANGELOG.md`](CHANGELOG.md).
