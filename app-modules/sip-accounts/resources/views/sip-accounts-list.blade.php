@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse($accounts as $account)
-                        <tr>
+                        <tr wire:key="{{ $account->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmAccountDeletion('{{ $account->id }}')">
                             <td class="font-medium">{{ $account->auth_username }}</td>
                             <td>
                                 <span class="badge badge-ghost">

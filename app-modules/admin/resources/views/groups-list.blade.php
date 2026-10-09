@@ -38,7 +38,9 @@
                 </thead>
                 <tbody>
                     @forelse($groups as $group)
-                        <tr>
+                        <tr wire:key="{{ $group->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmGroupDeletion('{{ $group->id }}')">
                             <td class="font-medium">{{ $group->name }}</td>
                             <td class="text-base-content/60">{{ $group->description }}</td>
                             <td>

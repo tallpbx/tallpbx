@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse($gateways as $gateway)
-                        <tr>
+                        <tr wire:key="{{ $gateway->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmGatewayDeletion('{{ $gateway->id }}')">
                             <td class="font-medium">{{ $gateway->name }}</td>
                             <td>{{ $gateway->profile ?? 'external' }}</td>
                             <td class="text-base-content/60">{{ $gateway->host }}:{{ $gateway->port }}</td>

@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse ($followMeRecords as $record)
-                        <tr>
+                        <tr wire:key="{{ $record->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmFollowMeDeletion('{{ $record->id }}')">
                             <td class="font-medium">{{ $record->name }}</td>
                             <td><span class="badge badge-ghost">{{ $record->extension }}</span></td>
                             <td><span class="font-mono text-sm">{{ $record->destination }}</span></td>

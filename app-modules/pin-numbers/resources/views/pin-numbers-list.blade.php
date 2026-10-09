@@ -20,7 +20,9 @@
                 </thead>
                 <tbody>
                     @forelse ($pinNumbers as $pinNumber)
-                        <tr>
+                        <tr wire:key="{{ $pinNumber->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmPinNumberDeletion('{{ $pinNumber->id }}')">
                             <td class="font-mono font-medium">{{ $pinNumber->pin_number }}</td>
                             <td>{{ $pinNumber->description ?? '-' }}</td>
                             <td>

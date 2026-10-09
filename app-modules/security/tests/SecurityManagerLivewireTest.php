@@ -99,6 +99,18 @@ it('detects the administrator IP and allows 1-click whitelisting', function (): 
     expect(SecurityIpList::where('type', 'whitelist')->where('ip_address', '127.0.0.1')->exists())->toBeTrue();
 });
 
+it('renders the lockout warning banner with loading state on the protect IP button', function (): void {
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'drop']);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSee('wire:target="whitelistCurrentIp"', false)
+        ->assertSee('wire:loading.attr="disabled"', false)
+        ->assertSee('loading loading-spinner', false)
+        ->assertSee((string) __('admin.security_protect_my_ip'))
+        ->assertSee((string) __('admin.security_protecting_my_ip'));
+});
+
 it('deletes an IP from the list', function (): void {
     $ip = SecurityIpList::create([
         'type' => 'whitelist',
@@ -112,6 +124,29 @@ it('deletes an IP from the list', function (): void {
         ->assertDontSee('10.0.0.1');
 
     expect(SecurityIpList::find($ip->id))->toBeNull();
+});
+
+it('renders the delete IP button with loading state and row dimming directives', function (): void {
+    $ip = SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '10.0.0.1',
+        'description' => 'Branch Office',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSee('wire:loading.class="opacity-40 pointer-events-none"', false)
+        ->assertSee("wire:target=\"deleteIp({$ip->id})\"", false)
+        ->assertSee('loading loading-spinner', false);
+});
+
+it('renders the add to whitelist and add to blacklist buttons with loading states', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSee('wire:target="addWhitelistIp"', false)
+        ->assertSee('wire:target="addBlacklistIp"', false)
+        ->assertSee((string) __('admin.security_adding_to_whitelist'))
+        ->assertSee((string) __('admin.security_adding_to_blacklist'));
 });
 
 it('restores a deleted Trusted entry when the lockout guard refuses the apply', function (): void {

@@ -24,7 +24,9 @@
                 </thead>
                 <tbody>
                     @forelse ($blocks as $block)
-                        <tr>
+                        <tr wire:key="{{ $block->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmBlockDeletion('{{ $block->id }}')">
                             <td class="font-medium">{{ $block->name }}</td>
                             <td><code class="badge badge-ghost">{{ $block->caller_id_number }}</code></td>
                             <td>

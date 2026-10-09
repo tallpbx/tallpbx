@@ -8,7 +8,7 @@
 
 ## Project Skills
 
-- Follow the project skills under `.agents/skills/` whenever a task matches their scope, and check them at the start of applicable work before writing code. Available skills: `laravel-best-practices` (all Laravel PHP code), `freeswitch-development` (FreeSWITCH/PBX behavior), `livewire-development` (Livewire components and reactivity), `tailwindcss-development` (Tailwind/UI classes), `tallpbx-custom` (TallPBX-specific patterns such as authentication guards, tenant isolation, group permissions, dual-event binding, and live-firewall safety/lockout prevention), `testing-best-practices` (Laravel test design, coverage, and review), and `echo-development` (Laravel Echo real-time broadcasting and WebSockets). Applicable skills take precedence over generic habits for matching work.
+- Follow the project skills under `.agents/skills/` whenever a task matches their scope, and check them at the start of applicable work before writing code. Available skills: `laravel-best-practices` (all Laravel PHP code), `freeswitch-development` (FreeSWITCH/PBX behavior), `livewire-development` (Livewire components, reactivity, and standardized loading animation patterns), `tailwindcss-development` (Tailwind/UI classes), `tallpbx-custom` (TallPBX-specific patterns such as authentication guards, tenant isolation, group permissions, dual-event binding, action progress animation architecture across three patterns, and live-firewall safety/lockout prevention), `testing-best-practices` (Laravel test design, coverage, and review), and `echo-development` (Laravel Echo real-time broadcasting and WebSockets). Applicable skills take precedence over generic habits for matching work.
 
 ## CRITICAL — Laravel Boost MCP Priority & Tool Usage
 
@@ -517,6 +517,29 @@ User-facing messages use three purpose-built patterns — choose the one that ma
 - **Fixed toast (Pattern 3)** — `<x-operational-toast>`: transient feedback (including cross-redirect session flashes) in the top-right layer above dialogs, with a × that dismisses without a page refresh. When an action fails while a modal is open, close the modal (mirroring the success path) so the page and the toast are both visible.
 
 All three are fed by `App\Support\Concerns\HasOperationalFeedback` (inherited via `BaseListComponent`/`BaseEditComponent`).
+
+## Standardized Action Progress Animation Architecture (Three Patterns)
+
+All asynchronous or mutating actions triggered via Livewire must display a standardized in-progress loading animation to prevent double-clicks, provide instant tactile feedback, and maintain uniform visual polish across the entire UI. TallPBX standardizes **three distinct patterns** across all modules (full specifications live in `.agents/skills/tallpbx-custom/SKILL.md`):
+
+### 1. Type 1: Top Notification & Alert Banner Action Buttons
+For buttons located within top-of-page alert banners, lockout warnings, or operational state headers (e.g. "Protect My IP", "Apply Firewall Changes", "Enable Firewall", "Resume Normal Mode"):
+- **Double-Click Lockout**: Add `wire:loading.attr="disabled" wire:target="<action>"`.
+- **Target Scoping**: Explicitly scope both loading indicators and button disablement with `wire:target="<action>"`.
+- **State Swapping**: Wrap the idle state (icon + imperative text) with `<span wire:loading.remove wire:target="<action>">` and active state with `<span wire:loading wire:target="<action>" class="inline-flex items-center gap-1.5">`.
+- **Spinner & Present-Continuous Copy**: Active state displays `<span class="loading loading-spinner loading-xs"></span>` accompanied by a localized present-continuous verb (e.g., "Protecting IP...", "Applying Changes...").
+
+### 2. Type 2: Form & Panel Action/Submit Buttons (Add / Save / Tool Triggers)
+For primary action buttons in forms, toolbars, modal dialogs, and card headers (e.g. "Add to Whitelist", "Save Settings", "Fetch", "Retry All", "Send Test", "Sync Now"):
+- **Button Disablement**: Add `wire:loading.attr="disabled" wire:target="<action>"`.
+- **DaisyUI Standard Spinner**: Use `<span class="loading loading-spinner loading-xs"></span>` (or `loading-sm` on default/large buttons). Never use raw `@keyframes` or `animate-spin`.
+- **Icon / Label Swapping**: Hide static icons or idle labels with `wire:loading.remove wire:target="<action>"` and show the spinner with `wire:loading wire:target="<action>"`. Preserve flex alignment without layout jumps.
+
+### 3. Type 3: Table Row Operations & Icon-Button Loading (Row Dimming Standard)
+For actions triggered directly from table rows (e.g. deleting an entry, promoting an address, unbanning, reordering, ending a session):
+- **Row Dimming & Click Locking**: Add `wire:loading.class="opacity-40 pointer-events-none" wire:target="<action>(<id>)"` to the parent `<tr>` element. This immediately dims the target row to 40% opacity and blocks pointer events during execution, signaling that the row is actively being operated upon.
+- **Automatic Icon-to-Spinner Swapping**: Use the shared `<x-icon-button>` component with `wire:click="<action>(<id>)"`. The component automatically infers the target from `wire:click`, swaps the static icon (e.g., trash can) for a DaisyUI spinner (`loading loading-spinner loading-xs`), and disables the button during active roundtrips via built-in `wire:target` inference. To disable loading behavior on an icon button, pass `:loading="false"`.
+- **Non-Icon Row Action Buttons**: For plain text or badge buttons in rows (e.g. "Unblock", "Logout"), apply `wire:loading.attr="disabled" wire:target="<action>(<id>)"` and swap content with `<span wire:loading wire:target="<action>(<id>)" class="loading loading-spinner loading-xs"></span>`.
 
 ## FreeSWITCH Telephony Integration
 - Do not write static XML configuration files to disk. Instead, serve dynamic dialplans, directories, configurations, and phrases using FreeSWITCH's `mod_xml_curl` through the application's XML Handler API (`/api/v1/xml-handler`).

@@ -25,6 +25,13 @@ After ANY code changes (Blade views, config, routes, events, Livewire components
 php artisan optimize:clear
 ```
 
+## Standardized Action Progress Animation Architecture (Three Patterns)
+All asynchronous or mutating actions triggered via Livewire must display a standardized in-progress loading animation (DaisyUI spinner and disabled state). Never use raw CSS animations or `animate-spin`. Full specifications in [`AGENTS.md`](../AGENTS.md) and [`.agents/skills/tallpbx-custom/SKILL.md`](../.agents/skills/tallpbx-custom/SKILL.md):
+- **Pattern 1 (Top Alert Banner Actions)**: Double-click lockout (`wire:loading.attr="disabled"`), target scoping (`wire:target="<action>"`), state swapping (`wire:loading.remove` / `wire:loading`), and DaisyUI spinner (`<span class="loading loading-spinner loading-xs"></span>`) with present-continuous copy.
+- **Pattern 2 (Form & Panel Action/Submit Buttons)**: Button disablement (`wire:loading.attr="disabled" wire:target="<action>"`), DaisyUI spinner (`<span class="loading loading-spinner loading-xs"></span>`), and icon/label swapping.
+- **Pattern 3 (Table Row Operations & Icon-Button Loading)**: Row dimming (`<tr wire:key="..." wire:loading.class="opacity-40 pointer-events-none" wire:target="<action>(<id>)">`), automatic icon-to-spinner swapping via `<x-icon-button>` (or explicit button disablement and spinner for text/badge row buttons).
+
+
 ## Mandatory Verification Order
 Before claiming a feature is complete:
 1. `php artisan optimize:clear`

@@ -30,7 +30,9 @@
                 </thead>
                 <tbody>
                     @forelse($admins as $admin)
-                        <tr>
+                        <tr wire:key="{{ $admin->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmAdminDeletion({{ $admin->id }})">
                             <td class="font-medium">
                                 <div class="flex items-center gap-2">
                                     <x-heroicon-o-user-circle class="w-5 h-5 text-base-content/40" />

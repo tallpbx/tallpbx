@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse ($broadcasts as $broadcast)
-                        <tr>
+                        <tr wire:key="{{ $broadcast->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmBroadcastDeletion('{{ $broadcast->id }}')">
                             <td class="font-medium">{{ $broadcast->name }}</td>
                             <td>
                                 {{ $broadcast->recipients_count }}

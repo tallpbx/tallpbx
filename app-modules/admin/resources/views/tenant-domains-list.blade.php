@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse($domains as $domain)
-                        <tr>
+                        <tr wire:key="{{ $domain->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmDomainDeletion({{ $domain->id }})">
                             <td class="font-medium">{{ $domain->domain }}</td>
                             <td>{{ $domain->tenant->name ?? '—' }}</td>
                             <td>

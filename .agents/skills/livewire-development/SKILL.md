@@ -1,6 +1,6 @@
 ---
 name: livewire-development
-description: "Use for any task or question involving Livewire. Activate if user mentions Livewire, wire: directives, or Livewire-specific concepts like wire:model, wire:click, wire:sort, or islands, invoke this skill. Covers building new components, debugging reactivity issues, real-time form validation, drag-and-drop, loading states, migrating from Livewire 3 to 4, converting component formats (SFC/MFC/class-based), and performance optimization. Do not use for non-Livewire reactive UI (React, Vue, Alpine-only, Inertia.js) or standard Laravel forms without Livewire."
+description: "Use for any task or question involving Livewire. Activate if user mentions Livewire, wire: directives, or Livewire-specific concepts like wire:model, wire:click, wire:sort, or islands, invoke this skill. Covers building new components, debugging reactivity issues, real-time form validation, drag-and-drop, loading states (standardized three action progress animation patterns: alert banner actions, form/tool action buttons, and table row dimming with icon-button auto-spinners), migrating from Livewire 3 to 4, converting component formats (SFC/MFC/class-based), and performance optimization. Do not use for non-Livewire reactive UI (React, Vue, Alpine-only, Inertia.js) or standard Laravel forms without Livewire."
 license: MIT
 metadata:
   author: laravel
@@ -127,6 +127,29 @@ These things changed in Livewire 4, but may not have been updated in this applic
 - Use `wire:loading` for loading states
 - Use `wire:model.live` for live updates; `wire:model` is deferred by default
 - Validate and authorize in actions (treat like HTTP requests)
+
+## Standardized Action Progress Animation Architecture (Three Patterns)
+
+All asynchronous or mutating actions triggered via Livewire must display a standardized in-progress loading animation to prevent double-clicks, provide instant tactile feedback, and maintain uniform visual polish across the UI. Follow the three established patterns (detailed specifications and templates in `tallpbx-custom` skill):
+
+### Pattern 1: Top Notification & Alert Banner Action Buttons
+Used for actionable banners at the top of pages or cards (e.g. Lockout warning "Protect My IP", Unapplied Changes "Apply Firewall Changes", "Enable Normal Mode"):
+- Lock out clicks: `wire:loading.attr="disabled" wire:target="<action>"`
+- Scope the target: explicitly use `wire:target="<action>"` on both loading and removal directives
+- State swapping: wrap idle state with `<span wire:loading.remove wire:target="<action>">` and active state with `<span wire:loading wire:target="<action>" class="inline-flex items-center gap-1.5">`
+- Use DaisyUI spinner (`<span class="loading loading-spinner loading-xs"></span>`) with localized present-continuous verb (e.g., "Applying Changes...")
+
+### Pattern 2: Form & Panel Action/Submit Buttons (Add / Save / Tool Triggers)
+Used for forms, quick-add toolbars, card header actions, and tool buttons (e.g. "Add to Whitelist", "Save Settings", "Fetch", "Retry All", "Send Test", "Refresh"):
+- Button disablement: `wire:loading.attr="disabled" wire:target="<action>"`
+- Standard DaisyUI spinner: `<span class="loading loading-spinner loading-xs"></span>` (never raw CSS animations or `animate-spin`)
+- Icon/label swapping: hide idle icon/text with `wire:loading.remove wire:target="<action>"` and show the spinner with `wire:loading wire:target="<action>"`
+
+### Pattern 3: Table Row Operations & Icon-Button Loading (Row Dimming Standard)
+Used for actions triggered directly from table rows (e.g. deleting an entry, promoting an IP, unbanning, ending a session):
+- Row dimming & pointer locking: `<tr wire:key="..." wire:loading.class="opacity-40 pointer-events-none" wire:target="<action>(<id>)">`
+- Automatic icon-to-spinner swapping: use `<x-icon-button wire:click="<action>(<id>)">` which automatically infers the target, disables the button during network roundtrips, and replaces the static icon with `<span class="loading loading-spinner loading-xs"></span>`
+- Plain text / badge row buttons: apply `wire:loading.attr="disabled" wire:target="<action>(<id>)"` and swap content with `<span wire:loading wire:target="<action>(<id>)" class="loading loading-spinner loading-xs"></span>`
 
 ## Configuration
 

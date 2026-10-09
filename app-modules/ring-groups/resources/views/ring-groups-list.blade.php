@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse ($ringGroups as $group)
-                        <tr>
+                        <tr wire:key="{{ $group->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmRingGroupDeletion('{{ $group->id }}')">
                             <td class="font-medium">{{ $group->name }}</td>
                             <td>
                                 <span class="badge badge-ghost">{{ $group->strategy }}</span>

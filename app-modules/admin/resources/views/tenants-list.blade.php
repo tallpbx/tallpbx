@@ -28,7 +28,9 @@
                 </thead>
                 <tbody>
                     @forelse($tenants as $tenant)
-                        <tr>
+                        <tr wire:key="{{ $tenant->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmTenantDeletion({{ $tenant->id }})">
                             <td class="font-medium">{{ $tenant->name }}</td>
                             <td class="text-base-content/60">{{ $tenant->slug }}</td>
                             <td>

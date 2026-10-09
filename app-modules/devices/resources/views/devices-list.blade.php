@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse($devices as $device)
-                        <tr>
+                        <tr wire:key="{{ $device->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmDeviceDeletion('{{ $device->id }}')">
                             <td class="font-medium">{{ $device->vendor }}</td>
                             <td>{{ $device->model }}</td>
                             <td class="font-mono text-sm">{{ $device->mac_address }}</td>

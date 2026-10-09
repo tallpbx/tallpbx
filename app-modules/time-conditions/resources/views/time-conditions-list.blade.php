@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse ($timeConditions as $condition)
-                        <tr>
+                        <tr wire:key="{{ $condition->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmTimeConditionDeletion('{{ $condition->id }}')">
                             <td class="font-medium">{{ $condition->name }}</td>
                             <td><span class="badge badge-ghost">{{ $condition->weekdays }}</span></td>
                             <td>{{ $condition->start_time }} - {{ $condition->end_time }}</td>

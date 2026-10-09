@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse ($bridges as $bridge)
-                        <tr>
+                        <tr wire:key="{{ $bridge->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmBridgeDeletion('{{ $bridge->id }}')">
                             <td class="font-medium">{{ $bridge->bridge_name }}</td>
                             <td><code class="badge badge-ghost">{{ $bridge->destination_number }}</code></td>
                             <td>{{ $bridge->pin_number ?? '-' }}</td>

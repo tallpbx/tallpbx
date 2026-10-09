@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.3] - 2026-10-08
+
+### Added
+- **Standardized Action Progress Animation Architecture (Three Patterns)**:
+  - Formalized three UI-wide standards for Livewire user interactions across the application:
+    1. **Pattern 1 (Top Notification & Alert Banner Actions)**: Banners at the top of pages or cards display double-click lockouts (`wire:loading.attr="disabled"`), DaisyUI spinners (`loading loading-spinner loading-xs`), and localized present-continuous active verbs (e.g., "Protecting IP...", "Applying Changes...").
+    2. **Pattern 2 (Form & Panel Action/Submit Buttons)**: Form submissions and panel toolbars feature scoped disablement (`wire:target`), DaisyUI spinners, and smooth icon/text state swapping.
+    3. **Pattern 3 (Table Row Operations & Icon-Button Loading)**: Row-level actions combine parent row dimming (`wire:loading.class="opacity-40 pointer-events-none"`) with automated `<x-icon-button>` spinner transitions to prevent rapid double-clicks and provide immediate visual feedback.
+  - Rolled out Pattern 3 across 28+ administrative and telephony routing list tables:
+    - Admin: `admins-list`, `groups-list`, `tenants-list`, `tenant-domains-list`, `users-list`
+    - Telephony & Routing: `bridges-list`, `call-blocks-list`, `broadcast-list`, `queue-list`, `call-flows-list`, `call-forwards-list`, `destinations-list`, `devices-list`, `dialplans-list`, `extensions-list`, `feature-codes-list`, `follow-me-list`, `gateways-list`, `hot-desking-list`, `inbound-routes-list`, `outbound-routes-list`, `pin-numbers-list`, `ring-groups-list`, `sip-accounts-list`, `sip-profiles-list`, `sip-trunks-list`, `time-conditions-list`
+    - Security Center: whitelist, blacklist, active bans, SIP scanner incident tables, core PBX services, and custom firewall rules.
+  - Enhanced `<x-icon-button>` component with automatic `wire:target` inference from `wire:click`, auto-disabled button state during requests, and DaisyUI spinner substitution.
+  - Added localized active continuous state verbs across English, Spanish, and French language files (`admin.security_protecting_my_ip`, `admin.security_adding_to_whitelist`, `admin.security_adding_to_blacklist`).
+  - Documented the architecture rules and Blade templates across all agent instructions and skills (`AGENTS.md`, `.agents/skills/tallpbx-custom/SKILL.md`, `.agents/skills/livewire-development/SKILL.md`, `.agents/skills/tailwindcss-development/SKILL.md`, `CLAUDE.md`, `.cursorrules`, and `.github/copilot-instructions.md`).
+
+### Fixed
+- **Security Center Table Responsiveness and Summary Cards Alignment**:
+  - Whitelist and Blacklist tables now wrap long description strings, enforce minimum and maximum column constraints, and preserve action button visibility with smooth horizontal scrolling on lower-resolution viewports.
+  - Aligned all summary status banners across the top overview cards along the same horizontal line (`items-start`), preventing vertical displacement when card titles wrap onto multiple lines.
+
 ### Changed
 - **Consolidated Installer State to Canonical Debian Path (`/etc/default/tallpbx`)**:
   - Replaced legacy `/etc/pbx/installer.env` with `/etc/default/tallpbx` (mode `0600 root:root`), eliminating the redundant `/etc/pbx` directory while maintaining complete privilege isolation from unprivileged web processes (`www-data`).

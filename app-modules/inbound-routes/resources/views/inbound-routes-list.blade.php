@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse($routes as $route)
-                        <tr>
+                        <tr wire:key="{{ $route->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmRouteDeletion('{{ $route->id }}')">
                             <td class="font-medium">{{ $route->name }}</td>
                             <td>{{ $route->destination_number }}</td>
                             <td>{{ $route->action }}</td>

@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse($dialplans as $dialplan)
-                        <tr>
+                        <tr wire:key="{{ $dialplan->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmDialplanDeletion('{{ $dialplan->id }}')">
                             <td class="font-medium">{{ $dialplan->name }}</td>
                             <td><code class="badge badge-ghost">{{ $dialplan->context }}</code></td>
                             <td>{{ $dialplan->order }}</td>

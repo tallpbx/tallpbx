@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 3.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, or UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
+description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 3.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
 license: MIT
 metadata:
   author: tallpbx
@@ -407,6 +407,125 @@ DaisyUI toast layer fixed to the top-right at `z-[9999]` — above any open dial
 
 - Messages persist until the next action replaces them, the × is clicked, or `dismissFeedback()` runs — there is no auto-hide timer because DaisyUI ships CSS only.
 - Both Pattern 1 and Pattern 3 render `role="alert"` for accessibility.
+
+## Standardized Action Progress Animation Architecture (Three Patterns)
+
+All asynchronous or mutating actions triggered via Livewire buttons must provide immediate visual feedback using the standardized DaisyUI spinner animation and disabled state. This prevents accidental double-clicks, reassures users during network/server roundtrips, and ensures uniform visual polish across the administrative panel.
+
+TallPBX standardizes **three distinct patterns** across all modules:
+
+---
+
+### Pattern 1: Top Notification & Alert Banner Action Buttons
+Used for actionable banners at the top of pages or cards (e.g. Lockout warning "Protect My IP", Unapplied Changes "Apply Firewall Changes", Observe Mode banner "Enable Normal Mode", Service Down notices).
+
+#### Template
+```blade
+<div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4" role="alert">
+    <div class="flex items-center gap-3">
+        <x-heroicon-o-exclamation-triangle class="w-6 h-6 text-warning shrink-0" />
+        <span class="text-sm font-medium">{{ $bannerNotice }}</span>
+    </div>
+    <button wire:click="whitelistCurrentIp"
+            wire:loading.attr="disabled"
+            wire:target="whitelistCurrentIp"
+            type="button"
+            class="btn btn-warning btn-sm whitespace-nowrap">
+        <span wire:loading.remove wire:target="whitelistCurrentIp" class="inline-flex items-center gap-1.5">
+            <x-heroicon-o-shield-check class="w-4 h-4" />
+            <span>{{ __('admin.security_protect_my_ip') }}</span>
+        </span>
+        <span wire:loading wire:target="whitelistCurrentIp" class="inline-flex items-center gap-1.5">
+            <span class="loading loading-spinner loading-xs"></span>
+            <span>{{ __('admin.security_protecting_my_ip') }}</span>
+        </span>
+    </button>
+</div>
+```
+
+---
+
+### Pattern 2: Form & Panel Action/Submit Buttons (Add / Save / Tool Triggers)
+Used for forms, quick-add bars, toolbar buttons, and card actions (e.g. "Add to Whitelist", "Save Settings", "Fetch", "Retry All", "Send Test", "Sync Now", "Refresh").
+
+#### Template
+```blade
+<button wire:click="addWhitelistIp"
+        wire:loading.attr="disabled"
+        wire:target="addWhitelistIp"
+        type="button"
+        class="btn btn-primary btn-sm">
+    <span wire:loading.remove wire:target="addWhitelistIp" class="inline-flex items-center gap-1.5">
+        <x-heroicon-o-plus class="w-4 h-4" />
+        <span>{{ __('admin.security_whitelist_add_btn') }}</span>
+    </span>
+    <span wire:loading wire:target="addWhitelistIp" class="inline-flex items-center gap-1.5">
+        <span class="loading loading-spinner loading-xs"></span>
+        <span>{{ __('admin.security_adding_to_whitelist') }}</span>
+    </span>
+</button>
+```
+
+#### Toolbar / Tool Button Variant (Icon-First)
+```blade
+<button wire:click="fetch"
+        wire:loading.attr="disabled"
+        wire:target="fetch"
+        type="button"
+        class="btn btn-outline btn-sm gap-2">
+    <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.remove wire:target="fetch" />
+    <span class="loading loading-spinner loading-xs" wire:loading wire:target="fetch"></span>
+    <span>{{ __('admin.git_fetch') }}</span>
+</button>
+```
+
+---
+
+### Pattern 3: Table Row Operations & Icon-Button Loading (Row Dimming Pattern)
+Used for actions triggered directly from table rows (e.g. deleting an entry, promoting an IP, unbanning, ending a session, reordering items).
+
+1. **Row Dimming & Click Locking**:
+   Add `wire:loading.class="opacity-40 pointer-events-none" wire:target="<methodName>(<id>)"` to the parent `<tr>`. This immediately dims the targeted row to 40% opacity and blocks pointer events during execution, providing instant visual feedback that the row is being modified or deleted.
+2. **Automatic Icon-to-Spinner Swapping**:
+   Use `<x-icon-button>` with `wire:click="<methodName>(<id>)"`. The component automatically infers the target from `wire:click`, swaps the icon for a DaisyUI spinner (`<span class="loading loading-spinner loading-xs"></span>`), and disables the button (`wire:loading.attr="disabled"`). To target a different action or pass explicit expressions, use the `loading-target` prop. To disable loading behavior on an icon button, pass `:loading="false"`.
+3. **Inline Non-Icon Buttons in Rows**:
+   When table rows use plain text or badge buttons (e.g. "Unblock", "Logout"), apply `wire:loading.attr="disabled" wire:target="<methodName>(<id>)"`, hide default text with `wire:loading.remove`, and show `<span class="loading loading-spinner loading-xs" wire:loading wire:target="..."></span>`.
+
+#### Template
+```blade
+<tr class="hover"
+    wire:key="{{ $item->id }}"
+    wire:loading.class="opacity-40 pointer-events-none"
+    wire:target="deleteIp({{ $item->id }})">
+    <td class="font-mono font-medium">{{ $item->ip_address }}</td>
+    <td>{{ $item->description }}</td>
+    <td class="text-right">
+        <x-icon-button icon="heroicon-o-trash"
+                       :label="__('client.delete').' '.$item->ip_address"
+                       wire:click="deleteIp({{ $item->id }})"
+                       class="text-error" />
+    </td>
+</tr>
+```
+
+---
+
+### Core Architecture Rules
+
+1. **DaisyUI Spinner Standard**:
+   - Always use the framework DaisyUI spinner class: `<span class="loading loading-spinner loading-xs"></span>` (use `loading-xs` for `btn-xs` and `btn-sm`; use `loading-sm` for standard `btn` or `btn-md`/`btn-lg`).
+   - Do NOT introduce custom CSS spinning animations, raw `@keyframes spin`, or unstyled SVG spinners.
+2. **Explicit Target Scoping (`wire:target`)**:
+   - Every `wire:loading`, `wire:loading.remove`, and `wire:loading.attr="disabled"` directive MUST specify `wire:target="<methodName>"` matching the triggering action.
+   - Without `wire:target`, unrelated Livewire background requests, polling hooks, or tab switches will unintentionally trigger the loading state across the page.
+3. **Double-Submission Prevention**:
+   - Always add `wire:loading.attr="disabled"` to the `<button>` element. This prevents rapid multi-clicks while the backend mutation or preflight check is running.
+4. **State Transition Swapping**:
+   - Isolate the idle content with `<span wire:loading.remove wire:target="<method>">` so icons and labels do not awkwardly jump or stack beside the spinner.
+   - Render the active content inside `<span wire:loading wire:target="<method>">` with `inline-flex items-center gap-1.5` for balanced alignment.
+5. **Plain-Language Present Continuous Copy**:
+   - Switch button copy from imperative ("Save", "Protect My IP", "Apply Rules", "Add to Whitelist") to present continuous ("Saving...", "Protecting IP...", "Applying Rules...", "Adding to Whitelist...").
+   - Maintain translation keys across all supported locales (`lang/en/admin.php`, `lang/es/admin.php`, `lang/fr/admin.php`).
 
 ## DaisyUI 5 CSS Compilation Behavior
 

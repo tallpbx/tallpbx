@@ -54,7 +54,9 @@
                 </thead>
                 <tbody>
                     @forelse ($sessions as $session)
-                        <tr>
+                        <tr wire:key="{{ $session->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="endSession('{{ $session->id }}'), confirmSessionDeletion('{{ $session->id }}')">
                             <td>
                                 <div class="font-bold flex items-center gap-2">
                                     <x-heroicon-o-user class="w-4 h-4 text-primary" />
@@ -93,10 +95,13 @@
                                     @if ($session->is_active)
                                         <button
                                             wire:click="endSession('{{ $session->id }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="endSession('{{ $session->id }}')"
                                             class="btn btn-warning btn-xs"
                                             title="{{ __('admin.hot_desking_end_session') }}"
                                         >
-                                            <x-heroicon-o-arrow-right-on-rectangle class="w-3.5 h-3.5" />
+                                            <span wire:loading wire:target="endSession('{{ $session->id }}')" class="loading loading-spinner loading-xs"></span>
+                                            <x-heroicon-o-arrow-right-on-rectangle wire:loading.remove wire:target="endSession('{{ $session->id }}')" class="w-3.5 h-3.5" />
                                             {{ __('admin.hot_desking_logout') }}
                                         </button>
                                     @endif

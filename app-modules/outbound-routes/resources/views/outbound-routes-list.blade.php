@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse($routes as $route)
-                        <tr>
+                        <tr wire:key="{{ $route->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmRouteDeletion('{{ $route->id }}')">
                             <td class="font-medium">{{ $route->name }}</td>
                             <td><code class="badge badge-primary">{{ $route->dial_pattern }}</code></td>
                             <td>{{ $route->gatewayRelation?->name ?? $route->gateway ?? '—' }}</td>

@@ -37,7 +37,9 @@
                 </thead>
                 <tbody>
                     @forelse($users as $user)
-                        <tr>
+                        <tr wire:key="{{ $user->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmUserDeletion({{ $user->id }})">
                             <td class="font-medium">{{ $user->name }}</td>
                             <td class="text-base-content/60">{{ $user->email }}</td>
                             <td>

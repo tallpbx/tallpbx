@@ -21,7 +21,9 @@
                 </thead>
                 <tbody>
                     @forelse($codes as $code)
-                        <tr>
+                        <tr wire:key="{{ $code->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmCodeDeletion('{{ $code->id }}')">
                             <td class="font-medium w-52 whitespace-nowrap">{{ $code->name }}</td>
                             <td class="w-64 max-w-xs">
                                 <div class="relative w-64"

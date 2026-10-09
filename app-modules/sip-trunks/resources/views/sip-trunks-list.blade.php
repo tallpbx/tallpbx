@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse ($trunks as $trunk)
-                        <tr>
+                        <tr wire:key="{{ $trunk->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmTrunkDeletion('{{ $trunk->id }}')">
                             <td class="font-medium">{{ $trunk->name }}</td>
                             <td class="font-mono text-sm">{{ $trunk->host }}:{{ $trunk->port }}</td>
                             <td>{{ $trunk->username ?? '-' }}</td>

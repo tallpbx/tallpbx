@@ -25,9 +25,19 @@
                     <div class="text-xs opacity-90">{{ __('admin.security_lockout_warning_body', ['ip' => $adminIp]) }}</div>
                 </div>
             </div>
-            <button wire:click="whitelistCurrentIp" type="button" class="btn btn-warning btn-sm whitespace-nowrap">
-                <x-heroicon-o-shield-check class="w-4 h-4" />
-                {{ __('admin.security_protect_my_ip') }}
+            <button wire:click="whitelistCurrentIp"
+                    wire:loading.attr="disabled"
+                    wire:target="whitelistCurrentIp"
+                    type="button"
+                    class="btn btn-warning btn-sm whitespace-nowrap">
+                <span wire:loading.remove wire:target="whitelistCurrentIp" class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-shield-check class="w-4 h-4" />
+                    <span>{{ __('admin.security_protect_my_ip') }}</span>
+                </span>
+                <span wire:loading wire:target="whitelistCurrentIp" class="inline-flex items-center gap-1.5">
+                    <span class="loading loading-spinner loading-xs"></span>
+                    <span>{{ __('admin.security_protecting_my_ip') }}</span>
+                </span>
             </button>
         </div>
     @endif
@@ -99,15 +109,15 @@
         {{-- Firewall Status --}}
         <div class="card bg-base-100 shadow-sm border border-base-200">
             <div class="card-body p-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-base-content/70">{{ __('admin.security_firewall_status') }}</span>
+                <div class="flex items-start justify-between gap-2">
+                    <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_firewall_status') }}</span>
                     @if ($firewallEnabled)
-                        <span class="badge badge-success badge-sm gap-1">
+                        <span class="badge badge-success badge-sm gap-1 shrink-0">
                             <span class="inline-block w-2 h-2 rounded-full bg-success-content"></span>
                             {{ __('admin.active') }}
                         </span>
                     @else
-                        <span class="badge badge-neutral badge-sm">{{ __('admin.security_firewall_disabled') }}</span>
+                        <span class="badge badge-neutral badge-sm shrink-0">{{ __('admin.security_firewall_disabled') }}</span>
                     @endif
                 </div>
                 <div class="mt-2 flex items-center justify-between">
@@ -147,15 +157,15 @@
         {{-- Attack Protection --}}
         <div class="card bg-base-100 shadow-sm border border-base-200">
             <div class="card-body p-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-base-content/70">{{ __('admin.security_attack_protection') }}</span>
+                <div class="flex items-start justify-between gap-2">
+                    <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_attack_protection') }}</span>
                     @if ($attackProtectionEnabled)
-                        <span class="badge badge-success badge-sm gap-1">
+                        <span class="badge badge-success badge-sm gap-1 shrink-0">
                             <span class="inline-block w-2 h-2 rounded-full bg-success-content"></span>
                             {{ __('admin.active') }}
                         </span>
                     @else
-                        <span class="badge badge-neutral badge-sm">{{ __('admin.security_firewall_disabled') }}</span>
+                        <span class="badge badge-neutral badge-sm shrink-0">{{ __('admin.security_firewall_disabled') }}</span>
                     @endif
                 </div>
                 <div class="mt-2 text-lg font-semibold text-base-content">
@@ -168,9 +178,9 @@
         {{-- Blocked Attackers --}}
         <div class="card bg-base-100 shadow-sm border border-base-200">
             <div class="card-body p-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-base-content/70">{{ __('admin.security_blocked_attackers') }}</span>
-                    <span class="badge badge-neutral badge-sm">{{ $bannedCount }}</span>
+                <div class="flex items-start justify-between gap-2">
+                    <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_blocked_attackers') }}</span>
+                    <span class="badge badge-neutral badge-sm shrink-0">{{ $bannedCount }}</span>
                 </div>
                 <div class="mt-2 text-lg font-semibold text-base-content">{{ $bannedCount }} {{ __('admin.security_active_bans') }}</div>
                 <p class="text-xs text-base-content/60">{{ __('admin.security_bans_help') }}</p>
@@ -180,12 +190,12 @@
         {{-- Administrator Connection (Lockout Guard) --}}
         <div class="card bg-base-100 shadow-sm border border-base-200">
             <div class="card-body p-4">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-base-content/70">{{ __('admin.security_your_connection') }}</span>
+                <div class="flex items-start justify-between gap-2">
+                    <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_your_connection') }}</span>
                     @if ($isCurrentIpWhitelisted)
-                        <span class="badge badge-success badge-sm">{{ __('admin.security_protected') }}</span>
+                        <span class="badge badge-success badge-sm shrink-0">{{ __('admin.security_protected') }}</span>
                     @else
-                        <span class="badge badge-warning badge-sm">{{ __('admin.security_unprotected') }}</span>
+                        <span class="badge badge-warning badge-sm shrink-0">{{ __('admin.security_unprotected') }}</span>
                     @endif
                 </div>
                 <div class="mt-2 text-lg font-semibold font-mono text-base-content">{{ $adminIp }}</div>
@@ -193,9 +203,19 @@
                     @if ($isCurrentIpWhitelisted)
                         <p class="text-xs text-success">{{ __('admin.security_lockout_help') }}</p>
                     @else
-                        <button wire:click="whitelistCurrentIp" type="button" class="btn btn-warning btn-xs gap-1 mt-1">
-                            <x-heroicon-o-shield-check class="w-3 h-3" />
-                            {{ __('admin.security_protect_my_ip') }}
+                        <button wire:click="whitelistCurrentIp"
+                                wire:loading.attr="disabled"
+                                wire:target="whitelistCurrentIp"
+                                type="button"
+                                class="btn btn-warning btn-xs gap-1 mt-1">
+                            <span wire:loading.remove wire:target="whitelistCurrentIp" class="inline-flex items-center gap-1">
+                                <x-heroicon-o-shield-check class="w-3 h-3" />
+                                <span>{{ __('admin.security_protect_my_ip') }}</span>
+                            </span>
+                            <span wire:loading wire:target="whitelistCurrentIp" class="inline-flex items-center gap-1">
+                                <span class="loading loading-spinner loading-xs"></span>
+                                <span>{{ __('admin.security_protecting_my_ip') }}</span>
+                            </span>
                         </button>
                     @endif
                 </div>
@@ -291,8 +311,8 @@
 
                 {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
                 <div class="flex flex-col lg:flex-row gap-6 items-start">
-                    {{-- Left Column: Quick-Add Form & Self-Whitelisting (Fixed Ergonomic Width) --}}
-                    <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
+                    {{-- Left Column: Quick-Add Form & Self-Whitelisting (Autosizes with min width) --}}
+                    <div class="w-full lg:w-1/4 xl:w-72 2xl:w-80 min-w-[240px] max-w-xs xl:max-w-sm lg:shrink-0 space-y-3">
                         <form wire:submit="addWhitelistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
                             <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
                                 <x-heroicon-o-shield-check class="w-4 h-4 text-success" />
@@ -310,16 +330,25 @@
                                 <input wire:model="newWhitelistDescription" type="text"
                                        placeholder="{{ __('admin.security_ip_description') }}"
                                        class="input input-bordered input-sm w-full" />
-                                <button type="submit" class="btn btn-primary btn-sm w-full gap-1 shadow-xs">
-                                    <x-heroicon-o-plus class="w-4 h-4" />
-                                    <span>{{ __('admin.security_add_to_whitelist') }}</span>
+                                <button type="submit"
+                                        wire:loading.attr="disabled"
+                                        wire:target="addWhitelistIp"
+                                        class="btn btn-primary btn-sm w-full gap-1 shadow-xs">
+                                    <span wire:loading.remove wire:target="addWhitelistIp" class="inline-flex items-center gap-1">
+                                        <x-heroicon-o-plus class="w-4 h-4" />
+                                        <span>{{ __('admin.security_add_to_whitelist') }}</span>
+                                    </span>
+                                    <span wire:loading wire:target="addWhitelistIp" class="inline-flex items-center gap-1">
+                                        <span class="loading loading-spinner loading-xs"></span>
+                                        <span>{{ __('admin.security_adding_to_whitelist') }}</span>
+                                    </span>
                                 </button>
                             </div>
                         </form>
 
-                        {{-- Admin Self-Whitelisting Lockout Guard --}}
+                        {{-- Admin Self-Whitelisting Lockout Guard (shown only when unprotected) --}}
                         @if (! $isCurrentIpWhitelisted)
-                            <div class="p-3 bg-warning/10 border border-warning/30 rounded-box flex items-center justify-between gap-2">
+                            <div class="p-3 bg-warning/10 border border-warning/30 rounded-box flex flex-col gap-2">
                                 <div class="text-xs">
                                     <div class="font-semibold text-warning-content flex items-center gap-1">
                                         <x-heroicon-o-exclamation-triangle class="w-3.5 h-3.5 text-warning shrink-0" />
@@ -327,20 +356,25 @@
                                     </div>
                                     <div class="text-base-content/70 text-[11px] mt-0.5">Your IP (<span class="font-mono">{{ $adminIp }}</span>) is not whitelisted.</div>
                                 </div>
-                                <button wire:click="whitelistCurrentIp" type="button" class="btn btn-warning btn-xs whitespace-nowrap shadow-xs">
-                                    {{ __('admin.security_protect_my_ip') }}
+                                <button wire:click="whitelistCurrentIp"
+                                        wire:loading.attr="disabled"
+                                        wire:target="whitelistCurrentIp"
+                                        type="button"
+                                        class="btn btn-warning btn-xs w-full shadow-xs">
+                                    <span wire:loading.remove wire:target="whitelistCurrentIp">
+                                        {{ __('admin.security_protect_my_ip') }}
+                                    </span>
+                                    <span wire:loading wire:target="whitelistCurrentIp" class="inline-flex items-center justify-center gap-1">
+                                        <span class="loading loading-spinner loading-xs"></span>
+                                        <span>{{ __('admin.security_protecting_my_ip') }}</span>
+                                    </span>
                                 </button>
-                            </div>
-                        @else
-                            <div class="p-2.5 bg-success/10 border border-success/30 rounded-box flex items-center gap-2 text-xs text-success font-medium">
-                                <x-heroicon-o-shield-check class="w-4 h-4 text-success shrink-0" />
-                                <span>Your current IP (<span class="font-mono font-bold">{{ $adminIp }}</span>) is whitelisted.</span>
                             </div>
                         @endif
                     </div>
 
                     {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
-                    <div class="w-full lg:flex-1 space-y-3">
+                    <div class="w-full lg:flex-1 min-w-0 space-y-3">
                         <div class="relative">
                             <input wire:model.live.debounce.250ms="whitelistSearch" type="text"
                                    placeholder="{{ __('admin.security_search_whitelist') }}"
@@ -348,27 +382,33 @@
                             <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
                         </div>
 
-                        <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
-                            <table class="table table-pin-rows">
+                        <div class="overflow-x-auto w-full max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                            <table class="table table-pin-rows w-full">
                                 <thead>
                                     <tr>
-                                        <th>{{ __('admin.security_ip_or_cidr') }}</th>
+                                        <th class="whitespace-nowrap">{{ __('admin.security_ip_or_cidr') }}</th>
                                         <th>{{ __('admin.description') }}</th>
-                                        <th class="text-right">{{ __('admin.actions') }}</th>
+                                        <th class="text-right w-16 whitespace-nowrap">{{ __('admin.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @forelse ($whitelistIps as $item)
-                                        <tr class="hover">
-                                            <td class="font-mono font-medium text-success">
+                                        <tr class="hover" wire:loading.class="opacity-40 pointer-events-none" wire:target="deleteIp({{ $item->id }})">
+                                            <td class="font-mono font-medium text-success whitespace-nowrap">
                                                 {{ $item->ip_address }}
                                                 @if ($item->ip_address === $adminIp)
                                                     <span class="badge badge-success badge-sm ml-1">You</span>
                                                 @endif
                                             </td>
-                                            <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
-                                            <td class="text-right">
-                                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->ip_address" wire:click="deleteIp({{ $item->id }})" class="text-error p-1" />
+                                            <td class="text-base-content/70 whitespace-normal break-words max-w-xs text-xs sm:text-sm">
+                                                {{ $item->description ?: '—' }}
+                                            </td>
+                                            <td class="text-right w-16 whitespace-nowrap">
+                                                <x-icon-button icon="heroicon-o-trash"
+                                                               :label="__('client.delete').' '.$item->ip_address"
+                                                               wire:click="deleteIp({{ $item->id }})"
+                                                               loading-target="deleteIp({{ $item->id }})"
+                                                               class="text-error p-1" />
                                             </td>
                                         </tr>
                                     @empty
@@ -403,8 +443,8 @@
 
                 {{-- Split-Panel Workbench: Add Form (Left) & Searchable Table (Right) --}}
                 <div class="flex flex-col lg:flex-row gap-6 items-start">
-                    {{-- Left Column: Quick-Add Form (Fixed Ergonomic Width) --}}
-                    <div class="w-full lg:w-80 lg:shrink-0 space-y-3">
+                    {{-- Left Column: Quick-Add Form (Autosizes with min width) --}}
+                    <div class="w-full lg:w-1/4 xl:w-72 2xl:w-80 min-w-[240px] max-w-xs xl:max-w-sm lg:shrink-0 space-y-3">
                         <form wire:submit="addBlacklistIp" class="space-y-2.5 bg-base-200/50 p-3.5 rounded-box border border-base-200">
                             <div class="text-xs font-semibold text-base-content/80 flex items-center gap-1.5">
                                 <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
@@ -422,16 +462,25 @@
                                 <input wire:model="newBlacklistDescription" type="text"
                                        placeholder="{{ __('admin.security_ip_description') }}"
                                        class="input input-bordered input-sm w-full" />
-                                <button type="submit" class="btn btn-error btn-sm w-full gap-1 shadow-xs">
-                                    <x-heroicon-o-plus class="w-4 h-4" />
-                                    <span>{{ __('admin.security_add_to_blacklist') }}</span>
+                                <button type="submit"
+                                        wire:loading.attr="disabled"
+                                        wire:target="addBlacklistIp"
+                                        class="btn btn-error btn-sm w-full gap-1 shadow-xs">
+                                    <span wire:loading.remove wire:target="addBlacklistIp" class="inline-flex items-center gap-1">
+                                        <x-heroicon-o-plus class="w-4 h-4" />
+                                        <span>{{ __('admin.security_add_to_blacklist') }}</span>
+                                    </span>
+                                    <span wire:loading wire:target="addBlacklistIp" class="inline-flex items-center gap-1">
+                                        <span class="loading loading-spinner loading-xs"></span>
+                                        <span>{{ __('admin.security_adding_to_blacklist') }}</span>
+                                    </span>
                                 </button>
                             </div>
                         </form>
                     </div>
 
                     {{-- Right Column: Search Filter & Scrollable Table Viewport (Flex Expand) --}}
-                    <div class="w-full lg:flex-1 space-y-3">
+                    <div class="w-full lg:flex-1 min-w-0 space-y-3">
                         <div class="relative">
                             <input wire:model.live.debounce.250ms="blacklistSearch" type="text"
                                    placeholder="{{ __('admin.security_search_blacklist') }}"
@@ -439,24 +488,30 @@
                             <x-heroicon-o-magnifying-glass class="w-4 h-4 absolute left-3 top-2.5 text-base-content/40" />
                         </div>
 
-                        <div class="overflow-x-auto max-h-80 overflow-y-auto border border-base-200 rounded-box">
-                            <table class="table table-pin-rows">
+                        <div class="overflow-x-auto w-full max-h-80 overflow-y-auto border border-base-200 rounded-box">
+                            <table class="table table-pin-rows w-full">
                                 <thead>
                                     <tr>
-                                        <th>{{ __('admin.security_ip_or_cidr') }}</th>
+                                        <th class="whitespace-nowrap">{{ __('admin.security_ip_or_cidr') }}</th>
                                         <th>{{ __('admin.description') }}</th>
-                                        <th class="text-right">{{ __('admin.actions') }}</th>
+                                        <th class="text-right w-16 whitespace-nowrap">{{ __('admin.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @forelse ($blacklistIps as $item)
-                                        <tr class="hover">
-                                            <td class="font-mono font-medium text-error">
+                                        <tr class="hover" wire:loading.class="opacity-40 pointer-events-none" wire:target="deleteIp({{ $item->id }})">
+                                            <td class="font-mono font-medium text-error whitespace-nowrap">
                                                 {{ $item->ip_address }}
                                             </td>
-                                            <td class="text-base-content/70 truncate max-w-xs">{{ $item->description ?: '—' }}</td>
-                                            <td class="text-right">
-                                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$item->ip_address" wire:click="deleteIp({{ $item->id }})" class="text-error p-1" />
+                                            <td class="text-base-content/70 whitespace-normal break-words max-w-xs text-xs sm:text-sm">
+                                                {{ $item->description ?: '—' }}
+                                            </td>
+                                            <td class="text-right w-16 whitespace-nowrap">
+                                                <x-icon-button icon="heroicon-o-trash"
+                                                               :label="__('client.delete').' '.$item->ip_address"
+                                                               wire:click="deleteIp({{ $item->id }})"
+                                                               loading-target="deleteIp({{ $item->id }})"
+                                                               class="text-error p-1" />
                                             </td>
                                         </tr>
                                     @empty
@@ -518,7 +573,10 @@
                         </thead>
                         <tbody>
                             @forelse ($activeBans as $ban)
-                                <tr class="hover">
+                                <tr class="hover"
+                                    wire:key="active-ban-{{ $ban->ip_address }}"
+                                    wire:loading.class="opacity-40 pointer-events-none"
+                                    wire:target="unban('{{ $ban->ip_address }}'), promoteToWhitelist('{{ $ban->ip_address }}'), promoteToBlacklist('{{ $ban->ip_address }}')">
                                     <td class="font-mono font-medium text-error">
                                         {{ $ban->ip_address }}
                                         {{-- The reason carries the signature that triggered the ban (e.g. sip_scanner · User-Agent: friendly-scanner),
@@ -555,19 +613,28 @@
                                     <td class="text-right whitespace-nowrap">
                                         <div class="join">
                                             <button wire:click="unban('{{ $ban->ip_address }}')" type="button"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="unban('{{ $ban->ip_address }}')"
                                                     class="btn btn-outline btn-xs join-item"
                                                     title="{{ __('admin.security_unblock') }}">
-                                                {{ __('admin.security_unblock') }}
+                                                <span wire:loading wire:target="unban('{{ $ban->ip_address }}')" class="loading loading-spinner loading-xs"></span>
+                                                <span wire:loading.remove wire:target="unban('{{ $ban->ip_address }}')">{{ __('admin.security_unblock') }}</span>
                                             </button>
                                             <button wire:click="promoteToWhitelist('{{ $ban->ip_address }}')" type="button"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="promoteToWhitelist('{{ $ban->ip_address }}')"
                                                     class="btn btn-success btn-xs join-item"
                                                     title="{{ __('admin.security_trust_ip') }}">
-                                                {{ __('admin.security_trust_ip') }}
+                                                <span wire:loading wire:target="promoteToWhitelist('{{ $ban->ip_address }}')" class="loading loading-spinner loading-xs"></span>
+                                                <span wire:loading.remove wire:target="promoteToWhitelist('{{ $ban->ip_address }}')">{{ __('admin.security_trust_ip') }}</span>
                                             </button>
                                             <button wire:click="promoteToBlacklist('{{ $ban->ip_address }}')" type="button"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="promoteToBlacklist('{{ $ban->ip_address }}')"
                                                     class="btn btn-error btn-xs join-item"
                                                     title="{{ __('admin.security_block_permanently') }}">
-                                                {{ __('admin.security_block_permanently') }}
+                                                <span wire:loading wire:target="promoteToBlacklist('{{ $ban->ip_address }}')" class="loading loading-spinner loading-xs"></span>
+                                                <span wire:loading.remove wire:target="promoteToBlacklist('{{ $ban->ip_address }}')">{{ __('admin.security_block_permanently') }}</span>
                                             </button>
                                         </div>
                                     </td>
@@ -688,13 +755,20 @@
                                 </thead>
                                 <tbody>
                                     @foreach ($sipScanner['incidents'] as $incident)
-                                        <tr class="hover">
+                                        <tr class="hover"
+                                            wire:key="scanner-incident-{{ $incident->ip_address }}"
+                                            wire:loading.class="opacity-40 pointer-events-none"
+                                            wire:target="promoteScannerIncident('{{ $incident->ip_address }}')">
                                             <td class="font-mono font-medium text-warning">{{ $incident->ip_address }}</td>
                                             <td class="text-xs text-base-content/70 max-w-md truncate" title="{{ $incident->reason }}">{{ $incident->reason }}</td>
                                             <td>{{ $incident->attempt_count }}</td>
                                             <td class="text-right whitespace-nowrap">
-                                                <button wire:click="promoteScannerIncident('{{ $incident->ip_address }}')" type="button" class="btn btn-error btn-xs">
-                                                    {{ __('admin.security_scanner_add_to_ban') }}
+                                                <button wire:click="promoteScannerIncident('{{ $incident->ip_address }}')" type="button"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="promoteScannerIncident('{{ $incident->ip_address }}')"
+                                                        class="btn btn-error btn-xs">
+                                                    <span wire:loading wire:target="promoteScannerIncident('{{ $incident->ip_address }}')" class="loading loading-spinner loading-xs"></span>
+                                                    <span wire:loading.remove wire:target="promoteScannerIncident('{{ $incident->ip_address }}')">{{ __('admin.security_scanner_add_to_ban') }}</span>
                                                 </button>
                                             </td>
                                         </tr>
@@ -1011,7 +1085,10 @@
 
                         {{-- Core PBX Services Rows --}}
                         @foreach ($catalogServices as $service)
-                            <tr class="hover {{ ! $service->enabled ? 'opacity-50' : '' }}">
+                            <tr class="hover {{ ! $service->enabled ? 'opacity-50' : '' }}"
+                                wire:key="sys-service-{{ $service->id }}"
+                                wire:loading.class="opacity-40 pointer-events-none"
+                                wire:target="toggleSystemService({{ $service->id }}), openEditSystemServiceModal({{ $service->id }})">
                                 <td class="text-center">
                                     <input wire:click="toggleSystemService({{ $service->id }})" type="checkbox"
                                            class="toggle toggle-success toggle-sm"
@@ -1125,7 +1202,10 @@
 
                         {{-- Custom Sequential Rules Rows --}}
                         @forelse ($firewallRules as $rule)
-                            <tr class="hover {{ ! $rule->enabled ? 'opacity-50' : '' }}">
+                            <tr class="hover {{ ! $rule->enabled ? 'opacity-50' : '' }}"
+                                wire:key="firewall-rule-{{ $rule->id }}"
+                                wire:loading.class="opacity-40 pointer-events-none"
+                                wire:target="toggleRule({{ $rule->id }}), moveRuleUp({{ $rule->id }}), moveRuleDown({{ $rule->id }}), openCustomRuleModal({{ $rule->id }}), deleteRule({{ $rule->id }})">
                                 {{-- Status Toggle --}}
                                 <td class="text-center">
                                     <input wire:click="toggleRule({{ $rule->id }})" type="checkbox"

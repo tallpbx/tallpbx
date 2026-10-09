@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse ($queues as $queue)
-                        <tr>
+                        <tr wire:key="{{ $queue->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmQueueDeletion('{{ $queue->id }}')">
                             <td class="font-medium">{{ $queue->name }}</td>
                             <td><span class="badge badge-ghost">{{ $queue->strategy }}</span></td>
                             <td>{{ $queue->timeout }}s</td>

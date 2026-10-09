@@ -26,7 +26,9 @@
                 </thead>
                 <tbody>
                     @forelse ($forwards as $forward)
-                        <tr>
+                        <tr wire:key="{{ $forward->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmForwardDeletion('{{ $forward->id }}')">
                             <td class="font-medium">{{ $forward->extension_uuid }}</td>
                             <td><span class="badge badge-ghost">{{ $forward->forward_type }}</span></td>
                             <td>{{ $forward->destination }}</td>

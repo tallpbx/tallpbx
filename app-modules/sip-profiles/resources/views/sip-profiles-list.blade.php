@@ -24,7 +24,9 @@
                 </thead>
                 <tbody>
                     @forelse($profiles as $profile)
-                        <tr>
+                        <tr wire:key="{{ $profile->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmProfileDeletion('{{ $profile->id }}')">
                             <td class="font-medium">{{ $profile->name }}</td>
                             <td class="text-base-content/60">{{ $profile->description }}</td>
                             <td>

@@ -25,7 +25,9 @@
                 </thead>
                 <tbody>
                     @forelse($destinations as $destination)
-                        <tr>
+                        <tr wire:key="{{ $destination->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmDestinationDeletion('{{ $destination->id }}')">
                             <td class="font-medium">{{ $destination->name }}</td>
                             <td><span class="badge badge-ghost">{{ $destination->type }}</span></td>
                             <td><code class="text-sm">{{ $destination->dial_string }}</code></td>

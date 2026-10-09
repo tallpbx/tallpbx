@@ -33,7 +33,9 @@
                 </thead>
                 <tbody>
                     @forelse($extensions as $extension)
-                        <tr>
+                        <tr wire:key="{{ $extension->id }}"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="confirmExtensionDeletion('{{ $extension->id }}')">
                             <td class="font-medium">{{ $extension->extension_number }}</td>
                             <td>{{ $extension->display_name }}</td>
                             <td>

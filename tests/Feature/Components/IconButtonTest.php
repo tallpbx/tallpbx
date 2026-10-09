@@ -24,6 +24,37 @@ it('renders a labeled navigation link when href is given', function (): void {
         ->toContain('aria-label="Edit recording"');
 });
 
+it('renders a loading spinner and wire directives when loading-target is specified', function (): void {
+    $html = Blade::render('<x-icon-button icon="heroicon-o-trash" label="Delete recording" loading-target="deleteRecord(1)" />');
+
+    expect($html)
+        ->toContain('<button')
+        ->toContain('wire:loading.attr="disabled"')
+        ->toContain('wire:target="deleteRecord(1)"')
+        ->toContain('loading loading-spinner loading-xs')
+        ->toContain('wire:loading.remove');
+});
+
+it('infers loading target from wire:click by default', function (): void {
+    $html = Blade::render('<x-icon-button icon="heroicon-o-trash" label="Delete recording" wire:click="deleteRecord(1)" />');
+
+    expect($html)
+        ->toContain('<button')
+        ->toContain('wire:loading.attr="disabled"')
+        ->toContain('wire:target="deleteRecord(1)"')
+        ->toContain('loading loading-spinner loading-xs')
+        ->toContain('wire:loading.remove');
+});
+
+it('disables loading behavior when loading prop is explicitly false', function (): void {
+    $html = Blade::render('<x-icon-button icon="heroicon-o-trash" label="Delete recording" wire:click="deleteRecord(1)" :loading="false" />');
+
+    expect($html)
+        ->toContain('<button')
+        ->not->toContain('wire:loading.attr="disabled"')
+        ->not->toContain('loading-spinner');
+});
+
 it('refuses to render without an accessible label', function (): void {
     // Blade wraps component exceptions in ViewException (twice in this
     // rendering path), so walk the chain to the component's real contract.
