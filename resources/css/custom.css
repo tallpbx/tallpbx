@@ -29,3 +29,38 @@
 .tabs-lift > .tab {
   --tab-border-color: color-mix(in oklab, var(--color-base-300) 75%, var(--color-base-content) 25%);
 }
+
+/*
+ * Panel Navigation Menu Styling
+ *
+ * DaisyUI 5's .menu component defaults --menu-active-bg to --color-neutral,
+ * which in light themes evaluates to near-black oklch(14% ...).
+ * We override DaisyUI's menu custom properties and active states with
+ * unlayered rules so active nav links use the primary brand tint in both
+ * light and dark themes.
+ */
+.panel-shell .menu {
+  --menu-active-fg: var(--color-primary);
+  --menu-active-bg: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100));
+}
+
+.panel-shell .menu li > a.menu-active,
+.panel-shell .menu li > a[data-current],
+.panel-shell .menu li > a[aria-current="page"],
+.panel-shell .menu li > :not(ul, menu, .menu-title, details, .btn).menu-active,
+.panel-shell .menu .menu-active {
+  color: var(--color-primary) !important;
+  background-color: color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 18%, transparent) !important;
+  font-weight: 500;
+}
+
+.panel-shell .menu li > a.menu-active:hover,
+.panel-shell .menu li > a[data-current]:hover,
+.panel-shell .menu li > a[aria-current="page"]:hover,
+.panel-shell .menu .menu-active:hover {
+  color: var(--color-primary) !important;
+  background-color: color-mix(in oklab, var(--color-primary) 16%, var(--color-base-100)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary) 22%, transparent) !important;
+}
+

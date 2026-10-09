@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Observe Mode UI Layout and Zero-Polling Conformance**:
   - Eliminated manual refresh button in favor of zero-polling Laravel Echo push events, conforming strictly to TallPBX's real-time push event architecture.
   - Refined `security_toggle_observe_help` and `security_observe_banner_body` to accurately describe non-blocking policy evaluation and point administrators directly to the activity viewer and CLI inspection tools.
+- **Security Center and Action Button Hierarchy**:
+  - Restyled the Observe Mode notification banner's "View activity" button using an outline style with warning content border and hover tokens, harmonizing contrast against the amber alert surface.
+  - Elevated the "Add Custom Rule" action button in the Firewall Rules tab to `btn-primary`.
+
+### Fixed
+- **Active Navigation Link Palette in Light Theme**:
+  - Overrode DaisyUI 5's default neutral black active menu background with unlayered brand primary styling (`color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100))`), primary text, and a 1px inset highlight across sidebar and horizontal menus in both light and dark themes.
 
 ## [3.0.3] - 2026-10-08
 

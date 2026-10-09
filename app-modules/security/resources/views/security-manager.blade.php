@@ -105,7 +105,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-                <button wire:click="openObserveDrawer" type="button" class="btn btn-neutral btn-sm whitespace-nowrap gap-1">
+                <button wire:click="openObserveDrawer" type="button" class="btn btn-outline border-warning-content/40 hover:bg-warning-content hover:text-warning text-warning-content btn-sm whitespace-nowrap gap-1">
                     <x-heroicon-o-list-bullet class="w-4 h-4" />
                     <span>{{ __('admin.security_observe_banner_view_activity') }}</span>
                 </button>
@@ -946,7 +946,7 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     {{-- Add Custom Rule --}}
-                    <button wire:click="openCustomRuleModal" type="button" class="btn btn-neutral btn-sm gap-1">
+                    <button wire:click="openCustomRuleModal" type="button" class="btn btn-primary btn-sm gap-1 shadow-xs">
                         <x-heroicon-o-plus class="w-4 h-4" />
                         <span>{{ __('admin.security_add_rule') }}</span>
                     </button>
