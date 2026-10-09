@@ -62,9 +62,9 @@ it('skips the protection stages, keeps the stored policy, and documents the rema
     $generator = new SecurityConfigGenerator($tempDir);
     $nft = $generator->generate();
 
-    // The protection stages are gone — including the loopback accept, which
-    // is exactly why the connectivity check refuses this configuration at
-    // apply time: local-only ports (database, cache) are not in the catalog.
+    // Stages 1–7 are gone entirely — including loopback, the whitelist, the
+    // malformed-packet drop, and the stateful fast path, exactly as the
+    // original design grants (the lockout guard, not a pinned rule, is the protection).
     expect($nft)->not->toContain('iif "lo" accept')
         ->and($nft)->not->toContain('ip saddr @whitelist_ips accept')
         ->and($nft)->not->toContain('ip6 saddr @whitelist_ips6 accept')

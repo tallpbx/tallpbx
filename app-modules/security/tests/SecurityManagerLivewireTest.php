@@ -638,6 +638,55 @@ it('does not show the drift banner when the live kernel policy matches the saved
         ->assertDontSee('Firewall Out of Sync');
 });
 
+it('does not show the drift banner in observe mode when kernel policy is accept even if saved default policy is drop', function (): void {
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'drop']);
+    SecuritySetting::updateOrCreate(['key' => 'firewall_observe_mode'], ['value' => '1']);
+
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn(
+        "table inet tallpbx_filter {\n\tchain input {\n\t\ttype filter hook input priority filter - 10; policy accept;\n\t}\n}"
+    );
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', 'accept')
+        ->assertDontSee('Firewall Out of Sync');
+});
+
+it('shows the drift banner in observe mode when kernel policy is unexpectedly drop', function (): void {
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'drop']);
+    SecuritySetting::updateOrCreate(['key' => 'firewall_observe_mode'], ['value' => '1']);
+
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn(
+        "table inet tallpbx_filter {\n\tchain input {\n\t\ttype filter hook input priority filter - 10; policy drop;\n\t}\n}"
+    );
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', 'drop')
+        ->assertSee('Firewall Out of Sync')
+        ->assertSee('Re-apply Ruleset');
+});
+
+it('does not show the drift banner when firewall is disabled and kernel policy is accept', function (): void {
+    SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'drop']);
+    SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => '0']);
+
+    $executorMock = Mockery::mock(SecurityExecutorInterface::class);
+    $executorMock->shouldReceive('status')->andReturn(
+        "table inet tallpbx_filter {\n\tchain input {\n\t\ttype filter hook input priority filter - 10; policy accept;\n\t}\n}"
+    );
+    app()->instance(SecurityExecutorInterface::class, $executorMock);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('liveFirewallPolicy', 'accept')
+        ->assertDontSee('Firewall Out of Sync');
+});
+
 it('shows the not-loaded warning when the kernel has no TallPBX firewall table', function (): void {
     $executorMock = Mockery::mock(SecurityExecutorInterface::class);
     $executorMock->shouldReceive('status')->andReturn("table inet other_filter {\n}");

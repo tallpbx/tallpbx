@@ -206,16 +206,15 @@ The **Security Center** (`/panel/security`) provides an evaluation-ordered, four
 ### Master Operational Switches (Top Banner)
 Pinned directly above the tab strip for immediate visibility:
 1. **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules.
-2. **Pre-Filter Pipeline Switch**: Enables or disables stages 1–7 as a single unit. Guarded by `LockoutGuardService::assertLocalServicesSafe()`—refuses to disable pre-filters if the default policy would drop loopback database/cache traffic.
-3. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops to the kernel journal, but nothing is blocked (the default policy is forced to `accept`). A prominent amber banner displays across all Security Center tabs with live packet hit counters and a 1-click **"View Observed Activity"** drawer, supplemented by the `php artisan security:observe` CLI command.
+2. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops to the kernel journal, but nothing is blocked (the default policy is forced to `accept`). A prominent amber banner displays across all Security Center tabs with live packet hit counters and a 1-click **"View Observed Activity"** drawer, supplemented by the `php artisan security:observe` CLI command.
 
 ---
 
 ### The Four Evaluation-Ordered Tabs
 
-#### Tab 1: Block & Allow Lists (`?tab=lists`)
-* **Permanent Blacklist**: Forbidden IP addresses and CIDR subnets dropped at line rate via kernel interval trees (`@blacklist_ips` / `@blacklist_ips6`). Features CIDR mask validation and instant search.
+#### Tab 1: Allow & Block Lists (`?tab=lists`)
 * **Trusted Whitelist**: IP addresses and subnets exempt from all packet filtering (`@whitelist_ips` / `@whitelist_ips6`). Includes a 1-click self-protection button to automatically whitelist the current administrator's connection IP.
+* **Permanent Blacklist**: Forbidden IP addresses and CIDR subnets dropped at line rate via kernel interval trees (`@blacklist_ips` / `@blacklist_ips6`). Features CIDR mask validation and instant search.
 
 #### Tab 2: Attackers (`?tab=attackers`)
 * **Active Intrusion Bans Table**: Real-time display of currently banned IPs, remaining hardware countdown timers, entry points / attack types (`SIP`, `Web`, `SSH`, `SIP Scanner`), and 1-click unban buttons.
@@ -233,7 +232,9 @@ Pinned directly above the tab strip for immediate visibility:
 * **Drop Counters & Emergency Escape**: Live per-feed kernel drop counters, on-demand "Sync Now" action, and a prominent "Remove all feed blocks" button in case of upstream false positives.
 
 #### Tab 4: Firewall Rules (`?tab=rules`)
-* **Pre-Filter Evaluation Order**: Interactive table showing the exact sequence of stages 1–7 with Up/Down reordering chevrons and a "Reset to recommended order" action.
+* **Pre-Filter Pipeline**: Interactive table showing the exact sequence of stages 1–7 with Up/Down reordering chevrons and a "Reset to recommended order" action:
+  - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, the section is greyed out. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
+  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
 * **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
   - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
   - **TFTP Provisioning Defense**: Hardened UDP 69 profile with shield badge showing real-time counters for blocked WRQ uploads, traversal attempts, and flood drops.

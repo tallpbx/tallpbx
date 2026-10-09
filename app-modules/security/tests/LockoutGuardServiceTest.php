@@ -136,20 +136,40 @@ it('reports local services safe while the pre-filter stays on', function (): voi
     expect($guard->wouldDropLocalServices())->toBeFalse();
 });
 
-it('flags local services at risk when the pre-filter would be off and the policy blocks', function (): void {
+it('detects unsafe local services when pre-filters are off with a blocking default policy and no custom rules', function (): void {
     $guard = new LockoutGuardService;
 
-    // The exact outage pattern this guard exists for: removing the pre-filter
-    // also removes the loopback accept, so the server's own database and
-    // cache connections fall through to the blocking default policy.
+    // Disabling pre-filters while the default policy is drop removes the loopback
+    // and connection tracking rules, causing local connections to drop.
     expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeTrue();
 
     // Same verdict once the switch is already off and nothing changes it.
     SecuritySetting::set('prefilter_enabled', false);
 
     expect($guard->wouldDropLocalServices())->toBeTrue()
-        // Re-enabling the pre-filter restores the loopback guarantee.
         ->and($guard->wouldDropLocalServices(proposedPrefilterEnabled: true))->toBeFalse();
+});
+
+it('reports local services safe when pre-filters are off if custom lo and ct state rules exist', function (): void {
+    $guard = new LockoutGuardService;
+
+    SecurityRule::create([
+        'sequence' => 10,
+        'description' => 'Custom Loopback Accept',
+        'source_ip' => '127.0.0.1',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    SecurityRule::create([
+        'sequence' => 20,
+        'description' => 'Custom ct state established,related Accept',
+        'source_ip' => 'any',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeFalse();
 });
 
 it('reports local services safe when the default policy allows', function (): void {
@@ -189,7 +209,7 @@ it('reports local services safe when the firewall is disabled', function (): voi
     expect($guard->wouldDropLocalServices(proposedPrefilterEnabled: false))->toBeFalse();
 });
 
-it('throws a local service safety alert when the pre-filter is off and the policy blocks', function (): void {
+it('throws LockoutException on assertLocalServicesSafe when pre-filter is off under default drop', function (): void {
     $guard = new LockoutGuardService;
 
     expect(fn () => $guard->assertLocalServicesSafe(proposedPrefilterEnabled: false))

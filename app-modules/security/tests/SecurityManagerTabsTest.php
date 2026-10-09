@@ -47,7 +47,7 @@ beforeEach(function (): void {
     $this->app->instance(SecurityConfigGenerator::class, $generator);
 });
 
-it('defaults to the Block & Allow Lists tab and renders every tab control', function (): void {
+it('defaults to the Allow & Block Lists tab and renders every tab control', function (): void {
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
         ->assertSet('activeTab', 'block-allow')
@@ -56,14 +56,14 @@ it('defaults to the Block & Allow Lists tab and renders every tab control', func
         ->assertSee(__('admin.security_tab_threat_feeds'))
         ->assertSee(__('admin.security_tab_firewall_rules'))
         // The page-global switch controls stay visible above the strip.
-        ->assertSee(__('admin.security_toggle_prefilter'))
+        ->assertSee(__('admin.security_toggle_firewall'))
         ->assertSee(__('admin.security_toggle_observe'));
 });
 
 it('shows only the selected tab panel', function (): void {
     $component = Livewire::actingAs($this->admin, 'admin')->test(SecurityManager::class);
 
-    // Block & Allow Lists shows the allow/block workbenches, not the pipeline.
+    // Allow & Block Lists shows the allow/block workbenches, not the pipeline.
     $component->assertSee(__('admin.security_add_to_whitelist'))
         ->assertDontSee('iif "lo"');
 
@@ -118,11 +118,12 @@ it('renders reorder controls on movable pre-filter rows and a lock on loopback',
         ->assertDontSee("movePreFilterUp('loopback')", false);
 });
 
-it('disables the reorder controls with a note while the pre-filter is off', function (): void {
+it('disables the reorder controls while the pre-filter is off', function (): void {
     SecuritySetting::set('prefilter_enabled', false);
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
         ->set('activeTab', 'firewall-rules')
-        ->assertSee(__('admin.security_prefilter_disabled_note'));
+        ->assertSet('prefilterEnabled', false)
+        ->assertSee('disabled', false);
 });

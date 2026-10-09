@@ -42,8 +42,8 @@
         </div>
     @endif
 
-    {{-- Firewall Drift Banner (the live kernel policy differs from the saved policy or ruleset content has drifted) --}}
-    @if (($liveFirewallPolicy !== null && $liveFirewallPolicy !== $firewallDefaultPolicy) || $firewallSyncState === 'drift')
+    {{-- Firewall Drift Banner (the live kernel policy differs from the expected policy or ruleset content has drifted) --}}
+    @if (($liveFirewallPolicy !== null && $liveFirewallPolicy !== $expectedFirewallPolicy) || $firewallSyncState === 'drift')
         <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
                 <x-heroicon-o-arrow-path class="w-6 h-6 text-warning flex-shrink-0" />
@@ -52,10 +52,10 @@
                     <div class="text-xs opacity-90">
                         @if ($liveFirewallPolicy === 'absent')
                             {{ __('admin.security_drift_not_loaded_body') }}
-                        @elseif ($liveFirewallPolicy !== null && $liveFirewallPolicy !== $firewallDefaultPolicy)
+                        @elseif ($liveFirewallPolicy !== null && $liveFirewallPolicy !== $expectedFirewallPolicy)
                             {{ __('admin.security_drift_warning_body', [
                                 'live' => $liveFirewallPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
-                                'saved' => $firewallDefaultPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
+                                'saved' => $expectedFirewallPolicy === 'drop' ? __('admin.security_policy_drop') : __('admin.security_policy_accept'),
                             ]) }}
                         @else
                             {{ __('admin.security_drift_content_body') }}
@@ -63,9 +63,19 @@
                     </div>
                 </div>
             </div>
-            <button wire:click="applyFirewallChanges" type="button" class="btn btn-warning btn-sm whitespace-nowrap">
-                <x-heroicon-o-arrow-path class="w-4 h-4" />
-                {{ __('admin.security_drift_reapply') }}
+            <button wire:click="applyFirewallChanges"
+                    wire:loading.attr="disabled"
+                    wire:target="applyFirewallChanges"
+                    type="button"
+                    class="btn btn-warning btn-sm whitespace-nowrap">
+                <span wire:loading.remove wire:target="applyFirewallChanges" class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-arrow-path class="w-4 h-4" />
+                    <span>{{ __('admin.security_drift_reapply') }}</span>
+                </span>
+                <span wire:loading wire:target="applyFirewallChanges" class="inline-flex items-center gap-1.5">
+                    <span class="loading loading-spinner loading-xs"></span>
+                    <span>{{ __('admin.security_drift_reapplying') }}</span>
+                </span>
             </button>
         </div>
     @endif
@@ -80,9 +90,19 @@
                     <div class="text-xs opacity-90">{{ __('admin.security_firewall_off_banner_body') }}</div>
                 </div>
             </div>
-            <button wire:click="setFirewallEnabled(true)" type="button" class="btn btn-error btn-sm whitespace-nowrap">
-                <x-heroicon-o-shield-check class="w-4 h-4" />
-                {{ __('admin.security_firewall_off_banner_action') }}
+            <button wire:click="setFirewallEnabled(true)"
+                    wire:loading.attr="disabled"
+                    wire:target="setFirewallEnabled"
+                    type="button"
+                    class="btn btn-error btn-sm whitespace-nowrap">
+                <span wire:loading.remove wire:target="setFirewallEnabled" class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-shield-check class="w-4 h-4" />
+                    <span>{{ __('admin.security_firewall_off_banner_action') }}</span>
+                </span>
+                <span wire:loading wire:target="setFirewallEnabled" class="inline-flex items-center gap-1.5">
+                    <span class="loading loading-spinner loading-xs"></span>
+                    <span>{{ __('admin.security_firewall_turning_on') }}</span>
+                </span>
             </button>
         </div>
     @endif
@@ -105,13 +125,27 @@
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-                <button wire:click="openObserveDrawer" type="button" class="btn btn-outline border-warning-content/40 hover:bg-warning-content hover:text-warning text-warning-content btn-sm whitespace-nowrap gap-1">
+                <button wire:click="openObserveDrawer"
+                        wire:loading.attr="disabled"
+                        wire:target="setObserveMode"
+                        type="button"
+                        class="btn btn-outline border-warning-content/40 hover:bg-warning-content hover:text-warning text-warning-content btn-sm whitespace-nowrap gap-1">
                     <x-heroicon-o-list-bullet class="w-4 h-4" />
                     <span>{{ __('admin.security_observe_banner_view_activity') }}</span>
                 </button>
-                <button wire:click="setObserveMode(false)" type="button" class="btn btn-warning btn-sm whitespace-nowrap gap-1">
-                    <x-heroicon-o-shield-check class="w-4 h-4" />
-                    <span>{{ __('admin.security_observe_banner_action') }}</span>
+                <button wire:click="setObserveMode(false)"
+                        wire:loading.attr="disabled"
+                        wire:target="setObserveMode"
+                        type="button"
+                        class="btn btn-warning btn-sm whitespace-nowrap">
+                    <span wire:loading.remove wire:target="setObserveMode" class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-shield-check class="w-4 h-4" />
+                        <span>{{ __('admin.security_observe_banner_action') }}</span>
+                    </span>
+                    <span wire:loading wire:target="setObserveMode" class="inline-flex items-center gap-1.5">
+                        <span class="loading loading-spinner loading-xs"></span>
+                        <span>{{ __('admin.security_observe_disabling') }}</span>
+                    </span>
                 </button>
             </div>
         </div>
@@ -241,40 +275,39 @@
         <div class="card-body p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
                 {{-- Whole firewall --}}
-                <label class="flex items-center gap-2 cursor-pointer">
+                <label class="flex items-center gap-2 cursor-pointer"
+                       wire:loading.class="opacity-70 pointer-events-none"
+                       wire:target="setFirewallEnabled">
                     <input wire:click="setFirewallEnabled({{ $firewallEnabled ? 'false' : 'true' }})"
-                           @if ($firewallEnabled) wire:confirm="{{ __('admin.security_firewall_off_confirm') }}" @endif
+                           wire:loading.attr="disabled"
+                           wire:target="setFirewallEnabled"
                            type="checkbox" class="toggle toggle-primary toggle-sm" @checked($firewallEnabled) />
                     <span class="text-sm font-medium">{{ __('admin.security_toggle_firewall') }}</span>
-                    <x-tooltip :tip="__('admin.security_toggle_firewall_help')" align="start" position="right">
-                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                    </x-tooltip>
-                </label>
-
-                {{-- Built-in pre-filter (stages 1–7) --}}
-                <label class="flex items-center gap-2 cursor-pointer">
-                    <input wire:click="setPrefilterEnabled({{ $prefilterEnabled ? 'false' : 'true' }})"
-                           type="checkbox" class="toggle toggle-primary toggle-sm" @checked($prefilterEnabled) />
-                    <span class="text-sm font-medium">{{ __('admin.security_toggle_prefilter') }}</span>
-                    <x-tooltip :tip="__('admin.security_toggle_prefilter_help')" align="start" position="right">
-                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                    </x-tooltip>
+                    <span wire:loading wire:target="setFirewallEnabled" class="loading loading-spinner loading-xs text-primary"></span>
+                    <span wire:loading.remove wire:target="setFirewallEnabled">
+                        <x-tooltip :tip="__('admin.security_toggle_firewall_help')" align="start" position="right">
+                            <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                        </x-tooltip>
+                    </span>
                 </label>
 
                 {{-- Global observe mode --}}
-                <label class="flex items-center gap-2 cursor-pointer">
+                <label class="flex items-center gap-2 cursor-pointer"
+                       wire:loading.class="opacity-70 pointer-events-none"
+                       wire:target="setObserveMode">
                     <input wire:click="setObserveMode({{ $firewallObserveMode ? 'false' : 'true' }})"
+                           wire:loading.attr="disabled"
+                           wire:target="setObserveMode"
                            type="checkbox" class="toggle toggle-warning toggle-sm" @checked($firewallObserveMode) />
                     <span class="text-sm font-medium">{{ __('admin.security_toggle_observe') }}</span>
-                    <x-tooltip :tip="__('admin.security_toggle_observe_help')" align="start" position="right">
-                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                    </x-tooltip>
+                    <span wire:loading wire:target="setObserveMode" class="loading loading-spinner loading-xs text-warning"></span>
+                    <span wire:loading.remove wire:target="setObserveMode">
+                        <x-tooltip :tip="__('admin.security_toggle_observe_help')" align="start" position="right">
+                            <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                        </x-tooltip>
+                    </span>
                 </label>
             </div>
-
-            @if (! $prefilterEnabled)
-                <span class="text-xs font-medium text-warning">{{ __('admin.security_prefilter_off_badge') }}</span>
-            @endif
         </div>
     </div>
 
@@ -304,7 +337,7 @@
         </div>
     </div>
 
-    {{-- Tab Panel: Block & Allow Lists (allow list first, matching the kernel evaluation order) --}}
+    {{-- Tab Panel: Allow & Block Lists (allow list first, matching the kernel evaluation order) --}}
     @if ($activeTab === 'block-allow')
     <div class="space-y-6">
         {{-- Card: Whitelist (trusted allow list) --}}
@@ -969,20 +1002,47 @@
                     </thead>
                     <tbody class="divide-y divide-base-200">
                         {{-- Ingress Pre-Filters Collapsible Header --}}
-                        <tr class="bg-base-200/40 text-xs font-semibold text-base-content/80 cursor-pointer hover:bg-base-200/70 transition-colors select-none"
+                        <tr x-data="{ suppressTitle: false }"
+                            class="bg-base-200/40 text-xs font-semibold text-base-content/80 cursor-pointer hover:bg-base-200/70 transition-colors select-none"
                             @click="showSystemPreFilters = !showSystemPreFilters"
-                            title="{{ __('admin.security_toggle_invariants_tooltip') }}">
+                            :title="suppressTitle ? null : '{{ __('admin.security_toggle_invariants_tooltip') }}'">
                             <td colspan="7" class="py-2.5 px-3">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <span class="uppercase tracking-wider text-xs">{{ __('admin.security_system_invariants_prefilters') }}</span>
-                                        <span class="badge badge-ghost badge-sm text-xs font-normal">
+                                    <div class="flex items-center gap-2.5">
+                                        {{-- Pre-filter switch on the left with no other text --}}
+                                        <label class="flex items-center cursor-pointer"
+                                               @click.stop
+                                               @mouseenter="suppressTitle = true"
+                                               @mouseleave="suppressTitle = false"
+                                               wire:loading.class="opacity-70 pointer-events-none"
+                                               wire:target="setPrefilterEnabled">
+                                            <input wire:click="setPrefilterEnabled({{ $prefilterEnabled ? 'false' : 'true' }})"
+                                                   wire:loading.attr="disabled"
+                                                   wire:target="setPrefilterEnabled"
+                                                   type="checkbox" class="toggle toggle-primary toggle-xs" @checked($prefilterEnabled) />
+                                        </label>
+
+                                        <span class="uppercase tracking-wider text-xs {{ ! $prefilterEnabled ? 'text-base-content/50' : '' }}">{{ __('admin.security_system_invariants_prefilters') }}</span>
+
+                                        <span wire:loading wire:target="setPrefilterEnabled" class="loading loading-spinner loading-xs text-primary"></span>
+                                        <span wire:loading.remove wire:target="setPrefilterEnabled"
+                                              @click.stop
+                                              @mouseenter="suppressTitle = true"
+                                              @mouseleave="suppressTitle = false">
+                                            <x-tooltip :tip="__('admin.security_toggle_prefilter_help')" align="start" position="right">
+                                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                            </x-tooltip>
+                                        </span>
+
+                                        <span class="badge badge-ghost badge-sm text-xs font-normal {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
                                             {{ __('admin.security_invariants_rules_count', ['count' => count($preFilterRows)]) }}
                                         </span>
                                     </div>
                                     <div class="flex items-center gap-3">
                                         {{-- The reset escape hatch always restores a known-safe evaluation order. --}}
                                         <button wire:click.stop="resetPreFilterOrder" type="button"
+                                                @mouseenter="suppressTitle = true"
+                                                @mouseleave="suppressTitle = false"
                                                 wire:confirm="{{ __('admin.security_prefilter_reset_confirm') }}"
                                                 @disabled(! $prefilterEnabled)
                                                 class="btn btn-ghost btn-xs gap-1 text-base-content/70 normal-case font-medium">
@@ -995,22 +1055,20 @@
                                         </div>
                                     </div>
                                 </div>
-                                @if (! $prefilterEnabled)
-                                    <div class="text-warning text-[11px] font-normal mt-1 normal-case tracking-normal">{{ __('admin.security_prefilter_disabled_note') }}</div>
-                                @endif
                             </td>
                         </tr>
 
                         {{-- Pre-Filter Rows (rendered in the stored evaluation order) --}}
                         @foreach ($preFilterRows as $preFilterRow)
-                            <tr class="hover {{ $preFilterRow['invariant'] ? 'bg-base-200/5' : '' }}" x-show="showSystemPreFilters" x-cloak>
+                            <tr class="hover transition-opacity duration-200 {{ ! $prefilterEnabled ? 'opacity-40 bg-base-200/20' : ($preFilterRow['invariant'] ? 'bg-base-200/5' : '') }}"
+                                x-show="showSystemPreFilters" x-cloak>
                                 <td class="text-center">
-                                    <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ $preFilterRow['status_class'] }} {{ $preFilterRow['count_pulse'] ? 'animate-pulse' : '' }}" title="Active"></span>
+                                    <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ ! $prefilterEnabled ? 'bg-base-content/25' : $preFilterRow['status_class'] }} {{ ($prefilterEnabled && $preFilterRow['count_pulse']) ? 'animate-pulse' : '' }}" title="{{ $prefilterEnabled ? 'Active' : 'Disabled' }}"></span>
                                 </td>
                                 <td>
                                     {{-- Fixed-width tracks keep the rule name, kernel badge and info icon aligned across every pre-filter row. --}}
                                     <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                        <span class="w-[17.25rem] shrink-0">{{ $preFilterRow['label'] }}</span>
+                                        <span class="w-[17.25rem] shrink-0 {{ ! $prefilterEnabled ? 'text-base-content/70' : '' }}">{{ $preFilterRow['label'] }}</span>
                                         <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">{{ $preFilterRow['badge'] }}</span></span>
                                         @if ($preFilterRow['tooltip'])
                                             <x-tooltip :tip="$preFilterRow['tooltip']" align="start" position="right">
@@ -1033,7 +1091,7 @@
                                         <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
                                         <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
                                     @else
-                                        <span class="font-mono text-sm {{ $preFilterRow['count_class'] }}">
+                                        <span class="font-mono text-sm {{ ! $prefilterEnabled ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
                                             {{ $preFilterRow['count'] }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
                                         </span>
                                     @endif
@@ -1073,7 +1131,8 @@
                                             @endif
                                             @if ($preFilterRow['manage'])
                                                 <button wire:click="$set('activeTab', '{{ $preFilterRow['manage']['tab'] }}')" type="button"
-                                                        class="btn btn-ghost btn-xs gap-1 {{ $preFilterRow['manage']['class'] }}">
+                                                        @disabled(! $prefilterEnabled)
+                                                        class="btn btn-ghost btn-xs gap-1 {{ ! $prefilterEnabled ? 'opacity-40 pointer-events-none' : $preFilterRow['manage']['class'] }}">
                                                     <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
                                                     <span>{{ $preFilterRow['manage']['label'] }}</span>
                                                 </button>
@@ -1313,7 +1372,9 @@
                             </td>
                         </tr>
                         {{-- Default Inbound Fallback Policy Row --}}
-                        <tr class="hover">
+                        <tr class="hover"
+                            wire:loading.class="opacity-40 pointer-events-none"
+                            wire:target="saveDefaultPolicy">
                             <td class="text-center">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-base-content/40" title="Active"></span>
                             </td>
@@ -1333,15 +1394,25 @@
                                 <span class="badge badge-ghost badge-sm">{{ __('admin.security_source_anywhere') }}</span>
                             </td>
                             <td>
-                                @if ($firewallDefaultPolicy === 'drop')
-                                    <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
-                                @else
-                                    <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
-                                @endif
+                                <span wire:loading.remove wire:target="saveDefaultPolicy">
+                                    @if ($firewallDefaultPolicy === 'drop')
+                                        <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                                    @else
+                                        <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                                    @endif
+                                </span>
+                                <span wire:loading wire:target="saveDefaultPolicy" class="inline-flex items-center gap-1.5">
+                                    <span class="loading loading-spinner loading-xs text-primary"></span>
+                                    <span class="badge badge-ghost badge-sm font-semibold text-base-content/60">{{ __('admin.saving') }}</span>
+                                </span>
                             </td>
                             <td class="text-right whitespace-nowrap">
-                                <button wire:click="openDefaultPolicyForm" type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/70">
-                                    <x-heroicon-o-cog-6-tooth class="w-3.5 h-3.5" />
+                                <button wire:click="openDefaultPolicyForm"
+                                        wire:loading.attr="disabled"
+                                        wire:target="saveDefaultPolicy"
+                                        type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/70">
+                                    <x-heroicon-o-cog-6-tooth class="w-3.5 h-3.5" wire:loading.remove wire:target="saveDefaultPolicy" />
+                                    <span wire:loading wire:target="saveDefaultPolicy" class="loading loading-spinner loading-xs text-primary"></span>
                                     <span>{{ __('admin.security_configure') }}</span>
                                 </button>
                             </td>
@@ -1467,11 +1538,23 @@
                     </div>
 
                     <div class="modal-action">
-                        <button wire:click="closeDefaultPolicyForm" type="button" class="btn btn-outline btn-sm">
+                        <button wire:click="closeDefaultPolicyForm"
+                                wire:loading.attr="disabled"
+                                wire:target="saveDefaultPolicy"
+                                type="button" class="btn btn-outline btn-sm">
                             {{ __('client.cancel') }}
                         </button>
-                        <button type="submit" class="btn btn-primary btn-sm">
-                            {{ __('client.save') }}
+                        <button type="submit"
+                                wire:loading.attr="disabled"
+                                wire:target="saveDefaultPolicy"
+                                class="btn btn-primary btn-sm">
+                            <span wire:loading.remove wire:target="saveDefaultPolicy" class="inline-flex items-center gap-1.5">
+                                <span>{{ __('client.save') }}</span>
+                            </span>
+                            <span wire:loading wire:target="saveDefaultPolicy" class="inline-flex items-center gap-1.5">
+                                <span class="loading loading-spinner loading-xs"></span>
+                                <span>{{ __('admin.saving') }}</span>
+                            </span>
                         </button>
                     </div>
                 </form>

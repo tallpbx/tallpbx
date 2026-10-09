@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added comprehensive "Testing Firewall Policies with Observe Mode" documentation across `docs/operations.md`, `docs/security-architecture.md`, and `docs/ui-tour.md`.
 
 ### Changed
+- **Security Center Pre-Filters Switch & Lockout Guard Modernization**:
+  - Restored the pre-filter switch to toggle all 7 pre-filter stages as a unified block, located cleanly on the left side of the "PRE-FILTERS" section header with no extra text, with the tooltip icon placed after the title.
+  - Re-pinned the loopback interface invariant to the first row with a lock icon.
+  - Updated `LockoutGuardService` to enforce that when pre-filters are disabled, either the default inbound policy is `accept`, or active custom rules explicitly provide both a loopback accept rule (`iif "lo"` / `127.0.0.1`) and a connection tracking rule (`ct state established,related accept`) to protect PBX local services and outbound return traffic.
+  - Added Pattern 2 and Pattern 3 in-progress loading animations to the Default Inbound Policy modal form submission and table row.
 - **Observe Mode UI Layout and Zero-Polling Conformance**:
   - Eliminated manual refresh button in favor of zero-polling Laravel Echo push events, conforming strictly to TallPBX's real-time push event architecture.
   - Refined `security_toggle_observe_help` and `security_observe_banner_body` to accurately describe non-blocking policy evaluation and point administrators directly to the activity viewer and CLI inspection tools.
@@ -29,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Elevated the "Add Custom Rule" action button in the Firewall Rules tab to `btn-primary`.
 
 ### Fixed
+- **Pre-Filters Header Tooltip Native Browser Hover Suppression**:
+  - Added reactive Alpine state (`suppressTitle`) to dynamically strip the table row's `title` attribute when hovering over the pre-filters tooltip icon, switch, or reset button, preventing the browser's native *"Click to expand or collapse pre-filters"* message from appearing on top of and obscuring the DaisyUI help tooltip.
+- **Pest Browser Smoke Test Tag Selector Resolution**:
+  - Replaced ambiguous plain tag selectors with explicit CSS selectors (`thead > tr`) in `PanelOperationsSmokeTest.php`, preventing Pest 4's `GuessLocator` from falling back to literal text search and hanging the browser runner.
 - **Active Navigation Link Palette in Light Theme**:
   - Overrode DaisyUI 5's default neutral black active menu background with unlayered brand primary styling (`color-mix(in oklab, var(--color-primary) 12%, var(--color-base-100))`), primary text, and a 1px inset highlight across sidebar and horizontal menus in both light and dark themes.
 

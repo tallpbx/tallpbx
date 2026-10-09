@@ -93,11 +93,7 @@ it('refuses to disable the pre-filter when the administrator would be dropped', 
     $this->executor->shouldNotHaveReceived('apply');
 });
 
-it('refuses to disable the pre-filter when local services would lose their loopback connection', function (): void {
-    // The administrator is whitelisted, but the seeded default policy still
-    // blocks: removing the pre-filter would also remove the loopback accept
-    // that the panel's own database and cache connections rely on, so the
-    // change is refused even though this operator's own address is safe.
+it('refuses to disable the pre-filter when local services would be severed', function (): void {
     SecurityIpList::create([
         'type' => 'whitelist',
         'ip_address' => '203.0.113.10',
@@ -115,6 +111,41 @@ it('refuses to disable the pre-filter when local services would lose their loopb
         ->and(SecuritySetting::getBoolean('prefilter_enabled', true))->toBeTrue();
 
     $this->executor->shouldNotHaveReceived('apply');
+});
+
+it('allows disabling the pre-filter when custom lo and ct rules exist', function (): void {
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.10',
+        'description' => 'Admin uplink',
+    ]);
+
+    \Modules\Security\Models\SecurityRule::create([
+        'sequence' => 10,
+        'description' => 'Custom loopback accept',
+        'source_ip' => '127.0.0.1',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    \Modules\Security\Models\SecurityRule::create([
+        'sequence' => 20,
+        'description' => 'Custom ct state established accept',
+        'source_ip' => 'any',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('adminIp', '203.0.113.10')
+        ->call('setPrefilterEnabled', false)
+        ->assertSet('prefilterEnabled', false);
+
+    expect($component->get('operationalMessageType'))->toBe('success')
+        ->and(SecuritySetting::getBoolean('prefilter_enabled', true))->toBeFalse();
+
+    $this->executor->shouldHaveReceived('apply')->once();
 });
 
 it('records an audit entry when the pre-filter is switched off', function (): void {
@@ -182,10 +213,7 @@ it('refuses to turn observe mode off when enforcement would drop the administrat
     $this->executor->shouldNotHaveReceived('apply');
 });
 
-it('refuses to leave observe mode when the pre-filter is off and the policy would drop local services', function (): void {
-    // The operator's request itself comes from the loopback address (safe),
-    // but leaving observe mode with the pre-filter off would make the stored
-    // blocking policy take effect and cut the panel off from its own services.
+it('refuses to leave observe mode while the pre-filter is off and the default policy blocks', function (): void {
     SecuritySetting::set('firewall_observe_mode', true);
     SecuritySetting::set('prefilter_enabled', false);
 

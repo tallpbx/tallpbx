@@ -218,7 +218,7 @@ it('renders the security manager dashboard', function (): void {
 
     $this->loginAs($this->admin, 'admin');
 
-    // Tab 1 — Block & Allow Lists (the default): the allow/block workbenches
+    // Tab 1 — Allow & Block Lists (the default): the allow/block workbenches
     // under the page-global status strip.
     $page = visit('/panel/security')->resize(1920, 2400);
     $page->assertSee('Security Center')
@@ -253,6 +253,20 @@ it('renders the security manager dashboard', function (): void {
         ->assertSee('Default Inbound Policy')
         ->assertSee('ICMP Ping Diagnostics')
         ->assertSee('SIP Signaling');
+
+    // Verify pre-filter header title suppression when hovering over the tooltip icon
+    expect($page->script("document.querySelector('tr[x-data*=\"suppressTitle\"]').getAttribute('title')"))
+        ->toContain('collapse');
+
+    // Hovering over the tooltip icon suppresses the tr's title attribute to prevent native browser tooltip overlap
+    $page->hover('tr[x-data*="suppressTitle"] [data-tip] svg');
+    expect($page->script("document.querySelector('tr[x-data*=\"suppressTitle\"]').getAttribute('title')"))
+        ->toBeNull();
+
+    // Moving away restores the header title (explicit selector 'thead > tr' prevents Pest text-matching fallback)
+    $page->hover('thead > tr');
+    expect($page->script("document.querySelector('tr[x-data*=\"suppressTitle\"]').getAttribute('title')"))
+        ->toContain('collapse');
 
     // Expand the collapsible Pre-Filters section so the full kernel pipeline is visible
     $page->click('tr[title*="expand or collapse"]')

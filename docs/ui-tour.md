@@ -88,12 +88,12 @@ Users can toggle their preferred language instantly via the topbar language drop
 The **Security Center** (`/panel/security`) provides system administrators with real-time control and visibility over the Linux kernel `nftables` host firewall, automated intrusion detection, public threat intelligence feeds, and telephony bot defense.
 
 * **Reactive Live Updates**: Connected directly to **Laravel Reverb WebSockets** via **Laravel Echo** — active threat counters, ban expirations, feed sync status, and rule changes update reactively without requiring page refreshes.
-* **Master Operational Switches & Zero-Lockout**: Pinned controls for the Firewall Master Switch, Built-in Pre-Filters Switch, and Global Observe Mode (with live would-be drop badges, dedicated **Observed Traffic Activity** drawer, and `php artisan security:observe` CLI inspection), protected by automated preflight guards that ensure the administrator's connection and local database/cache services can never be severed.
+* **Master Operational Switches & Zero-Lockout**: Pinned controls for the Firewall Master Switch and Global Observe Mode (with live would-be drop badges, dedicated **Observed Traffic Activity** drawer, and `php artisan security:observe` CLI inspection), protected by automated preflight guards that ensure the administrator's connection and local database/cache services can never be severed.
 * **Four Evaluation-Ordered Tabs**:
-  - **Block & Allow Lists**: Permanent CIDR-aware Blacklist and Trusted Whitelist with 1-click self-protection for administrator IPs.
+  - **Allow & Block Lists**: Trusted Whitelist with 1-click self-protection for administrator IPs, and permanent CIDR-aware Blacklist.
   - **Attackers**: Active intrusion bans with entry-point badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, auto-ban toggle, and live conntrack session termination).
   - **Threat Feeds**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
-  - **Firewall Rules**: Interactive, reorderable 7-stage pre-filter pipeline, PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69), custom sequential rules, and fallback default policy.
+  - **Firewall Rules**: Interactive, reorderable 7-stage pre-filter pipeline with a dedicated **Pre-Filters** toggle in the section header (pinned loopback rule with lock icon, greyed-out visual feedback when turned off, and Lockout Guard safety enforcement), PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69), custom sequential rules, and fallback default policy with in-progress animation.
 
 ![TallPBX Security Center](images/security-dashboard-full.png)
 

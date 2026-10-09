@@ -110,11 +110,58 @@ class LockoutGuardService
             return false;
         }
 
-        // The pre-filter is the only stage that guarantees the loopback accept;
-        // with it off and a blocking policy, the server's own connections die.
-        $prefilterEnabled = $proposedPrefilterEnabled ?? SecuritySetting::getBoolean('prefilter_enabled', true);
+        // When pre-filters are enabled, stage 1 unconditionally accepts loopback
+        // traffic regardless of the default policy.
+        $prefilter = $proposedPrefilterEnabled ?? SecuritySetting::getBoolean('prefilter_enabled', true);
+        if ($prefilter) {
+            return false;
+        }
 
-        return ! $prefilterEnabled;
+        // If pre-filters are off and the default policy is drop, local services and
+        // returning outbound traffic are safe ONLY if active custom rules include
+        // both an explicit loopback accept rule and a connection tracking (ct state) accept rule.
+        if ($this->hasCustomLoopbackRule() && $this->hasCustomConntrackRule()) {
+            return false;
+        }
+
+        // Pre-filter off + enforcing mode + blocking default policy without custom
+        // loopback and conntrack rules = loopback and return traffic fall through to default drop.
+        return true;
+    }
+
+    /**
+     * Check if active custom rules include an explicit loopback accept rule.
+     */
+    public function hasCustomLoopbackRule(): bool
+    {
+        return SecurityRule::active()
+            ->whereIn('action', ['accept', 'allow'])
+            ->get()
+            ->contains(function (SecurityRule $rule): bool {
+                $source = strtolower(trim($rule->source_ip));
+                $desc = strtolower(trim($rule->description));
+
+                return in_array($source, ['127.0.0.1', '127.0.0.0/8', '::1', 'lo', 'loopback'], true)
+                    || str_contains($desc, 'loopback')
+                    || str_contains($desc, 'iif "lo"');
+            });
+    }
+
+    /**
+     * Check if active custom rules include an explicit connection tracking (ct state) accept rule.
+     */
+    public function hasCustomConntrackRule(): bool
+    {
+        return SecurityRule::active()
+            ->whereIn('action', ['accept', 'allow'])
+            ->get()
+            ->contains(function (SecurityRule $rule): bool {
+                $desc = strtolower(trim($rule->description));
+
+                return str_contains($desc, 'ct state')
+                    || str_contains($desc, 'conntrack')
+                    || str_contains($desc, 'established');
+            });
     }
 
     /**
@@ -135,7 +182,7 @@ class LockoutGuardService
             throw new LockoutException(
                 'Local service safety alert: with the ingress pre-filters off and the default policy set to DROP, '
                 .'the loopback connections that the panel, database, and cache rely on would be dropped, locking you out of the server. '
-                .'Set the default policy to ALLOW first, or keep the pre-filters on.'
+                .'Set the default policy to ALLOW first, or ensure custom rules include both loopback and connection tracking accept rules.'
             );
         }
     }

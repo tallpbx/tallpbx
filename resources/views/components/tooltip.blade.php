@@ -16,7 +16,7 @@
 
 {{-- The tip doubles as the accessible label: the trigger is usually a
      decorative information icon that screen readers would otherwise skip. --}}
-<div {{ $attributes->merge(['class' => trim('tooltip ' . $positionClass . ' ' . $alignClass)]) }}
+<div {{ $attributes->merge(['class' => trim('tooltip ' . $positionClass . ' ' . $alignClass), 'title' => '']) }}
      @if ($useDataTip) data-tip="{{ $tip }}" aria-label="{{ $tip }}" @endif>
     @if ($hasTrigger)
         {{ $trigger }}

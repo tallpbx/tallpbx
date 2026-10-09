@@ -284,15 +284,12 @@ class SecurityConfigGenerator
             $lines[] = '        accept';
             $lines[] = '    }';
         } else {
-            // The pre-filter pipeline (stages 1–7) is a single on/off unit:
-            // turning it off removes every built-in pre-filter rule while the
-            // rest of the chain keeps running, and the administrator may
-            // re-author any of these rules in the custom section (stage 11).
-            // Within the unit, the stored pre-filter order decides the exact
-            // evaluation sequence; an unsafe stored order refuses compilation
-            // instead of leaking through to the kernel.
+            // The pre-filter pipeline: when enabled, all seven stages are emitted
+            // in their stored evaluation sequence. When disabled, the whole block
+            // is skipped; administrator-authored custom rules in STAGE 11 can
+            // re-create any individual stage the operator still wants.
+            $stageLines = $this->preFilterStageLines($observeMode);
             if ($prefilterEnabled) {
-                $stageLines = $this->preFilterStageLines($observeMode);
                 foreach ($this->preFilterOrder() as $position => $stageKey) {
                     foreach ($stageLines[$stageKey] as $stageLine) {
                         // Stage numbers follow the actual evaluation order so

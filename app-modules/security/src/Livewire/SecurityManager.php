@@ -362,6 +362,20 @@ class SecurityManager extends Component
     }
 
     /**
+     * Resolve the expected inbound firewall policy given the current operational mode.
+     *
+     * In observe mode or when the whole firewall is disabled, the ruleset generator
+     * intentionally compiles the input chain with 'accept' so traffic is not blocked.
+     * In standard enforcing mode, it matches the configured default policy.
+     */
+    public function expectedFirewallPolicy(): string
+    {
+        return ($this->firewallEnabled && ! $this->firewallObserveMode)
+            ? $this->firewallDefaultPolicy
+            : 'accept';
+    }
+
+    /**
      * Refresh the cryptographic and kernel synchronization state of the firewall.
      */
     private function refreshFirewallSyncState(): void
@@ -1949,7 +1963,7 @@ class SecurityManager extends Component
 
         // The kernel now runs the freshly applied ruleset; keep the drift
         // indicator truthful without a privileged re-read.
-        $this->liveFirewallPolicy = $this->firewallDefaultPolicy;
+        $this->liveFirewallPolicy = $this->expectedFirewallPolicy();
         $this->firewallSyncState = 'verified';
         $this->firewallSyncAppliedAt = now()->toIso8601String();
         $this->firewallSyncReason = null;
@@ -2195,6 +2209,7 @@ class SecurityManager extends Component
             ],
             'observeMetrics' => $this->observeCounters(),
             'observeEvents' => $this->showObserveDrawer ? $this->observeEvents(50) : [],
+            'expectedFirewallPolicy' => $this->expectedFirewallPolicy(),
         ]);
     }
 }
