@@ -9,6 +9,7 @@ use App\Events\FreeSwitch\SipScannerDetected;
 use App\Events\FreeSwitch\SofiaFailedAuth;
 use Illuminate\Auth\Events\Failed;
 use Modules\Security\Console\Commands\SecurityApplyCommand;
+use Modules\Security\Console\Commands\SecurityObserveCommand;
 use Modules\Security\Console\Commands\SecurityReconcileCommand;
 use Modules\Security\Console\Commands\SecurityStatusCommand;
 use Modules\Security\Console\Commands\SecuritySyncThreatFeedsCommand;
@@ -171,6 +172,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     {
         return [
             SecurityApplyCommand::class,
+            SecurityObserveCommand::class,
             SecurityReconcileCommand::class,
             SecurityStatusCommand::class,
             SecuritySyncThreatFeedsCommand::class,

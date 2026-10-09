@@ -7,6 +7,7 @@ namespace Modules\Security\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Modules\Security\Contracts\SecurityExecutorInterface;
+use Modules\Security\Support\ObserveMetricsParser;
 use Symfony\Component\Process\Process;
 use Throwable;
 
@@ -293,6 +294,38 @@ class SecurityExecutor implements SecurityExecutorInterface
         }
 
         return $result;
+    }
+
+    /**
+     * Query recent kernel Observe Mode log events.
+     *
+     * @param  int  $limit  Max number of entries to return (1-200)
+     * @return array<int, array{timestamp: string, raw_timestamp: string, stage: string, stage_label: string, interface: string, src_ip: string, dst_ip: string, proto: string, spt: string|null, dpt: string|null, raw: string}>
+     */
+    public function observeEvents(int $limit = 50): array
+    {
+        if ($this->blockedByTestGuard()) {
+            return [];
+        }
+
+        if (! file_exists($this->helperPath)) {
+            return [];
+        }
+
+        $clampedLimit = max(1, min(200, $limit));
+
+        try {
+            $process = $this->createProcess(['observe-events', (string) $clampedLimit]);
+            $process->run();
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! $process->isSuccessful()) {
+            return [];
+        }
+
+        return ObserveMetricsParser::parseEvents($process->getOutput());
     }
 
     /**

@@ -8,8 +8,8 @@
 #
 # Security Architecture:
 # - Strictly bounded interface: Only 'apply', 'validate', 'ban', 'unban',
-#   'flush-conntrack', 'update-threat-feed', 'version', 'status', and 'bans'
-#   are allowed.
+#   'flush-conntrack', 'update-threat-feed', 'version', 'status', 'bans',
+#   and 'observe-events' are allowed.
 # - Capability version: the 'version' action self-reports the marker below.
 #   TallPBX refuses threat-feed actions against helpers older than version 2.
 #   tallpbx-helper-version: 2
@@ -380,8 +380,18 @@ case "$ACTION" in
         fi
         ;;
 
+    observe-events)
+        # Read recent observe mode log entries from the kernel journal.
+        # Bounded line count: between 1 and 200, defaults to 50.
+        LIMIT="${2:-50}"
+        if ! [[ "$LIMIT" =~ ^[0-9]{1,4}$ ]] || [ "$LIMIT" -lt 1 ] || [ "$LIMIT" -gt 200 ]; then
+            LIMIT=50
+        fi
+        journalctl -k -g tallpbx-observe --no-pager -n "$LIMIT" -o short-iso 2>/dev/null || true
+        ;;
+
     *)
-        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|update-threat-feed|version|status|bans}" >&2
+        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|update-threat-feed|version|status|bans|observe-events [limit]}" >&2
         exit 1
         ;;
 esac

@@ -63,4 +63,12 @@ interface SecurityExecutorInterface
      * @return array<string, array{ip: string, timeout: int, expires: int, family: string}> Keyed by IP address
      */
     public function bans(): array;
+
+    /**
+     * Query recent kernel Observe Mode log events.
+     *
+     * @param  int  $limit  Max number of entries to return (1-200)
+     * @return array<int, array{timestamp: string, raw_timestamp: string, stage: string, stage_label: string, interface: string, src_ip: string, dst_ip: string, proto: string, spt: string|null, dpt: string|null, raw: string}>
+     */
+    public function observeEvents(int $limit = 50): array;
 }

@@ -29,6 +29,7 @@ use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 use Modules\Security\Services\ThreatFeedIngestionService;
 use Modules\Security\Services\ThreatFeedManager;
+use Modules\Security\Support\ObserveMetricsParser;
 use Modules\Security\Support\SipScannerSignatures;
 use Symfony\Component\HttpFoundation\IpUtils;
 
@@ -251,6 +252,11 @@ class SecurityManager extends Component
      * nothing is blocked, and the default policy is forced to accept.
      */
     public bool $firewallObserveMode = false;
+
+    /**
+     * Whether the Observed Traffic Activity drawer is open.
+     */
+    public bool $showObserveDrawer = false;
 
     /**
      * Whether the hardened TFTP defense profile is active.
@@ -559,9 +565,9 @@ class SecurityManager extends Component
             return preg_match($pattern, $status, $matches) === 1 ? (int) $matches[1] : null;
         };
 
-        $counters['uploads'] = $extract('/@th,64,16 0x0002 counter packets (\d+)/');
+        $counters['uploads'] = $extract('/@th,64,16 0x0*2 counter packets (\d+)/');
         $counters['traversal'] = $extract('/@th,80,24 0x2e2e2f counter packets (\d+)/');
-        $counters['probes'] = $extract('/@th,80,16 0x2f78 counter packets (\d+)/');
+        $counters['probes'] = $extract('/(?:@th,80,16 0x2f78|@th,64,32 0x12f78) counter packets (\d+)/');
 
         $floodV4 = $extract('/@tftp_flood4 .* counter packets (\d+)/');
         $floodV6 = $extract('/@tftp_flood6 .* counter packets (\d+)/');
@@ -570,6 +576,45 @@ class SecurityManager extends Component
             : (int) (($floodV4 ?? 0) + ($floodV6 ?? 0));
 
         return $counters;
+    }
+
+    /**
+     * Open the Observed Traffic Activity drawer.
+     */
+    public function openObserveDrawer(): void
+    {
+        $this->showObserveDrawer = true;
+    }
+
+    /**
+     * Close the Observed Traffic Activity drawer.
+     */
+    public function closeObserveDrawer(): void
+    {
+        $this->showObserveDrawer = false;
+    }
+
+    /**
+     * Retrieve structured Observe Mode counters across all firewall stages.
+     *
+     * @return array{total_packets: int, total_bytes: int, stages: array}
+     */
+    public function observeCounters(): array
+    {
+        $status = app(SecurityExecutorInterface::class)->status();
+
+        return ObserveMetricsParser::parseCounters($status);
+    }
+
+    /**
+     * Retrieve recent kernel Observe Mode log events from system journal.
+     *
+     * @param  int  $limit  Max events to read (default 50)
+     * @return array<int, array>
+     */
+    public function observeEvents(int $limit = 50): array
+    {
+        return app(SecurityExecutorInterface::class)->observeEvents($limit);
     }
 
     /**
@@ -1228,6 +1273,7 @@ class SecurityManager extends Component
     #[On('echo-private:security.alerts,.SecurityBanUpdated')]
     #[On('echo-private:security.alerts,.SecurityIncidentLogged')]
     #[On('echo-private:security.alerts,.FirewallRulesetUpdated')]
+    #[On('echo-private:security.alerts,.ObserveTrafficLogged')]
     public function refreshStatus(?LockoutGuardService $lockoutGuard = null): void
     {
         $lockoutGuard ??= app(LockoutGuardService::class);
@@ -2147,6 +2193,8 @@ class SecurityManager extends Component
                 'custom' => SipScannerSignatures::custom(),
                 'incidents' => $scannerIncidents,
             ],
+            'observeMetrics' => $this->observeCounters(),
+            'observeEvents' => $this->showObserveDrawer ? $this->observeEvents(50) : [],
         ]);
     }
 }

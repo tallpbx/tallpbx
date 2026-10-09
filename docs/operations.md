@@ -91,6 +91,67 @@ Three master operational switches pinned at the top of the Security Center contr
 
 For complete packet flow diagrams and kernel-level specifications, see [docs/security-architecture.md](security-architecture.md).
 
+### Testing Firewall Policies with Observe Mode
+
+**Global Observe Mode** turns the host firewall into a non-blocking test instrument. When active, every firewall rule still evaluates and counts packets, and every would-be drop is recorded, but no traffic is blocked (the chain policy is forced to `accept`). This enables administrators to audit proposed firewall policies and blocklists against production traffic without risk of unexpected downtime or lockouts.
+
+#### 1. How Observe Mode Works Under the Hood
+When Observe Mode is enabled, the ruleset compiler performs a dynamic transformation:
+* The chain default inbound policy is forced from `drop` to `accept`.
+* Every drop action across built-in pre-filters and custom rules is replaced with:
+  ```nftables
+  counter log prefix "tallpbx-observe:<stage> " limit rate 100/minute burst 5 packets
+  ```
+* Standard `accept` rules remain completely untouched, ensuring legitimate services stay accessible.
+
+#### 2. Viewing Observe Mode Results
+
+##### In the Web Panel (Security Center)
+* **Status Banner**: A pinned amber banner appears at the top of every Security Center tab, displaying the total number of would-be drops recorded across all rules.
+* **Observed Traffic Drawer**: Click **"View observed activity"** on the banner to open the dedicated activity drawer:
+  * **Stage Summary Cards**: Live packet and byte counts grouped by rule stage (Banned Attackers, Permanent Blacklist, Threat Feeds, TFTP Exploit Defense, Invalid Packets, Custom Rules).
+  * **Recent Observed Events**: A table displaying recent kernel packet log entries with timestamps, matching stage, interface, source IP, and destination port.
+* **Live In-Place Counters**: The TFTP Defense profile (Firewall Rules tab) and Public Threat Feeds card (Threat Feeds tab) continue counting observed matches in real time.
+
+##### In the CLI (`php artisan security:observe`)
+* **Inspect Summary & Recent Events**:
+  ```bash
+  php artisan security:observe
+  ```
+* **Live-Stream Observed Drops in Real Time**:
+  ```bash
+  php artisan security:observe --follow
+  ```
+* **Include in Engine Status**:
+  ```bash
+  php artisan security:status
+  ```
+
+##### In Linux System Logs
+Because `nftables` logs are emitted directly by the Linux kernel, you can also view raw packet logs via standard systemd journal commands:
+```bash
+# Follow live:
+journalctl -k -f -g tallpbx-observe
+
+# Inspect the last 50 events:
+journalctl -k -g tallpbx-observe -n 50 --no-pager
+```
+
+#### 3. Log Stage Prefixes
+Kernel log entries contain standard stage tags indicating which rule matched:
+* `tallpbx-observe:invalid` — Out-of-window TCP segments or malformed packets.
+* `tallpbx-observe:blacklist` — Matches against permanent blacklist IPs or CIDR subnets.
+* `tallpbx-observe:bans` — Matches against dynamic brute-force intruder bans.
+* `tallpbx-observe:threat_feeds` — Matches against VoIPBL automated fraud lists.
+* `tallpbx-observe:tftp` — Unauthorized TFTP write requests (`WRQ`), directory traversal (`../`), or floods.
+* `tallpbx-observe:custom` — Matches against administrator-defined custom drop rules.
+
+#### 4. The Loopback Floor Invariant (`iif "lo" accept`)
+When testing Observe Mode, remember that packets sent from the PBX console to itself (e.g. `ping 127.0.0.1` or `curl http://<pbx-ip>`) **will not trigger observe rules**.
+* In Linux networking, all traffic between local IPs routes across the loopback interface (`lo`).
+* Stage 1 of the firewall unconditionally admits loopback traffic (`iif "lo" accept`) to guarantee that the server's database (MariaDB 3306), cache (Redis 6379), and FreeSWITCH IPC can never be severed.
+* To test observe mode rules, traffic must enter an ingress interface other than `lo` (such as from a computer on the LAN, a WireGuard VPN client, or an isolated test network namespace).
+
 ## Troubleshooting
 
 ### Recovering from a Firewall Lockout

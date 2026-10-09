@@ -10,6 +10,7 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Support\ObserveMetricsParser;
 
 /**
  * Artisan command to display the active host firewall engine status,
@@ -43,11 +44,13 @@ class SecurityStatusCommand extends Command
         $firewallEnabled = SecuritySetting::getBoolean('firewall_enabled', true);
         $defaultPolicy = SecuritySetting::get('firewall_default_policy', 'drop');
         $intrusionEnabled = SecuritySetting::getBoolean('intrusion_detection_enabled', true);
+        $observeMode = SecuritySetting::getBoolean('firewall_observe_mode', false);
 
         $this->table(
             ['Setting', 'Current Value'],
             [
                 ['Firewall Status', $firewallEnabled ? 'ACTIVE' : 'DISABLED'],
+                ['Global Observe Mode', $observeMode ? 'ACTIVE (Non-Blocking)' : 'DISABLED (Enforcing)'],
                 ['Default Policy', strtoupper((string) $defaultPolicy)],
                 ['Intrusion Detection', $intrusionEnabled ? 'ACTIVE' : 'DISABLED'],
                 ['Whitelist Entries', (string) SecurityIpList::whitelist()->count()],
@@ -90,6 +93,25 @@ class SecurityStatusCommand extends Command
         $this->newLine();
         $this->info('=== Kernel nftables Ruleset Status ===');
         $kernelStatus = trim($executor->status());
+
+        if ($observeMode && $kernelStatus !== '') {
+            $metrics = ObserveMetricsParser::parseCounters($kernelStatus);
+            $obsRows = [];
+            foreach ($metrics['stages'] as $s) {
+                if ($s['packets'] > 0) {
+                    $obsRows[] = [$s['label'], number_format($s['packets']), number_format($s['bytes']).' B'];
+                }
+            }
+            if (! empty($obsRows)) {
+                $this->newLine();
+                $this->info('=== Observed Would-Be Drops (Non-Blocking Mode) ===');
+                $obsRows[] = ['----------------------------------------', '---------', '---------'];
+                $obsRows[] = ['Total Observed Hits', number_format($metrics['total_packets']), number_format($metrics['total_bytes']).' B'];
+                $this->table(['Firewall Stage', 'Packets', 'Bytes'], $obsRows);
+                $this->newLine();
+            }
+        }
+
         if ($kernelStatus !== '') {
             $this->line($kernelStatus);
         } else {

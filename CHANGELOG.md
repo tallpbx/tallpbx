@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Global Observe Mode Activity Drawer & Real-Time Reverb Broadcasting**:
+  - Added dedicated **Observed Traffic Activity** modal in the Security Center (`/panel/security`), providing real-time visibility into packets and connections evaluated by the firewall in non-blocking test mode:
+    - High-density compact summary strip highlighting active evaluation stages (Banned Attackers, Permanent Blacklist, Threat Feeds, TFTP Exploit Defense, Invalid Packets, Custom Rules) and total would-be drops.
+    - Expanded full-height kernel packet events table (`h-[88vh]`, 50 events) with sticky headers displaying timestamp, matched stage, interface, source IP, destination port, and protocol.
+    - Real-time push updates via **Laravel Reverb WebSockets**: created `ObserveTrafficLogged` event on the private `security.alerts` channel, updating active UI sessions live without polling or manual clicking.
+    - Added `LIVE ECHO` connection indicator in the modal header.
+    - Top amber banner displays live would-be drop counter badges and a 1-click **"View observed activity"** button.
+  - Added `php artisan security:observe` console command with `--follow` (`-f`) and `--broadcast` (`-b`) flags to stream real-time observe log events and broadcast them over Reverb directly to open Security Center dashboards.
+  - Updated `php artisan security:status` to include a live Observe Mode stage counters breakdown when observe mode is active.
+  - Added `observe-events` bounded action to `/usr/local/sbin/tallpbx-security` and `scripts/resources/tallpbx-security` to safely read kernel journal records.
+  - Added comprehensive "Testing Firewall Policies with Observe Mode" documentation across `docs/operations.md`, `docs/security-architecture.md`, and `docs/ui-tour.md`.
+
+### Changed
+- **Observe Mode UI Layout and Zero-Polling Conformance**:
+  - Eliminated manual refresh button in favor of zero-polling Laravel Echo push events, conforming strictly to TallPBX's real-time push event architecture.
+  - Refined `security_toggle_observe_help` and `security_observe_banner_body` to accurately describe non-blocking policy evaluation and point administrators directly to the activity viewer and CLI inspection tools.
+
 ## [3.0.3] - 2026-10-08
 
 ### Added
