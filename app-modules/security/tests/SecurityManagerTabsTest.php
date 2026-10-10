@@ -127,3 +127,63 @@ it('disables the reorder controls while the pre-filter is off', function (): voi
         ->assertSet('prefilterEnabled', false)
         ->assertSee('disabled', false);
 });
+
+it('shows defensive pre-filters disabled banner across tabs with one-click recovery', function (): void {
+    SecuritySetting::set('firewall_enabled', true);
+    SecuritySetting::set('prefilter_enabled', false);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSee(__('admin.security_prefilter_disabled_banner_title'))
+        ->assertSee(__('admin.security_prefilter_disabled_banner_body'))
+        ->assertSee(__('admin.security_prefilter_enable_action'))
+        ->call('setPrefilterEnabled', true)
+        ->assertSet('prefilterEnabled', true)
+        ->assertDontSee(__('admin.security_prefilter_disabled_banner_title'));
+});
+
+it('renders bypassed badges on affected tabs and in-tab notices when pre-filter is disabled', function (): void {
+    SecuritySetting::set('firewall_enabled', true);
+    SecuritySetting::set('prefilter_enabled', false);
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(SecurityManager::class);
+
+    // Bypassed badge appears on the tabs
+    $component->assertSee(__('admin.security_bypassed_badge'));
+
+    // Bypassed notice in Allow & Block Lists
+    $component->set('activeTab', 'block-allow')
+        ->assertSee(__('admin.security_prefilter_bypassed_block_allow_notice'));
+
+    // Bypassed notice in Attackers
+    $component->set('activeTab', 'attackers')
+        ->assertSee(__('admin.security_prefilter_bypassed_attackers_notice'));
+
+    // Bypassed notice in Threat Feeds
+    $component->set('activeTab', 'threat-feeds')
+        ->assertSee(__('admin.security_prefilter_bypassed_threat_feeds_notice'));
+});
+
+it('prompts confirmation modal before disabling pre-filters and executes safely', function (): void {
+    SecuritySetting::set('firewall_default_policy', 'accept');
+    $this->admin->update(['ip_address' => '203.0.113.10']);
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('adminIp', '203.0.113.10')
+        ->assertSet('showDisablePrefilterModal', false);
+
+    $component->call('confirmDisablePrefilter')
+        ->assertSet('showDisablePrefilterModal', true)
+        ->assertSee(__('admin.security_disable_prefilter_modal_title'))
+        ->assertSee(__('admin.security_disable_prefilter_btn'));
+
+    $component->call('closeDisablePrefilterModal')
+        ->assertSet('showDisablePrefilterModal', false);
+
+    $component->call('confirmDisablePrefilter')
+        ->assertSet('showDisablePrefilterModal', true)
+        ->call('executeDisablePrefilter')
+        ->assertSet('showDisablePrefilterModal', false)
+        ->assertSet('prefilterEnabled', false);
+});

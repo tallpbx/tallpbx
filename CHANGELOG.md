@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Defensive Pre-Filters Disabled Warnings & Auditing State**:
+  - Added an unmissable top-level warning banner in the Security Center displayed across all tabs whenever defensive pre-filters are disabled, clearly explaining that Whitelists, Blacklists, Attack Blocker bans, and Threat Feeds are bypassed in the active firewall ruleset, accompanied by a 1-click **"Turn pre-filters back on"** recovery button.
+  - Added visual `Bypassed` badges and explanatory tooltips to the **Allow & Block Lists**, **Attackers**, and **Threat Feeds** tabs to eliminate any false sense of security while keeping the registries fully browsable for auditing and IP management.
+  - Added contextual in-tab alerts and subtle section styling on the Whitelist, Blacklist, Active Bans, and Threat Feeds workbenches clarifying that entries are currently bypassed by the kernel firewall.
+  - Added a confirmation modal when toggling pre-filters off, summarizing the four defensive subsystems that will be bypassed before applying changes to the firewall.
+  - Added full translation keys across English, Spanish, and French.
+
 ### Changed
+- **Security Center Modular Decomposition**:
+  - Modularized the oversized Security Center Livewire view (`security-manager.blade.php`), reducing the master template from 2,308 lines down to 87 lines by extracting modular cockpit partials (`partials/cockpit-banners`, `partials/firewall-switches`, `partials/status-overview-cards`), dedicated tab panels (`tabs/firewall-rules`, `tabs/block-allow`, `tabs/attackers`, `tabs/external-blocklists`), action modals (`modals/confirm-disable-prefilter`, `modals/custom-rule`, `modals/default-policy`, `modals/edit-system-service`, `modals/manual-ban`), and slide-over drawers (`drawers/observe-activity`, `drawers/protection-settings`).
+  - Modularized the backend Livewire component (`SecurityManager.php`), reducing class size from 2,245 lines down to 497 lines by extracting 6 domain concerns into dedicated traits under `Modules\Security\Livewire\Concerns`: `ManagesPreFilters`, `ManagesAllowBlockLists`, `ManagesExternalBlocklists`, `ManagesObserveMode`, `ManagesAttackProtection`, and `ManagesFirewallRules`.
+- **Renamed Threat Feeds to External Blocklists**:
+  - Renamed user-facing and template references from "Threat Feeds" to "External Blocklists" across the Security Center navigation, tab header, status metrics, and workbench cards to present intuitive, self-explanatory terminology for administrative users.
+  - Maintained 100% backward compatibility for existing URL query parameters (`?tab=threat-feeds`), wire action methods, translation keys, and view parameters.
 - **Security Center Default Tab & Navigation Order**:
   - Reordered the Security Center tabs so **Firewall Rules** is positioned as Tab #1 on the far left and opens as the default active tab on `/panel/security`.
   - Positions the master firewall ruleset, port access list, and pre-filter pipeline at the forefront of the administrator workflow, while keeping supporting address registries (Allow & Block Lists, Attackers, Threat Feeds) immediately adjacent.
