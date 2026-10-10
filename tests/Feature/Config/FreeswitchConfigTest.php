@@ -132,4 +132,3 @@ it('binds demo mode from PBX_DEMO_MODE environment variable', function () {
     // Clean up
     setFsTestEnv('PBX_DEMO_MODE', null);
 });
-

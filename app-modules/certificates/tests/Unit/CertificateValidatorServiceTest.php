@@ -9,7 +9,7 @@ use Modules\Certificates\Exceptions\MismatchedKeypairException;
 use Modules\Certificates\Services\CertificateValidatorService;
 
 beforeEach(function (): void {
-    $this->validator = new CertificateValidatorService();
+    $this->validator = new CertificateValidatorService;
 
     // Keypair 1
     $key1 = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);

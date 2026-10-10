@@ -30,4 +30,3 @@ return [
         'thank_you' => 'Gracias por su preferencia.',
     ],
 ];
-

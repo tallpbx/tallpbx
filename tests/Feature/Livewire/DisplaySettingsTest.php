@@ -117,4 +117,3 @@ it('renders layout elements and display settings on dashboard for authenticated 
         ->assertSeeLivewire(DisplaySettings::class)
         ->assertSee('panel-sidebar');
 });
-

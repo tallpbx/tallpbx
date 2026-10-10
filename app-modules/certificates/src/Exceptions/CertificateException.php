@@ -9,6 +9,4 @@ use Exception;
 /**
  * Base exception for certificate management operations.
  */
-class CertificateException extends Exception
-{
-}
+class CertificateException extends Exception {}

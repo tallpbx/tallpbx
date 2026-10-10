@@ -28,8 +28,6 @@ interface CertificateValidatorServiceInterface
     /**
      * Validate that intermediate/full chain PEM content contains valid X.509 certificates.
      *
-     * @param  string  $chainPem
-     * @return bool
      *
      * @throws InvalidCertificateException
      */

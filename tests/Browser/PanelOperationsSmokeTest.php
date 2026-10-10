@@ -32,6 +32,7 @@ beforeEach(function (): void {
 it('renders the email connector configuration page', function (): void {
     $this->skipWhenModuleUninstalled('email-connector');
 
+    browserStep('Operations: Email Connector (/panel/email-connector)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/email-connector');
@@ -42,6 +43,7 @@ it('renders the email connector configuration page', function (): void {
 it('renders the backups list page', function (): void {
     $this->skipWhenModuleUninstalled('backups');
 
+    browserStep('Operations: Backups list (/panel/backups)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/backups');
@@ -51,6 +53,7 @@ it('renders the backups list page', function (): void {
 it('renders the backups create form', function (): void {
     $this->skipWhenModuleUninstalled('backups');
 
+    browserStep('Operations: Backups create form (/panel/backups/create)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/backups/create');
@@ -61,6 +64,7 @@ it('renders the backups create form', function (): void {
 it('renders the superadmin backup restore screen', function (): void {
     $this->skipWhenModuleUninstalled('backups');
 
+    browserStep('Operations: Backup restore screen (/panel/backups/restore)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/backups/restore');
@@ -72,6 +76,7 @@ it('renders the superadmin backup restore screen', function (): void {
 });
 
 it('renders the git update page', function (): void {
+    browserStep('Operations: Git Update (/panel/git-update)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/git-update');
@@ -79,6 +84,7 @@ it('renders the git update page', function (): void {
 });
 
 it('renders the queue status page', function (): void {
+    browserStep('Operations: Queue Status (/panel/queue)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/queue');
@@ -86,6 +92,7 @@ it('renders the queue status page', function (): void {
 });
 
 it('renders the monitoring dashboard with metrics', function (): void {
+    browserStep('Operations: Monitoring dashboard (/panel/monitoring)');
     $this->loginAs($this->admin, 'admin');
 
     $page = visit('/panel/monitoring');
@@ -101,6 +108,7 @@ it('renders the monitoring dashboard with metrics', function (): void {
 it('renders the security manager dashboard', function (): void {
     $this->skipWhenModuleUninstalled('security');
 
+    browserStep('Security: seeding threat & trust test data');
     $this->seed(SecurityServiceSeeder::class);
 
     // Seed representative threat and trust entries so the documentation
@@ -220,6 +228,7 @@ it('renders the security manager dashboard', function (): void {
 
     // Tab 1 — Allow & Block Lists (the default): the allow/block workbenches
     // under the page-global status strip.
+    browserStep('Security: Tab 1 (Allow & Block Lists)');
     $page = visit('/panel/security')->resize(1920, 2400);
     $page->assertSee('Security Center')
         ->assertSee('Firewall Status')
@@ -234,6 +243,7 @@ it('renders the security manager dashboard', function (): void {
 
     // Tab 2 — Attackers: the enforced bans with their vector and reason,
     // plus the SIP scanner signatures card.
+    browserStep('Security: Tab 2 (Attackers & Bans)');
     visit('/panel/security?tab=attackers')->resize(1920, 2400)
         ->assertSee('Blocked Attackers')
         ->assertSee('203.0.113.66')
@@ -243,6 +253,7 @@ it('renders the security manager dashboard', function (): void {
 
     // Tab 3 — Firewall Rules: the full kernel pipeline, the port catalog,
     // and the custom sequential rules.
+    browserStep('Security: Tab 3 (Firewall Rules & Port Access)');
     $page = visit('/panel/security?tab=firewall-rules')->resize(1920, 2400);
     $page->assertSee('Carrier SIP trunk')
         ->assertSee('Admin SSH from bastion')
@@ -255,6 +266,7 @@ it('renders the security manager dashboard', function (): void {
         ->assertSee('SIP Signaling');
 
     // Verify pre-filter header title suppression when hovering over the tooltip icon
+    browserStep('Security: verifying pre-filter tooltip hover title suppression');
     expect($page->script("document.querySelector('tr[x-data*=\"suppressTitle\"]').getAttribute('title')"))
         ->toContain('collapse');
 
@@ -269,9 +281,72 @@ it('renders the security manager dashboard', function (): void {
         ->toContain('collapse');
 
     // Expand the collapsible Pre-Filters section so the full kernel pipeline is visible
+    browserStep('Security: expanding pre-filters accordion');
     $page->click('tr[title*="expand or collapse"]')
         ->assertSee('Loopback Interface')
         ->assertSee('Stateful Connection Tracking');
+
+    // Verify horizontal table scroller container and navigation elements are present
+    browserStep('Security: verifying horizontal table scroller controls');
+    $page->assertPresent('.group\\/scroller')
+        ->assertPresent('[x-ref="tableContainer"]');
+
+    // Resize to a desktop width where the expanded pre-filters cause horizontal overflow
+    $page->resize(1200, 900);
+    $page->script("const card = Alpine.\$data(document.querySelector('.card[x-data*=\"canScrollLeft\"]')); card.checkScroll(); card.updateArrowPosition();");
+
+    // Click companion header scroll right button
+    browserStep('Clicking companion header scroll right button');
+    $page->click('#tableScrollHeaderRightBtn');
+    usleep(450000);
+    $scrollPosHeaderRight = (int) $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollLeft");
+    browserStep('Scroll pos after header right button: '.$scrollPosHeaderRight);
+    expect($scrollPosHeaderRight)->toBeGreaterThan(50);
+
+    // Click companion header scroll left button
+    browserStep('Clicking companion header scroll left button');
+    $page->click('#tableScrollHeaderLeftBtn');
+    usleep(450000);
+    $scrollPosHeaderLeft = (int) $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollLeft");
+    browserStep('Scroll pos after header left button: '.$scrollPosHeaderLeft);
+    expect($scrollPosHeaderLeft)->toBeLessThan($scrollPosHeaderRight);
+
+    // Click side arrow scroll right button
+    browserStep('Clicking side arrow scroll right button');
+    $page->click('#tableScrollSideRightBtn');
+    usleep(450000);
+    $scrollPosSideRight = (int) $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollLeft");
+    browserStep('Scroll pos after side right button: '.$scrollPosSideRight);
+    expect($scrollPosSideRight)->toBeGreaterThan(50);
+
+    // Click side arrow scroll left button
+    browserStep('Clicking side arrow scroll left button');
+    $page->click('#tableScrollSideLeftBtn');
+    usleep(450000);
+    $scrollPosSideLeft = (int) $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollLeft");
+    browserStep('Scroll pos after side left button: '.$scrollPosSideLeft);
+    // Verify vertical tracking: scrolling down to center of table adjusts arrowTop dynamically
+    $scrollTrackingDebug = $page->script(<<<'JS'
+        (() => {
+            const card = Alpine.$data(document.querySelector('.card[x-data*="canScrollLeft"]'));
+            const el = card.getContainer();
+            const scroller = document.querySelector('main') || window;
+            const initialTop = card.arrowTop;
+            
+            // Scroll so the table is centered in the viewport
+            el.scrollIntoView({ block: 'center' });
+            card.updateArrowPosition();
+            const centeredTop = card.arrowTop;
+            
+            return {
+                initialTop,
+                centeredTop,
+                height: el.clientHeight,
+            };
+        })()
+JS);
+    browserStep('Scroll tracking debug: '.json_encode($scrollTrackingDebug));
+    expect($scrollTrackingDebug['centeredTop'])->toBeGreaterThan(50);
 
     // Grow the viewport to the full document height for documentation screenshots
     $expandedHeight = (int) ($page->script(

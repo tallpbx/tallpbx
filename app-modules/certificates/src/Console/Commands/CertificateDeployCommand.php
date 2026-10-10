@@ -34,7 +34,7 @@ class CertificateDeployCommand extends Command
     /**
      * Execute the console command.
      *
-     * @param CertificateDeploymentServiceInterface $deploymentService The service deployer
+     * @param  CertificateDeploymentServiceInterface  $deploymentService  The service deployer
      * @return int Exit code
      */
     public function handle(CertificateDeploymentServiceInterface $deploymentService): int

@@ -100,4 +100,3 @@ it('reacts to ObserveTrafficLogged echo push event while drawer is open', functi
         ->assertSet('showObserveDrawer', true)
         ->assertSee('10.254.254.2');
 });
-

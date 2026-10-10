@@ -19,8 +19,8 @@ class CertificateRenewalFailedNotification extends Notification implements Shoul
     /**
      * Create a new notification instance.
      *
-     * @param Certificate $certificate The certificate that failed renewal
-     * @param string $errorMessage The failure reason or error output
+     * @param  Certificate  $certificate  The certificate that failed renewal
+     * @param  string  $errorMessage  The failure reason or error output
      */
     public function __construct(
         public readonly Certificate $certificate,
@@ -30,7 +30,7 @@ class CertificateRenewalFailedNotification extends Notification implements Shoul
     /**
      * Get the notification's delivery channels.
      *
-     * @param object $notifiable The entity receiving the notification
+     * @param  object  $notifiable  The entity receiving the notification
      * @return array<int, string>
      */
     public function via(object $notifiable): array
@@ -41,7 +41,7 @@ class CertificateRenewalFailedNotification extends Notification implements Shoul
     /**
      * Get the array representation of the notification.
      *
-     * @param object $notifiable The entity receiving the notification
+     * @param  object  $notifiable  The entity receiving the notification
      * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array

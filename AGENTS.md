@@ -42,15 +42,25 @@ Run them in this exact order after every change, before every commit:
 # 1. Application must boot without errors
 php artisan optimize:clear
 
-# 2. All feature/unit tests must pass (always use --parallel for fast multi-process execution)
+# 2. Code style and syntax must pass Laravel Pint linting
+./vendor/bin/pint --test
+
+# 3. All feature/unit tests must pass (always use --parallel for fast multi-process execution)
 php artisan test --compact --parallel
 
-# 3. Pest browser tests must pass (for UI changes)
+# 4. Pest browser tests must pass (for UI changes)
 ./vendor/bin/pest tests/Browser
 
-# 4. Routes must exist (especially for new features)
+# 5. Routes must exist (especially for new features)
 php artisan route:list --name=<feature-name>
 ```
+
+## CRITICAL — Laravel Pint Code Style & Syntax Linting
+
+All PHP code (application source, modules, migrations, tests, commands, and language files) MUST strictly adhere to Laravel code standards and formatting conventions using [Laravel Pint](https://laravel.com/docs/pint) (`./vendor/bin/pint`).
+- **Pre-commit verification**: Always verify clean styling with `./vendor/bin/pint --test` before committing or declaring work complete.
+- **Auto-formatting**: Run `./vendor/bin/pint <files>` to automatically format modified PHP files to the project standard.
+- Do not commit changes that fail `./vendor/bin/pint --test`.
 
 ## CRITICAL — Permission Setup in Pest Tests (Standard Convention)
 

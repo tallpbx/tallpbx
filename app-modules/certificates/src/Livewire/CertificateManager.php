@@ -493,7 +493,7 @@ class CertificateManager extends Component
         $cert = Certificate::findOrFail($id);
 
         if ($cert->is_default_web || $cert->is_default_telephony) {
-            $this->notifyError("Cannot delete an active certificate. Reassign Web and Telephony services first.");
+            $this->notifyError('Cannot delete an active certificate. Reassign Web and Telephony services first.');
 
             return;
         }
@@ -594,7 +594,7 @@ class CertificateManager extends Component
             $validator->validateKeypair($this->custom_cert, $this->custom_key);
             $parsed = $parser->parse($this->custom_cert);
 
-            $storageId = 'custom_' . Str::slug($parsed['common_name'], '_') . '_' . time();
+            $storageId = 'custom_'.Str::slug($parsed['common_name'], '_').'_'.time();
 
             // Write temporary files for executor with 0600 permissions
             $tempCert = tempnam(sys_get_temp_dir(), 'custom_cert_');

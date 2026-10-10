@@ -8,7 +8,7 @@ use Modules\Certificates\Exceptions\InvalidCertificateException;
 use Modules\Certificates\Services\CertificateParserService;
 
 beforeEach(function (): void {
-    $this->parser = new CertificateParserService();
+    $this->parser = new CertificateParserService;
 
     // Generate in-memory X.509 certificate for testing
     $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);

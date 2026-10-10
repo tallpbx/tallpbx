@@ -9,7 +9,6 @@ use Mockery;
 use Modules\Certificates\Contracts\CertificateDeploymentServiceInterface;
 use Modules\Certificates\Contracts\CertificateExecutorInterface;
 use Modules\Certificates\Contracts\CertificateParserServiceInterface;
-use Modules\Certificates\Contracts\CertificateValidatorServiceInterface;
 use Modules\Certificates\Exceptions\AcmeChallengeException;
 use Modules\Certificates\Exceptions\CertificateException;
 use Modules\Certificates\Models\Certificate;
@@ -21,7 +20,7 @@ use Modules\Certificates\Services\LetsEncryptAcmeService;
 beforeEach(function (): void {
     $this->executor = Mockery::mock(CertificateExecutorInterface::class);
     $this->parser = Mockery::mock(CertificateParserServiceInterface::class);
-    $this->validator = new CertificateValidatorService();
+    $this->validator = new CertificateValidatorService;
     $this->deploymentService = Mockery::mock(CertificateDeploymentServiceInterface::class);
 
     $this->admin = Admin::factory()->create(['enabled' => true]);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Admin;
+use App\Models\User;
 
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\get;
@@ -14,7 +15,7 @@ it('redirects authenticated admin away from admin login', function () {
 });
 
 it('redirects authenticated tenant user away from login', function () {
-    $user = \App\Models\User::factory()->create();
+    $user = User::factory()->create();
 
     actingAs($user, 'web')
         ->get(route('panel.login'))

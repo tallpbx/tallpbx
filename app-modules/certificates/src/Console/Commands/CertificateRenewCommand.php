@@ -39,8 +39,8 @@ class CertificateRenewCommand extends Command
     /**
      * Execute the console command.
      *
-     * @param LetsEncryptAcmeServiceInterface $acmeService The ACME issuance and renewal service
-     * @param CertificateDeploymentServiceInterface $deploymentService The service deployer for Nginx and FreeSWITCH
+     * @param  LetsEncryptAcmeServiceInterface  $acmeService  The ACME issuance and renewal service
+     * @param  CertificateDeploymentServiceInterface  $deploymentService  The service deployer for Nginx and FreeSWITCH
      * @return int Exit code
      */
     public function handle(
@@ -78,6 +78,7 @@ class CertificateRenewCommand extends Command
 
             if ($dryRun) {
                 $this->comment("[DRY RUN] Would renew: {$cert->name} ({$cert->common_name}) - {$daysDesc}");
+
                 continue;
             }
 

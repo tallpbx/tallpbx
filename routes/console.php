@@ -86,4 +86,3 @@ Schedule::command('certificates:renew')
     ->dailyAt('03:30')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/certificates-renewal.log'));
-

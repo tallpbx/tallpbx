@@ -32,8 +32,6 @@ trait SeedsSmokeAdmin
      * Mirrors the production permission setup so the smoke admin can access every panel
      * route without authorization exceptions: syncs module states, seeds AdminSeeder
      * to grant all permissions to the Super Administrators group, and attaches the admin.
-     *
-     * @return void
      */
     protected function setUpSmokeAdmin(): void
     {

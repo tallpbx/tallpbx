@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Firewall Rules Table Horizontal Scroll Navigation**:
+  - Added viewport-sticky floating **Left and Right Arrow** navigation buttons on the flanks of the **Firewall Rules & Port Access** table. As administrators scroll vertically through the long rules list, the buttons dynamically float at the active eye-level, enabling one-click smooth horizontal panning without having to scroll down to the bottom scrollbar.
+  - Added companion **Quick-Scroll Buttons** in the Firewall Rules card header next to the Add Rule button.
+  - Both navigation controls automatically reveal only when the table overflows horizontally, and the left/right buttons intelligently dim/hide when reaching respective scroll boundaries.
+  - Added localized tooltips in English, Spanish, and French.
 - **Global Observe Mode Activity Drawer & Real-Time Reverb Broadcasting**:
   - Added dedicated **Observed Traffic Activity** modal in the Security Center (`/panel/security`), providing real-time visibility into packets and connections evaluated by the firewall in non-blocking test mode:
     - High-density compact summary strip highlighting active evaluation stages (Banned Attackers, Permanent Blacklist, Threat Feeds, TFTP Exploit Defense, Invalid Packets, Custom Rules) and total would-be drops.
@@ -19,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `php artisan security:status` to include a live Observe Mode stage counters breakdown when observe mode is active.
   - Added `observe-events` bounded action to `/usr/local/sbin/tallpbx-security` and `scripts/resources/tallpbx-security` to safely read kernel journal records.
   - Added comprehensive "Testing Firewall Policies with Observe Mode" documentation across `docs/operations.md`, `docs/security-architecture.md`, and `docs/ui-tour.md`.
+- **Browser Test Anti-Hang & Live Feedback Architecture**:
+  - Configured Playwright with a fast 5,000ms assertion timeout in `tests/Pest.php`, catching missing elements and broken expectations in 5 seconds instead of waiting on the 30-second default.
+  - Introduced `browserStep()` milestone markers that stream unbuffered directly to `STDERR`, providing live execution feedback in the terminal log and pinpointing the exact phase if an operation fails.
+  - Added configurable execution watchdog timeout (`BROWSER_TEST_TIMEOUT:-180`) in `scripts/test-browser.sh` with automated diagnostic dumps (active Chromium/Pest processes and recent `storage/logs/laravel.log` entries) on timeout.
+  - Enhanced argument parsing in `scripts/test-browser.sh` to allow targeting specific test files without duplicating the `tests/Browser` directory.
 
 ### Changed
 - **Security Center Pre-Filters Switch & Lockout Guard Modernization**:
@@ -32,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Center and Action Button Hierarchy**:
   - Restyled the Observe Mode notification banner's "View activity" button using an outline style with warning content border and hover tokens, harmonizing contrast against the amber alert surface.
   - Elevated the "Add Custom Rule" action button in the Firewall Rules tab to `btn-primary`.
+- **Laravel Pint Code Style & Syntax Linting Standard**:
+  - Enforced Laravel Pint (`./vendor/bin/pint --test`) as a mandatory pre-claim verification gate in `AGENTS.md` and developer skills, ensuring all application source, modules, migrations, tests, commands, and language files conform strictly to Laravel code standards.
+  - Formatted 34 PHP files touched across recent changes to pass Pint linting cleanly.
 
 ### Fixed
 - **Pre-Filters Header Tooltip Native Browser Hover Suppression**:

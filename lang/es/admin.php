@@ -1360,6 +1360,8 @@ return [
     'security_firewall_rules' => 'Reglas del Firewall',
     'security_firewall_rules_desc' => 'Reglas secuenciales de filtrado evaluadas de arriba hacia abajo.',
     'security_firewall_rules_tooltip' => 'Las reglas se verifican en orden de arriba hacia abajo. La primera regla que coincida con el tráfico entrante decide qué hacer (Permitir o Bloquear), y las reglas inferiores se ignoran. Por ejemplo, para permitir su oficina y bloquear al resto, coloque la regla \'Permitir Oficina\' ARRIBA de la regla general de \'Bloquear\' para evitar que se bloquee a su oficina primero.',
+    'security_table_scroll_left' => 'Desplazar tabla a la izquierda',
+    'security_table_scroll_right' => 'Desplazar tabla a la derecha',
     'security_add_rule' => 'Añadir Regla Personalizada',
     'security_rule_name' => 'Nombre de Regla',
     'security_protocol' => 'Protocolo',
@@ -1485,4 +1487,3 @@ return [
     'certificates_active_badge' => 'Activo',
     'certificates_no_certificates' => 'No hay certificados instalados todavía.',
 ];
-

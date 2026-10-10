@@ -1,9 +1,15 @@
 <?php
 
+use App\Events\Dashboard\DashboardStatsUpdated;
+use App\Events\FreeSwitch\ChannelCreate;
+use App\Events\FreeSwitch\ChannelDestroy;
+use App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
 use App\Models\Admin;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Observers\DashboardStatsObserver;
 use App\Services\FreeSwitchServiceInterface;
+use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 
 it('shows zero counts with no data', function () {
@@ -92,54 +98,54 @@ it('handles FreeSWITCH disconnection reactively', function () {
 });
 
 it('broadcasts DashboardStatsUpdated on the dashboard.monitoring channel', function () {
-    $event = new \App\Events\Dashboard\DashboardStatsUpdated(source: 'test');
+    $event = new DashboardStatsUpdated(source: 'test');
 
     expect($event->broadcastOn()[0]->name)->toBe('dashboard.monitoring');
     expect($event->broadcastAs())->toBe('DashboardStatsUpdated');
 });
 
 it('dispatches DashboardStatsUpdated when model changes occur', function () {
-    \Illuminate\Support\Facades\Event::fake([\App\Events\Dashboard\DashboardStatsUpdated::class]);
+    Event::fake([DashboardStatsUpdated::class]);
     config(['broadcasting.test_broadcasts' => true]);
 
-    $observer = new \App\Observers\DashboardStatsObserver;
+    $observer = new DashboardStatsObserver;
     $user = User::factory()->make();
     $observer->created($user);
 
-    \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\Dashboard\DashboardStatsUpdated::class, function ($e) {
+    Event::assertDispatched(DashboardStatsUpdated::class, function ($e) {
         return $e->source === 'User';
     });
 });
 
 it('dispatches DashboardStatsUpdated when FreeSWITCH channel events occur', function () {
-    \Illuminate\Support\Facades\Event::fake([\App\Events\Dashboard\DashboardStatsUpdated::class]);
+    Event::fake([DashboardStatsUpdated::class]);
     config(['broadcasting.test_broadcasts' => true]);
 
-    $listener = new \App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
-    $event = new \App\Events\FreeSwitch\ChannelCreate(
+    $listener = new BroadcastDashboardStatsOnFreeSwitchEvent;
+    $event = new ChannelCreate(
         eventName: 'CHANNEL_CREATE',
         headers: ['Unique-ID' => 'test-uuid'],
         body: '',
     );
     $listener->handle($event);
 
-    \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\Dashboard\DashboardStatsUpdated::class, function ($e) {
+    Event::assertDispatched(DashboardStatsUpdated::class, function ($e) {
         return $e->source === 'CHANNEL_CREATE';
     });
 });
 
 it('dispatches DashboardStatsUpdated on CHANNEL_DESTROY without dropping events', function () {
-    \Illuminate\Support\Facades\Event::fake([\App\Events\Dashboard\DashboardStatsUpdated::class]);
+    Event::fake([DashboardStatsUpdated::class]);
     config(['broadcasting.test_broadcasts' => true]);
 
-    $listener = new \App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
+    $listener = new BroadcastDashboardStatsOnFreeSwitchEvent;
 
-    $createEvent = new \App\Events\FreeSwitch\ChannelCreate(
+    $createEvent = new ChannelCreate(
         eventName: 'CHANNEL_CREATE',
         headers: ['Unique-ID' => 'test-uuid-1'],
         body: '',
     );
-    $destroyEvent = new \App\Events\FreeSwitch\ChannelDestroy(
+    $destroyEvent = new ChannelDestroy(
         eventName: 'CHANNEL_DESTROY',
         headers: ['Unique-ID' => 'test-uuid-1'],
         body: '',
@@ -148,6 +154,5 @@ it('dispatches DashboardStatsUpdated on CHANNEL_DESTROY without dropping events'
     $listener->handle($createEvent);
     $listener->handle($destroyEvent);
 
-    \Illuminate\Support\Facades\Event::assertDispatchedTimes(\App\Events\Dashboard\DashboardStatsUpdated::class, 2);
+    Event::assertDispatchedTimes(DashboardStatsUpdated::class, 2);
 });
-

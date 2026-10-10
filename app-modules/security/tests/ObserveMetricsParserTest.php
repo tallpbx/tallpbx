@@ -10,7 +10,7 @@ use Modules\Security\Support\ObserveMetricsParser;
  * Tests for the ObserveMetricsParser support helper.
  */
 it('parses structured packet and byte counters from nftables ruleset status', function (): void {
-    $ruleset = <<<NFT
+    $ruleset = <<<'NFT'
 table inet tallpbx_filter {
     chain input {
         type filter hook input priority filter - 10; policy accept;
@@ -55,7 +55,7 @@ it('handles empty or blank kernel ruleset gracefully', function (): void {
 });
 
 it('parses raw journal lines into structured observe events', function (): void {
-    $rawLog = <<<LOG
+    $rawLog = <<<'LOG'
 2026-10-08T22:44:33-07:00 fspbx1 kernel: tallpbx-observe:tftp IN=veth-host OUT= MAC=72:60:bd:27:e6:a7:aa:f6:33:10:23:dc:08:00 SRC=10.254.254.2 DST=10.254.254.1 LEN=47 TOS=0x00 PREC=0x00 TTL=64 ID=38512 DF PROTO=UDP SPT=43032 DPT=69 LEN=27
 2026-10-08T22:44:33-07:00 fspbx1 kernel: tallpbx-observe:bans IN=veth-host OUT= MAC=72:60:bd:27:e6:a7:aa:f6:33:10:23:dc:08:00 SRC=10.254.254.2 DST=10.254.254.1 LEN=84 TOS=0x00 PREC=0x00 TTL=64 ID=57966 DF PROTO=ICMP TYPE=8 CODE=0 ID=54294 SEQ=1
 LOG;

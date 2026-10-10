@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Certificates\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,15 +39,18 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read CertificateDnsCredential|null $dnsCredential
- * @property-read \Illuminate\Database\Eloquent\Collection<int, CertificateAuditLog> $auditLogs
+ * @property-read Collection<int, CertificateAuditLog> $auditLogs
  */
 class Certificate extends Model
 {
     public const TYPE_LETS_ENCRYPT = 'lets_encrypt';
+
     public const TYPE_CUSTOM = 'custom';
+
     public const TYPE_SELF_SIGNED = 'self_signed';
 
     public const CHALLENGE_HTTP = 'http-01';
+
     public const CHALLENGE_DNS = 'dns-01';
 
     /**

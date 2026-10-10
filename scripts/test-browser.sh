@@ -40,4 +40,50 @@ if [[ $HAS_PARALLEL -eq 1 && $HAS_PROCESSES -eq 0 ]]; then
     ARGS+=("--processes=2")
 fi
 
-exec ./vendor/bin/pest tests/Browser "${ARGS[@]}"
+# Determine whether an explicit test path was provided as an argument
+HAS_TARGET=0
+for arg in "$@"; do
+    target_path="${arg%%:*}"
+    if [[ ! "$arg" =~ ^- ]] && { [[ -e "$arg" ]] || [[ -e "$target_path" ]] || [[ "$arg" =~ ^tests/ ]]; }; then
+        HAS_TARGET=1
+        break
+    fi
+done
+
+TARGET_DIR=()
+if [[ $HAS_TARGET -eq 0 ]]; then
+    TARGET_DIR=("tests/Browser")
+fi
+
+# Clean up any lingering orphaned Playwright processes from previous runs before starting
+pkill -f "playwright run-server" 2>/dev/null || true
+
+# Enforce a maximum execution budget (default 180s, overridable via BROWSER_TEST_TIMEOUT)
+# to prevent tests from hanging silently on blocked sockets or deadlocks.
+BROWSER_TIMEOUT="${BROWSER_TEST_TIMEOUT:-180}"
+
+set +e
+timeout -k 10s "${BROWSER_TIMEOUT}s" ./vendor/bin/pest "${TARGET_DIR[@]}" "${ARGS[@]}"
+EXIT_CODE=$?
+set -e
+
+if [[ $EXIT_CODE -eq 124 || $EXIT_CODE -eq 137 ]]; then
+    echo "" >&2
+    echo "================================================================================" >&2
+    echo "ERROR: Browser test run timed out after ${BROWSER_TIMEOUT}s!" >&2
+    echo "================================================================================" >&2
+    echo "--- Active Pest & Chromium Processes ---" >&2
+    ps aux | grep -E 'chrome|pest|playwright' | grep -v grep >&2 || true
+    echo "" >&2
+    echo "--- Recent Application Exception Log (storage/logs/laravel.log) ---" >&2
+    if [[ -f storage/logs/laravel.log ]]; then
+        tail -n 25 storage/logs/laravel.log >&2
+    else
+        echo "No storage/logs/laravel.log found." >&2
+    fi
+    echo "================================================================================" >&2
+    pkill -f "playwright" 2>/dev/null || true
+    exit 124
+fi
+
+exit "$EXIT_CODE"

@@ -1359,6 +1359,8 @@ return [
     'security_firewall_rules' => 'Règles du Pare-feu',
     'security_firewall_rules_desc' => 'Règles séquentielles de filtrage évaluées de haut en bas.',
     'security_firewall_rules_tooltip' => 'Les règles sont vérifiées dans l\'ordre, du haut vers le bas. La première règle correspondant au trafic entrant décide de l\'action (Autoriser ou Bloquer), et les règles suivantes sont ignorées. Par exemple, pour autoriser votre bureau tout en bloquant les autres, placez votre règle \'Autoriser Bureau\' AU-DESSUS de la règle générale \'Bloquer\' afin que votre bureau ne soit pas bloqué en premier.',
+    'security_table_scroll_left' => 'Faire défiler le tableau vers la gauche',
+    'security_table_scroll_right' => 'Faire défiler le tableau vers la droite',
     'security_add_rule' => 'Ajouter une Règle Personnalisée',
     'security_rule_name' => 'Nom de la Règle',
     'security_protocol' => 'Protocole',
@@ -1484,4 +1486,3 @@ return [
     'certificates_active_badge' => 'Actif',
     'certificates_no_certificates' => 'Aucun certificat installé pour le moment.',
 ];
-

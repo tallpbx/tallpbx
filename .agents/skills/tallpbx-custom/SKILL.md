@@ -19,6 +19,13 @@ Agents MUST prefer Boost tools over shell commands, Tinker scripts, or manual fi
 - **Error & Log Inspection**: Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces instead of parsing `storage/logs/laravel.log`.
 - **Browser Diagnostics**: Use `browser-logs` to inspect browser console diagnostics during frontend/Livewire testing.
 
+## Laravel Pint Code Style & Syntax Linting
+
+Laravel Pint runs as the authoritative code linter and formatter (`./vendor/bin/pint`).
+- **Standard Verification**: Run `./vendor/bin/pint --test` after PHP code edits to verify clean syntax and code style before committing.
+- **Auto-Formatting**: Run `./vendor/bin/pint <path>` to format modified files automatically according to Laravel standards.
+- All PHP code in `app/`, `app-modules/`, `database/`, `lang/`, `routes/`, and `tests/` must pass Pint verification cleanly.
+
 ## Installer And Resource Scripts
 
 Use this section whenever changing `scripts/install.sh` or a script under

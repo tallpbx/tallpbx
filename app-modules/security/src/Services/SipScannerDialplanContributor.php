@@ -136,7 +136,7 @@ class SipScannerDialplanContributor implements ContextWideDialplanXmlContributor
                 $xml .= "          <action application=\"set\" data=\"proto_security_violation=1\"/>\n";
             }
 
-            $xml .= "          <action application=\"event\" data=\"Event-Name=CUSTOM,Event-Subclass=".self::EVENT_SUBCLASS
+            $xml .= '          <action application="event" data="Event-Name=CUSTOM,Event-Subclass='.self::EVENT_SUBCLASS
                 .",Scanner-Type={$scannerType},Scanner-Value={$variableRef},Scanner-Confidence={$confidence}"
                 .',Attacker-IP=${sip_network_ip}"/>'."\n";
 

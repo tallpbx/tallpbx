@@ -16,7 +16,6 @@ use Modules\IvrMenus\Models\IvrMenuOption;
 use Modules\OutboundRoutes\Models\OutboundRoute;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Models\RingGroupExtension;
-use Modules\TimeConditions\Models\TimeCondition;
 
 beforeEach(function (): void {
     Cache::flush();

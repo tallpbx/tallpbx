@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\TenantManager;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Str;
+use Pest\Browser\Playwright\Playwright;
 use Tests\Browser\Concerns\InteractsWithAuthentication;
 use Tests\Browser\Concerns\SeedsSmokeAdmin;
 use Tests\TestCase;
@@ -16,6 +17,9 @@ pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->use(InteractsWithAuthentication::class)
     ->use(SeedsSmokeAdmin::class)
+    ->beforeEach(function (): void {
+        Playwright::setTimeout(5_000);
+    })
     ->in('Browser');
 
 /*
@@ -71,6 +75,17 @@ expect()->extend('toBeOne', function () {
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+/**
+ * Write an unbuffered progress step marker to STDERR during browser tests.
+ *
+ * Bypasses Pest/PHPUnit stdout buffering so execution progress is
+ * visible in real time to terminal operators, CI runners, and AI agents.
+ */
+function browserStep(string $message): void
+{
+    fwrite(STDERR, "\n  → [Browser] {$message}\n");
+}
 
 /**
  * Create an admin with common admin panel permissions.

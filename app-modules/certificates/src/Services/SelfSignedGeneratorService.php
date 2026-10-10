@@ -47,7 +47,7 @@ class SelfSignedGeneratorService implements SelfSignedGeneratorServiceInterface
             throw new CertificateException('Common Name cannot be empty.');
         }
 
-        $storageId = 'self_' . Str::slug($trimmedCommonName, '_') . '_' . time();
+        $storageId = 'self_'.Str::slug($trimmedCommonName, '_').'_'.time();
         $sanCsv = implode(',', array_filter(array_map('trim', $sanDomains)));
 
         $result = $this->executor->generateSelfSigned($storageId, $trimmedCommonName, $days, $sanCsv);

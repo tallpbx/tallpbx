@@ -32,8 +32,8 @@ class CertificateStatusCommand extends Command
     /**
      * Execute the console command.
      *
-     * @param CertificateDeploymentServiceInterface $deploymentService The service deployer
-     * @param CertificateExecutorInterface $executor The bounded root helper executor
+     * @param  CertificateDeploymentServiceInterface  $deploymentService  The service deployer
+     * @param  CertificateExecutorInterface  $executor  The bounded root helper executor
      * @return int Exit code
      */
     public function handle(

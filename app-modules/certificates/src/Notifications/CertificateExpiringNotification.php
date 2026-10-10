@@ -19,8 +19,8 @@ class CertificateExpiringNotification extends Notification implements ShouldQueu
     /**
      * Create a new notification instance.
      *
-     * @param Certificate $certificate The expiring certificate
-     * @param int $daysRemaining Number of days before the certificate expires
+     * @param  Certificate  $certificate  The expiring certificate
+     * @param  int  $daysRemaining  Number of days before the certificate expires
      */
     public function __construct(
         public readonly Certificate $certificate,
@@ -30,7 +30,7 @@ class CertificateExpiringNotification extends Notification implements ShouldQueu
     /**
      * Get the notification's delivery channels.
      *
-     * @param object $notifiable The entity receiving the notification
+     * @param  object  $notifiable  The entity receiving the notification
      * @return array<int, string>
      */
     public function via(object $notifiable): array
@@ -41,7 +41,7 @@ class CertificateExpiringNotification extends Notification implements ShouldQueu
     /**
      * Get the array representation of the notification.
      *
-     * @param object $notifiable The entity receiving the notification
+     * @param  object  $notifiable  The entity receiving the notification
      * @return array<string, mixed>
      */
     public function toArray(object $notifiable): array

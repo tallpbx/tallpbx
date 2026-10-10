@@ -18,8 +18,8 @@ trait InteractsWithAuthentication
     /**
      * Authenticate an Admin or User directly into the browser session via the test bridge.
      *
-     * @param Model $user An Admin or User Eloquent model instance
-     * @param string $guard The authentication guard to log into ('admin' or 'web')
+     * @param  Model  $user  An Admin or User Eloquent model instance
+     * @param  string  $guard  The authentication guard to log into ('admin' or 'web')
      */
     public function loginAs(Model $user, string $guard = 'admin'): void
     {

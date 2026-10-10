@@ -412,17 +412,17 @@ function applyDocumentationLayout(object $page, string $mode, bool $collapsed): 
 
     // The returned read-back proves the preference really landed.
     $written = $page->script(sprintf(
-        "(() => {"
+        '(() => {'
         ."localStorage.setItem('tallpbx:layout_mode', %s); "
         ."localStorage.setItem('tallpbx:sidebar_collapsed', %s); "
         ."document.documentElement.setAttribute('data-layout-mode', %s); "
         ."document.documentElement.setAttribute('data-sidebar-collapsed', %s); "
-        ."if (window.Livewire) { "
+        .'if (window.Livewire) { '
         ."Livewire.dispatch('layout-changed', { mode: %s }); "
         ."Livewire.dispatch('sidebar-collapse-changed', { collapsed: %s }); "
-        ."} "
+        .'} '
         ."return localStorage.getItem('tallpbx:sidebar_collapsed'); "
-        ."})()",
+        .'})()',
         json_encode($mode),
         json_encode($expected),
         json_encode($mode),

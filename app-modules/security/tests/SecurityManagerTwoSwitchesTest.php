@@ -13,6 +13,7 @@ use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecurityIpList;
+use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\SecurityConfigGenerator;
 
@@ -120,7 +121,7 @@ it('allows disabling the pre-filter when custom lo and ct rules exist', function
         'description' => 'Admin uplink',
     ]);
 
-    \Modules\Security\Models\SecurityRule::create([
+    SecurityRule::create([
         'sequence' => 10,
         'description' => 'Custom loopback accept',
         'source_ip' => '127.0.0.1',
@@ -128,7 +129,7 @@ it('allows disabling the pre-filter when custom lo and ct rules exist', function
         'enabled' => true,
     ]);
 
-    \Modules\Security\Models\SecurityRule::create([
+    SecurityRule::create([
         'sequence' => 20,
         'description' => 'Custom ct state established accept',
         'source_ip' => 'any',
