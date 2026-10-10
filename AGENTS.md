@@ -33,34 +33,41 @@ php artisan optimize:clear
 ```
 Do not skip this step. The application caches compiled views, config, routes, and events — failing to clear will result in stale output. This applies even to "cosmetic" changes like replacing raw SVGs with heroicons. The application listens for Artisan command completion and runs `App\Support\GeneratedFilePermissions::repair()` so generated cache/build files stay readable by `www-data`.
 
-## CRITICAL — Mandatory Pre-Claim Verification
+## CRITICAL — Mandatory Pre-Commit Verification Gate
 
 You MUST NOT claim a feature is "fixed" or "done" until ALL of the following pass.
-Run them in this exact order after every change, before every commit:
+Run this checklist **once when work is complete, before committing or declaring the task finished** (do NOT run the full verification checklist on intermediate micro-edits during active debugging):
 
 ```bash
-# 1. Application must boot without errors
+# 1. Application boots cleanly (run once after code/template changes)
 php artisan optimize:clear
 
-# 2. Code style and syntax must pass Laravel Pint linting
-./vendor/bin/pint --test
+# 2. Code style passes Pint (ONLY if PHP files were modified; always scope to dirty/modified files)
+./vendor/bin/pint --dirty
 
-# 3. All feature/unit tests must pass (always use --parallel for fast multi-process execution)
+# 3. Targeted test passes during development; full test suite passes before commit
 php artisan test --compact --parallel
 
-# 4. Pest browser tests must pass (for UI changes)
+# 4. Pest browser tests pass (when UI/browser changes are made)
 ./vendor/bin/pest tests/Browser
 
-# 5. Routes must exist (especially for new features)
+# 5. Routes exist (for new routes/features)
 php artisan route:list --name=<feature-name>
 ```
 
-## CRITICAL — Laravel Pint Code Style & Syntax Linting
+## CRITICAL — Laravel Pint Code Style & Syntax Linting (Scoping Rules)
 
-All PHP code (application source, modules, migrations, tests, commands, and language files) MUST strictly adhere to Laravel code standards and formatting conventions using [Laravel Pint](https://laravel.com/docs/pint) (`./vendor/bin/pint`).
-- **Pre-commit verification**: Always verify clean styling with `./vendor/bin/pint --test` before committing or declaring work complete.
-- **Auto-formatting**: Run `./vendor/bin/pint <files>` to automatically format modified PHP files to the project standard.
-- Do not commit changes that fail `./vendor/bin/pint --test`.
+All PHP code (application source, modules, migrations, tests, commands, and language files) MUST adhere to Laravel code standards and formatting conventions using [Laravel Pint](https://laravel.com/docs/pint) (`./vendor/bin/pint`).
+
+**Execution & Scoping Rules:**
+- **PHP files only**: Pint is strictly a PHP linter/formatter. Never run Pint when only Blade templates, CSS, JS, JSON, language files, or markdown documentation have been edited.
+- **Never scan the entire repo during routine work**: Running `./vendor/bin/pint` or `./vendor/bin/pint --test` without file arguments forces an expensive full-repository scan across thousands of unchanged files.
+- **Always scope to changed files**:
+  - Auto-format uncommitted PHP edits: `./vendor/bin/pint --dirty`
+  - Auto-format specific files: `./vendor/bin/pint <path/to/File.php>`
+  - Verify formatting without writing: `./vendor/bin/pint --dirty --test`
+- **Timing**: Run Pint once prior to staging/committing your work, NOT iteratively between every debug edit.
+- Do not commit changes that fail `./vendor/bin/pint --dirty --test`.
 
 ## CRITICAL — Permission Setup in Pest Tests (Standard Convention)
 

@@ -22,9 +22,10 @@ Agents MUST prefer Boost tools over shell commands, Tinker scripts, or manual fi
 ## Laravel Pint Code Style & Syntax Linting
 
 Laravel Pint runs as the authoritative code linter and formatter (`./vendor/bin/pint`).
-- **Standard Verification**: Run `./vendor/bin/pint --test` after PHP code edits to verify clean syntax and code style before committing.
-- **Auto-Formatting**: Run `./vendor/bin/pint <path>` to format modified files automatically according to Laravel standards.
-- All PHP code in `app/`, `app-modules/`, `database/`, `lang/`, `routes/`, and `tests/` must pass Pint verification cleanly.
+- **PHP files only**: Pint is strictly a PHP linter/formatter. Never run Pint when only Blade templates, CSS, JS, JSON, language files, or markdown documentation have been edited.
+- **Scope to changed files**: Always use `./vendor/bin/pint --dirty` or `./vendor/bin/pint <path>` instead of scanning the entire repository.
+- **Timing**: Run Pint once prior to staging/committing, not iteratively after every small edit or between test runs.
+- **Standard Verification**: Run `./vendor/bin/pint --dirty --test` to verify clean syntax and code style on uncommitted PHP changes before committing.
 
 ## Installer And Resource Scripts
 
