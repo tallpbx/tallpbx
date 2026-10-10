@@ -46,15 +46,14 @@ class SecurityManager extends Component
     use HasOperationalFeedback;
 
     /**
-     * Active tab in the evaluation-ordered tab strip.
+     * Active tab in the Security Command Center tab strip.
      *
-     * The tabs mirror the kernel evaluation order: the allow/block lists,
-     * the attackers, the threat feeds, and the full firewall pipeline.
+     * Defaults to 'firewall-rules' as the primary management cockpit.
      * Exposed as ?tab= so deep links like /panel/security?tab=threat-feeds
      * open the matching panel.
      */
     #[Url(as: 'tab')]
-    public string $activeTab = 'block-allow';
+    public string $activeTab = 'firewall-rules';
 
     /**
      * Search query for filtering IP entries.

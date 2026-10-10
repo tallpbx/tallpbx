@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Security Center Default Tab & Navigation Order**:
+  - Reordered the Security Center tabs so **Firewall Rules** is positioned as Tab #1 on the far left and opens as the default active tab on `/panel/security`.
+  - Positions the master firewall ruleset, port access list, and pre-filter pipeline at the forefront of the administrator workflow, while keeping supporting address registries (Allow & Block Lists, Attackers, Threat Feeds) immediately adjacent.
+
 ## [3.0.4] - 2026-10-09
 
 ### Added

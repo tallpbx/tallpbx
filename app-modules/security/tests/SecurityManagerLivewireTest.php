@@ -76,15 +76,15 @@ it('mounts and renders the full security command center with plain-English label
         ->assertSee('Firewall Status')
         ->assertSee('Attack Protection')
         ->assertSee('Blocked Attackers')
-        // The default tab shows the allow/block workbenches...
-        ->assertSee('Blacklist IPs')
-        ->assertSee('Whitelist IPs')
-        // ...and the full pipeline table lives on the Firewall Rules tab.
-        ->set('activeTab', 'firewall-rules')
+        // The default tab is Firewall Rules, which displays the pipeline table and services...
         ->assertSee('Standard Services')
         ->assertSee('Protocol')
         ->assertSee('Port')
         ->assertSee('Rules are checked in order from top to bottom')
+        // ...and switching to Allow & Block Lists reveals the address workbenches.
+        ->set('activeTab', 'block-allow')
+        ->assertSee('Blacklist IPs')
+        ->assertSee('Whitelist IPs')
         ->assertDontSee('wire:click="refreshStatus"', false)
         ->assertDontSee('wire:click="applyFirewallChanges"', false)
         ->assertDontSee('wire:poll', false);
@@ -135,6 +135,7 @@ it('renders the delete IP button with loading state and row dimming directives',
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
+        ->set('activeTab', 'block-allow')
         ->assertSee('wire:loading.class="opacity-40 pointer-events-none"', false)
         ->assertSee("wire:target=\"deleteIp({$ip->id})\"", false)
         ->assertSee('loading loading-spinner', false);
@@ -143,6 +144,7 @@ it('renders the delete IP button with loading state and row dimming directives',
 it('renders the add to whitelist and add to blacklist buttons with loading states', function (): void {
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
+        ->set('activeTab', 'block-allow')
         ->assertSee('wire:target="addWhitelistIp"', false)
         ->assertSee('wire:target="addBlacklistIp"', false)
         ->assertSee((string) __('admin.security_adding_to_whitelist'))
@@ -318,6 +320,7 @@ it('shows an inline error when adding a whitelisted IP to the blacklist', functi
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
+        ->set('activeTab', 'block-allow')
         ->set('newBlacklistIp', '203.0.113.197')
         ->set('newBlacklistDescription', 'Attempted block of protected IP')
         ->call('addBlacklistIp')
@@ -936,6 +939,7 @@ it('toggles a core PBX service and resets it to factory defaults', function (): 
 it('manages blacklist and whitelist simultaneously in sequential pipeline cards', function (): void {
     $component = Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
+        ->set('activeTab', 'block-allow')
         // Add to Blacklist
         ->set('newBlacklistIp', '198.51.100.25')
         ->set('newBlacklistDescription', 'Aggressive probe')

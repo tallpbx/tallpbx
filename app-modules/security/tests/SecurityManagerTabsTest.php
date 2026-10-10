@@ -47,14 +47,14 @@ beforeEach(function (): void {
     $this->app->instance(SecurityConfigGenerator::class, $generator);
 });
 
-it('defaults to the Allow & Block Lists tab and renders every tab control', function (): void {
+it('defaults to the Firewall Rules tab and renders every tab control', function (): void {
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
-        ->assertSet('activeTab', 'block-allow')
+        ->assertSet('activeTab', 'firewall-rules')
+        ->assertSee(__('admin.security_tab_firewall_rules'))
         ->assertSee(__('admin.security_tab_block_allow'))
         ->assertSee(__('admin.security_tab_attackers'))
         ->assertSee(__('admin.security_tab_threat_feeds'))
-        ->assertSee(__('admin.security_tab_firewall_rules'))
         // The page-global switch controls stay visible above the strip.
         ->assertSee(__('admin.security_toggle_firewall'))
         ->assertSee(__('admin.security_toggle_observe'));
@@ -63,19 +63,19 @@ it('defaults to the Allow & Block Lists tab and renders every tab control', func
 it('shows only the selected tab panel', function (): void {
     $component = Livewire::actingAs($this->admin, 'admin')->test(SecurityManager::class);
 
+    // Firewall Rules is the default open tab and shows the full pipeline summary.
+    $component->assertSee('iif "lo"')
+        ->assertSee(__('admin.security_core_services_title'));
+
     // Allow & Block Lists shows the allow/block workbenches, not the pipeline.
-    $component->assertSee(__('admin.security_add_to_whitelist'))
+    $component->set('activeTab', 'block-allow')
+        ->assertSee(__('admin.security_add_to_whitelist'))
         ->assertDontSee('iif "lo"');
 
     // Attackers shows the bans workbench and hides the pipeline table.
     $component->set('activeTab', 'attackers')
         ->assertSee(__('admin.security_block_manually'))
         ->assertDontSee('iif "lo"');
-
-    // Firewall Rules shows the full pipeline summary.
-    $component->set('activeTab', 'firewall-rules')
-        ->assertSee('iif "lo"')
-        ->assertSee(__('admin.security_core_services_title'));
 
     // Threat Feeds shows the feed controls panel.
     $component->set('activeTab', 'threat-feeds')

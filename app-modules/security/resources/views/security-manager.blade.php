@@ -311,9 +311,14 @@
         </div>
     </div>
 
-    {{-- Evaluation-Ordered Tabs: left to right mirrors the kernel evaluation order --}}
+    {{-- Security Center Tabs: Firewall Rules first as master cockpit, followed by address registries --}}
     <div class="overflow-x-auto">
         <div role="tablist" class="tabs tabs-lift tabs-sm">
+            <button role="tab" type="button" wire:click="$set('activeTab', 'firewall-rules')"
+                    class="tab gap-1.5 {{ $activeTab === 'firewall-rules' ? 'tab-active' : '' }}">
+                <x-heroicon-o-fire class="w-4 h-4" />
+                {{ __('admin.security_tab_firewall_rules') }}
+            </button>
             <button role="tab" type="button" wire:click="$set('activeTab', 'block-allow')"
                     class="tab gap-1.5 {{ $activeTab === 'block-allow' ? 'tab-active' : '' }}">
                 <x-heroicon-o-no-symbol class="w-4 h-4" />
@@ -328,11 +333,6 @@
                     class="tab gap-1.5 {{ $activeTab === 'threat-feeds' ? 'tab-active' : '' }}">
                 <x-heroicon-o-globe-alt class="w-4 h-4" />
                 {{ __('admin.security_tab_threat_feeds') }}
-            </button>
-            <button role="tab" type="button" wire:click="$set('activeTab', 'firewall-rules')"
-                    class="tab gap-1.5 {{ $activeTab === 'firewall-rules' ? 'tab-active' : '' }}">
-                <x-heroicon-o-fire class="w-4 h-4" />
-                {{ __('admin.security_tab_firewall_rules') }}
             </button>
         </div>
     </div>
