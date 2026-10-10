@@ -52,6 +52,32 @@ it('renders the sidebar with navigation', function (): void {
         ->assertPresent('label[for="sidebar-drawer"]');
 });
 
+it('locks the viewport frame and pins the sidebar to full viewport height', function (): void {
+    $this->loginAs($this->admin, 'admin');
+
+    $page = visit('/panel/dashboard');
+
+    $layoutMetrics = $page->script(<<<'JS'
+        (() => {
+            const body = document.body;
+            const sidebar = document.querySelector('.panel-sidebar');
+            const main = document.querySelector('main');
+            const vh = window.innerHeight;
+
+            return {
+                bodyOverflow: window.getComputedStyle(body).overflow,
+                sidebarHeight: sidebar ? Math.round(sidebar.getBoundingClientRect().height) : 0,
+                vh: vh,
+                mainIsScrollContainer: main ? window.getComputedStyle(main).overflowY : null,
+            };
+        })()
+    JS);
+
+    expect($layoutMetrics['sidebarHeight'])->toBeGreaterThanOrEqual($layoutMetrics['vh'] - 2);
+    expect($layoutMetrics['bodyOverflow'])->toBe('hidden');
+    expect($layoutMetrics['mainIsScrollContainer'])->toBe('auto');
+});
+
 it('renders the dashboard with Livewire components', function (): void {
     $this->loginAs($this->admin, 'admin');
 

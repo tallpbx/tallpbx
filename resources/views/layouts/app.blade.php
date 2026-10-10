@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+      class="h-full"
       x-data="{ ...themeData(), ...layoutData() }"
       x-init="initTheme(); initLayout()"
       :data-theme="theme === 'dark' ? 'dark' : (theme === 'light' ? 'light' : (systemDark ? 'dark' : 'light'))"
@@ -30,7 +31,7 @@
         document.documentElement.setAttribute('data-sidebar-collapsed', savedCollapsed ? 'true' : 'false');
     </script>
 </head>
-<body class="panel-shell bg-base-200 text-base-content min-h-screen overflow-x-hidden antialiased">
+<body class="panel-shell bg-base-200 text-base-content h-full h-dvh overflow-hidden antialiased flex flex-col">
     @php
         $impersonationService = app(\App\Services\ImpersonationServiceInterface::class);
         $panelUser = $impersonationService->isImpersonating()
@@ -51,7 +52,7 @@
     @endphp
     @if($impersonationService->isImpersonating())
         @php $originalAdmin = $impersonationService->getOriginalAdmin(); @endphp
-        <div class="bg-warning text-warning-content px-4 py-2 flex items-center justify-between text-sm">
+        <div class="bg-warning text-warning-content px-4 py-2 flex items-center justify-between text-sm shrink-0">
             <span>
                 {!! __('client.impersonating', ['name' => Auth::user()->name, 'admin' => $originalAdmin?->name]) !!}
             </span>
@@ -61,14 +62,14 @@
             </form>
         </div>
     @endif
-    <div class="drawer w-full max-w-full overflow-x-hidden"
+    <div class="drawer flex-1 w-full max-w-full overflow-hidden h-full min-h-0"
          :class="{ 'lg:drawer-open': layoutMode === 'sidebar' }">
         <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
-        <aside class="drawer-side z-50" data-panel-sidebar-scroll="drawer">
+        <aside class="drawer-side z-50 h-full min-h-full" data-panel-sidebar-scroll="drawer">
             <label for="sidebar-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-            <div class="panel-sidebar bg-base-100 border-r border-base-300 flex flex-col min-h-full transition-all duration-200 ease-in-out"
+            <div class="panel-sidebar bg-base-100 border-r border-base-300 flex flex-col h-full min-h-full transition-all duration-200 ease-in-out"
                  :class="sidebarCollapsed ? 'w-16' : 'w-64'">
-                <div class="flex items-center gap-3 h-16 border-b border-base-300 transition-all duration-200"
+                <div class="flex items-center gap-3 h-16 border-b border-base-300 shrink-0 transition-all duration-200"
                      :class="sidebarCollapsed ? 'justify-center px-0' : 'px-5'">
                     <div class="panel-brand-mark shrink-0">
                         <x-heroicon-o-phone class="w-5 h-5" />
@@ -76,7 +77,7 @@
                     <span x-show="!sidebarCollapsed" x-transition.opacity class="text-base font-semibold tracking-tight truncate">{{ config('app.name', 'TallPBX') }}</span>
                 </div>
                 @persist('panel-sidebar')
-                <nav class="flex-1 px-2 py-4 overflow-y-auto" wire:navigate:scroll data-panel-sidebar-scroll="nav">
+                <nav class="flex-1 min-h-0 px-2 py-4 overflow-y-auto" wire:navigate:scroll data-panel-sidebar-scroll="nav">
                     <ul class="menu text-sm gap-1 p-0">
                         @foreach ($menuTree as $item)
                             @include('components.sidebar-menu-item', ['item' => $item, 'guard' => 'panel', 'persistedNavigation' => true])
@@ -86,7 +87,7 @@
                 @endpersist
 
                 {{-- Mini Rail Collapse / Expand Toggle Button --}}
-                <div class="p-2 border-t border-base-300 hidden lg:flex items-center transition-all duration-200"
+                <div class="p-2 border-t border-base-300 hidden lg:flex items-center shrink-0 transition-all duration-200"
                      :class="sidebarCollapsed ? 'justify-center' : 'justify-end'">
                     <div class="tooltip tooltip-right" :data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
                         <button
@@ -107,8 +108,8 @@
             </div>
         </aside>
 
-        <div class="drawer-content flex flex-col min-h-screen min-w-0 max-w-full overflow-x-hidden">
-            <header class="panel-header navbar bg-base-100 border-b border-base-300 h-16 relative z-40" style="--navbar-padding: 0px">
+        <div class="drawer-content flex flex-col h-full min-h-0 min-w-0 max-w-full overflow-hidden">
+            <header class="panel-header navbar bg-base-100 border-b border-base-300 h-16 shrink-0 relative z-40" style="--navbar-padding: 0px">
                 <div class="flex-1 flex items-center pl-4 sm:pl-6 gap-3">
                     {{-- Mobile Drawer Toggle --}}
                     <x-tooltip :tip="__('admin.toggle_navigation')" position="right">
@@ -206,7 +207,7 @@
             </header>
 
             {{-- Horizontal Topbar Navigation --}}
-            <div x-show="layoutMode === 'horizontal'" class="relative z-30">
+            <div x-show="layoutMode === 'horizontal'" class="relative z-30 shrink-0">
                 <x-horizontal-navbar :menu-tree="$menuTree" />
             </div>
 
@@ -218,7 +219,7 @@
                         {{ $slot ?? '' }}
                     @endif
                 </div>
-                <footer class="w-full max-w-full px-4 sm:px-6 py-4 pt-4 border-t border-base-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-base-content/60">
+                <footer class="w-full max-w-full px-4 sm:px-6 py-4 pt-4 border-t border-base-300 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-base-content/60">
                     <div class="min-w-0">{!! __('admin.copyright', ['year' => date('Y')]) !!}</div>
                     <div class="flex flex-wrap items-center gap-4 sm:justify-end">
                         <x-tooltip :tip="__('admin.app_version_tooltip')" class="inline-flex shrink-0 whitespace-nowrap"><span>{{ __('admin.app_version', ['version' => app()->version()]) }}</span></x-tooltip>

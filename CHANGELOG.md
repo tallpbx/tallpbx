@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced argument parsing in `scripts/test-browser.sh` to allow targeting specific test files without duplicating the `tests/Browser` directory.
 
 ### Changed
+- **Viewport-Locked Application Frame Layout (Pinned Full-Height Sidebar)**:
+  - Transitioned the administrative layout in `resources/views/layouts/app.blade.php` to a modern viewport-locked application frame (`h-full h-dvh overflow-hidden flex flex-col` on body, `h-full min-h-0 overflow-hidden` on drawer containers).
+  - Pinned the left sidebar at 100% viewport height continuously across the application, eliminating sidebar truncation and void areas when scrolling through long pages such as the Security Center and extensive data tables.
+  - Designated `<main>` as the dedicated vertical scrolling viewport container with `overflow-y-auto` and `wire:navigate:scroll`, keeping the top navbar, brand header, and sidebar bottom rail fixed in place.
 - **Security Center Pre-Filters Switch & Lockout Guard Modernization**:
   - Restored the pre-filter switch to toggle all 7 pre-filter stages as a unified block, located cleanly on the left side of the "PRE-FILTERS" section header with no extra text, with the tooltip icon placed after the title.
   - Re-pinned the loopback interface invariant to the first row with a lock icon.

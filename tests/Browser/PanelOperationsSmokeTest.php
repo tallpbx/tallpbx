@@ -350,7 +350,7 @@ JS);
 
     // Grow the viewport to the full document height for documentation screenshots
     $expandedHeight = (int) ($page->script(
-        'Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight)'
+        "Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.querySelector('main')?.scrollHeight || 0)"
     ) ?? 2900);
     $page->resize(1920, max(2900, $expandedHeight + 120));
 

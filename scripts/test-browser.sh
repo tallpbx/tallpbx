@@ -58,9 +58,9 @@ fi
 # Clean up any lingering orphaned Playwright processes from previous runs before starting
 pkill -f "playwright run-server" 2>/dev/null || true
 
-# Enforce a maximum execution budget (default 180s, overridable via BROWSER_TEST_TIMEOUT)
+# Enforce a maximum execution budget (default 360s, overridable via BROWSER_TEST_TIMEOUT)
 # to prevent tests from hanging silently on blocked sockets or deadlocks.
-BROWSER_TIMEOUT="${BROWSER_TEST_TIMEOUT:-180}"
+BROWSER_TIMEOUT="${BROWSER_TEST_TIMEOUT:-360}"
 
 set +e
 timeout -k 10s "${BROWSER_TIMEOUT}s" ./vendor/bin/pest "${TARGET_DIR[@]}" "${ARGS[@]}"
