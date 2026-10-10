@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.4] - 2026-10-09
+
 ### Added
 - **Firewall Rules Table Horizontal Scroll Navigation**:
   - Added viewport-sticky floating **Left and Right Arrow** navigation buttons on the flanks of the **Firewall Rules & Port Access** table. As administrators scroll vertically through the long rules list, the buttons dynamically float at the active eye-level, enabling one-click smooth horizontal panning without having to scroll down to the bottom scrollbar.
@@ -31,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced argument parsing in `scripts/test-browser.sh` to allow targeting specific test files without duplicating the `tests/Browser` directory.
 
 ### Changed
+- **Security Center Firewall Rules Table Streamlined 7-Column Layout & Pre-Filter Sub-Badges**:
+  - Eliminated redundant `nftables Rule` column across Standard Services and Custom Rules where it merely reiterated the Protocol and Port columns.
+  - Placed Pre-Filter technical kernel expressions (e.g. `iif "lo"`, `ct state established,related`, `@whitelist_ips`) cleanly as a monospace sub-badge directly under the friendly rule name, eliminating the artificial name gap while maintaining technical precision.
+  - Streamlined table to 7 standard columns across all three sections: **Status**, **Rule Name**, **Protocol**, **Port**, **Source IP**, **Action**, and **Actions**.
+  - Reduced intrinsic table width to ~710px, fitting comfortably on desktop displays (>= 1024px, including 1164px) with zero horizontal overflow required.
 - **Viewport-Locked Application Frame Layout (Pinned Full-Height Sidebar)**:
   - Transitioned the administrative layout in `resources/views/layouts/app.blade.php` to a modern viewport-locked application frame (`h-full h-dvh overflow-hidden flex flex-col` on body, `h-full min-h-0 overflow-hidden` on drawer containers).
   - Pinned the left sidebar at 100% viewport height continuously across the application, eliminating sidebar truncation and void areas when scrolling through long pages such as the Security Center and extensive data tables.
@@ -51,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Formatted 34 PHP files touched across recent changes to pass Pint linting cleanly.
 
 ### Fixed
+- **Firewall Rules Table Floating Side Arrows Visibility on Non-Overflowing Viewports**:
+  - Resolved an Alpine.js directive collision where binding dynamic `:style="`top: ${arrowTop}px`"` directly on the floating scroll arrow wrappers clobbered the element's inline `style` attribute, wiping `display: none` set by `x-show` and causing both circular side arrows to remain permanently visible in the vertical center of the screen even on wide viewports (e.g. 1164px) with no horizontal scrollbar.
+  - Re-architected dynamic vertical positioning by publishing `--arrow-top: ${arrowTop}px` as a CSS custom property on the parent scroller container and using static `style="top: var(--arrow-top, 40px);"` on the arrow wrappers, allowing Alpine's `x-show` to toggle `display: none` cleanly without being overridden.
+  - Compacted table column widths and padding (`Status: w-10`, `Action: w-16`, `Actions: w-20`), decreasing intrinsic table width to ~710px so it fits naturally on 1164px desktop screens without requiring horizontal scroll.
+  - Added global `[x-cloak] { display: none !important; }` rule to `custom.css` to prevent uninitialized element flashes.
 - **Pre-Filters Header Tooltip Native Browser Hover Suppression**:
   - Added reactive Alpine state (`suppressTitle`) to dynamically strip the table row's `title` attribute when hovering over the pre-filters tooltip icon, switch, or reset button, preventing the browser's native *"Click to expand or collapse pre-filters"* message from appearing on top of and obscuring the DaisyUI help tooltip.
 - **Pest Browser Smoke Test Tag Selector Resolution**:

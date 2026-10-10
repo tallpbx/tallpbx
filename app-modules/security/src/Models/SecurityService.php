@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Modules\Security\Services\SecurityConfigGenerator;
 
 /**
  * Model representing a network service in the PBX Port Catalog.
@@ -27,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Collection<int, SecurityRule> $rules
+ * @property-read string $nftables_rule
  */
 class SecurityService extends Model
 {
@@ -178,5 +180,13 @@ class SecurityService extends Model
     public function getDefaultConfig(): ?array
     {
         return self::DEFAULT_SYSTEM_SERVICES[$this->name] ?? null;
+    }
+
+    /**
+     * Get the concise nftables match expression for this service (e.g. 'tcp dport { 80, 443 }').
+     */
+    public function getNftablesRuleAttribute(): string
+    {
+        return app(SecurityConfigGenerator::class)->formatServiceNftablesRule($this->protocol, $this->port_range);
     }
 }

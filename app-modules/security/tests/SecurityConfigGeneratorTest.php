@@ -503,3 +503,34 @@ it('changes canonical digest when permanent whitelist, blacklist, rules, service
     SecuritySetting::updateOrCreate(['key' => 'firewall_default_policy'], ['value' => 'drop']);
     expect($generator->canonicalDigest())->toBe($baselineDigest);
 });
+
+it('formats concise nftables match expressions for services and rules', function (): void {
+    $generator = new SecurityConfigGenerator;
+
+    expect($generator->formatServiceNftablesRule('tcp', '80,443'))->toBe('tcp dport { 80, 443 }')
+        ->and($generator->formatServiceNftablesRule('tcp', '22'))->toBe('tcp dport 22')
+        ->and($generator->formatServiceNftablesRule('udp', '16384-32768'))->toBe('udp dport 16384-32768')
+        ->and($generator->formatServiceNftablesRule('both', '5060,5061,5080'))->toBe('{ tcp, udp } dport { 5060, 5061, 5080 }')
+        ->and($generator->formatServiceNftablesRule('icmp', 'echo-request'))->toBe('icmp type echo-request')
+        ->and($generator->formatServiceNftablesRule('all', '8080'))->toBe('{ tcp, udp } dport 8080')
+        ->and($generator->formatServiceNftablesRule('all', ''))->toBe('meta l4proto { tcp, udp }')
+        ->and($generator->formatServiceNftablesRule('tcp', ''))->toBe('ip protocol tcp')
+        ->and($generator->formatServiceNftablesRule('udp', ''))->toBe('ip protocol udp');
+
+    $webService = SecurityService::where('name', 'Web Admin Portal')->first();
+    expect($webService->nftables_rule)->toBe('tcp dport { 80, 443 }');
+
+    $customRule = new SecurityRule([
+        'description' => 'Test rule',
+        'custom_protocol' => 'tcp',
+        'custom_port' => '8080',
+    ]);
+    expect($customRule->nftables_rule)->toBe('tcp dport 8080');
+
+    $linkedRule = new SecurityRule([
+        'description' => 'Linked rule',
+        'service_id' => $webService->id,
+    ]);
+    $linkedRule->setRelation('service', $webService);
+    expect($linkedRule->nftables_rule)->toBe('tcp dport { 80, 443 }');
+});

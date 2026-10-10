@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Modules\Security\Services\SecurityConfigGenerator;
 
 /**
  * Model representing a sequential host firewall filtering rule.
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read SecurityService|null $service
+ * @property-read string $nftables_rule
  */
 class SecurityRule extends Model
 {
@@ -95,5 +97,20 @@ class SecurityRule extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('enabled', true);
+    }
+
+    /**
+     * Get the concise nftables match expression for this rule (e.g. 'tcp dport 8080').
+     */
+    public function getNftablesRuleAttribute(): string
+    {
+        if ($this->service !== null) {
+            return $this->service->nftables_rule;
+        }
+
+        return app(SecurityConfigGenerator::class)->formatServiceNftablesRule(
+            $this->custom_protocol,
+            $this->custom_port
+        );
     }
 }

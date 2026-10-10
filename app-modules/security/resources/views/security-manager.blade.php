@@ -1037,9 +1037,9 @@
              checkScroll() {
                  const el = this.getContainer();
                  if (!el) return;
-                 this.hasOverflow = el.scrollWidth > (el.clientWidth + 2);
-                 this.canScrollLeft = el.scrollLeft > 4;
-                 this.canScrollRight = el.scrollLeft + el.clientWidth < (el.scrollWidth - 4);
+                 this.hasOverflow = el.scrollWidth > (el.clientWidth + 8);
+                 this.canScrollLeft = el.scrollLeft > 6;
+                 this.canScrollRight = el.scrollLeft + el.clientWidth < (el.scrollWidth - 6);
              },
              scrollLeft() {
                  const el = this.getContainer();
@@ -1108,7 +1108,7 @@
             </div>
 
             {{-- Table Scroller Area with Dynamic Floating Side Arrows --}}
-            <div class="relative group/scroller">
+            <div class="relative group/scroller" :style="`--arrow-top: ${arrowTop}px`">
                 {{-- Left Scroll Arrow (Floats dynamically at viewport center) --}}
                 <div x-show="hasOverflow && canScrollLeft && tableInViewport"
                      x-transition:enter="transition ease-out duration-200"
@@ -1118,7 +1118,7 @@
                      x-transition:leave-start="opacity-100 translate-x-0"
                      x-transition:leave-end="opacity-0 -translate-x-2"
                      x-cloak
-                     :style="`top: ${arrowTop}px`"
+                     style="top: var(--arrow-top, 40px);"
                      class="absolute left-2 z-20 -translate-y-1/2 pointer-events-auto">
                     <x-tooltip :tip="__('admin.security_table_scroll_left')" position="right" align="start">
                         <button id="tableScrollSideLeftBtn"
@@ -1140,7 +1140,7 @@
                      x-transition:leave-start="opacity-100 translate-x-0"
                      x-transition:leave-end="opacity-0 translate-x-2"
                      x-cloak
-                     :style="`top: ${arrowTop}px`"
+                     style="top: var(--arrow-top, 40px);"
                      class="absolute right-2 z-20 -translate-y-1/2 pointer-events-auto">
                     <x-tooltip :tip="__('admin.security_table_scroll_right')" position="left" align="start">
                         <button id="tableScrollSideRightBtn"
@@ -1158,16 +1158,16 @@
                      data-table-container
                      @scroll.passive="checkScroll()"
                      class="overflow-x-auto border border-base-200 rounded-box">
-                <table class="table">
+                <table class="table table-xs md:table-sm w-full">
                     <thead>
                         <tr class="bg-base-200/40 text-base-content/70">
-                            <th class="w-14 text-center">{{ __('client.status') }}</th>
-                            <th>{{ __('admin.security_rule_name') }}</th>
-                            <th class="w-24">{{ __('admin.security_protocol') }}</th>
-                            <th>{{ __('admin.security_port') }}</th>
-                            <th>{{ __('admin.security_source_ip') }}</th>
-                            <th>{{ __('admin.security_action') }}</th>
-                            <th class="text-right">{{ __('admin.actions') }}</th>
+                            <th class="w-10 text-center px-1">{{ __('client.status') }}</th>
+                            <th class="px-3">{{ __('admin.security_rule_name') }}</th>
+                            <th class="w-16 text-center px-1">{{ __('admin.security_protocol') }}</th>
+                            <th class="w-24 px-2">{{ __('admin.security_port') }}</th>
+                            <th class="w-28 px-2">{{ __('admin.security_source_ip') }}</th>
+                            <th class="w-16 text-center px-1">{{ __('admin.security_action') }}</th>
+                            <th class="w-20 text-right px-2">{{ __('admin.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200">
@@ -1196,9 +1196,9 @@
 
                                         <span wire:loading wire:target="setPrefilterEnabled" class="loading loading-spinner loading-xs text-primary"></span>
                                         <span wire:loading.remove wire:target="setPrefilterEnabled"
-                                              @click.stop
-                                              @mouseenter="suppressTitle = true"
-                                              @mouseleave="suppressTitle = false">
+                                               @click.stop
+                                               @mouseenter="suppressTitle = true"
+                                               @mouseleave="suppressTitle = false">
                                             <x-tooltip :tip="__('admin.security_toggle_prefilter_help')" align="start" position="right">
                                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                                             </x-tooltip>
@@ -1232,49 +1232,50 @@
                         @foreach ($preFilterRows as $preFilterRow)
                             <tr class="hover transition-opacity duration-200 {{ ! $prefilterEnabled ? 'opacity-40 bg-base-200/20' : ($preFilterRow['invariant'] ? 'bg-base-200/5' : '') }}"
                                 x-show="showSystemPreFilters" x-cloak>
-                                <td class="text-center">
+                                <td class="text-center px-1">
                                     <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ ! $prefilterEnabled ? 'bg-base-content/25' : $preFilterRow['status_class'] }} {{ ($prefilterEnabled && $preFilterRow['count_pulse']) ? 'animate-pulse' : '' }}" title="{{ $prefilterEnabled ? 'Active' : 'Disabled' }}"></span>
                                 </td>
-                                <td>
-                                    {{-- Fixed-width tracks keep the rule name, kernel badge and info icon aligned across every pre-filter row. --}}
+                                <td class="px-3">
                                     <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                        <span class="w-[17.25rem] shrink-0 {{ ! $prefilterEnabled ? 'text-base-content/70' : '' }}">{{ $preFilterRow['label'] }}</span>
-                                        <span class="w-56 shrink-0"><span class="badge badge-ghost badge-sm font-mono">{{ $preFilterRow['badge'] }}</span></span>
+                                        <span class="{{ ! $prefilterEnabled ? 'text-base-content/70' : '' }}">{{ $preFilterRow['label'] }}</span>
                                         @if ($preFilterRow['tooltip'])
                                             <x-tooltip :tip="$preFilterRow['tooltip']" align="start" position="right">
                                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                                             </x-tooltip>
                                         @endif
                                     </div>
+                                    <div class="mt-0.5">
+                                        <span class="badge badge-ghost badge-xs font-mono text-[11px] opacity-75" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
+                                    </div>
                                 </td>
-                                <td class="text-sm font-mono text-base-content/70">
+                                <td class="text-center text-xs font-mono font-semibold text-base-content/70 px-1.5">
                                     ALL
                                 </td>
-                                <td class="text-sm text-base-content/60">
+                                <td class="text-xs text-base-content/60 px-2">
                                     {{ __('admin.security_all_ports') }}
                                 </td>
-                                <td>
+                                <td class="px-2">
                                     @if ($preFilterRow['source_kind'] === 'static')
-                                        <span class="font-mono text-sm text-base-content/70">{{ $preFilterRow['source_static'] }}</span>
-                                        <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                                        <div class="font-mono text-xs text-base-content/70">{{ $preFilterRow['source_static'] }}</div>
+                                        <span class="badge badge-ghost badge-xs font-mono mt-0.5">{{ __('admin.security_dual_stack_badge') }}</span>
                                     @elseif ($preFilterRow['source_kind'] === 'anywhere')
-                                        <span class="font-mono text-sm text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
+                                        <span class="font-mono text-xs text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
                                         <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
                                     @else
-                                        <span class="font-mono text-sm {{ ! $prefilterEnabled ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
+                                        <span class="font-mono text-xs {{ ! $prefilterEnabled ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
                                             {{ $preFilterRow['count'] }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
                                         </span>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="text-center px-1.5">
                                     @if ($preFilterRow['action'] === 'allow')
                                         <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
                                     @else
                                         <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
                                     @endif
                                 </td>
-                                <td class="text-right whitespace-nowrap">
-                                    <div class="inline-flex items-center gap-1">
+                                <td class="text-right whitespace-nowrap px-2">
+                                    <div class="inline-flex items-center gap-1 justify-end">
                                         @if ($preFilterRow['pinned'])
                                             {{-- Pinned first: localhost IPC can never be filtered. --}}
                                             <x-tooltip :tip="__('admin.security_prefilter_locked_tooltip')" align="end" position="left">
@@ -1282,7 +1283,7 @@
                                                     <x-heroicon-o-lock-closed class="w-3.5 h-3.5" />
                                                 </span>
                                             </x-tooltip>
-                                            <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                                            <span class="badge badge-ghost badge-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
                                         @else
                                             <span class="flex flex-col">
                                                 <button wire:click="movePreFilterUp('{{ $preFilterRow['key'] }}')" type="button"
@@ -1297,15 +1298,17 @@
                                                 </button>
                                             </span>
                                             @if ($preFilterRow['invariant'])
-                                                <span class="badge badge-ghost badge-sm text-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                                                <span class="badge badge-ghost badge-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
                                             @endif
                                             @if ($preFilterRow['manage'])
-                                                <button wire:click="$set('activeTab', '{{ $preFilterRow['manage']['tab'] }}')" type="button"
-                                                        @disabled(! $prefilterEnabled)
-                                                        class="btn btn-ghost btn-xs gap-1 {{ ! $prefilterEnabled ? 'opacity-40 pointer-events-none' : $preFilterRow['manage']['class'] }}">
-                                                    <x-heroicon-o-arrow-up class="w-3.5 h-3.5" />
-                                                    <span>{{ $preFilterRow['manage']['label'] }}</span>
-                                                </button>
+                                                <x-tooltip :tip="$preFilterRow['manage']['label']" position="left">
+                                                    <button wire:click="$set('activeTab', '{{ $preFilterRow['manage']['tab'] }}')" type="button"
+                                                            @disabled(! $prefilterEnabled)
+                                                            aria-label="{{ $preFilterRow['manage']['label'] }}"
+                                                            class="btn btn-ghost btn-xs btn-square {{ ! $prefilterEnabled ? 'opacity-40 pointer-events-none' : $preFilterRow['manage']['class'] }}">
+                                                        <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                                                    </button>
+                                                </x-tooltip>
                                             @endif
                                         @endif
                                     </div>
@@ -1331,13 +1334,13 @@
                                 wire:key="sys-service-{{ $service->id }}"
                                 wire:loading.class="opacity-40 pointer-events-none"
                                 wire:target="toggleSystemService({{ $service->id }}), openEditSystemServiceModal({{ $service->id }})">
-                                <td class="text-center">
+                                <td class="text-center px-1">
                                     <input wire:click="toggleSystemService({{ $service->id }})" type="checkbox"
                                            class="toggle toggle-success toggle-sm"
                                            @checked($service->enabled)
                                            title="{{ $service->enabled ? __('client.enabled') : __('client.disabled') }}" />
                                 </td>
-                                <td>
+                                <td class="px-3">
                                     <div class="flex items-center gap-1.5 font-medium text-base-content">
                                         <span>{{ $service->name }}</span>
                                         @if ($service->description)
@@ -1350,21 +1353,21 @@
                                         {{-- Hardened TFTP Defense Profile: one shield badge for the
                                              office manager, expandable per-rule counters for the
                                              engineer (progressive depth). --}}
-                                        <div class="mt-1.5" x-data="{ tftpCountersOpen: false }">
-                                            <div class="flex items-center gap-2 flex-wrap">
+                                        <div class="mt-1" x-data="{ tftpCountersOpen: false }">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
                                                 <button type="button" @click="tftpCountersOpen = ! tftpCountersOpen"
-                                                        class="badge badge-warning badge-sm gap-1 cursor-pointer">
-                                                    <x-heroicon-o-shield-check class="w-3.5 h-3.5" />
+                                                        class="badge badge-warning badge-xs gap-1 cursor-pointer">
+                                                    <x-heroicon-o-shield-check class="w-3 h-3" />
                                                     <span>{{ __('admin.security_tftp_defense_label') }}</span>
-                                                    <x-heroicon-s-chevron-down class="w-3 h-3 transition-transform" x-bind:class="tftpCountersOpen ? 'rotate-180' : ''" />
+                                                    <x-heroicon-s-chevron-down class="w-2.5 h-2.5 transition-transform" x-bind:class="tftpCountersOpen ? 'rotate-180' : ''" />
                                                 </button>
                                                 <x-tooltip :tip="__('admin.security_tftp_defense_tooltip')" align="start" position="right">
                                                     <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/60 cursor-help" />
                                                 </x-tooltip>
-                                                <label class="label cursor-pointer gap-1.5 p-0">
+                                                <label class="label cursor-pointer gap-1 p-0">
                                                     <input wire:click="setTftpDefense({{ $tftpDefense['enabled'] ? 'false' : 'true' }})"
                                                            type="checkbox" class="toggle toggle-warning toggle-xs" @checked($tftpDefense['enabled']) />
-                                                    <span class="label-text text-xs">{{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}</span>
+                                                    <span class="label-text text-[11px]">{{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}</span>
                                                 </label>
                                             </div>
                                             <div x-show="tftpCountersOpen" x-cloak
@@ -1392,39 +1395,38 @@
                                         </div>
                                     @endif
                                 </td>
-                                <td class="font-mono text-sm font-semibold text-base-content/80">
+                                <td class="text-center font-mono text-xs font-semibold text-base-content/80 px-1.5">
                                     {{ $service->protocol === 'both' ? 'TCP/UDP' : strtoupper($service->protocol) }}
                                 </td>
-                                <td>
+                                <td class="px-2">
                                     @if ($service->protocol === 'icmp')
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="font-mono text-sm font-semibold text-base-content">echo-request</span>
+                                        <div>
+                                            <span class="font-mono text-xs font-semibold text-base-content">echo-request</span>
                                             @if ($service->rate_limit)
-                                                <span class="font-mono text-xs text-base-content/60 ml-1">{{ $service->rate_limit }}/s limit (burst {{ $service->burst ?? $service->rate_limit }})</span>
-                                            @else
-                                                <span class="font-mono text-xs text-base-content/60 ml-1">{{ __('admin.security_rate_limit_unlimited') }}</span>
+                                                <div class="font-mono text-[11px] text-base-content/60">
+                                                    {{ $service->rate_limit }}/s (burst {{ $service->burst ?? $service->rate_limit }})
+                                                </div>
                                             @endif
-                                            <span class="font-mono text-xs text-base-content/60 ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
                                         </div>
                                     @else
                                         <span class="font-mono text-sm font-semibold text-base-content">{{ $service->port_range }}</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="px-2">
                                     @if ($service->source_ip === 'any' || $service->source_ip === '0.0.0.0/0' || empty($service->source_ip))
-                                        <span class="badge badge-ghost badge-sm">{{ __('admin.security_source_anywhere') }}</span>
+                                        <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
                                     @else
-                                        <span class="font-mono text-sm text-primary font-medium">{{ $service->source_ip }}</span>
+                                        <span class="font-mono text-xs text-primary font-medium">{{ $service->source_ip }}</span>
                                     @endif
                                 </td>
-                                <td>
+                                <td class="text-center px-1.5">
                                     @if ($service->enabled)
                                         <span class="badge badge-success badge-sm">{{ __('admin.security_action_allow') }}</span>
                                     @else
                                         <span class="badge badge-ghost badge-sm">{{ __('client.disabled') }}</span>
                                     @endif
                                 </td>
-                                <td class="text-right whitespace-nowrap">
+                                <td class="text-right whitespace-nowrap px-2">
                                     <x-icon-button icon="heroicon-o-pencil-square" :label="__('admin.security_edit_service')" wire:click="openEditSystemServiceModal({{ $service->id }})" class="text-primary" />
                                 </td>
                             </tr>
@@ -1449,22 +1451,22 @@
                                 wire:loading.class="opacity-40 pointer-events-none"
                                 wire:target="toggleRule({{ $rule->id }}), moveRuleUp({{ $rule->id }}), moveRuleDown({{ $rule->id }}), openCustomRuleModal({{ $rule->id }}), deleteRule({{ $rule->id }})">
                                 {{-- Status Toggle --}}
-                                <td class="text-center">
+                                <td class="text-center px-1">
                                     <input wire:click="toggleRule({{ $rule->id }})" type="checkbox"
                                            class="toggle toggle-primary toggle-sm"
                                            @checked($rule->enabled) />
                                 </td>
 
                                 {{-- Rule Name / Description --}}
-                                <td class="font-medium text-base-content">
-                                    <div>{{ $rule->description }}</div>
+                                <td class="px-3">
+                                    <div class="font-medium text-base-content">{{ $rule->description }}</div>
                                     @if ($rule->service)
                                         <div class="text-xs text-base-content/60">{{ $rule->service->name }}</div>
                                     @endif
                                 </td>
 
                                 {{-- Protocol --}}
-                                <td class="font-mono text-sm font-semibold text-base-content/80">
+                                <td class="text-center font-mono text-xs font-semibold text-base-content/80 px-1.5">
                                     @if ($rule->service)
                                         {{ $rule->service->protocol === 'both' ? 'TCP/UDP' : strtoupper($rule->service->protocol) }}
                                     @else
@@ -1476,7 +1478,7 @@
                                 </td>
 
                                 {{-- Port --}}
-                                <td>
+                                <td class="px-2">
                                     @if ($rule->service)
                                         <span class="font-mono text-sm text-base-content/70 whitespace-nowrap">{{ $rule->service->port_range }}</span>
                                     @else
@@ -1485,16 +1487,16 @@
                                 </td>
 
                                 {{-- Source Network --}}
-                                <td>
+                                <td class="px-2">
                                     @if ($rule->source_ip === 'any' || $rule->source_ip === '0.0.0.0/0')
-                                        <span class="badge badge-ghost badge-sm">{{ __('admin.security_source_anywhere') }}</span>
+                                        <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
                                     @else
-                                        <span class="font-mono text-sm">{{ $rule->source_ip }}</span>
+                                        <span class="font-mono text-xs">{{ $rule->source_ip }}</span>
                                     @endif
                                 </td>
 
                                 {{-- Action Badge --}}
-                                <td>
+                                <td class="text-center px-1.5">
                                     @if ($rule->action === 'accept')
                                         <span class="badge badge-success badge-sm">{{ __('admin.security_action_allow') }}</span>
                                     @else
@@ -1503,9 +1505,8 @@
                                 </td>
 
                                 {{-- Reorder Arrows & Row Actions --}}
-                                <td class="text-right whitespace-nowrap">
-                                    {{-- items-center keeps the stacked arrow pair vertically centered against the single-row action icons --}}
-                                    <div class="inline-flex items-center gap-1">
+                                <td class="text-right whitespace-nowrap px-2">
+                                    <div class="inline-flex items-center gap-1 justify-end">
                                         <span class="flex flex-col">
                                             <button wire:click="moveRuleUp({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
                                                 <x-heroicon-s-chevron-up class="w-3 h-3" />
@@ -1545,25 +1546,23 @@
                         <tr class="hover"
                             wire:loading.class="opacity-40 pointer-events-none"
                             wire:target="saveDefaultPolicy">
-                            <td class="text-center">
+                            <td class="text-center px-1">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-base-content/40" title="Active"></span>
                             </td>
-                            <td>
-                                <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span>{{ __('admin.security_default_policy') }}</span>
-                                    <span class="badge badge-ghost badge-sm">{{ __('admin.security_unmatched_traffic') }}</span>
-                                </div>
+                            <td class="px-3">
+                                <div class="font-medium text-base-content">{{ __('admin.security_default_policy') }}</div>
+                                <div class="text-xs text-base-content/60">{{ __('admin.security_unmatched_traffic') }}</div>
                             </td>
-                            <td class="text-sm font-mono text-base-content/70">
+                            <td class="text-center text-xs font-mono text-base-content/70 px-1.5">
                                 ALL
                             </td>
-                            <td class="text-sm text-base-content/60">
-                                {{ __('admin.security_all_remaining_traffic') }}
+                            <td class="text-xs text-base-content/60 px-2">
+                                <span title="{{ __('admin.security_all_remaining_traffic') }}">{{ __('admin.security_all_ports') }}</span>
                             </td>
-                            <td>
-                                <span class="badge badge-ghost badge-sm">{{ __('admin.security_source_anywhere') }}</span>
+                            <td class="px-2">
+                                <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
                             </td>
-                            <td>
+                            <td class="text-center px-1.5">
                                 <span wire:loading.remove wire:target="saveDefaultPolicy">
                                     @if ($firewallDefaultPolicy === 'drop')
                                         <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
@@ -1576,7 +1575,7 @@
                                     <span class="badge badge-ghost badge-sm font-semibold text-base-content/60">{{ __('admin.saving') }}</span>
                                 </span>
                             </td>
-                            <td class="text-right whitespace-nowrap">
+                            <td class="text-right whitespace-nowrap px-2">
                                 <button wire:click="openDefaultPolicyForm"
                                         wire:loading.attr="disabled"
                                         wire:target="saveDefaultPolicy"

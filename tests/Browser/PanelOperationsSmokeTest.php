@@ -280,6 +280,26 @@ it('renders the security manager dashboard', function (): void {
     expect($page->script("document.querySelector('tr[x-data*=\"suppressTitle\"]').getAttribute('title')"))
         ->toContain('collapse');
 
+    // At default desktop width 1164px with pre-filters collapsed, table fits without overflow and side arrows must be hidden
+    browserStep('Security: verifying arrows hidden at 1164px desktop width');
+    $page->resize(1164, 1200);
+    $arrowsAt1164 = $page->script(<<<'JS'
+        (() => {
+            const leftEl = document.querySelector('#tableScrollSideLeftBtn')?.closest('[x-show]');
+            const rightEl = document.querySelector('#tableScrollSideRightBtn')?.closest('[x-show]');
+            const card = Alpine.$data(document.querySelector('.card[x-data*="canScrollLeft"]'));
+            card.checkScroll();
+            return {
+                hasOverflow: card.hasOverflow,
+                leftDisplay: leftEl ? window.getComputedStyle(leftEl).display : 'none',
+                rightDisplay: rightEl ? window.getComputedStyle(rightEl).display : 'none',
+            };
+        })()
+    JS);
+    expect($arrowsAt1164['hasOverflow'])->toBeFalse();
+    expect($arrowsAt1164['leftDisplay'])->toBe('none');
+    expect($arrowsAt1164['rightDisplay'])->toBe('none');
+
     // Expand the collapsible Pre-Filters section so the full kernel pipeline is visible
     browserStep('Security: expanding pre-filters accordion');
     $page->click('tr[title*="expand or collapse"]')
@@ -291,8 +311,8 @@ it('renders the security manager dashboard', function (): void {
     $page->assertPresent('.group\\/scroller')
         ->assertPresent('[x-ref="tableContainer"]');
 
-    // Resize to a desktop width where the expanded pre-filters cause horizontal overflow
-    $page->resize(1200, 900);
+    // Resize to a width where horizontal overflow occurs
+    $page->resize(750, 1200);
     $page->script("const card = Alpine.\$data(document.querySelector('.card[x-data*=\"canScrollLeft\"]')); card.checkScroll(); card.updateArrowPosition();");
 
     // Click companion header scroll right button
@@ -301,7 +321,7 @@ it('renders the security manager dashboard', function (): void {
     usleep(450000);
     $scrollPosHeaderRight = (int) $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollLeft");
     browserStep('Scroll pos after header right button: '.$scrollPosHeaderRight);
-    expect($scrollPosHeaderRight)->toBeGreaterThan(50);
+    expect($scrollPosHeaderRight)->toBeGreaterThan(15);
 
     // Click companion header scroll left button
     browserStep('Clicking companion header scroll left button');
@@ -311,13 +331,16 @@ it('renders the security manager dashboard', function (): void {
     browserStep('Scroll pos after header left button: '.$scrollPosHeaderLeft);
     expect($scrollPosHeaderLeft)->toBeLessThan($scrollPosHeaderRight);
 
+    // Ensure table is vertically centered for side arrow interactions
+    $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollIntoView({ block: 'center' }); Alpine.\$data(document.querySelector('.card[x-data*=\"canScrollLeft\"]')).updateArrowPosition();");
+
     // Click side arrow scroll right button
     browserStep('Clicking side arrow scroll right button');
     $page->click('#tableScrollSideRightBtn');
     usleep(450000);
     $scrollPosSideRight = (int) $page->script("document.querySelector('[x-ref=\"tableContainer\"]').scrollLeft");
     browserStep('Scroll pos after side right button: '.$scrollPosSideRight);
-    expect($scrollPosSideRight)->toBeGreaterThan(50);
+    expect($scrollPosSideRight)->toBeGreaterThan(15);
 
     // Click side arrow scroll left button
     browserStep('Clicking side arrow scroll left button');

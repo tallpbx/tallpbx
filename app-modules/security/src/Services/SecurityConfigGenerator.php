@@ -712,6 +712,33 @@ class SecurityConfigGenerator
     }
 
     /**
+     * Build the concise nftables match / selector expression for a service or rule.
+     *
+     * @param  string|null  $protocol  'tcp', 'udp', 'both', 'all', or 'icmp'
+     * @param  string|null  $portRaw  Raw port string (e.g. '80,443', '22', '16384-32768')
+     */
+    public function formatServiceNftablesRule(?string $protocol, ?string $portRaw = null): string
+    {
+        $proto = strtolower(trim((string) ($protocol ?? 'tcp')));
+        $portFormatted = $this->formatPortRange(trim((string) ($portRaw ?? '')));
+        $portSuffix = $portFormatted !== '' ? " dport {$portFormatted}" : '';
+
+        if ($proto === 'icmp') {
+            return 'icmp type echo-request';
+        }
+
+        if ($proto === 'both' || $proto === 'all') {
+            return $portSuffix !== '' ? "{ tcp, udp }{$portSuffix}" : 'meta l4proto { tcp, udp }';
+        }
+
+        if ($proto === 'udp') {
+            return $portSuffix !== '' ? "udp{$portSuffix}" : 'ip protocol udp';
+        }
+
+        return $portSuffix !== '' ? "tcp{$portSuffix}" : 'ip protocol tcp';
+    }
+
+    /**
      * Resolve the stored pre-filter order, validating it before use.
      *
      * A missing setting falls back to DEFAULT_PRE_FILTER_ORDER; a stored

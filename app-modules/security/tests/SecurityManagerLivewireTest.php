@@ -869,7 +869,9 @@ it('renders the unified firewall rules table with pipeline stages and core PBX s
         ->assertSee('SIP Signaling')
         ->assertSee('RTP Voice/Video Media')
         ->assertSee('Web Admin Portal')
-        ->assertSee('SSH Console');
+        ->assertSee('SSH Console')
+        ->assertSee('16384-32768')
+        ->assertSee('echo-request');
 });
 
 it('opens, edits, and saves a core PBX system service with custom port and source restrictions', function (): void {
