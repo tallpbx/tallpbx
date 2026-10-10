@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Banned IPs Firewall Location Explanation & CLI Inspection Hint**:
+  - Added clear UI descriptions and tooltips in the **Attackers** tab explaining exactly where banned IPs are stored in the firewall: the Linux kernel `nftables` table `inet tallpbx_filter` (chain `input`) dynamic sets `@banned_ips` (IPv4) and `@banned_ips6` (IPv6), dropping packets at wire speed before reaching any open port rules or PBX services.
+  - Added the `@banned_ips` badge to the **Blocked Attackers** card header and a terminal inspection hint (`sudo nft list set inet tallpbx_filter banned_ips`).
+  - Added explanatory guidance to the **Manual Ban Modal** and table empty state clarifying kernel dynamic set behavior.
+  - Added full translation parity across English, Spanish, and French.
+- **Firewall Rules CLI Inspection Hint**:
+  - Added a brief command hint beneath the description in the Security Center (`php artisan security:status`) for listing firewall rules from the Linux command line in the `/var/www/tallpbx` directory.
 - **Defensive Pre-Filters Disabled Warnings & Auditing State**:
   - Added an unmissable top-level warning banner in the Security Center displayed across all tabs whenever defensive pre-filters are disabled, clearly explaining that Whitelists, Blacklists, Attack Blocker bans, and Threat Feeds are bypassed in the active firewall ruleset, accompanied by a 1-click **"Turn pre-filters back on"** recovery button.
   - Added visual `Bypassed` badges and explanatory tooltips to the **Allow & Block Lists**, **Attackers**, and **Threat Feeds** tabs to eliminate any false sense of security while keeping the registries fully browsable for auditing and IP management.
@@ -15,7 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added a confirmation modal when toggling pre-filters off, summarizing the four defensive subsystems that will be bypassed before applying changes to the firewall.
   - Added full translation keys across English, Spanish, and French.
 
+### Fixed
+- **Hardened TFTP Defense Progress Animation & Click Locking**:
+  - Added an in-progress animation and double-submission protection to the **Hardened TFTP Defense** toggle on the TFTP Provisioning (UDP 69) service row in the Firewall Rules tab.
+  - While applying changes to the kernel firewall, the switch dims and locks pointer events (`opacity-70 pointer-events-none`), sets the disabled attribute, and displays an inline DaisyUI warning spinner alongside dynamic present continuous status text ("Enabling..." / "Disabling...") before transitioning back to the idle state.
+
 ### Changed
+- **Decoupled SIP Scanner Dialplan Call Rejection & Unified Firewall Blocking**:
+  - Re-architected `SipScannerDialplanContributor` so the FreeSWITCH dialplan acts purely as a passive sensor emitting `tallpbx::sip_scanner_detected` ESL events without sending `403 Forbidden` or hanging up on the channel. This prevents confirming PBX presence to automated reconnaissance scanners and leaves all packet blocking cleanly to `nftables` when enforcement is active.
+  - Renamed the enforcement switch in the Security Center to "Automatically block detected scanners in firewall" and introduced dynamic status helper text clearly distinguishing active firewall auto-blocking from passive monitor-only review.
+  - Aligned signature category badges with the master switch state: replaced the static red "Auto-ban on match" badge with dynamic badges that display "Known Scanners (Auto-Blocked in Firewall)" when the switch is ON and "Known Scanners (Monitored Only)" when the switch is OFF, eliminating contradictory "Auto-ban" visual alarms while monitoring.
+- **SIP Scanner Record-Only NAT Protection & Incident Workflow**:
+  - Removed the low-confidence sliding-window auto-escalation heuristic in `LogSipScannerListener` to prevent shared-NAT customer environments with multiple distinct devices or softphones from suffering false-positive firewall lockouts. Signatures in the "Record only" tier (such as `SIP Call`) are now strictly recorded without auto-banning.
+  - Clarified the Attackers tab UI: the **Detected Attack Probes (Unblocked)** card section is now permanently visible with an empty state when no probes have been recorded, the action button is clarified from "Add to Auto-Ban List" to **"Ban IP"**, and the explanatory helper text clearly states that recorded signatures appear for review without disrupting phone calls.
 - **Security Center Modular Decomposition**:
   - Modularized the oversized Security Center Livewire view (`security-manager.blade.php`), reducing the master template from 2,308 lines down to 87 lines by extracting modular cockpit partials (`partials/cockpit-banners`, `partials/firewall-switches`, `partials/status-overview-cards`), dedicated tab panels (`tabs/firewall-rules`, `tabs/block-allow`, `tabs/attackers`, `tabs/external-blocklists`), action modals (`modals/confirm-disable-prefilter`, `modals/custom-rule`, `modals/default-policy`, `modals/edit-system-service`, `modals/manual-ban`), and slide-over drawers (`drawers/observe-activity`, `drawers/protection-settings`).
   - Modularized the backend Livewire component (`SecurityManager.php`), reducing class size from 2,245 lines down to 497 lines by extracting 6 domain concerns into dedicated traits under `Modules\Security\Livewire\Concerns`: `ManagesPreFilters`, `ManagesAllowBlockLists`, `ManagesExternalBlocklists`, `ManagesObserveMode`, `ManagesAttackProtection`, and `ManagesFirewallRules`.

@@ -3,6 +3,7 @@
     <div class="modal modal-open">
         <div class="modal-box">
             <h3 class="font-bold text-lg text-base-content">{{ __('admin.security_manual_ban_title') }}</h3>
+            <p class="text-xs text-base-content/60 mt-1">{{ __('admin.security_manual_ban_desc') }}</p>
             <form wire:submit="manualBan" class="space-y-4 mt-4">
                 <div class="form-control">
                     <label class="label"><span class="label-text font-medium">{{ __('admin.security_attacker_ip') }}</span></label>

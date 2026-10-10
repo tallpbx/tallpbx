@@ -11,20 +11,21 @@ use Modules\Security\Support\SipScannerSignatures;
 /**
  * Contributes the early SIP scanner detection conditions to public contexts.
  *
- * The extension matches incoming requests against the curated signature
- * registry before any routing rule runs:
- *   - High-confidence matches (named scanners) are rejected with 403 and
- *     hung up, and emit a tallpbx::sip_scanner_detected event so the
- *     listener can enforce a kernel ban.
- *   - The low-confidence condition (a generic phrase legitimate softphones
- *     emit) only emits the event — it must never reject a real call.
+ * The extension acts purely as a sensor matching incoming requests against
+ * curated and custom signature registries before any routing rule runs,
+ * emitting a tallpbx::sip_scanner_detected event across ESL so the PHP
+ * listener can enforce a kernel firewall ban in nftables.
+ *
+ * It never sends 403 Forbidden or hangs up in the dialplan, avoiding scanner
+ * reconnaissance acknowledgment and leaving all packet blocking strictly to
+ * the Linux kernel firewall (nftables).
  *
  * The event always carries ${sip_network_ip}: the true socket peer address.
  * sip_from_host and sip_via_host are attacker-controlled and must never
  * feed the ban decision.
  *
- * Detection and recording are always on; the per-feature enforcement toggle
- * (which gates automatic bans) is evaluated later in PHP by the listener.
+ * Detection and recording are always active; the per-feature enforcement toggle
+ * (which gates automatic nftables bans) is evaluated in PHP by the listener.
  * Custom signatures are merged at render time and inherit the existing
  * dialplan contributor cache TTL — no extra cache plumbing.
  */
@@ -37,7 +38,7 @@ class SipScannerDialplanContributor implements ContextWideDialplanXmlContributor
 
     /**
      * Runs after emergency (10) and before call blocks (20) and every
-     * routing stage, so scanners are rejected before anything connects.
+     * routing stage, so scanners are detected before anything connects.
      */
     public function getDialplanPriority(): int
     {
@@ -68,14 +69,12 @@ class SipScannerDialplanContributor implements ContextWideDialplanXmlContributor
             $defaults['high'],
             $custom,
             'high',
-            withVerdict: true,
         );
 
         $xml .= $this->conditionsFor(
             $defaults['low'],
             [],
             'low',
-            withVerdict: false,
         );
 
         $xml .= "      </extension>\n";
@@ -89,9 +88,8 @@ class SipScannerDialplanContributor implements ContextWideDialplanXmlContributor
      * @param  array<int, array{field: string, pattern: string}>  $entries  Base entries for this tier
      * @param  array<int, string>  $extraPatterns  Additional high-confidence patterns (custom signatures)
      * @param  string  $confidence  'high' or 'low'
-     * @param  bool  $withVerdict  Whether the condition rejects the call (403 + hangup)
      */
-    private function conditionsFor(array $entries, array $extraPatterns, string $confidence, bool $withVerdict): string
+    private function conditionsFor(array $entries, array $extraPatterns, string $confidence): string
     {
         // Group the tier's patterns by field so a tier spanning two fields
         // renders one condition per field.
@@ -131,20 +129,9 @@ class SipScannerDialplanContributor implements ContextWideDialplanXmlContributor
             $expression = $this->escapeXml(SipScannerSignatures::escapedRegex($patterns));
 
             $xml .= "        <condition field=\"{$variableRef}\" expression=\"{$expression}\">\n";
-
-            if ($withVerdict) {
-                $xml .= "          <action application=\"set\" data=\"proto_security_violation=1\"/>\n";
-            }
-
             $xml .= '          <action application="event" data="Event-Name=CUSTOM,Event-Subclass='.self::EVENT_SUBCLASS
                 .",Scanner-Type={$scannerType},Scanner-Value={$variableRef},Scanner-Confidence={$confidence}"
                 .',Attacker-IP=${sip_network_ip}"/>'."\n";
-
-            if ($withVerdict) {
-                $xml .= "          <action application=\"respond\" data=\"403 Forbidden\"/>\n";
-                $xml .= "          <action application=\"hangup\"/>\n";
-            }
-
             $xml .= "        </condition>\n";
         }
 

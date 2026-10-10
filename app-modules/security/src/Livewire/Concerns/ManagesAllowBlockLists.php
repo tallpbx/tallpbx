@@ -9,6 +9,9 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Rules\ValidFirewallAddress;
 use Modules\Security\Services\LockoutGuardService;
 
+/**
+ * Livewire component concern for managing IP allow and block lists.
+ */
 trait ManagesAllowBlockLists
 {
     public string $newBlacklistIp = '';

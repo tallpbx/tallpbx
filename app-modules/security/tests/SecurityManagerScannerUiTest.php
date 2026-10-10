@@ -61,18 +61,20 @@ it('renders the scanner card with tier groups, the off-by-default toggle, durati
         ->assertSee(__('admin.security_scanner_title'))
         ->assertSee(__('admin.security_scanner_desc'))
         ->assertSet('sipScannerEnforcement', false)
-        // Both tier groups are visible with their curated members.
-        ->assertSee(__('admin.security_scanner_autoban_group'))
+        // Both tier groups are visible with their curated members (monitored by default).
+        ->assertSee(__('admin.security_scanner_high_group_monitored'))
         ->assertSee('friendly-scanner')
         ->assertSee('sipvicious')
         ->assertSee('sipcli')
         ->assertSee('Ozeki')
-        ->assertSee(__('admin.security_scanner_record_group'))
+        ->assertSee(__('admin.security_scanner_low_group'))
         ->assertSee('SIP Call')
         // Ban duration selector and the custom-signature input.
         ->assertSee(__('admin.security_scanner_duration_24h'))
         ->assertSee(__('admin.security_scanner_duration_permanent'))
-        ->assertSee(__('admin.security_scanner_add'));
+        ->assertSee(__('admin.security_scanner_add'))
+        ->assertSee(__('admin.security_scanner_incidents'))
+        ->assertSee(__('admin.security_scanner_incidents_empty'));
 });
 
 it('toggles enforcement, audits it, and never rewrites the firewall ruleset', function (): void {
@@ -80,7 +82,8 @@ it('toggles enforcement, audits it, and never rewrites the firewall ruleset', fu
         ->test(SecurityManager::class)
         ->set('activeTab', 'attackers')
         ->call('setSipScannerEnforcement', true)
-        ->assertSet('sipScannerEnforcement', true);
+        ->assertSet('sipScannerEnforcement', true)
+        ->assertSee(__('admin.security_scanner_high_group_active'));
 
     expect(SecuritySetting::getBoolean('sip_scanner_enforcement_enabled'))->toBeTrue();
     $this->assertDatabaseHas('security_audit_logs', ['action' => 'sip_scanner_enforcement_enabled']);
@@ -92,7 +95,8 @@ it('toggles enforcement, audits it, and never rewrites the firewall ruleset', fu
         ->test(SecurityManager::class)
         ->set('activeTab', 'attackers')
         ->call('setSipScannerEnforcement', false)
-        ->assertSet('sipScannerEnforcement', false);
+        ->assertSet('sipScannerEnforcement', false)
+        ->assertSee(__('admin.security_scanner_high_group_monitored'));
 
     expect(SecuritySetting::getBoolean('sip_scanner_enforcement_enabled'))->toBeFalse();
     $this->assertDatabaseHas('security_audit_logs', ['action' => 'sip_scanner_enforcement_disabled']);
@@ -213,7 +217,7 @@ it('lists detected-but-unblocked incidents and shows vector plus reason on banne
         ->test(SecurityManager::class)
         ->set('activeTab', 'attackers')
         ->assertSee(__('admin.security_scanner_incidents'))
-        ->assertSee(__('admin.security_scanner_add_to_ban'))
+        ->assertSee(__('admin.security_scanner_ban_ip'))
         // The detected incident is listed...
         ->assertSee('203.0.113.60')
         // ...and the enforced ban carries its vector label and reason.
@@ -263,6 +267,8 @@ it('ships every scanner label in English, Spanish, and French', function (): voi
         'security_scanner_desc',
         'security_scanner_enforcement',
         'security_scanner_enforcement_help',
+        'security_scanner_enforcement_help_on',
+        'security_scanner_enforcement_help_off',
         'security_scanner_duration',
         'security_scanner_duration_1h',
         'security_scanner_duration_24h',
@@ -271,6 +277,9 @@ it('ships every scanner label in English, Spanish, and French', function (): voi
         'security_scanner_duration_invalid',
         'security_scanner_autoban_group',
         'security_scanner_record_group',
+        'security_scanner_high_group_active',
+        'security_scanner_high_group_monitored',
+        'security_scanner_low_group',
         'security_scanner_custom',
         'security_scanner_custom_empty',
         'security_scanner_custom_help',
@@ -281,7 +290,9 @@ it('ships every scanner label in English, Spanish, and French', function (): voi
         'security_scanner_signature_removed',
         'security_scanner_incidents',
         'security_scanner_incidents_help',
+        'security_scanner_incidents_empty',
         'security_scanner_add_to_ban',
+        'security_scanner_ban_ip',
         'security_scanner_incident_banned',
         'security_scanner_incident_missing',
         'security_scanner_incident_refused',
@@ -289,10 +300,32 @@ it('ships every scanner label in English, Spanish, and French', function (): voi
         'security_vector_sip_scanner',
     ];
 
+    $bannedIpKeys = [
+        'security_banned_attackers_desc',
+        'security_banned_attackers_cli_hint',
+        'security_manual_ban_desc',
+        'security_no_attackers_help',
+    ];
+
+    $allRequired = array_merge($required, $bannedIpKeys);
+
     foreach (['en', 'es', 'fr'] as $locale) {
         $lines = require lang_path($locale.'/admin.php');
-        $missing = array_values(array_diff($required, array_keys($lines)));
+        $missing = array_values(array_diff($allRequired, array_keys($lines)));
 
         expect($missing)->toBe([], 'Missing keys in '.$locale.': '.implode(', ', $missing));
     }
+});
+
+it('explains in the UI where banned IPs are put in the firewall', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('activeTab', 'attackers')
+        ->assertSee(__('admin.security_banned_attackers_desc'))
+        ->assertSee(__('admin.security_banned_attackers_cli_hint'))
+        ->assertSee('sudo nft list set inet tallpbx_filter banned_ips')
+        ->assertSee('@banned_ips')
+        ->assertSee(__('admin.security_no_attackers_help'))
+        ->call('openManualBanModal')
+        ->assertSee(__('admin.security_manual_ban_desc'));
 });

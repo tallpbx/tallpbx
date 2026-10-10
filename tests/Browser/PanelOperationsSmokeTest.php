@@ -226,36 +226,13 @@ it('renders the security manager dashboard', function (): void {
 
     $this->loginAs($this->admin, 'admin');
 
-    // Tab 1 — Allow & Block Lists (the default): the allow/block workbenches
-    // under the page-global status strip.
-    browserStep('Security: Tab 1 (Allow & Block Lists)');
+    // Tab 1 — Firewall Rules (the default): the full kernel pipeline, the port catalog,
+    // and the custom sequential rules.
+    browserStep('Security: Tab 1 (Firewall Rules & Port Access)');
     $page = visit('/panel/security')->resize(1920, 2400);
     $page->assertSee('Security Center')
         ->assertSee('Firewall Status')
-        ->assertSee('Attack Protection')
-        ->assertSee('Blacklist')
-        ->assertSee('Whitelist')
-        ->assertSee('198.51.100.23')
-        ->assertSee('203.0.113.0/24')
-        ->assertSee('2001:db8:bad::/48')
-        ->assertSee('192.0.2.10')
-        ->assertSee('2001:db8:cafe::/64');
-
-    // Tab 2 — Attackers: the enforced bans with their vector and reason,
-    // plus the SIP scanner signatures card.
-    browserStep('Security: Tab 2 (Attackers & Bans)');
-    visit('/panel/security?tab=attackers')->resize(1920, 2400)
-        ->assertSee('Blocked Attackers')
-        ->assertSee('203.0.113.66')
-        ->assertSee('2001:db8:1234::88')
-        ->assertSee('Repeated failed SIP registrations')
-        ->assertSee('SIP Bot & Scanner Signatures');
-
-    // Tab 3 — Firewall Rules: the full kernel pipeline, the port catalog,
-    // and the custom sequential rules.
-    browserStep('Security: Tab 3 (Firewall Rules & Port Access)');
-    $page = visit('/panel/security?tab=firewall-rules')->resize(1920, 2400);
-    $page->assertSee('Carrier SIP trunk')
+        ->assertSee('Carrier SIP trunk')
         ->assertSee('Admin SSH from bastion')
         ->assertSee('Office PBX audio media')
         ->assertSee('Block RDP scanners')
@@ -264,6 +241,28 @@ it('renders the security manager dashboard', function (): void {
         ->assertSee('Default Inbound Policy')
         ->assertSee('ICMP Ping Diagnostics')
         ->assertSee('SIP Signaling');
+
+    // Tab 2 — Allow & Block Lists: the allow/block workbenches
+    // under the page-global status strip.
+    browserStep('Security: Tab 2 (Allow & Block Lists)');
+    visit('/panel/security?tab=block-allow')->resize(1920, 2400)
+        ->assertSee('Blacklist')
+        ->assertSee('Whitelist')
+        ->assertSee('198.51.100.23')
+        ->assertSee('203.0.113.0/24')
+        ->assertSee('2001:db8:bad::/48')
+        ->assertSee('192.0.2.10')
+        ->assertSee('2001:db8:cafe::/64');
+
+    // Tab 3 — Attackers: the enforced bans with their vector and reason,
+    // plus the SIP scanner signatures card.
+    browserStep('Security: Tab 3 (Attackers & Bans)');
+    visit('/panel/security?tab=attackers')->resize(1920, 2400)
+        ->assertSee('Blocked Attackers')
+        ->assertSee('203.0.113.66')
+        ->assertSee('2001:db8:1234::88')
+        ->assertSee('Repeated failed SIP registrations')
+        ->assertSee('SIP Bot & Scanner Signatures');
 
     // Verify pre-filter header title suppression when hovering over the tooltip icon
     browserStep('Security: verifying pre-filter tooltip hover title suppression');

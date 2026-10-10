@@ -14,6 +14,9 @@ use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 
+/**
+ * Livewire component concern for kernel defensive pre-filters and rate limiting.
+ */
 trait ManagesPreFilters
 {
     public bool $prefilterEnabled = true;

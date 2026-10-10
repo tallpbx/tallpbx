@@ -11,6 +11,9 @@ use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\LockoutGuardService;
 use Symfony\Component\HttpFoundation\IpUtils;
 
+/**
+ * Livewire component concern for managing packet filtering rules and port access.
+ */
 trait ManagesFirewallRules
 {
     public string $firewallDefaultPolicy = 'drop';

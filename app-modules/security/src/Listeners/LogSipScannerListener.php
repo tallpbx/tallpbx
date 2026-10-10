@@ -27,12 +27,12 @@ use Symfony\Component\HttpFoundation\IpUtils;
  *     enforcement toggle is on — through SecurityBanService (never the
  *     kernel executor directly), so the database row, the audit entry, the
  *     kernel set, and the conntrack flush stay consistent.
- *   - Low-confidence signatures are recorded and escalate to a ban only
- *     when two or more distinct signatures appear from the same address
- *     inside the configured window.
+ *   - Low-confidence signatures are strictly record-only (never auto-banned),
+ *     preventing shared NAT office environments with multiple distinct devices
+ *     from being accidentally banned.
  *   - While enforcement is off (the shipped record-only mode), every match
- *     is recorded as a non-enforcing incident row: the Attackers tab can
- *     surface it with an "Add to auto-ban list" action, and nothing is
+ *     is recorded as a non-enforcing incident row: the Attackers tab surfaces
+ *     it under "Detected Attack Probes" with a "Ban IP" action, and nothing is
  *     blocked.
  *
  * Safety nets: addresses that fail address validation are discarded
@@ -113,11 +113,11 @@ class LogSipScannerListener
             $confidence,
         );
 
-        // 4. Tier rules: high-confidence bans when enforcement is on; low
-        //    confidence escalates only on distinct signatures inside the window.
+        // 4. Tier rules: high-confidence signatures ban when enforcement is on.
+        //    Low-confidence signatures are strictly record-only to prevent
+        //    shared NAT networks with multiple devices from being banned.
         $enforcement = SipScannerSignatures::enforcementEnabled();
-        $shouldBan = $enforcement
-            && ($confidence === 'high' || $this->escalatesLowConfidence($ip, $value));
+        $shouldBan = $enforcement && $confidence === 'high';
 
         if ($shouldBan) {
             $seconds = SipScannerSignatures::banSeconds();
@@ -136,42 +136,6 @@ class LogSipScannerListener
         //    entry. Every enforcement consumer reads SecurityBan::active()
         //    only, so this row blocks nothing.
         $this->recordIncident($ip, $reason, $type, $value, $confidence);
-    }
-
-    /**
-     * Determine whether this low-confidence hit escalates to a ban.
-     *
-     * Tracks the distinct signature values seen for the address in a Redis
-     * set bounded by the configured window; two or more distinct values
-     * stop being generic. Redis failures degrade to "no escalation" — an
-     * outage must never take the whole listener down.
-     */
-    private function escalatesLowConfidence(string $ip, string $value): bool
-    {
-        $signature = mb_strtolower(trim($value));
-
-        if ($signature === '') {
-            return false;
-        }
-
-        try {
-            $key = "tallpbx:security:sip_scanner_low:{$ip}";
-
-            Redis::sadd($key, $signature);
-            Redis::expire($key, SipScannerSignatures::windowSeconds());
-
-            $distinct = (int) Redis::scard($key);
-
-            if ($distinct >= 2) {
-                Redis::del($key);
-
-                return true;
-            }
-        } catch (\Throwable $e) {
-            Log::warning("Failed to track low-confidence scanner signatures for {$ip}: {$e->getMessage()}");
-        }
-
-        return false;
     }
 
     /**

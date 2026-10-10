@@ -11,6 +11,9 @@ use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Support\ObserveMetricsParser;
 
+/**
+ * Livewire component concern for firewall observe mode and traffic telemetry.
+ */
 trait ManagesObserveMode
 {
     public bool $firewallObserveMode = false;

@@ -11,6 +11,9 @@ use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Services\ThreatFeedIngestionService;
 use Modules\Security\Services\ThreatFeedManager;
 
+/**
+ * Livewire component concern for managing external threat feed blocklists.
+ */
 trait ManagesExternalBlocklists
 {
     public bool $feedEnabled = true;

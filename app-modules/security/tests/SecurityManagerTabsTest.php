@@ -57,7 +57,10 @@ it('defaults to the Firewall Rules tab and renders every tab control', function 
         ->assertSee(__('admin.security_tab_threat_feeds'))
         // The page-global switch controls stay visible above the strip.
         ->assertSee(__('admin.security_toggle_firewall'))
-        ->assertSee(__('admin.security_toggle_observe'));
+        ->assertSee(__('admin.security_toggle_observe'))
+        ->assertSee(__('admin.security_firewall_rules_desc'))
+        ->assertSee(__('admin.security_firewall_rules_cli_hint'))
+        ->assertSee('php artisan security:status');
 });
 
 it('shows only the selected tab panel', function (): void {

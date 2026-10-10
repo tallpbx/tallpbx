@@ -25,6 +25,10 @@ use Modules\Security\Models\SecuritySetting;
  * kernel executor directly.
  */
 beforeEach(function (): void {
+    SecurityIpList::query()->delete();
+    SecurityBan::query()->delete();
+    SecurityAuditLog::query()->delete();
+
     $this->seed(SecurityServiceSeeder::class);
 
     $this->banService = Mockery::mock(SecurityBanServiceInterface::class);
@@ -43,11 +47,18 @@ afterEach(function (): void {
  */
 function clearLowSignatureKeys(): void
 {
+    $prefix = (string) config('database.redis.options.prefix', '');
+
     foreach (['tallpbx:security:sip_scanner_low:*', 'tallpbx:security:sip_scanner_audited:*'] as $pattern) {
         $keys = Redis::keys($pattern);
 
         if (! empty($keys)) {
-            Redis::del($keys);
+            $unprefixed = array_map(
+                static fn (string $key): string => str_starts_with($key, $prefix) ? substr($key, strlen($prefix)) : $key,
+                $keys
+            );
+
+            Redis::del($unprefixed);
         }
     }
 }
@@ -205,24 +216,20 @@ it('short-circuits when an active ban already exists for the address', function 
         ->and(SecurityAuditLog::where('ip_address', '203.0.113.14')->count())->toBe(0);
 });
 
-it('escalates two distinct low-confidence signatures within the window', function (): void {
+it('keeps low-confidence signatures record-only without auto-banning to protect shared NAT environments', function (): void {
     SecuritySetting::set('sip_scanner_enforcement_enabled', true);
     SecuritySetting::set('sip_scanner_ban_seconds', 86400);
 
-    // First low-confidence signature: recorded, never banned on its own.
+    // Low-confidence signatures are strictly record-only even with enforcement on,
+    // protecting shared NAT environments with multiple distinct devices.
+    $this->banService->shouldNotReceive('ban');
+
     event(scannerEvent('203.0.113.15', 'SIP Call', 'low'));
+    event(scannerEvent('203.0.113.15', 'Generic Softphone', 'low'));
 
     $incident = SecurityBan::where('ip_address', '203.0.113.15')->first();
     expect($incident)->not->toBeNull()
         ->and($incident->is_active)->toBeFalse();
-
-    // A second, distinct low-confidence signature within the window stops
-    // being generic: it escalates to a ban.
-    $this->banService->shouldReceive('ban')
-        ->once()
-        ->with('203.0.113.15', 'sip_scanner', Mockery::on(fn (string $reason): bool => str_contains($reason, 'Generic Softphone')), 86400);
-
-    event(scannerEvent('203.0.113.15', 'Generic Softphone', 'low'));
 });
 
 it('does not escalate a repeated identical low-confidence signature', function (): void {

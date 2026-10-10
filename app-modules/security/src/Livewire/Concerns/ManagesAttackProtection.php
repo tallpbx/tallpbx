@@ -15,6 +15,9 @@ use Modules\Security\Rules\ValidFirewallAddress;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Support\SipScannerSignatures;
 
+/**
+ * Livewire component concern for brute force protection, SIP scanners, and bans.
+ */
 trait ManagesAttackProtection
 {
     public int $maxRetry = 5;

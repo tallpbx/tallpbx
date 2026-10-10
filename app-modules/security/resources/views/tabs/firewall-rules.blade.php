@@ -107,6 +107,10 @@
                     </x-tooltip>
                 </div>
                 <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_firewall_rules_desc') }}</p>
+                <p class="text-xs text-base-content/60 mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span>{{ __('admin.security_firewall_rules_cli_hint') }}</span>
+                    <code class="px-1.5 py-0.5 rounded bg-base-200 text-xs font-mono select-all text-base-content">php artisan security:status</code>
+                </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 {{-- Companion Header Quick-Scroll Controls --}}
@@ -398,10 +402,20 @@
                                             <x-tooltip :tip="__('admin.security_tftp_defense_tooltip')" align="start" position="right">
                                                 <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/60 cursor-help" />
                                             </x-tooltip>
-                                            <label class="label cursor-pointer gap-1 p-0">
+                                            <label class="label cursor-pointer gap-1 p-0"
+                                                   wire:loading.class="opacity-70 pointer-events-none"
+                                                   wire:target="setTftpDefense">
                                                 <input wire:click="setTftpDefense({{ $tftpDefense['enabled'] ? 'false' : 'true' }})"
+                                                       wire:loading.attr="disabled"
+                                                       wire:target="setTftpDefense"
                                                        type="checkbox" class="toggle toggle-warning toggle-xs" @checked($tftpDefense['enabled']) />
-                                                <span class="label-text text-[11px]">{{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}</span>
+                                                <span wire:loading.remove wire:target="setTftpDefense" class="label-text text-[11px]">
+                                                    {{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}
+                                                </span>
+                                                <span wire:loading wire:target="setTftpDefense" class="inline-flex items-center gap-1 text-[11px] text-warning">
+                                                    <span class="loading loading-spinner loading-xs"></span>
+                                                    <span>{{ $tftpDefense['enabled'] ? __('admin.security_tftp_disabling') : __('admin.security_tftp_enabling') }}</span>
+                                                </span>
                                             </label>
                                         </div>
                                         <div x-show="tftpCountersOpen" x-cloak

@@ -62,6 +62,11 @@ it('renders the hardened tftp shield badge with live per-rule counters', functio
         ->assertSet('tftpDefenseEnabled', true)
         ->assertSee(__('admin.security_tftp_defense_label'))
         ->assertSee(__('admin.security_tftp_defense_tooltip'))
+        ->assertSeeHtml('wire:target="setTftpDefense"')
+        ->assertSeeHtml('wire:loading.attr="disabled"')
+        ->assertSeeHtml('wire:loading.class="opacity-70 pointer-events-none"')
+        ->assertSeeHtml('loading loading-spinner')
+        ->assertSee(__('admin.security_tftp_disabling'))
         // Per-rule counters: uploads, traversal, probes, and the flood sum.
         ->assertSee('4137')
         ->assertSee('7357')
@@ -130,6 +135,8 @@ it('ships every tftp defense label in English, Spanish, and French', function ()
         'security_tftp_counter_probes',
         'security_tftp_counter_flood',
         'security_tftp_defense_saved',
+        'security_tftp_enabling',
+        'security_tftp_disabling',
     ];
 
     foreach (['en', 'es', 'fr'] as $locale) {

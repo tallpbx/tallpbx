@@ -12,9 +12,9 @@ use Modules\Security\Support\SipScannerSignatures;
  * Feature tests for the SIP scanner detection dialplan contributor.
  *
  * The contributor renders the early public-context conditions that match
- * scanner signatures, emit the tallpbx::sip_scanner_detected event, and
- * reject high-confidence scanners — carrying the true socket peer address
- * and never a header-derived value.
+ * scanner signatures and emit the tallpbx::sip_scanner_detected event,
+ * carrying the true socket peer address and leaving all packet blocking to
+ * nftables.
  */
 beforeEach(function (): void {
     $this->seed(SecurityServiceSeeder::class);
@@ -42,23 +42,16 @@ it('runs before call blocks and emits detection for public contexts only', funct
         ->and($public)->toContain('Scanner-Confidence=low');
 });
 
-it('rejects high-confidence scanners and only records low-confidence matches', function (): void {
+it('emits detection events without responding or hanging up in the dialplan', function (): void {
     $xml = $this->contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
 
-    // Both high-confidence conditions respond 403 and hang up...
-    expect(substr_count($xml, 'application="respond"'))->toBe(2)
-        ->and(substr_count($xml, 'application="hangup"'))->toBe(2)
-        ->and($xml)->toContain('application="set" data="proto_security_violation=1"');
-
-    // ...while the low-confidence condition (a generic phrase legitimate
-    // softphones emit) must never reject the call: no respond, no hangup.
-    // Extract the block from the low condition's own opening tag onward.
-    $lowStart = (int) strpos($xml, 'expression="SIP Call"');
-    $lowBlock = substr($xml, $lowStart, (int) strpos($xml, '</condition>', $lowStart) - $lowStart);
-
-    expect($lowBlock)->not->toContain('application="respond"')
-        ->and($lowBlock)->not->toContain('application="hangup"')
-        ->and($lowBlock)->toContain('application="event"');
+    // The dialplan acts purely as a sensor: all conditions emit ESL events,
+    // and neither responds 403 nor hangs up (packet blocking is handled
+    // by nftables to avoid scanner reconnaissance acknowledgment).
+    expect($xml)->not->toContain('application="respond"')
+        ->and($xml)->not->toContain('application="hangup"')
+        ->and($xml)->not->toContain('proto_security_violation')
+        ->and(substr_count($xml, 'application="event"'))->toBe(3);
 });
 
 it('carries the socket peer address and never a header-derived address', function (): void {
