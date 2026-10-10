@@ -55,8 +55,15 @@ if [[ $HAS_TARGET -eq 0 ]]; then
     TARGET_DIR=("tests/Browser")
 fi
 
-# Clean up any lingering orphaned Playwright processes from previous runs before starting
-pkill -f "playwright run-server" 2>/dev/null || true
+# Clean up lingering Playwright processes on script exit or interruption
+cleanup() {
+    pkill -f "playwright run-server" 2>/dev/null || true
+    pkill -f "ms-playwright" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# Ensure a clean slate before starting
+cleanup
 
 # Enforce a maximum execution budget (default 360s, overridable via BROWSER_TEST_TIMEOUT)
 # to prevent tests from hanging silently on blocked sockets or deadlocks.
