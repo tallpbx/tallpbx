@@ -454,8 +454,9 @@ DaisyUI toast layer fixed to the top-right at `z-[9999]` — above any open dial
 
 ### Notes
 
-- Messages persist until the next action replaces them, the × is clicked, or `dismissFeedback()` runs — there is no auto-hide timer because DaisyUI ships CSS only.
-- Both Pattern 1 and Pattern 3 render `role="alert"` for accessibility.
+- Success and informational messages automatically dismiss after 5 seconds (`:timeout="5000"`) with pause-on-hover via an Alpine lifecycle controller. Warnings and errors remain persistent until manually dismissed or resolved so critical feedback is not missed.
+- Manual dismissal via the × button calls `HasOperationalFeedback::dismissFeedback()` and immediately hides the element client-side.
+- Both Pattern 1 and Pattern 3 render `role="alert"` / `role="status"` with appropriate `aria-live` semantics for accessibility.
 
 ## Standardized Action Progress Animation Architecture (Three Patterns)
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Operational Toast Auto-Dismiss & Countdown Progress Bar**:
+  - Enhanced the shared `<x-operational-toast>` component with severity-based auto-dismissal: success and informational toasts automatically dismiss after 5 seconds (`:timeout="5000"` default), while error and warning notifications remain persistent until manually dismissed.
+  - Added a slim 2px GPU-accelerated countdown progress bar (`toast-progress`) tracking along the bottom edge of auto-dismissing toasts.
+  - Implemented pause-on-hover and resume synchronization via Alpine.js and CSS `.toast-paused`, pausing the countdown timer and progress animation when hovered and resuming seamlessly on mouse leave.
+  - Added polite `aria-live` semantics for accessibility and automated feature component test coverage in `tests/Feature/Components/OperationalToastTest.php`.
+
 ## [3.0.5] - 2026-10-10
 
 ### Changed
