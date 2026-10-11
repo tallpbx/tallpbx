@@ -85,8 +85,8 @@ The host firewall evaluates incoming connections sequentially through a 12-stage
 
 ### Master Control Switches
 Three master operational switches pinned at the top of the Security Center control global behavior:
-- **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules.
-- **Built-in Pre-Filters Switch**: Enables or disables stages 1–7 as a single unit. Guarded against accidental lockout; the panel refuses changes that would sever loopback database and cache services.
+- **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules. In the web interface, the Zone 1 overview telemetry dashboard is greyed out and all tab navigation and panels are hidden until re-enabled.
+- **Built-in Pre-Filters Switch**: Located directly in the Pre-Filters section header of the Firewall Rules tab, enables or disables stages 1–7 as a single unit. When disabled, an unmissable warning banner appears across all tabs and entries are marked as bypassed. Guarded against accidental lockout; the panel refuses changes that would sever loopback database and cache services.
 - **Global Observe Mode**: Keeps all rules active and counting, but changes drop verdicts to log-only so you can test policies safely before enforcing them.
 
 For complete packet flow diagrams and kernel-level specifications, see [docs/security-architecture.md](security-architecture.md).
@@ -111,7 +111,7 @@ When Observe Mode is enabled, the ruleset compiler performs a dynamic transforma
 * **Observed Traffic Drawer**: Click **"View observed activity"** on the banner to open the dedicated activity drawer:
   * **Stage Summary Cards**: Live packet and byte counts grouped by rule stage (Banned Attackers, Permanent Blacklist, Threat Feeds, TFTP Exploit Defense, Invalid Packets, Custom Rules).
   * **Recent Observed Events**: A table displaying recent kernel packet log entries with timestamps, matching stage, interface, source IP, and destination port.
-* **Live In-Place Counters**: The TFTP Defense profile (Firewall Rules tab) and Public Threat Feeds card (Threat Feeds tab) continue counting observed matches in real time.
+* **Live In-Place Counters**: The TFTP Defense profile (Firewall Rules tab) and Public Threat Feeds card (External Blocklists tab) continue counting observed matches in real time.
 
 ##### In the CLI (`php artisan security:observe`)
 * **Inspect Summary & Recent Events**:

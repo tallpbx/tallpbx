@@ -1,5 +1,5 @@
 {{-- Lockout Warning Banner (if unprotected under drop policy) --}}
-@if (! $isCurrentIpWhitelisted && $firewallDefaultPolicy === 'drop')
+@if ($firewallEnabled && ! $isCurrentIpWhitelisted && $firewallDefaultPolicy === 'drop')
     <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
             <x-heroicon-o-exclamation-triangle class="w-6 h-6 text-warning flex-shrink-0" />
@@ -26,7 +26,7 @@
 @endif
 
 {{-- Firewall Drift Banner (the live kernel policy differs from the expected policy or ruleset content has drifted) --}}
-@if (($liveFirewallPolicy !== null && $liveFirewallPolicy !== $expectedFirewallPolicy) || $firewallSyncState === 'drift')
+@if ($firewallEnabled && (($liveFirewallPolicy !== null && $liveFirewallPolicy !== $expectedFirewallPolicy) || $firewallSyncState === 'drift'))
     <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
             <x-heroicon-o-arrow-path class="w-6 h-6 text-warning flex-shrink-0" />
@@ -53,7 +53,7 @@
                 class="btn btn-warning btn-sm whitespace-nowrap">
             <span wire:loading.remove wire:target="applyFirewallChanges" class="inline-flex items-center gap-1.5">
                 <x-heroicon-o-arrow-path class="w-4 h-4" />
-                <span>{{ __('admin.security_drift_reapply') }}</span>
+                <span>{{ __('admin.security_drift_reapplying') }}</span>
             </span>
             <span wire:loading wire:target="applyFirewallChanges" class="inline-flex items-center gap-1.5">
                 <span class="loading loading-spinner loading-xs"></span>
@@ -63,35 +63,8 @@
     </div>
 @endif
 
-{{-- Whole-Firewall-Off Banner (unmissable, shown on every tab while off) --}}
-@if (! $firewallEnabled)
-    <div class="alert alert-error shadow-sm border border-error/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-            <x-heroicon-o-fire class="w-6 h-6 text-error flex-shrink-0" />
-            <div>
-                <div class="font-semibold">{{ __('admin.security_firewall_off_banner_title') }}</div>
-                <div class="text-xs opacity-90">{{ __('admin.security_firewall_off_banner_body') }}</div>
-            </div>
-        </div>
-        <button wire:click="setFirewallEnabled(true)"
-                wire:loading.attr="disabled"
-                wire:target="setFirewallEnabled"
-                type="button"
-                class="btn btn-error btn-sm whitespace-nowrap">
-            <span wire:loading.remove wire:target="setFirewallEnabled" class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-shield-check class="w-4 h-4" />
-                <span>{{ __('admin.security_firewall_off_banner_action') }}</span>
-            </span>
-            <span wire:loading wire:target="setFirewallEnabled" class="inline-flex items-center gap-1.5">
-                <span class="loading loading-spinner loading-xs"></span>
-                <span>{{ __('admin.security_firewall_turning_on') }}</span>
-            </span>
-        </button>
-    </div>
-@endif
-
 {{-- Observe-Mode Banner (evaluating and recording, nothing is blocked) --}}
-@if ($firewallObserveMode)
+@if ($firewallEnabled && $firewallObserveMode)
     <div class="alert alert-warning shadow-sm border border-warning/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
             <x-heroicon-o-eye class="w-6 h-6 text-warning-content flex-shrink-0" />

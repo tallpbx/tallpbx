@@ -1,5 +1,5 @@
 {{-- Zone 1: System Status Overview Cards --}}
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 transition-opacity duration-200 {{ ! $firewallEnabled ? 'opacity-40 pointer-events-none select-none' : '' }}">
     {{-- Firewall Status --}}
     <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body p-4">

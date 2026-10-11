@@ -25,55 +25,57 @@
     @include('security::partials.firewall-switches')
 
     {{-- Security Center Tabs: Firewall Rules first as master cockpit, followed by address registries --}}
-    <div class="overflow-x-auto">
-        <div role="tablist" class="tabs tabs-lift tabs-sm">
-            <button role="tab" type="button" wire:click="$set('activeTab', 'firewall-rules')"
-                    class="tab gap-1.5 {{ $activeTab === 'firewall-rules' ? 'tab-active' : '' }}">
-                <x-heroicon-o-fire class="w-4 h-4" />
-                {{ __('admin.security_tab_firewall_rules') }}
-            </button>
-            <button role="tab" type="button" wire:click="$set('activeTab', 'block-allow')"
-                    class="tab gap-1.5 {{ $activeTab === 'block-allow' ? 'tab-active' : '' }}">
-                <x-heroicon-o-no-symbol class="w-4 h-4" />
-                <span>{{ __('admin.security_tab_block_allow') }}</span>
-                @if (! $prefilterEnabled)
-                    <x-tooltip :tip="__('admin.security_tab_prefilter_bypassed_tooltip')" position="bottom">
-                        <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
-                    </x-tooltip>
-                @endif
-            </button>
-            <button role="tab" type="button" wire:click="$set('activeTab', 'attackers')"
-                    class="tab gap-1.5 {{ $activeTab === 'attackers' ? 'tab-active' : '' }}">
-                <x-heroicon-o-shield-exclamation class="w-4 h-4" />
-                <span>{{ __('admin.security_tab_attackers') }}</span>
-                @if (! $prefilterEnabled)
-                    <x-tooltip :tip="__('admin.security_tab_prefilter_bypassed_tooltip')" position="bottom">
-                        <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
-                    </x-tooltip>
-                @endif
-            </button>
-            <button role="tab" type="button" wire:click="$set('activeTab', 'external-blocklists')"
-                    class="tab gap-1.5 {{ in_array($activeTab, ['external-blocklists', 'threat-feeds'], true) ? 'tab-active' : '' }}">
-                <x-heroicon-o-globe-alt class="w-4 h-4" />
-                <span>{{ __('admin.security_tab_external_blocklists') }}</span>
-                @if (! $prefilterEnabled)
-                    <x-tooltip :tip="__('admin.security_tab_prefilter_bypassed_tooltip')" position="bottom">
-                        <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
-                    </x-tooltip>
-                @endif
-            </button>
+    @if ($firewallEnabled)
+        <div class="overflow-x-auto">
+            <div role="tablist" class="tabs tabs-lift tabs-sm">
+                <button role="tab" type="button" wire:click="$set('activeTab', 'firewall-rules')"
+                        class="tab gap-1.5 {{ $activeTab === 'firewall-rules' ? 'tab-active' : '' }}">
+                    <x-heroicon-o-fire class="w-4 h-4" />
+                    {{ __('admin.security_tab_firewall_rules') }}
+                </button>
+                <button role="tab" type="button" wire:click="$set('activeTab', 'block-allow')"
+                        class="tab gap-1.5 {{ $activeTab === 'block-allow' ? 'tab-active' : '' }}">
+                    <x-heroicon-o-no-symbol class="w-4 h-4" />
+                    <span>{{ __('admin.security_tab_block_allow') }}</span>
+                    @if (! $prefilterEnabled)
+                        <x-tooltip :tip="__('admin.security_tab_prefilter_bypassed_tooltip')" position="bottom">
+                            <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
+                        </x-tooltip>
+                    @endif
+                </button>
+                <button role="tab" type="button" wire:click="$set('activeTab', 'attackers')"
+                        class="tab gap-1.5 {{ $activeTab === 'attackers' ? 'tab-active' : '' }}">
+                    <x-heroicon-o-shield-exclamation class="w-4 h-4" />
+                    <span>{{ __('admin.security_tab_attackers') }}</span>
+                    @if (! $prefilterEnabled)
+                        <x-tooltip :tip="__('admin.security_tab_prefilter_bypassed_tooltip')" position="bottom">
+                            <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
+                        </x-tooltip>
+                    @endif
+                </button>
+                <button role="tab" type="button" wire:click="$set('activeTab', 'external-blocklists')"
+                        class="tab gap-1.5 {{ in_array($activeTab, ['external-blocklists', 'threat-feeds'], true) ? 'tab-active' : '' }}">
+                    <x-heroicon-o-globe-alt class="w-4 h-4" />
+                    <span>{{ __('admin.security_tab_external_blocklists') }}</span>
+                    @if (! $prefilterEnabled)
+                        <x-tooltip :tip="__('admin.security_tab_prefilter_bypassed_tooltip')" position="bottom">
+                            <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
+                        </x-tooltip>
+                    @endif
+                </button>
+            </div>
         </div>
-    </div>
 
-    {{-- Tab Panels --}}
-    @if ($activeTab === 'firewall-rules')
-        @include('security::tabs.firewall-rules')
-    @elseif ($activeTab === 'block-allow')
-        @include('security::tabs.block-allow')
-    @elseif ($activeTab === 'attackers')
-        @include('security::tabs.attackers')
-    @elseif (in_array($activeTab, ['external-blocklists', 'threat-feeds'], true))
-        @include('security::tabs.external-blocklists')
+        {{-- Tab Panels --}}
+        @if ($activeTab === 'firewall-rules')
+            @include('security::tabs.firewall-rules')
+        @elseif ($activeTab === 'block-allow')
+            @include('security::tabs.block-allow')
+        @elseif ($activeTab === 'attackers')
+            @include('security::tabs.attackers')
+        @elseif (in_array($activeTab, ['external-blocklists', 'threat-feeds'], true))
+            @include('security::tabs.external-blocklists')
+        @endif
     @endif
 
     {{-- Drawers & Modals --}}

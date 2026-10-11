@@ -93,21 +93,29 @@ it('binds the active tab to the ?tab deep link', function (): void {
         ->assertSet('activeTab', 'threat-feeds');
 });
 
-it('shows the whole-firewall-off and observe banners with one-click recovery', function (): void {
+it('hides tabs and greys out the dashboard overview when firewall is disabled', function (): void {
     SecuritySetting::set('firewall_enabled', false);
-    SecuritySetting::set('firewall_observe_mode', true);
 
-    Livewire::actingAs($this->admin, 'admin')
-        ->test(SecurityManager::class)
-        ->assertSee(__('admin.security_firewall_off_banner_title'))
-        ->assertSee(__('admin.security_observe_banner_title'))
-        ->call('setFirewallEnabled', true)
-        ->call('setObserveMode', false)
+    $component = Livewire::actingAs($this->admin, 'admin')->test(SecurityManager::class);
+
+    // The whole-firewall-off banner is not shown
+    $component->assertDontSee(__('admin.security_firewall_off_banner_title'))
+        // Overview dashboard is greyed out
+        ->assertSee('opacity-40 pointer-events-none select-none', false)
+        // Tab navigation and tablist are completely hidden
+        ->assertDontSee('role="tablist"', false)
+        ->assertDontSee(__('admin.security_tab_firewall_rules'))
+        ->assertDontSee(__('admin.security_tab_block_allow'))
+        ->assertDontSee(__('admin.security_tab_external_blocklists'));
+
+    // Enabling via the switch restores tabs and dashboard
+    $component->call('setFirewallEnabled', true)
         ->assertSet('firewallEnabled', true)
-        ->assertSet('firewallObserveMode', false);
+        ->assertSee('role="tablist"', false)
+        ->assertSee(__('admin.security_tab_firewall_rules'))
+        ->assertSee(__('admin.security_tab_block_allow'));
 
-    expect(SecuritySetting::getBoolean('firewall_enabled', true))->toBeTrue()
-        ->and(SecuritySetting::getBoolean('firewall_observe_mode', false))->toBeFalse();
+    expect(SecuritySetting::getBoolean('firewall_enabled', true))->toBeTrue();
 });
 
 it('renders reorder controls on movable pre-filter rows and a lock on loopback', function (): void {

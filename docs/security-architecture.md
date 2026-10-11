@@ -205,42 +205,43 @@ The **Security Center** (`/panel/security`) provides an evaluation-ordered, four
 
 ### Master Operational Switches (Top Banner)
 Pinned directly above the tab strip for immediate visibility:
-1. **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules.
+1. **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules. In the web interface, turning off the firewall visually greys out the top telemetry dashboard and automatically hides all tab navigation and panels until re-enabled.
 2. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops to the kernel journal, but nothing is blocked (the default policy is forced to `accept`). A prominent amber banner displays across all Security Center tabs with live packet hit counters and a 1-click **"View Observed Activity"** drawer, supplemented by the `php artisan security:observe` CLI command.
 
 ---
 
-### The Four Evaluation-Ordered Tabs
+### The Four Security Center Tabs
 
-#### Tab 1: Allow & Block Lists (`?tab=lists`)
+#### Tab 1: Firewall Rules (`?tab=rules`)
+* **Pre-Filter Pipeline**: Interactive table showing the exact sequence of stages 1–7 with Up/Down reordering chevrons and a "Reset to recommended order" action:
+  - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
+  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
+* **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
+  - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
+  - **TFTP Provisioning Defense**: Hardened UDP 69 profile with shield badge showing real-time counters for blocked WRQ uploads, traversal attempts, and flood drops, featuring real-time progress animation and click locking.
+  - Core telephony services: SIP Signaling, RTP Audio Media, Web Admin, SSH, FreeSWITCH ESL, Reverb WebSockets, WebRTC.
+* **Custom Sequential Rules**: Custom port and network rules with priority reordering (Up/Down buttons). Viewport-sticky horizontal floating arrows and header quick-scroll buttons assist in navigation on wide viewports.
+* **Default Inbound Policy**: Final fallback decision (`Drop` or `Accept`).
+
+#### Tab 2: Allow & Block Lists (`?tab=lists`)
 * **Trusted Whitelist**: IP addresses and subnets exempt from all packet filtering (`@whitelist_ips` / `@whitelist_ips6`). Includes a 1-click self-protection button to automatically whitelist the current administrator's connection IP.
 * **Permanent Blacklist**: Forbidden IP addresses and CIDR subnets dropped at line rate via kernel interval trees (`@blacklist_ips` / `@blacklist_ips6`). Features CIDR mask validation and instant search.
 
-#### Tab 2: Attackers (`?tab=attackers`)
-* **Active Intrusion Bans Table**: Real-time display of currently banned IPs, remaining hardware countdown timers, entry points / attack types (`SIP`, `Web`, `SSH`, `SIP Scanner`), and 1-click unban buttons.
+#### Tab 3: Attackers (`?tab=attackers`)
+* **Active Intrusion Bans Table**: Real-time display of currently banned IPs in the kernel dynamic sets (`@banned_ips` / `@banned_ips6`), remaining hardware countdown timers, entry points / attack types (`SIP`, `Web`, `SSH`, `SIP Scanner`), and 1-click unban buttons.
 * **SIP Bot & Scanner Signatures Card**:
-  - **Instant Kernel Ban Toggle**: When turned on, detected SIP scanners are banned in the kernel immediately. (Ships off by default: scanners are blocked with 403 hangup and recorded without an IP ban).
+  - **Auto-Block Detected Scanners in Firewall Toggle**: When enabled, detected SIP scanners are banned in the kernel immediately. The FreeSWITCH dialplan acts as a passive sensor emitting ESL events without confirming PBX presence via 403 hangup, leaving all packet drops to `nftables`.
   - **Ban Duration Selector**: 1 hour, 24 hours, 7 days, or permanent.
   - **Curated Signature Registry**: Base list of known automated tools (`sipvicious`, `friendly-scanner`, `VaxSIPUserAgent`, `sipcli`, `Ozeki`).
   - **Custom Signatures**: Add custom user-agent string matches.
+* **Detected Attack Probes (Unblocked)**: Review unblocked or monitored probes without disrupting active calls, with 1-click manual IP banning.
 * **Incident History & Audit Trail**: Real-time log of security events and threshold triggers.
 
-#### Tab 3: Threat Feeds (`?tab=feeds`)
+#### Tab 4: External Blocklists (`?tab=blocklists` or `?tab=feeds`)
 * **Public Threat Feeds (VoIPBL)**: Automated ingestion of public blocklists identifying active VoIP fraud and brute-force scanning networks.
 * **Fail-Open Contract**: Feed downloads are memory-bounded and stream-parsed. If a download fails or is malformed, existing kernel entries remain untouched so the server is never left unprotected.
 * **Country Filter**: Filter feed blocks to specific geographic regions or exclude your domestic operating countries.
 * **Drop Counters & Emergency Escape**: Live per-feed kernel drop counters, on-demand "Sync Now" action, and a prominent "Remove all feed blocks" button in case of upstream false positives.
-
-#### Tab 4: Firewall Rules (`?tab=rules`)
-* **Pre-Filter Pipeline**: Interactive table showing the exact sequence of stages 1–7 with Up/Down reordering chevrons and a "Reset to recommended order" action:
-  - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, the section is greyed out. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
-  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
-* **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
-  - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
-  - **TFTP Provisioning Defense**: Hardened UDP 69 profile with shield badge showing real-time counters for blocked WRQ uploads, traversal attempts, and flood drops.
-  - Core telephony services: SIP Signaling, RTP Audio Media, Web Admin, SSH, FreeSWITCH ESL, Reverb WebSockets, WebRTC.
-* **Custom Sequential Rules**: Custom port and network rules with priority reordering (Up/Down buttons).
-* **Default Inbound Policy**: Final fallback decision (`Drop` or `Accept`).
 
 ---
 
@@ -278,10 +279,10 @@ TallPBX features distinct layers of security designed for different parts of the
 | Security Component | Layer | Technology | Primary Purpose | Example |
 | :--- | :--- | :--- | :--- | :--- |
 | **Host Firewall** | Network / Kernel (OS) | Linux `nftables` | Blocks unwanted network packets before they reach any service. Protects the entire operating system. | Dropping brute-force bots, restricting SSH to management IPs, blocking unauthorized SIP traffic. |
-| **Threat Feeds** | Network / Kernel (OS) | VoIPBL + `nftables` | Proactively drops known fraud and scanner IP networks at the kernel boundary. | Dropping traffic from distributed VoIP attack botnets before packets hit FreeSWITCH. |
+| **External Blocklists** | Network / Kernel (OS) | VoIPBL + `nftables` | Proactively drops known fraud and scanner IP networks at the kernel boundary. | Dropping traffic from distributed VoIP attack botnets before packets hit FreeSWITCH. |
 | **TFTP Defense** | Network / Kernel (OS) | Linux `nftables` deep packet match | Drops write uploads (WRQ), traversal (`../`), and scan probes (`/x`) on UDP 69 before port accept. | Preventing attackers from uploading malicious configs or scanning phone provisioning files. |
 | **Attack Protection** | In-Process Intrusion Defense | Redis + Reverb + `nftables` | Tracks authentication failures across SIP, Web login, and SSH, automatically banning offenders in kernel RAM. | Automatically blocking an IP for 24 hours after 5 failed phone registrations or admin passwords. |
-| **SIP Scanner Filter** | Telephony (FreeSWITCH) | Dialplan signature matching | Curated pattern matching in public context; hangs up with 403 and severs live conntrack sessions. | Detecting `friendly-scanner` or `sipvicious` probes and terminating existing active calls. |
+| **SIP Scanner Filter** | Telephony (FreeSWITCH) + `nftables` | Dialplan sensor + kernel firewall | Passive signature detection in public dialplan context; emits ESL events without confirming PBX presence via 403, and auto-blocks offending IPs in kernel `nftables` with conntrack termination when enabled. | Detecting `friendly-scanner` or `sipvicious` probes and dropping packets at the kernel boundary without confirming active SIP service. |
 | **Access Control Lists (ACL)** | Telephony Engine (FreeSWITCH) | FreeSWITCH `mod_sofia` ACLs | Authorizes which trusted IP subnets or devices are allowed to register SIP extensions or connect carriers inside the phone engine. | Allowing SIP carriers (e.g. Twilio, Telnyx) to deliver calls without SIP password challenges. |
 | **Event Rate Limits (Telephony)** | Application (TallPBX ESL Listener) | TallPBX `event-rate-limits` module | Caps how many FreeSWITCH events a single source can send per minute and per burst, protecting the PBX from event storms. | Blocking a misconfigured device that floods the system with repeated registration or DTMF events. |
 

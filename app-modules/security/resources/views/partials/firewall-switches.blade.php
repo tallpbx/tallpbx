@@ -20,12 +20,13 @@
             </label>
 
             {{-- Global observe mode --}}
-            <label class="flex items-center gap-2 cursor-pointer"
+            <label class="flex items-center gap-2 cursor-pointer {{ ! $firewallEnabled ? 'opacity-40 pointer-events-none select-none' : '' }}"
                    wire:loading.class="opacity-70 pointer-events-none"
                    wire:target="setObserveMode">
                 <input wire:click="setObserveMode({{ $firewallObserveMode ? 'false' : 'true' }})"
                        wire:loading.attr="disabled"
                        wire:target="setObserveMode"
+                       @disabled(! $firewallEnabled)
                        type="checkbox" class="toggle toggle-warning toggle-sm" @checked($firewallObserveMode) />
                 <span class="text-sm font-medium">{{ __('admin.security_toggle_observe') }}</span>
                 <span wire:loading wire:target="setObserveMode" class="loading loading-spinner loading-xs text-warning"></span>

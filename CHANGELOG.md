@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.5] - 2026-10-10
+
 ### Added
 - **Banned IPs Firewall Location Explanation & CLI Inspection Hint**:
   - Added clear UI descriptions and tooltips in the **Attackers** tab explaining exactly where banned IPs are stored in the firewall: the Linux kernel `nftables` table `inet tallpbx_filter` (chain `input`) dynamic sets `@banned_ips` (IPv4) and `@banned_ips6` (IPv6), dropping packets at wire speed before reaching any open port rules or PBX services.
@@ -28,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - While applying changes to the kernel firewall, the switch dims and locks pointer events (`opacity-70 pointer-events-none`), sets the disabled attribute, and displays an inline DaisyUI warning spinner alongside dynamic present continuous status text ("Enabling..." / "Disabling...") before transitioning back to the idle state.
 
 ### Changed
+- **Security Center Firewall Disabled State & Layout**:
+  - Streamlined the Security Center interface when the host firewall is turned off:
+    - Automatically hides all tab navigation and tab panels (**Firewall Rules**, **Allow & Block Lists**, **Attackers**, and **External Blocklists**) while the firewall is disabled.
+    - Visually greys out and locks the Zone 1 overview telemetry dashboard (`opacity-40 pointer-events-none select-none`) above the firewall enable/disable switch.
+    - Disables the Observe Mode toggle when the host firewall is off.
+    - Removed the redundant red whole-firewall-off notification banner, letting the greyed-out dashboard and primary switch cleanly convey the disarmed state.
 - **Decoupled SIP Scanner Dialplan Call Rejection & Unified Firewall Blocking**:
   - Re-architected `SipScannerDialplanContributor` so the FreeSWITCH dialplan acts purely as a passive sensor emitting `tallpbx::sip_scanner_detected` ESL events without sending `403 Forbidden` or hanging up on the channel. This prevents confirming PBX presence to automated reconnaissance scanners and leaves all packet blocking cleanly to `nftables` when enforcement is active.
   - Renamed the enforcement switch in the Security Center to "Automatically block detected scanners in firewall" and introduced dynamic status helper text clearly distinguishing active firewall auto-blocking from passive monitor-only review.
@@ -44,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Security Center Default Tab & Navigation Order**:
   - Reordered the Security Center tabs so **Firewall Rules** is positioned as Tab #1 on the far left and opens as the default active tab on `/panel/security`.
   - Positions the master firewall ruleset, port access list, and pre-filter pipeline at the forefront of the administrator workflow, while keeping supporting address registries (Allow & Block Lists, Attackers, Threat Feeds) immediately adjacent.
+- **Documentation Parity & Automated Test Count Synchronization**:
+  - Synchronized documentation across `README.md`, `docs/parity-comparison.md`, `docs/security-architecture.md`, `docs/ui-tour.md`, and `docs/operations.md` to reflect recent Security Center enhancements (Firewall Rules as Tab #1, External Blocklists terminology, decoupled SIP scanner sensor, disarmed firewall UI state, pre-filter confirmation modals, and recovery banners).
+  - Updated automated test suite counts to 2,700+ Pest tests across `README.md` and `docs/parity-comparison.md`.
 
 ## [3.0.4] - 2026-10-09
 
