@@ -60,6 +60,7 @@ class MakeModuleCommand extends Command
         $this->createComposerJson($moduleDir, $name, $namespace);
         $this->createServiceProvider($moduleDir, $namespace, $name);
         $this->createStubView($moduleDir, $name);
+        $this->createLanguageFiles($moduleDir, $name, $displayName);
 
         $this->components->info("Module [{$name}] scaffolded successfully at [{$moduleDir}].");
 
@@ -72,7 +73,7 @@ class MakeModuleCommand extends Command
             'resources/views/   — Livewire view directory',
             'tests/             — Pest tests discovered by the host suite',
             'database/migrations/ — module migrations',
-            'lang/en/           — translation files',
+            'lang/{en,es,fr}/   — translation files with collision prevention header',
             'config/            — module config merged over centralized defaults',
         ]);
 
@@ -93,6 +94,8 @@ class MakeModuleCommand extends Command
         mkdir("{$moduleDir}/resources/views", 0755, true);
         mkdir("{$moduleDir}/database/migrations", 0755, true);
         mkdir("{$moduleDir}/lang/en", 0755, true);
+        mkdir("{$moduleDir}/lang/es", 0755, true);
+        mkdir("{$moduleDir}/lang/fr", 0755, true);
         mkdir("{$moduleDir}/config", 0755, true);
         mkdir("{$moduleDir}/tests", 0755, true);
     }
@@ -227,5 +230,45 @@ PHP;
 HTML;
 
         file_put_contents("{$moduleDir}/resources/views/index.blade.php", $content);
+    }
+
+    /**
+     * Create stub translation files for en, es, and fr with collision prevention docblock.
+     */
+    private function createLanguageFiles(string $moduleDir, string $name, string $displayName): void
+    {
+        $entityPrefix = str_replace('-', '_', $name);
+        $content = <<<PHP
+<?php
+
+/**
+ * --------------------------------------------------------------------------
+ * Module Language Lines: {$displayName} ({$name})
+ * --------------------------------------------------------------------------
+ *
+ * COLLISION PREVENTION & KEY NAMING RULES:
+ * Under TallPBX's multi-path cascading translation architecture, module
+ * language files merge directly into the global group dictionary (e.g. 'admin')
+ * at runtime.
+ *
+ * To prevent collisions across modules or with the root dictionary:
+ * 1. Every key defined in this file MUST include the module/entity name
+ *    (e.g. '{$entityPrefix}_*', 'create_{$entityPrefix}', 'no_{$entityPrefix}_found').
+ * 2. Generic keys (e.g. 'save', 'cancel', 'delete', 'edit', 'enabled', 'disabled',
+ *    'status', 'actions') belong strictly in root lang/{locale}/admin.php and
+ *    must NEVER be defined in module language files.
+ * 3. Module language files will be rejected at runtime by ModuleServiceProvider
+ *    if any collision with root language keys is detected.
+ */
+
+return [
+    //
+];
+
+PHP;
+
+        foreach (['en', 'es', 'fr'] as $locale) {
+            file_put_contents("{$moduleDir}/lang/{$locale}/admin.php", $content);
+        }
     }
 }

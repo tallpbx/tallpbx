@@ -112,4 +112,13 @@ it('scaffolds modules using current TallPBX conventions', function () {
         ->and($provider)->toContain("return 'Modules\\NativeCommandTest';")
         ->and($stubView)->toContain('<x-inline-alert :type="$operationalMessageType ?? \'info\'">')
         ->and($stubView)->toContain('@if (($operationalMessage ?? null) !== null)');
+
+    foreach (['en', 'es', 'fr'] as $locale) {
+        $langFile = $modulePath."/lang/{$locale}/admin.php";
+        expect($langFile)->toBeFile();
+        $langContent = (string) file_get_contents($langFile);
+        expect($langContent)->toContain('COLLISION PREVENTION & KEY NAMING RULES:')
+            ->and($langContent)->toContain('native_command_test')
+            ->and($langContent)->toContain('Module language files will be rejected at runtime by ModuleServiceProvider');
+    }
 });

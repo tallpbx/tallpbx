@@ -1,33 +1,36 @@
 # Implementation Plan: Modular Translation Architecture (`app-modules/*/lang`)
 
-**Document Version:** 2.0  
+**Document Version:** 3.1  
 **Target Branch:** `3.x`  
-**Scope:** All 60 modules in `app-modules/` and root `lang/{locale}/`  
-**Primary Goal:** Relocate module-specific administrative and client translations out of the monolithic root `lang/{en,es,fr}/admin.php` and `client.php` into standardized, encapsulated module directories (`app-modules/{module}/lang/{locale}/admin.php`).
+**Architecture:** Option A — Native Path Cascading (`FileLoader::addPath`) with Automated Collision Prevention & Runtime Guard  
+**Scope:** Modules in `app-modules/` and root `lang/{locale}/`  
+**Primary Goal:** Relocate module-specific administrative and client translations out of the monolithic root `lang/{en,es,fr}/admin.php` and `client.php` into encapsulated module directories (`app-modules/{module}/lang/{locale}/admin.php`) using Laravel's native multi-path cascading loader, with **zero changes to UI presentation, zero changes to button identifiers, zero template rewrites, and strict collision prevention**.
 
 ---
 
-## 1. Executive Summary & Problem Statement
+## 1. Executive Summary & Core Invariants
 
-Currently, TallPBX houses 1,494 translation keys inside monolithic global files per language:
-- `lang/en/admin.php` (1,494 keys, 1,661 lines)
-- `lang/es/admin.php` (1,473 keys, 1,549 lines — 21 keys missing from English)
-- `lang/fr/admin.php` (1,473 keys, 1,548 lines — 21 keys missing from English)
-- `lang/{en,es,fr}/client.php` (~129 lines)
+### 1.1 Non-Negotiable Core Invariants
+1. **Zero UI Changes:** Absolutely **nothing** changes in how language is presented in the user interface. If a button in the gateways module previously said "Save" or "Delete", it continues to say that in English, Spanish, and French.
+2. **Identifier & Call Site Stability:** Button identifiers, translation keys, and view call sites are **never** renamed or modified. If a view calls `__('admin.gateway_host_tooltip')` or `__('admin.save')`, that call site remains untouched.
+3. **Mandatory Module Name in Keys (Collision Prevention):** Every key defined in a module language file **must** include the module/entity name (e.g. `gateway_host_tooltip`, `no_gateways_found`, `modal_delete_gateway_title`, `sip_trunk_port`). We do **not** strip prefixes into generic words like `host`, `title`, or `create`.
+4. **Global Generic Integrity:** Generic actions (`save`, `delete`, `cancel`, `edit`, `create`, `enabled`, `disabled`, `actions`, `status`) and shell navigation menu labels in `ModuleServiceProvider` remain in the root `lang/{locale}/admin.php` dictionary.
+5. **Runtime Collision Guard:** `ModuleServiceProvider` actively inspects module language files upon boot and **refuses to load** any module language file that collides with keys in the root global dictionary.
+6. **Mandatory File Header Comment:** Every module language file and newly scaffolded module language file must include a standardized header comment explaining the cascading collision rule and key-naming requirements.
+7. **Complete Locale Parity:** All keys extracted to module language files must exist in all shipped locales (`en`, `es`, `fr`) with 100% key parity.
 
-### Core Architectural Problems
-1. **Breaks Module Encapsulation**: A self-contained module (e.g. `security`, `extensions`, `gateways`) cannot be inspected, maintained, or tested in isolation because its user-facing copy is scattered across massive global files.
-2. **Developer & AI Agent Overhead**: Modifying, adding, or reviewing even a single UI button or status notice requires reading and editing three 1,600-line global files. This consumes tens of thousands of unnecessary context tokens, slows down tooling, and causes merge conflicts.
-3. **Rigid Key Prefixes**: Keys in the root file are prefixed with module names (e.g. `security_threat_feeds_title`, `extensions_create_button`) to prevent collisions in the shared namespace.
-4. **Locale Drift**: Because translations live in massive monolithic files, locale drift has accumulated: 21 keys currently exist in English that were never added to Spanish or French.
-5. **No Transitional Shims on `3.x`**: In accordance with the repository's `AGENTS.md` guidelines (*"No Backwards Compatibility for Unreleased Series Branches"*), the migration must not introduce runtime fallback engines, legacy translation bridges, or dual-lookup shims. Migrations must be atomic per module: key extractions and template call-site updates land together in clean commits.
+### 1.2 Core Architectural Benefits of Option A
+- **Zero Template Churn:** Not a single Blade view or Livewire component needs to be rewritten.
+- **Physical Module Encapsulation:** Module-specific keys physically move into `app-modules/{module}/lang/{en,es,fr}/admin.php`.
+- **100% Native Laravel 13:** Leverages `Illuminate\Translation\FileLoader::addPath()`. Laravel natively merges module paths over root dictionaries via `array_replace_recursive()`.
+- **Works in All Contexts:** Operates seamlessly across Blade views, Livewire components, Form Requests, Eloquent models, Artisan commands, and background FreeSWITCH ESL queue workers.
 
 ---
 
-## 2. Target Architecture & Standard Conventions
+## 2. Target Architecture & Conventions
 
 ### 2.1 Uniform Module Structure
-Every module in `app-modules/` adopting translations will use the modern Laravel directory layout:
+Modules owning translations define the standard Laravel directory layout:
 
 ```
 app-modules/{module-name}/
@@ -43,150 +46,109 @@ app-modules/{module-name}/
         └── client.php
 ```
 
-> [!NOTE]
-> Files are only created when a module actually defines copy for that context. Modules without client portal features must NOT have empty `client.php` files created.
+### 2.2 Mandatory Module Language File Header Comment
+Every module language file must begin with this standardized header docblock:
 
-### 2.2 Global `lang/` Directory Boundary
-An audit of the codebase confirms that only **45 keys** are shared across multiple modules or application shell components. The root `/lang` directory is reserved **strictly** for cross-module application shell and framework copy:
-- `lang/{locale}/admin.php`: Generic actions (`save`, `saving`, `cancel`, `delete`, `edit`, `filter`, `actions`, `enabled`, `disabled`), global navigation menus, user/tenant shell, dashboard metrics, and universal tooltips (`tenant_select_tooltip`).
+```php
+<?php
+
+/**
+ * --------------------------------------------------------------------------
+ * Module Language Lines: {module_name}
+ * --------------------------------------------------------------------------
+ *
+ * COLLISION PREVENTION & KEY NAMING RULES:
+ * Under TallPBX's multi-path cascading translation architecture, module
+ * language files merge directly into the global group dictionary (e.g. 'admin')
+ * at runtime.
+ *
+ * To prevent collisions across modules or with the root dictionary:
+ * 1. Every key defined in this file MUST include the module/entity prefix
+ *    (e.g. '{entity}_*').
+ * 2. Generic keys (e.g. 'save', 'cancel', 'delete', 'enabled', 'disabled')
+ *    belong strictly in root lang/{locale}/admin.php and must NEVER be
+ *    defined in module language files.
+ * 3. Module language files will be rejected at runtime by ModuleServiceProvider
+ *    if any collision with root language keys is detected.
+ */
+
+return [
+    // ...
+];
+```
+
+### 2.3 Global `lang/` Directory Boundary
+The root `/lang` directory is reserved strictly for cross-cutting application shell, universal navigation, and generic actions:
+- `lang/{locale}/admin.php`: Generic actions (`save`, `cancel`, `delete`, `edit`, `filter`, `actions`, `enabled`, `disabled`), global navigation menu labels (`admin.gateways`, `admin.extensions`, etc.), user/tenant shell, dashboard metrics, and universal tooltips (`tenant_select_tooltip`).
 - `lang/{locale}/client.php`: Core portal shell, global tenant dashboard labels.
 - `lang/{locale}/auth.php`, `home.php`, `mail.php`.
 
-### 2.3 Translation Access Pattern & Prefix Normalization
-Modules access their own translations using Laravel's standard package namespacing:
-- Admin panel copy: `__('security::admin.threat_feeds_title')`
-- Client portal copy: `__('extensions::client.voicemail_pin')`
-- Global shared copy: `__('admin.save')`, `__('admin.cancel')`
-
-**Prefix Stripping Rule**: When moving a module-specific key from the root `admin.php` into `app-modules/{module}/lang/{locale}/admin.php`, the redundant `{module}_` prefix is systematically stripped:
-- Monolithic key: `__('admin.security_protect_my_ip')`
-- Namespaced key: `__('security::admin.protect_my_ip')`
-
----
-
-## 3. Implementation Phases
-
-### Phase 1: Base Provider Infrastructure & Automated Parity Guards
-**Files:** `app/Support/ModuleServiceProvider.php`, `tests/Feature/Architecture/TranslationParityTest.php`
-
-1. **Standardize Module `lang` Path in `ModuleServiceProvider`**:
-   Update `ModuleServiceProvider` to register `lang/` directly under the module root:
-   ```php
-   protected function translationPath(): ?string
-   {
-       $path = $this->modulePath().'/lang';
-
-       return is_dir($path) ? $path : null;
-   }
-
-   private function registerTranslations(): void
-   {
-       if ($path = $this->translationPath()) {
-           $this->loadTranslationsFrom($path, $this->moduleName());
-       }
-   }
-   ```
-   Remove any legacy custom loaders (e.g. in `app-modules/admin/src/Providers/ModuleServiceProvider.php`).
-
-2. **Automated Locale Parity Test**:
-   Create a Pest architecture test that scans all modules containing a `lang/` directory:
-   - For every module, asserts that the keys in `es/admin.php` and `fr/admin.php` match `en/admin.php` exactly (`array_diff_key` is empty).
-   - Prevents incomplete language files from being committed in any future module work.
-
-3. **Missing Translation Fast-Fail in Tests**:
-   Configure Laravel's translator in the testing bootstrap (`tests/TestCase.php` or `Pest.php`):
-   ```php
-   Lang::handleMissingKeysUsing(function (string $key, array $replace, ?string $locale) {
-       throw new \RuntimeException("Missing translation key detected: [{$key}] for locale [{$locale}]");
-   });
-   ```
-   This ensures that any forgotten translation key or broken namespace call immediately fails CI and feature tests rather than silently rendering the raw string in HTML.
+### 2.4 Runtime Collision Guard in `App\Support\ModuleServiceProvider`
+During module booting, before registering any module translation path with the loader:
+1. The provider loads the module's keys from `lang/en/{group}.php`.
+2. It checks against the root `lang/en/{group}.php` keys.
+3. If an intersection/collision is detected:
+   - In `local` and `testing` environments: throws a `LogicException` (`"Module [{$module}] language file [{$group}] collides with root dictionary for key(s): [{$keys}]. Refusing to load."`).
+   - In `production`: logs a critical error and skips adding the path, preventing corruption of global translations.
+4. If no collision exists, it registers `app('translation.loader')->addPath($path)`.
 
 ---
 
-### Phase 2: Root Locale Reconciliation & Pilot Migration
-**Target Pilot:** `app-modules/certificates/` or `app-modules/hot-desking/` (Lightweight modules already containing empty `lang/` scaffolding)
+## 3. Implementation Plan & Phases
 
-1. **Reconcile 21 Missing Root Keys in `es` and `fr`**:
-   Before extracting translations into module files, backfill the 21 missing translation keys in `lang/es/admin.php` and `lang/fr/admin.php` so child modules do not inherit dictionary gaps.
-2. **Execute Pilot Module Migration**:
-   - Extract `certificates` keys from root `lang/{en,es,fr}/admin.php` into `app-modules/certificates/lang/{en,es,fr}/admin.php`.
-   - Strip `certificates_` prefix from keys.
-   - Update `app-modules/certificates` Blade templates and components to `__('certificates::admin.key')`.
-   - Update any tests in `app-modules/certificates/tests` asserting translation strings.
-   - Run tests: `./vendor/bin/pest app-modules/certificates`.
-   - Verify zero regression and clean test pass.
+### Phase 1: Base Provider Infrastructure, Generator Scaffolding & Collision Guards
+1. **ModuleServiceProvider Runtime Collision Guard**:
+   Implement `validateNoCollisions()` and register `$loader->addPath($path)` in `App\Support\ModuleServiceProvider`.
+2. **Module Generator Scaffolding (`MakeModuleCommand`)**:
+   Update `php artisan make:module` to automatically scaffold `lang/en/admin.php`, `lang/es/admin.php`, and `lang/fr/admin.php` containing the mandatory collision warning header docblock.
+3. **Reconcile 21 Missing Root Keys in `es` and `fr`**:
+   Ensure `lang/es/admin.php` and `lang/fr/admin.php` have 100% key parity with `lang/en/admin.php`.
+4. **Automated Collision & Parity Test Suite**:
+   Implement `tests/Feature/Architecture/TranslationParityTest.php`:
+   - **Root Collision Check:** Asserts 0 module keys collide with root keys.
+   - **Cross-Module Collision Check:** Asserts 0 keys collide between different modules.
+   - **Module Name in Key Check:** Asserts that every key in a module's file includes the module/entity name.
+   - **Locale Parity Check:** Asserts 100% key parity across `en`, `es`, and `fr`.
 
----
+### Phase 2: Telephony Core Modules Atomic Migration
+Migrate the primary telephony modules one by one in clean, atomic commits:
+1. [x] `app-modules/gateways/` (19 keys migrated across `en`, `es`, `fr`; tests passing)
+2. [x] `app-modules/sip-profiles/` (16 keys migrated across `en`, `es`, `fr`; tests passing)
+3. [x] `app-modules/sip-trunks/` (14 keys migrated across `en`, `es`, `fr`; tests passing)
+4. [x] `app-modules/extensions/` (19 keys migrated across `en`, `es`, `fr`; tests passing)
+5. [x] `app-modules/inbound-routes/` (8 keys migrated across `en`, `es`, `fr`; tests passing)
+6. [x] `app-modules/outbound-routes/` (8 keys migrated across `en`, `es`, `fr`; tests passing)
+7. [x] `app-modules/dialplans/` (15 keys migrated across `en`, `es`, `fr`; tests passing)
+8. [ ] `app-modules/voicemails/` (next up in queue)
 
-### Phase 3: Telephony Core Modules Atomic Migration
-Migrate the primary high-traffic telephony modules in discrete, atomic commits:
-1. `app-modules/extensions/`
-2. `app-modules/gateways/`
-3. `app-modules/sip-profiles/`
-4. `app-modules/sip-trunks/`
-5. `app-modules/inbound-routes/`
-6. `app-modules/outbound-routes/`
-7. `app-modules/dialplans/`
-8. `app-modules/voicemails/`
+**Per-Module Atomic Workflow:**
+- Extract the module's entity-specific keys (keeping their exact key names intact) from root `admin.php` into `app-modules/{module}/lang/{en,es,fr}/admin.php` with the required header comment.
+- Remove the extracted keys from root `lang/{en,es,fr}/admin.php`.
+- Do **not** touch Blade templates, Livewire classes, or button identifiers.
+- Run targeted module tests + architecture collision test.
+- Commit atomically per module.
 
-For each module in its own commit:
-- Create `lang/{en,es,fr}/admin.php`.
-- Move keys from root `admin.php` into module files with normalized prefixes.
-- Update module Blade views and Livewire components.
-- Run module Pest tests: `php artisan test app-modules/{module} --compact`.
+### Phase 3: Remaining Modules Migration
+Migrate remaining modules following the exact same pattern:
+- Extract entity-specific keys into module `lang/{en,es,fr}/admin.php`.
+- Remove extracted keys from root files.
+- Keep templates and identifiers untouched.
+- Verify tests and commit.
 
----
-
-### Phase 4: Deterministic Usage-Based Automated Extraction for Remaining Modules
-**Tool:** Scratch Artisan script or CLI command (`php artisan modules:extract-translations`)
-
-> [!WARNING]
-> Do NOT parse section header comments (`// ─── Module Name ───`). Root `lang/en/admin.php` has 76 section headers, whereas `es` and `fr` have only 33 headers, and several headers group keys by UI type rather than module name.
-
-1. **Deterministic Classifier Algorithm**:
-   - Parse all PHP and Blade files across `app-modules/{module}/`.
-   - Scan for literal translation calls `__('admin.<key>')` or `trans('admin.<key>')`.
-   - Handle dynamic string assembly explicitly (e.g. `'admin.security_threat_feed_status_'.$feedStatus`).
-   - Audit unreferenced keys (up to 258 keys in root `admin.php` with no literal call site): distinguish between dynamically assembled string families vs truly orphaned dead keys.
-   - If a key is referenced exclusively within one module: migrate to that module's `lang/{en,es,fr}/admin.php`.
-   - If a key is referenced across multiple modules or in `app/`/`resources/`: retain in root `lang/`.
-2. **Template Rewriter**:
-   - Atomically replace `__('admin.<module_key>')` with `__('<module>::admin.<key>')` across all matching module templates.
+### Phase 4: Final Verification & Clean Baseline
+- `php artisan optimize:clear`
+- `./vendor/bin/pint --dirty --test`
+- `./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php`
+- `php artisan test --compact --parallel`
 
 ---
 
-### Phase 5: Client Portal (`client.php`), Root Cleanup & Final Verification
-1. **Client Portal Translations (`client.php`)**:
-   - Extract module-specific strings from `lang/{en,es,fr}/client.php` into corresponding `app-modules/{module}/lang/{locale}/client.php` files.
-   - Retain core portal shell labels in root `client.php`.
-2. **Root Language File Trim**:
-   - Trim root `lang/{en,es,fr}/admin.php` down to its core ~45 shared actions and framework labels.
-   - Ensure strict 100% key parity between English, Spanish, and French for all remaining shared root keys.
-3. **Verification**:
-   - `php artisan optimize:clear`
-   - `./vendor/bin/pint --dirty --test`
-   - `php artisan test --compact --parallel`
-   - Run translation parity test: `./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php`
+## 4. Verification Checklist
+- [x] Every module language file contains the required collision-prevention header docblock.
+- [x] `php artisan make:module` generates `lang/{en,es,fr}/admin.php` with the collision header docblock.
+- [x] Runtime collision guard in `ModuleServiceProvider` actively refuses colliding files.
+- [x] Automated architecture test asserts zero root collisions, zero cross-module collisions, module names in keys, and 100% locale parity.
+- [x] No button identifiers or labels were modified in any view template.
+- [x] UI appearance and copy in English, Spanish, and French is 100% identical to baseline.
+- [ ] All automated feature and architecture tests pass (in progress across remaining modules).
 
----
-
-### Phase 6: Security Module Migration (Sequencing with Security Refactor)
-- The Security module contains 372 keys and 489 template call sites, with exactly 0 keys referenced outside `app-modules/security`.
-- **Coordination Rule**: To prevent merge conflicts and Git churn with the Security Module architectural refactor (Plan B), the security translation migration must occur either:
-  1. Fully **before** Plan B extracts Livewire child components, OR
-  2. Fully **after** Plan B's new component hierarchy lands.
-  It must NOT be performed concurrently while security component files are actively being split.
-
----
-
-## 4. Verification & Success Criteria Checklist
-
-- [ ] `php artisan optimize:clear` executes cleanly without stale view or provider artifacts.
-- [ ] No raw translation strings (e.g. `module::admin.key`) leak into rendered panel HTML.
-- [ ] Language switching across English, Spanish, and French works identically in all modules.
-- [ ] `TranslationParityTest` passes: 100% key parity across `en`, `es`, and `fr` in every module.
-- [ ] `Lang::handleMissingKeysUsing()` raises zero exceptions across the entire Pest test suite.
-- [ ] Root `lang/{en,es,fr}/admin.php` contains strictly generic, cross-module shell copy.
-- [ ] Pint code style passes cleanly: `./vendor/bin/pint --dirty --test`.
-- [ ] Full test suite passes: `php artisan test --compact --parallel`.

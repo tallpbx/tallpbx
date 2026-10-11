@@ -153,7 +153,7 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 **For new modules specifically**, also verify:
 - `module.json` exists and `php artisan module:sync --only-local` succeeds
 - Permissions are in the database: check with `php artisan tinker --execute 'echo Permission::where("name","your.permission")->exists() ? "YES" : "NO";'`
-- Translation keys exist in `lang/en/admin.php` (use `grep` to verify)
+- Translation keys exist in module dictionaries (`app-modules/<module>/lang/en/admin.php`) or root (`lang/en/admin.php`) with zero root collisions and 100% parity across `en`, `es`, `fr`
 - View namespace is registered (test by visiting the page in a browser test)
 - Route middleware includes `web` (sessions), `auth.panel` (auth), and `throttle` (rate limit)
 - Super Admin group has the new permissions: `php artisan db:seed --class=AdminSeeder`
@@ -290,7 +290,8 @@ All module service providers MUST extend `App\Support\ModuleServiceProvider` ins
 **Optional overrides:**
 - `menuItems(): array` — Return menu items in the format expected by `MenuService::register()`. Menu items do NOT include a `guard` key — visibility is controlled by permissions alone.
 - `permissions(): array` — Return permissions as `[key => description]` pairs. Permission names use the `admin.*` prefix (e.g., `'bridges.view'`), NOT the route prefix.
-- `hasTranslations(): bool` — Override to return `true` if the module has a `resources/lang/` directory.
+- `translationPath(): ?string` — Override to customize the translation directory path (by default automatically detects `lang/` then `resources/lang/`).
+- `hasTranslations(): bool` — Returns `true` if `translationPath()` is non-null.
 - `routeGroups(): array` — Override to customize route groups. By default, a single group with `/panel/` prefix, `panel.*` route names, and `auth.panel` middleware is registered.
 
 **Service bindings (Laravel 13):**
@@ -311,6 +312,18 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
 ```
 
 **Do NOT extend the base class if:** The module has extensive custom boot logic (only `admin` qualifies today — its provider is 289 lines of bespoke menu/permission setup).
+
+### Modular Translation Architecture & Collision Safeguards (Option A)
+
+TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) to support modular translation dictionaries (`app-modules/{module}/lang/{locale}/admin.php`) while guaranteeing **100% frozen UI presentation, zero template rewrites, and immutable button identifiers**:
+
+- **Native Multi-Path Cascading**: `ModuleServiceProvider` registers the module's `lang/` path via `app('translation.loader')->addPath($path)`. Under Laravel 13, translation paths cascade into the global group dictionary (`admin`), resolving `__('admin.gateway_host')` without changing Blade views or component call sites.
+- **Root Dictionary Sanctity**: Root `lang/{locale}/admin.php` is reserved strictly for generic actions (`save`, `delete`, `cancel`, `edit`, `filter`, `actions`, `enabled`, `disabled`, `status`, `confirm`, `back`) and global navigation menu labels (`admin.gateways`, `admin.extensions`). Generic action keys must **NEVER** be defined in module language files.
+- **Module Key Domain Relevance**: Every key defined in a module language file **must** include the module or entity domain identifier (e.g., `gateway_host`, `create_gateway`, `modal_delete_gateway_title`, `no_gateways_found`).
+- **Mandatory File Header Comment**: Every module language file (`lang/{en,es,fr}/admin.php`) and scaffolded file from `make:module` MUST begin with the standardized collision warning docblock explaining the cascading merging rule and prohibition on generic keys.
+- **Runtime Collision Refusal Guard**: During boot, `ModuleServiceProvider` inspects module keys against the root dictionary. If any key collision is detected, the provider throws a `LogicException` in local/testing environments and logs a critical error while refusing to load the path in production, preventing global dictionary corruption.
+- **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` continuously enforces zero root collisions, zero cross-module collisions, domain name presence in keys, and 100% key parity across `en`, `es`, and `fr`.
+- Detailed architectural specification: [`docs/modular-architecture.md`](docs/modular-architecture.md).
 
 ### CrudService Base Class for Services
 

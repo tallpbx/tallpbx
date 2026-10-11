@@ -93,6 +93,7 @@ TallPBX uses a modular architecture where features reside in `app-modules/`:
 - Core PHP code, migrations, views, routes, and translations are encapsulated within each module directory (`app-modules/<ModuleName>/`).
 - Modules register themselves via `App\Support\ModuleServiceProvider`.
 - Modules are auto-discovered through Composer path repositories and Laravel package discovery.
+- Detailed architecture, lifecycle, and cascading translation specification: [Modular Architecture & Translation Guide →](docs/modular-architecture.md)
 
 TallPBX utilizes Laravel's command-line tool, **Artisan** (`php artisan`), for system tasks and custom PBX commands. Scaffold a new module:
 

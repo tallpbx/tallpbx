@@ -902,7 +902,21 @@ scaffolded with `php artisan make:module <name>` and must keep this shape:
 - Factories: `src/Database/Factories/`, namespace `Modules\{Studly}\Database\Factories`, resolved by standard HasFactory — never `database/factories/Pbx`, never a `newFactory()` override.
 - Tests: Pest tests inside `app-modules/{name}/tests/` (`*Test.php`), discovered by the phpunit.xml glob. Cross-module tests stay in the central `tests/` tree; the ModuleAwareTestGuard skips them automatically when a referenced module is missing. Annotate URL-only or Dusk tests with `$this->skipWhenModuleUninstalled('<module>');`.
 - Config: ship `config/{name}.php` to override centralized app-level defaults; it merges under the module's key (module values win on conflicts, all other keys survive).
+- Translations: ship `lang/{en,es,fr}/admin.php` for admin translations (and `client.php` if client UI exists). Must include the mandatory collision warning docblock. Module keys MUST contain the module/entity domain (e.g. `gateway_host`, `create_gateway`). Generic action keys (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`) belong strictly in root `lang/{locale}/admin.php` and must NEVER be defined in module files. `ModuleServiceProvider` actively refuses to load files with root collisions at runtime. Zero template rewriting: views continue using `__('admin.*')`.
 - Dependencies: declare every cross-module class reference in `module.json` → `requirements.modules` (array of module name strings). ModuleBoundaryTest fails on undeclared references or cycles.
 - Core modules are protected — never uninstallable, never disable-able: extensions, devices, sip-accounts, destinations, dialplans, dialplan-tools, gateways, sip-profiles, inbound-routes, outbound-routes (plus required admin, auth, tenant).
 - Lifecycle: the panel offers enable/disable only. Removal: `php artisan module:uninstall <name>` (typed confirmation; refuses while dependents exist). Restore: `php artisan module:restore <name>` (from git or Composer; database data is not restored).
+
+## Modular Translation Architecture & Collision Safeguards (Option A)
+
+TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular translations with absolute UI and template invariance:
+- **Zero UI Presentation Changes**: All buttons, labels, and copy in English, Spanish, and French remain 100% frozen.
+- **Zero Template Churn**: Never rewrite Blade templates or Livewire components to package namespaces (`module::admin.*`). Views call `__('admin.*')` and resolve seamlessly via path cascading.
+- **Root Dictionary Sanctity**: Root `lang/{locale}/admin.php` exclusively owns generic action keys (`save`, `delete`, `cancel`, `edit`, `filter`, `actions`, `enabled`, `disabled`, `status`, `confirm`, `back`) and global navigation menu labels (`admin.gateways`, `admin.extensions`).
+- **Module Key Domain Relevance**: Every key in `app-modules/{module}/lang/{locale}/admin.php` must include the entity name. Never define generic keys in module files.
+- **Mandatory File Header Comment**: All module translation files (`lang/{en,es,fr}/admin.php`) and scaffolded files from `make:module` must start with the standardized collision warning docblock.
+- **Runtime Collision Guard**: `ModuleServiceProvider` inspects keys on boot and throws `LogicException` in local/testing (or logs critical error and refuses path in production) if any collision with root keys is detected.
+- **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` checks root non-collision, peer non-collision, entity naming, and 100% key parity across `en`, `es`, `fr`.
+- Complete architectural reference: [`docs/modular-architecture.md`](docs/modular-architecture.md).
+
 

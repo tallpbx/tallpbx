@@ -7,7 +7,9 @@ namespace App\Support;
 use App\Services\MenuService;
 use App\Services\ModuleState;
 use App\Services\PermissionService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -104,12 +106,28 @@ abstract class ModuleServiceProvider extends ServiceProvider
     }
 
     /**
+     * Resolve the module's translation directory path if it exists.
+     * Checks lang/ first (modern convention), then resources/lang/ (legacy fallback).
+     */
+    protected function translationPath(): ?string
+    {
+        $base = $this->modulePath();
+        if (is_dir("{$base}/lang")) {
+            return "{$base}/lang";
+        }
+        if (is_dir("{$base}/resources/lang")) {
+            return "{$base}/resources/lang";
+        }
+
+        return null;
+    }
+
+    /**
      * Whether this module has translation files to load.
-     * Checks for the existence of a resources/lang directory.
      */
     protected function hasTranslations(): bool
     {
-        return is_dir($this->modulePath().'/resources/lang');
+        return $this->translationPath() !== null;
     }
 
     /**
@@ -212,17 +230,106 @@ abstract class ModuleServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the module's translation namespace, if translation
-     * files exist in resources/lang.
+     * Cache of root translation keys by locale and group.
+     *
+     * @var array<string, array<string, int>>
+     */
+    private static array $rootGroupKeysCache = [];
+
+    /**
+     * Clear the static root translation keys cache.
+     */
+    public static function clearRootTranslationKeysCache(): void
+    {
+        self::$rootGroupKeysCache = [];
+    }
+
+    /**
+     * Register module translation paths, namespaces, and cascading loader.
+     *
+     * Registers both namespaced translations ({moduleName}::{group}.{key})
+     * and adds the module path to the translation loader for native path cascading
+     * into the global dictionary ({group}.{key}).
+     *
+     * Before adding the cascading path, validates that no keys in the module's
+     * language files collide with keys in the root global dictionary.
      */
     private function registerTranslations(): void
     {
-        if ($this->hasTranslations()) {
-            $this->loadTranslationsFrom(
-                $this->modulePath().'/resources/lang',
-                $this->moduleName(),
-            );
+        $path = $this->translationPath();
+        if ($path === null) {
+            return;
         }
+
+        $this->loadTranslationsFrom($path, $this->moduleName());
+
+        $collisions = $this->detectRootTranslationCollisions($path);
+        if (! empty($collisions)) {
+            $formatted = implode(', ', $collisions);
+            $message = "Module [{$this->moduleName()}] language file collides with root dictionary for key(s): [{$formatted}]. Refusing to load module cascading path.";
+
+            if ($this->app->environment('local', 'testing')) {
+                throw new \LogicException($message);
+            }
+
+            Log::critical($message);
+
+            return;
+        }
+
+        $loader = $this->app->make('translation.loader');
+        if (method_exists($loader, 'addPath')) {
+            $loader->addPath($path);
+        }
+    }
+
+    /**
+     * Detect any key collisions between a module translation directory and the root dictionary.
+     *
+     * @return array<int, string> Colliding keys in {group}.{key} format
+     */
+    protected function detectRootTranslationCollisions(string $path): array
+    {
+        $collisions = [];
+        $localeDirs = glob("{$path}/*", GLOB_ONLYDIR) ?: [];
+
+        foreach ($localeDirs as $localeDir) {
+            $locale = basename($localeDir);
+            $files = glob("{$localeDir}/*.php") ?: [];
+
+            foreach ($files as $file) {
+                $group = basename($file, '.php');
+                $cacheKey = "{$locale}.{$group}";
+                $rootFile = base_path("lang/{$locale}/{$group}.php");
+
+                if (! file_exists($rootFile)) {
+                    continue;
+                }
+
+                if (! isset(self::$rootGroupKeysCache[$cacheKey])) {
+                    $rootContent = require $rootFile;
+                    $rootKeys = is_array($rootContent) ? array_keys(Arr::dot($rootContent)) : [];
+                    self::$rootGroupKeysCache[$cacheKey] = array_flip($rootKeys);
+                }
+
+                $moduleContent = require $file;
+                if (! is_array($moduleContent)) {
+                    continue;
+                }
+
+                $moduleKeys = array_keys(Arr::dot($moduleContent));
+                foreach ($moduleKeys as $mKey) {
+                    if (isset(self::$rootGroupKeysCache[$cacheKey][$mKey])) {
+                        $collisionEntry = "{$group}.{$mKey}";
+                        if (! in_array($collisionEntry, $collisions, true)) {
+                            $collisions[] = $collisionEntry;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $collisions;
     }
 
     /**
