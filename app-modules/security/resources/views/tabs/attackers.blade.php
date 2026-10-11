@@ -51,7 +51,6 @@
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
                     </div>
-                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_banned_attackers_desc') }}</p>
                     <p class="text-xs text-base-content/60 mt-1 flex items-center gap-1.5 flex-wrap">
                         <span>{{ __('admin.security_banned_attackers_cli_hint') }}</span>
                         <code class="px-1.5 py-0.5 rounded bg-base-200 text-xs font-mono select-all text-base-content">sudo nft list set inet tallpbx_filter banned_ips</code>
@@ -199,24 +198,26 @@
                 {{-- Left: enforcement, duration, custom signatures --}}
                 <div class="space-y-4">
                     <div>
-                        <label class="label cursor-pointer justify-start gap-2 p-0"
-                               wire:loading.class="opacity-70 pointer-events-none"
-                               wire:target="setSipScannerEnforcement">
-                            <input wire:click="setSipScannerEnforcement({{ $sipScanner['enforcement'] ? 'false' : 'true' }})"
-                                   wire:loading.attr="disabled"
-                                   wire:target="setSipScannerEnforcement"
-                                   type="checkbox" class="toggle toggle-error toggle-sm" @checked($sipScanner['enforcement']) />
-                            <span wire:loading.remove wire:target="setSipScannerEnforcement" class="label-text font-medium">
-                                {{ __('admin.security_scanner_enforcement') }}
-                            </span>
-                            <span wire:loading wire:target="setSipScannerEnforcement" class="inline-flex items-center gap-1.5 label-text font-medium text-error">
-                                <span class="loading loading-spinner loading-xs"></span>
-                                <span>{{ $sipScanner['enforcement'] ? __('admin.security_scanner_disabling') : __('admin.security_scanner_enabling') }}</span>
-                            </span>
-                        </label>
-                        <p class="text-xs text-base-content/60 mt-1">
-                            {{ $sipScanner['enforcement'] ? __('admin.security_scanner_enforcement_help_on') : __('admin.security_scanner_enforcement_help_off') }}
-                        </p>
+                        <div class="flex items-center gap-2">
+                            <label class="label cursor-pointer justify-start gap-2 p-0"
+                                   wire:loading.class="opacity-70 pointer-events-none"
+                                   wire:target="setSipScannerEnforcement">
+                                <input wire:click="setSipScannerEnforcement({{ $sipScanner['enforcement'] ? 'false' : 'true' }})"
+                                       wire:loading.attr="disabled"
+                                       wire:target="setSipScannerEnforcement"
+                                       type="checkbox" class="toggle toggle-error toggle-sm" @checked($sipScanner['enforcement']) />
+                                <span wire:loading.remove wire:target="setSipScannerEnforcement" class="label-text font-medium">
+                                    {{ __('admin.security_scanner_enforcement') }}
+                                </span>
+                                <span wire:loading wire:target="setSipScannerEnforcement" class="inline-flex items-center gap-1.5 label-text font-medium text-error">
+                                    <span class="loading loading-spinner loading-xs"></span>
+                                    <span>{{ $sipScanner['enforcement'] ? __('admin.security_scanner_disabling') : __('admin.security_scanner_enabling') }}</span>
+                                </span>
+                            </label>
+                            <x-tooltip :tip="$sipScanner['enforcement'] ? __('admin.security_scanner_enforcement_help_on') : __('admin.security_scanner_enforcement_help_off')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
                     </div>
 
                     <div class="form-control">
@@ -232,7 +233,12 @@
                     </div>
 
                     <div>
-                        <span class="text-sm font-medium text-base-content block mb-1.5">{{ __('admin.security_scanner_custom') }}</span>
+                        <div class="flex items-center gap-1.5 mb-1.5">
+                            <span class="text-sm font-medium text-base-content">{{ __('admin.security_scanner_custom') }}</span>
+                            <x-tooltip :tip="__('admin.security_scanner_custom_help')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
                         <div class="flex items-center gap-1.5 flex-wrap mb-2">
                             @forelse ($sipScanner['custom'] as $signature)
                                 <span class="badge badge-warning badge-sm gap-1 font-mono">
@@ -251,7 +257,6 @@
                             <button wire:click="addScannerSignature" type="button" class="btn btn-outline btn-sm">{{ __('admin.security_scanner_add') }}</button>
                         </div>
                         @error('newScannerSignature') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
-                        <p class="text-xs text-base-content/60 mt-1">{{ __('admin.security_scanner_custom_help') }}</p>
                     </div>
                 </div>
 
@@ -270,14 +275,18 @@
                         </div>
                     </div>
                     <div>
-                        <span class="badge {{ $sipScanner['enforcement'] ? 'badge-warning' : 'badge-neutral' }} badge-sm mb-1.5">{{ __('admin.security_scanner_low_group') }}</span>
+                        <div class="flex items-center gap-1.5 mb-1.5">
+                            <span class="badge {{ $sipScanner['enforcement'] ? 'badge-warning' : 'badge-neutral' }} badge-sm">{{ __('admin.security_scanner_low_group') }}</span>
+                            <x-tooltip :tip="__('admin.security_scanner_incidents_help')" align="start" position="right">
+                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                            </x-tooltip>
+                        </div>
                         <div class="flex items-center gap-1.5 flex-wrap">
                             @foreach ($sipScanner['defaults']['low'] as $entry)
                                 <span class="badge badge-ghost badge-sm font-mono">{{ $entry['pattern'] }}</span>
                             @endforeach
                         </div>
                     </div>
-                    <p class="text-xs text-base-content/60">{{ __('admin.security_scanner_incidents_help') }}</p>
                 </div>
             </div>
 

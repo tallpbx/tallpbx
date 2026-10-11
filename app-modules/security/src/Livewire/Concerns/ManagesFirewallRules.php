@@ -82,6 +82,8 @@ trait ManagesFirewallRules
      */
     public function saveDefaultPolicy(): void
     {
+        $this->ensureEditPermission();
+
         $this->validate([
             'firewallDefaultPolicy' => ['required', 'in:drop,accept'],
         ]);
@@ -114,6 +116,8 @@ trait ManagesFirewallRules
      */
     public function moveRuleUp(int $ruleId): void
     {
+        $this->ensureEditPermission();
+
         $rule = SecurityRule::findOrFail($ruleId);
         $previous = SecurityRule::where('sequence', '<', $rule->sequence)
             ->orderBy('sequence', 'desc')
@@ -139,6 +143,8 @@ trait ManagesFirewallRules
      */
     public function moveRuleDown(int $ruleId): void
     {
+        $this->ensureEditPermission();
+
         $rule = SecurityRule::findOrFail($ruleId);
         $next = SecurityRule::where('sequence', '>', $rule->sequence)
             ->orderBy('sequence', 'asc')
@@ -164,6 +170,8 @@ trait ManagesFirewallRules
      */
     public function toggleRule(int $ruleId): void
     {
+        $this->ensureEditPermission();
+
         $rule = SecurityRule::findOrFail($ruleId);
         $rule->enabled = ! $rule->enabled;
         $rule->save();
@@ -178,6 +186,8 @@ trait ManagesFirewallRules
      */
     public function deleteRule(int $ruleId): void
     {
+        $this->ensureEditPermission();
+
         $rule = SecurityRule::findOrFail($ruleId);
         $rule->delete();
 
@@ -191,6 +201,8 @@ trait ManagesFirewallRules
      */
     public function addServiceFromCatalog(int $serviceId): void
     {
+        $this->ensureEditPermission();
+
         $service = SecurityService::findOrFail($serviceId);
         $maxSeq = (int) SecurityRule::max('sequence') ?: 0;
 
@@ -240,6 +252,8 @@ trait ManagesFirewallRules
      */
     public function saveSystemService(?LockoutGuardService $lockoutGuard = null): void
     {
+        $this->ensureEditPermission();
+
         $lockoutGuard ??= app(LockoutGuardService::class);
 
         $this->validate([
@@ -313,6 +327,8 @@ trait ManagesFirewallRules
      */
     public function toggleSystemService(int $serviceId, ?LockoutGuardService $lockoutGuard = null): void
     {
+        $this->ensureEditPermission();
+
         $lockoutGuard ??= app(LockoutGuardService::class);
         $service = SecurityService::findOrFail($serviceId);
 
@@ -341,6 +357,8 @@ trait ManagesFirewallRules
      */
     public function resetSystemServiceToDefault(int $serviceId): void
     {
+        $this->ensureEditPermission();
+
         $service = SecurityService::findOrFail($serviceId);
         $default = $service->getDefaultConfig();
 
@@ -404,6 +422,8 @@ trait ManagesFirewallRules
      */
     public function saveCustomRule(): void
     {
+        $this->ensureEditPermission();
+
         $this->validate([
             'ruleDescription' => ['required', 'string', 'max:255'],
             'ruleSourceIp' => ['required', 'string', 'max:100'],

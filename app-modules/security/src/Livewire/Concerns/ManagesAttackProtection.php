@@ -57,6 +57,8 @@ trait ManagesAttackProtection
      */
     public function unban(string $ip, SecurityBanServiceInterface $banService): void
     {
+        $this->ensureEditPermission();
+
         $adminId = Auth::guard('admin')->id();
         $banService->unban($ip, is_int($adminId) ? $adminId : null);
 
@@ -81,6 +83,8 @@ trait ManagesAttackProtection
      */
     public function manualBan(SecurityBanServiceInterface $banService, ?LockoutGuardService $lockoutGuard = null): void
     {
+        $this->ensureEditPermission();
+
         $lockoutGuard ??= app(LockoutGuardService::class);
 
         $this->validate([
@@ -136,6 +140,8 @@ trait ManagesAttackProtection
      */
     public function setSipScannerEnforcement(bool $enabled): void
     {
+        $this->ensureEditPermission();
+
         SecuritySetting::set(SipScannerSignatures::ENFORCEMENT_KEY, $enabled);
         $this->sipScannerEnforcement = $enabled;
 
@@ -156,6 +162,8 @@ trait ManagesAttackProtection
      */
     public function setSipScannerBanSeconds(mixed $seconds): void
     {
+        $this->ensureEditPermission();
+
         $candidate = (int) $seconds;
 
         if (! in_array($candidate, [0, 3600, 86400, 604800], true)) {
@@ -184,6 +192,8 @@ trait ManagesAttackProtection
      */
     public function addScannerSignature(): void
     {
+        $this->ensureEditPermission();
+
         $validated = SipScannerSignatures::validateCustomEntry($this->newScannerSignature);
 
         if ($validated === null) {
@@ -219,6 +229,8 @@ trait ManagesAttackProtection
      */
     public function removeScannerSignature(string $signature): void
     {
+        $this->ensureEditPermission();
+
         $custom = SipScannerSignatures::custom();
         $lower = mb_strtolower(trim($signature));
 
@@ -250,6 +262,8 @@ trait ManagesAttackProtection
      */
     public function promoteScannerIncident(string $ip, SecurityBanServiceInterface $banService): void
     {
+        $this->ensureEditPermission();
+
         $incident = SecurityBan::where('ip_address', $ip)
             ->where('vector', 'sip_scanner')
             ->where('is_active', false)
@@ -284,6 +298,8 @@ trait ManagesAttackProtection
      */
     public function setTftpDefense(bool $enabled, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         SecuritySetting::updateOrCreate(['key' => 'tftp_defense_enabled'], ['value' => $enabled ? '1' : '0']);
         $this->tftpDefenseEnabled = $enabled;
 
@@ -361,6 +377,8 @@ trait ManagesAttackProtection
      */
     public function saveSettings(): void
     {
+        $this->ensureEditPermission();
+
         $this->validate([
             'maxRetry' => ['required', 'integer', 'min:1', 'max:100'],
             'findTime' => ['required', 'integer', 'min:10', 'max:86400'],
@@ -389,6 +407,8 @@ trait ManagesAttackProtection
      */
     public function setAttackProtectionEnabled(bool $enabled): void
     {
+        $this->ensureEditPermission();
+
         SecuritySetting::updateOrCreate(['key' => 'attack_protection_enabled'], ['value' => $enabled ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'intrusion_detection_enabled'], ['value' => $enabled ? '1' : '0']);
         $this->attackProtectionEnabled = $enabled;

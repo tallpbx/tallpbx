@@ -323,7 +323,7 @@ it('explains in the UI where banned IPs are put in the firewall', function (): v
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
         ->set('activeTab', 'attackers')
-        ->assertSee(__('admin.security_banned_attackers_desc'))
+        ->assertSee(__('admin.security_threats_desc'))
         ->assertSee(__('admin.security_banned_attackers_cli_hint'))
         ->assertSee('sudo nft list set inet tallpbx_filter banned_ips')
         ->assertSee('@banned_ips')

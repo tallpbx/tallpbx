@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented pause-on-hover and resume synchronization via Alpine.js and CSS `.toast-paused`, pausing the countdown timer and progress animation when hovered and resuming seamlessly on mouse leave.
   - Added polite `aria-live` semantics for accessibility and automated feature component test coverage in `tests/Feature/Components/OperationalToastTest.php`.
 
+### Security
+- **Enforced `security.edit` Authorization on Firewall Mutations**:
+  - Closed an authorization gap across `SecurityManager` and its concerns (`ManagesAllowBlockLists`, `ManagesAttackProtection`, `ManagesFirewallRules`, `ManagesObserveMode`, and `ManagesPreFilters`) by enforcing the `security.edit` permission check on all mutating actions (enabling/disabling firewall, rule reordering, IP whitelist/blacklist additions and deletions, manual bans, scanner configuration, and service catalog updates).
+  - Added comprehensive authorization feature test coverage in `SecurityManagerAuthorizationTest`.
+
+### Changed
+- **Security Center Tooltip Merges & UI Streamlining**:
+  - Merged redundant description paragraphs into informative header tooltips across the Blocked Attackers, External Blocklists, SIP Bot & Scanner Signatures, and Firewall Rules tabs.
+  - Converted SIP Bot & Scanner Signatures enforcement helper copy, custom signatures, and generic patterns descriptions into dynamic contextual tooltips.
+  - Formatted the Linux CLI inspection command for firewall rules (`php artisan security:status`) on its own dedicated newline under the header hint sentence.
+
 ## [3.0.5] - 2026-10-10
 
 ### Changed

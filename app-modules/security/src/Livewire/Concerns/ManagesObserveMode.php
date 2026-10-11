@@ -25,6 +25,8 @@ trait ManagesObserveMode
      */
     public function setObserveMode(bool $enabled, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy)) {
             $this->notifyError((string) __('admin.security_observe_restore_lockout_refused', ['ip' => $this->adminIp]));
 

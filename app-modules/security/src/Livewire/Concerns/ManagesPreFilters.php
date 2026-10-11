@@ -28,6 +28,8 @@ trait ManagesPreFilters
      */
     public function setPrefilterEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         // Enabling is purely protective: it can never lock anyone out.
         if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy)) {
             $this->notifyError((string) __('admin.security_prefilter_lockout_refused', ['ip' => $this->adminIp]));
@@ -269,6 +271,8 @@ trait ManagesPreFilters
      */
     public function resetPreFilterOrder(): void
     {
+        $this->ensureEditPermission();
+
         $order = SecurityConfigGenerator::DEFAULT_PRE_FILTER_ORDER;
 
         DB::transaction(function () use ($order): void {
@@ -292,6 +296,8 @@ trait ManagesPreFilters
      */
     private function movePreFilterStage(string $stage, int $direction): void
     {
+        $this->ensureEditPermission();
+
         // The loopback stage is pinned first — it is how the server talks to
         // its own database, cache, and phone engine.
         if ($stage === 'loopback') {

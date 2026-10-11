@@ -40,6 +40,8 @@ trait ManagesAllowBlockLists
      */
     public function setWhitelistEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy, proposedWhitelistEnabled: false)) {
             $this->notifyError((string) __('admin.security_whitelist_lockout_refused', ['ip' => $this->adminIp]));
 
@@ -68,6 +70,8 @@ trait ManagesAllowBlockLists
      */
     public function setBlacklistEnabled(bool $enabled): void
     {
+        $this->ensureEditPermission();
+
         SecuritySetting::updateOrCreate(['key' => 'blacklist_enabled'], ['value' => $enabled ? '1' : '0']);
         $this->blacklistEnabled = $enabled;
 
@@ -90,6 +94,8 @@ trait ManagesAllowBlockLists
      */
     public function whitelistCurrentIp(LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         $lockoutGuard->whitelistIp($this->adminIp, 'Auto-whitelisted administrator session');
         $this->isCurrentIpWhitelisted = true;
 
@@ -104,6 +110,8 @@ trait ManagesAllowBlockLists
      */
     public function addBlacklistIp(LockoutGuardService $lockoutGuard, SecurityBanServiceInterface $banService): void
     {
+        $this->ensureEditPermission();
+
         $this->validate([
             'newBlacklistIp' => [
                 'required',
@@ -156,6 +164,8 @@ trait ManagesAllowBlockLists
      */
     public function addWhitelistIp(LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         $this->validate([
             'newWhitelistIp' => [
                 'required',
@@ -194,6 +204,8 @@ trait ManagesAllowBlockLists
      */
     public function deleteIp(int $id, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         $entry = SecurityIpList::findOrFail($id);
 
         // Remember the entry so a refused apply can be rolled back: removing
@@ -221,6 +233,8 @@ trait ManagesAllowBlockLists
      */
     public function promoteToWhitelist(string $ip, SecurityBanServiceInterface $banService, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         if (method_exists($banService, 'promoteToWhitelist')) {
             $banService->promoteToWhitelist($ip, 'Promoted from active threats by administrator');
         } else {
@@ -243,6 +257,8 @@ trait ManagesAllowBlockLists
      */
     public function promoteToBlacklist(string $ip, SecurityBanServiceInterface $banService): void
     {
+        $this->ensureEditPermission();
+
         if (method_exists($banService, 'promoteToBlacklist')) {
             $banService->promoteToBlacklist($ip, 'Promoted from active threats to permanent blacklist');
         } else {

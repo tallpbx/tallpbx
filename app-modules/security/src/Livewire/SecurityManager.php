@@ -222,6 +222,16 @@ class SecurityManager extends Component
     }
 
     /**
+     * Refuse firewall, list, and configuration mutations without the edit permission.
+     */
+    protected function ensureEditPermission(): void
+    {
+        $actor = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+
+        abort_unless($actor !== null && $actor->hasPermission('security.edit'), 403);
+    }
+
+    /**
      * Turn the whole firewall on or off.
      *
      * Turning it off makes the generated ruleset fully open (policy accept);
@@ -231,6 +241,8 @@ class SecurityManager extends Component
      */
     public function setFirewallEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
     {
+        $this->ensureEditPermission();
+
         // Remember the persisted switch so a refused apply can be rolled back
         // (in that case the kernel is still running the previous ruleset).
         $previous = SecuritySetting::getBoolean('firewall_enabled', true);
@@ -294,6 +306,8 @@ class SecurityManager extends Component
         ?SecurityExecutorInterface $executor = null,
         bool $force = false
     ): bool {
+        $this->ensureEditPermission();
+
         $lockoutGuard ??= app(LockoutGuardService::class);
         $generator ??= app(SecurityConfigGenerator::class);
         $executor ??= app(SecurityExecutorInterface::class);
@@ -371,6 +385,8 @@ class SecurityManager extends Component
         ?SecurityExecutorInterface $executor = null,
         bool $force = false
     ): void {
+        $this->ensureEditPermission();
+
         if ($this->autoApplyFirewallRuleset($lockoutGuard, $generator, $executor, $force)) {
             $this->notifySuccess((string) __('admin.security_firewall_applied_success'));
         }

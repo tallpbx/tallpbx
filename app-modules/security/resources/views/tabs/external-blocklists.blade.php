@@ -59,8 +59,7 @@
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
                     </div>
-                <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_threat_feeds_desc') }}</p>
-            </div>
+                </div>
             <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
                 <button wire:click="syncThreatFeedNow"
                         wire:loading.attr="disabled"
