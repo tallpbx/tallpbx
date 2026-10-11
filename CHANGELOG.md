@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added runtime collision refusal guards in `App\Support\ModuleServiceProvider` that actively inspect module dictionaries against root translations and refuse to load colliding files (throwing a `LogicException` in local/testing).
   - Updated `php artisan make:module` scaffolding to generate `lang/{en,es,fr}/admin.php` stubs with standardized collision warning docblocks.
   - Added architecture test suite `tests/Feature/Architecture/TranslationParityTest.php` enforcing 100% locale parity across `en`, `es`, `fr`, zero root collisions, zero cross-module collisions, and mandatory docblock headers.
-  - Migrated core telephony modules to encapsulated language files: `gateways`, `sip-profiles`, `sip-trunks`, `extensions`, `inbound-routes`, `outbound-routes`, and `dialplans`.
+  - Migrated core telephony modules to encapsulated language files: `gateways`, `sip-profiles`, `sip-trunks`, `extensions`, `inbound-routes`, `outbound-routes`, `dialplans`, and `voicemails`.
 - **Operational Toast Auto-Dismiss & Countdown Progress Bar**:
   - Enhanced the shared `<x-operational-toast>` component with severity-based auto-dismissal: success and informational toasts automatically dismiss after 5 seconds (`:timeout="5000"` default), while error and warning notifications remain persistent until manually dismissed.
   - Added a slim 2px GPU-accelerated countdown progress bar (`toast-progress`) tracking along the bottom edge of auto-dismissing toasts.

@@ -253,19 +253,6 @@ return [
     'route_provider_placeholder' => 'sip-provider',
     'route_prefix' => 'Prefix',
 
-    // ─── Voicemails ─────────────────────────────────────────────────────────
-    'voicemails_title' => 'Voicemails',
-    'create_voicemail' => 'Create Voicemail',
-    'edit_voicemail' => 'Edit Voicemail',
-    'voicemail_mailbox' => 'Mailbox',
-    'voicemail_pin' => 'PIN',
-    'voicemail_email' => 'Email',
-    'voicemail_attach' => 'Attach audio to email',
-    'voicemail_require_pin' => 'Require PIN to access voicemail',
-    'voicemail_forward_email' => 'Forward messages to email',
-    'no_voicemails_found' => 'No voicemails found.',
-    'confirm_delete_voicemail' => 'Are you sure you want to delete this voicemail?',
-
     // ─── Devices ────────────────────────────────────────────────────────────
     'devices_title' => 'Devices',
     'device_header_tooltip' => 'A physical piece of hardware or softphone client',
@@ -1059,10 +1046,6 @@ return [
     'modal_delete_user_confirm' => 'Delete User',
     'modal_delete_user_message' => 'Delete “:name”? The user loses panel access.',
     'modal_delete_user_error_title' => 'User Cannot Be Deleted',
-    'modal_delete_voicemail_mailbox_title' => 'Delete Voicemail Mailbox?',
-    'modal_delete_voicemail_mailbox_confirm' => 'Delete Voicemail Mailbox',
-    'modal_delete_voicemail_mailbox_message' => 'Delete mailbox “:name”? This cannot be undone.',
-    'modal_delete_voicemail_mailbox_error_title' => 'Voicemail Mailbox Cannot Be Deleted',
     'modal_delete_voicemail_message_title' => 'Delete Voicemail Message?',
     'modal_delete_voicemail_message_confirm' => 'Delete Message',
     'modal_delete_voicemail_message_message' => 'Delete this voicemail message. This cannot be undone.',

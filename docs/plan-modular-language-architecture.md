@@ -119,7 +119,7 @@ Migrate the primary telephony modules one by one in clean, atomic commits:
 5. [x] `app-modules/inbound-routes/` (8 keys migrated across `en`, `es`, `fr`; tests passing)
 6. [x] `app-modules/outbound-routes/` (8 keys migrated across `en`, `es`, `fr`; tests passing)
 7. [x] `app-modules/dialplans/` (15 keys migrated across `en`, `es`, `fr`; tests passing)
-8. [ ] `app-modules/voicemails/` (next up in queue)
+8. [x] `app-modules/voicemails/` (15 keys migrated across `en`, `es`, `fr`; tests passing) — Phase 2 Complete (8/8 Core Telephony Modules)
 
 **Per-Module Atomic Workflow:**
 - Extract the module's entity-specific keys (keeping their exact key names intact) from root `admin.php` into `app-modules/{module}/lang/{en,es,fr}/admin.php` with the required header comment.
