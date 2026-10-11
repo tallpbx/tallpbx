@@ -217,15 +217,18 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2.5">
                                     {{-- Pre-filter switch on the left with no other text --}}
-                                    <label class="flex items-center cursor-pointer"
+                                    <label wire:key="prefilter-switch-{{ $prefilterEnabled ? 'on' : 'off' }}"
+                                           class="flex items-center cursor-pointer"
                                            @click.stop
                                            @mouseenter="suppressTitle = true"
                                            @mouseleave="suppressTitle = false"
                                            wire:loading.class="opacity-70 pointer-events-none"
                                            wire:target="setPrefilterEnabled, confirmDisablePrefilter, executeDisablePrefilter">
-                                        <input @if ($prefilterEnabled) wire:click="confirmDisablePrefilter" @else wire:click="setPrefilterEnabled(true)" @endif
+                                        <input wire:key="prefilter-input-{{ $prefilterEnabled ? 'on' : 'off' }}"
+                                               @if ($prefilterEnabled) wire:click="confirmDisablePrefilter" @else wire:click="setPrefilterEnabled(true)" @endif
                                                wire:loading.attr="disabled"
                                                wire:target="setPrefilterEnabled, confirmDisablePrefilter, executeDisablePrefilter"
+                                               :checked="$wire.prefilterEnabled"
                                                type="checkbox" class="toggle toggle-primary toggle-xs" @checked($prefilterEnabled) />
                                     </label>
 
