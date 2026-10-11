@@ -28,7 +28,7 @@ class LockoutGuardService
      * @param  string|null  $ip  Target IP address (defaults to request client IP)
      * @param  string|null  $proposedDefaultPolicy  'drop' or 'accept' (defaults to saved setting)
      */
-    public function isIpSafe(?string $ip = null, ?string $proposedDefaultPolicy = null): bool
+    public function isIpSafe(?string $ip = null, ?string $proposedDefaultPolicy = null, ?bool $proposedWhitelistEnabled = null): bool
     {
         $targetIp = trim($ip ?? request()->ip() ?? '127.0.0.1');
         $policy = strtolower(trim($proposedDefaultPolicy ?? SecuritySetting::get('firewall_default_policy', 'drop')));
@@ -44,7 +44,8 @@ class LockoutGuardService
         }
 
         // 3. Check if the IP is covered by any Trusted whitelist entry
-        if ($this->isWhitelisted($targetIp)) {
+        $whitelistOn = $proposedWhitelistEnabled ?? SecuritySetting::getBoolean('whitelist_enabled', true);
+        if ($whitelistOn && $this->isWhitelisted($targetIp)) {
             return true;
         }
 

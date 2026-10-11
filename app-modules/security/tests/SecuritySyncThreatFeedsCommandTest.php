@@ -33,7 +33,8 @@ beforeEach(function (): void {
     // Keep the privileged helper out of the test run; the command's kernel
     // step is observable through this mock.
     $this->executor = Mockery::mock(SecurityExecutorInterface::class);
-    $this->executor->shouldReceive('updateThreatFeed')->andReturn(true);
+    $this->executor->shouldReceive('updateExternalBlocklist')->byDefault()->andReturn(true);
+    $this->executor->shouldReceive('updateThreatFeed')->byDefault()->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $this->executor);
 
     $this->provider = new VoipblFeedProvider($this->ingestion, $this->executor);
@@ -129,7 +130,7 @@ it('clears kernel elements when a feed is disabled and arms an immediate sync on
     expect($feed->fresh()->last_status)->toBe('disabled');
 
     // The disable transition flushed the kernel sets through the helper.
-    $this->executor->shouldHaveReceived('updateThreatFeed')->once();
+    $this->executor->shouldHaveReceived('updateExternalBlocklist')->once();
 
     $this->assertDatabaseHas('security_audit_logs', ['action' => 'threat_feed_disabled']);
 

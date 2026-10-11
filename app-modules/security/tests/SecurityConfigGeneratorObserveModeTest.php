@@ -49,7 +49,7 @@ it('converts every drop rule into a rate-limited counter log without verdicts', 
         ->and($nft)->toContain('ip saddr @blacklist_ips counter log prefix "tallpbx-observe:blacklist " limit rate 100/minute')
         ->and($nft)->toContain('ip6 saddr @blacklist_ips6 counter log prefix "tallpbx-observe:blacklist " limit rate 100/minute')
         ->and($nft)->toContain('ip saddr @banned_ips counter log prefix "tallpbx-observe:bans " limit rate 100/minute')
-        ->and($nft)->toContain('ip saddr @threat_feed_ips counter log prefix "tallpbx-observe:threat_feeds " limit rate 100/minute');
+        ->and($nft)->toContain('ip saddr @external_blocklist_ips counter log prefix "tallpbx-observe:threat_feeds " limit rate 100/minute');
 
     // Custom-rule drops are observed too — nothing is dropped while observing.
     expect($nft)->not->toContain('udp dport 3000 drop')

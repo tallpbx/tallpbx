@@ -32,7 +32,17 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_whitelist_ips') }}</h2>
-                        <span class="badge badge-neutral badge-sm font-mono">{{ $whitelistCount }}</span>
+                        <span class="badge {{ $whitelistEnabled ? 'badge-success' : 'badge-neutral' }} badge-sm font-semibold">
+                            {{ $whitelistEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
+                        </span>
+                        @if ($whitelistEnabled)
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $whitelistCount }}</span>
+                        @else
+                            <span class="badge badge-neutral badge-sm font-mono">0</span>
+                            @if ($whitelistCount > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $whitelistCount]) }})</span>
+                            @endif
+                        @endif
                         @if (! $prefilterEnabled)
                             <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
                         @endif
@@ -40,6 +50,23 @@
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
                     </div>
+                </div>
+                <div class="flex items-center gap-2 self-start sm:self-auto">
+                    <label class="label cursor-pointer justify-start gap-2 p-0"
+                           wire:loading.class="opacity-70 pointer-events-none"
+                           wire:target="setWhitelistEnabled">
+                        <input wire:click="setWhitelistEnabled({{ $whitelistEnabled ? 'false' : 'true' }})"
+                               wire:loading.attr="disabled"
+                               wire:target="setWhitelistEnabled"
+                               type="checkbox" class="toggle toggle-success toggle-sm" @checked($whitelistEnabled) />
+                        <span wire:loading.remove wire:target="setWhitelistEnabled" class="label-text font-medium text-xs sm:text-sm">
+                            {{ __('admin.security_whitelist_enabled_toggle') }}
+                        </span>
+                        <span wire:loading wire:target="setWhitelistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ $whitelistEnabled ? __('admin.security_whitelist_disabling') : __('admin.security_whitelist_enabling') }}</span>
+                        </span>
+                    </label>
                 </div>
             </div>
 
@@ -167,7 +194,17 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_blacklist_ips') }}</h2>
-                        <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
+                        <span class="badge {{ $blacklistEnabled ? 'badge-error' : 'badge-neutral' }} badge-sm font-semibold">
+                            {{ $blacklistEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
+                        </span>
+                        @if ($blacklistEnabled)
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
+                        @else
+                            <span class="badge badge-neutral badge-sm font-mono">0</span>
+                            @if ($blacklistCount > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $blacklistCount]) }})</span>
+                            @endif
+                        @endif
                         @if (! $prefilterEnabled)
                             <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
                         @endif
@@ -175,6 +212,23 @@
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
                     </div>
+                </div>
+                <div class="flex items-center gap-2 self-start sm:self-auto">
+                    <label class="label cursor-pointer justify-start gap-2 p-0"
+                           wire:loading.class="opacity-70 pointer-events-none"
+                           wire:target="setBlacklistEnabled">
+                        <input wire:click="setBlacklistEnabled({{ $blacklistEnabled ? 'false' : 'true' }})"
+                               wire:loading.attr="disabled"
+                               wire:target="setBlacklistEnabled"
+                               type="checkbox" class="toggle toggle-error toggle-sm" @checked($blacklistEnabled) />
+                        <span wire:loading.remove wire:target="setBlacklistEnabled" class="label-text font-medium text-xs sm:text-sm">
+                            {{ __('admin.security_blacklist_enabled_toggle') }}
+                        </span>
+                        <span wire:loading wire:target="setBlacklistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ $blacklistEnabled ? __('admin.security_blacklist_disabling') : __('admin.security_blacklist_enabling') }}</span>
+                        </span>
+                    </label>
                 </div>
             </div>
 

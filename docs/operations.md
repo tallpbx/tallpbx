@@ -28,7 +28,7 @@ TallPBX enforces a strict privilege boundary across its configuration paths usin
 | Path | Mode & Owner | Purpose |
 | :--- | :--- | :--- |
 | `/etc/default/tallpbx` | `0600 root:root` | Root installer state, database passwords, and package tokens. Unreadable by web processes. |
-| `/etc/tallpbx/` | `2775 root:www-data` | Runtime firewall rules (`firewall.nft`, `threat_feed.nft`) and SSL/TLS certificates (`certs/`). |
+| `/etc/tallpbx/` | `2775 root:www-data` | Runtime firewall rules (`firewall.nft`, `external_blocklist.nft`) and SSL/TLS certificates (`certs/`). |
 | `/var/www/tallpbx/` | `0755 root:www-data` | Web application source code, Artisan CLI commands, and web UI. |
 | `/var/lib/tallpbx/media/` | `2775 www-data:www-data` | Call recordings, voicemail audio, and tenant media files. |
 

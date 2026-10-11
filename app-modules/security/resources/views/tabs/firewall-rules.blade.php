@@ -268,14 +268,17 @@
 
                     {{-- Pre-Filter Rows (rendered in the stored evaluation order) --}}
                     @foreach ($preFilterRows as $preFilterRow)
-                        <tr class="hover transition-opacity duration-200 {{ ! $prefilterEnabled ? 'opacity-40 bg-base-200/20' : ($preFilterRow['invariant'] ? 'bg-base-200/5' : '') }}"
+                        @php
+                            $rowActive = $prefilterEnabled && ($preFilterRow['enabled'] ?? true);
+                        @endphp
+                        <tr class="hover transition-opacity duration-200 {{ ! $rowActive ? 'opacity-40 bg-base-200/20' : ($preFilterRow['invariant'] ? 'bg-base-200/5' : '') }}"
                             x-show="showSystemPreFilters" x-cloak>
                             <td class="text-center px-1">
-                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ ! $prefilterEnabled ? 'bg-base-content/25' : $preFilterRow['status_class'] }} {{ ($prefilterEnabled && $preFilterRow['count_pulse']) ? 'animate-pulse' : '' }}" title="{{ $prefilterEnabled ? 'Active' : 'Disabled' }}"></span>
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ ! $rowActive ? 'bg-base-content/25' : $preFilterRow['status_class'] }} {{ ($rowActive && $preFilterRow['count_pulse']) ? 'animate-pulse' : '' }}" title="{{ $rowActive ? 'Active' : 'Disabled' }}"></span>
                             </td>
                             <td class="px-3">
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                    <span class="{{ ! $prefilterEnabled ? 'text-base-content/70' : '' }}">{{ $preFilterRow['label'] }}</span>
+                                    <span class="{{ ! $rowActive ? 'text-base-content/70' : '' }}">{{ $preFilterRow['label'] }}</span>
                                     @if ($preFilterRow['tooltip'])
                                         <x-tooltip :tip="$preFilterRow['tooltip']" align="start" position="right">
                                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
@@ -300,13 +303,20 @@
                                     <span class="font-mono text-xs text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
                                     <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
                                 @else
-                                    <span class="font-mono text-xs {{ ! $prefilterEnabled ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
-                                        {{ $preFilterRow['count'] }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
+                                    <span class="font-mono text-xs {{ ! $rowActive ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
+                                        {{ number_format($preFilterRow['count']) }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
                                     </span>
+                                    @if (! $rowActive && ! empty($preFilterRow['downloaded_count']))
+                                        <div class="text-[11px] text-base-content/50 font-normal">
+                                            ({{ __('admin.security_in_list_note', ['count' => number_format($preFilterRow['downloaded_count'])]) }})
+                                        </div>
+                                    @endif
                                 @endif
                             </td>
                             <td class="text-center px-1.5">
-                                @if ($preFilterRow['action'] === 'allow')
+                                @if (! $rowActive)
+                                    <span class="badge badge-neutral badge-sm font-semibold opacity-75">{{ __('admin.security_threat_feed_status_disabled') }}</span>
+                                @elseif ($preFilterRow['action'] === 'allow')
                                     <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
                                 @else
                                     <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>

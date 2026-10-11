@@ -185,16 +185,16 @@ class ThreatFeedIngestionService
     private function compileSetElementFile(array $v4, array $v6): void
     {
         $lines = [
-            '# TallPBX threat feed kernel elements — generated '.now()->toIso8601String().'; do not edit.',
-            'flush set inet tallpbx_filter threat_feed_ips',
-            'flush set inet tallpbx_filter threat_feed_ips6',
+            '# TallPBX external blocklist kernel elements — generated '.now()->toIso8601String().'; do not edit.',
+            'flush set inet tallpbx_filter external_blocklist_ips',
+            'flush set inet tallpbx_filter external_blocklist_ips6',
         ];
 
-        foreach ($this->chunkedAddElements('threat_feed_ips', $v4) as $line) {
+        foreach ($this->chunkedAddElements('external_blocklist_ips', $v4) as $line) {
             $lines[] = $line;
         }
 
-        foreach ($this->chunkedAddElements('threat_feed_ips6', $v6) as $line) {
+        foreach ($this->chunkedAddElements('external_blocklist_ips6', $v6) as $line) {
             $lines[] = $line;
         }
 
@@ -202,7 +202,7 @@ class ThreatFeedIngestionService
             @mkdir($this->firewallDir, 0750, true);
         }
 
-        file_put_contents($this->firewallDir.'/threat_feed.nft.pending', implode("\n", $lines)."\n");
+        file_put_contents($this->firewallDir.'/external_blocklist.nft.pending', implode("\n", $lines)."\n");
     }
 
     /**

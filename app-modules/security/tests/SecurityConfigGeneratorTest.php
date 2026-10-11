@@ -33,8 +33,8 @@ it('generates valid nftables ruleset structure with invariants and default drop 
         ->and($nft)->toContain('set blacklist_ips {')
         ->and($nft)->toContain('set banned_ips {')
         ->and($nft)->toContain('set whitelist_ips {')
-        ->and($nft)->toContain('set threat_feed_ips {')
-        ->and($nft)->toContain('set threat_feed_ips6 {')
+        ->and($nft)->toContain('set external_blocklist_ips {')
+        ->and($nft)->toContain('set external_blocklist_ips6 {')
         ->and($nft)->toContain('chain input {')
         ->and($nft)->toContain('type filter hook input priority -10; policy drop;')
         ->and($nft)->toContain('iif "lo" accept')
@@ -244,7 +244,7 @@ it('compiles IPv6 lists and bans into parallel ipv6 sets with mirrored pipeline 
     $fastPath = strpos($nft, 'ct state established,related accept');
     $blacklist6 = strpos($nft, 'ip6 saddr @blacklist_ips6 drop');
     $banned6 = strpos($nft, 'ip6 saddr @banned_ips6 drop');
-    $feed6 = strpos($nft, 'ip6 saddr @threat_feed_ips6 counter drop');
+    $feed6 = strpos($nft, 'ip6 saddr @external_blocklist_ips6 counter drop');
     $icmp6 = strpos($nft, 'mld2-listener-report');
 
     expect($whitelist6)->toBeLessThan($invalidDrop)
@@ -280,7 +280,7 @@ it('orders the input chain by the final kernel evaluation stages', function (): 
         'ct state established,related accept',
         'ip saddr @blacklist_ips drop',
         'ip saddr @banned_ips drop',
-        'ip saddr @threat_feed_ips counter drop',
+        'ip saddr @external_blocklist_ips counter drop',
         'icmp type echo-request',
         'udp dport { 5060, 5061, 5080 } accept',
         '# Rule 50: Order probe rule',
@@ -303,20 +303,20 @@ it('declares empty threat feed sets that stay digest-stable and kernel-valid', f
     $nft = $generator->generate();
 
     // Both families are declared as empty interval sets: the main ruleset
-    // never carries feed elements (threat_feed.nft populates them), so feed
+    // never carries feed elements (external_blocklist.nft populates them), so feed
     // churn can never change the canonical digest.
-    expect($nft)->toContain('set threat_feed_ips {')
-        ->and($nft)->toContain('set threat_feed_ips6 {');
+    expect($nft)->toContain('set external_blocklist_ips {')
+        ->and($nft)->toContain('set external_blocklist_ips6 {');
 
-    preg_match('/set threat_feed_ips \{(.*?)\n    \}/s', $nft, $v4Set);
+    preg_match('/set external_blocklist_ips \{(.*?)\n    \}/s', $nft, $v4Set);
     expect($v4Set[1] ?? '')
         ->toContain('flags interval')
         ->and($v4Set[1] ?? '')->not->toContain('elements');
 
     // The drop rules reference the sets and carry counters for the panel's
     // "packets dropped by the feed" metric.
-    expect($nft)->toContain('ip saddr @threat_feed_ips counter drop')
-        ->and($nft)->toContain('ip6 saddr @threat_feed_ips6 counter drop');
+    expect($nft)->toContain('ip saddr @external_blocklist_ips counter drop')
+        ->and($nft)->toContain('ip6 saddr @external_blocklist_ips6 counter drop');
 
     $pending = $generator->writePending();
     try {

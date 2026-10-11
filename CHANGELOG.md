@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.5] - 2026-10-10
 
+### Changed
+- **Renamed External Blocklist Kernel Sets & File Paths**:
+  - Renamed the Linux kernel `nftables` sets from `@threat_feed_ips` / `@threat_feed_ips6` to `@external_blocklist_ips` / `@external_blocklist_ips6` to align with the human-readable UI terminology.
+  - Renamed the runtime ruleset element files from `/etc/tallpbx/threat_feed.nft` and `.pending` to `/etc/tallpbx/external_blocklist.nft` and `.pending`.
+  - Updated the bounded host security helper `/usr/local/sbin/tallpbx-security` to capability version 3, introducing the `update-external-blocklist` action with backward-compatible aliases for `update-threat-feed`.
+  - Shortened the whole-firewall toggle tooltip across English, Spanish, and French to plainly state that when off, the firewall accepts all inbound traffic.
+
+### Performance
+- **Firewall Apply Latency Optimization & Threat Feed Bypass**:
+  - Eliminated the redundant `nft -c -f` dry-run precheck during firewall reload operations in `/usr/local/sbin/tallpbx-security`, removing ~3.2 seconds of unnecessary re-parsing of 100,000+ IP ranges on every apply.
+  - Optimized the firewall apply pipeline to conditionally skip loading external blocklists into the kernel whenever `@external_blocklist_ips` is unreferenced in the compiled ruleset (such as when the firewall is off or defensive pre-filters are disabled), dropping apply time from ~6.7 seconds down to ~50 milliseconds.
+
 ### Added
 - **Banned IPs Firewall Location Explanation & CLI Inspection Hint**:
   - Added clear UI descriptions and tooltips in the **Attackers** tab explaining exactly where banned IPs are stored in the firewall: the Linux kernel `nftables` table `inet tallpbx_filter` (chain `input`) dynamic sets `@banned_ips` (IPv4) and `@banned_ips6` (IPv6), dropping packets at wire speed before reaching any open port rules or PBX services.
@@ -23,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added contextual in-tab alerts and subtle section styling on the Whitelist, Blacklist, Active Bans, and Threat Feeds workbenches clarifying that entries are currently bypassed by the kernel firewall.
   - Added a confirmation modal when toggling pre-filters off, summarizing the four defensive subsystems that will be bypassed before applying changes to the firewall.
   - Added full translation keys across English, Spanish, and French.
+- **Cross-Subsystem Enable Toggles & Truthful Kernel Rule Counts**:
+  - Added individual enable/disable toggle switches with inline DaisyUI loading spinners and pointer-event locking across all defensive security workbenches: **External Blocklists**, **Attack Blocker** (Active Attackers), **Permanent Blacklist**, and **Trusted Whitelist**.
+  - Synchronized active firewall state so disabled subsystems truthfully reflect 0 active rules (`0 threats`, `0 entries`) in both workbench metric cards and the master Firewall Rules table, while preserving total database/downloaded counts in auxiliary labels (e.g., `0 entries (:count in list)`).
+  - Empty kernel sets (`@external_blocklist_ips`, `@banned_ips`, `@blacklist_ips`, `@whitelist_ips`) when subsystems are disabled so network packets bypass inactive stages cleanly.
+  - Added visual synchronization in the Firewall Rules table: disabled pre-filter rows are visibly dimmed (`opacity-40 bg-base-200/20`), their status indicator dot turns neutral (`bg-base-content/25`), and action badges display `Disabled` (`badge-neutral`).
+  - Integrated lockout protection into Whitelist toggling (`LockoutGuardService`) to prevent administrators from unintentionally severing active web panel sessions when operating under a drop default policy.
+  - Added `Active` / `Disabled` badges and standardized loading indicators to the SIP Scanner enforcement controls.
+
 
 ### Fixed
 - **Hardened TFTP Defense Progress Animation & Click Locking**:

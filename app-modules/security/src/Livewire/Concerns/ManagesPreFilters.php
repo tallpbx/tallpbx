@@ -92,10 +92,22 @@ trait ManagesPreFilters
      */
     public function preFilterRows(): array
     {
-        $whitelistCount = SecurityIpList::whitelist()->count();
-        $blacklistCount = SecurityIpList::blacklist()->count();
-        $bannedCount = SecurityBan::active()->count();
-        $threatFeedCount = (int) (SecurityThreatFeed::where('provider', 'voipbl')->value('entries_count') ?? 0);
+        $whitelistEnabled = SecuritySetting::getBoolean('whitelist_enabled', true);
+        $blacklistEnabled = SecuritySetting::getBoolean('blacklist_enabled', true);
+        $attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true)
+            && SecuritySetting::getBoolean('intrusion_detection_enabled', true);
+        $threatFeed = SecurityThreatFeed::where('provider', 'voipbl')->first();
+        $threatFeedEnabled = $threatFeed?->enabled ?? false;
+
+        $whitelistDbCount = SecurityIpList::whitelist()->count();
+        $blacklistDbCount = SecurityIpList::blacklist()->count();
+        $bannedDbCount = SecurityBan::active()->count();
+        $threatFeedDownloadedCount = (int) ($threatFeed?->entries_count ?? 0);
+
+        $whitelistCount = $whitelistEnabled ? $whitelistDbCount : 0;
+        $blacklistCount = $blacklistEnabled ? $blacklistDbCount : 0;
+        $bannedCount = $attackProtectionEnabled ? $bannedDbCount : 0;
+        $threatFeedCount = $threatFeedEnabled ? $threatFeedDownloadedCount : 0;
 
         $descriptors = [
             'loopback' => [
@@ -103,6 +115,7 @@ trait ManagesPreFilters
                 'badge' => 'iif "lo"',
                 'tooltip' => __('admin.security_loopback_tooltip'),
                 'invariant' => true,
+                'enabled' => true,
                 'status_class' => 'bg-success',
                 'action' => 'allow',
                 'source_kind' => 'static',
@@ -119,13 +132,15 @@ trait ManagesPreFilters
                 'badge' => '@whitelist_ips',
                 'tooltip' => null,
                 'invariant' => false,
-                'status_class' => 'bg-success',
-                'action' => 'allow',
+                'enabled' => $whitelistEnabled,
+                'status_class' => $whitelistEnabled ? 'bg-success' : 'bg-base-content/25',
+                'action' => $whitelistEnabled ? 'allow' : 'disabled',
                 'source_kind' => 'count',
                 'source_static' => null,
                 'count' => $whitelistCount,
+                'downloaded_count' => $whitelistDbCount,
                 'count_choice' => 'admin.security_entries_count',
-                'count_class' => $whitelistCount > 0 ? 'text-success font-semibold' : 'text-base-content/60',
+                'count_class' => $whitelistEnabled && $whitelistCount > 0 ? 'text-success font-semibold' : 'text-base-content/60',
                 'count_pulse' => false,
                 'manage' => ['label' => __('admin.security_manage_whitelist'), 'tab' => 'block-allow', 'class' => 'text-success'],
                 'pinned' => false,
@@ -135,6 +150,7 @@ trait ManagesPreFilters
                 'badge' => 'ct state invalid',
                 'tooltip' => __('admin.security_invalid_tooltip'),
                 'invariant' => true,
+                'enabled' => true,
                 'status_class' => 'bg-error',
                 'action' => 'drop',
                 'source_kind' => 'anywhere',
@@ -151,6 +167,7 @@ trait ManagesPreFilters
                 'badge' => 'ct state established,related',
                 'tooltip' => __('admin.security_conntrack_tooltip'),
                 'invariant' => true,
+                'enabled' => true,
                 'status_class' => 'bg-success',
                 'action' => 'allow',
                 'source_kind' => 'anywhere',
@@ -167,13 +184,15 @@ trait ManagesPreFilters
                 'badge' => '@blacklist_ips',
                 'tooltip' => null,
                 'invariant' => false,
-                'status_class' => 'bg-error',
-                'action' => 'drop',
+                'enabled' => $blacklistEnabled,
+                'status_class' => $blacklistEnabled ? 'bg-error' : 'bg-base-content/25',
+                'action' => $blacklistEnabled ? 'drop' : 'disabled',
                 'source_kind' => 'count',
                 'source_static' => null,
                 'count' => $blacklistCount,
+                'downloaded_count' => $blacklistDbCount,
                 'count_choice' => 'admin.security_entries_count',
-                'count_class' => $blacklistCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
+                'count_class' => $blacklistEnabled && $blacklistCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
                 'count_pulse' => false,
                 'manage' => ['label' => __('admin.security_manage_blacklist'), 'tab' => 'block-allow', 'class' => 'text-error'],
                 'pinned' => false,
@@ -183,29 +202,33 @@ trait ManagesPreFilters
                 'badge' => '@banned_ips',
                 'tooltip' => null,
                 'invariant' => false,
-                'status_class' => 'bg-error',
-                'action' => 'drop',
+                'enabled' => $attackProtectionEnabled,
+                'status_class' => $attackProtectionEnabled ? 'bg-error' : 'bg-base-content/25',
+                'action' => $attackProtectionEnabled ? 'drop' : 'disabled',
                 'source_kind' => 'count',
                 'source_static' => null,
                 'count' => $bannedCount,
+                'downloaded_count' => $bannedDbCount,
                 'count_choice' => 'admin.security_threats_count',
-                'count_class' => $bannedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
-                'count_pulse' => $bannedCount > 0,
+                'count_class' => $attackProtectionEnabled && $bannedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
+                'count_pulse' => $attackProtectionEnabled && $bannedCount > 0,
                 'manage' => ['label' => __('admin.security_view_threats'), 'tab' => 'attackers', 'class' => 'text-error'],
                 'pinned' => false,
             ],
             'threat_feeds' => [
                 'label' => __('admin.security_threat_feeds_title'),
-                'badge' => '@threat_feed_ips',
+                'badge' => '@external_blocklist_ips',
                 'tooltip' => null,
                 'invariant' => false,
-                'status_class' => 'bg-error',
-                'action' => 'drop',
+                'enabled' => $threatFeedEnabled,
+                'status_class' => $threatFeedEnabled ? 'bg-error' : 'bg-base-content/25',
+                'action' => $threatFeedEnabled ? 'drop' : 'disabled',
                 'source_kind' => 'count',
                 'source_static' => null,
                 'count' => $threatFeedCount,
+                'downloaded_count' => $threatFeedDownloadedCount,
                 'count_choice' => 'admin.security_entries_count',
-                'count_class' => $threatFeedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
+                'count_class' => $threatFeedEnabled && $threatFeedCount > 0 ? 'text-error font-semibold' : 'text-base-content/60',
                 'count_pulse' => false,
                 'manage' => ['label' => __('admin.security_threat_feed_manage'), 'tab' => 'external-blocklists', 'class' => 'text-error'],
                 'pinned' => false,

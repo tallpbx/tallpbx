@@ -297,6 +297,8 @@ it('ships every scanner label in English, Spanish, and French', function (): voi
         'security_scanner_incident_missing',
         'security_scanner_incident_refused',
         'security_scanner_saved',
+        'security_scanner_enabling',
+        'security_scanner_disabling',
         'security_vector_sip_scanner',
     ];
 

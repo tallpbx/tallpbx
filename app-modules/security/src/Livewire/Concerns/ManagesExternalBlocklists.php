@@ -38,6 +38,56 @@ trait ManagesExternalBlocklists
     }
 
     /**
+     * Turn the external threat feed blocklist on or off immediately.
+     */
+    public function setFeedEnabled(bool $enabled): void
+    {
+        $this->ensureFeedManagePermission();
+
+        $feed = $this->voipblFeed();
+        $feed->update(['enabled' => $enabled]);
+        $this->feedEnabled = $enabled;
+
+        if (! $enabled) {
+            app(ThreatFeedIngestionService::class)->clear();
+
+            if (! app(SecurityExecutorInterface::class)->updateExternalBlocklist()) {
+                $this->notifyError((string) __('admin.security_threat_feed_remove_blocks_failed'));
+
+                return;
+            }
+
+            SecurityAuditLog::record(
+                action: 'threat_feed_disabled',
+                ipAddress: $this->adminIp,
+                description: "External blocklist '{$feed->name}' disabled from the Security Center; kernel blocklist set was flushed.",
+                details: ['provider' => $feed->provider],
+                adminId: Auth::guard('admin')->id(),
+            );
+
+            $this->notifySuccess((string) __('admin.security_threat_feed_disabled_notice'));
+        } else {
+            $result = app(ThreatFeedManager::class)->sync($feed, force: true);
+
+            SecurityAuditLog::record(
+                action: 'threat_feed_enabled',
+                ipAddress: $this->adminIp,
+                description: "External blocklist '{$feed->name}' enabled from the Security Center.",
+                details: ['provider' => $feed->provider],
+                adminId: Auth::guard('admin')->id(),
+            );
+
+            if ($result->status === 'success' || $result->status === 'not_modified') {
+                $this->notifySuccess((string) __('admin.security_threat_feed_enabled_notice'));
+            } else {
+                $this->notifyError((string) __('admin.security_threat_feed_sync_failed', ['error' => (string) $result->error]));
+            }
+        }
+
+        $this->loadFeedState();
+    }
+
+    /**
      * Persist the external blocklist configuration from the tab form.
      */
     public function saveFeedSettings(): void
@@ -112,11 +162,14 @@ trait ManagesExternalBlocklists
 
         app(ThreatFeedIngestionService::class)->clear();
 
-        if (! app(SecurityExecutorInterface::class)->updateThreatFeed()) {
+        if (! app(SecurityExecutorInterface::class)->updateExternalBlocklist()) {
             $this->notifyError((string) __('admin.security_threat_feed_remove_blocks_failed'));
 
             return;
         }
+
+        $feed = $this->voipblFeed();
+        $feed->update(['entries_count' => 0]);
 
         SecurityAuditLog::record(
             action: 'threat_feed_blocks_removed',
@@ -124,6 +177,8 @@ trait ManagesExternalBlocklists
             description: 'All external blocklist kernel elements removed from the Security Center; the feed configuration was left enabled.',
             adminId: Auth::guard('admin')->id(),
         );
+
+        $this->loadFeedState();
 
         $this->notifySuccess((string) __('admin.security_threat_feed_blocks_removed'));
     }
@@ -135,7 +190,7 @@ trait ManagesExternalBlocklists
     {
         $status = app(SecurityExecutorInterface::class)->status();
 
-        if ($status === '' || preg_match('/ip saddr @threat_feed_ips counter packets (\d+)/', $status, $matches) !== 1) {
+        if ($status === '' || preg_match('/ip saddr @(?:external_blocklist_ips|threat_feed_ips) counter packets (\d+)/', $status, $matches) !== 1) {
             return null;
         }
 

@@ -8,11 +8,11 @@
 #
 # Security Architecture:
 # - Strictly bounded interface: Only 'apply', 'validate', 'ban', 'unban',
-#   'flush-conntrack', 'update-threat-feed', 'version', 'status', 'bans',
+#   'flush-conntrack', 'update-external-blocklist', 'update-threat-feed', 'version', 'status', 'bans',
 #   and 'observe-events' are allowed.
 # - Capability version: the 'version' action self-reports the marker below.
-#   TallPBX refuses threat-feed actions against helpers older than version 2.
-#   tallpbx-helper-version: 2
+#   TallPBX refuses external-blocklist actions against helpers older than version 3.
+#   tallpbx-helper-version: 3
 # - Input validation: IP addresses and durations are rigorously validated with regular
 #   expressions before being passed to nftables, preventing any arbitrary command injection.
 # - Atomic ruleset updates: Pending firewall rulesets are validated with 'nft -c'
@@ -29,7 +29,7 @@ set -euo pipefail
 umask 027
 
 # Capability marker PHP reads back through the 'version' action.
-HELPER_VERSION=2
+HELPER_VERSION=3
 
 ACTION="${1:-}"
 
@@ -53,9 +53,13 @@ FIREWALL_CONF_DIR="${TALLPBX_FIREWALL_CONF_DIR:-/etc/tallpbx}"
 FIREWALL_PENDING="${FIREWALL_CONF_DIR}/firewall.nft.pending"
 FIREWALL_ACTIVE="${FIREWALL_CONF_DIR}/firewall.nft"
 
-# Canonical threat feed files. The web application writes the pending file;
-# this helper promotes and loads it (update-threat-feed) and re-loads the
+# Canonical external blocklist files. The web application writes the pending file;
+# this helper promotes and loads it (update-external-blocklist) and re-loads the
 # active file after every firewall rebuild (apply).
+EXTERNAL_BLOCKLIST_PENDING="${FIREWALL_CONF_DIR}/external_blocklist.nft.pending"
+EXTERNAL_BLOCKLIST_ACTIVE="${FIREWALL_CONF_DIR}/external_blocklist.nft"
+
+# Legacy threat feed files (retained for backward compatibility)
 THREAT_FEED_PENDING="${FIREWALL_CONF_DIR}/threat_feed.nft.pending"
 THREAT_FEED_ACTIVE="${FIREWALL_CONF_DIR}/threat_feed.nft"
 
@@ -92,22 +96,37 @@ ban_set_for_ip() {
     fi
 }
 
-# Helper function to re-load the last good threat feed elements file.
+# Helper function to re-load the last good external blocklist elements file.
 #
-# Anything that (re)loads the main ruleset must call this afterwards: the
-# main ruleset opens with 'flush ruleset', which empties every kernel set —
-# without this step the threat feed sets would stay empty until the next
-# scheduled sync (up to a day of lost blocking while the panel still reports
-# a healthy feed). A corrupt feed file is skipped with a warning instead of
-# failing the operation: a degraded feed gate beats a broken firewall.
-load_threat_feed_active() {
-    [ -f "$THREAT_FEED_ACTIVE" ] || return 0
-
-    if "$NFT_BIN" -c -f "$THREAT_FEED_ACTIVE"; then
-        "$NFT_BIN" -f "$THREAT_FEED_ACTIVE"
+# Anything that (re)loads the main ruleset must call this afterwards when the
+# external blocklists stage is active: the main ruleset opens with 'flush ruleset',
+# which empties every kernel set — without this step the external blocklist sets
+# would stay empty until the next scheduled sync (up to a day of lost blocking
+# while the panel still reports a healthy feed).
+#
+# Performance optimization: Set elements are validated at compilation/promotion
+# time with 'nft -c'. We intentionally omit running a redundant 'nft -c' dry-run on
+# every firewall apply because parsing 100,000+ IP ranges twice adds several seconds
+# of latency. Instead, we load directly with 'nft -f' and log a warning if it fails:
+# a degraded feed gate beats a broken firewall.
+load_external_blocklist_active() {
+    local feed_file=""
+    if [ -f "$EXTERNAL_BLOCKLIST_ACTIVE" ]; then
+        feed_file="$EXTERNAL_BLOCKLIST_ACTIVE"
+    elif [ -f "$THREAT_FEED_ACTIVE" ]; then
+        feed_file="$THREAT_FEED_ACTIVE"
     else
-        echo "WARNING: threat feed file failed validation and was not re-loaded" >&2
+        return 0
     fi
+
+    if ! "$NFT_BIN" -f "$feed_file"; then
+        echo "WARNING: external blocklist file failed to load into kernel sets" >&2
+    fi
+}
+
+# Backward-compatibility alias
+load_threat_feed_active() {
+    load_external_blocklist_active
 }
 
 case "$ACTION" in
@@ -137,10 +156,13 @@ case "$ACTION" in
         # Step 5: Load the validated configuration into the Linux kernel atomically
         "$NFT_BIN" -f "$FIREWALL_ACTIVE"
 
-        # Step 6: Re-load the threat feed elements. The main ruleset loads
-        # with 'flush ruleset', which empties every set — see the
-        # load_threat_feed_active helper for the full reasoning.
-        load_threat_feed_active
+        # Step 6: Re-load the external blocklist elements ONLY IF the ruleset
+        # references @external_blocklist_ips (or legacy @threat_feed_ips).
+        # When the firewall is off or pre-filters are disabled, loading 100k+
+        # IPs into unreferenced sets is redundant and wastes several seconds.
+        if grep -qE '@(external_blocklist_ips|threat_feed_ips)' "$FIREWALL_ACTIVE"; then
+            load_external_blocklist_active
+        fi
 
         # Step 7: Post-apply verification and authoritative sidecar creation
         DECLARED_POLICY="$(sed -n 's/^# tallpbx-policy:[[:space:]]*\([a-z]*\).*/\1/p' "$FIREWALL_ACTIVE")"
@@ -205,9 +227,10 @@ case "$ACTION" in
                 "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
 
                 # The restore is a full ruleset load ('flush ruleset'), so the
-                # feed elements must be re-loaded with it or the feed gate
-                # silently vanishes until the next apply or sync.
-                load_threat_feed_active
+                # external blocklist elements must be re-loaded with it if referenced.
+                if grep -qE '@(external_blocklist_ips|threat_feed_ips)' "$FIREWALL_ACTIVE"; then
+                    load_external_blocklist_active
+                fi
             fi
         fi
 
@@ -241,9 +264,10 @@ case "$ACTION" in
                 "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
 
                 # The restore is a full ruleset load ('flush ruleset'), so the
-                # feed elements must be re-loaded with it or the feed gate
-                # silently vanishes until the next apply or sync.
-                load_threat_feed_active
+                # external blocklist elements must be re-loaded with it if referenced.
+                if grep -qE '@(external_blocklist_ips|threat_feed_ips)' "$FIREWALL_ACTIVE"; then
+                    load_external_blocklist_active
+                fi
             fi
         fi
 
@@ -296,13 +320,21 @@ case "$ACTION" in
         echo "tallpbx-helper-version: $HELPER_VERSION"
         ;;
 
-    update-threat-feed)
-        # Promote and load the pending threat feed set-element file. This
+    update-external-blocklist|update-threat-feed)
+        # Promote and load the pending external blocklist set-element file. This
         # action takes NO path argument by contract: the web user must never
         # be able to point a root-owned helper at an arbitrary file, so only
         # the canonical pending path written by the application is read.
-        if [ ! -f "$THREAT_FEED_PENDING" ]; then
-            echo "ERROR: Pending threat feed file not found: $THREAT_FEED_PENDING" >&2
+        PENDING_FEED_FILE=""
+        ACTIVE_FEED_FILE=""
+        if [ -f "$EXTERNAL_BLOCKLIST_PENDING" ]; then
+            PENDING_FEED_FILE="$EXTERNAL_BLOCKLIST_PENDING"
+            ACTIVE_FEED_FILE="$EXTERNAL_BLOCKLIST_ACTIVE"
+        elif [ -f "$THREAT_FEED_PENDING" ]; then
+            PENDING_FEED_FILE="$THREAT_FEED_PENDING"
+            ACTIVE_FEED_FILE="$THREAT_FEED_ACTIVE"
+        else
+            echo "ERROR: Pending external blocklist file not found: $EXTERNAL_BLOCKLIST_PENDING" >&2
             exit 1
         fi
 
@@ -319,15 +351,15 @@ case "$ACTION" in
 
         # Preflight the set-element statements before promoting anything, so
         # a malformed compile never replaces the last good feed file.
-        "$NFT_BIN" -c -f "$THREAT_FEED_PENDING"
+        "$NFT_BIN" -c -f "$PENDING_FEED_FILE"
 
         # Promote atomically, then load. The flush and add-element statements
         # travel in one file, so the kernel sees one transaction.
-        mv "$THREAT_FEED_PENDING" "$THREAT_FEED_ACTIVE"
-        chown root:www-data "$THREAT_FEED_ACTIVE" 2>/dev/null || true
-        chmod 0640 "$THREAT_FEED_ACTIVE" 2>/dev/null || true
-        "$NFT_BIN" -f "$THREAT_FEED_ACTIVE"
-        echo "SUCCESS: Threat feed elements loaded"
+        mv "$PENDING_FEED_FILE" "$ACTIVE_FEED_FILE"
+        chown root:www-data "$ACTIVE_FEED_FILE" 2>/dev/null || true
+        chmod 0640 "$ACTIVE_FEED_FILE" 2>/dev/null || true
+        "$NFT_BIN" -f "$ACTIVE_FEED_FILE"
+        echo "SUCCESS: External blocklist elements loaded"
         ;;
 
     status)
@@ -391,7 +423,7 @@ case "$ACTION" in
         ;;
 
     *)
-        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|update-threat-feed|version|status|bans|observe-events [limit]}" >&2
+        echo "Usage: $0 {apply|validate|ban <ip> [seconds]|unban <ip>|flush-conntrack <ip>|update-external-blocklist|update-threat-feed|version|status|bans|observe-events [limit]}" >&2
         exit 1
         ;;
 esac

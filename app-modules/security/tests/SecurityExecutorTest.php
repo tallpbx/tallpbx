@@ -65,6 +65,7 @@ it('returns false gracefully when helper script does not exist', function (): vo
     expect($executor->ban('192.0.2.1', 3600))->toBeFalse()
         ->and($executor->unban('192.0.2.1'))->toBeFalse()
         ->and($executor->apply())->toBeFalse()
+        ->and($executor->updateExternalBlocklist())->toBeFalse()
         ->and($executor->updateThreatFeed())->toBeFalse()
         ->and($executor->status())->toBe('');
 });
@@ -303,16 +304,16 @@ it('fails loudly when the conntrack flush really fails', function (): void {
 it('self-reports the helper capability version marker', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
-    // PHP refuses threat-feed actions against helpers older than version 2,
+    // PHP refuses external-blocklist actions against helpers older than version 3,
     // so the script must self-report what it supports.
     $process = new Process(['bash', $scriptPath, 'version']);
     $process->run();
 
     expect($process->getExitCode())->toBe(0)
-        ->and($process->getOutput())->toContain('tallpbx-helper-version: 2');
+        ->and($process->getOutput())->toContain('tallpbx-helper-version: 3');
 });
 
-it('update-threat-feed requires the canonical pending file', function (): void {
+it('update-external-blocklist requires the canonical pending file', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
     $isolatedDir = sys_get_temp_dir().'/tallpbx_security_exec_test_'.uniqid();
@@ -320,20 +321,20 @@ it('update-threat-feed requires the canonical pending file', function (): void {
 
     try {
         $process = new Process(
-            ['bash', $scriptPath, 'update-threat-feed'],
+            ['bash', $scriptPath, 'update-external-blocklist'],
             null,
             ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir],
         );
         $process->run();
 
         expect($process->getExitCode())->toBe(1)
-            ->and($process->getErrorOutput())->toContain('Pending threat feed file not found');
+            ->and($process->getErrorOutput())->toContain('Pending external blocklist file not found');
     } finally {
         @rmdir($isolatedDir);
     }
 });
 
-it('update-threat-feed ignores any path argument and only reads the canonical file', function (): void {
+it('update-external-blocklist ignores any path argument and only reads the canonical file', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
     // The helper contract is a NO-argument action: even when an argument is
@@ -347,36 +348,36 @@ it('update-threat-feed ignores any path argument and only reads the canonical fi
 
     $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_helper_test_'.uniqid();
     mkdir($isolatedDir, 0700, true);
-    file_put_contents($isolatedDir.'/threat_feed.nft.pending', "# feed elements\n");
+    file_put_contents($isolatedDir.'/external_blocklist.nft.pending', "# feed elements\n");
 
     try {
         $process = new Process(
-            ['bash', $scriptPath, 'update-threat-feed', '/tmp/evil-path.nft'],
+            ['bash', $scriptPath, 'update-external-blocklist', '/tmp/evil-path.nft'],
             null,
             ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
         );
         $process->run();
 
         expect($process->getExitCode())->toBe(0)
-            ->and($process->getOutput())->toContain("NFT: -c -f {$isolatedDir}/threat_feed.nft.pending")
-            ->and($process->getOutput())->toContain("NFT: -f {$isolatedDir}/threat_feed.nft")
+            ->and($process->getOutput())->toContain("NFT: -c -f {$isolatedDir}/external_blocklist.nft.pending")
+            ->and($process->getOutput())->toContain("NFT: -f {$isolatedDir}/external_blocklist.nft")
             ->and($process->getOutput())->not->toContain('/tmp/evil-path.nft')
-            ->and(file_exists($isolatedDir.'/threat_feed.nft'))->toBeTrue()
-            ->and(file_exists($isolatedDir.'/threat_feed.nft.pending'))->toBeFalse();
+            ->and(file_exists($isolatedDir.'/external_blocklist.nft'))->toBeTrue()
+            ->and(file_exists($isolatedDir.'/external_blocklist.nft.pending'))->toBeFalse();
     } finally {
-        @unlink($isolatedDir.'/threat_feed.nft');
+        @unlink($isolatedDir.'/external_blocklist.nft');
         @rmdir($isolatedDir);
         @unlink($nftStub);
         @rmdir($stubDir);
     }
 });
 
-it('reloads the last good threat feed file after every successful apply', function (): void {
+it('reloads the last good external blocklist file after successful apply when referenced', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
     // The main ruleset loads with `flush ruleset`, which empties the feed
     // sets — so a successful apply must re-load the last good feed file
-    // (invariant 5) right after the main ruleset.
+    // when referenced by the ruleset.
     $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
     mkdir($stubDir, 0700, true);
     $nftStub = $stubDir.'/nft';
@@ -385,8 +386,8 @@ it('reloads the last good threat feed file after every successful apply', functi
 
     $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_apply_test_'.uniqid();
     mkdir($isolatedDir, 0700, true);
-    file_put_contents($isolatedDir.'/firewall.nft.pending', "#!/usr/sbin/nft -f\n# main ruleset\n");
-    file_put_contents($isolatedDir.'/threat_feed.nft', "# feed elements\n");
+    file_put_contents($isolatedDir.'/firewall.nft.pending', "#!/usr/sbin/nft -f\n# main ruleset\nip saddr @external_blocklist_ips counter drop\n");
+    file_put_contents($isolatedDir.'/external_blocklist.nft', "# feed elements\n");
 
     try {
         $process = new Process(
@@ -400,54 +401,7 @@ it('reloads the last good threat feed file after every successful apply', functi
 
         $output = $process->getOutput();
         $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
-        $feedCheck = strpos($output, "NFT: -c -f {$isolatedDir}/threat_feed.nft");
-        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/threat_feed.nft");
-
-        expect($mainLoad)->not->toBeFalse()
-            ->and($feedCheck)->not->toBeFalse()
-            ->and($feedLoad)->not->toBeFalse()
-            ->and($mainLoad)->toBeLessThan($feedCheck)
-            ->and($feedCheck)->toBeLessThan($feedLoad);
-    } finally {
-        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
-            @unlink($file);
-        }
-        @rmdir($isolatedDir);
-        @unlink($nftStub);
-        @rmdir($stubDir);
-    }
-});
-
-it('reloads the last good threat feed file when ban restores a missing ruleset', function (): void {
-    $scriptPath = base_path('scripts/resources/tallpbx-security');
-
-    // Restoring a missing kernel table from the active file is a full ruleset
-    // load (`flush ruleset`), so the feed elements file must be re-loaded
-    // right after it — exactly like the apply path (invariant 5).
-    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
-    mkdir($stubDir, 0700, true);
-    $nftStub = $stubDir.'/nft';
-    file_put_contents($nftStub, "#!/bin/bash\nif [ \"\$1\" = \"list\" ]; then exit 1; fi\necho \"NFT: \$*\"\nexit 0\n");
-    chmod($nftStub, 0755);
-
-    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_ban_restore_test_'.uniqid();
-    mkdir($isolatedDir, 0700, true);
-    file_put_contents($isolatedDir.'/firewall.nft', "#!/usr/sbin/nft -f\n# main ruleset\n");
-    file_put_contents($isolatedDir.'/threat_feed.nft', "# feed elements\n");
-
-    try {
-        $process = new Process(
-            ['bash', $scriptPath, 'ban', '198.51.100.9', '3600'],
-            null,
-            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
-        );
-        $process->run();
-
-        expect($process->getExitCode())->toBe(0);
-
-        $output = $process->getOutput();
-        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
-        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/threat_feed.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/external_blocklist.nft");
 
         expect($mainLoad)->not->toBeFalse()
             ->and($feedLoad)->not->toBeFalse()
@@ -462,7 +416,88 @@ it('reloads the last good threat feed file when ban restores a missing ruleset',
     }
 });
 
-it('reloads the last good threat feed file when unban restores a missing ruleset', function (): void {
+it('skips reloading external blocklist elements when not referenced in the ruleset', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_apply_skip_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/firewall.nft.pending', "#!/usr/sbin/nft -f\n# main ruleset without feed set\n");
+    file_put_contents($isolatedDir.'/external_blocklist.nft', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+
+        $output = $process->getOutput();
+        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/external_blocklist.nft");
+
+        expect($mainLoad)->not->toBeFalse()
+            ->and($feedLoad)->toBeFalse();
+    } finally {
+        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
+it('reloads the last good external blocklist file when ban restores a missing ruleset', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\nif [ \"\$1\" = \"list\" ]; then exit 1; fi\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_ban_restore_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/firewall.nft', "#!/usr/sbin/nft -f\n# main ruleset\nip saddr @external_blocklist_ips counter drop\n");
+    file_put_contents($isolatedDir.'/external_blocklist.nft', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'ban', '198.51.100.9', '3600'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+
+        $output = $process->getOutput();
+        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/external_blocklist.nft");
+
+        expect($mainLoad)->not->toBeFalse()
+            ->and($feedLoad)->not->toBeFalse()
+            ->and($mainLoad)->toBeLessThan($feedLoad);
+    } finally {
+        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
+it('reloads the last good external blocklist file when unban restores a missing ruleset', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
     $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
@@ -473,8 +508,8 @@ it('reloads the last good threat feed file when unban restores a missing ruleset
 
     $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_unban_restore_test_'.uniqid();
     mkdir($isolatedDir, 0700, true);
-    file_put_contents($isolatedDir.'/firewall.nft', "#!/usr/sbin/nft -f\n# main ruleset\n");
-    file_put_contents($isolatedDir.'/threat_feed.nft', "# feed elements\n");
+    file_put_contents($isolatedDir.'/firewall.nft', "#!/usr/sbin/nft -f\n# main ruleset\nip saddr @external_blocklist_ips counter drop\n");
+    file_put_contents($isolatedDir.'/external_blocklist.nft', "# feed elements\n");
 
     try {
         $process = new Process(
@@ -488,7 +523,7 @@ it('reloads the last good threat feed file when unban restores a missing ruleset
 
         $output = $process->getOutput();
         $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
-        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/threat_feed.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/external_blocklist.nft");
 
         expect($mainLoad)->not->toBeFalse()
             ->and($feedLoad)->not->toBeFalse()
@@ -1077,7 +1112,7 @@ it('reads kernel status chain-by-chain without dumping the full table', function
         "        printf 'table inet tallpbx_filter {\\n\\tchain input {\\n\\t\\ttype filter hook input priority filter - 10; policy drop;\\n\\t}\\n\\tchain output {\\n\\t\\ttype filter hook output priority filter; policy accept;\\n\\t}\\n}\\n'\n".
         "        ;;\n".
         "    'list chain inet tallpbx_filter input')\n".
-        "        printf 'table inet tallpbx_filter {\\n\\tchain input {\\n\\t\\ttype filter hook input priority filter - 10; policy drop;\\n\\t\\tip saddr @threat_feed_ips counter packets 7 bytes 0 drop\\n\\t\\tudp dport 69 @th,64,16 0x0002 counter packets 3 bytes 0 drop\\n\\t\\tudp dport 69 @th,80,24 0x2e2e2f counter packets 2 bytes 0 drop\\n\\t\\tudp dport 69 @th,80,16 0x2f78 counter packets 1 bytes 0 drop\\n\\t\\tudp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter packets 5 bytes 0 drop\\n\\t\\tudp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter packets 4 bytes 0 drop\\n\\t}\\n}\\n'\n".
+        "        printf 'table inet tallpbx_filter {\\n\\tchain input {\\n\\t\\ttype filter hook input priority filter - 10; policy drop;\\n\\t\\tip saddr @external_blocklist_ips counter packets 7 bytes 0 drop\\n\\t\\tudp dport 69 @th,64,16 0x0002 counter packets 3 bytes 0 drop\\n\\t\\tudp dport 69 @th,80,24 0x2e2e2f counter packets 2 bytes 0 drop\\n\\t\\tudp dport 69 @th,80,16 0x2f78 counter packets 1 bytes 0 drop\\n\\t\\tudp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter packets 5 bytes 0 drop\\n\\t\\tudp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter packets 4 bytes 0 drop\\n\\t}\\n}\\n'\n".
         "        ;;\n".
         "    'list chain inet tallpbx_filter output')\n".
         "        printf 'table inet tallpbx_filter {\\n\\tchain output {\\n\\t\\ttype filter hook output priority filter; policy accept;\\n\\t}\\n}\\n'\n".
@@ -1103,7 +1138,7 @@ it('reads kernel status chain-by-chain without dumping the full table', function
             // Every output contract the PHP parsers depend on survives…
             ->and($process->getOutput())->toContain('table inet tallpbx_filter')
             ->and($process->getOutput())->toContain('type filter hook input priority filter - 10; policy drop;')
-            ->and($process->getOutput())->toContain('ip saddr @threat_feed_ips counter packets 7')
+            ->and($process->getOutput())->toContain('ip saddr @external_blocklist_ips counter packets 7')
             ->and($process->getOutput())->toContain('@th,64,16 0x0002 counter packets 3')
             ->and($process->getOutput())->toContain('@th,80,24 0x2e2e2f counter packets 2')
             ->and($process->getOutput())->toContain('@th,80,16 0x2f78 counter packets 1')

@@ -25,6 +25,19 @@ Laravel Boost runs as an active Model Context Protocol (MCP) server for this wor
 
 See the detailed search syntax and rules in [Laravel Boost](#laravel-boost) below.
 
+## CRITICAL — Mandatory Pre-Inspection of Existing UI Conventions & Holistic Parity
+
+The entire TallPBX user interface must remain **predictably consistent, intuitive, and cohesive** in look, feel, and function across every module, tab, and table:
+- **Mandatory Pre-Modification Inspection of Peer UI Patterns**: Before writing or altering ANY user interface template, component, modal, or form (Blade, Livewire, Alpine, CSS), an AI agent MUST inspect established peer components elsewhere in the project to determine the exact conventions already in use:
+  - **Fonts & Text Sizing**: Match existing headings (`text-2xl font-bold` for page titles, `text-lg font-semibold` for cards/sections), table content (`text-xs`), form labels (`text-sm font-medium`), helper copy (`text-xs text-base-content/60`), and technical identifiers (`font-mono`). Never guess or introduce arbitrary font sizes (e.g. `text-[11px]`) or non-standard weights.
+  - **DaisyUI Semantic Color Tokens**: Strictly use established DaisyUI palette tokens (`primary`, `success`, `warning`, `error`, `neutral`, `base-content`). Never introduce ad-hoc Tailwind colors (e.g., `text-red-500`, `bg-blue-600`) or hardcoded hex values that break theme consistency.
+  - **Button Types & Sizing**: Match standard button types (`btn btn-primary btn-sm` for primary actions, `btn btn-outline btn-sm` for secondary tools, `btn btn-ghost btn-xs btn-square` for table actions). Never invent one-off button variants.
+  - **Switches & Toggles**: Match the exact toggle size (`toggle-sm`), color intent, loading spinner integration, pointer-events lock, and present-continuous status copy.
+  - **Badges**: Use `badge-xs font-mono` in table cells, `badge-sm` in card headers and status banners, and `badge-neutral opacity-75` for disabled/inactive states.
+- **Holistic Assessment (Never Change One Section in a Vacuum)**: When introducing or altering a capability (such as an enable/disable toggle, inline loading spinner, status indicator dot, dimming opacity, or action progress animation) in one tab or section, agents MUST examine adjacent and structurally similar tabs and workbenches. If one feature (e.g. External Blocklists) supports an enable/disable toggle or live state feedback, evaluate whether companion subsystems (e.g. Whitelist, Blacklist, Attack Blocker, or individual pre-filter stages) should have matching controls or visual status parity, and proactively propose or implement those consistent patterns.
+- **Synchronized State Reflection Across the UI**: Disabling a subsystem in one tab MUST be accurately reflected everywhere that subsystem appears in the UI. For example, if External Blocklists are disabled, its corresponding row in the Firewall Rules master table must be visibly greyed out (`opacity-40`), its status indicator must change from active to neutral/disabled (`bg-base-content/25`), and its badge must reflect its inactive state (`badge-neutral` showing "Disabled")—never leaving the user with the false impression that an inactive rule is actively dropping traffic.
+- **Consistent Micro-Interactions**: All toggle switches, button triggers, table row actions, and confirmation modals must adhere to the standardized visual feedback patterns (DaisyUI spinners, pointer-events locks, present-continuous labels e.g. "Enabling..." / "Disabling...", and operational toast notifications).
+
 ## CRITICAL — Cache Clearing After Code Changes
 
 After ANY code changes (Blade views, config, routes, events, Livewire components, compiled classes), ALWAYS run:

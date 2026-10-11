@@ -133,7 +133,7 @@ class SecuritySyncThreatFeedsCommand extends Command
         }
 
         $ingestion->clear();
-        $executor->updateThreatFeed();
+        $executor->updateExternalBlocklist();
 
         $feed->update(['last_status' => 'disabled', 'last_error' => null]);
 

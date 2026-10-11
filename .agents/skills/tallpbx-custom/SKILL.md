@@ -97,6 +97,47 @@ TallPBX is built for administrators who **may or may not be technical** telephon
 4. **Actionable Guidance & Error Messages**:
    - Explain what happened in human terms and immediately provide the recovery step (for example, providing the free registration link `https://signalwire.com` when a SignalWire token is requested).
 
+## Cross-Section Consistency & Holistic Feature Parity
+
+A central requirement of the TallPBX user experience is **predictable consistency and cohesive polish** across all modules, tabs, and tables. Fragmented changes—where an agent updates one button or tab in isolation while ignoring adjacent components—are strictly unacceptable.
+
+### 1. Mandatory Pre-Modification Inspection of Peer UI Patterns
+- **Inspect Before Editing**: Before writing or altering ANY user interface template, component, modal, or form (Blade, Livewire, Alpine, CSS), an AI agent MUST inspect established peer components elsewhere in the project to determine the exact conventions already in use (fonts, font sizes, DaisyUI semantic colors, button variants, toggle sizes, and badge styles). Never guess or invent arbitrary classes in isolation.
+- **Holistic Assessment (Never Change One Section in a Vacuum)**: When introducing or altering a capability (such as an enable/disable toggle, inline loading spinner, status indicator dot, dimming opacity, or action progress animation) in one tab or section, agents MUST examine adjacent and structurally similar tabs and workbenches.
+- **Functional Symmetry**: If one feature (e.g. External Blocklists) supports an enable/disable toggle or live state feedback, evaluate whether companion subsystems (e.g. Whitelist, Blacklist, Attack Blocker, or individual pre-filter stages) should have matching controls or visual status parity, and proactively propose or implement those consistent patterns.
+
+### 2. Synchronized State Reflection Across the UI
+- Disabling a subsystem (e.g. External Blocklists or Pre-Filters) in one tab MUST be accurately reflected everywhere that subsystem appears in the UI. For example, if External Blocklists are disabled, its corresponding row in the Firewall Rules master table must be visibly greyed out (`opacity-40`), its status indicator must change from active to neutral/disabled (`bg-base-content/25`), and its badge must reflect its inactive state (`badge-neutral` showing "Disabled")—never leaving the user with the false impression that an inactive rule is actively dropping traffic.
+
+### 3. Design System Token Discipline (Strict Parity Across All Pages)
+- **Colors**: Strictly use DaisyUI semantic color tokens (`error`, `warning`, `success`, `primary`, `neutral`, `base-content`). Never introduce ad-hoc Tailwind colors (e.g., `text-red-500`, `bg-blue-600`) that break theme switching:
+  - `error`: Destructive, dropped, blocked, banned, critical failure.
+  - `warning`: Bypassed, observe mode, lockout risk, needs attention.
+  - `success`: Allowed, active, healthy, passed.
+  - `primary`: Interactive triggers, primary submits, active tabs.
+  - `neutral` / `ghost`: Disabled, muted, inactive, invariants.
+- **Typography & Sizing**:
+  - Page Titles: `text-2xl font-bold tracking-tight text-base-content`
+  - Card/Section Titles: `text-lg font-semibold text-base-content`
+  - Table Content: `text-xs` (standard across all tables)
+  - Form Field Labels: `text-sm font-medium text-base-content`
+  - Secondary / Helper Copy: `text-xs text-base-content/60`
+  - Technical Data (IPs, Ports, Rules, Hashes): `font-mono`
+- **Buttons**:
+  - Primary Action / Submit: `btn btn-primary btn-sm` (e.g. "Save", "Add")
+  - Secondary Action / Tool: `btn btn-outline btn-sm` (e.g. "Sync Now", "Refresh")
+  - Destructive Action: `btn btn-outline btn-error btn-sm` (or `btn btn-error btn-sm` for high-risk confirms)
+  - Table Row Actions: `btn btn-ghost btn-xs btn-square`
+  - Mutating buttons MUST include standardized `wire:loading` progress feedback (disabled attribute, DaisyUI spinner, and present-continuous verb).
+- **Badges**:
+  - Table cells & inline tags: `badge-xs font-mono`
+  - Card headers & status callouts: `badge-sm font-semibold`
+  - Inactive / Disabled state: `badge-neutral badge-sm opacity-75`
+  - Invariant / System marker: `badge-ghost badge-xs opacity-75 font-mono`
+- **Toggles & Switches**:
+  - Use DaisyUI `toggle toggle-sm` (match theme color to intent: `toggle-primary`, `toggle-warning`, or `toggle-error`).
+  - Always wire with pointer lock (`wire:loading.class="opacity-70 pointer-events-none"`), input disabled state (`wire:loading.attr="disabled"`), and inline DaisyUI spinner with present-continuous status.
+
 ## Privileged Host Command Architecture (Bounded Sudoers Pattern)
 
 TallPBX enforces a strict two-tier policy for running host Linux commands to prevent command injection (CWE-78) and root privilege escalation:

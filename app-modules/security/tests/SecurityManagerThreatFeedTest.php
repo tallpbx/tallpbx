@@ -54,7 +54,8 @@ beforeEach(function (): void {
     $this->executor->shouldReceive('apply')->andReturn(true);
     $this->executor->shouldReceive('status')->andReturnUsing(fn (): string => $this->statusOutput);
     $this->executor->shouldReceive('flushConntrack')->andReturn(true);
-    $this->executor->shouldReceive('updateThreatFeed')->andReturn(true);
+    $this->executor->shouldReceive('updateExternalBlocklist')->byDefault()->andReturn(true);
+    $this->executor->shouldReceive('updateThreatFeed')->byDefault()->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $this->executor);
 
     $ingestion = new ThreatFeedIngestionService($this->firewallDir, $this->tempDir);
@@ -122,6 +123,14 @@ it('ships every threat feed label in English, Spanish, and French', function ():
         'security_threat_feed_remove_blocks_failed',
         'security_threat_feed_blocks_removed',
         'security_threat_feed_saved',
+        'security_threat_feed_enabling',
+        'security_threat_feed_disabling',
+        'security_threat_feed_syncing',
+        'security_threat_feed_removing_blocks',
+        'security_threat_feed_enabled_notice',
+        'security_threat_feed_disabled_notice',
+        'security_threat_feed_downloaded_count',
+        'security_threat_feed_in_feed_note',
     ];
 
     foreach (['en', 'es', 'fr'] as $locale) {
@@ -158,7 +167,7 @@ it('renders the threat feeds tab with status, controls, and the IPv4-only note',
         ->assertSee(__('admin.security_threat_feed_remove_blocks'))
         ->assertSee(__('admin.security_threat_feed_ipv4_note'))
         ->assertSee(__('admin.security_threat_feed_mode_bc'))
-        ->assertSee('12345');
+        ->assertSee('12,345');
 });
 
 it('saves country filtering and sync interval with case normalization and validation', function (): void {
@@ -200,7 +209,7 @@ it('syncs on demand and reports the compiled entry count', function (): void {
         ->and($feed->entries_count)->toBe(4);
 
     // The freshly compiled elements were pushed into the kernel.
-    $this->executor->shouldHaveReceived('updateThreatFeed')->once();
+    $this->executor->shouldHaveReceived('updateExternalBlocklist')->once();
 });
 
 it('removes all feed blocks without disabling the feed', function (): void {
@@ -218,11 +227,37 @@ it('removes all feed blocks without disabling the feed', function (): void {
 
     // The kernel sets were flushed through the helper while the feed stays
     // enabled — the documented escape hatch for a provider false positive.
-    $this->executor->shouldHaveReceived('updateThreatFeed')->once();
+    $this->executor->shouldHaveReceived('updateExternalBlocklist')->once();
 
-    expect(SecurityThreatFeed::where('provider', 'voipbl')->first()->enabled)->toBeTrue();
+    expect(SecurityThreatFeed::where('provider', 'voipbl')->first()->enabled)->toBeTrue()
+        ->and(SecurityThreatFeed::where('provider', 'voipbl')->first()->entries_count)->toBe(0);
 
     $this->assertDatabaseHas('security_audit_logs', ['action' => 'threat_feed_blocks_removed']);
+});
+
+it('displays zero active addresses and notes the downloaded feed count when feed is disabled', function (): void {
+    SecurityThreatFeed::factory()->create([
+        'provider' => 'voipbl',
+        'enabled' => false,
+        'entries_count' => 12345,
+        'last_status' => 'success',
+        'last_sync_at' => now()->subMinutes(10),
+    ]);
+
+    $test = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('activeTab', 'threat-feeds')
+        ->assertSee(__('admin.security_threat_feed_status_disabled'))
+        ->assertSee(__('admin.security_threat_feed_downloaded_count', ['count' => '12,345']));
+
+    // In preFilterRows, threat_feeds stage must be disabled with count 0
+    $rows = $test->instance()->preFilterRows();
+    $threatFeedRow = collect($rows)->firstWhere('key', 'threat_feeds');
+
+    expect($threatFeedRow)->not->toBeNull()
+        ->and($threatFeedRow['enabled'])->toBeFalse()
+        ->and($threatFeedRow['count'])->toBe(0)
+        ->and($threatFeedRow['downloaded_count'])->toBe(12345);
 });
 
 it('refuses feed changes without the manage permission', function (): void {
@@ -230,25 +265,58 @@ it('refuses feed changes without the manage permission', function (): void {
     // every threat feed mutation must be refused with a 403.
     $limited = Admin::factory()->create(['enabled' => true]);
 
-    foreach (['saveFeedSettings', 'syncThreatFeedNow', 'removeAllFeedBlocks'] as $action) {
+    foreach (['saveFeedSettings', 'syncThreatFeedNow', 'removeAllFeedBlocks', 'setFeedEnabled'] as $action) {
         // A fresh component per action: the harness converts the abort(403)
         // into a plain 403 response and the failed state cannot be reused.
         Livewire::actingAs($limited, 'admin')
             ->test(SecurityManager::class)
             ->set('activeTab', 'threat-feeds')
-            ->call($action)
+            ->call($action, false)
             ->assertStatus(403);
     }
 
     // The refusal happened before any database or kernel side effect.
     expect(SecurityThreatFeed::where('provider', 'voipbl')->exists())->toBeFalse();
-    $this->executor->shouldNotHaveReceived('updateThreatFeed');
+    $this->executor->shouldNotHaveReceived('updateExternalBlocklist');
+});
+
+it('enables and disables external threat feed with immediate kernel synchronization and audit logging', function (): void {
+    SecurityThreatFeed::factory()->create([
+        'provider' => 'voipbl',
+        'enabled' => true,
+        'entries_count' => 100,
+        'last_status' => 'success',
+    ]);
+
+    // Test disabling
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('activeTab', 'threat-feeds')
+        ->call('setFeedEnabled', false)
+        ->assertSee(__('admin.security_threat_feed_disabled_notice'));
+
+    expect(SecurityThreatFeed::where('provider', 'voipbl')->first()->enabled)->toBeFalse();
+    $this->executor->shouldHaveReceived('updateExternalBlocklist')->once();
+    $this->assertDatabaseHas('security_audit_logs', ['action' => 'threat_feed_disabled']);
+
+    // Test enabling (with HTTP fake for feed download)
+    Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.1/32\n203.0.113.2/32\n203.0.113.3/32\n203.0.113.4/32", 200)]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('activeTab', 'threat-feeds')
+        ->call('setFeedEnabled', true)
+        ->assertSee(__('admin.security_threat_feed_enabled_notice'));
+
+    expect(SecurityThreatFeed::where('provider', 'voipbl')->first()->enabled)->toBeTrue();
+    $this->executor->shouldHaveReceived('updateExternalBlocklist')->twice();
+    $this->assertDatabaseHas('security_audit_logs', ['action' => 'threat_feed_enabled']);
 });
 
 it('renders the feed drop counter from the live kernel status', function (): void {
     $this->statusOutput = "table inet tallpbx_filter {\n"
         ."\tchain input {\n"
-        ."\t\tip saddr @threat_feed_ips counter packets 12345 bytes 678901 drop\n"
+        ."\t\tip saddr @external_blocklist_ips counter packets 12345 bytes 678901 drop\n"
         ."\t}\n}";
 
     SecurityThreatFeed::factory()->create(['provider' => 'voipbl', 'enabled' => true]);

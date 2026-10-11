@@ -72,9 +72,9 @@ class SecurityExecutor implements SecurityExecutorInterface
     }
 
     /**
-     * Capability version of the helper that introduced threat feed updates.
+     * Capability version of the helper that introduced external blocklist updates.
      */
-    private const REQUIRED_HELPER_VERSION = 2;
+    private const REQUIRED_HELPER_VERSION = 3;
 
     /**
      * Cache key holding the latest kernel status snapshot.
@@ -88,27 +88,35 @@ class SecurityExecutor implements SecurityExecutorInterface
     private const STATUS_CACHE_SECONDS = 15;
 
     /**
-     * Promote and load the pending threat feed set-element file.
+     * Promote and load the pending external blocklist set-element file.
      *
      * Existing installs may still carry the previous helper build, which
      * cannot touch the feed sets — the refusal is a plain-language log line
      * telling the operator to re-run the installer's security step, instead
      * of the helper's opaque usage error.
      */
-    public function updateThreatFeed(): bool
+    public function updateExternalBlocklist(): bool
     {
         $version = $this->helperVersion();
 
         if ($version === null || $version < self::REQUIRED_HELPER_VERSION) {
             Log::warning(
                 'The security helper on this server is out of date (version '.($version ?? 'unknown')
-                .'); re-run the installer\'s security step to enable threat feed updates.'
+                .'); re-run the installer\'s security step to enable external blocklist updates.'
             );
 
             return false;
         }
 
-        return $this->runCommand(['update-threat-feed']);
+        return $this->runCommand(['update-external-blocklist']);
+    }
+
+    /**
+     * Promote and load the pending threat feed set-element file (alias for updateExternalBlocklist).
+     */
+    public function updateThreatFeed(): bool
+    {
+        return $this->updateExternalBlocklist();
     }
 
     /**

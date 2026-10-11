@@ -30,7 +30,8 @@ beforeEach(function (): void {
     SecuritySetting::set('threat_feed_min_entries', '3');
 
     $this->executor = Mockery::mock(SecurityExecutorInterface::class);
-    $this->executor->shouldReceive('updateThreatFeed')->andReturn(true);
+    $this->executor->shouldReceive('updateExternalBlocklist')->byDefault()->andReturn(true);
+    $this->executor->shouldReceive('updateThreatFeed')->byDefault()->andReturn(true);
 
     $ingestion = new ThreatFeedIngestionService($this->firewallDir, $this->tempDir);
     $this->provider = new VoipblFeedProvider($ingestion, $this->executor);
@@ -93,12 +94,12 @@ it('compiles a successful download into chunked set-element statements', functio
 
     // The compiled file is a set-element file: flush statements first, then
     // add-element statements chunked so no line outgrows the nft lexer.
-    $pending = $this->firewallDir.'/threat_feed.nft.pending';
+    $pending = $this->firewallDir.'/external_blocklist.nft.pending';
     expect(file_exists($pending))->toBeTrue();
 
     $content = (string) file_get_contents($pending);
-    expect($content)->toContain('flush set inet tallpbx_filter threat_feed_ips')
-        ->and($content)->toContain('flush set inet tallpbx_filter threat_feed_ips6')
+    expect($content)->toContain('flush set inet tallpbx_filter external_blocklist_ips')
+        ->and($content)->toContain('flush set inet tallpbx_filter external_blocklist_ips6')
         ->and($content)->toContain('2001:db8::/48');
 
     $addLines = array_values(array_filter(
@@ -114,7 +115,7 @@ it('compiles a successful download into chunked set-element statements', functio
     }
 
     // A successful compile is pushed into the kernel through the helper.
-    $this->executor->shouldHaveReceived('updateThreatFeed')->once();
+    $this->executor->shouldHaveReceived('updateExternalBlocklist')->once();
 });
 
 it('updates only the check timestamp when the server reports not modified', function (): void {
@@ -164,7 +165,7 @@ it('sends conditional headers and gzip acceptance, and force bypasses the cache'
 });
 
 it('fails open and keeps the previous list when the download fails', function (): void {
-    $pending = $this->firewallDir.'/threat_feed.nft.pending';
+    $pending = $this->firewallDir.'/external_blocklist.nft.pending';
     file_put_contents($pending, "OLD GOOD LIST\n");
 
     Http::fake(['www.voipbl.org/*' => Http::response('server exploded', 500)]);
@@ -184,11 +185,11 @@ it('fails open and keeps the previous list when the download fails', function ()
     expect(file_get_contents($pending))->toBe("OLD GOOD LIST\n");
 
     // A failed download never touches the kernel either.
-    $this->executor->shouldNotHaveReceived('updateThreatFeed');
+    $this->executor->shouldNotHaveReceived('updateExternalBlocklist');
 });
 
 it('treats rate limiting as a failed sync that keeps the loaded list', function (): void {
-    $pending = $this->firewallDir.'/threat_feed.nft.pending';
+    $pending = $this->firewallDir.'/external_blocklist.nft.pending';
     file_put_contents($pending, "OLD GOOD LIST\n");
 
     Http::fake(['www.voipbl.org/*' => Http::response('slow down', 429)]);
@@ -203,7 +204,7 @@ it('treats rate limiting as a failed sync that keeps the loaded list', function 
 });
 
 it('rejects truncated downloads that fall below the minimum entry count', function (): void {
-    $pending = $this->firewallDir.'/threat_feed.nft.pending';
+    $pending = $this->firewallDir.'/external_blocklist.nft.pending';
     file_put_contents($pending, "OLD GOOD LIST\n");
 
     Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.9/32\n", 200)]);
@@ -243,7 +244,7 @@ it('marks the sync as failed when the kernel refuses to load the compiled list',
     Http::fake(['www.voipbl.org/*' => Http::response($body, 200)]);
 
     $executor = Mockery::mock(SecurityExecutorInterface::class);
-    $executor->shouldReceive('updateThreatFeed')->once()->andReturn(false);
+    $executor->shouldReceive('updateExternalBlocklist')->once()->andReturn(false);
     $provider = new VoipblFeedProvider(new ThreatFeedIngestionService($this->firewallDir, $this->tempDir), $executor);
 
     $feed = SecurityThreatFeed::factory()->create(['enabled' => true]);

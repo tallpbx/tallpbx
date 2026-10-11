@@ -112,10 +112,15 @@ class SecurityConfigGenerator
         // 1. Compile IP sets, kept split per address family because nftables
         //    sets are typed (ipv4_addr vs ipv6_addr) and mixing families in a
         //    single set would make the whole ruleset uncompilable.
-        $blacklistIps = SecurityIpList::blacklist()->orderBy('ip_address')->pluck('ip_address')->all();
-        $whitelistIps = SecurityIpList::whitelist()->orderBy('ip_address')->pluck('ip_address')->all();
+        $whitelistEnabled = SecuritySetting::getBoolean('whitelist_enabled', true);
+        $blacklistEnabled = SecuritySetting::getBoolean('blacklist_enabled', true);
+        $attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true)
+            && SecuritySetting::getBoolean('intrusion_detection_enabled', true);
 
-        $activeBans = SecurityBan::active()->get();
+        $blacklistIps = $blacklistEnabled ? SecurityIpList::blacklist()->orderBy('ip_address')->pluck('ip_address')->all() : [];
+        $whitelistIps = $whitelistEnabled ? SecurityIpList::whitelist()->orderBy('ip_address')->pluck('ip_address')->all() : [];
+
+        $activeBans = $attackProtectionEnabled ? SecurityBan::active()->get() : collect();
 
         // Refuse to compile entries the kernel sets cannot represent:
         // one invalid element would make the whole ruleset uncompilable.
@@ -227,19 +232,19 @@ class SecurityConfigGenerator
         $lines[] = '    }';
         $lines[] = '';
 
-        // 7. Automated Public Threat Feed Set (IPv4 interval tree). Declared
-        //    empty here and populated exclusively by threat_feed.nft, so feed
+        // 7. Automated Public External Blocklist Set (IPv4 interval tree). Declared
+        //    empty here and populated exclusively by external_blocklist.nft, so feed
         //    churn can never change the canonical ruleset digest.
-        $lines[] = '    # 7. Automated Public Threat Feed Set (populated by threat_feed.nft)';
-        $lines[] = '    set threat_feed_ips {';
+        $lines[] = '    # 7. Automated Public External Blocklist Set (populated by external_blocklist.nft)';
+        $lines[] = '    set external_blocklist_ips {';
         $lines[] = '        type ipv4_addr';
         $lines[] = '        flags interval';
         $lines[] = '    }';
         $lines[] = '';
 
-        // 8. Automated Public Threat Feed Set (IPv6, mirrors set threat_feed_ips)
-        $lines[] = '    # 8. IPv6 Automated Public Threat Feed Set (mirrors set threat_feed_ips)';
-        $lines[] = '    set threat_feed_ips6 {';
+        // 8. Automated Public External Blocklist Set (IPv6, mirrors set external_blocklist_ips)
+        $lines[] = '    # 8. IPv6 Automated Public External Blocklist Set (mirrors set external_blocklist_ips)';
+        $lines[] = '    set external_blocklist_ips6 {';
         $lines[] = '        type ipv6_addr';
         $lines[] = '        flags interval';
         $lines[] = '    }';
@@ -870,8 +875,8 @@ class SecurityConfigGenerator
             // the feed" metric; the sets stay populated across rebuilds.
             'threat_feeds' => [
                 '        # STAGE {n}: DROP AUTOMATED PUBLIC THREAT FEED MATCHES',
-                '        ip saddr @threat_feed_ips '.$this->dropStatement('threat_feeds', $observeMode, true),
-                '        ip6 saddr @threat_feed_ips6 '.$this->dropStatement('threat_feeds', $observeMode, true),
+                '        ip saddr @external_blocklist_ips '.$this->dropStatement('threat_feeds', $observeMode, true),
+                '        ip6 saddr @external_blocklist_ips6 '.$this->dropStatement('threat_feeds', $observeMode, true),
                 '',
             ],
         ];

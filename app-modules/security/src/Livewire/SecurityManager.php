@@ -215,7 +215,9 @@ class SecurityManager extends Component
         // registry so the panel and the listener can never disagree.
         $this->sipScannerEnforcement = SipScannerSignatures::enforcementEnabled();
         $this->sipScannerBanSeconds = SipScannerSignatures::banSeconds();
-        $this->attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true);
+        $this->attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true) && SecuritySetting::getBoolean('intrusion_detection_enabled', true);
+        $this->whitelistEnabled = SecuritySetting::getBoolean('whitelist_enabled', true);
+        $this->blacklistEnabled = SecuritySetting::getBoolean('blacklist_enabled', true);
         $this->pendingChangesCount = (int) SecuritySetting::get('pending_changes_count', '0');
     }
 

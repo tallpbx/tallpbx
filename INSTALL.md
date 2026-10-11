@@ -264,7 +264,7 @@ Never run broad `chown` or `chmod` commands across the repository. If Laravel ca
 TallPBX separates root installer credentials from runtime application files using standard Debian paths:
 
 - **`/etc/default/tallpbx` (file, `0600 root:root`)**: Stores root-level installer settings and credentials (database setup passwords and package tokens). It lives in Debian's standard `/etc/default/` directory and is restricted to `root` so the web server (`www-data`) can never read, modify, or delete installer secrets.
-- **`/etc/tallpbx/` (directory, `2775 root:www-data`)**: Holds runtime firewall rules (`firewall.nft`, `threat_feed.nft`) and SSL/TLS certificates (`certs/`). The web process needs group write access here so the Security Center can stage pending firewall updates and deploy certificates.
+- **`/etc/tallpbx/` (directory, `2775 root:www-data`)**: Holds runtime firewall rules (`firewall.nft`, `external_blocklist.nft`) and SSL/TLS certificates (`certs/`). The web process needs group write access here so the Security Center can stage pending firewall updates and deploy certificates.
 
 ### Firewall (nftables)
 

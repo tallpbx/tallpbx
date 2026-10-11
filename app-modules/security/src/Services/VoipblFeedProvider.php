@@ -97,9 +97,9 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
             // bounded helper. A refused load (stale helper, missing pending
             // file) must surface as a failed sync: reporting a healthy feed
             // while the kernel blocks nothing would mislead the operator.
-            if (! $this->executor->updateThreatFeed()) {
+            if (! $this->executor->updateExternalBlocklist()) {
                 $updates['last_status'] = 'failed';
-                $updates['last_error'] = 'The threat feed list was downloaded but could not be loaded into the kernel (the security helper is missing or out of date).';
+                $updates['last_error'] = 'The external blocklist was downloaded but could not be loaded into the kernel (the security helper is missing or out of date).';
             }
         }
 

@@ -18,7 +18,7 @@ table inet tallpbx_filter {
         ct state invalid counter packets 4 bytes 320 log prefix "tallpbx-observe:invalid " limit rate 100/minute burst 5 packets
         ip saddr @blacklist_ips counter packets 12 bytes 960 log prefix "tallpbx-observe:blacklist " limit rate 100/minute burst 5 packets
         ip saddr @banned_ips counter packets 33 bytes 1665 log prefix "tallpbx-observe:bans " limit rate 100/minute burst 5 packets
-        ip saddr @threat_feed_ips counter packets 8 bytes 640 log prefix "tallpbx-observe:threat_feeds " limit rate 100/minute burst 5 packets
+        ip saddr @external_blocklist_ips counter packets 8 bytes 640 log prefix "tallpbx-observe:threat_feeds " limit rate 100/minute burst 5 packets
         udp dport 69 @th,64,16 0x2 counter packets 1 bytes 57 log prefix "tallpbx-observe:tftp " limit rate 100/minute burst 5 packets
         udp dport 69 @th,64,16 0x1 @th,80,24 0x2e2e2f counter packets 5 bytes 265 log prefix "tallpbx-observe:tftp " limit rate 100/minute burst 5 packets
         udp dport 69 @th,64,32 0x12f78 counter packets 2 bytes 100 log prefix "tallpbx-observe:tftp " limit rate 100/minute burst 5 packets

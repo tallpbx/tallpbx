@@ -375,11 +375,35 @@ trait ManagesAttackProtection
         SecuritySetting::updateOrCreate(['key' => 'protect_ssh'], ['value' => $this->protectSsh ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'firewall_enabled'], ['value' => $this->firewallEnabled ? '1' : '0']);
         SecuritySetting::updateOrCreate(['key' => 'attack_protection_enabled'], ['value' => $this->attackProtectionEnabled ? '1' : '0']);
+        SecuritySetting::updateOrCreate(['key' => 'intrusion_detection_enabled'], ['value' => $this->attackProtectionEnabled ? '1' : '0']);
 
         $this->showSettingsDrawer = false;
 
         if ($this->autoApplyFirewallRuleset()) {
             $this->notifySuccess((string) __('admin.security_settings_saved'));
+        }
+    }
+
+    /**
+     * Turn attack protection and automatic brute force defense on or off.
+     */
+    public function setAttackProtectionEnabled(bool $enabled): void
+    {
+        SecuritySetting::updateOrCreate(['key' => 'attack_protection_enabled'], ['value' => $enabled ? '1' : '0']);
+        SecuritySetting::updateOrCreate(['key' => 'intrusion_detection_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->attackProtectionEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'attack_protection_enabled' : 'attack_protection_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Attack protection re-enabled from the Security Center'
+                : 'Attack protection disabled from the Security Center; brute force protection and attacker bans bypassed',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __($enabled ? 'admin.security_attack_protection_enabled_notice' : 'admin.security_attack_protection_disabled_notice'));
         }
     }
 }

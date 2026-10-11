@@ -54,7 +54,7 @@ flowchart TD
         S5 -->|NO: Safe| S6{"Stage 6: Active Intruder Ban?<br/>(@banned_ips / @banned_ips6)"}:::prefilter
 
         S6 -->|YES: Banned| DROP_BAN["❌ DROP IMMEDIATELY<br/>(Dynamic Kernel Auto-Timeout)"]:::drop
-        S6 -->|NO: Safe| S7{"Stage 7: Public Threat Feed?<br/>(@threat_feed_ips / @threat_feed_ips6)"}:::prefilter
+        S6 -->|NO: Safe| S7{"Stage 7: External Blocklists?<br/>(@external_blocklist_ips / @external_blocklist_ips6)"}:::prefilter
 
         S7 -->|YES: VoIPBL Hit| DROP_FEED["❌ DROP IMMEDIATELY<br/>(Public Fraud / Scanner Network)"]:::drop
     end
@@ -117,7 +117,7 @@ Toggled and reordered as an administrative unit in the **Firewall Rules** tab:
 4. **Stateful Fast Path (`ct state established,related accept`)**: Established call audio (RTP) and active sessions pass with zero CPU lookup overhead.
 5. **Permanent Blacklist (`@blacklist_ips drop`)**: Explicitly forbidden IPs/CIDRs dropped at line rate via kernel interval trees.
 6. **Active Intrusion Bans (`@banned_ips drop`)**: Dynamic hardware-timed bans triggered by authentication failures or scanner probes.
-7. **Public Threat Feeds (`@threat_feed_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL) dropped at the perimeter.
+7. **External Blocklists (`@external_blocklist_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL) dropped at the perimeter.
 
 ### 2. Diagnostics & Protocol Defense (Stages 8–9)
 8. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
@@ -295,18 +295,18 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, thr
 1. **Tier 1: MariaDB (Authoritative Source of Truth)**
    - Database tables (`security_bans`, `security_ip_lists`, `security_rules`, `security_settings`, `security_threat_feeds`) permanently store all whitelisted IPs, blacklisted subnets, custom firewall rules, PBX port definitions, and active attacker bans.
 
-2. **Tier 2: Boot Persistence (`/etc/tallpbx/firewall.nft`, `/etc/tallpbx/threat_feed.nft`, & `/etc/nftables.conf`)**
+2. **Tier 2: Boot Persistence (`/etc/tallpbx/firewall.nft`, `/etc/tallpbx/external_blocklist.nft`, & `/etc/nftables.conf`)**
    - Whenever any security change is made in the web UI, [SecurityConfigGenerator](../app-modules/security/src/Services/SecurityConfigGenerator.php) compiles the active ruleset directly into `/etc/tallpbx/firewall.nft`.
-   - Threat feed elements are maintained in `/etc/tallpbx/threat_feed.nft` and loaded into `@threat_feed_ips`.
+   - External blocklist elements are maintained in `/etc/tallpbx/external_blocklist.nft` and loaded into `@external_blocklist_ips`.
    - The systemd boot loader `/etc/nftables.conf` includes `/etc/tallpbx/firewall.nft`.
-   - When the Linux server reboots, systemd's `nftables.service` executes `/etc/nftables.conf` before networking starts, instantly restoring all rules, trusted IPs, threat feeds, and temporary attacker bans with their remaining expiration times intact.
+   - When the Linux server reboots, systemd's `nftables.service` executes `/etc/nftables.conf` before networking starts, instantly restoring all rules, trusted IPs, external blocklists, and temporary attacker bans with their remaining expiration times intact.
 
 ### Privilege Separation: Installer Secrets vs. Runtime Assets
 
 TallPBX enforces a strict privilege separation boundary between root installer state and web-managed assets:
 
 - **`/etc/default/tallpbx` (`0600 root:root`)**: Stored in Debian's standard `/etc/default/` location. Contains root installer credentials and tokens that the unprivileged web application (`www-data`) cannot read, modify, or delete.
-- **`/etc/tallpbx/` (`2775 root:www-data`)**: Holds the active firewall rules (`firewall.nft`, `threat_feed.nft`) and certificates. The web panel stages `.pending` changes here, which the root helper validates and promotes.
+- **`/etc/tallpbx/` (`2775 root:www-data`)**: Holds the active firewall rules (`firewall.nft`, `external_blocklist.nft`) and certificates. The web panel stages `.pending` changes here, which the root helper validates and promotes.
 
 > [!NOTE]
 > **Atomic Swaps & Safety Checks**:
@@ -354,7 +354,7 @@ php artisan security:sync-threat-feeds
 # Force sync ignoring HTTP cache
 php artisan security:sync-threat-feeds --force
 ```
-*Downloads the latest IP blocklists from configured threat feed providers (VoIPBL), filters by country, writes `/etc/tallpbx/threat_feed.nft.pending`, validates syntax with `nft -c`, and atomically promotes elements into kernel sets.*
+*Downloads the latest IP blocklists from configured threat feed providers (VoIPBL), filters by country, writes `/etc/tallpbx/external_blocklist.nft.pending`, validates syntax with `nft -c`, and atomically promotes elements into kernel sets.*
 
 #### Recompile & Apply Active Ruleset
 ```bash
@@ -399,11 +399,11 @@ sudo /usr/local/sbin/tallpbx-security flush-conntrack 198.51.100.22
 ```
 *Deletes all active connection tracking flows for the given IP address, immediately terminating in-flight phone calls and active TCP sessions.*
 
-#### Update Threat Feed Elements
+#### Update External Blocklist Elements
 ```bash
-sudo /usr/local/sbin/tallpbx-security update-threat-feed
+sudo /usr/local/sbin/tallpbx-security update-external-blocklist
 ```
-*Validates `/etc/tallpbx/threat_feed.nft.pending` with `nft -c`, atomically moves it to `/etc/tallpbx/threat_feed.nft`, and loads elements into kernel sets.*
+*Validates `/etc/tallpbx/external_blocklist.nft.pending` with `nft -c`, atomically moves it to `/etc/tallpbx/external_blocklist.nft`, and loads elements into kernel sets.*
 
 #### Helper Capability & Version Check
 ```bash
@@ -424,7 +424,7 @@ System administrators with root or sudo access can inspect and interact directly
 | **View Active Banned IPs** | `sudo nft list set inet tallpbx_filter banned_ips` |
 | **View Whitelist IPs/Subnets** | `sudo nft list set inet tallpbx_filter whitelist_ips` |
 | **View Blacklist IPs/Subnets** | `sudo nft list set inet tallpbx_filter blacklist_ips` |
-| **View Threat Feed IPs** | `sudo nft list set inet tallpbx_filter threat_feed_ips` |
+| **View External Blocklist IPs** | `sudo nft list set inet tallpbx_filter external_blocklist_ips` |
 | **View Inbound Chain & Packet Counters** | `sudo nft list chain inet tallpbx_filter input` |
 
 #### Emergency Recovery: Panel and `php artisan` Unreachable

@@ -62,15 +62,33 @@
                 <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_threat_feeds_desc') }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <button wire:click="syncThreatFeedNow" type="button" class="btn btn-outline btn-sm gap-1">
-                    <x-heroicon-o-arrow-path class="w-4 h-4" />
-                    <span>{{ __('admin.security_threat_feed_sync_now') }}</span>
+                <button wire:click="syncThreatFeedNow"
+                        wire:loading.attr="disabled"
+                        wire:target="syncThreatFeedNow"
+                        type="button" class="btn btn-outline btn-sm gap-1">
+                    <span wire:loading.remove wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
+                        <x-heroicon-o-arrow-path class="w-4 h-4" />
+                        <span>{{ __('admin.security_threat_feed_sync_now') }}</span>
+                    </span>
+                    <span wire:loading wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
+                        <span class="loading loading-spinner loading-xs"></span>
+                        <span>{{ __('admin.security_threat_feed_syncing') }}</span>
+                    </span>
                 </button>
-                <button wire:click="removeAllFeedBlocks" type="button"
+                <button wire:click="removeAllFeedBlocks"
+                        wire:loading.attr="disabled"
+                        wire:target="removeAllFeedBlocks"
+                        type="button"
                         wire:confirm="{{ __('admin.security_threat_feed_remove_blocks_confirm') }}"
                         class="btn btn-outline btn-error btn-sm gap-1">
-                    <x-heroicon-o-trash class="w-4 h-4" />
-                    <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
+                    <span wire:loading.remove wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
+                        <x-heroicon-o-trash class="w-4 h-4" />
+                        <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
+                    </span>
+                    <span wire:loading wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
+                        <span class="loading loading-spinner loading-xs"></span>
+                        <span>{{ __('admin.security_threat_feed_removing_blocks') }}</span>
+                    </span>
                 </button>
             </div>
         </div>
@@ -78,9 +96,20 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             {{-- Left: feed configuration --}}
             <div class="space-y-4">
-                <label class="label cursor-pointer justify-start gap-2 p-0">
-                    <input wire:model="feedEnabled" type="checkbox" class="toggle toggle-error toggle-sm" />
-                    <span class="label-text font-medium">{{ __('admin.security_threat_feed_enable') }}</span>
+                <label class="label cursor-pointer justify-start gap-2 p-0"
+                       wire:loading.class="opacity-70 pointer-events-none"
+                       wire:target="setFeedEnabled">
+                    <input wire:click="setFeedEnabled({{ $feedEnabled ? 'false' : 'true' }})"
+                           wire:loading.attr="disabled"
+                           wire:target="setFeedEnabled"
+                           type="checkbox" class="toggle toggle-error toggle-sm" @checked($feedEnabled) />
+                    <span wire:loading.remove wire:target="setFeedEnabled" class="label-text font-medium">
+                        {{ __('admin.security_threat_feed_enable') }}
+                    </span>
+                    <span wire:loading wire:target="setFeedEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-error">
+                        <span class="loading loading-spinner loading-xs"></span>
+                        <span>{{ $feedEnabled ? __('admin.security_threat_feed_disabling') : __('admin.security_threat_feed_enabling') }}</span>
+                    </span>
                 </label>
 
                 <div>
@@ -127,8 +156,17 @@
 
                 <p class="text-xs text-base-content/60">{{ __('admin.security_threat_feed_ipv4_note') }}</p>
 
-                <button wire:click="saveFeedSettings" type="button" class="btn btn-primary btn-sm">
-                    {{ __('client.save') }}
+                <button wire:click="saveFeedSettings"
+                        wire:loading.attr="disabled"
+                        wire:target="saveFeedSettings"
+                        type="button" class="btn btn-primary btn-sm">
+                    <span wire:loading.remove wire:target="saveFeedSettings">
+                        {{ __('client.save') }}
+                    </span>
+                    <span wire:loading wire:target="saveFeedSettings" class="inline-flex items-center gap-1.5">
+                        <span class="loading loading-spinner loading-xs"></span>
+                        <span>{{ __('admin.saving') }}</span>
+                    </span>
                 </button>
             </div>
 
@@ -136,7 +174,19 @@
             <div class="grid grid-cols-2 gap-3">
                 <div class="p-3 bg-base-200/50 rounded-box border border-base-200">
                     <div class="text-xs text-base-content/60">{{ __('admin.security_threat_feed_metric_entries') }}</div>
-                    <div class="text-lg font-semibold font-mono text-base-content">{{ $threatFeed?->entries_count ?? 0 }}</div>
+                    @if ($feedEnabled)
+                        <div class="text-lg font-semibold font-mono text-base-content">{{ number_format($threatFeed?->entries_count ?? 0) }}</div>
+                    @else
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-lg font-semibold font-mono text-base-content/60">0</span>
+                            <span class="badge badge-neutral badge-xs opacity-75">{{ __('admin.security_threat_feed_status_disabled') }}</span>
+                        </div>
+                        @if (($threatFeed?->entries_count ?? 0) > 0)
+                            <div class="text-[11px] text-base-content/60 mt-0.5">
+                                {{ __('admin.security_threat_feed_downloaded_count', ['count' => number_format($threatFeed->entries_count)]) }}
+                            </div>
+                        @endif
+                    @endif
                 </div>
                 <div class="p-3 bg-base-200/50 rounded-box border border-base-200">
                     <div class="text-xs text-base-content/60">{{ __('admin.security_threat_feed_metric_rejected') }}</div>

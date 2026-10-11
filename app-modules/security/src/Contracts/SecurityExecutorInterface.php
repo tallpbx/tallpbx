@@ -39,11 +39,16 @@ interface SecurityExecutorInterface
     public function flushConntrack(string $ip): bool;
 
     /**
-     * Promote and load the pending threat feed set-element file.
+     * Promote and load the pending external blocklist set-element file.
      *
      * The bounded helper reads only its canonical pending file (no path
      * argument); a helper older than the capability version refuses with a
      * logged plain-language error instead of an opaque usage message.
+     */
+    public function updateExternalBlocklist(): bool;
+
+    /**
+     * Promote and load the pending threat feed set-element file (alias for updateExternalBlocklist).
      */
     public function updateThreatFeed(): bool;
 

@@ -72,7 +72,7 @@ it('skips the protection stages, keeps the stored policy, and documents the rema
         ->and($nft)->not->toContain('ct state established,related accept')
         ->and($nft)->not->toContain('ip saddr @blacklist_ips drop')
         ->and($nft)->not->toContain('ip saddr @banned_ips drop')
-        ->and($nft)->not->toContain('ip saddr @threat_feed_ips counter drop');
+        ->and($nft)->not->toContain('ip saddr @external_blocklist_ips counter drop');
 
     // The stored default policy is honored exactly as saved — never
     // silently changed by the switch.
@@ -102,7 +102,7 @@ it('skips the protection stages, keeps the stored policy, and documents the rema
     // The sets stay declared so re-enabling the pre-filter repopulates the
     // kernel without a schema change.
     expect($nft)->toContain('set whitelist_ips {')
-        ->and($nft)->toContain('set threat_feed_ips {');
+        ->and($nft)->toContain('set external_blocklist_ips {');
 
     $pending = $generator->writePending();
     try {

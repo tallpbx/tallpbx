@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Security\Livewire\Concerns;
 
+use Illuminate\Support\Facades\Auth;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
+use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityIpList;
+use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Rules\ValidFirewallAddress;
 use Modules\Security\Services\LockoutGuardService;
 
@@ -27,6 +30,60 @@ trait ManagesAllowBlockLists
     public string $whitelistSearch = '';
 
     public string $blacklistSearch = '';
+
+    public bool $whitelistEnabled = true;
+
+    public bool $blacklistEnabled = true;
+
+    /**
+     * Turn the trusted whitelist on or off.
+     */
+    public function setWhitelistEnabled(bool $enabled, LockoutGuardService $lockoutGuard): void
+    {
+        if (! $enabled && ! $lockoutGuard->isIpSafe($this->adminIp !== '' ? $this->adminIp : null, $this->firewallDefaultPolicy, proposedWhitelistEnabled: false)) {
+            $this->notifyError((string) __('admin.security_whitelist_lockout_refused', ['ip' => $this->adminIp]));
+
+            return;
+        }
+
+        SecuritySetting::updateOrCreate(['key' => 'whitelist_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->whitelistEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'whitelist_enabled' : 'whitelist_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Trusted whitelist re-enabled from the Security Center'
+                : 'Trusted whitelist disabled from the Security Center; whitelisted addresses are bypassed in the firewall',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __($enabled ? 'admin.security_whitelist_enabled_notice' : 'admin.security_whitelist_disabled_notice'));
+        }
+    }
+
+    /**
+     * Turn the permanent blacklist on or off.
+     */
+    public function setBlacklistEnabled(bool $enabled): void
+    {
+        SecuritySetting::updateOrCreate(['key' => 'blacklist_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->blacklistEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'blacklist_enabled' : 'blacklist_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Permanent blacklist re-enabled from the Security Center'
+                : 'Permanent blacklist disabled from the Security Center; blacklisted addresses are bypassed in the firewall',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset()) {
+            $this->notifySuccess((string) __($enabled ? 'admin.security_blacklist_enabled_notice' : 'admin.security_blacklist_disabled_notice'));
+        }
+    }
 
     /**
      * 1-click rescue action: unconditionally whitelist the current administrator IP.

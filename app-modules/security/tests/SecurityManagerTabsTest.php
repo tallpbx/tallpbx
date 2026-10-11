@@ -12,6 +12,8 @@ use Livewire\Livewire;
 use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
+use Modules\Security\Models\SecurityBan;
+use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\SecurityConfigGenerator;
 
@@ -197,4 +199,73 @@ it('prompts confirmation modal before disabling pre-filters and executes safely'
         ->call('executeDisablePrefilter')
         ->assertSet('showDisablePrefilterModal', false)
         ->assertSet('prefilterEnabled', false);
+});
+
+it('toggles attack protection, whitelist, and blacklist with accurate counts and prefilter reflection', function (): void {
+    // Seed some test data
+    SecurityIpList::create(['type' => 'whitelist', 'ip_address' => '198.51.100.10']);
+    SecurityIpList::create(['type' => 'blacklist', 'ip_address' => '198.51.100.20']);
+    SecurityBan::create([
+        'ip_address' => '198.51.100.30',
+        'vector' => 'sip_auth',
+        'reason' => 'Failed SIP registration',
+        'is_active' => true,
+        'banned_at' => now(),
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(SecurityManager::class);
+
+    // Initial state: all enabled
+    $component->assertSet('whitelistEnabled', true)
+        ->assertSet('blacklistEnabled', true)
+        ->assertSet('attackProtectionEnabled', true);
+
+    $rows = $component->instance()->preFilterRows();
+    $whitelistRow = collect($rows)->firstWhere('key', 'whitelist');
+    $blacklistRow = collect($rows)->firstWhere('key', 'blacklist');
+    $bannedRow = collect($rows)->firstWhere('key', 'banned');
+
+    expect($whitelistRow['enabled'])->toBeTrue()
+        ->and($whitelistRow['count'])->toBeGreaterThan(0)
+        ->and($blacklistRow['enabled'])->toBeTrue()
+        ->and($blacklistRow['count'])->toBe(1)
+        ->and($bannedRow['enabled'])->toBeTrue()
+        ->and($bannedRow['count'])->toBe(1);
+
+    // Test disabling blacklist
+    $component->call('setBlacklistEnabled', false)
+        ->assertSet('blacklistEnabled', false);
+
+    $rows = $component->instance()->preFilterRows();
+    $blacklistRow = collect($rows)->firstWhere('key', 'blacklist');
+    expect($blacklistRow['enabled'])->toBeFalse()
+        ->and($blacklistRow['count'])->toBe(0)
+        ->and($blacklistRow['downloaded_count'])->toBe(1);
+
+    // Test disabling attack protection
+    $component->call('setAttackProtectionEnabled', false)
+        ->assertSet('attackProtectionEnabled', false);
+
+    $rows = $component->instance()->preFilterRows();
+    $bannedRow = collect($rows)->firstWhere('key', 'banned');
+    expect($bannedRow['enabled'])->toBeFalse()
+        ->and($bannedRow['count'])->toBe(0)
+        ->and($bannedRow['downloaded_count'])->toBe(1);
+
+    // Test whitelist lockout check: with default policy drop, disabling is refused if admin IP not safe
+    SecuritySetting::set('firewall_default_policy', 'drop');
+    $component->set('adminIp', '203.0.113.99');
+    $component->call('setWhitelistEnabled', false);
+    expect($component->get('whitelistEnabled'))->toBeTrue();
+
+    // With loopback admin IP, disabling whitelist is safe and succeeds
+    $component->set('adminIp', '127.0.0.1');
+    $component->call('setWhitelistEnabled', false)
+        ->assertSet('whitelistEnabled', false);
+
+    $rows = $component->instance()->preFilterRows();
+    $whitelistRow = collect($rows)->firstWhere('key', 'whitelist');
+    expect($whitelistRow['enabled'])->toBeFalse()
+        ->and($whitelistRow['count'])->toBe(0);
 });
