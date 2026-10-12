@@ -13,315 +13,13 @@
         "multi-tenant"
     ],
     "license": "Apache-2.0",
-    "repositories": [
-        {
-            "type": "path",
-            "url": "app-modules/acl"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/active-calls"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/active-conferences"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/admin"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/auth"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/backups"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/bridges"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-blocks"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-broadcast"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-center-active"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-centers"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-flows"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-forwards"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/call-recordings"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/certificates"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/click-to-call"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/conference-centers"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/conferences"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/destinations"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/devices"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/dialplan-tools"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/dialplans"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/email-queue"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/email-connector"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/email-templates"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/emergency"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/event-rate-limits"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/extension-settings"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/extensions"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/fax"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/file-stores"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/feature-codes"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/follow-me"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/hot-desking"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/gateways"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/inbound-routes"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/ivr-menus"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/logs"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/music-on-hold"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/number-translations"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/operator-panel"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/outbound-routes"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/pin-numbers"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/provision"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/recordings"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/registrations"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/ring-groups"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/security"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/sip-accounts"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/sip-profiles"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/sip-status"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/sip-trunks"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/speech"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/tenant"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/tenant-limits"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/time-conditions"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/transcribe"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/voicemail-messages"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/voicemails"
-        },
-        {
-            "type": "path",
-            "url": "app-modules/xml-cdr"
-        }
-    ],
     "require": {
         "php": "^8.3",
         "blade-ui-kit/blade-heroicons": "^2.7",
         "laravel/framework": "^13.8",
         "laravel/reverb": "^1.11",
         "laravel/tinker": "^3.0",
-        "livewire/livewire": "^4.0",
-        "tallpbx/module-acl": "*",
-        "tallpbx/module-active-calls": "*",
-        "tallpbx/module-active-conferences": "*",
-        "tallpbx/module-admin": "*",
-        "tallpbx/module-auth": "*",
-        "tallpbx/module-backups": "@dev",
-        "tallpbx/module-bridges": "*",
-        "tallpbx/module-call-blocks": "*",
-        "tallpbx/module-call-broadcast": "*",
-        "tallpbx/module-call-center-active": "*",
-        "tallpbx/module-call-centers": "*",
-        "tallpbx/module-call-flows": "*",
-        "tallpbx/module-call-forwards": "*",
-        "tallpbx/module-call-recordings": "*",
-        "tallpbx/module-certificates": "*",
-        "tallpbx/module-click-to-call": "*",
-        "tallpbx/module-conference-centers": "*",
-        "tallpbx/module-conferences": "*",
-        "tallpbx/module-destinations": "*",
-        "tallpbx/module-devices": "*",
-        "tallpbx/module-dialplan-tools": "*",
-        "tallpbx/module-dialplans": "*",
-        "tallpbx/module-email-connector": "@dev",
-        "tallpbx/module-email-queue": "*",
-        "tallpbx/module-email-templates": "*",
-        "tallpbx/module-emergency": "*",
-        "tallpbx/module-event-rate-limits": "*",
-        "tallpbx/module-extension-settings": "*",
-        "tallpbx/module-extensions": "*",
-        "tallpbx/module-fax": "*",
-        "tallpbx/module-feature-codes": "*",
-        "tallpbx/module-file-stores": "@dev",
-        "tallpbx/module-follow-me": "*",
-        "tallpbx/module-gateways": "*",
-        "tallpbx/module-hot-desking": "*",
-        "tallpbx/module-inbound-routes": "*",
-        "tallpbx/module-ivr-menus": "*",
-        "tallpbx/module-logs": "*",
-        "tallpbx/module-music-on-hold": "*",
-        "tallpbx/module-number-translations": "*",
-        "tallpbx/module-operator-panel": "*",
-        "tallpbx/module-outbound-routes": "*",
-        "tallpbx/module-pin-numbers": "*",
-        "tallpbx/module-provision": "*",
-        "tallpbx/module-recordings": "*",
-        "tallpbx/module-registrations": "*",
-        "tallpbx/module-ring-groups": "*",
-        "tallpbx/module-security": "*",
-        "tallpbx/module-sip-accounts": "*",
-        "tallpbx/module-sip-profiles": "*",
-        "tallpbx/module-sip-status": "*",
-        "tallpbx/module-sip-trunks": "*",
-        "tallpbx/module-speech": "*",
-        "tallpbx/module-tenant": "*",
-        "tallpbx/module-tenant-limits": "*",
-        "tallpbx/module-time-conditions": "*",
-        "tallpbx/module-transcribe": "*",
-        "tallpbx/module-voicemail-messages": "*",
-        "tallpbx/module-voicemails": "*",
-        "tallpbx/module-xml-cdr": "*"
+        "livewire/livewire": "^4.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -342,7 +40,66 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
-            "Modules\\Backups\\": "app-modules/backups/src/"
+            "Modules\\Acl\\": "app-modules/acl/src/",
+            "Modules\\ActiveCalls\\": "app-modules/active-calls/src/",
+            "Modules\\ActiveConferences\\": "app-modules/active-conferences/src/",
+            "Modules\\Admin\\": "app-modules/admin/src/",
+            "Modules\\Auth\\": "app-modules/auth/src/",
+            "Modules\\Backups\\": "app-modules/backups/src/",
+            "Modules\\Bridges\\": "app-modules/bridges/src/",
+            "Modules\\CallBlocks\\": "app-modules/call-blocks/src/",
+            "Modules\\CallBroadcast\\": "app-modules/call-broadcast/src/",
+            "Modules\\CallCenterActive\\": "app-modules/call-center-active/src/",
+            "Modules\\CallCenters\\": "app-modules/call-centers/src/",
+            "Modules\\CallFlows\\": "app-modules/call-flows/src/",
+            "Modules\\CallForwards\\": "app-modules/call-forwards/src/",
+            "Modules\\CallRecordings\\": "app-modules/call-recordings/src/",
+            "Modules\\Certificates\\": "app-modules/certificates/src/",
+            "Modules\\ClickToCall\\": "app-modules/click-to-call/src/",
+            "Modules\\ConferenceCenters\\": "app-modules/conference-centers/src/",
+            "Modules\\Conferences\\": "app-modules/conferences/src/",
+            "Modules\\Destinations\\": "app-modules/destinations/src/",
+            "Modules\\Devices\\": "app-modules/devices/src/",
+            "Modules\\DialplanTools\\": "app-modules/dialplan-tools/src/",
+            "Modules\\Dialplans\\": "app-modules/dialplans/src/",
+            "Modules\\EmailConnector\\": "app-modules/email-connector/src/",
+            "Modules\\EmailQueue\\": "app-modules/email-queue/src/",
+            "Modules\\EmailTemplates\\": "app-modules/email-templates/src/",
+            "Modules\\Emergency\\": "app-modules/emergency/src/",
+            "Modules\\EventRateLimits\\": "app-modules/event-rate-limits/src/",
+            "Modules\\ExtensionSettings\\": "app-modules/extension-settings/src/",
+            "Modules\\Extensions\\": "app-modules/extensions/src/",
+            "Modules\\Fax\\": "app-modules/fax/src/",
+            "Modules\\FeatureCodes\\": "app-modules/feature-codes/src/",
+            "Modules\\FileStores\\": "app-modules/file-stores/src/",
+            "Modules\\FollowMe\\": "app-modules/follow-me/src/",
+            "Modules\\Gateways\\": "app-modules/gateways/src/",
+            "Modules\\HotDesking\\": "app-modules/hot-desking/src/",
+            "Modules\\InboundRoutes\\": "app-modules/inbound-routes/src/",
+            "Modules\\IvrMenus\\": "app-modules/ivr-menus/src/",
+            "Modules\\Logs\\": "app-modules/logs/src/",
+            "Modules\\MusicOnHold\\": "app-modules/music-on-hold/src/",
+            "Modules\\NumberTranslations\\": "app-modules/number-translations/src/",
+            "Modules\\OperatorPanel\\": "app-modules/operator-panel/src/",
+            "Modules\\OutboundRoutes\\": "app-modules/outbound-routes/src/",
+            "Modules\\PinNumbers\\": "app-modules/pin-numbers/src/",
+            "Modules\\Provision\\": "app-modules/provision/src/",
+            "Modules\\Recordings\\": "app-modules/recordings/src/",
+            "Modules\\Registrations\\": "app-modules/registrations/src/",
+            "Modules\\RingGroups\\": "app-modules/ring-groups/src/",
+            "Modules\\Security\\": "app-modules/security/src/",
+            "Modules\\SipAccounts\\": "app-modules/sip-accounts/src/",
+            "Modules\\SipProfiles\\": "app-modules/sip-profiles/src/",
+            "Modules\\SipStatus\\": "app-modules/sip-status/src/",
+            "Modules\\SipTrunks\\": "app-modules/sip-trunks/src/",
+            "Modules\\Speech\\": "app-modules/speech/src/",
+            "Modules\\Tenant\\": "app-modules/tenant/src/",
+            "Modules\\TenantLimits\\": "app-modules/tenant-limits/src/",
+            "Modules\\TimeConditions\\": "app-modules/time-conditions/src/",
+            "Modules\\Transcribe\\": "app-modules/transcribe/src/",
+            "Modules\\VoicemailMessages\\": "app-modules/voicemail-messages/src/",
+            "Modules\\Voicemails\\": "app-modules/voicemails/src/",
+            "Modules\\XmlCdr\\": "app-modules/xml-cdr/src/"
         }
     },
     "autoload-dev": {

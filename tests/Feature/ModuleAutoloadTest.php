@@ -3,20 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Validates that every module namespace resolves correctly through
- * Composer's autoloader (previously validated modules_autoload.php).
- *
- * Modules are now autoloaded via Composer path repositories.
+ * Validates that every built-in module namespace resolves directly
+ * through Composer's root PSR-4 autoloader, without path repositories
+ * or package symlinks.
  */
 
 /**
- * Converts a hyphenated module directory name to a PSR-4 namespace
- * prefix.
- *
- * Examples:
- *   'sip-accounts'   => 'Modules\\SipAccounts\\'
- *   'call-forwards'  => 'Modules\\CallForwards\\'
- *   'xml-cdr'        => 'Modules\\XmlCdr\\'
+ * Converts a hyphenated module directory name to a PSR-4 namespace prefix.
  */
 function moduleNamespace(string $dirName): string
 {
@@ -25,10 +18,10 @@ function moduleNamespace(string $dirName): string
     return "Modules\\{$studly}\\";
 }
 
-test('every module provider class is autoloadable via Composer', function () {
+test('every built-in module provider class is autoloadable via root psr-4', function () {
     $manifests = glob(base_path('app-modules/*/module.json'));
 
-    expect($manifests)->not->toBeEmpty('No module manifests found.');
+    expect($manifests)->toHaveCount(60, 'Expected exactly 60 built-in module manifests.');
 
     $missing = [];
 
@@ -53,14 +46,37 @@ test('every module provider class is autoloadable via Composer', function () {
     );
 });
 
-test('the backups module is installed through its Composer path repository', function (): void {
-    /** @var array{repositories: array<int, array{type: string, url: string}>, require: array<string, string>} $composer */
+test('root composer.json contains zero path repositories and zero pseudo-package requirements', function (): void {
+    /** @var array{repositories?: array<mixed>, require?: array<string, string>} $composer */
     $composer = json_decode((string) file_get_contents(base_path('composer.json')), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($composer['repositories'])->toContain([
-        'type' => 'path',
-        'url' => 'app-modules/backups',
-    ])->and($composer['require'])->toHaveKey('tallpbx/module-backups', '@dev');
+    expect($composer['repositories'] ?? [])->toBeEmpty('Root composer.json should not contain any repositories.');
+
+    $moduleRequires = array_filter(
+        array_keys($composer['require'] ?? []),
+        fn (string $pkg) => str_starts_with($pkg, 'tallpbx/module-')
+    );
+
+    expect($moduleRequires)->toBeEmpty('Root composer.json should not require any tallpbx/module-* pseudo-packages.');
+});
+
+test('root composer.json contains direct psr-4 mappings for all 60 built-in modules', function (): void {
+    /** @var array{autoload?: array{psr-4?: array<string, string>}} $composer */
+    $composer = json_decode((string) file_get_contents(base_path('composer.json')), true, flags: JSON_THROW_ON_ERROR);
+
+    $psr4 = $composer['autoload']['psr-4'] ?? [];
+    $dirs = glob(base_path('app-modules/*'), GLOB_ONLYDIR);
+
+    expect($dirs)->toHaveCount(60);
+
+    foreach ($dirs as $dir) {
+        $name = basename($dir);
+        $expectedNs = moduleNamespace($name);
+        $expectedPath = "app-modules/{$name}/src/";
+
+        expect($psr4)->toHaveKey($expectedNs)
+            ->and($psr4[$expectedNs])->toBe($expectedPath);
+    }
 });
 
 test('all module directories resolve to the expected namespace prefix', function (string $dir, string $expectedNs) {
