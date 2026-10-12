@@ -280,30 +280,21 @@ To prevent untrusted or poorly written third-party extensions in `custom-modules
 
 ---
 
-## 9. Module Scaffolding Architecture (`make:module`)
+## 9. Custom Module Scaffolding Architecture (`make:module`)
 
-The generator command `php artisan make:module` provides dual scaffolding workflows tailored to the Domain-Driven Modular Monolith:
+In the Domain-Driven Modular Monolith, built-in modules (`app-modules/`) are part of the permanent appliance monorepo maintained directly in source code. To keep the developer experience clean and avoid fragile runtime mutations of root `composer.json`, the scaffolding command `php artisan make:module` is dedicated exclusively to generating **third-party and community extensions** in `custom-modules/`:
 
-### 9.1 Built-in Core Modules (`app-modules/{name}/`)
-When adding a new first-party domain capability to the appliance:
 ```bash
-php artisan make:module call-whisper --category="PBX"
+php artisan make:module my-crm-connector --category="Integrations"
 ```
-* **Directory**: Creates `app-modules/{name}/`.
-* **Manifest**: Generates `module.json` containing `$schema`, namespace (`Modules\{Studly}`), service provider, display name, and dependencies.
+
+### Key Behaviors:
+* **Target Location**: Scaffolds directly into `custom-modules/{name}/` (untracked, git-ignored).
+* **Manifest (`module.json`)**: Generates the standard manifest tagged with `source: "custom"`, setting up namespace (`CustomModules\{Studly}` or `Modules\{Studly}`), display name, category, and dependencies.
 * **Service Provider**: Generates `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider`.
-* **Autoloading Integration**: Automatically inserts the PSR-4 namespace mapping into root `composer.json`'s `autoload.psr-4` block (`"Modules\\{Studly}\\": "app-modules/{name}/src/"`) and executes `composer dump-autoload -o`.
-* **Clean Monolith Structure**: Does not generate redundant per-module `composer.json` files; `module.json` is the sole source of module metadata.
-
-### 9.2 Third-Party Community Extensions (`--custom`)
-When developing an external plugin or community add-on:
-```bash
-php artisan make:module my-crm-connector --custom --category="Integrations"
-```
-* **Directory**: Creates `custom-modules/{name}/` (untracked, git-ignored).
-* **Manifest**: Generates `module.json` with source type tagged as `custom`.
-* **Root Invariance**: Does not modify root `composer.json`. Autoloading is handled dynamically at runtime via `CustomModuleAutoloader`.
-* **Collision Guard Ready**: Generates stub language files and migrations ready for pre-flight collision checks.
+* **Zero Root Mutation**: Leaves root `composer.json` completely untouched.
+* **Instant Activation**: Immediately discovered and autoloaded at runtime via `CustomModuleAutoloader` and validated by pre-flight collision guards.
+* **Component Stubs**: Pre-generates boilerplate Livewire component directories, Blade views, migration directories, and collision-safe translation files (`lang/{en,es,fr}/admin.php`).
 
 ---
 

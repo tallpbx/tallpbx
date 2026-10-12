@@ -83,7 +83,7 @@ git commit -m "refactor: replace 60 composer path repos with direct psr-4 autolo
 
 ---
 
-### Task 2: Unified Discovery Engine, Dynamic Booting & Module Scaffolding
+### Task 2: Unified Discovery Engine, Dynamic Booting & Custom Module Scaffolding
 
 **Files:**
 - Modify: `app/Providers/ModuleServiceProvider.php`
@@ -96,9 +96,9 @@ git commit -m "refactor: replace 60 composer path repos with direct psr-4 autolo
 
 **Interfaces:**
 - Consumes: `app-modules/*/module.json`, `custom-modules/*/module.json`, `vendor/*/*/module.json`
-- Produces: `modules.manifest` array tagged with `source` (`core`, `custom`, `vendor`); dynamic `$this->app->register()` for enabled module service providers; runtime autoloader for `CustomModules\`; modernized `make:module` with dual built-in/custom workflows.
+- Produces: `modules.manifest` array tagged with `source` (`core`, `custom`, `vendor`); dynamic `$this->app->register()` for enabled module service providers; runtime autoloader for `CustomModules\`; streamlined `make:module` scaffolding exclusively into `custom-modules/`.
 
-- [ ] **Step 1: Write failing test for multi-source module discovery and dynamic provider registration**
+- [ ] **Step 1: Write failing test for multi-source module discovery, dynamic provider registration, and custom module scaffolding**
 
 In `tests/Feature/Providers/ModuleServiceProviderTest.php`, test that:
 1. `modules.manifest` tags `app-modules/` as `source: 'core'`.
@@ -116,14 +116,14 @@ test('module discovery tags core modules and registers their providers dynamical
 ```
 
 In `tests/Feature/Commands/NativeModuleCommandTest.php`:
-Add test verifying that `make:module` supports `--custom` scaffolding into `custom-modules/{name}/` without editing root `composer.json`, and that default scaffolding into `app-modules/` registers root PSR-4 without generating a redundant per-module `composer.json`.
+Update scaffolding test verifying that `make:module` scaffolds directly into `custom-modules/{name}/` with `module.json` (`source: custom`), `src/Providers/ModuleServiceProvider.php`, and views, without touching root `composer.json`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `php artisan test tests/Feature/Providers/ModuleServiceProviderTest.php`
 Expected: FAIL (missing `source` tag on manifest).
 
-- [ ] **Step 3: Implement multi-source discovery, custom autoloader, and modern make:module**
+- [ ] **Step 3: Implement multi-source discovery, custom autoloader, and custom make:module**
 
 1. Add `/custom-modules/` to `.gitignore` (ignoring everything inside except a `.gitkeep`).
 2. Implement `app/Support/CustomModuleAutoloader.php` using `spl_autoload_register` to resolve `CustomModules\{Name}\` to `custom-modules/{name}/src/`.
@@ -134,10 +134,10 @@ Expected: FAIL (missing `source` tag on manifest).
    - In `register()`, loop through discovered modules: if `ModuleState::isEnabled($name)` is true, register the provider `$this->app->register($providerClass)`.
 4. Update `app/Console/Commands/ModuleSyncCommand.php` to scan `custom-modules/` alongside `app-modules/` and `vendor/`.
 5. Update `app/Console/Commands/MakeModuleCommand.php`:
-   - Add `--custom` option.
-   - For `--custom`: scaffold into `custom-modules/{name}/` with `module.json` (`source: custom`).
-   - For default: scaffold into `app-modules/{name}/`, append `"Modules\\{Studly}\\": "app-modules/{name}/src/"` to root `composer.json`'s `autoload.psr-4`, and run `composer dump-autoload -o`.
-   - Drop redundant per-module `composer.json` generation.
+   - Target `custom-modules/{name}/` directly.
+   - Generate `module.json` with `source: custom`.
+   - Drop per-module `composer.json` generation.
+   - Leave root `composer.json` untouched.
 
 - [ ] **Step 4: Run targeted tests to verify they pass**
 
@@ -148,7 +148,7 @@ Expected: PASS.
 
 ```bash
 git add app/Providers/ModuleServiceProvider.php app/Console/Commands/ModuleSyncCommand.php app/Console/Commands/MakeModuleCommand.php app/Support/CustomModuleAutoloader.php .gitignore tests/Feature/Providers/ModuleServiceProviderTest.php tests/Feature/Commands/NativeModuleCommandTest.php
-git commit -m "feat: implement multi-source module discovery, dynamic booting, and modernized make:module scaffolding"
+git commit -m "feat: implement multi-source module discovery, dynamic booting, and custom module scaffolding"
 ```
 
 ---
