@@ -140,7 +140,10 @@ it('ships every tftp defense label in English, Spanish, and French', function ()
     ];
 
     foreach (['en', 'es', 'fr'] as $locale) {
-        $lines = require lang_path($locale.'/admin.php');
+        $moduleFile = __DIR__.'/../lang/'.$locale.'/admin.php';
+        $lines = file_exists($moduleFile)
+            ? array_merge(require lang_path($locale.'/admin.php'), require $moduleFile)
+            : require lang_path($locale.'/admin.php');
         $missing = array_values(array_diff($required, array_keys($lines)));
 
         expect($missing)->toBe([], 'Missing keys in '.$locale.': '.implode(', ', $missing));

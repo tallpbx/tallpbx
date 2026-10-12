@@ -155,21 +155,33 @@ it('throws LogicException at runtime when a module language file collides with r
 
     $probeProvider = new class(app()) extends ModuleServiceProvider
     {
+        /**
+         * Path to the probe module.
+         */
         protected function modulePath(): string
         {
             return base_path('app-modules/collision-test-probe');
         }
 
+        /**
+         * Name of the probe module.
+         */
         protected function moduleName(): string
         {
             return 'collision-test-probe';
         }
 
+        /**
+         * Namespace of the probe module.
+         */
         protected function moduleNamespace(): string
         {
             return 'Modules\\CollisionTestProbe';
         }
 
+        /**
+         * Boot the probe provider.
+         */
         public function boot(MenuService $menu, PermissionService $permission, ModuleState $modules): void
         {
             parent::boot($menu, $permission, $modules);
