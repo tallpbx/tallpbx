@@ -1,7 +1,7 @@
 # TallPBX 4.x Modular Architecture Modernization Spec
 ## Domain-Driven Modular Monolith & Unified Extensibility Engine
 
-- **Branch**: `4.x` (Target release series, no backwards-compatibility bridges with 3.x)
+- **Branch**: `4.x` (Primary active development series)
 - **Status**: Draft Spec for Review
 - **Date**: 2026-10-11
 - **Author**: Antigravity & TallPBX Core Architecture Team
@@ -10,9 +10,7 @@
 
 ## 1. Executive Summary & Goals
 
-TallPBX organizes its telecommunications and administration capabilities into 60 distinct domain packages in `app-modules/`. In the 3.x series, these internal domains were treated as pseudo-Composer packages via 60 path repositories in root `composer.json`. This led to high maintenance friction, long Composer dependency-solving times (60+ seconds), memory exhaustion on 2GB–4GB appliances, and fragile lifecycle operations that dirtied git-tracked source directories and broke the Git Updater.
-
-For the **4.x series**, TallPBX transitions to an idiomatic **Domain-Driven Modular Monolith**:
+TallPBX organizes its telecommunications, administrative, and PBX capabilities into 60 distinct domain packages in `app-modules/` following an idiomatic **Domain-Driven Modular Monolith**:
 1. **Core Appliance Monorepo (`app-modules/`)**: All 60 built-in modules are recognized as first-party domain modules of the appliance. They are versioned, tested, and updated together atomically via the central Git Updater.
 2. **Elimination of Composer Path Repositories**: The 60 path repository declarations in root `composer.json` are completely removed. Autoloading is handled directly by optimized PSR-4 autoloading, dropping Composer execution time to < 5 seconds and slashing memory usage.
 3. **Clean Extensibility Boundary (`custom-modules/`)**: Third-party and community extensions are supported via an untracked, git-ignored `custom-modules/` directory (drop-in zips or git clones) and standard Composer packages in `vendor/`. External plugins never touch or dirty the core Git repository.
@@ -282,11 +280,38 @@ To prevent untrusted or poorly written third-party extensions in `custom-modules
 
 ---
 
-## 9. Authoritative Documentation Updates (`docs/modular-architecture.md`)
+## 9. Module Scaffolding Architecture (`make:module`)
+
+The generator command `php artisan make:module` provides dual scaffolding workflows tailored to the Domain-Driven Modular Monolith:
+
+### 9.1 Built-in Core Modules (`app-modules/{name}/`)
+When adding a new first-party domain capability to the appliance:
+```bash
+php artisan make:module call-whisper --category="PBX"
+```
+* **Directory**: Creates `app-modules/{name}/`.
+* **Manifest**: Generates `module.json` containing `$schema`, namespace (`Modules\{Studly}`), service provider, display name, and dependencies.
+* **Service Provider**: Generates `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider`.
+* **Autoloading Integration**: Automatically inserts the PSR-4 namespace mapping into root `composer.json`'s `autoload.psr-4` block (`"Modules\\{Studly}\\": "app-modules/{name}/src/"`) and executes `composer dump-autoload -o`.
+* **Clean Monolith Structure**: Does not generate redundant per-module `composer.json` files; `module.json` is the sole source of module metadata.
+
+### 9.2 Third-Party Community Extensions (`--custom`)
+When developing an external plugin or community add-on:
+```bash
+php artisan make:module my-crm-connector --custom --category="Integrations"
+```
+* **Directory**: Creates `custom-modules/{name}/` (untracked, git-ignored).
+* **Manifest**: Generates `module.json` with source type tagged as `custom`.
+* **Root Invariance**: Does not modify root `composer.json`. Autoloading is handled dynamically at runtime via `CustomModuleAutoloader`.
+* **Collision Guard Ready**: Generates stub language files and migrations ready for pre-flight collision checks.
+
+---
+
+## 10. Authoritative Documentation Updates (`docs/modular-architecture.md`)
 
 Update `docs/modular-architecture.md` with:
-1. **Modular Monolith Principles**: Explaining the Domain-Driven Design rationale, benefits, and contrast with FreePBX's fragmented multi-repo approach.
-2. **Module Directory Anatomy**: Updated structure highlighting direct PSR-4 autoloading without path repositories.
+1. **Modular Monolith Principles**: Explaining the Domain-Driven Design rationale, benefits, and bounded context encapsulation.
+2. **Module Directory Anatomy**: Clean structure highlighting direct PSR-4 autoloading without path repositories.
 3. **Core vs. Custom Developer Guide**:
    * How to develop a first-party module in `app-modules/`.
    * How to develop a drop-in 3rd-party extension in `custom-modules/`.
@@ -297,7 +322,7 @@ Update `docs/modular-architecture.md` with:
 
 ---
 
-## 10. Verification & Pre-Commit Quality Gate
+## 11. Verification & Pre-Commit Quality Gate
 
 Every change in this modernization must satisfy the verification checklist before merging on `4.x`:
 1. `php artisan optimize:clear`: Cleans caches without errors.

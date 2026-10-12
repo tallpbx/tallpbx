@@ -19,6 +19,15 @@ Laravel Boost is active as an MCP server (`php artisan boost:mcp`). **Prefer Boo
 - **Tagging Best Practices**: Never tag individual commits or task completions. Tags (`v1.0.0`, `v1.1.0`, `v2.0.0`, `v2.1.0`, `v2.1.1`, `v3.0.0`, `v4.0.0`, etc.) are reserved strictly for official, finished production releases on series branch heads.
 - **Reference**: Detailed explanations are available in [`README.md`](../README.md), [`INSTALL.md`](../INSTALL.md), and [`CHANGELOG.md`](../CHANGELOG.md).
 
+## Domain-Driven Modular Monolith Architecture
+- **Architecture Model**: TallPBX 4.x is explicitly designed as a **Domain-Driven Modular Monolith**. All 60 built-in telephony and administration features are partitioned into cohesive bounded contexts under `app-modules/{domain}/`.
+- **Atomic Deployment**: Built-in modules are part of the core repository and update atomically via Git. They are NOT independent microservices or separate Composer packages.
+- **Direct PSR-4 Autoloading**: All built-in modules are mapped directly in root `composer.json` via PSR-4 (`Modules\{Domain}\` => `app-modules/{domain}/src/`). Zero path repositories are used.
+- **No Deletion of Core Modules**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in registry, suppressing route and provider registration).
+- **Extensibility Boundary (`custom-modules/`)**: Third-party community extensions reside in the untracked, git-ignored `custom-modules/` directory or in standard Composer packages under `vendor/`, guarded by strict Pre-flight Collision Guards.
+- **Domain Boundaries & Decoupling**: All future AI design decisions and code changes must maintain high cohesion within domains, low coupling across domains, and route cross-domain communication through events, contracts, or service layer abstractions. Avoid deep coupling to another module's internal schema.
+- **Autonomous System Utilities**: System administration tools like Backups are self-contained modules under Core Administration (Superadmin-centric).
+
 ## Cache Clearing Rule (Mandatory)
 After ANY code changes (Blade views, config, routes, events, Livewire components, compiled classes), ALWAYS run:
 ```bash

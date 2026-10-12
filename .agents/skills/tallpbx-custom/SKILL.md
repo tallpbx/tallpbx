@@ -894,19 +894,21 @@ Run the narrow affected test files first, then `php artisan app:test --smoke` wh
 - Use branch heads and commit SHAs for intermediate work and references.
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
 
-## Module Design Conventions
+## Domain-Driven Modular Monolith Architecture (4.x)
 
-Apply when creating or modifying an app-modules module. New modules are
-scaffolded with `php artisan make:module <name>` and must keep this shape:
+TallPBX is architected as a **Domain-Driven Modular Monolith**. Telephony, administrative, and PBX capabilities are structured into cohesive bounded contexts under `app-modules/{name}/`. All future design decisions, code changes, and refactoring by AI agents must strictly uphold these modular principles:
 
-- Code: `src/{Models,Services,Livewire,Support,Database/Factories,Providers}` under `Modules\{Studly}\`.
-- Factories: `src/Database/Factories/`, namespace `Modules\{Studly}\Database\Factories`, resolved by standard HasFactory — never `database/factories/Pbx`, never a `newFactory()` override.
-- Tests: Pest tests inside `app-modules/{name}/tests/` (`*Test.php`), discovered by the phpunit.xml glob. Cross-module tests stay in the central `tests/` tree; the ModuleAwareTestGuard skips them automatically when a referenced module is missing. Annotate URL-only or Dusk tests with `$this->skipWhenModuleUninstalled('<module>');`.
-- Config: ship `config/{name}.php` to override centralized app-level defaults; it merges under the module's key (module values win on conflicts, all other keys survive).
-- Translations: ship `lang/{en,es,fr}/admin.php` for admin translations (and `client.php` if client UI exists). Must include the mandatory collision warning docblock. Module keys MUST contain the module/entity domain (e.g. `gateway_host`, `create_gateway`). Generic action keys (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`) belong strictly in root `lang/{locale}/admin.php` and must NEVER be defined in module files. `ModuleServiceProvider` actively refuses to load files with root collisions at runtime. Zero template rewriting: views continue using `__('admin.*')`.
-- Dependencies: declare every cross-module class reference in `module.json` → `requirements.modules` (array of module name strings). ModuleBoundaryTest fails on undeclared references or cycles.
-- Core modules are protected — never uninstallable, never disable-able: extensions, devices, sip-accounts, destinations, dialplans, dialplan-tools, gateways, sip-profiles, inbound-routes, outbound-routes (plus required admin, auth, tenant).
-- Lifecycle: the panel offers enable/disable only. Removal: `php artisan module:uninstall <name>` (typed confirmation; refuses while dependents exist). Restore: `php artisan module:restore <name>` (from git or Composer; database data is not restored).
+- **Monolithic Core Deployment**: All 60 built-in modules are part of the core repository and update atomically via Git. They are NOT independent microservices or pseudo-packages.
+- **Direct PSR-4 Autoloading**: All built-in modules are autoloaded via direct PSR-4 entries in root `composer.json` (`Modules\{Studly}\` => `app-modules/{name}/src/`). Root `composer.json` contains 0 path repositories.
+- **Code Organization**: `src/{Models,Services,Livewire,Support,Database/Factories,Providers}` under `Modules\{Studly}\`.
+- **Factories**: `src/Database/Factories/`, namespace `Modules\{Studly}\Database\Factories`, resolved by standard `HasFactory` — never root `database/factories/`, never a `newFactory()` override.
+- **Tests**: Pest tests inside `app-modules/{name}/tests/` (`*Test.php`), discovered by the `phpunit.xml` glob. Cross-module integration tests stay in the root `tests/` tree.
+- **Config**: Ship `config/{name}.php` to override centralized app-level defaults; it merges under the module's key (module values win on conflicts, all other keys survive).
+- **Translations**: Ship `lang/{en,es,fr}/admin.php` for admin translations (and `client.php` if client UI exists). Must include the mandatory collision warning docblock. Module keys MUST contain the module/entity domain (e.g. `gateway_host`, `create_gateway`). Generic action keys (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`) belong strictly in root `lang/{locale}/admin.php`. `ModuleServiceProvider` actively refuses to load files with root collisions at runtime. Views continue using `__('admin.*')`.
+- **Dependencies & Decoupling**: High cohesion within a domain, loose coupling across domains. Cross-domain interactions must flow through events, service contracts, or published interfaces—never through deep coupling to another module's internal schema. Declare every cross-module class reference in `module.json` → `requirements.modules`.
+- **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in the database registry, suppressing route and provider registration). Attempting to uninstall a core module will throw a validation error. Never dirty the Git worktree with file deletions.
+- **Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community extensions reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External extensions never dirty Git and are protected by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
+- **Autonomous System Utilities**: System administration utilities such as Backups are self-contained modules under Core Administration (Superadmin-centric), responsible for full appliance backup and restore.
 
 ## Modular Translation Architecture & Collision Safeguards (Option A)
 

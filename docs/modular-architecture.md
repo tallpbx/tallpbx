@@ -4,15 +4,18 @@ This document is the authoritative architectural and developer reference for Tal
 
 ---
 
-## 1. Modular Architecture Overview
+## 1. Domain-Driven Modular Monolith Architecture
 
-TallPBX organizes its telecommunications and administration features into self-contained modules located in the `app-modules/` directory. Rather than housing all models, controllers, Livewire components, routes, migrations, and translation strings in a single monolithic `app/` directory, each domain feature (such as `gateways`, `extensions`, `sip-profiles`, `voicemails`, `security`, and `firewall`) is encapsulated in its own module.
+TallPBX 4.x organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**. Rather than maintaining all models, controllers, Livewire components, routes, migrations, and translation strings in a single monolithic `app/` directory or treating internal modules as fragile pseudo-packages, each domain feature (such as `gateways`, `extensions`, `sip-profiles`, `voicemails`, `security`, and `firewall`) is encapsulated into a cohesive **bounded context** in `app-modules/`.
 
 ### Core Architectural Principles
-1. **Self-Contained Domains**: A module owns its Livewire components, Eloquent models, domain services, database migrations, Blade views, and language dictionaries.
-2. **Standardized Base Service Provider**: All modules boot via a child class extending `App\Support\ModuleServiceProvider`, eliminating repetitive boilerplate for views, migrations, routes, Livewire components, permissions, and translations.
-3. **Decoupled Package Discovery**: Modules are discovered via Composer path repositories and Laravel package discovery, keeping each module independently testable.
-4. **Zero-Friction Scaffolding**: The Artisan command `php artisan make:module <name>` scaffolds production-ready modules conforming strictly to project conventions.
+1. **Single Deployable Monolith**: All built-in modules belong to the unified core codebase and update atomically via Git. They are NOT independent microservices or separate Composer packages.
+2. **Direct Root PSR-4 Autoloading**: All built-in modules are mapped directly in root `composer.json` via standard PSR-4 (`Modules\{Domain}\` => `app-modules/{domain}/src/`). Root `composer.json` contains 0 path repositories and 0 `tallpbx/module-*` package requirements.
+3. **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are permanent parts of the system and are never deleted from disk. Disabling a module is strictly logical (`enabled = false` in the database registry, suppressing route, view, and provider registration).
+4. **Clean Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community extensions reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External extensions are guarded by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
+5. **Standardized Base Service Provider**: All modules boot via a child class extending `App\Support\ModuleServiceProvider`, eliminating repetitive boilerplate for views, migrations, routes, Livewire components, permissions, and translations.
+6. **Decoupled Cross-Domain Communication**: High cohesion within domains, low coupling between domains. Modules communicate through Laravel events, service contracts, or published interfaces rather than deep cross-domain database coupling.
+7. **Zero-Friction Scaffolding**: The Artisan command `php artisan make:module <name>` scaffolds production-ready modules conforming strictly to project conventions.
 
 ---
 
@@ -22,7 +25,6 @@ Each module under `app-modules/{module-name}/` follows a standardized layout:
 
 ```
 app-modules/{module-name}/
-├── composer.json               # Package definition and PSR-4 autoloading
 ├── module.json                 # TallPBX module manifest (schema, display name, category)
 ├── config/                     # Optional module configuration merged over defaults
 │   └── {module-name}.php
@@ -158,7 +160,8 @@ The test suite at `tests/Feature/Architecture/TranslationParityTest.php` runs on
 
 ## 5. Scaffolding Modules with Artisan
 
-When creating a new module, use the built-in generator command:
+### 5.1 Built-in Core Modules
+To scaffold a new built-in domain module under `app-modules/`:
 
 ```bash
 php artisan make:module call-forwarding \
@@ -167,25 +170,37 @@ php artisan make:module call-forwarding \
     --category="Telephony"
 ```
 
-The command automatically scaffolds the complete module tree, including:
-- `lang/en/admin.php` with the collision warning header docblock.
-- `lang/es/admin.php` with the collision warning header docblock.
-- `lang/fr/admin.php` with the collision warning header docblock.
-- `src/Providers/ModuleServiceProvider.php`.
+The command scaffolds the complete module tree:
+- `module.json` manifest configured with the module namespace, providers, and requirements.
+- `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider`.
+- `lang/{en,es,fr}/admin.php` with the collision warning header docblock.
 - `resources/views/index.blade.php`.
-- `module.json` and `composer.json`.
+- Model factories (`src/Database/Factories/`), migrations (`database/migrations/`), and tests (`tests/`).
+- Automatically registers the PSR-4 namespace in root `composer.json` and dumps the autoloader.
+
+### 5.2 Third-Party Custom Extensions (`--custom`)
+To scaffold a standalone community extension in `custom-modules/`:
+
+```bash
+php artisan make:module my-crm-connector \
+    --display-name="My CRM Connector" \
+    --description="Third-party CRM integration" \
+    --category="Integrations" \
+    --custom
+```
+
+This scaffolds into `custom-modules/my-crm-connector/` (which is untracked and git-ignored). It requires no changes to root `composer.json` and is dynamically autoloaded and discovered at runtime.
 
 ---
 
-## 6. Migration Guide for Existing Modules
+## 6. Translation Authoring Guidelines
 
-When moving keys from root `lang/{locale}/admin.php` to a module:
-1. **Identify Module Keys**: Identify keys in `lang/en/admin.php` specific to the module (e.g. `gateway_*`, `create_gateway`, `modal_delete_gateway_title`).
-2. **Verify Entity Name Inclusion**: Ensure all identified keys include the domain/entity name. Generic keys (`save`, `delete`, `edit`) must stay in root.
-3. **Extract Keys with Locale Parity**: Create `app-modules/{module}/lang/{en,es,fr}/admin.php` containing the mandatory header docblock and the translated strings for English, Spanish, and French.
-4. **Remove from Root**: Delete the extracted keys from root `lang/en/admin.php`, `lang/es/admin.php`, and `lang/fr/admin.php`.
-5. **Preserve Views**: Do **not** touch any Blade views or Livewire components. The cascading loader resolves keys seamlessly.
-6. **Rebuild Cache & Test**:
+When creating translation keys for a module:
+1. **Module Domain Prefixing**: Every key defined in `app-modules/{module}/lang/{en,es,fr}/admin.php` must include the entity or domain name (e.g. `gateway_*`, `create_gateway`, `modal_delete_gateway_title`).
+2. **Root Action Keys**: Generic action labels (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`, `status`, `actions`) belong strictly in root `lang/{locale}/admin.php` and must never be defined in module dictionaries.
+3. **Locale Parity**: All module keys must be populated across all supported languages (`en`, `es`, `fr`).
+4. **Header Docblock**: All module translation files must begin with the collision prevention docblock.
+5. **Verification**: Verify that keys follow all collision and parity rules:
    ```bash
    php artisan optimize:clear
    ./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php
