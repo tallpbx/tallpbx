@@ -32,6 +32,10 @@ class ModuleServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../../resources/views', 'admin');
         $this->loadTranslationsFrom(__DIR__.'/../../lang', 'admin');
+        $loader = $this->app->make('translation.loader');
+        if (method_exists($loader, 'addPath')) {
+            $loader->addPath(realpath(__DIR__.'/../../lang') ?: __DIR__.'/../../lang');
+        }
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
         $this->loadRoutesFrom(__DIR__.'/../../routes/web.php');
 
