@@ -249,7 +249,40 @@ The module management workbench (`/panel/modules`) organizes all built-in and cu
 
 ---
 
-## 8. Authoritative Documentation Updates (`docs/modular-architecture.md`)
+## 8. Custom Module Collision Prevention & Validation Guards
+
+To prevent untrusted or poorly written third-party extensions in `custom-modules/` or `vendor/` from crashing the appliance or hijacking core behavior, the 4.x architecture implements strict **Pre-flight & Runtime Collision Guards**:
+
+### 8.1 Module Identifier & Namespace Collisions
+* **Precedence Rule**: Core built-in modules (`app-modules/`) always take precedence.
+* **Manifest Validation**: During discovery in `ModuleServiceProvider`, any custom module declaring a `"name"` that matches an existing core module (e.g. `extensions`, `admin`, `security`, `dialplans`) is rejected with a descriptive error: `Custom module [{name}] collides with a core appliance module and cannot be loaded.`
+
+### 8.2 Route & URL Prefix Hijacking Prevention
+* **Route Name Clashes**: When custom modules register routes, route names are checked against the core route registry. Duplicate names (e.g. attempting to register `panel.extensions.index` or `panel.dashboard`) are blocked.
+* **URL Prefix Isolation**: Standard custom modules are scoped to `/panel/{module-name}/*`. Custom modules are strictly prohibited from binding routes that hijack reserved core paths:
+  * Authentication: `/panel/login`, `/panel/setup`, `/panel/logout`
+  * System Core: `/panel/dashboard`, `/panel/profile`, `/panel/settings`, `/panel/modules`, `/panel/git-update`
+  * Core Telephony: Existing core endpoints (`/panel/extensions`, `/panel/gateways`, etc.)
+
+### 8.3 Database Schema & Migration Collisions
+* **Pre-Migration Safety Inspection**:
+  * Before executing migrations from `custom-modules/{name}/database/migrations/`, the migration runner inspects table creation calls.
+  * If a custom migration attempts to create a table that already exists in the database (`Schema::hasTable($table)`), or attempts to alter core appliance tables (`users`, `admins`, `tenants`, `groups`, `permissions`, `modules`, `menus`), the migration is halted with a `MigrationCollisionException`.
+* **Migration Class Names**: Custom migrations must use standard anonymous class migrations (`return new class extends Migration`) to avoid global class name collisions.
+
+### 8.4 Language & Translation Dictionary Collisions
+* **Multi-Tier Cascade Protection**:
+  * Level 1 (Root Protection): Extends `detectRootTranslationCollisions()` to ensure custom module keys never overwrite core strings in `lang/{locale}/admin.php`.
+  * Level 2 (Inter-Module Protection): Custom module translation keys are verified against all active core module cascading keys.
+* **Graceful Fallback**: If a collision is detected, rather than crashing the PBX in production, the custom module's global cascading path is revoked, and its translations are restricted strictly to its explicit namespace (`__('{module-name}::{group}.{key}')`).
+
+### 8.5 Permission & Menu Collisions
+* **Permission Ownership**: `PermissionService` enforces module ownership. A custom module cannot register or overwrite an existing permission owned by another module (e.g., a custom extension declaring `extensions.view` or `admin.users.delete`).
+* **Menu Key Clashes**: `MenuService` rejects custom menu registrations that collide with existing core menu keys.
+
+---
+
+## 9. Authoritative Documentation Updates (`docs/modular-architecture.md`)
 
 Update `docs/modular-architecture.md` with:
 1. **Modular Monolith Principles**: Explaining the Domain-Driven Design rationale, benefits, and contrast with FreePBX's fragmented multi-repo approach.
@@ -264,7 +297,7 @@ Update `docs/modular-architecture.md` with:
 
 ---
 
-## 9. Verification & Pre-Commit Quality Gate
+## 10. Verification & Pre-Commit Quality Gate
 
 Every change in this modernization must satisfy the verification checklist before merging on `4.x`:
 1. `php artisan optimize:clear`: Cleans caches without errors.
