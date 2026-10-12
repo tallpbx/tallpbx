@@ -45,6 +45,11 @@ Each module inside `app-modules/{module-name}/` remains a strictly encapsulated 
 | **File Deletion** | **Strictly Forbidden** (Preserves clean working tree) | Safe to delete folder on uninstall | Removed via Composer |
 | **Source Type** | `core` | `custom` | `vendor` |
 
+### 2.3 Filesystem Structure Decision: Flat Structure with Metadata Grouping
+The directory structure for `app-modules/` remains flat (`app-modules/{module-name}/`) rather than nested into category subfolders (`app-modules/{category}/{module-name}/`).
+* **Rationale**: Decouples physical disk paths and PHP namespaces from UI navigation taxonomy. If a feature's UI grouping evolves (e.g. moving a module from "Advanced" to "Features"), only metadata changes, with zero `git mv` operations, broken paths, or namespace refactoring.
+* **Category Mapping**: Categorization is declared in each module's `module.json` and `ModuleServiceProvider::menuItems()`, and rendered dynamically in both the sidebar and the `/panel/modules` management workbench.
+
 ---
 
 ## 3. Composer & Autoloading Modernization
