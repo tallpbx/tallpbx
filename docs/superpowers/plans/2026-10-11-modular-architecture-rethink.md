@@ -28,7 +28,7 @@
 
 ---
 
-### Task 1: Composer & Autoloading Modernization
+### Task 1: Composer & Autoloading Modernization (COMPLETED)
 
 **Files:**
 - Modify: `composer.json`
@@ -38,56 +38,20 @@
 - Consumes: Existing 60 modules in `app-modules/`
 - Produces: Direct PSR-4 autoload mapping in `composer.json` for all `Modules\{Name}\` namespaces; root `composer.json` with 0 path repositories and 0 `tallpbx/module-*` requirements.
 
-- [ ] **Step 1: Write tests verifying direct PSR-4 autoloading for all 60 modules**
-
-In `tests/Feature/ModuleAutoloadTest.php`, assert that all 60 `Modules\{PascalName}\Providers\ModuleServiceProvider` classes can be autoloaded directly without relying on `vendor/tallpbx/*` symlinks:
-
-```php
-test('all 60 built-in modules are autoloadable via root psr-4', function () {
-    $modules = array_map('basename', glob(base_path('app-modules/*'), GLOB_ONLYDIR));
-    expect($modules)->toHaveCount(60);
-
-    foreach ($modules as $module) {
-        $studly = str_replace(' ', '', ucwords(str_replace('-', ' ', $module)));
-        $providerClass = "Modules\\{$studly}\\Providers\\ModuleServiceProvider";
-        expect(class_exists($providerClass))->toBeTrue("Failed to autoload {$providerClass}");
-    }
-});
-```
-
-- [ ] **Step 2: Run test to observe baseline state**
-
-Run: `php artisan test tests/Feature/ModuleAutoloadTest.php`
-Expected: Passes on current symlinked environment.
-
-- [ ] **Step 3: Update `composer.json` to remove 60 path repositories and add 60 PSR-4 mappings**
-
-1. Remove the entire `"repositories"` array from `composer.json`.
-2. Remove all 60 `"tallpbx/module-*": "*"` lines from `"require"`.
-3. Add the 60 PSR-4 namespace mappings to `"autoload"."psr-4"` (e.g. `"Modules\\Extensions\\": "app-modules/extensions/src/"`).
-4. Run `composer dump-autoload -o` to regenerate `vendor/composer/autoload_psr4.php`.
-
-- [ ] **Step 4: Verify composer dump-autoload performance and test suite**
-
-Run: `time composer dump-autoload -o`
-Expected: Completes in < 3 seconds without path-repository warnings.
-Run: `php artisan test tests/Feature/ModuleAutoloadTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add composer.json tests/Feature/ModuleAutoloadTest.php
-git commit -m "refactor: replace 60 composer path repos with direct psr-4 autoloading"
-```
+- [x] **Step 1: Write tests verifying direct PSR-4 autoloading for all 60 modules** (Completed in `c8d31284`)
+- [x] **Step 2: Run test to observe baseline state** (Completed)
+- [x] **Step 3: Update `composer.json` to remove 60 path repositories and add 60 PSR-4 mappings** (Completed in `c8d31284`)
+- [x] **Step 4: Verify composer dump-autoload performance and test suite** (Completed: 10 tests, 132 assertions pass; dump completes in ~1.5s)
+- [x] **Step 5: Commit** (Committed in `c8d31284`: `refactor: replace 60 composer path repos with direct psr-4 autoloading`)
 
 ---
 
-### Task 2: Unified Discovery Engine, Dynamic Booting & Custom Module Scaffolding
+### Task 2: Unified Discovery Engine, Dynamic Booting & Custom Module Scaffolding (COMPLETED)
 
 **Files:**
 - Modify: `app/Providers/ModuleServiceProvider.php`
 - Modify: `app/Console/Commands/ModuleSyncCommand.php`
+- Modify: `app/Console/Commands/ModuleCacheCommand.php`
 - Modify: `app/Console/Commands/MakeModuleCommand.php`
 - Create: `app/Support/CustomModuleAutoloader.php`
 - Modify: `.gitignore`
@@ -96,60 +60,18 @@ git commit -m "refactor: replace 60 composer path repos with direct psr-4 autolo
 
 **Interfaces:**
 - Consumes: `app-modules/*/module.json`, `custom-modules/*/module.json`, `vendor/*/*/module.json`
-- Produces: `modules.manifest` array tagged with `source` (`core`, `custom`, `vendor`); dynamic `$this->app->register()` for enabled module service providers; runtime autoloader for `CustomModules\`; streamlined `make:module` scaffolding exclusively into `custom-modules/`.
+- Produces: `modules.manifest` array tagged with `source` (`core`, `custom`, `vendor`); dynamic provider registration for enabled modules; runtime autoloader for `CustomModules\`; streamlined `make:module` scaffolding exclusively into `custom-modules/`.
 
-- [ ] **Step 1: Write failing test for multi-source module discovery, dynamic provider registration, and custom module scaffolding**
-
-In `tests/Feature/Providers/ModuleServiceProviderTest.php`, test that:
-1. `modules.manifest` tags `app-modules/` as `source: 'core'`.
-2. Discovered service providers for enabled modules are registered in the application container.
-3. Disabled modules are skipped from container registration.
-
-```php
-test('module discovery tags core modules and registers their providers dynamically', function () {
-    $manifests = app('modules.manifest');
-    expect($manifests['extensions']['source'])->toBe('core');
-
-    // Enabled provider should be registered in the application
-    expect(app()->getProviders(\Modules\Extensions\Providers\ModuleServiceProvider::class))->not->toBeEmpty();
-});
-```
-
-In `tests/Feature/Commands/NativeModuleCommandTest.php`:
-Update scaffolding test verifying that `make:module` scaffolds directly into `custom-modules/{name}/` with `module.json` (`source: custom`), `src/Providers/ModuleServiceProvider.php`, and views, without touching root `composer.json`.
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `php artisan test tests/Feature/Providers/ModuleServiceProviderTest.php`
-Expected: FAIL (missing `source` tag on manifest).
-
-- [ ] **Step 3: Implement multi-source discovery, custom autoloader, and custom make:module**
-
-1. Add `/custom-modules/` to `.gitignore` (ignoring everything inside except a `.gitkeep`).
-2. Implement `app/Support/CustomModuleAutoloader.php` using `spl_autoload_register` to resolve `CustomModules\{Name}\` to `custom-modules/{name}/src/`.
-3. In `app/Providers/ModuleServiceProvider.php`:
-   - Scan `app-modules/*/module.json` &rarr; set `$manifest['source'] = 'core'`.
-   - Scan `custom-modules/*/module.json` &rarr; set `$manifest['source'] = 'custom'`.
-   - Scan `vendor/*/*/module.json` &rarr; set `$manifest['source'] = 'vendor'`.
-   - In `register()`, loop through discovered modules: if `ModuleState::isEnabled($name)` is true, register the provider `$this->app->register($providerClass)`.
-4. Update `app/Console/Commands/ModuleSyncCommand.php` to scan `custom-modules/` alongside `app-modules/` and `vendor/`.
-5. Update `app/Console/Commands/MakeModuleCommand.php`:
-   - Target `custom-modules/{name}/` directly.
-   - Generate `module.json` with `source: custom`.
-   - Drop per-module `composer.json` generation.
-   - Leave root `composer.json` untouched.
-
-- [ ] **Step 4: Run targeted tests to verify they pass**
-
-Run: `php artisan test tests/Feature/Providers/ModuleServiceProviderTest.php tests/Feature/Commands/NativeModuleCommandTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/Providers/ModuleServiceProvider.php app/Console/Commands/ModuleSyncCommand.php app/Console/Commands/MakeModuleCommand.php app/Support/CustomModuleAutoloader.php .gitignore tests/Feature/Providers/ModuleServiceProviderTest.php tests/Feature/Commands/NativeModuleCommandTest.php
-git commit -m "feat: implement multi-source module discovery, dynamic booting, and custom module scaffolding"
-```
+- [x] **Step 1: Write tests for multi-source module discovery, dynamic provider registration, and custom module scaffolding** (Completed in `728b1816`)
+- [x] **Step 2: Run test to verify it fails** (Observed expected failures on missing source tag and missing custom-modules path)
+- [x] **Step 3: Implement multi-source discovery, custom autoloader, and custom make:module** (Completed in `728b1816`)
+  1. Added `/custom-modules/` to `.gitignore` with tracked `.gitkeep`.
+  2. Implemented `app/Support/CustomModuleAutoloader.php` (`spl_autoload_register` for `CustomModules\` namespace).
+  3. Updated `app/Providers/ModuleServiceProvider.php` with multi-source discovery (`core`, `custom`, `vendor`) and dynamic registration.
+  4. Updated `app/Console/Commands/ModuleSyncCommand.php` and `ModuleCacheCommand.php` to scan `custom-modules/` and assign sources.
+  5. Updated `app/Console/Commands/MakeModuleCommand.php` to scaffold exclusively into `custom-modules/{name}/` without `composer.json` and with core module naming collision prevention.
+- [x] **Step 4: Run targeted tests to verify they pass** (Completed: 17 tests, 91 assertions pass)
+- [x] **Step 5: Commit with documentation** (Committed in `728b1816`: `feat: implement multi-source module discovery, dynamic booting, and custom module scaffolding with documentation`)
 
 ---
 
