@@ -4,7 +4,7 @@
 # ==============================================================================
 # This small launcher makes a full TallPBX installation a single command:
 #
-#   wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash
+#   wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash
 #
 # It prepares the TallPBX source code at /var/www/tallpbx and then starts the
 # main installer (scripts/install.sh), which asks the normal setup questions
@@ -12,13 +12,13 @@
 # source code safely and runs the installer again.
 #
 # Options:
-#   --ref <branch-or-tag>   Install a specific branch or tag (default: 3.x).
+#   --ref <branch-or-tag>   Install a specific branch or tag (default: 4.x).
 #   --no-demo               Do not ask the installer to add demo data.
 #   --no-development        Do not install development tooling.
 #   --help                  Show this help text.
 #
 # Note:
-#   TallPBX 3.x is not backwards compatible with earlier release branches (2.x / 1.x).
+#   TallPBX 4.x is not backwards compatible with earlier release branches (3.x / 2.x / 1.x).
 #   Updating from earlier branches requires a fresh re-install.
 # ==============================================================================
 
@@ -34,7 +34,7 @@ repository_url="https://github.com/tallpbx/tallpbx.git"
 application_root="/var/www/tallpbx"
 
 # The branch installed by default for normal users. --ref replaces it.
-requested_ref="3.x"
+requested_ref="4.x"
 
 # Options that are forwarded to the main installer unchanged.
 installer_flags=()
@@ -43,17 +43,17 @@ installer_flags=()
 usage () {
     cat <<'USAGE'
 Install TallPBX with one command:
-
-  wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash
+ 
+  wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash
 
 Options:
-  --ref <branch-or-tag>   Install a specific branch or tag (default: 3.x).
+  --ref <branch-or-tag>   Install a specific branch or tag (default: 4.x).
   --no-demo               Do not ask the installer to add demo data.
   --no-development        Do not install development tooling.
   --help                  Show this help text.
 
 Note:
-  TallPBX 3.x is not backwards compatible with earlier release branches (2.x / 1.x).
+  TallPBX 4.x is not backwards compatible with earlier release branches (3.x / 2.x / 1.x).
   Updating from earlier branches requires a fresh re-install.
 USAGE
 }

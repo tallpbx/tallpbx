@@ -73,7 +73,7 @@ class ApplicationFilePermissions
     private function repairFullApplication(): void
     {
         foreach ([
-            'app', 'app-modules', 'bootstrap', 'config', 'database', 'docs', 'lang', 'public', 'resources', 'routes', 'scripts', 'tests',
+            'app', 'app-modules', 'bootstrap', 'config', 'custom-modules', 'database', 'docs', 'lang', 'public', 'resources', 'routes', 'scripts', 'tests',
         ] as $path) {
             $this->repairSourceTree($this->path($path));
         }

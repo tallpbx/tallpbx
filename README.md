@@ -214,13 +214,14 @@ For complete benchmarking instructions, PHP-FPM pool sizing, and empirical perfo
 
 TallPBX follows the **[Laravel framework versioning model](https://laravel.com/docs/releases#versioning-scheme)** and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`):
 
-- **Versioned Series Branches**: Following the pattern used by Laravel, the repository does not maintain a perpetual `main` or `master` branch. Instead, active development takes place directly on versioned series branches representing release lines (e.g. `1.1`, `2.0`, `3.x`).
+- **Versioned Series Branches**: Following the pattern used by Laravel, the repository does not maintain a perpetual `main` or `master` branch. Instead, active development takes place directly on versioned series branches representing release lines (e.g. `1.1`, `2.0`, `3.x`, `4.x`).
 - **Release Strategy**:
-  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `3.x` and `2.0` series introduce major modernizations and require a fresh install rather than an in-place upgrade from earlier major lines.
+  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `4.x` series introduces the Domain-Driven Modular Monolith modernization and requires a fresh install rather than an in-place upgrade from earlier major lines (`3.x`, `2.0`, `1.x`).
   - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
   - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
 - **Active Release Branches**:
-  - **`3.x`**: Current primary development branch for 3.x features and releases.
+  - **`4.x`**: Current primary development branch for 4.x features and releases.
+  - **`3.x`**: Maintenance release series for 3.x deployments.
   - **`2.0`**: Maintenance release series for 2.x deployments.
   - **`1.1`**: Maintenance release series for 1.1.x deployments.
   - **`1.0`**: Frozen maintenance branch for critical security fixes only.

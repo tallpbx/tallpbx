@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 3.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
+description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 4.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
 license: MIT
 metadata:
   author: tallpbx
@@ -874,22 +874,23 @@ Run the narrow affected test files first, then `php artisan app:test --smoke` wh
 - When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
 
 ### Branching & Release Strategy (Laravel Model)
-- TallPBX follows the **[Laravel framework versioned-branch model](https://laravel.com/docs/releases#versioning-scheme)** (e.g. `1.1`, `2.0`, `3.x`) and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`).
-- **Active Branch Confirmation**: Run `git branch --show-current` before starting work. Active development occurs directly on the current major/series branch (`3.x`). There is no perpetual `main` or `master` branch; never attempt to branch off or merge into `main`. All new features, modernizations, and architectural improvements are committed directly to `3.x` or merged into it.
-- **No Backwards Compatibility for Unreleased Series Branches**: Because major series branch `3.x` is currently unreleased (no `v3.0.0` tag exists yet) and is explicitly not backwards compatible with the 2.x/1.x series, do not introduce or retain backward-compatibility fallbacks, deprecated aliases, transitional shims, or migration bridges for 2.x or unreleased 3.x iterations. Write all configuration, schema, routes, services, and tests directly in their modern canonical form. Backwards compatibility guarantees apply strictly to maintenance releases after a production tag (`v3.0.0`) is cut.
+- TallPBX follows the **[Laravel framework versioned-branch model](https://laravel.com/docs/releases#versioning-scheme)** (e.g. `1.1`, `2.0`, `3.x`, `4.x`) and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`).
+- **Active Branch Confirmation**: Run `git branch --show-current` before starting work. Active development occurs directly on the current major/series branch (`4.x`). There is no perpetual `main` or `master` branch; never attempt to branch off or merge into `main`. All new features, modernizations, and architectural improvements are committed directly to `4.x` or merged into it.
+- **No Backwards Compatibility for Unreleased Series Branches**: Because major series branch `4.x` is currently unreleased (no `v4.0.0` tag exists yet) and is explicitly not backwards compatible with the 3.x/2.x/1.x series, do not introduce or retain backward-compatibility fallbacks, deprecated aliases, transitional shims, or migration bridges for 3.x, 2.x, or unreleased 4.x iterations. Write all configuration, schema, routes, services, and tests directly in their modern canonical form. Backwards compatibility guarantees apply strictly to maintenance releases after a production tag (`v4.0.0`) is cut.
 - **Numbered Release Series Branches**:
   - `1.0`: Frozen maintenance branch for 1.0.x (critical security/bug fixes only). Never push new feature work to `1.0`.
   - `1.1`: Maintenance release series for 1.1.x deployments.
   - `2.0`: Maintenance release series for 2.x deployments (latest stable: `v2.1.1`).
-  - `3.x`: Current primary development branch for 3.x features and releases.
-- **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`3.x`) or maintenance branches when backporting fixes for existing releases.
-- **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.x|(\.\d+)+)`) as stable release series, sorting them in reverse version order so `3.x` is the top/default target.
+  - `3.x`: Maintenance release series for 3.x deployments.
+  - `4.x`: Current primary development branch for 4.x features and releases.
+- **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`4.x`) or maintenance branches when backporting fixes for existing releases.
+- **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.x|(\.\d+)+)`) as stable release series, sorting them in reverse version order so `4.x` is the top/default target.
 - **Documentation**: User-facing versioning details are in [`README.md#versioning--release-strategy`](README.md#versioning--release-strategy), installation notes in [`INSTALL.md`](INSTALL.md), and release logs in [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Tagging Best Practices (Do NOT Tag Every Commit)
 - **Never tag individual commits or task completions.**
-- Tags (`v1.0.0`, `v1.1.0`, `v2.0.0`, `v2.1.0`, `v2.1.1`, `v3.0.0`, etc.) are reserved strictly for official, finished production releases.
-- Tags are created directly on their respective series branch heads (`1.0`, `1.1`, `2.0`, `3.x`).
+- Tags (`v1.0.0`, `v1.1.0`, `v2.0.0`, `v2.1.0`, `v2.1.1`, `v3.0.0`, `v4.0.0`, etc.) are reserved strictly for official, finished production releases.
+- Tags are created directly on their respective series branch heads (`1.0`, `1.1`, `2.0`, `3.x`, `4.x`).
 - Use branch heads and commit SHAs for intermediate work and references.
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
 

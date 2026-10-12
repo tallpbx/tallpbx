@@ -100,8 +100,8 @@ class GitUpdate extends Component
         $this->currentVersion = $this->gitService->currentVersion();
         $this->remoteUrl = $this->gitService->remoteUrl();
         $this->isClean = $this->gitService->isClean();
-        // Default the target: stay on the current branch, else the top stable series, else the 3.x line.
-        $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '3.x');
+        // Default the target: stay on the current branch, else the top stable series, else the 4.x line.
+        $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '4.x');
 
         $status = $this->gitService->getStatus();
         if (($status['running'] ?? false) === true) {
@@ -138,7 +138,7 @@ class GitUpdate extends Component
         }
 
         if ($this->selectedTarget === '' || (! in_array($this->selectedTarget, $this->branches, true) && ! in_array($this->selectedTarget, $this->tags, true))) {
-            $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '2.0');
+            $this->selectedTarget = $this->currentBranch !== '' ? $this->currentBranch : ($this->stableBranches[0] ?? '4.x');
         }
 
         $this->refreshCommitStatus();

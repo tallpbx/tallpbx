@@ -120,6 +120,7 @@ for source_path in \
     "$ROOT_DIR/app-modules" \
     "$ROOT_DIR/bootstrap" \
     "$ROOT_DIR/config" \
+    "$ROOT_DIR/custom-modules" \
     "$ROOT_DIR/database" \
     "$ROOT_DIR/docs" \
     "$ROOT_DIR/lang" \

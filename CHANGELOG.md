@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Kickoff of TallPBX 4.x Series Branch (Domain-Driven Modular Monolith Modernization)**:
+  - Established the `4.x` series branch as the primary active development line, transitioning from `3.x` to introduce a true Domain-Driven Modular Monolith architecture.
+  - Updated documentation (`README.md`, `INSTALL.md`, `AGENTS.md`), installer bootstrap scripts (`scripts/bootstrap.sh`), and web updater fallback channels (`GitUpdate.php`) to target `4.x` by default, maintaining `3.x`, `2.0`, and `1.1` as stable maintenance release branches.
 - **Modular Translation Architecture (`app-modules/*/lang`) & Native Path Cascading**:
   - Implemented Option A (Native Path Cascading via `Illuminate\Translation\FileLoader::addPath()`) allowing modules to encapsulate their administrative translations under `app-modules/{module}/lang/{locale}/admin.php` with zero UI changes and zero template call site modifications.
   - Added runtime collision refusal guards in `App\Support\ModuleServiceProvider` that actively inspect module dictionaries against root translations and refuse to load colliding files (throwing a `LogicException` in local/testing).

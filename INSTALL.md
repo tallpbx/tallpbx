@@ -107,7 +107,7 @@ ip addr show <interface>
 Install TallPBX with a single command:
 
 ```bash
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash
 ```
 
 The command downloads a small bootstrap script and runs it. The bootstrap
@@ -118,24 +118,24 @@ Re-running the command is safe within the same release series — the installer 
 run repeatedly without affecting existing data, and it updates TallPBX in place. See
 [Upgrading TallPBX](#upgrading-tallpbx) for details.
 Use the same `--ref` value every time: without it, the re-run switches the
-working copy to `3.x`.
+working copy to `4.x`.
 
 > [!WARNING]
-> **Major Version Notice (3.x vs Earlier Versions)**:
-> TallPBX 3.x is not backwards-compatible with earlier release branches (`2.0`, `1.1`). Updating an existing 1.x or 2.x system to 3.x is not supported via in-place updates and requires a clean re-install. If operating an existing 2.x deployment, remain on your release series branch (e.g., `--ref 2.0`). Routine in-place updates are supported within the same release series.
+> **Major Version Notice (4.x vs Earlier Versions)**:
+> TallPBX 4.x is not backwards-compatible with earlier release branches (`3.x`, `2.0`, `1.1`). Updating an existing 1.x, 2.x, or 3.x system to 4.x is not supported via in-place updates and requires a clean re-install. If operating an existing deployment, remain on your release series branch (e.g., `--ref 3.x` or `--ref 2.0`). Routine in-place updates are supported within the same release series.
 
 To customize the installation, add options after `-s --`:
 
 ```bash
-# Pin the stable 2.0 release branch instead of the default 3.x:
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --ref 2.0
+# Pin a specific release branch (such as 3.x or 2.0) instead of the default 4.x:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash -s -- --ref 3.x
 
 # Skip the demo-data question and install clean data (recommended for production):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --no-demo
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash -s -- --no-demo
 
 # Standard production install without demo data or development packages:
 # (Development mode configures APP_ENV=local and installs test/debug utilities)
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash -s -- --no-demo --no-development
 ```
 
 ### First Administrator Setup
@@ -316,7 +316,7 @@ whether to rebuild the source installation.
 ## Upgrading TallPBX
 
 > [!CAUTION]
-> Always take a full backup before upgrading. In-place updates are supported strictly within the same release series (e.g., updating within `3.x` or within `2.0`). Upgrading across major version boundaries (such as 2.x to 3.x) requires a clean re-install.
+> Always take a full backup before upgrading. In-place updates are supported strictly within the same release series (e.g., updating within `4.x`, `3.x`, or within `2.0`). Upgrading across major version boundaries (such as 3.x to 4.x or 2.x to 3.x) requires a clean re-install.
 
 ### Updating from the Web Panel (Recommended)
 
@@ -347,11 +347,11 @@ database migrations, and preserves all your existing configuration, accounts,
 and recordings:
 
 ```bash
-# Update on the default 3.x branch:
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash
+# Update on the default 4.x branch:
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash
 
-# Or update on a specific release branch (such as 2.0 or 1.1):
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/3.x/scripts/bootstrap.sh | bash -s -- --ref 2.0
+# Or update on a specific release branch (such as 3.x, 2.0, or 1.1):
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/4.x/scripts/bootstrap.sh | bash -s -- --ref 3.x
 ```
 
 Use the same `--ref` value you used during initial installation so the working
@@ -363,8 +363,8 @@ To update manually step by step, take a backup first, then run from `/var/www/ta
 
 ```bash
 # 1. Pull the latest code from the branch you installed
-#    (such as 3.x, or a maintenance release branch such as 2.0 or 1.1).
-git pull --ff-only origin 3.x
+#    (such as 4.x, or a maintenance release branch such as 3.x, 2.0, or 1.1).
+git pull --ff-only origin 4.x
 
 # 2. Install PHP dependencies and rebuild browser files.
 composer install --no-dev --optimize-autoloader
@@ -429,7 +429,7 @@ the new code. Do not delete those changes — save them, update, then restore:
 git stash push --include-untracked -m "before TallPBX upgrade"
 
 # Download the straightforward update:
-git pull --ff-only origin 3.x
+git pull --ff-only origin 4.x
 
 # Put the saved local changes back after the update:
 git stash pop
