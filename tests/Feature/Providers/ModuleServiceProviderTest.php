@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Providers\ModuleServiceProvider;
-use Illuminate\Foundation\PackageManifest;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Route;
 
@@ -30,17 +29,19 @@ it('can be resolved from the container', function () {
     expect($provider)->toBeInstanceOf(ModuleServiceProvider::class);
 });
 
-it('uses Composer package discovery as the module provider source of truth', function () {
-    $source = (string) file_get_contents(app_path('Providers/ModuleServiceProvider.php'));
+it('discovers modules and tags them with their source', function () {
+    $manifest = App::make('modules.manifest');
 
-    expect($source)->not->toContain('$this->app->register($provider)');
+    expect($manifest['admin']['source'])->toBe('core')
+        ->and($manifest['extensions']['source'])->toBe('core');
 });
 
-it('discovers representative module providers through Composer packages', function () {
-    $providers = app(PackageManifest::class)->providers();
+it('discovers representative module providers dynamically', function () {
+    $adminProvider = App::getProvider(Modules\Admin\Providers\ModuleServiceProvider::class);
+    $extensionsProvider = App::getProvider(Modules\Extensions\Providers\ModuleServiceProvider::class);
 
-    expect($providers)->toContain(Modules\Admin\Providers\ModuleServiceProvider::class)
-        ->and($providers)->toContain(Modules\Extensions\Providers\ModuleServiceProvider::class);
+    expect($adminProvider)->toBeInstanceOf(Modules\Admin\Providers\ModuleServiceProvider::class)
+        ->and($extensionsProvider)->toBeInstanceOf(Modules\Extensions\Providers\ModuleServiceProvider::class);
 });
 
 // ─── Module Manifest ────────────────────────────────────────────

@@ -8,11 +8,10 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
 /**
- * Scaffold a new module directory with module.json, composer.json, and src/.
+ * Scaffold a new custom module directory with module.json and src/.
  *
- * Creates the standard module directory structure with all required
- * bootstrap files for a new module, including the service provider
- * and a stub view.
+ * Creates the standard module directory structure under custom-modules/
+ * for 3rd-party and community extensions, without modifying root composer.json.
  */
 class MakeModuleCommand extends Command
 {
@@ -22,13 +21,13 @@ class MakeModuleCommand extends Command
         {--description= : Module description}
         {--category= : Module category for UI grouping}';
 
-    protected $description = 'Scaffold a new module directory with module.json, composer.json, and src/';
+    protected $description = 'Scaffold a new custom module in custom-modules/ with module.json and src/';
 
     /**
      * Execute the console command.
      *
      * Creates the standard module directory structure with all required
-     * bootstrap files for a new module.
+     * bootstrap files for a custom module.
      */
     public function handle(): int
     {
@@ -43,30 +42,28 @@ class MakeModuleCommand extends Command
             return self::FAILURE;
         }
 
-        $moduleDir = base_path("app-modules/{$name}");
+        $moduleDir = base_path("custom-modules/{$name}");
 
-        if (is_dir($moduleDir)) {
-            $this->components->error("Module [{$name}] already exists at [{$moduleDir}].");
+        if (is_dir($moduleDir) || is_dir(base_path("app-modules/{$name}"))) {
+            $this->components->error("Module [{$name}] already exists.");
 
             return self::FAILURE;
         }
 
         $studlyName = Str::studly(str_replace('-', '_', $name));
-        $namespace = "Modules\\{$studlyName}";
+        $namespace = "CustomModules\\{$studlyName}";
         $displayName = $this->option('display-name') ?? Str::title(str_replace(['-', '_'], ' ', $name));
 
         $this->createDirectories($moduleDir);
         $this->createModuleJson($moduleDir, $name, $namespace, $displayName);
-        $this->createComposerJson($moduleDir, $name, $namespace);
         $this->createServiceProvider($moduleDir, $namespace, $name);
         $this->createStubView($moduleDir, $name);
         $this->createLanguageFiles($moduleDir, $name, $displayName);
 
-        $this->components->info("Module [{$name}] scaffolded successfully at [{$moduleDir}].");
+        $this->components->info("Custom module [{$name}] scaffolded successfully at [{$moduleDir}].");
 
         $this->components->bulletList([
-            'module.json        — module manifest',
-            'composer.json      — Composer autoloading',
+            'module.json        — module manifest (source: custom)',
             'src/Providers/     — ModuleServiceProvider',
             'src/Livewire/      — Livewire component directory',
             'src/Database/Factories/ — model factory directory',
@@ -112,6 +109,7 @@ class MakeModuleCommand extends Command
             '$schema' => '../../resources/schemas/module.json',
             'name' => $name,
             'version' => '1.0.0',
+            'source' => 'custom',
             'namespace' => $namespace,
             'display_name' => $displayName,
             'description' => $description,
@@ -132,42 +130,6 @@ class MakeModuleCommand extends Command
 
         file_put_contents(
             "{$moduleDir}/module.json",
-            json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
-        );
-    }
-
-    /**
-     * Create the per-module composer.json for dependency management.
-     */
-    private function createComposerJson(string $moduleDir, string $name, string $namespace): void
-    {
-        $vendorName = str_replace('_', '-', $name);
-        $content = [
-            'name' => "tallpbx/module-{$vendorName}",
-            'type' => 'tallpbx-module',
-            'description' => '',
-            'require' => [
-                'php' => '>=8.3',
-            ],
-            'autoload' => [
-                'psr-4' => [
-                    "{$namespace}\\" => 'src/',
-                ],
-            ],
-            'extra' => [
-                'laravel' => [
-                    'providers' => [
-                        "{$namespace}\\Providers\\ModuleServiceProvider",
-                    ],
-                ],
-                'tallpbx' => [
-                    'module' => $name,
-                ],
-            ],
-        ];
-
-        file_put_contents(
-            "{$moduleDir}/composer.json",
             json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n"
         );
     }

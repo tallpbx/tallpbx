@@ -333,6 +333,13 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) to support modula
 - **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` continuously enforces zero root collisions, zero cross-module collisions, domain name presence in keys, and 100% key parity across `en`, `es`, and `fr`.
 - Detailed architectural specification: [`docs/modular-architecture.md`](docs/modular-architecture.md).
 
+### Custom Module Scaffolding (`make:module`)
+
+In the Domain-Driven Modular Monolith architecture:
+- **Built-in Core Modules (`app-modules/`)**: Permanent first-party bounded contexts maintained directly in version control by AI agents and developers. They are autoloaded via direct root `composer.json` PSR-4 (`Modules\{Domain}\` => `app-modules/{domain}/src/`) and are never uninstalled or deleted from disk.
+- **Third-Party Custom Extensions (`custom-modules/`)**: Community add-ons and external integrations reside in the untracked, git-ignored `custom-modules/{name}/` directory.
+- **Artisan Scaffolding (`php artisan make:module <name>`)**: Scaffolds **exclusively into `custom-modules/{name}/`** (no `--custom` flag needed). It does NOT scaffold into `app-modules/` and never mutates root `composer.json`. It configures `module.json` with `source: "custom"`, sets the `CustomModules\{Studly}` namespace, generates collision-safe translation files, and refuses module names that collide with existing core modules in `app-modules/`. Autoloading for custom modules is handled dynamically at runtime via `App\Support\CustomModuleAutoloader`.
+
 ### CrudService Base Class for Services
 
 For modules whose services only implement standard CRUD operations (create, update, delete) without custom business logic, the service class should extend `App\Support\CrudService` instead of implementing a separate interface and duplicating method bodies. The base class provides `create()`, `update()`, and `delete()` methods that delegate to the Eloquent model.

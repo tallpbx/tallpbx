@@ -34,13 +34,17 @@ class ModuleSyncCommand extends Command
 
         $manifests = [];
 
-        // Scan first-party local modules.
-        $localCount = $this->scanDirectory(base_path('app-modules/*/module.json'), $manifests);
-        $this->components->twoColumnDetail('Local modules found', (string) $localCount);
+        // Scan first-party core modules.
+        $coreCount = $this->scanDirectory(base_path('app-modules/*/module.json'), $manifests, 'core');
+        $this->components->twoColumnDetail('Core modules found', (string) $coreCount);
+
+        // Scan custom modules.
+        $customCount = $this->scanDirectory(base_path('custom-modules/*/module.json'), $manifests, 'custom');
+        $this->components->twoColumnDetail('Custom modules found', (string) $customCount);
 
         // Optionally scan vendor modules
         if (! $this->option('only-local')) {
-            $vendorCount = $this->scanDirectory(base_path('vendor/*/*/module.json'), $manifests);
+            $vendorCount = $this->scanDirectory(base_path('vendor/*/*/module.json'), $manifests, 'vendor');
             $this->components->twoColumnDetail('Vendor modules found', (string) $vendorCount);
         }
 
@@ -77,7 +81,7 @@ class ModuleSyncCommand extends Command
     /**
      * Scan a glob pattern for module.json files and collect valid manifests.
      */
-    private function scanDirectory(string $pattern, array &$manifests): int
+    private function scanDirectory(string $pattern, array &$manifests, string $source = 'core'): int
     {
         $count = 0;
 
@@ -87,6 +91,9 @@ class ModuleSyncCommand extends Command
             if ($manifest === null) {
                 continue;
             }
+
+            $manifest['source'] = $source;
+            $manifest['path'] = dirname($path);
 
             $name = $manifest['name'];
 

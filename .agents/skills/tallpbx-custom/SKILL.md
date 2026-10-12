@@ -909,6 +909,7 @@ TallPBX is architected as a **Domain-Driven Modular Monolith**. Telephony, admin
 - **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in the database registry, suppressing route and provider registration). Attempting to uninstall a core module will throw a validation error. Never dirty the Git worktree with file deletions.
 - **Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community extensions reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External extensions never dirty Git and are protected by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
 - **Autonomous System Utilities**: System administration utilities such as Backups are self-contained modules under Core Administration (Superadmin-centric), responsible for full appliance backup and restore.
+- **Custom Module Scaffolding**: `php artisan make:module <name>` scaffolds exclusively into `custom-modules/{name}/` (no `--custom` flag, no root `composer.json` edits). Core modules in `app-modules/` are created and maintained directly in code by AI agents and developers.
 
 ## Modular Translation Architecture & Collision Safeguards (Option A)
 

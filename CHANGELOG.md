@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Domain-Driven Modular Monolith & Custom Modules Extensibility (`custom-modules/`)**:
+  - Eliminated all 60 Composer path repositories and `tallpbx/module-*` requirements from root `composer.json`, adopting direct root PSR-4 autoloading (`Modules\{Domain}\` => `app-modules/{domain}/src/`) and slashing autoloader generation time from 60+ seconds to < 2 seconds.
+  - Added the `custom-modules/` directory (git-ignored) for third-party community plugins and integrations, with dynamic runtime class autoloading via `App\Support\CustomModuleAutoloader` (`CustomModules\` namespace) and zero root `composer.json` mutations.
+  - Upgraded `ModuleServiceProvider`, `ModuleSyncCommand`, and `ModuleCacheCommand` to support multi-source discovery across `app-modules/` (source `core`), `custom-modules/` (source `custom`), and `vendor/` (source `vendor`).
+  - Streamlined `php artisan make:module <name>` to scaffold exclusively into `custom-modules/{name}/` with collision protection against core module names.
 - **Kickoff of TallPBX 4.x Series Branch (Domain-Driven Modular Monolith Modernization)**:
   - Established the `4.x` series branch as the primary active development line, transitioning from `3.x` to introduce a true Domain-Driven Modular Monolith architecture.
   - Updated documentation (`README.md`, `INSTALL.md`, `AGENTS.md`), installer bootstrap scripts (`scripts/bootstrap.sh`), and web updater fallback channels (`GitUpdate.php`) to target `4.x` by default, maintaining `3.x`, `2.0`, and `1.1` as stable maintenance release branches.

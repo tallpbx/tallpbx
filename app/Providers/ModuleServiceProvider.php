@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Support\CustomModuleAutoloader;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 
 /**
  * Service provider for the module discovery and registration system.
  *
- * Scans module.json files in app-modules/ and vendor/ directories,
- * validates them, and exposes parsed metadata through the container.
- * Laravel package discovery remains the source of truth for loading
- * each module's service provider.
+ * Scans module.json files in app-modules/, custom-modules/, and vendor/ directories,
+ * validates them, and registers enabled module service providers dynamically.
  */
 class ModuleServiceProvider extends ServiceProvider
 {
@@ -22,12 +21,31 @@ class ModuleServiceProvider extends ServiceProvider
     /**
      * Register module system services.
      *
-     * Discovers all module manifests, validates them, checks inter-module
-     * dependencies, and binds the parsed metadata for registry consumers.
+     * Discovers all module manifests, initializes the custom module autoloader,
+     * binds parsed metadata, and dynamically registers service providers for enabled modules.
      */
     public function register(): void
     {
-        $this->app->singleton('modules.manifest', fn (): array => $this->discoverModules());
+        CustomModuleAutoloader::register();
+
+        $modules = $this->discoverModules();
+
+        // Register custom module namespaces in dynamic autoloader
+        foreach ($modules as $manifest) {
+            if (($manifest['source'] ?? null) === 'custom' && ! empty($manifest['namespace']) && ! empty($manifest['path'])) {
+                CustomModuleAutoloader::addModule($manifest['namespace'], $manifest['path'].'/src');
+            }
+        }
+
+        $this->app->singleton('modules.manifest', fn (): array => $modules);
+
+        foreach ($modules as $name => $manifest) {
+            foreach ($manifest['providers'] ?? [] as $providerClass) {
+                if (class_exists($providerClass)) {
+                    $this->app->register($providerClass);
+                }
+            }
+        }
     }
 
     /**
@@ -42,7 +60,7 @@ class ModuleServiceProvider extends ServiceProvider
      * Discover all installed modules by scanning the filesystem.
      *
      * Returns cached manifests when available; otherwise scans
-     * module.json files in app-modules/ and vendor/ directories.
+     * module.json files in app-modules/, custom-modules/, and vendor/ directories.
      */
     private function discoverModules(): array
     {
@@ -51,13 +69,23 @@ class ModuleServiceProvider extends ServiceProvider
         if (is_file($cachedPath)) {
             $modules = require $cachedPath;
 
+            foreach ($modules as &$module) {
+                $module['source'] ??= 'core';
+            }
+            unset($module);
+
             $this->validateModuleNames($modules);
 
             return $modules;
         }
 
-        $modules = $this->scanDirectory(base_path('app-modules/*/module.json'));
-        $modules = array_merge($modules, $this->scanDirectory(base_path('vendor/*/*/module.json')));
+        $modules = $this->scanDirectory(base_path('app-modules/*/module.json'), 'core');
+        foreach ($this->scanDirectory(base_path('custom-modules/*/module.json'), 'custom') as $name => $manifest) {
+            $modules[$name] ??= $manifest;
+        }
+        foreach ($this->scanDirectory(base_path('vendor/*/*/module.json'), 'vendor') as $name => $manifest) {
+            $modules[$name] ??= $manifest;
+        }
 
         $this->validateModuleNames($modules);
         $this->checkDependencies($modules);
@@ -70,7 +98,7 @@ class ModuleServiceProvider extends ServiceProvider
     /**
      * Scan a glob pattern for module.json files and return parsed manifests.
      */
-    private function scanDirectory(string $pattern): array
+    private function scanDirectory(string $pattern, string $source): array
     {
         $modules = [];
 
@@ -80,6 +108,9 @@ class ModuleServiceProvider extends ServiceProvider
             if ($manifest === null) {
                 continue;
             }
+
+            $manifest['source'] = $source;
+            $manifest['path'] = dirname($path);
 
             $name = $manifest['name'];
             $modules[$name] = $manifest;

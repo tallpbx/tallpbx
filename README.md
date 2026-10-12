@@ -86,22 +86,23 @@ The installer configures TallPBX, FreeSWITCH, Nginx, MariaDB, and Redis. It is s
   - **RAM**: 4 GB RAM
   - **Swap**: 2 GB swap
 
-## Modular Architecture
+## Modular Architecture (Domain-Driven Modular Monolith)
 
-TallPBX uses a modular architecture where features reside in `app-modules/`:
+TallPBX organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**:
 
-- Core PHP code, migrations, views, routes, and translations are encapsulated within each module directory (`app-modules/<ModuleName>/`).
-- Modules register themselves via `App\Support\ModuleServiceProvider`.
-- Modules are auto-discovered through Composer path repositories and Laravel package discovery.
-- Detailed architecture, lifecycle, and cascading translation specification: [Modular Architecture & Translation Guide →](docs/modular-architecture.md)
+- **Built-in Core Modules (`app-modules/`)**: All 60 built-in telephony and administration domains reside in `app-modules/<domain-name>/`. They autoload directly via root `composer.json` PSR-4 (`Modules\<Domain>\`), eliminating fragile path repositories and pseudo-packages. Core modules update atomically via Git and are never deleted from disk.
+- **Third-Party Extensions (`custom-modules/`)**: Community add-ons and integrations live in the untracked, git-ignored `custom-modules/<name>/` directory. They are dynamically autoloaded at runtime via `CustomModuleAutoloader` under `CustomModules\<Name>\` with zero modifications to root `composer.json`.
+- **Standard Service Providers**: All modules register views, migrations, Livewire components, routes, menus, and permissions via `App\Support\ModuleServiceProvider`.
+- **Pre-Flight Collision Guards**: External modules are validated against core route prefixes, database tables, module names, permissions, and language keys.
+- **Detailed Specification**: See the [Modular Architecture & Translation Guide →](docs/modular-architecture.md).
 
-TallPBX utilizes Laravel's command-line tool, **Artisan** (`php artisan`), for system tasks and custom PBX commands. Scaffold a new module:
+Scaffold a new custom third-party extension in `custom-modules/`:
 
 ```bash
-php artisan make:module call-forwarding \
-    --display-name="Call Forwarding" \
-    --description="Forward calls to external numbers" \
-    --category="PBX Features"
+php artisan make:module my-crm-connector \
+    --display-name="My CRM Connector" \
+    --description="Third-party CRM integration for customer lookups" \
+    --category="Integrations"
 ```
 
 Manage modules from the command line:

@@ -158,38 +158,25 @@ The test suite at `tests/Feature/Architecture/TranslationParityTest.php` runs on
 
 ---
 
-## 5. Scaffolding Modules with Artisan
+## 5. Scaffolding Custom Extensions with Artisan (`make:module`)
 
-### 5.1 Built-in Core Modules
-To scaffold a new built-in domain module under `app-modules/`:
-
-```bash
-php artisan make:module call-forwarding \
-    --display-name="Call Forwarding" \
-    --description="Manage user and extension call redirection rules" \
-    --category="Telephony"
-```
-
-The command scaffolds the complete module tree:
-- `module.json` manifest configured with the module namespace, providers, and requirements.
-- `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider`.
-- `lang/{en,es,fr}/admin.php` with the collision warning header docblock.
-- `resources/views/index.blade.php`.
-- Model factories (`src/Database/Factories/`), migrations (`database/migrations/`), and tests (`tests/`).
-- Automatically registers the PSR-4 namespace in root `composer.json` and dumps the autoloader.
-
-### 5.2 Third-Party Custom Extensions (`--custom`)
-To scaffold a standalone community extension in `custom-modules/`:
+In the Domain-Driven Modular Monolith, built-in modules (`app-modules/`) are part of the permanent appliance monorepo maintained directly in version control. To keep the developer experience clean and avoid fragile runtime mutations of root `composer.json`, the scaffolding command `php artisan make:module` is dedicated exclusively to generating **third-party community extensions and plugins** in `custom-modules/`:
 
 ```bash
 php artisan make:module my-crm-connector \
     --display-name="My CRM Connector" \
-    --description="Third-party CRM integration" \
-    --category="Integrations" \
-    --custom
+    --description="Third-party CRM integration for customer lookups" \
+    --category="Integrations"
 ```
 
-This scaffolds into `custom-modules/my-crm-connector/` (which is untracked and git-ignored). It requires no changes to root `composer.json` and is dynamically autoloaded and discovered at runtime.
+### Key Behaviors:
+- **Target Location**: Scaffolds directly into `custom-modules/{name}/` (untracked, git-ignored).
+- **Zero Root Mutation**: Leaves root `composer.json` completely untouched.
+- **Manifest (`module.json`)**: Generates the standard manifest tagged with `source: "custom"`, setting up namespace (`CustomModules\{Studly}`), display name, category, and dependencies.
+- **Service Provider**: Generates `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider` with `moduleNamespace()` returning `CustomModules\{Studly}`.
+- **Instant Dynamic Autoloading**: Automatically discovered and autoloaded at runtime via `CustomModuleAutoloader` (`CustomModules\` namespace) without running `composer dump-autoload`.
+- **Component Stubs**: Pre-generates boilerplate Livewire component directories, model factories, Blade views, migration directories, and collision-safe translation files (`lang/{en,es,fr}/admin.php`).
+- **Core Collision Protection**: Rejects names that collide with existing core modules in `app-modules/` (e.g. `php artisan make:module extensions` will fail with an error).
 
 ---
 

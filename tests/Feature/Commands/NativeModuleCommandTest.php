@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\File;
 
 afterEach(function () {
     File::deleteDirectory(base_path('app-modules/native-command-test'));
+    File::deleteDirectory(base_path('custom-modules/native-command-test'));
     File::deleteDirectory(base_path('app-modules/my_mod'));
+    File::deleteDirectory(base_path('custom-modules/my_mod'));
 });
 
 it('rejects module names that are not canonical kebab-case', function () {
@@ -16,7 +18,7 @@ it('rejects module names that are not canonical kebab-case', function () {
     // by dependency checks, so scaffolding must refuse them.
     $this->artisan('make:module my_mod')->assertFailed();
 
-    expect(File::exists(base_path('app-modules/my_mod')))->toBeFalse();
+    expect(File::exists(base_path('custom-modules/my_mod')))->toBeFalse();
 });
 
 it('propagates failure exit codes from wrapped module commands', function () {
@@ -74,7 +76,7 @@ it('caches module manifests from app modules without generating a module autoloa
 });
 
 it('scaffolds modules using current TallPBX conventions', function () {
-    $modulePath = base_path('app-modules/native-command-test');
+    $modulePath = base_path('custom-modules/native-command-test');
 
     File::deleteDirectory($modulePath);
 
@@ -89,7 +91,7 @@ it('scaffolds modules using current TallPBX conventions', function () {
         ->and($modulePath.'/lang/en')->toBeDirectory()
         ->and($modulePath.'/resources/views')->toBeDirectory()
         ->and($modulePath.'/src/Providers/ModuleServiceProvider.php')->toBeFile()
-        ->and($modulePath.'/composer.json')->toBeFile()
+        ->and($modulePath.'/composer.json')->not->toBeFile()
         ->and($modulePath.'/module.json')->toBeFile()
         ->and($modulePath.'/routes/web.php')->not->toBeFile();
 
@@ -97,19 +99,17 @@ it('scaffolds modules using current TallPBX conventions', function () {
 
     expect($manifest['protected'])->toBeFalse()
         ->and($manifest['required'])->toBeFalse()
+        ->and($manifest['source'])->toBe('custom')
+        ->and($manifest['namespace'])->toBe('CustomModules\\NativeCommandTest')
         ->and($manifest['requirements']['modules'])->toBe([])
-        ->and($manifest['providers'])->toContain('Modules\\NativeCommandTest\\Providers\\ModuleServiceProvider');
-
-    $composer = json_decode((string) file_get_contents($modulePath.'/composer.json'), true);
-
-    expect($composer['extra']['laravel']['providers'])->toContain('Modules\\NativeCommandTest\\Providers\\ModuleServiceProvider');
+        ->and($manifest['providers'])->toContain('CustomModules\\NativeCommandTest\\Providers\\ModuleServiceProvider');
 
     $provider = (string) file_get_contents($modulePath.'/src/Providers/ModuleServiceProvider.php');
     $stubView = (string) file_get_contents($modulePath.'/resources/views/index.blade.php');
 
     expect($provider)->toContain('extends \\App\\Support\\ModuleServiceProvider')
         ->and($provider)->toContain("return 'native-command-test';")
-        ->and($provider)->toContain("return 'Modules\\NativeCommandTest';")
+        ->and($provider)->toContain("return 'CustomModules\\NativeCommandTest';")
         ->and($stubView)->toContain('<x-inline-alert :type="$operationalMessageType ?? \'info\'">')
         ->and($stubView)->toContain('@if (($operationalMessage ?? null) !== null)');
 

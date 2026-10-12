@@ -39,3 +39,5 @@ Thumbs.db
 app-modules/backups/backups
 tests/Browser/Screenshots/
 /storage/framework/browser-media*
+/custom-modules/*
+!/custom-modules/.gitkeep

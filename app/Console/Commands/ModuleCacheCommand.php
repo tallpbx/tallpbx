@@ -58,6 +58,18 @@ class ModuleCacheCommand extends Command
             $manifest = $this->loadManifest($path);
 
             if ($manifest !== null) {
+                $manifest['source'] = 'core';
+                $manifest['path'] = dirname($path);
+                $modules[$manifest['name']] = $manifest;
+            }
+        }
+
+        foreach (glob(base_path('custom-modules/*/module.json')) as $path) {
+            $manifest = $this->loadManifest($path);
+
+            if ($manifest !== null && ! isset($modules[$manifest['name']])) {
+                $manifest['source'] = 'custom';
+                $manifest['path'] = dirname($path);
                 $modules[$manifest['name']] = $manifest;
             }
         }
@@ -65,7 +77,9 @@ class ModuleCacheCommand extends Command
         foreach (glob(base_path('vendor/*/*/module.json')) as $path) {
             $manifest = $this->loadManifest($path);
 
-            if ($manifest !== null) {
+            if ($manifest !== null && ! isset($modules[$manifest['name']])) {
+                $manifest['source'] = 'vendor';
+                $manifest['path'] = dirname($path);
                 $modules[$manifest['name']] = $manifest;
             }
         }
