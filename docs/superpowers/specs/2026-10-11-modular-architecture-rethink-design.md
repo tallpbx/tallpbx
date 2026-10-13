@@ -1,6 +1,8 @@
 # TallPBX 4.x Modular Architecture Modernization Spec
 ## Domain-Driven Modular Monolith & Unified Extensibility Engine
 
+> **Independent review**: [2026-10-12 review](../reviews/2026-10-12-modular-architecture-rethink-review.md) — baseline findings register (F1–F12) covering this spec, the plan, and the Task 1–2 implementation state. Read before amending this document.
+
 - **Branch**: `4.x` (Primary active development series)
 - **Status**: Draft Spec for Review
 - **Date**: 2026-10-11

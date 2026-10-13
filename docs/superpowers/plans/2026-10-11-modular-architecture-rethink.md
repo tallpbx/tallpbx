@@ -1,5 +1,7 @@
 # TallPBX 4.x Modular Architecture Modernization Implementation Plan
 
+> **Independent review**: [2026-10-12 review](../reviews/2026-10-12-modular-architecture-rethink-review.md) — baseline findings register (F1–F12) covering this plan, the spec, and the Task 1–2 implementation state. Read before amending or executing tasks.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Modernize TallPBX's modular architecture on branch `4.x` by removing the 60 Composer path repositories in favor of direct PSR-4 autoloading, establishing a safe `custom-modules/` extensibility boundary with collision guards, cleaning up Backups as an autonomous system-superadmin utility, and organizing `/panel/modules` by UI navigation subcategories.
