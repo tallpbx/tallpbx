@@ -218,7 +218,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 ### Task 2: Multi-Source Discovery Engine, Dynamic Booting & Scaffolding (COMPLETED + F2 Manifest Corrections)
 
 **Status:** Completed in `728b1816`.  
-**Remaining Step:** Add missing manifest `providers` keys, convention fallback, and completeness test to resolve F2 & F11.
+**Remaining Step:** COMPLETED 2026-10-13 in `e391c1cf` — manifests fixed, fallback implemented, completeness tests landed.
 **Live-regression note (verified 2026-10-13):** with these keys missing, `email-connector` currently has **no registered routes** (`php artisan route:list --name=email-connector` is empty) and `backups` has an unbound `RestoreCommandRunnerInterface`; the old path-repo packages used to register both providers via `extra.laravel.providers` in their `composer.json` files. Because the never-registered Backups provider also carries the module's migration registration, its tables never load in fresh test databases — `app-modules/file-stores/tests/FileStoreServiceTest.php` and `FileStoreUiTest.php` currently fail with `no such table: backups` (verified 2026-10-13; 2 failures, 44 passes) and will be repaired by this step. This step is load-bearing for Task 5 (Backups route ownership moves behind the provider this fix enables) — land it before Task 5.
 
 **Files:**
@@ -228,7 +228,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Test: `tests/Feature/Providers/ModuleServiceProviderTest.php`
 
 - [x] **Step 1: Implement multi-source discovery, custom autoloader, and custom make:module** (Completed in `728b1816`)
-- [ ] **Step 2 (F2/F11 Amendment): Fix manifests, add discovery convention fallback, and add completeness test**
+- [x] **Step 2 (F2/F11 Amendment): Fix manifests, add discovery convention fallback, and add completeness test** (Completed 2026-10-13 in `e391c1cf`)
   1. In `app-modules/backups/module.json`, add:
      ```json
      "providers": [
@@ -246,11 +246,11 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   4. In `tests/Feature/Providers/ModuleServiceProviderTest.php`:
      - Add test asserting that all 60 core modules declare their service provider in `module.json` (assert on the manifest `providers` key explicitly — the existing `ModuleAutoloadTest` derives provider classes by convention and passes today despite F2) and that providers boot in cold state.
      - Add route-existence assertions: `panel.email-connector.edit` resolves and `panel.backups.*` routes are registered — guards against recurrence of the F2 silent-drop regression.
-- [ ] **Step 3: Run targeted test to verify it passes**
+- [x] **Step 3: Run targeted test to verify it passes** (16 passed / 219 assertions)
   ```bash
   php artisan test tests/Feature/Providers/ModuleServiceProviderTest.php
   ```
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (Committed as `e391c1cf`)
   ```bash
   git add app-modules/backups/module.json app-modules/email-connector/module.json app/Providers/ModuleServiceProvider.php tests/Feature/Providers/ModuleServiceProviderTest.php
   git commit -m "fix: declare missing service providers in backups and email-connector manifests with discovery fallback"
@@ -258,7 +258,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ---
 
-### Task 3: Database Schema, Module Taxonomy & Cache Reconciliation Engine (Resolves F3, F4, F9, F12)
+### Task 3: Database Schema, Module Taxonomy & Cache Reconciliation Engine (COMPLETED — Resolves F3, F4, F9, F12)
+
+**Status:** Completed 2026-10-13 in `5d85da59` (+ follow-ups `6011b7b0`, `ef65ebb7`, and the cache/robustness hardening commit of the same day).
 
 **Files:**
 - Create: `database/migrations/2026_10_13_000001_add_source_and_category_to_modules_table.php`
@@ -273,14 +275,14 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Delete: `app-modules/*/composer.json` (60 vestigial files)
 - Test: `tests/Feature/Commands/ModuleSyncTaxonomyTest.php`
 
-- [ ] **Step 1: Write migration and update Module Eloquent model**
+- [x] **Step 1: Write migration and update Module Eloquent model** (Completed — migration `2026_10_13_000001_...`, model fillable updated)
   1. Create migration adding `source` (`string`, default `'core'`) and `category` (`string`, nullable) to `modules` table.
   2. Add `$fillable = [..., 'source', 'category']` to `app/Models/Module.php`.
-  3. **Decide the fate of `composer_package` and `source_ref`**: both are relics of the path-repo uninstall/restore workflow that Task 6 removes (the `modules` migration comment documents `module:restore` git-based file recovery). Either drop them in this migration and scrub that comment, or repurpose them — leaving them undocumented will rot. If dropped, update `ModuleUninstallCommand` preview output and `ModuleRestoreCommand` in coordination with Task 6.
-- [ ] **Step 2: Update `module.json` schema and all 60 core manifests**
+  3. **Decide the fate of `composer_package` and `source_ref`** — DECIDED (see Task 6): `source_ref` is dropped in Task 6's migration (git-based restore dies with core-uninstall refusal); `composer_package` is kept for vendor-module Composer re-require.
+- [x] **Step 2: Update `module.json` schema and all 60 core manifests** (Completed — schema enums tightened; all 60 manifests canonicalized to §1.6)
   1. Update `resources/schemas/module.json`: **add** `source` (enum: `core`, `custom`, `vendor`) and **constrain the existing** `category` property to the canonical enum (`core`, `accounts`, `connectivity`, `routing`, `features`, `media`, `advanced`, `monitoring`, `custom`) — the schema already defines `category` as a free string with a `"General"` default, so this is a tightening, not a new property.
   2. Update all 60 `app-modules/*/module.json` manifests to declare their canonical `category` matching the 60/60 navigation mapping (including `click-to-call` &rarr; `features`, `destinations` &rarr; `routing`, `extension-settings` &rarr; `accounts`, `backups` &rarr; `core`, `email-connector` &rarr; `advanced`). **Note**: 58 manifests already carry a `category` key with *different* values (`PBX`, `Monitoring`, `System`, `Call Features`, `Advanced`, `PBX Features`, `Provisioning`) — every one of those must be rewritten to the canonical enum, not just backfilled for the two missing (`backups`, `email-connector`).
-- [ ] **Step 3: Update commands & wire cache reconciliation**
+- [x] **Step 3: Update commands & wire cache reconciliation** (Completed — sync upserts taxonomy + regenerates cache; make:module refreshes cache with canonical `custom` category default and enum validation; optimize:clear reconciles the cache via purge + atomic rebuild; docblocks swept)
   1. In `ModuleSyncCommand`:
      - Sync `source` and `category` from manifest into the `Module` database record.
      - Automatically regenerate `bootstrap/cache/modules.php` after successful sync.
@@ -289,15 +291,15 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   3. In `AppServiceProvider`:
      - Listen for `CommandFinished` on `optimize:clear` and invoke `module:clear` to ensure `bootstrap/cache/modules.php` is purged during cache clears.
   4. Modernize docblocks in `ModuleCacheCommand`, `ModuleClearCommand`, and `ModuleSyncCommand` (removing path-repo references).
-- [ ] **Step 4: Remove 60 vestigial `app-modules/*/composer.json` files**
+- [x] **Step 4: Remove 60 vestigial `app-modules/*/composer.json` files** (Completed — `git rm` of all 60)
   ```bash
   git rm -f app-modules/*/composer.json
   ```
   These files are dead weight but were historically load-bearing: their `extra.laravel.providers` blocks used to register module providers through Composer auto-discovery. Delete them **only after** Task 2 has added the missing `providers` keys to `backups` and `email-connector` — those two modules are already broken today precisely because their manifest keys are absent (see F2).
-- [ ] **Step 5: Write and run targeted test**
+- [x] **Step 5: Write and run targeted test** (Completed — `ModuleSyncTaxonomyTest`, 12 passing)
   1. Create `tests/Feature/Commands/ModuleSyncTaxonomyTest.php` asserting that `module:sync` populates all 60 modules with correct `source` and `category` and that cache is rebuilt.
   2. Run: `php artisan test tests/Feature/Commands/ModuleSyncTaxonomyTest.php`
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** (Committed as `5d85da59`)
   ```bash
   git add database/migrations/ app/Models/Module.php resources/schemas/module.json app-modules/ app/Console/Commands/ app/Providers/AppServiceProvider.php tests/Feature/Commands/ModuleSyncTaxonomyTest.php
   git commit -m "feat: establish module database taxonomy, cache reconciliation, and prune vestigial composer files"
@@ -332,9 +334,10 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Replace the no-op `validateModuleNames()` (currently a stub whose comment claims names are unique because they are array keys) with explicit `ModuleCollisionGuard` inspection.
      - In `checkDependencies()`, implement fail-soft: mark module disabled and log a critical error instead of throwing `RuntimeException`. **Important**: `checkDependencies()` currently runs only on the cold discovery path (when `bootstrap/cache/modules.php` is absent) — cached boots skip dependency validation entirely. Run the fail-soft check in **both** paths (or inside cache load) so behavior never depends on cache state.
      - Extend the fail-soft check to `requirements.packages`: verify each declared Composer package is actually installed (e.g. `Composer\InstalledVersions::isInstalled()`) and fail-soft when missing. Today only `requirements.modules` is checked — the file-stores manifest declared its four Flysystem adapter packages under `requirements.packages`, but nothing enforced them, which is exactly how the 2026-10-13 lockfile prune silently broke the S3/FTP/SFTP/Dropbox file stores until `FileStoreAdapterDependenciesTest` was added.
+     - **Specify the disabled-mark propagation mechanism** (the plan previously left this implicit): when a module fails its dependency check, the discovery engine records `'enabled' => false` on that module's manifest entry (both in the in-memory manifest and in `bootstrap/cache/modules.php`), and `register()` skips registering providers for any manifest entry marked `'enabled' => false`. Additionally write the failure into the `modules` registry row (`enabled = false`, `status = disabled`) so `ModuleState` agrees with the manifest. Without this, "mark module disabled" has no consumption point — `register()` currently registers every discovered provider unconditionally.
      - Unify name regex to `^[a-z][a-z0-9-]*$` (drop the underscore allowance) in `loadManifest()` of `app/Providers/ModuleServiceProvider.php` — the only permissive copy left; `ModuleCacheCommand`'s `loadManifest()` was already tightened in `375a6ba4` and `MakeModuleCommand` scaffolds already enforce kebab-case, so no change is needed there. (`resources/schemas/module.json` already uses the strict pattern in both `name` and `requirements.modules`.)
   3. In `app/Support/ModuleServiceProvider.php`:
-     - Check translation collisions against core modules; on custom module collision, revoke cascading path and fall back to namespaced `loadTranslationsFrom()`.
+     - **Lay a NEW inter-module collision check on top of the existing machinery**: `detectRootTranslationCollisions()` today only compares a module's keys against the **root** `lang/{locale}/*.php` dictionaries — it does NOT detect custom-vs-core or module-vs-module collisions. Add that check for custom modules; on collision, revoke the cascading path and fall back to namespaced `loadTranslationsFrom()`.
   4. In `app/Services/PermissionService.php`:
      - Prevent custom modules from claiming permissions owned by another module.
   5. In `app/Database/SafeMigrator.php` (or in `MigrationSafetyGuard`, its pending-source inspector):
@@ -387,6 +390,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   6. In `app-modules/backups/src/Services/BackupService.php` **and** the restore side (`RestoreService` / `RestoreOperationExecutor` / the root-owned `tallpbx-restore` bounded helper that extracts the staged archive):
      - Include `custom-modules/` in backup filesystem paths so user extensions survive restore. Today `archiveAppFiles()` copies only `storage/app`. Mirror the scope on restore — a backup-only change would capture extensions that restores silently drop.
   7. **Decision — enable/disable semantics**: once Backups is the autonomous disaster-recovery utility, `ModuleState` gating means a disabled Backups module hides its routes/menu and strands restore. Recommended: set `required: true` in `app-modules/backups/module.json` (schema: "cannot be disabled"). Otherwise document explicitly that disabling is allowed and how restore remains reachable.
+  8. **Keep `BlockFileStoreDeletion` root-registered**: the listener guarding backup profiles from losing their destination file store is deliberately wired in `AppServiceProvider::boot()` so it stays active while the module is disabled (see its inline comment). Do NOT move it into the Backups provider's `listeners()` during this task — moving it would strand backup-destination protection whenever Backups is disabled.
 - [ ] **Step 3: Run targeted tests**
   ```bash
   php artisan route:list --name=panel.backups
@@ -406,7 +410,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Modify: `app/Services/ModuleLifecycleService.php`
 - Modify: `app/Console/Commands/ModuleUninstallCommand.php` (also removes the last F9 path-repo strings — the "Composer path-repository entry" preview rows)
 - Modify or delete: `app/Console/Commands/ModuleRestoreCommand.php` (see Step 2.3 — the plan previously omitted this file)
-- Rewrite alongside the service: `tests/Feature/Services/ModuleLifecycleServiceTest.php`, `tests/Feature/Commands/ModuleUninstallCommandTest.php`, `tests/Feature/Commands/ModuleRestoreCommandTest.php` — all three currently assert Composer path-repo manipulation (sandbox `composer.json` fixtures, `composer remove tallpbx/module-*` call assertions, `composer_package_removed` / `repository_entry_removed` report keys) and must be rewritten together with the implementation, not after it. (`NativeModuleCommandTest` needs no rewrite: its only composer reference asserts that scaffolds contain **no** `composer.json`.)
+- Rewrite alongside the service: `tests/Feature/Services/ModuleLifecycleServiceTest.php`, `tests/Feature/Commands/ModuleUninstallCommandTest.php`, `tests/Feature/Commands/ModuleRestoreCommandTest.php` — all three currently assert Composer path-repo manipulation (sandbox `composer.json` fixtures, `composer remove tallpbx/module-*` call assertions, `composer_package_removed` / `repository_entry_removed` report keys) and must be rewritten together with the implementation, not after it. **Additional blast radius** (verified against the suite): `tests/Feature/Commands/NativeModuleCommandTest.php` asserts `module:restore` remains registered; `tests/Feature/Modules/ModuleComposerPackageMigrationTest.php` and `ModuleSourceRefMigrationTest.php` assert the two legacy columns exist; and `tests/Feature/Livewire/ModulesListTest.php` asserts the UI shows a `php artisan module:restore` hint for uninstalled modules — reconcile all four with the restore semantics decided in Step 2.3.
 
 - [ ] **Step 1: Write failing test verifying non-destructive core toggling & safe custom deletion**
   In `tests/Feature/Services/ModuleLifecycleServiceTest.php`:
@@ -419,9 +423,8 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Check `$manifest['source'] ?? 'core'`. If `'core'`, strictly refuse uninstallation.
      - For `source === 'custom'`, remove only `custom-modules/{name}` directory with irreversible-deletion warnings.
      - For `source === 'vendor'`, remove via Composer package removal.
-  3. Update `previewRestore()` and `restore()` (and decide the fate of `module:restore`):
-     - Core modules cannot be uninstalled, so restore is not applicable; custom modules are untracked and cannot be restored from Git.
-     - **Vendor modules are currently unspecified**: either implement restore as a Composer re-require (matching the `modules` migration comment "can reinstall vendor modules after an uninstall") or explicitly retire `ModuleRestoreCommand` entirely — if retired, delete the command, its test, and (coordinated with Task 3) the `source_ref` column. Leaving the command in place against gutted service methods will fail at runtime.
+  3. Update `previewRestore()` and `restore()` — **DECIDED branch**: restore survives ONLY as a Composer re-require for `source === 'vendor'` modules (matching the `modules` migration comment "can reinstall vendor modules after an uninstall"). Core modules cannot be uninstalled, so git-based restore is dead; custom modules are untracked and cannot be restored from Git. Keep `ModuleRestoreCommand` scoped to vendor re-require, **drop the `source_ref` column** in a Task 6 migration (scrub the `create_modules_table` comment), keep `composer_package` for vendor, and update `ModuleUninstallCommand` output to stop printing git-revision restore hints for non-vendor modules.
+  4. **Registry pruning for ghost core rows**: delete `modules` registry rows whose `source = 'core'` and whose module directory no longer exists on disk (e.g. the live `smtp-connector` ghost) as part of `module:sync` reconciliation. Core modules are monorepo-permanent, so a missing core directory is always dead. Do NOT prune `custom`/`vendor` rows — unplugged extensions must keep their registry state.
 - [ ] **Step 3: Run targeted test to verify it passes**
   ```bash
   php artisan test tests/Feature/Services/ModuleLifecycleServiceTest.php
@@ -465,8 +468,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Add `deleteCustomModule(string $id, string $confirmation)` method.
   2. In `modules-list.blade.php`:
      - Render category sections/accordions matching DaisyUI conventions.
-     - Use `input type="checkbox" class="toggle toggle-success toggle-sm"` with `wire:click="toggleEnabled('{{ $module->id }}')"` and `wire:loading.attr="disabled"`.
-     - Add inline DaisyUI loading spinner during toggle operations.
+     - Follow the **Standardized Action Progress Animation Architecture** from the tallpbx-custom / livewire-development skills for the toggle pattern: theme color from the house set (`toggle-primary` / `toggle-warning` / `toggle-error` — do not invent `toggle-success`), `wire:click="toggleEnabled('{{ $module->id }}')"` scoped with `wire:target="toggleEnabled({{ $module->id }})"` on the loading directives, pointer-lock while in flight (`wire:loading.class="opacity-70 pointer-events-none"` on the row/toggle), a present-continuous status verb ("Enabling…" / "Disabling…"), and the DaisyUI `<span class="loading loading-spinner loading-xs"></span>` spinner — not a generic inline spinner.
      - Display `<x-tooltip>` for required/protected modules.
      - Show `badge-neutral` for "Built-in" and `badge-info` for "Custom".
      - Add dropdown menu for custom modules with "Delete Extension" opening a confirmation dialog.
