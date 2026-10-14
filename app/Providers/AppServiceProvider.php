@@ -278,12 +278,13 @@ class AppServiceProvider extends ServiceProvider
                     return;
                 }
 
-                // Stale module manifests must never survive a cache clear:
-                // purge the generated module cache so the next boot
-                // rediscovers current manifests. module:sync and make:module
-                // regenerate it eagerly after their own changes.
+                // Stale module manifests must never survive a cache clear.
+                // Purge and immediately rebuild the generated module cache so
+                // the next request never boot-cold-scans 60+ manifests; the
+                // rebuild also closes the torn-read window for the CLI case.
                 if ($event->command === 'optimize:clear') {
                     Artisan::call('module:clear');
+                    Artisan::call('module:cache');
                 }
 
                 GeneratedFilePermissions::repair();

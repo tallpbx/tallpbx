@@ -16,6 +16,13 @@ use Illuminate\Support\Str;
  */
 class MakeModuleCommand extends Command
 {
+    /**
+     * Canonical UI navigation groups (plan §1.6, mirror of the manifest
+     * schema enum). A custom scaffold uses "custom" unless the caller
+     * overrides it with another canonical value.
+     */
+    private const CANONICAL_CATEGORIES = ['core', 'accounts', 'connectivity', 'routing', 'features', 'media', 'advanced', 'monitoring', 'custom'];
+
     protected $signature = 'make:module
         {name : The module name in kebab-case (e.g., "call-forwarding")}
         {--display-name= : Human-readable display name}
@@ -54,9 +61,18 @@ class MakeModuleCommand extends Command
         $studlyName = Str::studly(str_replace('-', '_', $name));
         $namespace = "CustomModules\\{$studlyName}";
         $displayName = $this->option('display-name') ?? Str::title(str_replace(['-', '_'], ' ', $name));
+        $category = $this->option('category') ?? 'custom';
+
+        // Refuse non-canonical categories up front so an invalid scaffold is
+        // rejected before any directory or manifest is written.
+        if (! in_array($category, self::CANONICAL_CATEGORIES, true)) {
+            $this->components->error('Category must be one of: '.implode(', ', self::CANONICAL_CATEGORIES).'.');
+
+            return self::FAILURE;
+        }
 
         $this->createDirectories($moduleDir);
-        $this->createModuleJson($moduleDir, $name, $namespace, $displayName);
+        $this->createModuleJson($moduleDir, $name, $namespace, $displayName, $category);
         $this->createServiceProvider($moduleDir, $namespace, $name);
         $this->createStubView($moduleDir, $name);
         $this->createLanguageFiles($moduleDir, $name, $displayName);
@@ -105,11 +121,13 @@ class MakeModuleCommand extends Command
 
     /**
      * Create the module.json manifest file.
+     *
+     * Receives the validated category so the manifest and the schema enum
+     * always agree.
      */
-    private function createModuleJson(string $moduleDir, string $name, string $namespace, string $displayName): void
+    private function createModuleJson(string $moduleDir, string $name, string $namespace, string $displayName, string $category): void
     {
         $description = $this->option('description') ?? '';
-        $category = $this->option('category') ?? 'General';
 
         $content = [
             '$schema' => '../../resources/schemas/module.json',

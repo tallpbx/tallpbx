@@ -114,8 +114,14 @@ it('optimize:clear reconciles the module manifest cache through module:clear', f
         0,
     ));
 
+    // The reconciliation must never leave the panel booting cold-scan: the
+    // cache is purged and immediately rebuilt, so it exists and is fresh.
     expect(is_file(base_path('bootstrap/cache/modules.php')))
-        ->toBeFalse('optimize:clear must purge the module manifest cache so stale manifests never survive a cache clear.');
+        ->toBeTrue('optimize:clear must reconcile the module manifest cache instead of leaving the panel without one.');
+
+    $cached = require base_path('bootstrap/cache/modules.php');
+
+    expect($cached['backups']['category'] ?? null)->toBe('core');
 });
 
 it('make:module refreshes the module manifest cache so the scaffold is discoverable', function () {
@@ -127,6 +133,32 @@ it('make:module refreshes the module manifest cache so the scaffold is discovera
 
     expect($cached)->toHaveKey('taxonomy-cache-probe');
     expect($cached['taxonomy-cache-probe']['source'])->toBe('custom');
+});
+
+it('scaffolds custom modules with the canonical custom category', function () {
+    Artisan::call('make:module', ['name' => 'taxonomy-cache-probe']);
+
+    $manifest = json_decode((string) file_get_contents(base_path('custom-modules/taxonomy-cache-probe/module.json')), true);
+
+    expect($manifest['category'])
+        ->toBe('custom', 'Scaffolds must use the canonical custom category so they group under Custom Extensions and satisfy the manifest schema enum.');
+});
+
+it('rejects non-canonical --category values when scaffolding', function () {
+    Artisan::call('make:module', ['name' => 'taxonomy-cache-probe', '--category' => 'General']);
+
+    expect(is_dir(base_path('custom-modules/taxonomy-cache-probe')))
+        ->toBeFalse('A non-canonical category must fail the scaffold before any directory is created.');
+});
+
+it('module:cache leaves a parseable cache and no temp files behind', function () {
+    Artisan::call('module:cache');
+
+    $cached = require base_path('bootstrap/cache/modules.php');
+
+    expect($cached)->toHaveCount(60);
+    expect(glob(base_path('bootstrap/cache/modules.php.tmp.*')))
+        ->toBeEmpty('The atomic cache writer must clean up its per-process temp file.');
 });
 
 it('removes the vestigial per-module composer.json files', function () {
