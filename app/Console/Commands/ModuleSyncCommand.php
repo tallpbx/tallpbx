@@ -6,13 +6,16 @@ namespace App\Console\Commands;
 
 use App\Models\Module;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 
 /**
  * Synchronizes module manifests from the filesystem into the modules table.
  *
- * Scans module.json files in app-modules/ and vendor/ directories
- * and upserts each module's metadata while preserving user-set
- * enabled/disabled state.
+ * Scans module.json files in app-modules/, custom-modules/, and vendor/
+ * directories and upserts each module's metadata — including its discovery
+ * source and canonical UI category — while preserving user-set
+ * enabled/disabled state. Finishes by regenerating the module manifest
+ * cache so bootstrap/cache/modules.php never goes stale after a sync.
  */
 class ModuleSyncCommand extends Command
 {
@@ -74,6 +77,12 @@ class ModuleSyncCommand extends Command
         }
 
         $this->components->info('Module database sync completed successfully.');
+
+        // Reconcile the generated manifest cache in the same step: a sync that
+        // left bootstrap/cache/modules.php stale would keep serving outdated
+        // metadata until the next manual module:cache.
+        Artisan::call('module:cache');
+        $this->components->info('Module manifest cache regenerated.');
 
         return self::SUCCESS;
     }
@@ -161,6 +170,8 @@ class ModuleSyncCommand extends Command
         $data = [
             'display_name' => $manifest['display_name'],
             'version' => $manifest['version'],
+            'source' => $manifest['source'] ?? 'core',
+            'category' => $manifest['category'] ?? null,
             'protected' => $manifest['protected'] ?? false,
             'required' => $manifest['required'] ?? false,
             'priority' => $manifest['priority'] ?? 0,

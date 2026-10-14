@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Str;
 
 /**
@@ -59,6 +60,11 @@ class MakeModuleCommand extends Command
         $this->createServiceProvider($moduleDir, $namespace, $name);
         $this->createStubView($moduleDir, $name);
         $this->createLanguageFiles($moduleDir, $name, $displayName);
+
+        // Rebuild the module manifest cache in the same step so the scaffolded
+        // extension is discoverable immediately and the cache never serves a
+        // pre-scaffold snapshot.
+        Artisan::call('module:cache');
 
         $this->components->info("Custom module [{$name}] scaffolded successfully at [{$moduleDir}].");
 

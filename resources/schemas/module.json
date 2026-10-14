@@ -37,10 +37,17 @@
             "type": "string",
             "description": "Short description of the module's purpose."
         },
+        "source": {
+            "type": "string",
+            "enum": ["core", "custom", "vendor"],
+            "description": "Where the module lives: core app-modules/ monorepo code (default, tagged by discovery), untracked custom-modules/ extension, or vendor package. Not declared in built-in manifests; discovery tags it.",
+            "default": "core"
+        },
         "category": {
             "type": "string",
-            "description": "UI grouping category (e.g., System, PBX Core, Call Features).",
-            "default": "General"
+            "enum": ["core", "accounts", "connectivity", "routing", "features", "media", "advanced", "monitoring", "custom"],
+            "description": "Canonical UI navigation group (plan §1.6) rendered by the /panel/modules workbench. The 'custom' value is assigned to third-party extensions only.",
+            "default": "core"
         },
         "required": {
             "type": "boolean",

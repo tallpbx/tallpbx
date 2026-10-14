@@ -9,10 +9,11 @@ use Illuminate\Console\Command;
 /**
  * Discover all modules and generate bootstrap cache files.
  *
- * Scans module.json files in app-modules/ and vendor/ directories,
- * validates manifests, checks dependencies, and writes modules.php
- * with parsed manifest metadata. Composer remains responsible for
- * autoloading modules through path or VCS repositories.
+ * Scans module.json files in app-modules/, custom-modules/, and vendor/
+ * directories, validates manifests, checks dependencies, and writes
+ * modules.php with parsed manifest metadata. Root composer.json autoloads
+ * all modules through its direct PSR-4 mappings; this cache only stores
+ * parsed manifest metadata for fast discovery.
  */
 class ModuleCacheCommand extends Command
 {

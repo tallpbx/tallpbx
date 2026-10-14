@@ -25,6 +25,12 @@ class Module extends Model
 
     protected $fillable = [
         'name',
+        // Where the module lives: core (permanent app-modules/ monorepo code),
+        // custom (untracked custom-modules/ extension), or vendor package.
+        'source',
+        // Canonical UI navigation group (plan §1.6) used by the /panel/modules
+        // workbench grouping.
+        'category',
         'composer_package',
         // Git revision that still held the module's files at uninstall time,
         // so module:restore can bring them back after the deletion is committed.

@@ -9,8 +9,10 @@ use Illuminate\Console\Command;
 /**
  * Remove generated module cache files.
  *
- * Composer is responsible for module autoloading. This command only
- * clears first-party TallPBX module manifest caches.
+ * Root composer.json autoloads all modules through its direct PSR-4
+ * mappings. This command only clears first-party TallPBX module manifest
+ * caches; module:sync and make:module regenerate them after their own
+ * changes, and optimize:clear purges them as part of a full cache clear.
  */
 class ModuleClearCommand extends Command
 {

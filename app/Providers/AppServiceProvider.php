@@ -51,6 +51,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Events\MigrationEnded;
 use Illuminate\Database\Events\MigrationStarted;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -275,6 +276,14 @@ class AppServiceProvider extends ServiceProvider
                 // redundant second pass when the repair command itself exits.
                 if ($event->command === 'permissions:repair') {
                     return;
+                }
+
+                // Stale module manifests must never survive a cache clear:
+                // purge the generated module cache so the next boot
+                // rediscovers current manifests. module:sync and make:module
+                // regenerate it eagerly after their own changes.
+                if ($event->command === 'optimize:clear') {
+                    Artisan::call('module:clear');
                 }
 
                 GeneratedFilePermissions::repair();
