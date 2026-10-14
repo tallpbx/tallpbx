@@ -16,7 +16,7 @@ TallPBX organizes its telecommunications, administrative, and PBX capabilities i
 2. **Elimination of Composer Path Repositories**: The 60 path repository declarations and `tallpbx/module-*` requirements in root `composer.json` are completely removed. Autoloading is handled directly by optimized PSR-4 autoloading (`"Modules\\{Domain}\\": "app-modules/{domain}/src/"`), dropping Composer execution time to < 2 seconds and slashing memory usage.
 3. **Clean Extensibility Boundary (`custom-modules/`)**: Third-party and community extensions are supported via an untracked, git-ignored `custom-modules/` directory (drop-in directories or git clones) and standard Composer packages in `vendor/`. External plugins never touch or dirty the core Git repository.
 4. **System Superadmin Backups Architecture**: Full system backup and restore (`app-modules/backups/`) is explicitly designated as an autonomous **System Superadmin** utility responsible for the complete appliance (database, configuration, storage, FreeSWITCH state, and `custom-modules/`), organized under Core Administration with strict access controls.
-5. **UI Navigation Parity on `/panel/modules`**: The module management workbench is restructured to mirror the sidebar navigation subcategories exactly (Core Administration, Accounts, Connectivity, Call Routing, Features, Media, Advanced, Monitoring, and Custom Extensions) using standardized DaisyUI 5 reactive toggle switches.
+5. **UI Navigation Parity on `/panel/modules`**: The module management workbench is restructured around the same taxonomy as the sidebar PBX navigation groups (Accounts, Connectivity, Call Routing, Features, Media, Advanced, Monitoring) plus a Core Administration group for top-level admin modules (`admin`, `auth`, `tenant`, `backups`, `logs`) and a Custom Extensions group, using standardized DaisyUI 5 reactive toggle switches. **Reality note**: the sidebar has no labeled "Core Administration" group today (admin items are flat top-level entries) and its labels are "Advanced"/"Monitoring"; the workbench may use display labels ("Advanced & System", "Monitoring & Diagnostics") as long as the mapping to sidebar groups is documented in §1.6 so the two taxonomies cannot drift.
 6. **Pre-flight & Runtime Collision Guards**: Third-party extensions are validated before boot to prevent name collisions, reserved route hijacking, table schema collisions, permission conflicts, and language key collisions. Missing dependencies fail-soft without bricking the appliance.
 
 ---
@@ -38,7 +38,7 @@ TallPBX organizes its telecommunications, administrative, and PBX capabilities i
 ### 1.3 Filesystem Structure Decision: Flat Structure with Metadata Grouping
 The directory structure for `app-modules/` remains flat (`app-modules/{module-name}/`) rather than nested into category subfolders (`app-modules/{category}/{module-name}/`).
 * **Rationale**: Decouples physical disk paths and PHP namespaces from UI navigation taxonomy. If a feature's UI grouping evolves, only metadata changes, with zero `git mv` operations, broken paths, or namespace refactoring.
-* **Category Mapping**: Categorization is declared in each module's `module.json` under `category`, synced into the `modules` database table, and rendered dynamically in both the sidebar and the `/panel/modules` management workbench.
+* **Category Mapping**: Categorization is declared in each module's `module.json` under `category` and synced into the `modules` database table. The `/panel/modules` management workbench renders grouping dynamically from this metadata (Task 7). **Reality note**: the sidebar does **not** derive its grouping from `category` today — it uses hardcoded `'parent'` keys in each module provider's `menuItems()` (`pbx.accounts`, `pbx.connectivity`, `pbx.routing`, `pbx.features`, `pbx.media`, `pbx.advanced`, `pbx.monitoring`, plus deeper nests such as `pbx.features.routing`). Category metadata governs the workbench only; keeping sidebar parents aligned with categories is a manual mapping (see §1.6) until a follow-up derives menu grouping from metadata.
 
 ---
 
@@ -165,7 +165,7 @@ Core `app-modules/` are part of the version-controlled monorepo. `php artisan ma
 * Emits `module.json` tagged with `source: "custom"` and namespace `CustomModules\{Studly}`.
 * Leaves root `composer.json` completely untouched.
 * Pre-generates boilerplate Livewire components, Blade views, migration templates, and language files.
-* Automatically invalidates `bootstrap/cache/modules.php` so the extension is discoverable immediately.
+* Automatically invalidates `bootstrap/cache/modules.php` so the extension is discoverable immediately (target behavior — `MakeModuleCommand` does not invalidate the cache today; implemented in Task 3).
 
 ---
 
@@ -175,15 +175,15 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 | Finding | Severity | Validated Resolution in Master Plan |
 | :--- | :--- | :--- |
-| **F1** | **Critical** | **Lockfile & Installed Metadata Cleanup**: Run `composer update --lock` to purge 60 path packages from `composer.lock` and `installed.json`. Run `optimize:clear` to purge legacy package discovery from `packages.php`. Added `composer validate --strict` to the verification gate. *(Amends Task 1)* |
-| **F2** | **Critical** | **Missing Manifest `providers` Keys**: Add `"providers"` array to `backups` and `email-connector` manifests. Add convention fallback in discovery (`{namespace}\Providers\ModuleServiceProvider`). Add a Pest completeness test ensuring all 60 core modules declare their provider. *(Amends Task 2 / Task 5)* |
-| **F3** | **High** | **Missing Database Columns & 60/60 Taxonomy**: Migration adds `source` and `category` to `modules` table. Schema and manifests updated with canonical `category` values. Spec §6.1 updated to cover all 60 modules (adding `click-to-call`, `destinations`, `extension-settings`). *(Addressed in Task 3 & Task 7)* |
+| **F1** | **Critical** | **Lockfile & Installed Metadata Cleanup (RESOLVED, committed 2026-10-13 in `e708781c`)**: `c8d31284` cleaned `composer.json` but left HEAD's `composer.lock` still carrying the 60 `tallpbx/module-*` path packages; the lockfile reconciliation was executed against the working tree on 2026-10-13 and committed as `e708781c` (60 path packages plus 13 orphaned cloud-storage adapter packages pruned, zero additions, every root require satisfied). `composer validate --strict` passes and `bootstrap/cache/packages.php` holds no legacy package discovery. `composer validate --strict` remains in the verification gate as a standing check. *(Amends Task 1 — complete)* |
+| **F2** | **Critical** | **Missing Manifest `providers` Keys (live regression, not just metadata hygiene)**: The removed path packages used to auto-register module providers via `extra.laravel.providers` inside the 60 vestigial `app-modules/*/composer.json` files; with path repos gone, only manifest `providers` keys remain as the registration path, and `backups` + `email-connector` never had them. Verified impact (2026-10-13): `php artisan route:list --name=email-connector` returns **no routes** — the Email Connector page is currently unreachable (its routes, menu, and permissions all live in its never-registered provider) — and `backups` works only because routes/menu/permissions are hoisted into the admin module and views/service are manually wired in `AppServiceProvider` (its `RestoreCommandRunnerInterface` binding is currently unbound). Fix: add `"providers"` arrays to both manifests, add the convention fallback in discovery (`{namespace}\Providers\ModuleServiceProvider`), and add a Pest completeness test ensuring all 60 core modules declare their provider plus route-existence assertions for both modules. **Ordering**: Task 5 depends on this fix — once Backups routes move into `app-modules/backups/routes/web.php`, they are registered only through the provider that this manifest fix enables. *(Amends Task 2 / Task 5)* |
+| **F3** | **High** | **Missing Database Columns & 60/60 Taxonomy**: Migration adds `source` and `category` to `modules` table. Schema and manifests updated with canonical `category` values. Spec §1.6 (the merged taxonomy section) updated to cover all 60 modules (adding `click-to-call`, `destinations`, `extension-settings`). *(Addressed in Task 3 & Task 7)* |
 | **F4** | **High** | **Cache Reconciliation Engine**: Hook `module:clear` into `optimize:clear`. Ensure `module:sync` updates both the database and `bootstrap/cache/modules.php`. Make `make:module` invalidate the manifest cache. *(Addressed in Task 3)* |
 | **F5** | **High** | **Hybrid Boot Documentation**: Document the real, superior hybrid boot architecture: all providers register in `register()`, while `boot()` gates routes/menus/permissions via `ModuleState::isEnabled()`, preserving migrations, views, and container bindings. *(Addressed in Spec §1.5)* |
 | **F6** | **High** | **Robust Collision Guards & Fail-Soft Policy**: Replace empty `validateModuleNames()` with explicit rejection logging. Change dependency check to fail-soft (disable module + log error, never throw `RuntimeException` at boot). Integrate table guards into `SafeMigrator`. Unify name regex to `^[a-z][a-z0-9-]*$`. *(Addressed in Task 4)* |
 | **F7** | **High** | **Module Lifecycle Path-Repo Elimination**: Rewrite `ModuleLifecycleService` to completely remove all path-repo Composer manipulation. Strictly forbid uninstall/deletion on `source === 'core'`. For `source === 'custom'`, perform safe directory deletion with typed confirmation (`UNINSTALL {name}`). *(Addressed in Task 6)* |
 | **F8** | **Medium** | **Scope Realism & Translation Parity**: Explicitly defer complex out-of-scope items (ZIP web uploader, monolithic `RoutingCacheObserver` refactor across 29 models). Add 100% translation parity (`en`, `es`, `fr`) for new UI category strings in Task 7. Add "Delete Extension" UI action for custom modules. *(Addressed in Tasks 6 & 7)* |
-| **F9** | **Medium** | **Command Docblock Modernization**: Sweep docblocks in `ModuleCacheCommand`, `ModuleClearCommand`, and `ModuleSyncCommand` to remove outdated path-repo claims. *(Addressed in Task 3)* |
+| **F9** | **Medium** | **Command Docblock Modernization**: Sweep docblocks and user-facing strings for outdated path-repo claims. Confirmed stale: `ModuleCacheCommand` ("autoloading modules through path or VCS repositories") and `ModuleUninstallCommand` preview labels ("Composer path-repository entry" — handled in Task 6). `ModuleSyncCommand`'s docblock is already clean and `ModuleClearCommand`'s is only mildly stale ("Composer is responsible for module autoloading" — tighten to reference direct PSR-4). *(Addressed in Task 3 / Task 6)* |
 | **F10** | **Medium** | **Disaster Recovery Custom Modules Scope**: Add `custom-modules/` directory to the filesystem backup paths in `app-modules/backups/` so custom extensions survive full-appliance restores. *(Addressed in Task 5)* |
 | **F11** | **Low** | **Manifest Completeness & Cold-State Tests**: Add tests verifying that every module shipping a provider declares it in `module.json`, plus cold-state discovery tests without cache files. *(Addressed in Task 2 & Task 8)* |
 | **F12** | **Low** | **Vestigial File Removal & Schema Modernization**: Delete all 60 unused `app-modules/*/composer.json` files. Update `resources/schemas/module.json` to model `source` and the 9 canonical UI categories. *(Addressed in Task 3)* |
@@ -195,7 +195,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 ### Task 1: Composer & Autoloading Modernization (COMPLETED + F1 Lockfile Cleanup)
 
 **Status:** Completed in `c8d31284` (root `composer.json` cleaned, tests green).  
-**Remaining Step:** Reconcile Composer lockfile and installed metadata to resolve F1.
+**F1 Lockfile Status: Resolved and committed 2026-10-13 in `e708781c`** — the reconciled `composer.lock` (zero `tallpbx/module-*` packages; 13 orphaned storage-adapter packages pruned; `vendor/composer/installed.json` clean as untracked vendor state) was executed as working-tree work and committed alongside this plan review. `composer validate --strict` passes (the lock is in sync with `composer.json`) and `bootstrap/cache/packages.php` holds no legacy package discovery. No further lockfile mutation is required.
 
 **Files:**
 - Modify: `composer.lock`
@@ -206,17 +206,12 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - [x] **Step 1: Write tests verifying direct PSR-4 autoloading for all 60 modules** (Completed in `c8d31284`)
 - [x] **Step 2: Update `composer.json` to remove 60 path repositories and add 60 PSR-4 mappings** (Completed in `c8d31284`)
 - [x] **Step 3: Verify composer dump-autoload performance and test suite** (Completed in `c8d31284`)
-- [ ] **Step 4 (F1 Amendment): Reconcile `composer.lock` and purge legacy path metadata**
-  1. Run `COMPOSER_ALLOW_SUPERUSER=1 composer update --lock` to update `composer.lock` and `installed.json` without path packages.
-  2. Run `php artisan optimize:clear` to purge legacy package discovery from `bootstrap/cache/packages.php`.
-  3. Verify `composer validate --strict` passes with 0 warnings or lockfile errors.
-  4. Verify `grep -c '"name": "tallpbx/module' composer.lock` returns 0.
-  5. Run targeted test: `php artisan test tests/Feature/ModuleAutoloadTest.php`.
-- [ ] **Step 5: Commit**
-  ```bash
-  git add composer.lock
-  git commit -m "refactor: update composer lockfile removing legacy module path packages"
-  ```
+- [x] **Step 4 (F1 Amendment): Reconcile `composer.lock` and purge legacy path metadata** (Completed and committed in `e708781c` on 2026-10-13; keep the checks below as standing verification only — do not re-run `composer update --lock` against an already-clean lockfile)
+  1. Verify `composer validate --strict` passes with 0 warnings or lockfile errors.
+  2. Verify `grep -c '"name": "tallpbx/module' composer.lock` returns 0.
+  3. Verify `php artisan optimize:clear` leaves `bootstrap/cache/packages.php` free of legacy package discovery.
+  4. Run targeted test: `php artisan test tests/Feature/ModuleAutoloadTest.php`.
+- [x] **Step 5: Commit** (Completed 2026-10-13 — the reconciled `composer.lock` was committed in `e708781c` as `refactor: update composer lockfile removing legacy module path packages`.)
 
 ---
 
@@ -224,6 +219,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 **Status:** Completed in `728b1816`.  
 **Remaining Step:** Add missing manifest `providers` keys, convention fallback, and completeness test to resolve F2 & F11.
+**Live-regression note (verified 2026-10-13):** with these keys missing, `email-connector` currently has **no registered routes** (`php artisan route:list --name=email-connector` is empty) and `backups` has an unbound `RestoreCommandRunnerInterface`; the old path-repo packages used to register both providers via `extra.laravel.providers` in their `composer.json` files. This step is load-bearing for Task 5 (Backups route ownership moves behind the provider this fix enables) — land it before Task 5.
 
 **Files:**
 - Modify: `app-modules/backups/module.json`
@@ -248,7 +244,8 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   3. In `app/Providers/ModuleServiceProvider.php`:
      - If `$manifest['providers']` is empty, fallback to `{namespace}\Providers\ModuleServiceProvider` when that class exists.
   4. In `tests/Feature/Providers/ModuleServiceProviderTest.php`:
-     - Add test asserting that all 60 core modules declare their service provider in `module.json` and that providers boot in cold state.
+     - Add test asserting that all 60 core modules declare their service provider in `module.json` (assert on the manifest `providers` key explicitly — the existing `ModuleAutoloadTest` derives provider classes by convention and passes today despite F2) and that providers boot in cold state.
+     - Add route-existence assertions: `panel.email-connector.edit` resolves and `panel.backups.*` routes are registered — guards against recurrence of the F2 silent-drop regression.
 - [ ] **Step 3: Run targeted test to verify it passes**
   ```bash
   php artisan test tests/Feature/Providers/ModuleServiceProviderTest.php
@@ -279,9 +276,10 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - [ ] **Step 1: Write migration and update Module Eloquent model**
   1. Create migration adding `source` (`string`, default `'core'`) and `category` (`string`, nullable) to `modules` table.
   2. Add `$fillable = [..., 'source', 'category']` to `app/Models/Module.php`.
+  3. **Decide the fate of `composer_package` and `source_ref`**: both are relics of the path-repo uninstall/restore workflow that Task 6 removes (the `modules` migration comment documents `module:restore` git-based file recovery). Either drop them in this migration and scrub that comment, or repurpose them — leaving them undocumented will rot. If dropped, update `ModuleUninstallCommand` preview output and `ModuleRestoreCommand` in coordination with Task 6.
 - [ ] **Step 2: Update `module.json` schema and all 60 core manifests**
-  1. Update `resources/schemas/module.json` to define `source` (`core`, `custom`, `vendor`) and `category` (enum: `core`, `accounts`, `connectivity`, `routing`, `features`, `media`, `advanced`, `monitoring`, `custom`).
-  2. Update all 60 `app-modules/*/module.json` manifests to declare their canonical `category` matching the 60/60 navigation mapping (including `click-to-call` &rarr; `features`, `destinations` &rarr; `routing`, `extension-settings` &rarr; `accounts`, `backups` &rarr; `core`, `email-connector` &rarr; `advanced`).
+  1. Update `resources/schemas/module.json`: **add** `source` (enum: `core`, `custom`, `vendor`) and **constrain the existing** `category` property to the canonical enum (`core`, `accounts`, `connectivity`, `routing`, `features`, `media`, `advanced`, `monitoring`, `custom`) — the schema already defines `category` as a free string with a `"General"` default, so this is a tightening, not a new property.
+  2. Update all 60 `app-modules/*/module.json` manifests to declare their canonical `category` matching the 60/60 navigation mapping (including `click-to-call` &rarr; `features`, `destinations` &rarr; `routing`, `extension-settings` &rarr; `accounts`, `backups` &rarr; `core`, `email-connector` &rarr; `advanced`). **Note**: 58 manifests already carry a `category` key with *different* values (`PBX`, `Monitoring`, `System`, `Call Features`, `Advanced`, `PBX Features`, `Provisioning`) — every one of those must be rewritten to the canonical enum, not just backfilled for the two missing (`backups`, `email-connector`).
 - [ ] **Step 3: Update commands & wire cache reconciliation**
   1. In `ModuleSyncCommand`:
      - Sync `source` and `category` from manifest into the `Module` database record.
@@ -293,8 +291,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   4. Modernize docblocks in `ModuleCacheCommand`, `ModuleClearCommand`, and `ModuleSyncCommand` (removing path-repo references).
 - [ ] **Step 4: Remove 60 vestigial `app-modules/*/composer.json` files**
   ```bash
-  rm -f app-modules/*/composer.json
+  git rm -f app-modules/*/composer.json
   ```
+  These files are dead weight but were historically load-bearing: their `extra.laravel.providers` blocks used to register module providers through Composer auto-discovery. Delete them **only after** Task 2 has added the missing `providers` keys to `backups` and `email-connector` — those two modules are already broken today precisely because their manifest keys are absent (see F2).
 - [ ] **Step 5: Write and run targeted test**
   1. Create `tests/Feature/Commands/ModuleSyncTaxonomyTest.php` asserting that `module:sync` populates all 60 modules with correct `source` and `category` and that cache is rebuilt.
   2. Run: `php artisan test tests/Feature/Commands/ModuleSyncTaxonomyTest.php`
@@ -313,7 +312,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Modify: `app/Providers/ModuleServiceProvider.php`
 - Modify: `app/Support/ModuleServiceProvider.php`
 - Modify: `app/Services/PermissionService.php`
-- Modify: `app/Services/SafeMigrator.php` (or migration safety checks)
+- Modify: `app/Database/SafeMigrator.php` (class `App\Database\SafeMigrator` — there is no `app/Services/SafeMigrator.php`; consider routing table guards through `app/Support/MigrationSafetyGuard.php`, which already inspects pending migration source and is bound in `AppServiceProvider`)
 - Test: `tests/Feature/Modules/CustomModuleCollisionGuardTest.php`
 
 - [ ] **Step 1: Write failing test for collision guards**
@@ -330,14 +329,14 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - `assertNoRouteCollision(array $routes, array $reservedRoutes)`
      - `assertNoTableCollision(string $table, array $reservedTables)`
   2. In `app/Providers/ModuleServiceProvider.php`:
-     - Replace empty `validateModuleNames()` with explicit `ModuleCollisionGuard` inspection.
-     - In `checkDependencies()`, implement fail-soft: mark module disabled and log a critical error instead of throwing `RuntimeException`.
-     - Unify regex to `^[a-z][a-z0-9-]*$`.
+     - Replace the no-op `validateModuleNames()` (currently a stub whose comment claims names are unique because they are array keys) with explicit `ModuleCollisionGuard` inspection.
+     - In `checkDependencies()`, implement fail-soft: mark module disabled and log a critical error instead of throwing `RuntimeException`. **Important**: `checkDependencies()` currently runs only on the cold discovery path (when `bootstrap/cache/modules.php` is absent) — cached boots skip dependency validation entirely. Run the fail-soft check in **both** paths (or inside cache load) so behavior never depends on cache state.
+     - Unify name regex to `^[a-z][a-z0-9-]*$` (drop the underscore allowance) in `loadManifest()` — and also in `app/Console/Commands/ModuleCacheCommand.php`'s duplicate `loadManifest()` copy (same permissive `^[a-z][a-z0-9_-]*$`) and `MakeModuleCommand`'s generated manifest, so new scaffolds validate against the tightened rule. (`resources/schemas/module.json` already uses the strict pattern in both `name` and `requirements.modules`.)
   3. In `app/Support/ModuleServiceProvider.php`:
      - Check translation collisions against core modules; on custom module collision, revoke cascading path and fall back to namespaced `loadTranslationsFrom()`.
   4. In `app/Services/PermissionService.php`:
      - Prevent custom modules from claiming permissions owned by another module.
-  5. In `SafeMigrator`:
+  5. In `app/Database/SafeMigrator.php` (or in `MigrationSafetyGuard`, its pending-source inspector):
      - Guard custom module migrations against existing tables.
 - [ ] **Step 3: Run targeted test to verify it passes**
   ```bash
@@ -345,7 +344,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   ```
 - [ ] **Step 4: Commit**
   ```bash
-  git add app/Services/ModuleCollisionGuard.php app/Providers/ModuleServiceProvider.php app/Support/ModuleServiceProvider.php app/Services/PermissionService.php app/Services/SafeMigrator.php tests/Feature/Modules/CustomModuleCollisionGuardTest.php
+  git add app/Services/ModuleCollisionGuard.php app/Providers/ModuleServiceProvider.php app/Support/ModuleServiceProvider.php app/Services/PermissionService.php app/Database/SafeMigrator.php tests/Feature/Modules/CustomModuleCollisionGuardTest.php
   git commit -m "feat: implement pre-flight collision guards and fail-soft dependency handling for custom modules"
   ```
 
@@ -353,20 +352,24 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ### Task 5: Backups Module Autonomous Superadmin Cleanup (Resolves F2, F10)
 
+**Dependency:** Task 2 must land first — once the routes move to `app-modules/backups/routes/web.php`, they are registered exclusively through the Backups provider, which only loads after its manifest declares `providers` (F2).
+
 **Files:**
 - Modify: `app-modules/admin/routes/web.php`
 - Modify: `app-modules/admin/src/Providers/ModuleServiceProvider.php`
 - Create: `app-modules/backups/routes/web.php`
 - Modify: `app-modules/backups/src/Providers/ModuleServiceProvider.php`
 - Modify: `app-modules/backups/src/Services/BackupService.php` (or backup config)
+- Modify: `app-modules/backups/src/Services/RestoreService.php` / `RestoreOperationExecutor.php` (restore-side symmetry for `custom-modules/` — see Step 2.6)
+- Modify: `app-modules/backups/module.json` (enable/disable decision — see Step 2.7)
 - Modify: `app/Providers/AppServiceProvider.php`
-- Test: `app-modules/backups/tests/Feature/BackupsRouteIndependenceTest.php`
+- Test: `app-modules/backups/tests/BackupsRouteIndependenceTest.php` (keep the flat convention of the module's existing tests in `app-modules/backups/tests/`; `phpunit.xml` already includes `app-modules/*/tests`)
 
 - [ ] **Step 1: Write test verifying Backups route and menu independence**
-  In `app-modules/backups/tests/Feature/BackupsRouteIndependenceTest.php`:
+  In `app-modules/backups/tests/BackupsRouteIndependenceTest.php`:
   1. Assert `/panel/backups` routes are registered exclusively by Backups provider.
-  2. Assert Backups menu item is registered under Core Administration (parent: null, order: 85).
-  3. Assert `custom-modules/` directory is included in backup filesystem paths.
+  2. Assert the Backups menu item is registered by the Backups provider at top level (`parent: null`, `order: 85`). **Note**: "Core Administration" is a modules-workbench section label, not an existing sidebar group — today admin items are flat top-level entries and Backups sits at `parent: 'pbx.advanced'`, `order: 90`. Decide in Step 2 whether the sidebar also gains a "Core Administration" header or the label stays workbench-only.
+  3. Assert `custom-modules/` is included in backup filesystem paths **and** that the restore path restores it (see Step 2.6).
 - [ ] **Step 2: Move routes, menus, and permissions to Backups module**
   1. Create `app-modules/backups/routes/web.php` defining `/panel/backups` routes with `auth.panel` and `admin.can:backups.*`.
   2. In `app-modules/backups/src/Providers/ModuleServiceProvider.php`:
@@ -378,9 +381,11 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   4. In `app-modules/admin/src/Providers/ModuleServiceProvider.php`:
      - Remove `'backups'` menu and permission entries.
   5. In `app/Providers/AppServiceProvider.php`:
-     - Remove lines 176–186 (`loadViewsFrom` and `BackupServiceInterface` manual registrations).
-  6. In `app-modules/backups/src/Services/BackupService.php`:
-     - Include `custom-modules/` in backup filesystem paths so user extensions survive restore.
+     - Remove lines 176–186 (`loadViewsFrom` and `BackupServiceInterface` manual registrations). Their comment cites a "sandbox composer double-load edge case" from the old provider-loading mechanism; after the F2 manifest fix the provider loads through discovery, so verify the backups test suite (`BackupServiceTest`, `RestoreServiceTest`, `RestoreModalTest`) stays green in the in-memory SQLite harness before deleting.
+     - Also remove the duplicate `BackupServiceInterface` binding at line 160 (it is bound twice today; the module provider owns the binding after this move).
+  6. In `app-modules/backups/src/Services/BackupService.php` **and** the restore side (`RestoreService` / `RestoreOperationExecutor` / the root-owned `tallpbx-restore` bounded helper that extracts the staged archive):
+     - Include `custom-modules/` in backup filesystem paths so user extensions survive restore. Today `archiveAppFiles()` copies only `storage/app`. Mirror the scope on restore — a backup-only change would capture extensions that restores silently drop.
+  7. **Decision — enable/disable semantics**: once Backups is the autonomous disaster-recovery utility, `ModuleState` gating means a disabled Backups module hides its routes/menu and strands restore. Recommended: set `required: true` in `app-modules/backups/module.json` (schema: "cannot be disabled"). Otherwise document explicitly that disabling is allowed and how restore remains reachable.
 - [ ] **Step 3: Run targeted tests**
   ```bash
   php artisan route:list --name=panel.backups
@@ -398,8 +403,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 **Files:**
 - Modify: `app/Services/ModuleLifecycleService.php`
-- Modify: `app/Console/Commands/ModuleUninstallCommand.php`
-- Test: `tests/Feature/Services/ModuleLifecycleServiceTest.php`
+- Modify: `app/Console/Commands/ModuleUninstallCommand.php` (also removes the last F9 path-repo strings — the "Composer path-repository entry" preview rows)
+- Modify or delete: `app/Console/Commands/ModuleRestoreCommand.php` (see Step 2.3 — the plan previously omitted this file)
+- Rewrite alongside the service: `tests/Feature/Services/ModuleLifecycleServiceTest.php`, `tests/Feature/Commands/ModuleUninstallCommandTest.php`, `tests/Feature/Commands/ModuleRestoreCommandTest.php`, `tests/Feature/Commands/NativeModuleCommandTest.php` — all currently assert Composer path-repo manipulation (sandbox `composer.json` fixtures, `composer remove tallpbx/module-*` call assertions, `composer_package_removed` / `repository_entry_removed` report keys) and must be rewritten together with the implementation, not after it.
 
 - [ ] **Step 1: Write failing test verifying non-destructive core toggling & safe custom deletion**
   In `tests/Feature/Services/ModuleLifecycleServiceTest.php`:
@@ -412,8 +418,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Check `$manifest['source'] ?? 'core'`. If `'core'`, strictly refuse uninstallation.
      - For `source === 'custom'`, remove only `custom-modules/{name}` directory with irreversible-deletion warnings.
      - For `source === 'vendor'`, remove via Composer package removal.
-  3. Update `previewRestore()` and `restore()`:
-     - Core modules cannot be uninstalled, so restore is not applicable; custom modules cannot be restored from Git.
+  3. Update `previewRestore()` and `restore()` (and decide the fate of `module:restore`):
+     - Core modules cannot be uninstalled, so restore is not applicable; custom modules are untracked and cannot be restored from Git.
+     - **Vendor modules are currently unspecified**: either implement restore as a Composer re-require (matching the `modules` migration comment "can reinstall vendor modules after an uninstall") or explicitly retire `ModuleRestoreCommand` entirely — if retired, delete the command, its test, and (coordinated with Task 3) the `source_ref` column. Leaving the command in place against gutted service methods will fail at runtime.
 - [ ] **Step 3: Run targeted test to verify it passes**
   ```bash
   php artisan test tests/Feature/Services/ModuleLifecycleServiceTest.php
@@ -440,7 +447,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   In `tests/Feature/Livewire/ModulesListTest.php`:
   1. Test that `ModulesList` groups all modules into the 8 navigation subcategories (+1 for Custom Extensions) with 60/60 core coverage.
   2. Test that toggling an enabled module flips `enabled` and invalidates caches.
-  3. Test that core protected modules (`admin`, `auth`, `tenant`) cannot be toggled off.
+  3. Test that **required** modules (`admin`, `auth`, `tenant` — `required: true` in their manifests) cannot be toggled off. Per `resources/schemas/module.json`, `required` = cannot be disabled and `protected` = cannot be uninstalled; `admin` is both `required` and `protected`, and `extensions` is also `protected: true`. Do not conflate the two flags.
   4. Test that custom modules show a "Delete Extension" action that calls `ModuleLifecycleService::uninstall()`.
 - [ ] **Step 2: Update `ModulesList.php` and `modules-list.blade.php`**
   1. In `ModulesList.php`:
@@ -464,6 +471,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Add dropdown menu for custom modules with "Delete Extension" opening a confirmation dialog.
   3. Add translation keys with 100% parity across `app-modules/admin/lang/{en,es,fr}/admin.php`:
      - Navigation category headers, "Built-in", "Custom", "Delete Extension", confirmation prompts.
+     - **Reuse existing root dictionary keys wherever they already exist** — `lang/en/admin.php` defines `pbx_accounts`, `pbx_connectivity`, `pbx_routing`, `pbx_features`, `pbx_media`, `pbx_advanced`, `pbx_monitoring` (labels: Accounts, Connectivity, Call Routing, Features, Media, Advanced, Monitoring). Add only genuinely new keys (Core Administration, Custom Extensions, badge/confirm copy) to the admin module dictionary and verify zero root collisions: `App\Support\ModuleServiceProvider::detectRootTranslationCollisions()` flags module dictionary keys that collide with root `lang/{locale}/*.php` groups. Re-adding the seven existing labels into the module dictionary would trip this machinery and violate the zero-root-collision rule.
 - [ ] **Step 3: Run targeted test to verify it passes**
   ```bash
   php artisan test tests/Feature/Livewire/ModulesListTest.php
@@ -504,10 +512,13 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   # 3. Run full parallel Pest test suite
   php artisan test --compact --parallel
 
-  # 4. Verify Composer autoload dump is fast and clean
+  # 4. Run the Pest browser suite (Task 7 changes UI — required by the AGENTS.md gate)
+  ./vendor/bin/pest tests/Browser
+
+  # 5. Verify Composer autoload dump is fast and clean
   composer dump-autoload -o
 
-  # 5. Verify Composer lockfile is 100% strict and clean
+  # 6. Verify Composer lockfile is 100% strict and clean
   composer validate --strict
   ```
 - [ ] **Step 4: Commit**
