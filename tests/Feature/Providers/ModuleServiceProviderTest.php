@@ -110,3 +110,99 @@ it('loads module routes', function () {
 
     expect($route)->not->toBeNull();
 });
+
+// ─── Manifest Provider Completeness (F2/F11) ────────────────────
+
+it('declares a service provider in every built-in module manifest', function () {
+    $manifestPaths = glob(base_path('app-modules/*/module.json'));
+
+    expect($manifestPaths)->toHaveCount(60);
+
+    $missing = [];
+
+    foreach ($manifestPaths as $path) {
+        $manifest = json_decode((string) file_get_contents($path), true);
+        $name = $manifest['name'] ?? basename(dirname($path));
+        $providers = $manifest['providers'] ?? [];
+
+        if ($providers === []) {
+            $missing[] = $name;
+
+            continue;
+        }
+
+        foreach ($providers as $providerClass) {
+            expect(class_exists($providerClass))
+                ->toBeTrue("[{$name}] declares provider [{$providerClass}] that does not exist.");
+        }
+    }
+
+    expect($missing)
+        ->toBeEmpty('Every built-in module manifest must declare its service provider. Missing: '.implode(', ', $missing));
+});
+
+it('builds the admin panel from module providers that register through the base contract, with the panel-host exception documented', function () {
+    // F2 scope is provider DECLARATION. Lineage is informational: every module
+    // provider extends App\Support\ModuleServiceProvider except the admin
+    // panel-host module, which predates the base contract and extends
+    // Illuminate\Support\ServiceProvider directly.
+    $nonConforming = [];
+
+    foreach (glob(base_path('app-modules/*/module.json')) as $path) {
+        $manifest = json_decode((string) file_get_contents($path), true);
+
+        foreach ($manifest['providers'] ?? [] as $providerClass) {
+            // Leading backslash is required: the file imports the App facade,
+            // so a relative "App\Support\..." would resolve under the facade namespace.
+            if (! is_subclass_of($providerClass, \App\Support\ModuleServiceProvider::class) && $providerClass !== Modules\Admin\Providers\ModuleServiceProvider::class) {
+                $nonConforming[] = $manifest['name'];
+            }
+        }
+    }
+
+    expect($nonConforming)->toBeEmpty('Only the admin panel-host module may bypass the module provider base contract. Offenders: '.implode(', ', $nonConforming));
+});
+
+it('registers panel routes through manifest providers for backups and email-connector', function () {
+    expect(Route::has('panel.backups.index'))->toBeTrue();
+    expect(Route::has('panel.email-connector.edit'))
+        ->toBeTrue('The email-connector manifest must declare its provider so its routes register.');
+});
+
+it('keeps the generated module cache providers in sync with module manifests', function () {
+    $cachePath = base_path('bootstrap/cache/modules.php');
+
+    if (! is_file($cachePath)) {
+        $this->markTestSkipped('No generated module cache present (cold discovery in effect).');
+    }
+
+    $cached = require $cachePath;
+
+    foreach (glob(base_path('app-modules/*/module.json')) as $path) {
+        $manifest = json_decode((string) file_get_contents($path), true);
+        $name = $manifest['name'];
+
+        expect($cached)->toHaveKey($name);
+        expect($cached[$name]['providers'] ?? [])
+            ->toBe($manifest['providers'] ?? [], "Generated module cache for [{$name}] is stale — regenerate it with php artisan module:cache.");
+    }
+});
+
+it('falls back to the conventional provider class when a manifest omits providers', function () {
+    expect(ModuleServiceProvider::providersFor(['name' => 'email-connector', 'namespace' => 'Modules\\EmailConnector']))
+        ->toBe(['Modules\\EmailConnector\\Providers\\ModuleServiceProvider']);
+
+    expect(ModuleServiceProvider::providersFor([
+        'name' => 'admin',
+        'namespace' => 'Modules\\Admin',
+        'providers' => ['Modules\\Admin\\Providers\\ModuleServiceProvider'],
+    ]))->toBe(['Modules\\Admin\\Providers\\ModuleServiceProvider']);
+
+    expect(ModuleServiceProvider::providersFor(['name' => 'ghost', 'namespace' => 'Modules\\Ghost']))
+        ->toBe([]);
+
+    // A malformed manifest must never leak a non-array providers value into
+    // the discovery loop, where foreach would fatal at boot.
+    expect(ModuleServiceProvider::providersFor(['name' => 'broken', 'namespace' => 'Modules\\Broken', 'providers' => 'not-an-array']))
+        ->toBe([]);
+});

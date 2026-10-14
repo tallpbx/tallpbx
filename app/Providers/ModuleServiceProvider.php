@@ -40,12 +40,45 @@ class ModuleServiceProvider extends ServiceProvider
         $this->app->singleton('modules.manifest', fn (): array => $modules);
 
         foreach ($modules as $name => $manifest) {
-            foreach ($manifest['providers'] ?? [] as $providerClass) {
+            foreach (self::providersFor($manifest) as $providerClass) {
                 if (class_exists($providerClass)) {
                     $this->app->register($providerClass);
                 }
             }
         }
+    }
+
+    /**
+     * Resolve the service provider classes a manifest declares.
+     *
+     * Returns the manifest's explicit providers list; when the manifest omits
+     * one, falls back to the conventional `{namespace}\Providers\ModuleServiceProvider`
+     * class when it exists, and to an empty list otherwise.
+     */
+    public static function providersFor(array $manifest): array
+    {
+        $providers = $manifest['providers'] ?? [];
+
+        // Guard against malformed manifests: a non-array providers value must
+        // fall through to the convention (or nothing) rather than fatal boot.
+        if (is_array($providers) && $providers !== []) {
+            return $providers;
+        }
+
+        // Convention fallback: modules may omit the providers key, in which
+        // case the standard src/Providers/ModuleServiceProvider.php layout is
+        // used when that class exists.
+        $namespace = $manifest['namespace'] ?? '';
+
+        if ($namespace !== '') {
+            $fallback = $namespace.'\\Providers\\ModuleServiceProvider';
+
+            if (class_exists($fallback)) {
+                return [$fallback];
+            }
+        }
+
+        return [];
     }
 
     /**

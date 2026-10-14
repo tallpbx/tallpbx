@@ -2,6 +2,9 @@
     "name": "email-connector",
     "version": "1.0.0",
     "namespace": "Modules\\EmailConnector",
+    "providers": [
+        "Modules\\EmailConnector\\Providers\\ModuleServiceProvider"
+    ],
     "display_name": "Email Connector",
     "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
     "type": "pbx-module",

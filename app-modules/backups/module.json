@@ -2,6 +2,9 @@
     "name": "backups",
     "version": "1.0.0",
     "namespace": "Modules\\Backups",
+    "providers": [
+        "Modules\\Backups\\Providers\\ModuleServiceProvider"
+    ],
     "display_name": "Backups",
     "description": "Database, file, media, and configuration backup with scheduling, retention, compression, and restore.",
     "type": "pbx-module",
