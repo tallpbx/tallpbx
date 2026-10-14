@@ -11,6 +11,11 @@ afterEach(function () {
     File::deleteDirectory(base_path('custom-modules/native-command-test'));
     File::deleteDirectory(base_path('app-modules/my_mod'));
     File::deleteDirectory(base_path('custom-modules/my_mod'));
+
+    // make:module regenerates the shared module manifest cache while the
+    // probe scaffold still exists; rebuild it so the deleted directories do
+    // not linger as ghost entries for the rest of the suite.
+    Artisan::call('module:cache');
 });
 
 it('rejects module names that are not canonical kebab-case', function () {
