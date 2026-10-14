@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Converted SIP Bot & Scanner Signatures enforcement helper copy, custom signatures, and generic patterns descriptions into dynamic contextual tooltips.
   - Formatted the Linux CLI inspection command for firewall rules (`php artisan security:status`) on its own dedicated newline under the header hint sentence.
 
+### Fixed
+- **File Stores Remote Provider Adapters Restored**: Re-homed the `league/flysystem-aws-s3-v3`, `league/flysystem-ftp`, `league/flysystem-sftp-v3`, and `spatie/flysystem-dropbox` packages into root `composer.json` requirements. They previously arrived transitively through the removed `tallpbx/module-file-stores` Composer path package, and the lockfile reconciliation that followed the path-repository elimination pruned them, breaking every S3/FTP/SFTP/Dropbox file store profile with a "Class not found" error. A regression-guard test now pins both the adapter classes and the root requirements. Requires `composer update` on existing deployments.
+
 ## [3.0.5] - 2026-10-10
 
 ### Changed
