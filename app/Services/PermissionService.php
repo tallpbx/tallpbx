@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\Module;
 use App\Models\Permission;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -46,20 +47,34 @@ class PermissionService
      * Accepts either an indexed array of permission name strings (no descriptions)
      * or an associative array mapping permission names to their descriptions.
      *
+     * Custom modules may not claim permissions already registered by another
+     * module — the claim is rejected with a logged warning so a community
+     * extension cannot hijack core RBAC entries (plan §1.7.5).
+     *
      * @param  string  $module  The module name (e.g. 'extensions')
      * @param  array<int, string>|array<string, string|null>  $permissions  Permission names or name=>description pairs
      */
     public function register(string $module, array $permissions): void
     {
+        $source = $this->moduleSource($module);
         $names = [];
+
         foreach ($permissions as $key => $value) {
+            $name = is_string($key) ? $key : $value;
+
+            // Ownership guard: reject a custom module's claim on a permission
+            // another module already registered.
+            if ($source === 'custom' && ($owner = $this->ownerOf($name)) !== null && $owner !== $module) {
+                Log::warning("Custom module [{$module}] attempted to claim permission [{$name}] already owned by module [{$owner}]. The claim was rejected.");
+
+                continue;
+            }
+
+            $names[] = $name;
+
             if (is_string($key)) {
                 // Associative: name => description
-                $names[] = $key;
-                $this->descriptions[$key] = $value;
-            } else {
-                // Indexed: just a name string
-                $names[] = $value;
+                $this->descriptions[$name] = $value;
             }
         }
 
@@ -67,6 +82,51 @@ class PermissionService
             ...($this->permissions[$module] ?? []),
             ...$names,
         ]));
+    }
+
+    /**
+     * Find the module that already registered a permission, if any.
+     *
+     * Consults the in-memory registrations first; once synced, also checks
+     * the database so permissions owned by modules whose providers did not
+     * boot this request (for example disabled modules) stay protected.
+     */
+    private function ownerOf(string $name): ?string
+    {
+        foreach ($this->permissions as $module => $names) {
+            if (in_array($name, $names, true)) {
+                return $module;
+            }
+        }
+
+        if (! $this->synced) {
+            return null;
+        }
+
+        $owner = Permission::query()->where('name', $name)->value('module');
+
+        return is_string($owner) ? $owner : null;
+    }
+
+    /**
+     * Resolve a module's declared source (core, custom, or vendor).
+     *
+     * Defaults to 'core' whenever the module is not in the manifest, so only
+     * explicitly custom modules are subject to the ownership guard.
+     */
+    private function moduleSource(string $module): string
+    {
+        try {
+            if (! app()->bound('modules.manifest')) {
+                return 'core';
+            }
+
+            $manifests = app('modules.manifest');
+
+            return is_array($manifests) ? ($manifests[$module]['source'] ?? 'core') : 'core';
+        } catch (\Throwable) {
+            return 'core';
+        }
     }
 
     /**

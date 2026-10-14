@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Services\MenuService;
+use App\Services\ModuleCollisionGuard;
 use App\Services\ModuleState;
 use App\Services\PermissionService;
+use Illuminate\Contracts\Foundation\CachesRoutes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -237,11 +239,50 @@ abstract class ModuleServiceProvider extends ServiceProvider
     private static array $rootGroupKeysCache = [];
 
     /**
+     * Cascading translation keys contributed by every registered module,
+     * indexed by locale, group, then module name. Used by the inter-module
+     * collision check so a custom module cannot shadow keys another module
+     * already cascades into the global dictionary (plan §1.7.4).
+     *
+     * @var array<string, array<string, array<string, array<string, int>>>>
+     */
+    private static array $moduleTranslationKeys = [];
+
+    /**
      * Clear the static root translation keys cache.
      */
     public static function clearRootTranslationKeysCache(): void
     {
         self::$rootGroupKeysCache = [];
+    }
+
+    /**
+     * Clear the static module translation keys registry (primarily for tests).
+     */
+    public static function clearModuleTranslationKeysCache(): void
+    {
+        self::$moduleTranslationKeys = [];
+    }
+
+    /**
+     * Resolve this module's declared source (core, custom, or vendor).
+     *
+     * Defaults to 'core' whenever the manifest is not resolvable, so only
+     * explicitly custom modules receive the stricter custom-extension guards.
+     */
+    protected function moduleSource(): string
+    {
+        try {
+            if (! $this->app->bound('modules.manifest')) {
+                return 'core';
+            }
+
+            $manifests = $this->app->make('modules.manifest');
+
+            return is_array($manifests) ? ($manifests[$this->moduleName()]['source'] ?? 'core') : 'core';
+        } catch (\Throwable) {
+            return 'core';
+        }
     }
 
     /**
@@ -252,7 +293,10 @@ abstract class ModuleServiceProvider extends ServiceProvider
      * into the global dictionary ({group}.{key}).
      *
      * Before adding the cascading path, validates that no keys in the module's
-     * language files collide with keys in the root global dictionary.
+     * language files collide with keys in the root global dictionary and —
+     * for custom modules — with keys another module already cascades. On a
+     * custom-module collision the cascading path is revoked and the module
+     * falls back to its namespaced translations only (plan §1.7.4).
      */
     private function registerTranslations(): void
     {
@@ -277,10 +321,96 @@ abstract class ModuleServiceProvider extends ServiceProvider
             return;
         }
 
+        // Inter-module layer (§1.7.4): a custom module must not shadow keys
+        // another module already cascades into the global dictionary.
+        if ($this->moduleSource() === 'custom') {
+            $moduleCollisions = $this->detectModuleTranslationCollisions($path);
+
+            if ($moduleCollisions !== []) {
+                $formatted = implode(', ', $moduleCollisions);
+
+                Log::critical("Custom module [{$this->moduleName()}] language keys collide with another module's dictionary for key(s): [{$formatted}]. Cascading path revoked; use namespaced {$this->moduleName()}:: translations.");
+
+                return;
+            }
+        }
+
         $loader = $this->app->make('translation.loader');
         if (method_exists($loader, 'addPath')) {
             $loader->addPath($path);
         }
+
+        $this->rememberModuleTranslationKeys($path);
+    }
+
+    /**
+     * Detect any key collisions between a custom module's translations and
+     * the dictionaries of previously registered modules.
+     *
+     * @return array<int, string> Colliding keys in {group}.{key} format
+     */
+    protected function detectModuleTranslationCollisions(string $path): array
+    {
+        $collisions = [];
+
+        foreach ($this->collectTranslationKeys($path) as $locale => $groups) {
+            foreach ($groups as $group => $keys) {
+                foreach (self::$moduleTranslationKeys[$locale][$group] ?? [] as $otherModule => $otherKeys) {
+                    if ($otherModule === $this->moduleName()) {
+                        continue;
+                    }
+
+                    foreach (array_keys(array_intersect_key($keys, $otherKeys)) as $key) {
+                        $collisionEntry = "{$group}.{$key}";
+
+                        if (! in_array($collisionEntry, $collisions, true)) {
+                            $collisions[] = $collisionEntry;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $collisions;
+    }
+
+    /**
+     * Record a module's cascading translation keys for future collision checks.
+     */
+    private function rememberModuleTranslationKeys(string $path): void
+    {
+        foreach ($this->collectTranslationKeys($path) as $locale => $groups) {
+            foreach ($groups as $group => $keys) {
+                self::$moduleTranslationKeys[$locale][$group][$this->moduleName()] = $keys;
+            }
+        }
+    }
+
+    /**
+     * Collect a module's translation keys indexed by locale and group.
+     *
+     * @return array<string, array<string, array<string, int>>> Locale => group => flipped key list.
+     */
+    private function collectTranslationKeys(string $path): array
+    {
+        $collected = [];
+
+        foreach (glob("{$path}/*", GLOB_ONLYDIR) ?: [] as $localeDir) {
+            $locale = basename($localeDir);
+
+            foreach (glob("{$localeDir}/*.php") ?: [] as $file) {
+                $group = basename($file, '.php');
+                $content = require $file;
+
+                if (! is_array($content)) {
+                    continue;
+                }
+
+                $collected[$locale][$group] = array_flip(array_keys(Arr::dot($content)));
+            }
+        }
+
+        return $collected;
     }
 
     /**
@@ -417,12 +547,61 @@ abstract class ModuleServiceProvider extends ServiceProvider
         $routesPath = $this->modulePath().'/routes/web.php';
 
         if (file_exists($routesPath)) {
+            $isCustom = $this->moduleSource() === 'custom';
+
+            // With cached routes the router holds a compiled collection that
+            // never loads this file anyway (loadRoutesFrom is a no-op), so
+            // there is no snapshot to take and no audit to run.
+            $routesCached = $this->app instanceof CachesRoutes
+                && $this->app->routesAreCached();
+
+            // Snapshot the router before a custom module loads its route file
+            // so the post-load audit can identify and undo anything it hijacked.
+            $snapshot = ($isCustom && ! $routesCached) ? Route::getRoutes()->getRoutes() : [];
+
+            // Static pre-flight (§1.7.2) stays as the cheap first line of
+            // defense; the post-load router audit catches every registration
+            // style it cannot see statically.
+            if ($isCustom && ! $this->assertRouteFileIsSafe($routesPath)) {
+                return;
+            }
+
             $this->loadRoutesFrom($routesPath);
+
+            if ($isCustom && ! $routesCached) {
+                (new ModuleCollisionGuard)->enforceRouteBoundaries($snapshot);
+            }
 
             return;
         }
 
         $this->autoRegisterRouteGroups();
+    }
+
+    /**
+     * Run the route collision guard over a custom module's route file.
+     *
+     * Reserved URLs come from the guard's fixed panel list; reserved route
+     * names are every name already registered by the application.
+     */
+    private function assertRouteFileIsSafe(string $routesPath): bool
+    {
+        $guard = new ModuleCollisionGuard;
+        $registeredNames = [];
+
+        foreach (Route::getRoutes()->getRoutes() as $route) {
+            if (($name = $route->getName()) !== null) {
+                $registeredNames[] = $name;
+            }
+        }
+
+        return $guard->assertNoRouteCollision(
+            $guard->extractRouteDescriptors($routesPath),
+            [
+                'uris' => ModuleCollisionGuard::RESERVED_PANEL_URIS,
+                'names' => $registeredNames,
+            ],
+        );
     }
 
     /**

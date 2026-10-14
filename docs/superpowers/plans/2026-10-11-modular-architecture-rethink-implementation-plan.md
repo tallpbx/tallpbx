@@ -307,17 +307,20 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ---
 
-### Task 4: Custom Module Pre-Flight & Runtime Collision Guards (Resolves F6)
+### Task 4: Custom Module Pre-Flight & Runtime Collision Guards (Resolves F6) (COMPLETED)
+
+**Status:** Completed 2026-10-14 in `16620ff7` (peer review fix pass folded in: router-state route audit, runtime DDL watch, log/registry dedup, dependency cascade). **Second re-check pass** fixed the route:cache boot crash (compiled-collection gate), vendor collision labeling, synced permission ownership, and watch cleanup — see the ledger; final hash in the commit trail.
 
 **Files:**
 - Create: `app/Services/ModuleCollisionGuard.php`
+- Create: `app/Exceptions/MigrationCollisionException.php` (named by §1.7.3, omitted from this file list)
 - Modify: `app/Providers/ModuleServiceProvider.php`
 - Modify: `app/Support/ModuleServiceProvider.php`
 - Modify: `app/Services/PermissionService.php`
-- Modify: `app/Database/SafeMigrator.php` (class `App\Database\SafeMigrator` — there is no `app/Services/SafeMigrator.php`; consider routing table guards through `app/Support/MigrationSafetyGuard.php`, which already inspects pending migration source and is bound in `AppServiceProvider`)
+- Modify: `app/Database/SafeMigrator.php` (class `App\Database\SafeMigrator` — there is no `app/Services/SafeMigrator.php`; table guards routed through `app/Support/MigrationSafetyGuard.php`, which already inspects pending migration source and is bound in `AppServiceProvider`)
 - Test: `tests/Feature/Modules/CustomModuleCollisionGuardTest.php`
 
-- [ ] **Step 1: Write failing test for collision guards**
+- [x] **Step 1: Write failing test for collision guards** (Completed — 14 tests watched failing RED before implementation)
   In `tests/Feature/Modules/CustomModuleCollisionGuardTest.php`:
   1. Assert that a custom module declaring `name: 'extensions'` or `name: 'admin'` is rejected with a descriptive logged error and omitted from registration.
   2. Assert that missing dependencies fail-soft (module marked disabled and critical error logged, without throwing `RuntimeException` at boot).
@@ -325,7 +328,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   4. Assert that a custom migration attempting to create an existing table or alter core tables is halted.
   5. Assert that colliding translation keys revoke cascading loader and fallback to namespaced strings.
   6. Assert that a custom module cannot register permissions owned by an existing module.
-- [ ] **Step 2: Implement `ModuleCollisionGuard` and integrate with providers**
+- [x] **Step 2: Implement `ModuleCollisionGuard` and integrate with providers** (Completed — merge-time `mergeDiscovered()` guard + fail-soft dependencies on both boot paths + `requirements.packages` enforcement + registry propagation + inter-module translation collisions + permission ownership + SafeMigrator table guards. **Implementation note (variance from the Step 2.2 letter):** the disabled mark is recorded in the in-memory manifest and the `modules` registry row (`enabled = false`, `status = disabled`) rather than written back into `bootstrap/cache/modules.php`; a per-boot `registryRecordsDisabled()` dedup makes the cache write-back unnecessary, and the cache stays generated-content-only.)
   1. Create `app/Services/ModuleCollisionGuard.php` with:
      - `assertNoNameCollision(string $name, array $coreModules)`: Logs error and returns false if custom module clashes with core.
      - `assertNoRouteCollision(array $routes, array $reservedRoutes)`
@@ -342,11 +345,11 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Prevent custom modules from claiming permissions owned by another module.
   5. In `app/Database/SafeMigrator.php` (or in `MigrationSafetyGuard`, its pending-source inspector):
      - Guard custom module migrations against existing tables.
-- [ ] **Step 3: Run targeted test to verify it passes**
+- [x] **Step 3: Run targeted test to verify it passes** (20 passed / 69 assertions)
   ```bash
   php artisan test tests/Feature/Modules/CustomModuleCollisionGuardTest.php
   ```
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (Committed as `16620ff7`, amended with the post-commit review fix pass)
   ```bash
   git add app/Services/ModuleCollisionGuard.php app/Providers/ModuleServiceProvider.php app/Support/ModuleServiceProvider.php app/Services/PermissionService.php app/Database/SafeMigrator.php tests/Feature/Modules/CustomModuleCollisionGuardTest.php
   git commit -m "feat: implement pre-flight collision guards and fail-soft dependency handling for custom modules"

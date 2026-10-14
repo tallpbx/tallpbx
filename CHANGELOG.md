@@ -40,11 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added polite `aria-live` semantics for accessibility and automated feature component test coverage in `tests/Feature/Components/OperationalToastTest.php`.
 
 ### Security
+- **Custom Module Pre-Flight & Runtime Collision Guards**: Third-party extensions installed in `custom-modules/` are now validated before and during boot so a community plugin can never shadow or hijack core appliance functionality:
+  - A custom module declaring the name of an installed module (for example `extensions` or `admin`) is rejected with a descriptive logged error instead of being silently dropped or shadowing the original.
+  - Custom module route files may not bind reserved core panel URLs (`/panel/login`, `/panel/setup`, `/panel/dashboard`, `/panel/settings`, `/panel/modules`, `/panel/git-update`) or reuse route names already registered by the appliance; offending route files are never loaded.
+  - Custom module migrations may not create a table that already exists or alter protected core tables (`users`, `admins`, `tenants`, `groups`, `permissions`, `modules`, `menus`); the migration run halts with a `MigrationCollisionException` before any SQL executes.
+  - Custom module language files whose keys collide with another module's cascading dictionary lose their global cascading path and fall back to namespaced `{module}::` translations, and a custom module cannot register permissions already owned by another module.
+  - Guarded by `tests/Feature/Modules/CustomModuleCollisionGuardTest.php` (20 feature tests). Administrators do not need to take any action.
 - **Enforced `security.edit` Authorization on Firewall Mutations**:
   - Closed an authorization gap across `SecurityManager` and its concerns (`ManagesAllowBlockLists`, `ManagesAttackProtection`, `ManagesFirewallRules`, `ManagesObserveMode`, and `ManagesPreFilters`) by enforcing the `security.edit` permission check on all mutating actions (enabling/disabling firewall, rule reordering, IP whitelist/blacklist additions and deletions, manual bans, scanner configuration, and service catalog updates).
   - Added comprehensive authorization feature test coverage in `SecurityManagerAuthorizationTest`.
 
 ### Changed
+- **Fail-Soft Module Dependency Handling at Boot**: A module with unmet requirements (missing required modules, wrong versions, or missing Composer packages declared under `requirements.packages`) no longer crashes the whole appliance with a boot-time exception. It is instead marked disabled — in the module manifest, in the `modules` registry (so the panel reflects the state), and its service providers are skipped — with a critical log entry explaining the unmet requirements. The check runs on both the cold discovery path and the cached manifest path, so protection never depends on cache state. Built-in modules are unaffected. After installing missing requirements, re-enable the module from `/panel/modules`.
 - **Security Center Tooltip Merges & UI Streamlining**:
   - Merged redundant description paragraphs into informative header tooltips across the Blocked Attackers, External Blocklists, SIP Bot & Scanner Signatures, and Firewall Rules tabs.
   - Converted SIP Bot & Scanner Signatures enforcement helper copy, custom signatures, and generic patterns descriptions into dynamic contextual tooltips.

@@ -14,6 +14,10 @@ use LogicException;
 
 beforeEach(function () {
     ModuleServiceProvider::clearRootTranslationKeysCache();
+    // The inter-module key registry is static and shared per worker process.
+    if (method_exists(ModuleServiceProvider::class, 'clearModuleTranslationKeysCache')) {
+        ModuleServiceProvider::clearModuleTranslationKeysCache();
+    }
 });
 
 it('enforces 100% key parity across root language files in en, es, and fr', function () {

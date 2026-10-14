@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Exceptions\MigrationCollisionException;
+use App\Services\ModuleCollisionGuard;
 use Illuminate\Database\Connection;
 use RuntimeException;
 
@@ -38,6 +40,18 @@ final class MigrationSafetyGuard
     /** The protected connection used to confirm whether the reviewed schema is empty. */
     private ?Connection $protectedConnection = null;
 
+    /** Names of the pending custom-module migrations in the current run. */
+    private array $customMigrationNames = [];
+
+    /** Whether a migrator run with custom-module migrations is being watched. */
+    private bool $watchingCustomMigrations = false;
+
+    /** Connection used by the custom-migration runtime DDL guard. */
+    private ?Connection $customWatchConnection = null;
+
+    /** @var array<int, int> Connections that already have the custom-migration DDL callback. */
+    private array $customWatchedConnections = [];
+
     /**
      * Reject every pending migration that contains a destructive operation in up().
      *
@@ -56,6 +70,206 @@ final class MigrationSafetyGuard
                 ));
             }
         }
+    }
+
+    /**
+     * Reject pending custom-module migrations that collide with the existing schema.
+     *
+     * Applies only to files under custom-modules/ (plan §1.7.3): creating a
+     * table that already exists, or touching a protected core table, is a
+     * packaging bug that would corrupt the appliance, so the migration run is
+     * halted with MigrationCollisionException before any SQL executes.
+     *
+     * @param  array<int, string>  $migrationFiles  Absolute paths to pending migration files.
+     * @param  Connection  $connection  Connection used to check table existence.
+     */
+    public function assertNoCustomTableCollisions(array $migrationFiles, Connection $connection): void
+    {
+        $customRoot = base_path('custom-modules').DIRECTORY_SEPARATOR;
+        $schema = $connection->getSchemaBuilder();
+        $guard = new ModuleCollisionGuard;
+
+        // Reset the watched set for this run: the runtime DDL guard uses it
+        // to know which executing migrations belong to custom modules.
+        $this->customMigrationNames = [];
+
+        foreach ($migrationFiles as $migrationFile) {
+            if (! str_starts_with($migrationFile, $customRoot)) {
+                continue;
+            }
+
+            $this->customMigrationNames[] = basename($migrationFile, '.php');
+
+            foreach ($this->customTableTargets($migrationFile) as [$operation, $table]) {
+                // Both creating and altering a protected core table is forbidden.
+                if (! $guard->assertNoTableCollision($table, ModuleCollisionGuard::PROTECTED_CORE_TABLES)) {
+                    throw new MigrationCollisionException(sprintf(
+                        'Custom migration [%s] cannot touch protected core table [%s]. Custom modules must use their own prefixed tables.',
+                        basename($migrationFile),
+                        $table,
+                    ));
+                }
+
+                if ($operation === 'create' && $schema->hasTable($table)) {
+                    throw new MigrationCollisionException(sprintf(
+                        'Custom migration [%s] cannot create table [%s] because it already exists. Use Schema::table to extend it, or rename your table.',
+                        basename($migrationFile),
+                        $table,
+                    ));
+                }
+            }
+        }
+    }
+
+    /**
+     * Watch a migrator run for DDL issued by custom-module migrations.
+     *
+     * Static source analysis cannot see raw DB::statement SQL or table
+     * names passed as variables, so this attaches a runtime guard: while a
+     * custom migration executes, any CREATE TABLE for an existing table or
+     * any DDL on a protected core table is halted before the database
+     * receives it (plan §1.7.3).
+     */
+    public function beginCustomMigrationWatch(Connection $connection): void
+    {
+        $this->watchingCustomMigrations = true;
+        $this->customWatchConnection = $connection;
+        $connectionId = spl_object_id($connection);
+
+        if (in_array($connectionId, $this->customWatchedConnections, true)) {
+            return;
+        }
+
+        $connection->beforeExecuting(function (string $query): void {
+            $this->assertCustomMigrationSqlIsSafe($query);
+        });
+
+        $this->customWatchedConnections[] = $connectionId;
+    }
+
+    /** End the custom-migration watch and clear its per-run bookkeeping. */
+    public function endCustomMigrationWatch(): void
+    {
+        $this->watchingCustomMigrations = false;
+        $this->customWatchConnection = null;
+        $this->customMigrationNames = [];
+        // Mirrors endProtectedMigrationRun: a guard thrown mid-up() skips the
+        // MigrationEnded event, so the active migration must not linger.
+        $this->activeMigration = null;
+    }
+
+    /**
+     * Reject DDL that a custom migration may not issue, at execution time.
+     *
+     * Only applies while the currently executing migration belongs to a
+     * custom module — core migrations legitimately alter their own tables.
+     */
+    public function assertCustomMigrationSqlIsSafe(string $query): void
+    {
+        if ($this->activeMigration === null || ! in_array($this->activeMigration, $this->customMigrationNames, true)) {
+            return;
+        }
+
+        $table = $this->ddlTargetTable($query);
+
+        if ($table === null) {
+            return;
+        }
+
+        $guard = new ModuleCollisionGuard;
+
+        if (! $guard->assertNoTableCollision($table, ModuleCollisionGuard::PROTECTED_CORE_TABLES)) {
+            throw new MigrationCollisionException(sprintf(
+                'Custom migration [%s] attempted prohibited DDL on protected core table [%s]. Custom modules must use their own prefixed tables.',
+                $this->activeMigration,
+                $table,
+            ));
+        }
+
+        $isCreate = preg_match('/^\s*CREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?!IF\s+NOT\s+EXISTS)/i', $query) === 1;
+
+        if ($isCreate && $this->customWatchConnection?->getSchemaBuilder()->hasTable($table)) {
+            throw new MigrationCollisionException(sprintf(
+                'Custom migration [%s] attempted to create table [%s] which already exists. Use Schema::table to extend it, or rename your table.',
+                $this->activeMigration,
+                $table,
+            ));
+        }
+    }
+
+    /**
+     * Extract the target table from a CREATE TABLE or ALTER TABLE statement.
+     *
+     * Handles quoted ("table", `table`, [table]) and bare identifiers;
+     * returns null for statements that are not table DDL.
+     */
+    private function ddlTargetTable(string $query): ?string
+    {
+        if (preg_match('/^\s*(?:CREATE\s+(?:TEMPORARY\s+)?TABLE|ALTER\s+TABLE)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?["`\[]?([A-Za-z0-9_.\-]+)/i', $query, $matches) !== 1) {
+            return null;
+        }
+
+        $table = trim($matches[1], '"`[]');
+
+        // Schema-qualified names keep only the table segment.
+        $dotPosition = strrpos($table, '.');
+
+        return $dotPosition === false ? $table : substr($table, $dotPosition + 1);
+    }
+
+    /**
+     * Extract the Schema::create / Schema::table targets from a migration's up() method.
+     *
+     * Returns [operation, table] pairs found by token inspection. Table names
+     * passed as variables instead of string literals cannot be resolved
+     * statically and are silently skipped.
+     *
+     * @return array<int, array{0: string, 1: string}>
+     */
+    private function customTableTargets(string $migrationFile): array
+    {
+        $source = file_get_contents($migrationFile);
+
+        if ($source === false) {
+            return [];
+        }
+
+        $targets = [];
+        $tokens = $this->upMethodTokens($source);
+
+        foreach ($tokens as $index => $token) {
+            if (! is_array($token) || $token[0] !== T_STRING || ! in_array($token[1], ['create', 'table'], true)) {
+                continue;
+            }
+
+            // Only Schema::create()/Schema::table() calls define schema
+            // targets. Look-alikes such as DB::table('users') are
+            // query-builder data access, not schema alteration.
+            $previous = $tokens[$index - 1] ?? null;
+            $beforePrevious = $tokens[$index - 2] ?? null;
+
+            $isSchemaCall = is_array($previous) && $previous[0] === T_DOUBLE_COLON
+                && is_array($beforePrevious) && $beforePrevious[0] === T_STRING
+                && strcasecmp((string) $beforePrevious[1], 'Schema') === 0;
+
+            if (! $isSchemaCall) {
+                continue;
+            }
+
+            // Schema::create('users', ...) — the table literal follows the
+            // method name and its opening parenthesis.
+            $next = $tokens[$index + 1] ?? null;
+
+            if ($next === '(') {
+                $next = $tokens[$index + 2] ?? null;
+            }
+
+            if (is_array($next) && $next[0] === T_CONSTANT_ENCAPSED_STRING) {
+                $targets[] = [$token[1], trim($next[1], "'\"")];
+            }
+        }
+
+        return $targets;
     }
 
     /** Mark a migrator run as protected and attach a callback before it sends SQL. */
@@ -87,7 +301,7 @@ final class MigrationSafetyGuard
     /** Record the migration whose up method is about to run. */
     public function startMigration(string $migrationName): void
     {
-        if ($this->protectingMigrationRun) {
+        if ($this->protectingMigrationRun || $this->watchingCustomMigrations) {
             $this->activeMigration = $migrationName;
         }
     }
