@@ -27,9 +27,10 @@ class ModuleSyncCommand extends Command
     /**
      * Execute the console command.
      *
-     * Scans module.json files in app-modules/ and vendor/ directories,
-     * upserts each module's metadata into the modules table while
-     * preserving user-set enabled/disabled state.
+     * Scans module.json files in app-modules/, custom-modules/, and vendor/
+     * directories, upserts each module's metadata (including source and
+     * category) into the modules table while preserving user-set
+     * enabled/disabled state, then regenerates the manifest cache.
      */
     public function handle(): int
     {
