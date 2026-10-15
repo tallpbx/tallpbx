@@ -201,7 +201,9 @@ sequenceDiagram
 
 The **Security Center** (`/panel/security`) provides an evaluation-ordered, four-tab interface mirroring the kernel packet filtering pipeline:
 
-![TallPBX Security Center](images/security-dashboard-full.png)
+| Light Theme | Dark Theme |
+| :---: | :---: |
+| [![TallPBX Security Center (Light)](images/security-dashboard-light.png)](images/security-dashboard-light.png) | [![TallPBX Security Center (Dark)](images/security-dashboard-dark.png)](images/security-dashboard-dark.png) |
 
 ### Master Operational Switches (Top Banner)
 Pinned directly above the tab strip for immediate visibility:

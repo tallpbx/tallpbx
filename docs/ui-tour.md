@@ -95,7 +95,9 @@ The **Security Center** (`/panel/security`) provides system administrators with 
   - **Attackers**: Active intrusion bans with entry-point badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, detected attack probes review, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, decoupled dialplan sensor, auto-block firewall toggle, and live conntrack session termination).
   - **External Blocklists**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
 
-![TallPBX Security Center](images/security-dashboard-full.png)
+| Light Theme | Dark Theme |
+| :---: | :---: |
+| [![TallPBX Security Center (Light)](images/security-dashboard-light.png)](images/security-dashboard-light.png) | [![TallPBX Security Center (Dark)](images/security-dashboard-dark.png)](images/security-dashboard-dark.png) |
 
 ---
 

@@ -378,17 +378,49 @@ JS);
 
     // Documentation screenshots are refreshed on demand only (TALLPBX_CAPTURE_DOCS=1)
     if (getenv('TALLPBX_CAPTURE_DOCS') === '1') {
-        $imgName = 'security-dashboard-full.png';
-        // Pest writes screenshots into tests/Browser/Screenshots/ and prefixes the
-        // directory itself, so pass only the bare filename here.
-        $src = base_path("tests/Browser/Screenshots/{$imgName}");
-        $dest = base_path("docs/images/{$imgName}");
+        // 1. Light Theme Capture
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'light');
+                document.documentElement.setAttribute('data-theme', 'light');
+            })()
+        JS);
+        $page->wait(0.5);
 
-        $page->screenshot(filename: $imgName);
+        $images = [
+            'security-dashboard-light.png',
+            'security-dashboard-full.png', // Maintain backwards compatibility for existing links
+        ];
+        foreach ($images as $imgName) {
+            $src = base_path("tests/Browser/Screenshots/{$imgName}");
+            $dest = base_path("docs/images/{$imgName}");
 
-        if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
-            copy($src, $dest);
-            fwrite(STDOUT, "Updated documentation image: docs/images/{$imgName}".PHP_EOL);
+            $page->screenshot(filename: $imgName);
+
+            if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
+                copy($src, $dest);
+                fwrite(STDOUT, "Updated documentation image: docs/images/{$imgName}".PHP_EOL);
+            }
+        }
+
+        // 2. Dark Theme Capture
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'dark');
+                document.documentElement.setAttribute('data-theme', 'dark');
+            })()
+        JS);
+        $page->wait(0.5);
+
+        $darkImgName = 'security-dashboard-dark.png';
+        $srcDark = base_path("tests/Browser/Screenshots/{$darkImgName}");
+        $destDark = base_path("docs/images/{$darkImgName}");
+
+        $page->screenshot(filename: $darkImgName);
+
+        if (file_exists($srcDark) && (! file_exists($destDark) || md5_file($srcDark) !== md5_file($destDark))) {
+            copy($srcDark, $destDark);
+            fwrite(STDOUT, "Updated documentation image: docs/images/{$darkImgName}".PHP_EOL);
         }
     }
 });

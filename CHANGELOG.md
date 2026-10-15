@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Documentation Screenshots Refresh & Security Center Theme Duality**:
+  - Refreshed all stale documentation screenshots in `docs/images/` using perceptual diff gating to capture the modern v4.x navigation and data views without unnecessary churn (`dashboard-full-sidebar.png`, `dashboard-compressed-sidebar.png`, `dashboard-horizontal-menu.png`, `pbx-tenants.png`, `pbx-devices.png`, `pbx-extensions.png`, `pbx-impersonation.png`, and `pbx-multi-language.png`).
+  - Added dual Light and Dark theme screenshot captures for the Security Center (`security-dashboard-light.png` and `security-dashboard-dark.png`) displayed side-by-side in `docs/ui-tour.md` and `docs/security-architecture.md`, matching the Guest Landing Page visual comparison.
+
 ## [4.0.0] - 2026-10-15
 
 ### Added
