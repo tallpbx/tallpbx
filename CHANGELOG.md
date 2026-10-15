@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-10-15
+
 ### Added
 - **Domain-Driven Modular Monolith & Custom Modules Extensibility (`custom-modules/`)**:
   - Eliminated all 60 Composer path repositories and `tallpbx/module-*` requirements from root `composer.json`, adopting direct root PSR-4 autoloading (`Modules\{Domain}\` => `app-modules/{domain}/src/`) and slashing autoloader generation time from 60+ seconds to < 2 seconds.
