@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Admin;
 use App\Models\Module;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Modules\Admin\Livewire\ModulesList;
 
@@ -134,4 +135,126 @@ it('shows a CLI restore hint for uninstalled modules without destructive buttons
         ->assertSee('php artisan module:restore extensions')
         ->assertDontSee('prepareUninstall')
         ->assertDontSee('reinstallModule');
+});
+
+// ─── Task 7: category grouping, custom deletion, toggle cache invalidation ──
+
+it('groups modules into the nine canonical navigation categories', function () {
+    $fixtures = [
+        'core' => 'admin-panel-mod',
+        'accounts' => 'accounts-mod',
+        'connectivity' => 'connectivity-mod',
+        'routing' => 'routing-mod',
+        'features' => 'features-mod',
+        'media' => 'media-mod',
+        'advanced' => 'advanced-mod',
+        'monitoring' => 'monitoring-mod',
+        'custom' => 'rogue-tool',
+    ];
+
+    foreach ($fixtures as $category => $name) {
+        Module::create([
+            'name' => $name,
+            'display_name' => $name,
+            'version' => '1.0',
+            'category' => $category,
+            'source' => $category === 'custom' ? 'custom' : 'core',
+            'enabled' => true,
+        ]);
+    }
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class);
+
+    $grouped = $component->instance()->groupedModules();
+
+    expect(array_keys($grouped))->toBe(ModulesList::CATEGORY_ORDER)
+        ->and($grouped['custom']->pluck('name'))->toContain('rogue-tool')
+        ->and($grouped['core']->pluck('name'))->toContain('admin-panel-mod');
+
+    foreach (ModulesList::CATEGORY_ORDER as $category) {
+        expect($component->instance()->categoryLabel($category))->not->toBe('');
+    }
+});
+
+it('covers every built-in module manifest with a canonical category', function () {
+    $manifests = glob(base_path('app-modules/*/module.json'));
+
+    expect($manifests)->toHaveCount(60);
+
+    foreach ($manifests as $path) {
+        $manifest = json_decode((string) file_get_contents($path), true);
+
+        expect(in_array($manifest['category'] ?? null, ModulesList::CATEGORY_ORDER, true))
+            ->toBeTrue("Manifest [{$manifest['name']}] declares a non-canonical category.");
+    }
+});
+
+it('invalidates caches when toggling a module', function () {
+    $module = Module::create([
+        'name' => 'gateways', 'display_name' => 'Gateways', 'version' => '1.0',
+        'category' => 'accounts', 'source' => 'core', 'enabled' => true,
+    ]);
+
+    Artisan::shouldReceive('call')->once()->with('optimize:clear');
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->call('toggleEnabled', $module->id);
+
+    expect($module->fresh()->enabled)->toBeFalse();
+});
+
+it('deletes a custom extension through the typed-confirmation dialog', function () {
+    $fixtureDir = base_path('custom-modules/delete-me');
+    File::makeDirectory($fixtureDir, 0755, true);
+    File::put($fixtureDir.'/module.json', json_encode([
+        'name' => 'delete-me', 'version' => '1.0.0',
+        'namespace' => 'CustomModules\\DeleteMe', 'display_name' => 'Delete Me',
+        'source' => 'custom',
+    ]));
+
+    $module = Module::create([
+        'name' => 'delete-me', 'display_name' => 'Delete Me', 'version' => '1.0.0',
+        'category' => 'custom', 'source' => 'custom', 'enabled' => true,
+    ]);
+
+    try {
+        $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class);
+
+        // The lifecycle service runs optimize:clear outside tests only; the
+        // runningUnitTests guard keeps the real Artisan calls out of the test.
+        $component->call('confirmDeleteCustom', $module->id)
+            ->assertSet('pendingDeletionId', $module->id)
+            ->assertSet('pendingDeletionPhrase', 'UNINSTALL delete-me');
+
+        // A wrong typed phrase surfaces the error inside the dialog.
+        $component->set('confirmTypedInput', 'wrong phrase')
+            ->call('deleteCustomModule', $module->id);
+
+        expect($component->instance()->deleteError)->not->toBeNull()
+            ->and(File::exists($fixtureDir))->toBeTrue();
+
+        // The exact typed phrase performs the destructive delete.
+        $component->set('confirmTypedInput', 'UNINSTALL delete-me')
+            ->call('deleteCustomModule', $module->id);
+
+        expect($component->instance()->pendingDeletionId)->toBeNull()
+            ->and(File::exists($fixtureDir))->toBeFalse();
+
+        $this->assertDatabaseMissing('modules', ['id' => $module->id]);
+    } finally {
+        File::deleteDirectory($fixtureDir);
+    }
+});
+
+it('refuses to delete non-custom modules from the workbench', function () {
+    $module = Module::create([
+        'name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0',
+        'category' => 'accounts', 'source' => 'core', 'enabled' => true,
+    ]);
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class)
+        ->call('confirmDeleteCustom', $module->id);
+
+    expect($component->instance()->pendingDeletionId)->toBeNull();
 });
