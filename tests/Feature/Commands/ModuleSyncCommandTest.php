@@ -6,6 +6,7 @@ use App\Console\Commands\ModuleSyncCommand;
 use App\Models\Module;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
     // Ensure we're testing against the local modules directory
@@ -102,12 +103,25 @@ it('skips a manifest that disappears after filesystem discovery', function (): v
 it('keeps a core registry row whose directory survives even when its manifest is unreadable', function (): void {
     // Ghost pruning must key on the directory itself, never on the parsed
     // manifest: a transient JSON corruption would otherwise delete the
-    // registry row of a real installed module.
-    $fixtureDir = base_path('app-modules/sync-prune-fixture');
-    File::makeDirectory($fixtureDir, 0755, true);
-    File::put($fixtureDir.'/module.json', '{not valid json');
+    // registry row of a real installed module. The fixture lives in a
+    // sandboxed base path so parallel workers never glimpse a corrupt
+    // manifest (or the cache module:sync regenerates) in the live tree —
+    // manifest-completeness suites glob app-modules/*/module.json.
+    $root = storage_path('framework/testing/sync-prune-'.uniqid('', true));
+    File::ensureDirectoryExists($root.'/app-modules/sync-prune-fixture');
+    File::ensureDirectoryExists($root.'/bootstrap/cache');
+    File::put($root.'/app-modules/sync-prune-fixture/module.json', '{not valid json');
+
+    // Force the lazy database refresh to run under the REAL base path
+    // before switching: a refresh triggered inside the fixture window
+    // would migrate the fixture skeleton's nonexistent migrations.
+    Schema::hasTable('modules');
+
+    $originalBasePath = base_path();
 
     try {
+        app()->setBasePath($root);
+
         Module::create([
             'name' => 'sync-prune-fixture', 'display_name' => 'Prune Fixture',
             'version' => '1.0.0', 'source' => 'core',
@@ -117,7 +131,8 @@ it('keeps a core registry row whose directory survives even when its manifest is
 
         $this->assertDatabaseHas('modules', ['name' => 'sync-prune-fixture']);
     } finally {
-        File::deleteDirectory($fixtureDir);
+        app()->setBasePath($originalBasePath);
+        File::deleteDirectory($root);
     }
 });
 
