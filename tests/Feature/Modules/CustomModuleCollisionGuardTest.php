@@ -417,11 +417,17 @@ it('does not audit a compiled route collection on cached-route boots', function 
 
     $router = new class(app('events'), app(), $collection) extends Router
     {
+        /**
+         * Bind the fixture compiled route collection into the anonymous router.
+         */
         public function __construct($events, $container, private readonly RouteCollectionInterface $fixtureCollection)
         {
             parent::__construct($events, $container);
         }
 
+        /**
+         * Serve the fixture compiled collection as the router's routes.
+         */
         public function getRoutes(): RouteCollectionInterface
         {
             return $this->fixtureCollection;
@@ -818,16 +824,25 @@ function cgAnonymousProvider(string $name, string $path): ModuleBaseProvider
             parent::__construct($app);
         }
 
+        /**
+         * Return the fixture module's kebab-case name.
+         */
         protected function moduleName(): string
         {
             return $this->fixtureName;
         }
 
+        /**
+         * Return the fixture module's PHP root namespace.
+         */
         protected function moduleNamespace(): string
         {
             return 'CustomModules\\Fixture';
         }
 
+        /**
+         * Return the fixture module's sandbox directory.
+         */
         protected function modulePath(): string
         {
             return $this->fixturePath;

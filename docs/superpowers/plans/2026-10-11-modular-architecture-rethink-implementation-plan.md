@@ -409,7 +409,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ---
 
-### Task 6: Refactor Module Lifecycle Service for Non-Destructive Core Toggling (Resolves F7, F8)
+### Task 6: Refactor Module Lifecycle Service for Non-Destructive Core Toggling (Resolves F7, F8) (COMPLETED)
+
+**Status:** Completed 2026-10-14 in `71ef9d06` (see ledger for the source_ref drop ruling).
 
 **Files:**
 - Modify: `app/Services/ModuleLifecycleService.php`
@@ -417,12 +419,12 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Modify or delete: `app/Console/Commands/ModuleRestoreCommand.php` (see Step 2.3 — the plan previously omitted this file)
 - Rewrite alongside the service: `tests/Feature/Services/ModuleLifecycleServiceTest.php`, `tests/Feature/Commands/ModuleUninstallCommandTest.php`, `tests/Feature/Commands/ModuleRestoreCommandTest.php` — all three currently assert Composer path-repo manipulation (sandbox `composer.json` fixtures, `composer remove tallpbx/module-*` call assertions, `composer_package_removed` / `repository_entry_removed` report keys) and must be rewritten together with the implementation, not after it. **Additional blast radius** (verified against the suite): `tests/Feature/Commands/NativeModuleCommandTest.php` asserts `module:restore` remains registered; `tests/Feature/Modules/ModuleComposerPackageMigrationTest.php` and `ModuleSourceRefMigrationTest.php` assert the two legacy columns exist; and `tests/Feature/Livewire/ModulesListTest.php` asserts the UI shows a `php artisan module:restore` hint for uninstalled modules — reconcile all four with the restore semantics decided in Step 2.3.
 
-- [ ] **Step 1: Write failing test verifying non-destructive core toggling & safe custom deletion**
+- [x] **Step 1: Write failing test verifying non-destructive core toggling & safe custom deletion** (Completed — ModuleLifecycleServiceTest rewritten 17 tests)
   In `tests/Feature/Services/ModuleLifecycleServiceTest.php`:
   1. Assert calling `previewUninstall()` or `uninstall()` on an `app-modules/` core module returns `can_uninstall: false` and throws `ValidationException`: `"Built-in core modules cannot be uninstalled. Use the disable toggle instead."`
   2. Assert calling `uninstall()` on a `custom-modules/` extension deletes only its untracked directory and database record, requiring typed confirmation (`UNINSTALL {name}`).
   3. Assert no Composer path-repository manipulation is attempted.
-- [ ] **Step 2: Refactor `ModuleLifecycleService.php`**
+- [x] **Step 2: Refactor `ModuleLifecycleService.php`** (Completed — core refusal, custom deletion with registry-row removal, vendor Composer remove/re-require; path-repo helpers purged; ghost core-row pruning in module:sync; source_ref dropped from baseline + model; see ledger ruling on the drop migration)
   1. Purge dead path-repo helpers: `stripRepositoryEntry()`, `stripRequireEntry()`, `addRepositoryEntry()`, `addRequireEntry()`.
   2. In `previewUninstall()` and `uninstall()`:
      - Check `$manifest['source'] ?? 'core'`. If `'core'`, strictly refuse uninstallation.
@@ -430,11 +432,11 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - For `source === 'vendor'`, remove via Composer package removal.
   3. Update `previewRestore()` and `restore()` — **DECIDED branch**: restore survives ONLY as a Composer re-require for `source === 'vendor'` modules (matching the `modules` migration comment "can reinstall vendor modules after an uninstall"). Core modules cannot be uninstalled, so git-based restore is dead; custom modules are untracked and cannot be restored from Git. Keep `ModuleRestoreCommand` scoped to vendor re-require, **drop the `source_ref` column** in a Task 6 migration (scrub the `create_modules_table` comment), keep `composer_package` for vendor, and update `ModuleUninstallCommand` output to stop printing git-revision restore hints for non-vendor modules.
   4. **Registry pruning for ghost core rows**: delete `modules` registry rows whose `source = 'core'` and whose module directory no longer exists on disk (e.g. the live `smtp-connector` ghost) as part of `module:sync` reconciliation. Core modules are monorepo-permanent, so a missing core directory is always dead. Do NOT prune `custom`/`vendor` rows — unplugged extensions must keep their registry state.
-- [ ] **Step 3: Run targeted test to verify it passes**
+- [x] **Step 3: Run targeted test to verify it passes** (17 passed / 58 assertions; full blast radius green)
   ```bash
   php artisan test tests/Feature/Services/ModuleLifecycleServiceTest.php
   ```
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (Committed as `71ef9d06`)
   ```bash
   git add app/Services/ModuleLifecycleService.php app/Console/Commands/ModuleUninstallCommand.php tests/Feature/Services/ModuleLifecycleServiceTest.php
   git commit -m "feat: refactor module lifecycle service to disallow core module deletion and eliminate composer path-repo code"
@@ -442,7 +444,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ---
 
-### Task 7: Modernize `/panel/modules` UI with Navigation Subcategories & DaisyUI Toggles (Resolves F3, F8)
+### Task 7: Modernize `/panel/modules` UI with Navigation Subcategories & DaisyUI Toggles (Resolves F3, F8) (COMPLETED)
+
+**Status:** Completed 2026-10-14 in `eb48a0a2`.
 
 **Files:**
 - Modify: `app-modules/admin/src/Livewire/ModulesList.php`
@@ -452,13 +456,13 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Modify: `app-modules/admin/lang/fr/admin.php`
 - Test: `tests/Feature/Livewire/ModulesListTest.php`
 
-- [ ] **Step 1: Write tests for categorized module listing, toggle behavior, and custom deletion**
+- [x] **Step 1: Write tests for categorized module listing, toggle behavior, and custom deletion** (Completed — 6 new tests, RED-proven with the component stashed)
   In `tests/Feature/Livewire/ModulesListTest.php`:
   1. Test that `ModulesList` groups all modules into the 8 navigation subcategories (+1 for Custom Extensions) with 60/60 core coverage.
   2. Test that toggling an enabled module flips `enabled` and invalidates caches.
   3. Test that **required** modules (`admin`, `auth`, `tenant` — `required: true` in their manifests) cannot be toggled off. Per `resources/schemas/module.json`, `required` = cannot be disabled and `protected` = cannot be uninstalled; `admin` is both `required` and `protected`, and `extensions` is also `protected: true`. Do not conflate the two flags.
   4. Test that custom modules show a "Delete Extension" action that calls `ModuleLifecycleService::uninstall()`.
-- [ ] **Step 2: Update `ModulesList.php` and `modules-list.blade.php`**
+- [x] **Step 2: Update `ModulesList.php` and `modules-list.blade.php`** (Completed — 9-category accordions, standardized toggles, source badges, tooltips, typed-confirmation Delete Extension modal; 11 new module-dict keys with 100% en/es/fr parity and zero root collisions)
   1. In `ModulesList.php`:
      - Load modules from database and group by `category`:
        - `core`: Core Administration
@@ -480,11 +484,11 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   3. Add translation keys with 100% parity across `app-modules/admin/lang/{en,es,fr}/admin.php`:
      - Navigation category headers, "Built-in", "Custom", "Delete Extension", confirmation prompts.
      - **Reuse existing root dictionary keys wherever they already exist** — `lang/en/admin.php` defines `pbx_accounts`, `pbx_connectivity`, `pbx_routing`, `pbx_features`, `pbx_media`, `pbx_advanced`, `pbx_monitoring` (labels: Accounts, Connectivity, Call Routing, Features, Media, Advanced, Monitoring). Add only genuinely new keys (Core Administration, Custom Extensions, badge/confirm copy) to the admin module dictionary and verify zero root collisions: `App\Support\ModuleServiceProvider::detectRootTranslationCollisions()` flags module dictionary keys that collide with root `lang/{locale}/*.php` groups. Re-adding the seven existing labels into the module dictionary would trip this machinery and violate the zero-root-collision rule.
-- [ ] **Step 3: Run targeted test to verify it passes**
+- [x] **Step 3: Run targeted test to verify it passes** (13 passed / 103 assertions)
   ```bash
   php artisan test tests/Feature/Livewire/ModulesListTest.php
   ```
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (Committed as `eb48a0a2`)
   ```bash
   git add app-modules/admin/src/Livewire/ModulesList.php app-modules/admin/resources/views/modules-list.blade.php app-modules/admin/lang/ tests/Feature/Livewire/ModulesListTest.php
   git commit -m "feat: modernize /panel/modules with navigation subcategories, daisyui toggles, and i18n parity"
@@ -492,23 +496,25 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ---
 
-### Task 8: Authoritative Documentation & Pre-Commit Verification Gate (Resolves F11)
+### Task 8: Authoritative Documentation & Pre-Commit Verification Gate (Resolves F11) (COMPLETED)
+
+**Status:** Completed 2026-10-14 (docs in `docs/modular-architecture.md` §7, README overview verified, CHANGELOG [Unreleased] entries for every task).
 
 **Files:**
 - Modify: `docs/modular-architecture.md`
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Update `docs/modular-architecture.md`**
+- [x] **Step 1: Update `docs/modular-architecture.md`** (Completed — §7 added: why path repositories were replaced, multi-source discovery, the six collision guards, the custom extension lifecycle matrix, and the Backups disaster-recovery role)
   1. Document the **Modular Monolith (DDD)** architecture and why path repositories were replaced with direct PSR-4 autoloading.
   2. Detail the directory structure of first-party modules (`app-modules/`) vs. third-party drop-ins (`custom-modules/`).
   3. Document the **Pre-flight & Runtime Collision Guards**.
   4. Document the **System Superadmin Backups** role and configuration.
   5. Document developer examples for `make:module`, route auto-registration, and dialplan XML hooks.
-- [ ] **Step 2: Update `README.md` and `CHANGELOG.md`**
+- [x] **Step 2: Update `README.md` and `CHANGELOG.md`** (Completed — README module overview already current; CHANGELOG gained the Task 6 lifecycle and Task 7 workbench entries under [Unreleased])
   1. Record the complete architectural modernization under `## [Unreleased]` in `CHANGELOG.md`.
   2. Update module architecture overview in `README.md`.
-- [ ] **Step 3: Run the Mandatory Pre-Commit Verification Checklist**
+- [x] **Step 3: Run the Mandatory Pre-Commit Verification Checklist** (Completed — optimize:clear ✓, Pint ✓, full suite 2787 passed / 1 skipped / 0 failed ✓, browser suite 7 files passed + 1 opt-in skipped ✓, composer dump-autoload -o ✓, composer validate --strict ✓)
   Run the complete verification gate:
   ```bash
   # 1. Clear application optimization caches
@@ -529,7 +535,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
   # 6. Verify Composer lockfile is 100% strict and clean
   composer validate --strict
   ```
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (see commit trail — docs + gate fixes)
   ```bash
   git add docs/modular-architecture.md README.md CHANGELOG.md
   git commit -m "docs: finalize modular architecture documentation and update changelog for 4.x modular monolith"

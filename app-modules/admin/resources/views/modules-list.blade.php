@@ -13,7 +13,7 @@
             </summary>
             <div class="collapse-content">
                 <div class="overflow-x-auto">
-                    <table class="table table-sm">
+                    <table class="table table-zebra w-full">
                         <thead>
                             <tr>
                                 <th>{{ __('admin.module_name') }}</th>
