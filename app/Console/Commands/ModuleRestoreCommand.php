@@ -9,19 +9,20 @@ use Illuminate\Console\Command;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Restore a previously uninstalled module from its origin.
+ * Restore a previously uninstalled vendor module through Composer.
  *
- * First-party modules return from the git repository (including their
- * central tests); vendor modules are reinstalled through Composer.
- * Migrations re-run into empty tables and permissions are re-seeded.
- * Database data is not restored.
+ * Built-in core modules are permanent monorepo code and can never be
+ * uninstalled, and custom extensions are untracked with nothing to restore
+ * from — so restore applies exclusively to vendor packages. Migrations
+ * re-run into empty tables and permissions are re-seeded. Database data is
+ * not restored.
  */
 class ModuleRestoreCommand extends Command
 {
     protected $signature = 'module:restore
-        {name : Module name in kebab-case (e.g., "call-broadcast")}';
+        {name : Vendor module name in kebab-case}';
 
-    protected $description = 'Restore a previously uninstalled module from git or Composer';
+    protected $description = 'Restore a previously uninstalled vendor module via Composer re-require';
 
     /**
      * Execute the console command.

@@ -9,19 +9,21 @@ use Illuminate\Console\Command;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Permanently uninstall a module from the installation.
+ * Permanently uninstall a custom extension or vendor module.
  *
- * Deletes the module's files, Composer entries, central test folder,
- * permissions, and data (through its uninstall handler when one exists),
- * keeping a registry marker so module:restore can bring it back.
+ * Built-in core modules are refused — they are permanent monorepo code and
+ * are disabled with the panel toggle instead. Custom extensions are deleted
+ * from custom-modules/ (irreversible; nothing can restore them), and vendor
+ * modules are removed through Composer, keeping a registry marker so
+ * module:restore can re-require them later.
  */
 class ModuleUninstallCommand extends Command
 {
     protected $signature = 'module:uninstall
-        {name : Module name in kebab-case (e.g., "call-broadcast")}
+        {name : Module name in kebab-case (e.g., "my-extension")}
         {--confirm= : Exact confirmation phrase (skips the interactive prompt)}';
 
-    protected $description = 'Permanently uninstall a module (restorable via module:restore)';
+    protected $description = 'Permanently uninstall a custom extension or vendor module';
 
     /**
      * Execute the console command.
@@ -60,8 +62,7 @@ class ModuleUninstallCommand extends Command
 
         // Never present a partial cleanup as a clean uninstall: tell the
         // operator exactly what still needs manual attention.
-        $cleanupIncomplete = $report['module_kind'] === 'local'
-            && (! $report['module_dir_deleted'] || ! $report['repository_entry_removed'] || ! $report['require_entry_removed']);
+        $cleanupIncomplete = $report['module_kind'] === 'custom' && ! $report['module_dir_deleted'];
 
         if ($cleanupIncomplete) {
             $this->components->warn("Uninstalled module [{$name}], but some cleanup steps need manual attention — review the warnings below.");
@@ -69,12 +70,8 @@ class ModuleUninstallCommand extends Command
             $this->components->info("Uninstalled module [{$name}].");
         }
 
-        $this->components->info($report['restore_hint']);
-
-        // Only describe deleted working-tree files when they really were
-        // deleted; vendor files are removed by Composer instead.
-        if ($report['module_kind'] === 'local' && $report['module_dir_deleted']) {
-            $this->components->warn('The module files are now deleted in the working tree, which the Git updater treats as uncommitted changes. Use module:restore to undo, or commit/stash the deletions before updating — module:restore keeps working afterwards from the git revision recorded at uninstall time.');
+        if ($report['restore_hint'] !== '') {
+            $this->components->info($report['restore_hint']);
         }
 
         foreach ($report['warnings'] as $warning) {
@@ -97,16 +94,11 @@ class ModuleUninstallCommand extends Command
         $this->components->bulletList([
             $isVendor
                 ? "Vendor package: {$preview['vendor_package']} (removed via Composer)"
-                : "Module directory: {$preview['module_dir']}",
-            ! $isVendor
-                ? 'Module tests (inside the module directory): included in the deletion'
-                : 'Central tests: none',
-            ! $isVendor && $preview['repository_entry']
-                ? 'Composer path-repository entry'
-                : 'Composer path-repository entry: none',
-            "Composer package: {$preview['composer_package']}",
-            $preview['registry_row'] ? 'Module registry row (kept as a restore marker)' : 'Module registry row: none',
+                : "Custom extension directory: {$preview['module_dir']} (irreversible — custom extensions cannot be restored)",
             "Permissions: {$preview['permission_count']}",
+            $preview['registry_row']
+                ? ($isVendor ? 'Module registry row (kept as a restore marker)' : 'Module registry row (deleted with the extension)')
+                : 'Module registry row: none',
         ]);
 
         foreach ($preview['uninstall_items'] as $item) {

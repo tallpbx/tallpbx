@@ -117,10 +117,14 @@ it('prevents disabling required modules', function () {
 });
 
 it('shows a CLI restore hint for uninstalled modules without destructive buttons', function () {
+    // Under the modular-monolith lifecycle only vendor modules are ever
+    // uninstalled (and restorable via Composer), so the fixture carries the
+    // composer package a real vendor uninstall would have recorded.
     $module = Module::create([
         'name' => 'extensions',
         'display_name' => 'Extensions',
         'version' => '1.0',
+        'composer_package' => 'acme/extensions',
         'enabled' => false,
         'status' => Module::StatusUninstalled,
     ]);

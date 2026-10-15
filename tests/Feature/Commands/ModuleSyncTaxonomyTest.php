@@ -165,3 +165,32 @@ it('removes the vestigial per-module composer.json files', function () {
     expect(glob(base_path('app-modules/*/composer.json')))
         ->toBeEmpty('Path-repository era composer.json files must be removed from app-modules/; root PSR-4 autoloading and module.json own everything now.');
 });
+
+it('prunes ghost core registry rows whose module directory no longer exists', function () {
+    // Core modules are permanent monorepo code, so a core-sourced registry
+    // row without an app-modules/ directory is always dead (the live
+    // smtp-connector ghost pattern).
+    $ghost = Module::create([
+        'name' => 'smtp-connector-ghost',
+        'display_name' => 'Ghost',
+        'version' => '1.0.0',
+        'source' => 'core',
+        'enabled' => false,
+    ]);
+
+    // Unplugged custom/vendor rows keep their registry state for reinstall.
+    $unplugged = Module::create([
+        'name' => 'unplugged-extension',
+        'display_name' => 'Unplugged',
+        'version' => '1.0.0',
+        'source' => 'custom',
+        'enabled' => false,
+    ]);
+
+    $this->artisan('module:sync')->assertSuccessful();
+
+    expect(Module::query()->whereKey($ghost->getKey())->exists())
+        ->toBeFalse('Ghost core rows must be pruned by module:sync.')
+        ->and(Module::query()->whereKey($unplugged->getKey())->exists())
+        ->toBeTrue('Custom extension rows must never be pruned.');
+});

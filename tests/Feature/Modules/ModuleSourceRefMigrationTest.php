@@ -2,22 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Models\Module;
 use Illuminate\Support\Facades\Schema;
 
-it('stores the git source revision on module registry rows', function (): void {
-    // The source_ref column records which git revision still held a module's
-    // files at uninstall time, keeping module:restore working even after the
-    // deletion itself is committed to the repository.
-    expect(Schema::hasColumn('modules', 'source_ref'))->toBeTrue();
-
-    Module::create([
-        'name' => 'revived-module',
-        'display_name' => 'Revived Module',
-        'version' => '1.0.0',
-        'enabled' => false,
-        'source_ref' => 'deadbeef1234abcd',
-    ]);
-
-    expect(Module::where('name', 'revived-module')->value('source_ref'))->toBe('deadbeef1234abcd');
+it('drops the obsolete source_ref column from module registry rows', function (): void {
+    // Git-based module restore is dead under the modular-monolith rules:
+    // core modules are permanent monorepo code that can never be uninstalled,
+    // and custom extensions are untracked. Vendor restore re-requires the
+    // Composer package, so only composer_package remains meaningful.
+    expect(Schema::hasColumn('modules', 'source_ref'))->toBeFalse()
+        ->and(Schema::hasColumn('modules', 'composer_package'))->toBeTrue();
 });

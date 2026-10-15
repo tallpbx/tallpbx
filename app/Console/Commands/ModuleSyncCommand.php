@@ -79,6 +79,21 @@ class ModuleSyncCommand extends Command
 
         $this->components->info('Module database sync completed successfully.');
 
+        // Prune ghost core rows: core modules are permanent monorepo code, so
+        // a registry row whose app-modules/ directory no longer exists is
+        // always dead (e.g. left behind by an old install). Custom and vendor
+        // rows are kept — unplugged extensions must retain their registry
+        // state for reinstall.
+        $coreNames = array_keys(array_filter($manifests, fn (array $manifest): bool => ($manifest['source'] ?? 'core') === 'core'));
+        $pruned = $coreNames === [] ? 0 : Module::query()
+            ->where('source', 'core')
+            ->whereNotIn('name', $coreNames)
+            ->delete();
+
+        if ($pruned > 0) {
+            $this->components->twoColumnDetail('Ghost core rows pruned', (string) $pruned);
+        }
+
         // Reconcile the generated manifest cache in the same step: a sync that
         // left bootstrap/cache/modules.php stale would keep serving outdated
         // metadata until the next manual module:cache.

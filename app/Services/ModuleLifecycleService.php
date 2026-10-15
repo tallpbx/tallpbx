@@ -19,35 +19,32 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
 
 /**
- * Manages the destructive module lifecycle: complete uninstall and restore.
+ * Manages the destructive module lifecycle under the modular-monolith rules.
  *
- * An uninstall drops the module's data (through its tagged uninstall
- * handler when one exists), deletes its files and Composer entries, and
- * keeps a minimal registry marker so the module can be restored later.
- * A restore brings the module back from its origin — the git repository
- * for first-party modules, or Composer for vendor packages — re-runs its
- * migrations, and re-seeds its permissions. Database data is intentionally
- * not restored.
+ * First-party core modules (app-modules/) are permanent monorepo code and can
+ * never be uninstalled — administrators disable them instead. Third-party
+ * custom modules (custom-modules/) are untracked extensions that can be
+ * deleted with typed confirmation; their registry row is removed because
+ * nothing on disk or in git can bring them back. Vendor modules are removed
+ * and restored through Composer, keeping a registry marker with the package
+ * name so module:restore can re-require them later. Database data is
+ * intentionally not restored.
  */
 class ModuleLifecycleService
 {
     /**
      * Create the lifecycle service.
      *
-     * The base path and process runners are injectable so tests can run the
+     * The base path and process runner are injectable so tests can run the
      * service against a hermetic sandbox instead of the real installation.
      *
      * @param  Closure(array<int, string>): bool|null  $composerRunner  test seam that performs Composer operations
-     * @param  Closure(array<int, string>): bool|null  $gitRunner  test seam that performs git operations
-     * @param  Closure(): string|null  $gitRevisionResolver  test seam that reports the current git revision
      */
     public function __construct(
         private readonly Application $app,
         private readonly Filesystem $files,
         private readonly ?string $basePath = null,
         private readonly ?Closure $composerRunner = null,
-        private readonly ?Closure $gitRunner = null,
-        private readonly ?Closure $gitRevisionResolver = null,
     ) {}
 
     // ─── Uninstall ──────────────────────────────────────────────────────
@@ -71,15 +68,24 @@ class ModuleLifecycleService
             return $this->refusal('Invalid module name.');
         }
 
-        // Local app-modules directories take precedence over vendor packages.
-        $moduleDir = $this->moduleDir($name);
-        $vendor = $moduleDir === null ? $this->vendorModuleInfo($name) : null;
+        // Discover which lifecycle class the module belongs to: permanent
+        // core code, an untracked custom extension, or a vendor package.
+        $coreDir = $this->coreDir($name);
+        $customDir = $coreDir === null ? $this->customDir($name) : null;
+        $vendor = ($coreDir === null && $customDir === null) ? $this->vendorModuleInfo($name) : null;
 
-        if ($moduleDir === null && $vendor === null) {
-            return $this->refusal("Module [{$name}] is neither a local app-modules directory nor an installed vendor package.");
+        if ($coreDir !== null) {
+            return $this->refusal('Built-in core modules cannot be uninstalled. Use the disable toggle instead.');
         }
 
-        $manifest = $this->manifestFor($moduleDir ?? $vendor['dir']);
+        if ($customDir === null && $vendor === null) {
+            return $this->refusal("Module [{$name}] is not an installed custom extension or vendor package.");
+        }
+
+        $source = $customDir !== null ? 'custom' : 'vendor';
+        $dir = $customDir ?? ($vendor['dir'] ?? '');
+
+        $manifest = $this->manifestFor($dir);
 
         if ($manifest === null) {
             return $this->refusal("Module [{$name}] has no readable module.json manifest.");
@@ -108,8 +114,6 @@ class ModuleLifecycleService
             }
         }
 
-        $isVendor = $moduleDir === null;
-
         $dependents = $this->installedDependents($name);
 
         if ($dependents !== []) {
@@ -123,19 +127,24 @@ class ModuleLifecycleService
             $warnings[] = "Module [{$name}] has no uninstall handler; its database tables (if any) will be left intact.";
         }
 
+        if ($source === 'custom') {
+            // Custom modules are untracked, so nothing can bring them back.
+            $warnings[] = 'This custom extension cannot be restored after deletion — no copy exists in git or Composer.';
+        }
+
         return [
             'can_uninstall' => true,
             'reason' => null,
-            'module_kind' => $isVendor ? 'vendor' : 'local',
-            'module_dir' => $moduleDir,
-            'vendor_package' => $isVendor ? $vendor['package'] : null,
-            'composer_package' => $isVendor ? $vendor['package'] : "tallpbx/module-{$name}",
-            'repository_entry' => ! $isVendor && $this->hasRepositoryEntry($name),
+            'module_kind' => $source,
+            'module_dir' => $dir,
+            'vendor_package' => $source === 'vendor' ? ($vendor['package'] ?? null) : null,
             'registry_row' => $registryRow !== null,
             'permission_count' => Permission::where('module', $name)->count(),
             'uninstall_items' => $uninstallItems,
             'uninstall_available' => $uninstallAvailable,
-            'restore_hint' => "Restore later with: php artisan module:restore {$name} (database data is not restored)",
+            'restore_hint' => $source === 'vendor'
+                ? 'Restore later with: php artisan module:restore '.$name.' (Composer re-require; database data is not restored)'
+                : '',
             'display_name' => $manifest['display_name'] ?? $name,
             'version' => $manifest['version'] ?? '0.0.0',
             'warnings' => $warnings,
@@ -163,17 +172,19 @@ class ModuleLifecycleService
 
         $isVendor = $preview['module_kind'] === 'vendor';
 
-        // Remove the Composer package FIRST, before touching any data, files,
-        // or the registry: a path-repository package whose source directory
-        // is already gone cannot be resolved by Composer, and a registry or
-        // autoloader left pointing at a missing package makes every subsequent
-        // artisan boot fail — including the module:restore recovery command.
-        $composerRemoved = $this->runComposer(['remove', $preview['composer_package'], '--no-interaction']);
+        // Vendor modules are removed through Composer first: the package must
+        // stay resolvable until Composer has cleaned its own autoloader and
+        // lockfile, and a failed removal leaves everything untouched.
+        $composerRemoved = false;
 
-        if (! $composerRemoved) {
-            throw ValidationException::withMessages([
-                'module' => "Composer could not remove [{$preview['composer_package']}]. The module was left untouched so the installation stays bootable; fix Composer and retry.",
-            ]);
+        if ($isVendor) {
+            $composerRemoved = $this->runComposer(['remove', (string) $preview['vendor_package'], '--no-interaction']);
+
+            if (! $composerRemoved) {
+                throw ValidationException::withMessages([
+                    'module' => "Composer could not remove [{$preview['vendor_package']}]. The module was left untouched so the installation stays bootable; fix Composer and retry.",
+                ]);
+            }
         }
 
         $uninstallRan = false;
@@ -193,19 +204,9 @@ class ModuleLifecycleService
         $moduleDirDeleted = false;
 
         if (! $isVendor) {
-            // Only local modules own files in the installation tree. Vendor
-            // packages belong to Composer, which deletes them itself.
+            // Custom extensions own their untracked directory; nothing else
+            // in the installation tree belongs to them.
             $moduleDirDeleted = $this->files->deleteDirectory((string) $preview['module_dir']);
-        }
-
-        $repositoryEntryRemoved = false;
-        $requireEntryRemoved = false;
-
-        if (! $isVendor) {
-            // Composer remove handles the lockfile; strip the JSON entries
-            // ourselves so the state is complete even if Composer failed.
-            $repositoryEntryRemoved = $this->stripRepositoryEntry($name);
-            $requireEntryRemoved = $this->stripRequireEntry($preview['composer_package']);
         }
 
         // Surface any cleanup step that did not complete, so a partial
@@ -216,12 +217,15 @@ class ModuleLifecycleService
             $cleanupWarnings[] = "The module directory [{$preview['module_dir']}] could not be deleted; please remove it manually.";
         }
 
-        if (! $isVendor && (! $repositoryEntryRemoved || ! $requireEntryRemoved)) {
-            $cleanupWarnings[] = "The Composer entries in composer.json for [{$preview['composer_package']}] could not be cleaned up automatically; please review composer.json manually.";
+        if ($isVendor) {
+            // Keep a minimal registry marker so restore can re-require the
+            // package later.
+            $this->recordUninstallMarker($name, $preview);
+        } else {
+            // Custom modules have no origin to restore from, so their registry
+            // row is deleted along with their files.
+            Module::where('name', $name)->delete();
         }
-
-        // Keep a minimal registry marker so restore knows what to bring back.
-        $this->recordUninstallMarker($name, $preview);
 
         // Clear caches so stale provider/view/route caches do not linger.
         // During automated tests, skip optimize:clear so we do not wipe in-flight
@@ -230,14 +234,12 @@ class ModuleLifecycleService
             Artisan::call('optimize:clear');
         }
 
-        Log::notice('Module uninstalled.', ['module' => $name]);
+        Log::notice('Module uninstalled.', ['module' => $name, 'source' => $preview['module_kind']]);
 
         return [
             'module_kind' => $preview['module_kind'],
             'module_dir_deleted' => $moduleDirDeleted,
             'composer_package_removed' => $composerRemoved,
-            'repository_entry_removed' => $repositoryEntryRemoved,
-            'require_entry_removed' => $requireEntryRemoved,
             'permissions_deleted' => $permissionsDeleted,
             'uninstall_ran' => $uninstallRan,
             'restore_hint' => $preview['restore_hint'],
@@ -250,6 +252,11 @@ class ModuleLifecycleService
     /**
      * Return a human-readable restore plan for a previously uninstalled module.
      *
+     * Restore survives only for vendor modules: Composer can re-require their
+     * package. Core modules are permanent monorepo code and can never be
+     * uninstalled, and custom modules are untracked with no origin to restore
+     * from.
+     *
      * @return array<string, mixed>
      */
     public function previewRestore(string $name): array
@@ -258,7 +265,6 @@ class ModuleLifecycleService
             'can_restore' => false,
             'reason' => null,
             'source' => null,
-            'revision' => null,
             'module_dir' => '',
             'composer_package' => '',
             'registry_row' => false,
@@ -273,9 +279,8 @@ class ModuleLifecycleService
         $registryRow = Module::where('name', $name)->first();
 
         // Restore only applies to a module that was actually uninstalled.
-        // Touching a module that is still installed would run git restore over
-        // its live working tree (destroying uncommitted work) and force it
-        // back on, so refuse before anything else happens.
+        // Touching a module that is still installed would overwrite its live
+        // files and force it back on, so refuse before anything else happens.
         if ($registryRow !== null && $registryRow->status !== Module::StatusUninstalled) {
             return array_merge($empty, [
                 'reason' => "Module [{$name}] is still installed; only uninstalled modules can be restored.",
@@ -283,17 +288,15 @@ class ModuleLifecycleService
             ]);
         }
 
-        if ($registryRow === null && ($this->moduleDir($name) !== null || $this->vendorModuleInfo($name) !== null)) {
+        if ($registryRow === null && ($this->coreDir($name) !== null || $this->customDir($name) !== null || $this->vendorModuleInfo($name) !== null)) {
             return array_merge($empty, [
                 'reason' => "Module [{$name}] is still installed; it was never marked uninstalled, so there is nothing to restore.",
             ]);
         }
 
-        $revision = $this->localRestoreRevision($name, $registryRow);
-
-        if ($revision === null && ($registryRow?->composer_package === null || $registryRow?->composer_package === '')) {
+        if ($registryRow === null || $registryRow->composer_package === null || $registryRow->composer_package === '') {
             return array_merge($empty, [
-                'reason' => "Module [{$name}] is not tracked in this repository and has no recorded Composer package to restore from.",
+                'reason' => "Module [{$name}] has no recorded Composer package to restore from. Custom extensions are untracked and cannot be restored.",
                 'registry_row' => $registryRow !== null,
             ]);
         }
@@ -301,26 +304,19 @@ class ModuleLifecycleService
         return [
             'can_restore' => true,
             'reason' => null,
-            'source' => $revision !== null ? 'git' : 'composer',
-            'revision' => $revision,
-            'module_dir' => $this->basePath()."/app-modules/{$name}",
-            'composer_package' => $revision !== null ? "tallpbx/module-{$name}" : $registryRow->composer_package,
-            'registry_row' => $registryRow !== null,
-            'items' => $revision !== null
-                ? [
-                    "Restore the module directory (code, migrations, factories, and tests) from git revision {$revision}: app-modules/{$name}",
-                    'Re-add the Composer path-repository and require entries',
-                    'Re-link the Composer path package so the module classes autoload again',
-                ]
-                : [
-                    "Reinstall the Composer package: {$registryRow->composer_package}",
-                ],
+            'source' => 'composer',
+            'module_dir' => $registryRow->composer_package,
+            'composer_package' => $registryRow->composer_package,
+            'registry_row' => true,
+            'items' => [
+                "Reinstall the Composer package: {$registryRow->composer_package}",
+            ],
             'data_notice' => 'The module returns with empty tables; uninstalled data is not restored.',
         ];
     }
 
     /**
-     * Restore a previously uninstalled module from its origin.
+     * Restore a previously uninstalled vendor module through Composer.
      *
      * @return array<string, mixed>
      *
@@ -334,43 +330,12 @@ class ModuleLifecycleService
             throw ValidationException::withMessages(['module' => $preview['reason'] ?? 'This module cannot be restored.']);
         }
 
-        $restored = false;
+        $restored = $this->runComposer(['require', $preview['composer_package'], '--no-interaction']);
 
-        if ($preview['source'] === 'git') {
-            // The module directory contains its code, migrations, factories,
-            // views, AND tests — one restore brings everything back. The
-            // revision is HEAD while the checkout still has the module, or the
-            // revision recorded at uninstall time once the deletion itself has
-            // been committed.
-            $restored = $this->runGit(['restore', '--source='.$preview['revision'], '--', "app-modules/{$name}"]);
-
-            if (! $restored) {
-                throw ValidationException::withMessages([
-                    'module' => "Could not restore module files from git. Check that [app-modules/{$name}] is committed and the installation is a git checkout.",
-                ]);
-            }
-
-            $this->addRepositoryEntry($name);
-            $this->addRequireEntry($preview['composer_package']);
-
-            // Re-link the path package so Composer recreates its vendor
-            // symlink and autoload mappings — without this, the restored
-            // module's classes cannot be loaded by the application.
-            $relinked = $this->runComposer(['require', $preview['composer_package'], '--no-interaction']);
-
-            if (! $relinked) {
-                throw ValidationException::withMessages([
-                    'module' => "Module files were restored, but Composer could not re-link [{$preview['composer_package']}]. Run composer install to finish restoring the module.",
-                ]);
-            }
-        } else {
-            $restored = $this->runComposer(['require', $preview['composer_package'], '--no-interaction']);
-
-            if (! $restored) {
-                throw ValidationException::withMessages([
-                    'module' => "Composer could not reinstall [{$preview['composer_package']}].",
-                ]);
-            }
+        if (! $restored) {
+            throw ValidationException::withMessages([
+                'module' => "Composer could not reinstall [{$preview['composer_package']}].",
+            ]);
         }
 
         // Refresh the registry row from the restored manifest and re-enable it.
@@ -412,8 +377,6 @@ class ModuleLifecycleService
             'module_kind' => null,
             'module_dir' => null,
             'vendor_package' => null,
-            'composer_package' => '',
-            'repository_entry' => false,
             'registry_row' => false,
             'permission_count' => 0,
             'uninstall_items' => [],
@@ -434,11 +397,21 @@ class ModuleLifecycleService
     }
 
     /**
-     * Resolve the local app-modules directory for a module name.
+     * Resolve the permanent core module directory for a module name.
      */
-    private function moduleDir(string $name): ?string
+    private function coreDir(string $name): ?string
     {
         $dir = $this->basePath()."/app-modules/{$name}";
+
+        return is_dir($dir) ? $dir : null;
+    }
+
+    /**
+     * Resolve the untracked custom extension directory for a module name.
+     */
+    private function customDir(string $name): ?string
+    {
+        $dir = $this->basePath()."/custom-modules/{$name}";
 
         return is_dir($dir) ? $dir : null;
     }
@@ -503,49 +476,6 @@ class ModuleLifecycleService
     }
 
     /**
-     * Resolve the git revision a local module's files can be restored from.
-     *
-     * Prefers the current checkout (HEAD) so a restore brings back the newest
-     * committed copy, and falls back to the revision recorded at uninstall
-     * time — that keeps restore working even after the deletion itself is
-     * committed to the repository. Returns null when git holds no copy.
-     */
-    private function localRestoreRevision(string $name, ?Module $registryRow): ?string
-    {
-        if ($this->runGit(['cat-file', '-e', "HEAD:app-modules/{$name}/module.json"])) {
-            return 'HEAD';
-        }
-
-        $recorded = $registryRow?->source_ref;
-
-        if (is_string($recorded) && $recorded !== ''
-            && $this->runGit(['cat-file', '-e', "{$recorded}:app-modules/{$name}/module.json"])) {
-            return $recorded;
-        }
-
-        return null;
-    }
-
-    /**
-     * Resolve the current git revision of the installation, if it is a checkout.
-     *
-     * Only plain hex revisions are returned so the stored value can safely be
-     * handed back to git as a restore source later.
-     */
-    private function currentRevision(): ?string
-    {
-        if ($this->gitRevisionResolver !== null) {
-            $revision = ($this->gitRevisionResolver)();
-        } else {
-            $process = new Process(['git', 'rev-parse', 'HEAD'], $this->basePath());
-            $process->run();
-            $revision = $process->isSuccessful() ? trim($process->getOutput()) : null;
-        }
-
-        return is_string($revision) && preg_match('/^[0-9a-f]{6,40}$/i', $revision) === 1 ? $revision : null;
-    }
-
-    /**
      * Run a Composer command, or the injected test seam.
      *
      * @param  array<int, string>  $arguments
@@ -564,157 +494,8 @@ class ModuleLifecycleService
     }
 
     /**
-     * Run a git command, or the injected test seam.
-     *
-     * @param  array<int, string>  $arguments
-     */
-    private function runGit(array $arguments): bool
-    {
-        if ($this->gitRunner !== null) {
-            return ($this->gitRunner)($arguments);
-        }
-
-        $process = new Process(array_merge(['git'], $arguments), $this->basePath());
-        $process->run();
-
-        return $process->isSuccessful();
-    }
-
-    /**
-     * Read the root composer.json into an associative array.
-     *
-     * @return array<string, mixed>
-     */
-    private function readComposer(): array
-    {
-        $contents = @file_get_contents($this->basePath().'/composer.json');
-
-        if ($contents === false) {
-            return [];
-        }
-
-        $composer = json_decode($contents, true);
-
-        return is_array($composer) ? $composer : [];
-    }
-
-    /**
-     * Persist the root composer.json after a change.
-     *
-     * @param  array<string, mixed>  $composer
-     */
-    private function writeComposer(array $composer): void
-    {
-        $this->files->put(
-            $this->basePath().'/composer.json',
-            json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n",
-        );
-    }
-
-    /**
-     * Whether the root composer.json declares this module as a path repository.
-     */
-    private function hasRepositoryEntry(string $name): bool
-    {
-        $composer = $this->readComposer();
-
-        return collect($composer['repositories'] ?? [])
-            ->contains(fn (array $repo): bool => ($repo['url'] ?? '') === "app-modules/{$name}");
-    }
-
-    /**
-     * Remove the module's path-repository entry from the root composer.json.
-     */
-    private function stripRepositoryEntry(string $name): bool
-    {
-        $composer = $this->readComposer();
-
-        if ($composer === []) {
-            return false;
-        }
-
-        $composer['repositories'] = collect($composer['repositories'] ?? [])
-            ->reject(fn (array $repo): bool => ($repo['url'] ?? '') === "app-modules/{$name}")
-            ->values()
-            ->all();
-
-        $this->writeComposer($composer);
-
-        return true;
-    }
-
-    /**
-     * Remove the module's require entry from the root composer.json.
-     */
-    private function stripRequireEntry(string $package): bool
-    {
-        $composer = $this->readComposer();
-
-        if ($composer === []) {
-            return false;
-        }
-
-        if (! isset($composer['require'][$package])) {
-            return true;
-        }
-
-        unset($composer['require'][$package]);
-        $this->writeComposer($composer);
-
-        return true;
-    }
-
-    /**
-     * Re-add the module's path-repository entry to the root composer.json.
-     */
-    private function addRepositoryEntry(string $name): bool
-    {
-        $composer = $this->readComposer();
-
-        if ($composer === []) {
-            return false;
-        }
-
-        $repositories = $composer['repositories'] ?? [];
-
-        foreach ($repositories as $repo) {
-            if (is_array($repo) && ($repo['url'] ?? '') === "app-modules/{$name}") {
-                return true; // already present
-            }
-        }
-
-        $repositories[] = ['type' => 'path', 'url' => "app-modules/{$name}"];
-        $composer['repositories'] = $repositories;
-
-        $this->writeComposer($composer);
-
-        return true;
-    }
-
-    /**
-     * Re-add the module's Composer require entry to the root composer.json.
-     */
-    private function addRequireEntry(string $package): bool
-    {
-        $composer = $this->readComposer();
-
-        if ($composer === []) {
-            return false;
-        }
-
-        if (isset($composer['require'][$package])) {
-            return true; // already present
-        }
-
-        $composer['require'][$package] = '*';
-        $this->writeComposer($composer);
-
-        return true;
-    }
-
-    /**
-     * Keep or create a registry row marking the module as uninstalled so the
-     * restore command can determine where the module comes from.
+     * Keep or create a registry marker for an uninstalled vendor module so
+     * the restore command knows which Composer package to re-require.
      *
      * @param  array<string, mixed>  $preview
      */
@@ -723,10 +504,7 @@ class ModuleLifecycleService
         $attributes = [
             'enabled' => false,
             'status' => Module::StatusUninstalled,
-            'composer_package' => $preview['composer_package'],
-            // Record the git revision that still holds the module files so a
-            // restore keeps working after the deletion is committed.
-            'source_ref' => $preview['module_kind'] === 'local' ? $this->currentRevision() : null,
+            'composer_package' => $preview['vendor_package'],
         ];
 
         $registryRow = Module::where('name', $name)->first();
@@ -738,7 +516,7 @@ class ModuleLifecycleService
         }
 
         // A module that was never synced still needs a marker so restore can
-        // recover its origin (especially vendor package names).
+        // recover its origin (the vendor package name).
         Module::create(array_merge([
             'name' => $name,
             'display_name' => $preview['display_name'],
@@ -751,11 +529,7 @@ class ModuleLifecycleService
      */
     private function refreshRegistryRow(string $name): void
     {
-        $dir = $this->moduleDir($name);
-
-        if ($dir === null) {
-            $dir = $this->vendorModuleInfo($name)['dir'] ?? null;
-        }
+        $dir = $this->vendorModuleInfo($name)['dir'] ?? null;
 
         $manifest = $dir !== null ? $this->manifestFor($dir) : null;
 
@@ -784,6 +558,7 @@ class ModuleLifecycleService
 
         foreach (array_merge(
             glob($this->basePath().'/app-modules/*/module.json') ?: [],
+            glob($this->basePath().'/custom-modules/*/module.json') ?: [],
             glob($this->basePath().'/vendor/*/*/module.json') ?: [],
         ) as $path) {
             $manifest = $this->manifestFor(dirname($path));
@@ -823,6 +598,7 @@ class ModuleLifecycleService
         $needle = "Modules\\{$studly}\\";
         $ownDirs = [
             $this->basePath()."/tests/Feature/Modules/{$studly}",
+            $this->basePath()."/custom-modules/{$name}",
             $this->basePath()."/app-modules/{$name}",
         ];
         $hits = [];
@@ -832,6 +608,7 @@ class ModuleLifecycleService
         $scanRoots = array_filter([
             $this->basePath().'/tests',
             $this->basePath().'/app-modules',
+            $this->basePath().'/custom-modules',
         ], 'is_dir');
 
         foreach ($this->files->allFiles($scanRoots) as $file) {
@@ -849,20 +626,16 @@ class ModuleLifecycleService
         }
 
         if ($hits !== []) {
-            $warnings[] = 'Cross-module tests reference this module and will be skipped until it is restored: '.implode(', ', array_slice($hits, 0, 10)).(count($hits) > 10 ? ' ('.count($hits).' total)' : '');
+            $warnings[] = 'Cross-module tests reference this module: '.implode(', ', array_slice($hits, 0, 10)).(count($hits) > 10 ? ' ('.count($hits).' total)' : '');
         }
     }
 
     /**
-     * Locate the module migration directory from local or vendor modules.
+     * Locate the vendor module migration directory for a restored package.
      */
     private function migrationPathFor(string $name): ?string
     {
-        $modulePath = $this->moduleDir($name);
-
-        if ($modulePath === null) {
-            $modulePath = $this->vendorModuleInfo($name)['dir'] ?? null;
-        }
+        $modulePath = $this->vendorModuleInfo($name)['dir'] ?? null;
 
         if ($modulePath === null) {
             return null;
