@@ -44,4 +44,20 @@ return [
     'admin_updated_success' => 'Administrator updated successfully.',
     'admin_cannot_disable_self' => 'You cannot disable your own administrator account.',
     'no_admins_found' => 'No administrators found.',
+
+    // Modules workbench (Task 7): category headers, source badges, and
+    // the custom-extension deletion flow. No root-dictionary collisions.
+    'modules_category_core' => 'Core Administration',
+    'modules_category_custom' => 'Custom Extensions',
+    'modules_source' => 'Source',
+    'modules_builtin' => 'Built-in',
+    'modules_custom' => 'Custom',
+    'modules_vendor' => 'Vendor',
+    'modules_enabling' => 'Enabling…',
+    'modules_disabling' => 'Disabling…',
+    'modules_delete_extension' => 'Delete Extension',
+    'modules_delete_confirm' => 'Permanently delete the custom extension ":name"? This action cannot be undone — custom extensions cannot be restored.',
+    'modules_protected_hint' => 'Protected modules cannot be uninstalled.',
+    'modules_delete_not_custom' => 'Only custom extensions can be deleted from the workbench.',
+    'modules_delete_failed' => 'The extension could not be deleted.',
 ];

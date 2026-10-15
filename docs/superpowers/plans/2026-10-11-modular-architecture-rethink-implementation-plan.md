@@ -411,7 +411,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ### Task 6: Refactor Module Lifecycle Service for Non-Destructive Core Toggling (Resolves F7, F8) (COMPLETED)
 
-**Status:** Completed 2026-10-14 in `71ef9d06` (see ledger for the source_ref drop ruling).
+**Status:** Completed 2026-10-14 in `71ef9d06` (see ledger for the source_ref drop ruling). Note for reviewers:
+- The `source_ref` column was dropped by scrubbing the `create_modules_table` baseline migration and the `Module` model — the drop-column migration drafted in this task was **never shipped**. `SafeMigrator` blocks destructive DDL on the primary database, and shipping it would have failed every future `php artisan migrate` on live installs. No installations ever carried the column, so no migration is needed.
+- The `source_ref` test fixture migration and its test were removed with it (folded into the composer_package test).
 
 **Files:**
 - Modify: `app/Services/ModuleLifecycleService.php`
@@ -431,7 +433,7 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - For `source === 'custom'`, remove only `custom-modules/{name}` directory with irreversible-deletion warnings.
      - For `source === 'vendor'`, remove via Composer package removal.
   3. Update `previewRestore()` and `restore()` — **DECIDED branch**: restore survives ONLY as a Composer re-require for `source === 'vendor'` modules (matching the `modules` migration comment "can reinstall vendor modules after an uninstall"). Core modules cannot be uninstalled, so git-based restore is dead; custom modules are untracked and cannot be restored from Git. Keep `ModuleRestoreCommand` scoped to vendor re-require, **drop the `source_ref` column** in a Task 6 migration (scrub the `create_modules_table` comment), keep `composer_package` for vendor, and update `ModuleUninstallCommand` output to stop printing git-revision restore hints for non-vendor modules.
-  4. **Registry pruning for ghost core rows**: delete `modules` registry rows whose `source = 'core'` and whose module directory no longer exists on disk (e.g. the live `smtp-connector` ghost) as part of `module:sync` reconciliation. Core modules are monorepo-permanent, so a missing core directory is always dead. Do NOT prune `custom`/`vendor` rows — unplugged extensions must keep their registry state.
+  4. **Registry pruning for ghost core rows**: delete `modules` registry rows whose `source = 'core'` and whose module directory no longer exists on disk (e.g. the live `smtp-connector` ghost) as part of `module:sync` reconciliation. Core modules are monorepo-permanent, so a missing core directory is always dead. Do NOT prune `custom`/`vendor` rows — unplugged extensions must keep their registry state. The surviving set is derived from the `app-modules/*` directory names themselves, never the parsed manifests, so a corrupt `module.json` cannot make a real module directory look absent and its row deletable.
 - [x] **Step 3: Run targeted test to verify it passes** (17 passed / 58 assertions; full blast radius green)
   ```bash
   php artisan test tests/Feature/Services/ModuleLifecycleServiceTest.php

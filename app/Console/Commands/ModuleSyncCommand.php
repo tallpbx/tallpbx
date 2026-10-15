@@ -81,13 +81,16 @@ class ModuleSyncCommand extends Command
 
         // Prune ghost core rows: core modules are permanent monorepo code, so
         // a registry row whose app-modules/ directory no longer exists is
-        // always dead (e.g. left behind by an old install). Custom and vendor
-        // rows are kept — unplugged extensions must retain their registry
-        // state for reinstall.
-        $coreNames = array_keys(array_filter($manifests, fn (array $manifest): bool => ($manifest['source'] ?? 'core') === 'core'));
-        $pruned = $coreNames === [] ? 0 : Module::query()
+        // always dead (e.g. left behind by an old install). The surviving set
+        // comes from the directory names themselves, never the parsed
+        // manifests, so a corrupt module.json can never make a real module
+        // directory look absent and its row deletable. Custom and vendor rows
+        // are kept — unplugged extensions must retain their registry state
+        // for reinstall.
+        $coreDirs = array_map('basename', glob(base_path('app-modules/*'), GLOB_ONLYDIR) ?: []);
+        $pruned = $coreDirs === [] ? 0 : Module::query()
             ->where('source', 'core')
-            ->whereNotIn('name', $coreNames)
+            ->whereNotIn('name', $coreDirs)
             ->delete();
 
         if ($pruned > 0) {

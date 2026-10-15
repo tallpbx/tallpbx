@@ -214,16 +214,18 @@ class ModuleLifecycleService
         $cleanupWarnings = [];
 
         if (! $isVendor && ! $moduleDirDeleted) {
-            $cleanupWarnings[] = "The module directory [{$preview['module_dir']}] could not be deleted; please remove it manually.";
+            $cleanupWarnings[] = "The module directory [{$preview['module_dir']}] could not be deleted; please remove it manually and retry the deletion.";
         }
 
         if ($isVendor) {
             // Keep a minimal registry marker so restore can re-require the
             // package later.
             $this->recordUninstallMarker($name, $preview);
-        } else {
+        } elseif ($moduleDirDeleted) {
             // Custom modules have no origin to restore from, so their registry
-            // row is deleted along with their files.
+            // row is deleted along with their files. When the directory
+            // deletion failed, keep the row: deleting it would re-register a
+            // default-enabled, panel-visible extension on the next boot.
             Module::where('name', $name)->delete();
         }
 
@@ -613,6 +615,14 @@ class ModuleLifecycleService
 
         foreach ($this->files->allFiles($scanRoots) as $file) {
             $path = $file->getPathname();
+
+            // Dependency trees and VCS/scratch directories are never part of
+            // the installation's own module or test code; scanning them would
+            // surface vendored copies of the same namespace as false
+            // cross-module hits.
+            if (preg_match('#/(vendor|node_modules)/#', $path) === 1 || str_contains($path, '/.')) {
+                continue;
+            }
 
             foreach ($ownDirs as $ownDir) {
                 if (str_starts_with($path, $ownDir)) {

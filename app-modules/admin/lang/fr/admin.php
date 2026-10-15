@@ -44,4 +44,20 @@ return [
     'admin_updated_success' => 'Administrateur mis à jour avec succès.',
     'admin_cannot_disable_self' => 'Vous ne pouvez pas désactiver votre propre compte administrateur.',
     'no_admins_found' => 'Aucun administrateur trouvé.',
+
+    // Modules workbench (Task 7): category headers, source badges, and
+    // the custom-extension deletion flow. No root-dictionary collisions.
+    'modules_category_core' => 'Administration centrale',
+    'modules_category_custom' => 'Extensions personnalisées',
+    'modules_source' => 'Source',
+    'modules_builtin' => 'Intégré',
+    'modules_custom' => 'Personnalisé',
+    'modules_vendor' => 'Fournisseur',
+    'modules_enabling' => 'Activation…',
+    'modules_disabling' => 'Désactivation…',
+    'modules_delete_extension' => 'Supprimer l\'extension',
+    'modules_delete_confirm' => 'Supprimer définitivement l\'extension personnalisée « :name » ? Cette action est irréversible : les extensions personnalisées ne peuvent pas être restaurées.',
+    'modules_protected_hint' => 'Les modules protégés ne peuvent pas être désinstallés.',
+    'modules_delete_not_custom' => 'Seules les extensions personnalisées peuvent être supprimées depuis le panneau des modules.',
+    'modules_delete_failed' => 'L\'extension n\'a pas pu être supprimée.',
 ];

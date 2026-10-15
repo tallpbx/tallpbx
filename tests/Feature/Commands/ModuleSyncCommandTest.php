@@ -99,6 +99,28 @@ it('skips a manifest that disappears after filesystem discovery', function (): v
     expect($result)->toBeNull();
 });
 
+it('keeps a core registry row whose directory survives even when its manifest is unreadable', function (): void {
+    // Ghost pruning must key on the directory itself, never on the parsed
+    // manifest: a transient JSON corruption would otherwise delete the
+    // registry row of a real installed module.
+    $fixtureDir = base_path('app-modules/sync-prune-fixture');
+    File::makeDirectory($fixtureDir, 0755, true);
+    File::put($fixtureDir.'/module.json', '{not valid json');
+
+    try {
+        Module::create([
+            'name' => 'sync-prune-fixture', 'display_name' => 'Prune Fixture',
+            'version' => '1.0.0', 'source' => 'core',
+        ]);
+
+        $this->artisan('module:sync')->assertSuccessful();
+
+        $this->assertDatabaseHas('modules', ['name' => 'sync-prune-fixture']);
+    } finally {
+        File::deleteDirectory($fixtureDir);
+    }
+});
+
 it('rejects manifests whose module name is not canonical kebab-case', function (): void {
     // Underscore names cannot round-trip through the kebab-case mapping used
     // for dependency matching, so manifests using them must not sync. The

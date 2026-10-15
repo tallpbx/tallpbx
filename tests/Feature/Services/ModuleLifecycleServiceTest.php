@@ -138,6 +138,8 @@ it('keeps a custom extension intact when its directory cannot be deleted', funct
         }
     };
 
+    Module::create(['name' => 'rogue-tool', 'display_name' => 'Rogue Tool', 'version' => '1.0.0']);
+
     $service = new ModuleLifecycleService(
         app(),
         $stubbornFiles,
@@ -150,6 +152,11 @@ it('keeps a custom extension intact when its directory cannot be deleted', funct
     expect($report['module_dir_deleted'])->toBeFalse()
         ->and(implode(' ', $report['warnings']))->toContain('could not be deleted')
         ->and(File::exists($this->sandbox.'/custom-modules/rogue-tool/module.json'))->toBeTrue();
+
+    // A failed directory deletion must keep the registry row: deleting it
+    // would re-register a default-enabled, panel-invisible extension on the
+    // next boot.
+    $this->assertDatabaseHas('modules', ['name' => 'rogue-tool']);
 });
 
 it('runs the module uninstall handler when one is registered', function (): void {
@@ -231,6 +238,29 @@ it('refuses to uninstall while a dependent declares the requirement in the legac
     }
 
     expect(File::exists($this->sandbox.'/custom-modules/rogue-tool'))->toBeTrue();
+});
+
+it('scans only module code and central tests for cross-module references, skipping dependency trees', function (): void {
+    // A real centralized reference must be reported...
+    File::makeDirectory($this->sandbox.'/tests/Feature', 0755, true);
+    File::put($this->sandbox.'/tests/Feature/CentralTest.php', "<?php\n\nuse Modules\\RogueTool\\Something;\n");
+
+    // ...while identical text inside vendored dependency trees and VCS
+    // directories must never surface as a false cross-module hit.
+    File::makeDirectory($this->sandbox.'/app-modules/demo-module/vendor/lib', 0755, true);
+    File::put($this->sandbox.'/app-modules/demo-module/vendor/lib/Fixture.php', "<?php\n\nuse Modules\\RogueTool\\Something;\n");
+    File::makeDirectory($this->sandbox.'/app-modules/demo-module/node_modules/pkg', 0755, true);
+    File::put($this->sandbox.'/app-modules/demo-module/node_modules/pkg/fixture.js', 'Modules\\RogueTool\\Something');
+    File::makeDirectory($this->sandbox.'/app-modules/demo-module/.git', 0755, true);
+    File::put($this->sandbox.'/app-modules/demo-module/.git/HEAD', 'Modules\\RogueTool\\Something');
+
+    $preview = $this->service->previewUninstall('rogue-tool');
+    $warnings = implode(' ', $preview['warnings']);
+
+    expect($warnings)->toContain('tests/Feature/CentralTest.php')
+        ->and($warnings)->not->toContain('vendor/lib/Fixture.php')
+        ->and($warnings)->not->toContain('node_modules/pkg/fixture.js')
+        ->and($warnings)->not->toContain('.git');
 });
 
 // ─── Restore: vendor re-require only ─────────────────────────────

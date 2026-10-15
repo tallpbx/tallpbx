@@ -60,17 +60,23 @@
                                                 <div class="flex items-center gap-2"
                                                      wire:loading.class="opacity-70 pointer-events-none"
                                                      wire:target="toggleEnabled('{{ $module->id }}')">
-                                                    @if($module->required || $module->protected)
-                                                        <x-tooltip :tip="$module->required ? __('admin.module_required') : __('admin.modules_protected_hint')" position="left">
+                                                    @if($module->required)
+                                                        <x-tooltip :tip="__('admin.module_required')" position="left">
                                                             <input type="checkbox" class="toggle toggle-sm toggle-primary" checked disabled />
                                                         </x-tooltip>
                                                         <span class="text-xs text-base-content/60">{{ __('admin.enabled') }}</span>
                                                     @else
-                                                        <input type="checkbox" class="toggle toggle-sm {{ $module->enabled ? 'toggle-primary' : 'toggle-warning' }}"
-                                                               @checked($module->enabled)
-                                                               wire:click="toggleEnabled('{{ $module->id }}')"
-                                                               wire:target="toggleEnabled('{{ $module->id }}')"
-                                                               wire:loading.attr="disabled" />
+                                                        @if($module->protected)
+                                                            <x-tooltip :tip="__('admin.modules_protected_hint')" position="left">
+                                                        @endif
+                                                            <input type="checkbox" class="toggle toggle-sm {{ $module->enabled ? 'toggle-primary' : 'toggle-warning' }}"
+                                                                   @checked($module->enabled)
+                                                                   wire:click="toggleEnabled('{{ $module->id }}')"
+                                                                   wire:target="toggleEnabled('{{ $module->id }}')"
+                                                                   wire:loading.attr="disabled" />
+                                                        @if($module->protected)
+                                                            </x-tooltip>
+                                                        @endif
                                                         <span class="text-xs text-base-content/60"
                                                               wire:loading.remove wire:target="toggleEnabled('{{ $module->id }}')">
                                                             {{ $module->enabled ? __('admin.enabled') : __('admin.disabled') }}

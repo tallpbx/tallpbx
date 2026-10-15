@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Admin;
 use App\Models\Module;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Modules\Admin\Livewire\ModulesList;
@@ -54,19 +56,54 @@ it('toggles module enabled status', function () {
     ]);
 });
 
-it('prevents disabling protected modules', function () {
-    $module = Module::create(['name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0', 'enabled' => true, 'protected' => true]);
+it('refuses to delete protected custom extensions through the dialog', function () {
+    // protected forbids uninstall (service-level refusal), not disabling:
+    // the two flags must not be conflated (plan §7 Step 1.3).
+    $fixtureDir = base_path('custom-modules/protected-rogue');
+    File::makeDirectory($fixtureDir, 0755, true);
+    File::put($fixtureDir.'/module.json', json_encode([
+        'name' => 'protected-rogue', 'version' => '1.0.0',
+        'namespace' => 'CustomModules\\ProtectedRogue', 'display_name' => 'Protected Rogue',
+        'source' => 'custom', 'protected' => true,
+    ]));
 
-    Artisan::shouldReceive('call')->never();
-
-    Livewire::actingAs($this->admin, 'admin')
-        ->test(ModulesList::class)
-        ->call('toggleEnabled', $module->id);
-
-    $this->assertDatabaseHas('modules', [
-        'id' => $module->id,
-        'enabled' => true,
+    $module = Module::create([
+        'name' => 'protected-rogue', 'display_name' => 'Protected Rogue', 'version' => '1.0.0',
+        'category' => 'custom', 'source' => 'custom', 'enabled' => true,
+        'protected' => true, 'required' => false,
     ]);
+
+    try {
+        $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class);
+
+        $component->call('confirmDeleteCustom', $module->id)
+            ->assertSet('pendingDeletionPhrase', 'UNINSTALL protected-rogue');
+
+        $component->set('confirmTypedInput', 'UNINSTALL protected-rogue')
+            ->call('deleteCustomModule', $module->id);
+
+        expect($component->instance()->deleteError)->not->toBeNull()
+            ->and(File::exists($fixtureDir))->toBeTrue();
+    } finally {
+        File::deleteDirectory($fixtureDir);
+    }
+});
+
+it('loads the module registry exactly once on the initial render', function () {
+    // The registry is loaded at render time only; a second load in mount()
+    // doubles every page-open query for no gain.
+    Module::create(['name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0', 'enabled' => true]);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class);
+
+    $moduleQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains($query['query'], 'from "modules"'))
+        ->count();
+
+    expect($moduleQueries)->toBe(1);
 });
 
 it('can re-enable disabled modules', function () {
@@ -257,4 +294,58 @@ it('refuses to delete non-custom modules from the workbench', function () {
         ->call('confirmDeleteCustom', $module->id);
 
     expect($component->instance()->pendingDeletionId)->toBeNull();
+});
+
+// ─── Whole-plan review fix pass ───────────────────────────────────
+
+it('translates every workbench category and workflow string', function () {
+    // The missing-key fallback returns the key itself, so these assertions
+    // fail when a key is absent from every dictionary.
+    $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class)->instance();
+
+    expect($component->categoryLabel('core'))->toBe('Core Administration')
+        ->and($component->categoryLabel('custom'))->toBe('Custom Extensions');
+
+    foreach (['modules_source', 'modules_builtin', 'modules_custom', 'modules_vendor', 'modules_enabling', 'modules_disabling', 'modules_delete_extension', 'modules_delete_confirm', 'modules_protected_hint'] as $key) {
+        expect(__("admin.{$key}"))->not->toBe("admin.{$key}", "Missing translation key admin.{$key}");
+    }
+});
+
+it('allows toggling protected modules that are not required', function () {
+    // protected only forbids uninstall; required forbids disabling (plan §7
+    // Step 1.3 — the two flags must not be conflated).
+    $module = Module::create([
+        'name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0',
+        'category' => 'accounts', 'source' => 'core', 'enabled' => true,
+        'protected' => true, 'required' => false,
+    ]);
+
+    Artisan::shouldReceive('call')->once()->with('optimize:clear');
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->call('toggleEnabled', $module->id);
+
+    expect($module->fresh()->enabled)->toBeFalse();
+});
+
+it('surfaces translated delete-flow errors', function () {
+    // Assert against the Spanish dictionary so a hardcoded English string
+    // can never masquerade as a translated one.
+    App::setLocale('es');
+
+    try {
+        $module = Module::create([
+            'name' => 'extensions', 'display_name' => 'Extensions', 'version' => '1.0',
+            'category' => 'accounts', 'source' => 'core', 'enabled' => true,
+        ]);
+
+        $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class);
+
+        $component->call('deleteCustomModule', $module->id);
+
+        expect($component->instance()->deleteError)->toBe(__('admin.modules_delete_not_custom'));
+    } finally {
+        App::setLocale('en');
+    }
 });

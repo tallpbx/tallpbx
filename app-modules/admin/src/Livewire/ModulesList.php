@@ -52,14 +52,6 @@ class ModulesList extends Component
     public ?string $deleteError = null;
 
     /**
-     * Load modules when the page first opens.
-     */
-    public function mount(): void
-    {
-        $this->loadModules();
-    }
-
-    /**
      * Group the loaded modules by their canonical category, in the
      * navigation order every built-in manifest declares.
      *
@@ -144,7 +136,7 @@ class ModulesList extends Component
         // Only untracked custom extensions are deletable here; core modules
         // are permanent and vendor modules are removed via Composer.
         if ($module->source !== 'custom') {
-            $this->deleteError = 'Only custom extensions can be deleted from the workbench.';
+            $this->deleteError = (string) __('admin.modules_delete_not_custom');
 
             return;
         }
@@ -154,7 +146,8 @@ class ModulesList extends Component
         try {
             app(ModuleLifecycleService::class)->uninstall($module->name, $confirmation);
         } catch (ValidationException $exception) {
-            $this->deleteError = collect($exception->errors())->flatten()->first() ?? 'The extension could not be deleted.';
+            $this->deleteError = collect($exception->errors())->flatten()->first()
+                ?? (string) __('admin.modules_delete_failed');
 
             return;
         }
@@ -166,7 +159,8 @@ class ModulesList extends Component
     /**
      * Toggle the enabled status of a module.
      *
-     * Required and protected modules cannot be disabled.
+     * Required modules cannot be disabled; protected modules are only
+     * shielded from uninstall, not from disabling (plan §7 Step 1.3).
      */
     public function toggleEnabled(string $moduleId): void
     {
@@ -176,8 +170,8 @@ class ModulesList extends Component
             return;
         }
 
-        // Required and protected modules cannot be disabled
-        if (($module->required || $module->protected) && $module->enabled) {
+        // Required modules cannot be disabled
+        if ($module->required && $module->enabled) {
             return;
         }
 

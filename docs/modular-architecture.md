@@ -263,7 +263,7 @@ hooks (`DialplanXmlContributor`) work identically for custom modules and core mo
 
 The Backups module is a required Core Administration utility (`required: true` — it cannot be
 disabled) that owns its own routes, menu entry, and permissions. Third-party extensions ride with
-the "Application files" backup scope: `custom-modules/` is captured into every backup, included in
-pre-restore rollback snapshots, and restored module-by-module — extensions installed after a
-backup are left untouched. See the Security Center documentation for firewall-adjacent restore
-safety rules.
+the "Application files" backup scope: `custom-modules/` is captured into every backup that includes
+that scope, included in pre-restore rollback snapshots, and restored module-by-module — extensions
+installed after a backup are left untouched. See the Security Center documentation for
+firewall-adjacent restore safety rules.
