@@ -459,12 +459,16 @@ class ModuleServiceProvider extends ServiceProvider
         if (str_starts_with($constraint, '~')) {
             $lower = substr($constraint, 1);
             $parts = explode('.', $lower);
+
             // The ~ constraint accepts the current minor line only:
-            // ~1.2 means >= 1.2 and < 1.3.
-            $nextMinor = $parts[0].'.'.((int) ($parts[1] ?? 0) + 1).'.0';
+            // ~1.2 means >= 1.2 and < 1.3. A bare major (~1) has no minor
+            // to pin, so it spans the whole major line: >= 1 and < 2.0.
+            $ceiling = count($parts) === 1
+                ? ((int) $parts[0] + 1).'.0.0'
+                : $parts[0].'.'.((int) $parts[1] + 1).'.0';
 
             return version_compare($installed, $lower, '>=')
-                && version_compare($installed, $nextMinor, '<');
+                && version_compare($installed, $ceiling, '<');
         }
 
         if (str_starts_with($constraint, '^')) {

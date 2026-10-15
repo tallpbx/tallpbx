@@ -206,3 +206,25 @@ it('falls back to the conventional provider class when a manifest omits provider
     expect(ModuleServiceProvider::providersFor(['name' => 'broken', 'namespace' => 'Modules\\Broken', 'providers' => 'not-an-array']))
         ->toBe([]);
 });
+
+it('resolves version constraints with composer semantics', function () {
+    $provider = new ModuleServiceProvider(app());
+    $method = new ReflectionMethod($provider, 'satisfiesVersion');
+
+    // A bare-major tilde spans the whole major line: ~1 means >= 1.0 < 2.0,
+    // not the 1.0.x patch line the naive next-minor ceiling computes.
+    expect($method->invoke($provider, '1.0.0', '~1'))->toBeTrue()
+        ->and($method->invoke($provider, '1.9.3', '~1'))->toBeTrue()
+        ->and($method->invoke($provider, '2.0.0', '~1'))->toBeFalse()
+        // A pinned-minor tilde keeps accepting the current minor line only.
+        ->and($method->invoke($provider, '1.2.0', '~1.2'))->toBeTrue()
+        ->and($method->invoke($provider, '1.2.9', '~1.2'))->toBeTrue()
+        ->and($method->invoke($provider, '1.3.0', '~1.2'))->toBeFalse()
+        // Caret keeps accepting everything below the next major.
+        ->and($method->invoke($provider, '1.9.9', '^1.2'))->toBeTrue()
+        ->and($method->invoke($provider, '2.0.0', '^1.2'))->toBeFalse()
+        // Exact and wildcard forms stay intact.
+        ->and($method->invoke($provider, '1.2.3', '1.2.3'))->toBeTrue()
+        ->and($method->invoke($provider, '1.2.4', '1.2.3'))->toBeFalse()
+        ->and($method->invoke($provider, '9.9.9', '*'))->toBeTrue();
+});
