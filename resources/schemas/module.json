@@ -26,8 +26,8 @@
         },
         "namespace": {
             "type": "string",
-            "pattern": "^Modules\\\\[A-Z][a-zA-Z0-9_]*$",
-            "description": "PHP namespace (e.g., Modules\\CallForwarding)."
+            "pattern": "^(Modules|CustomModules)\\\\[A-Z][a-zA-Z0-9_]*$",
+            "description": "PHP namespace (e.g., Modules\\CallForwarding for built-in modules or CustomModules\\MyPlugin for extensions)."
         },
         "display_name": {
             "type": "string",

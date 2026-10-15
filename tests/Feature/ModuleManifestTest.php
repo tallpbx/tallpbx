@@ -37,3 +37,19 @@ test('the manifest schema allows only canonical kebab-case module names', functi
     expect($schema['properties']['name']['pattern'])->toBe('^[a-z][a-z0-9-]*$')
         ->and($schema['properties']['requirements']['properties']['modules']['items']['pattern'])->toBe('^[a-z][a-z0-9-]*$');
 });
+
+test('the manifest schema accepts the namespaces both module sources scaffold', function () {
+    $schema = json_decode((string) file_get_contents(base_path('resources/schemas/module.json')), true);
+
+    // make:module stamps CustomModules\{Studly} into every scaffolded
+    // manifest and references this schema from them, so validating a fresh
+    // scaffold against the schema must not flag its own namespace.
+    $pattern = '/'.$schema['properties']['namespace']['pattern'].'/';
+
+    expect(preg_match($pattern, 'Modules\CallForwards'))->toBe(1)
+        ->and(preg_match($pattern, 'CustomModules\NativeCommandTest'))->toBe(1)
+        // Malformed namespaces must still be rejected by the same pattern.
+        ->and(preg_match($pattern, 'custommodules\Lowercase'))->toBe(0)
+        ->and(preg_match($pattern, 'Modules\lowercase'))->toBe(0)
+        ->and(preg_match($pattern, 'ThirdParty\Plugin'))->toBe(0);
+});
