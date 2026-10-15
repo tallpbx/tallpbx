@@ -109,6 +109,14 @@ class RestoreOperationExecutor
 
         if (in_array('app_files', $scopes, true)) {
             File::copyDirectory(storage_path('app'), $snapshotDirectory.'/app_files');
+
+            // Mirror the backup: third-party custom modules ride with the
+            // app-files scope so a rollback snapshot can bring them back.
+            $customModulesPath = base_path('custom-modules');
+
+            if (is_dir($customModulesPath)) {
+                File::copyDirectory($customModulesPath, $snapshotDirectory.'/custom_modules');
+            }
         }
 
         if (in_array('media', $scopes, true)) {
@@ -167,6 +175,30 @@ class RestoreOperationExecutor
                 $destination = storage_path('app/'.basename($source));
                 File::deleteDirectory($destination);
                 File::copyDirectory($source, $destination);
+            }
+        }
+
+        // Mirror the backup: a selected app-files restore also brings back
+        // third-party custom modules. Only directories present in the archive
+        // are replaced, so extensions installed after the backup was taken
+        // survive the restore; older archives without the member are skipped
+        // by the is_dir guard.
+        if (in_array('app_files', $scopes, true) && is_dir($archiveRoot.'/custom_modules')) {
+            foreach (File::directories($archiveRoot.'/custom_modules') as $source) {
+                $destination = base_path('custom-modules/'.basename($source));
+                File::deleteDirectory($destination);
+                File::copyDirectory($source, $destination);
+            }
+
+            // scandir (not the File facade): Symfony Finder skips dot entries,
+            // so root-level artifacts like .gitkeep would otherwise never
+            // make it back from the archive.
+            foreach (scandir($archiveRoot.'/custom_modules') ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..' || is_dir($archiveRoot.'/custom_modules/'.$entry)) {
+                    continue;
+                }
+
+                File::copy($archiveRoot.'/custom_modules/'.$entry, base_path('custom-modules/'.$entry));
             }
         }
 

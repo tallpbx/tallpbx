@@ -137,15 +137,6 @@ class ModuleServiceProvider extends ServiceProvider
                 'order' => 38,
             ],
             [
-                'key' => 'backups',
-                'label' => 'admin.backups',
-                'route' => 'panel.backups.index',
-                'permission' => 'backups.view',
-                'icon' => 'heroicon-o-archive-box-arrow-down',
-                'parent' => 'pbx.advanced',
-                'order' => 90,
-            ],
-            [
                 'key' => 'pbx',
                 'label' => 'admin.pbx',
                 'icon' => 'heroicon-o-server-stack',
@@ -248,12 +239,6 @@ class ModuleServiceProvider extends ServiceProvider
             'admin.monitoring.view' => 'View monitoring dashboard',
             'admin.queue.view' => 'View queue status',
             'admin.git-update.view' => 'View and trigger git updates',
-            'backups.view' => 'View backup configurations and history',
-            'backups.create' => 'Create new backup configurations',
-            'backups.update' => 'Edit existing backup configurations',
-            'backups.delete' => 'Delete backup configurations and files',
-            'backups.run' => 'Run a backup immediately',
-            'backups.restore' => 'Restore from a backup (superadmin only)',
         ]);
     }
 }

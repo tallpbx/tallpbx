@@ -45,7 +45,7 @@ class BackupService implements BackupServiceInterface
     {
         return [
             'database' => 'Database (full SQL dump)',
-            'app_files' => 'Application files (Laravel storage, excluding media)',
+            'app_files' => 'Application files (Laravel storage excluding media, plus third-party custom extensions)',
             'media' => 'Media files (recordings, voicemail, fax)',
             'configuration' => 'Configuration (.env, config files, FreeSWITCH conf)',
         ];
@@ -186,6 +186,10 @@ class BackupService implements BackupServiceInterface
             // Step 2: Copy app files into the temp directory
             if (in_array('app_files', $backup->scope, true)) {
                 $this->archiveAppFiles($tempDir);
+
+                // Third-party custom modules ride with the app-files scope so
+                // a disaster-recovery restore brings user extensions back.
+                $this->archiveCustomModules($tempDir);
             }
 
             // Step 3: Copy media files
@@ -318,6 +322,39 @@ class BackupService implements BackupServiceInterface
             foreach (File::files($storagePath) as $file) {
                 File::copy($file->getPathname(), $appDir.'/'.$file->getFilename());
             }
+        }
+    }
+
+    /**
+     * Archive third-party custom modules so user extensions survive restore.
+     *
+     * Captured alongside the app-files scope (plan §1.2 / F10): a
+     * disaster-recovery restore of application files brings the installed
+     * extensions back with it instead of silently dropping them.
+     */
+    private function archiveCustomModules(string $tempDir): void
+    {
+        $customModulesPath = base_path('custom-modules');
+
+        if (! is_dir($customModulesPath)) {
+            return;
+        }
+
+        $archiveDir = $tempDir.'/custom_modules';
+        File::ensureDirectoryExists($archiveDir, 0755, true);
+
+        foreach (File::directories($customModulesPath) as $directory) {
+            File::copyDirectory($directory, $archiveDir.'/'.basename($directory));
+        }
+
+        // scandir (not the File facade): Symfony Finder skips dot entries,
+        // and root-level artifacts like .gitkeep must survive the round trip.
+        foreach (scandir($customModulesPath) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || is_dir($customModulesPath.'/'.$entry)) {
+                continue;
+            }
+
+            File::copy($customModulesPath.'/'.$entry, $archiveDir.'/'.$entry);
         }
     }
 

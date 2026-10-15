@@ -59,8 +59,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Modules\Backups\Listeners\BlockFileStoreDeletion;
-use Modules\Backups\Services\BackupService;
-use Modules\Backups\Services\BackupServiceInterface;
 use Modules\Bridges\Models\Bridge;
 use Modules\CallBlocks\Models\CallBlock;
 use Modules\CallCenters\Models\Agent;
@@ -158,7 +156,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(TenantDomainServiceInterface::class, TenantDomainService::class);
         $this->app->bind(TenantIdentityResolverInterface::class, TenantIdentityResolver::class);
         $this->app->bind(ImpersonationServiceInterface::class, ImpersonationService::class);
-        $this->app->bind(BackupServiceInterface::class, BackupService::class);
         $this->app->bind(ProcessRunner::class, SystemProcessRunner::class);
 
         $this->app->singleton(FreeSwitchServiceInterface::class, function (): FreeSwitchService {
@@ -173,18 +170,6 @@ class AppServiceProvider extends ServiceProvider
         // Dialplan XML collector aggregates contributions from all
         // feature modules implementing DialplanXmlContributor.
         $this->app->singleton(DialplanXmlCollector::class);
-
-        // Backups module: manually register view namespace and service
-        // binding since the module's provider cannot be loaded through
-        // bootstrap/providers.php (sandbox composer double-load edge case).
-        $this->loadViewsFrom(
-            base_path('app-modules/backups/resources/views'),
-            'backups',
-        );
-        $this->app->bind(
-            BackupServiceInterface::class,
-            BackupService::class,
-        );
     }
 
     /**

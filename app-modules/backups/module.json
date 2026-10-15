@@ -10,7 +10,7 @@
     "description": "Database, file, media, and configuration backup with scheduling, retention, compression, and restore.",
     "type": "pbx-module",
     "protected": false,
-    "required": false,
+    "required": true,
     "priority": 90,
     "requirements": {
         "modules": [

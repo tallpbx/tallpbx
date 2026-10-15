@@ -240,6 +240,22 @@ it('logs and records a fail-soft failure only once until the module is re-enable
     cgAssertLogged('critical', '/re-enable/');
 });
 
+it('flags required modules prominently when a dependency check disables them', function (): void {
+    $root = cgFixtureRoot();
+    cgWriteManifest($root, 'critical-extension', [
+        'required' => true,
+        'requirements' => ['packages' => ['ghost/missing-package']],
+    ]);
+
+    $modules = cgRunDiscovery($root);
+
+    expect($modules['critical-extension']['enabled'])->toBeFalse();
+
+    // A required module being disabled strands core functionality — the log
+    // message must say so explicitly.
+    cgAssertLogged('critical', '/Required module \[critical-extension\]/');
+});
+
 // ─── §1.7.2 Route prefix & name hijacking ────────────────────────
 
 it('rejects custom routes binding reserved panel URLs or existing route names', function (): void {

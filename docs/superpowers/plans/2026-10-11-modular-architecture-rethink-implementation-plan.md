@@ -357,7 +357,9 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 
 ---
 
-### Task 5: Backups Module Autonomous Superadmin Cleanup (Resolves F2, F10)
+### Task 5: Backups Module Autonomous Superadmin Cleanup (Resolves F2, F10) (COMPLETED)
+
+**Status:** Completed 2026-10-14 in `17b2c6d1`.
 
 **Dependency:** Task 2 must land first — once the routes move to `app-modules/backups/routes/web.php`, they are registered exclusively through the Backups provider, which only loads after its manifest declares `providers` (F2).
 
@@ -372,12 +374,12 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
 - Modify: `app/Providers/AppServiceProvider.php`
 - Test: `app-modules/backups/tests/BackupsRouteIndependenceTest.php` (keep the flat convention of the module's existing tests in `app-modules/backups/tests/`; `phpunit.xml` already includes `app-modules/*/tests`)
 
-- [ ] **Step 1: Write test verifying Backups route and menu independence**
+- [x] **Step 1: Write test verifying Backups route and menu independence** (Completed — 6 tests watched failing RED first: route ownership, menu top-level, permission ownership, backup capture, restore, required flag)
   In `app-modules/backups/tests/BackupsRouteIndependenceTest.php`:
   1. Assert `/panel/backups` routes are registered exclusively by Backups provider.
   2. Assert the Backups menu item is registered by the Backups provider at top level (`parent: null`, `order: 85`). **Note**: "Core Administration" is a modules-workbench section label, not an existing sidebar group — today admin items are flat top-level entries and Backups sits at `parent: 'pbx.advanced'`, `order: 90`. Decide in Step 2 whether the sidebar also gains a "Core Administration" header or the label stays workbench-only.
   3. Assert `custom-modules/` is included in backup filesystem paths **and** that the restore path restores it (see Step 2.6).
-- [ ] **Step 2: Move routes, menus, and permissions to Backups module**
+- [x] **Step 2: Move routes, menus, and permissions to Backups module** (Completed — routes/web.php owned by the module; menu at parent: null / order: 85; permissions moved; AppServiceProvider manual wiring removed; custom-modules/ rides with the app_files scope on backup, snapshot, and restore; module.json required: true; BlockFileStoreDeletion kept root-registered)
   1. Create `app-modules/backups/routes/web.php` defining `/panel/backups` routes with `auth.panel` and `admin.can:backups.*`.
   2. In `app-modules/backups/src/Providers/ModuleServiceProvider.php`:
      - Remove `routeGroups() => []`.
@@ -394,12 +396,12 @@ The independent review evaluated Tasks 1–2 and the codebase on `4.x`. All 12 f
      - Include `custom-modules/` in backup filesystem paths so user extensions survive restore. Today `archiveAppFiles()` copies only `storage/app`. Mirror the scope on restore — a backup-only change would capture extensions that restores silently drop.
   7. **Decision — enable/disable semantics**: once Backups is the autonomous disaster-recovery utility, `ModuleState` gating means a disabled Backups module hides its routes/menu and strands restore. Recommended: set `required: true` in `app-modules/backups/module.json` (schema: "cannot be disabled"). Otherwise document explicitly that disabling is allowed and how restore remains reachable.
   8. **Keep `BlockFileStoreDeletion` root-registered**: the listener guarding backup profiles from losing their destination file store is deliberately wired in `AppServiceProvider::boot()` so it stays active while the module is disabled (see its inline comment). Do NOT move it into the Backups provider's `listeners()` during this task — moving it would strand backup-destination protection whenever Backups is disabled.
-- [ ] **Step 3: Run targeted tests**
+- [x] **Step 3: Run targeted tests** (route:list shows 4 panel.backups routes; backups suite 50 passed / 225 assertions; related suites green)
   ```bash
   php artisan route:list --name=panel.backups
   php artisan test app-modules/backups/
   ```
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** (Committed as `17b2c6d1`)
   ```bash
   git add app-modules/admin/ app-modules/backups/ app/Providers/AppServiceProvider.php
   git commit -m "refactor: decouple backups routes and menus into autonomous system superadmin module"

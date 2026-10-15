@@ -294,11 +294,21 @@ class ModuleServiceProvider extends ServiceProvider
                     continue;
                 }
 
-                Log::critical(sprintf(
-                    'Module [%s] failed its boot dependency check and was disabled: %s. After installing the missing requirements, re-enable the module from /panel/modules and clear caches with php artisan optimize:clear.',
-                    $name,
-                    implode('; ', $reasons),
-                ));
+                // Required modules strand core functionality when disabled,
+                // so their failure is logged with an unmistakable warning.
+                if (($manifest['required'] ?? false) === true) {
+                    Log::critical(sprintf(
+                        'Required module [%s] failed its boot dependency check and was disabled: %s. This strands critical functionality — install the missing requirements and re-enable the module from /panel/modules immediately.',
+                        $name,
+                        implode('; ', $reasons),
+                    ));
+                } else {
+                    Log::critical(sprintf(
+                        'Module [%s] failed its boot dependency check and was disabled: %s. After installing the missing requirements, re-enable the module from /panel/modules and clear caches with php artisan optimize:clear.',
+                        $name,
+                        implode('; ', $reasons),
+                    ));
+                }
 
                 $this->markRegistryDisabled($name, $manifest);
             }

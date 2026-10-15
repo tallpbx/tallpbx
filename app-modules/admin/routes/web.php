@@ -23,9 +23,6 @@ use Modules\Admin\Livewire\TenantsEdit;
 use Modules\Admin\Livewire\TenantsList;
 use Modules\Admin\Livewire\UsersEdit;
 use Modules\Admin\Livewire\UsersList;
-use Modules\Backups\Livewire\BackupsEdit;
-use Modules\Backups\Livewire\BackupsList;
-use Modules\Backups\Livewire\RestoreArchive;
 
 /*
 |--------------------------------------------------------------------------
@@ -95,9 +92,4 @@ Route::prefix('panel')->name('panel.')->middleware(['web', 'auth.panel', 'thrott
     // ── Git Update ────────────────────────────────────────────────────────
     Route::get('/git-update', GitUpdate::class)->middleware('admin.can:admin.git-update.view')->name('git-update');
 
-    // ── Backups ───────────────────────────────────────────────────────────
-    Route::get('/backups', BackupsList::class)->middleware('admin.can:backups.view')->name('backups.index');
-    Route::get('/backups/create', BackupsEdit::class)->middleware('admin.can:backups.create')->name('backups.create');
-    Route::get('/backups/{backupId}/edit', BackupsEdit::class)->middleware('admin.can:backups.edit')->name('backups.edit');
-    Route::get('/backups/restore', RestoreArchive::class)->middleware('admin.can:backups.restore')->name('backups.restore');
 });
