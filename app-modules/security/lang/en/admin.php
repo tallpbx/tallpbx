@@ -439,6 +439,7 @@ return [
     'security_geo_sync_success' => 'Geo-IP sync completed (:v4 IPv4 CIDRs, :v6 IPv6 CIDRs).',
     'security_geo_sync_failed' => 'Geo-IP sync failed: :error',
     'security_geo_lockout_warning' => 'Zero-Lockout Safety Alert: "Block All Except Selected" mode cannot be enabled unless your current administrator connection IP is in the Trusted Whitelist.',
+    'security_geo_whitelist_countries_required' => 'Select at least one country before enabling Block All Except Selected — an empty selection would drop traffic from every country.',
     'security_manage_geo_blocking' => 'Manage Geo-Blocking',
     'security_geo_country_single' => 'Country',
     'security_geo_country_plural' => 'Countries',

@@ -35,7 +35,9 @@ beforeEach(function (): void {
     $this->executor = Mockery::mock(SecurityExecutorInterface::class);
     $this->executor->shouldReceive('ban')->andReturn(true);
     $this->executor->shouldReceive('unban')->andReturn(true);
-    $this->executor->shouldReceive('apply')->andReturn(true);
+    // byDefault keeps this permissive default demoted so individual tests
+    // can declare their own scoped apply expectations (counts/sequences).
+    $this->executor->shouldReceive('apply')->byDefault()->andReturn(true);
     $this->executor->shouldReceive('status')->andReturn('');
     $this->executor->shouldReceive('flushConntrack')->andReturn(true);
     $this->executor->shouldReceive('updateExternalBlocklist')->byDefault()->andReturn(true);
@@ -91,6 +93,7 @@ it('prevents self-lockout when enabling geofence without whitelist coverage', fu
         ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
         ->set('adminIp', '198.51.100.50')
         ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
         ->call('setGeoEnabled', true);
 
     $rule = SecurityGeoRule::instance();
@@ -106,6 +109,7 @@ it('prevents self-lockout when enabling geofence without whitelist coverage', fu
         ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
         ->set('adminIp', '198.51.100.50')
         ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
         ->call('setGeoEnabled', true);
 
     expect(SecurityGeoRule::instance()->enabled)->toBeTrue();
@@ -146,6 +150,84 @@ it('rejects geo mutations from admins without geo permissions before any state c
         ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
         ->call('setGeoEnabled', true)
         ->assertForbidden();
+
+    expect(SecurityGeoRule::instance()->enabled)->toBeFalse();
+});
+
+it('populates geo allow sets before applying the firewall ruleset when enabling whitelist mode', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    // Record the actual call sequence and capture the compiled geo file at
+    // the moment the sets are promoted; the ruleset apply must come after.
+    $callOrder = [];
+    $geoFileAtPromotion = null;
+    $this->executor->shouldReceive('updateExternalBlocklist')
+        ->once()
+        ->andReturnUsing(function () use (&$callOrder, &$geoFileAtPromotion): bool {
+            $callOrder[] = 'promote_sets';
+            $geoFileAtPromotion = file_get_contents($this->tempDir.'/geo_blocking.nft.pending') ?: '';
+
+            return true;
+        });
+    $this->executor->shouldReceive('apply')
+        ->once()
+        ->andReturnUsing(function () use (&$callOrder): bool {
+            $callOrder[] = 'apply_ruleset';
+
+            return true;
+        });
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('setGeoEnabled', true)
+        ->assertOk();
+
+    expect(SecurityGeoRule::instance()->enabled)->toBeTrue()
+        ->and($callOrder)->toBe(['promote_sets', 'apply_ruleset'])
+        ->and($geoFileAtPromotion)->toContain('add element inet tallpbx_filter geo_allowed_ips');
+});
+
+it('refuses to enable whitelist geo blocking when the zone sync fails', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    // Provider down: no ranges and no cache available.
+    $this->geoProvider->shouldReceive('fetchCountryRanges')
+        ->byDefault()
+        ->andReturn(['v4' => [], 'v6' => []]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('setGeoEnabled', true)
+        ->assertOk();
+
+    expect(SecurityGeoRule::instance()->enabled)->toBeFalse();
+});
+
+it('refuses to enable whitelist geo blocking with no countries selected', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', [])
+        ->call('setGeoEnabled', true)
+        ->assertOk();
 
     expect(SecurityGeoRule::instance()->enabled)->toBeFalse();
 });

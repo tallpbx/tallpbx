@@ -57,22 +57,31 @@ trait ManagesGeoBlocking
 
                 return;
             }
-        }
 
-        $rule->enabled = $enabled;
-        $rule->save();
-        $this->geoEnabled = $enabled;
+            // "Block All Except Selected" with nothing selected would arm a
+            // drop-everything perimeter; refuse until a country is chosen.
+            if (empty($this->geoCountries)) {
+                $this->notifyError((string) __('admin.security_geo_whitelist_countries_required'));
 
-        // Regenerate main ruleset so the geo stage in input chain is emitted or omitted
-        if (! $this->regenerateAndApplyFirewall()) {
-            $rule->enabled = ! $enabled;
-            $rule->save();
-            $this->geoEnabled = ! $enabled;
-
-            return;
+                return;
+            }
         }
 
         if (! $enabled) {
+            $rule->enabled = false;
+            $rule->save();
+            $this->geoEnabled = false;
+
+            // Regenerate the ruleset without the geo stage; roll back if the
+            // kernel refuses so the panel never reports a state it is not running.
+            if (! $this->regenerateAndApplyFirewall()) {
+                $rule->enabled = true;
+                $rule->save();
+                $this->geoEnabled = true;
+
+                return;
+            }
+
             app(GeoBlockingService::class)->clear();
 
             SecurityAuditLog::record(
@@ -83,21 +92,59 @@ trait ManagesGeoBlocking
             );
 
             $this->notifySuccess((string) __('admin.security_geo_disabled_notice'));
+            $this->loadGeoState();
+
+            return;
+        }
+
+        // Enabling: mirror the form state into the rule and populate the
+        // kernel sets FIRST, so the perimeter chain armed moments later
+        // by the ruleset apply never references empty sets — in whitelist
+        // mode an empty allow-set would drop all new inbound traffic.
+        $rule->mode = $this->geoMode;
+        $rule->countries = array_values(array_unique(array_map('strtoupper', $this->geoCountries)));
+        $rule->enabled = false;
+        $rule->save();
+
+        $result = app(GeoBlockingService::class)->sync($rule, force: true);
+
+        // Whitelist mode refuses to arm without its full allow-set.
+        // Blacklist mode stays fail-open: an empty blocked set drops
+        // nothing, so enabling with a failed sync is safe to proceed.
+        if ($result['status'] !== 'success' && $rule->mode === 'whitelist') {
+            $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
+            $this->loadGeoState();
+
+            return;
+        }
+
+        $rule->enabled = true;
+        $rule->save();
+        $this->geoEnabled = true;
+
+        if (! $this->regenerateAndApplyFirewall()) {
+            // Roll back so the panel never claims an enabled state the
+            // kernel is not actually running.
+            $rule->enabled = false;
+            $rule->save();
+            $this->geoEnabled = false;
+            $this->loadGeoState();
+
+            return;
+        }
+
+        // Audit only after the outcome is known, including the sync result.
+        SecurityAuditLog::record(
+            action: 'geo_blocking_enabled',
+            ipAddress: $this->adminIp,
+            description: "Geo-Blocking was enabled (mode: {$rule->mode}, countries: ".count($rule->countries ?? []).", sync: {$result['status']}).",
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($result['status'] === 'success') {
+            $this->notifySuccess((string) __('admin.security_geo_enabled_notice'));
         } else {
-            $result = app(GeoBlockingService::class)->sync($rule, force: true);
-
-            SecurityAuditLog::record(
-                action: 'geo_blocking_enabled',
-                ipAddress: $this->adminIp,
-                description: "Geo-Blocking was enabled (mode: {$rule->mode}, countries: ".count($rule->countries ?? []).').',
-                adminId: Auth::guard('admin')->id(),
-            );
-
-            if ($result['status'] === 'success') {
-                $this->notifySuccess((string) __('admin.security_geo_enabled_notice'));
-            } else {
-                $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
-            }
+            $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
         }
 
         $this->loadGeoState();
@@ -127,17 +174,42 @@ trait ManagesGeoBlocking
         }
 
         $rule = SecurityGeoRule::instance();
+
+        // Snapshot for rollback: switching an armed whitelist perimeter
+        // must never leave it running with a partial or missing allow-set.
+        $previousMode = $rule->mode;
+        $previousCountries = $rule->countries;
+
         $rule->mode = $this->geoMode;
         $rule->sync_interval = $this->geoSyncInterval;
         $rule->countries = array_values(array_unique(array_map('strtoupper', $this->geoCountries)));
         $rule->save();
 
-        if (! $this->regenerateAndApplyFirewall()) {
-            return;
+        if ($this->geoEnabled) {
+            $result = app(GeoBlockingService::class)->sync($rule, force: false);
+
+            // Whitelist mode with a failed sync means the allow-set is not
+            // fully populated — roll back instead of shrinking the perimeter.
+            if ($result['status'] !== 'success' && $rule->mode === 'whitelist') {
+                $rule->mode = $previousMode ?? 'blacklist';
+                $rule->countries = is_array($previousCountries) ? $previousCountries : [];
+                $rule->save();
+
+                $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
+                $this->loadGeoState();
+
+                return;
+            }
         }
 
-        if ($this->geoEnabled) {
-            app(GeoBlockingService::class)->sync($rule, force: false);
+        if (! $this->regenerateAndApplyFirewall()) {
+            // Keep the database truthful about what the kernel is running.
+            $rule->mode = $previousMode ?? 'blacklist';
+            $rule->countries = is_array($previousCountries) ? $previousCountries : [];
+            $rule->save();
+            $this->loadGeoState();
+
+            return;
         }
 
         SecurityAuditLog::record(

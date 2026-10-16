@@ -79,8 +79,14 @@ class GeoBlockingService
                         continue;
                     }
                 } else {
-                    file_put_contents($v4Cache, implode("\n", $ranges['v4'])."\n");
-                    file_put_contents($v6Cache, implode("\n", $ranges['v6'])."\n");
+                    // Zone cache writes must succeed: a silently missing cache
+                    // file would shrink the allow-set on the next whitelist sync.
+                    if (@file_put_contents($v4Cache, implode("\n", $ranges['v4'])."\n") === false
+                        || @file_put_contents($v6Cache, implode("\n", $ranges['v6'])."\n") === false) {
+                        $errors[] = "Failed to write zone cache for country: {$cc}";
+
+                        continue;
+                    }
                 }
             }
 
@@ -108,11 +114,12 @@ class GeoBlockingService
         $allV4 = array_values(array_unique($allV4));
         $allV6 = array_values(array_unique($allV6));
 
-        $rule->v4_cidrs_count = count($allV4);
-        $rule->v6_cidrs_count = count($allV6);
-        $rule->last_sync_at = now();
+        // Whitelist mode must never compile a partial allow-set: every
+        // country that yielded no entries would be silently dropped at
+        // the perimeter while the UI reports success.
+        $whitelistIncomplete = $rule->mode === 'whitelist' && ! empty($errors) && ! empty($countries);
 
-        if (! empty($errors) && empty($allV4) && empty($allV6) && ! empty($countries)) {
+        if ($whitelistIncomplete || (! empty($errors) && empty($allV4) && empty($allV6) && ! empty($countries))) {
             $rule->last_status = 'failed';
             $rule->last_error = implode('; ', $errors);
             $rule->save();
@@ -125,6 +132,9 @@ class GeoBlockingService
             ];
         }
 
+        $rule->v4_cidrs_count = count($allV4);
+        $rule->v6_cidrs_count = count($allV6);
+        $rule->last_sync_at = now();
         $rule->last_status = 'success';
         $rule->last_error = null;
         $rule->save();
@@ -188,13 +198,15 @@ class GeoBlockingService
             'flush set inet tallpbx_filter geo_allowed_ips6',
         ];
 
-        if ($rule->enabled) {
-            foreach ($this->chunkedAddElements($setNameV4, $v4) as $line) {
-                $lines[] = $line;
-            }
-            foreach ($this->chunkedAddElements($setNameV6, $v6) as $line) {
-                $lines[] = $line;
-            }
+        // Elements are compiled whenever a country set is provided, even
+        // while the rule is still disabled: populating the kernel sets
+        // BEFORE the perimeter chain is armed is what makes enablement
+        // race-free. Sets no chain references are simply unused.
+        foreach ($this->chunkedAddElements($setNameV4, $v4) as $line) {
+            $lines[] = $line;
+        }
+        foreach ($this->chunkedAddElements($setNameV6, $v6) as $line) {
+            $lines[] = $line;
         }
 
         file_put_contents($targetFile, implode("\n", $lines)."\n");
