@@ -157,8 +157,10 @@ return [
     'disable_module' => 'Désactiver',
     'uninstalled' => 'Désinstallé',
     'module_restore_hint' => 'Restaurer via SSH : php artisan module:restore :name',
-    'module_required' => 'Les modules requis ne peuvent pas être désactivés.',
+    'module_required' => 'Requis',
     'no_modules_found' => 'Aucun module trouvé.',
+    'expand_all' => 'Tout développer',
+    'collapse_all' => 'Tout réduire',
 
     // ─── SIP Accounts ───────────────────────────────────────────────────────
     'sip_username' => 'Nom d\'utilisateur',

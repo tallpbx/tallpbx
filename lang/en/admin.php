@@ -201,8 +201,10 @@ return [
     'disable_module' => 'Disable',
     'uninstalled' => 'Uninstalled',
     'module_restore_hint' => 'Restore over SSH: php artisan module:restore :name',
-    'module_required' => 'Required modules cannot be disabled.',
+    'module_required' => 'Required',
     'no_modules_found' => 'No modules found.',
+    'expand_all' => 'Expand All',
+    'collapse_all' => 'Collapse All',
 
     // ─── SIP Accounts ───────────────────────────────────────────────────────
     'sip_username' => 'Username',

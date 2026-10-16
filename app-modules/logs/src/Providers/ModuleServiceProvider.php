@@ -52,9 +52,9 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.logs.index',
                 'permission' => 'logs.view',
                 'icon' => 'heroicon-o-document-text',
-                'parent' => 'admin.system',
+                'parent' => 'pbx.monitoring',
                 'guard' => 'admin',
-                'order' => 39,
+                'order' => 90,
             ],
         ];
     }

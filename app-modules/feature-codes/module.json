@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "namespace": "Modules\\FeatureCodes",
     "display_name": "Feature Codes",
-    "category": "routing",
+    "category": "features",
     "description": "Manage star codes and feature codes like *97 voicemail for per-tenant customization.",
     "required": false,
     "protected": false,

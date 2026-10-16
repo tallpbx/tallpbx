@@ -44,9 +44,9 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.click-to-call.index',
                 'permission' => 'click-to-call.view',
                 'icon' => 'heroicon-o-cursor-arrow-rays',
-                'parent' => 'pbx.advanced',
+                'parent' => 'pbx.features',
                 'guard' => 'admin',
-                'order' => 80,
+                'order' => 50,
             ],
         ];
     }

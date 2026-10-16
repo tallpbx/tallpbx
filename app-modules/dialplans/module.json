@@ -6,7 +6,7 @@
     "display_name": "Dialplans",
     "category": "routing",
     "description": "Manage call routing dialplans with ordered conditions and actions.",
-    "required": false,
+    "required": true,
     "protected": true,
     "priority": 170,
     "providers": [

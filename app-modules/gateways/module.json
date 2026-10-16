@@ -6,7 +6,7 @@
     "display_name": "Gateways",
     "category": "accounts",
     "description": "Manage SIP trunks and upstream provider connections for outbound routing.",
-    "required": false,
+    "required": true,
     "protected": true,
     "priority": 140,
     "providers": [

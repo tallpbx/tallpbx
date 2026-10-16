@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "namespace": "Modules\\Conferences",
     "display_name": "Conferences",
-    "category": "features",
+    "category": "media",
     "description": "Conference room management for FreeSWITCH",
     "required": false,
     "protected": false,

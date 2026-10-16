@@ -8,9 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Navigation Links for Primary Administrative & PBX Workbenches**:
+  - Registered missing panel navigation menu items with proper permissions: **Modules** (`panel.modules.index`, permission `admin.modules.view`) positioned prominently in the top administration navigation block (right beside **Permissions** and **Notifications**), **Settings** (`panel.settings.index`, permission `admin.settings.view`) in the administration section, **SIP Accounts** (`panel.sip-accounts.index`, permission `sip-accounts.view`) under **PBX Accounts**, and **Extension Settings** (`panel.extension-settings.index`, permission `extension-settings.view`) under **PBX Advanced**.
+  - Consolidated interactive queue job management directly into the **Monitoring** dashboard (`/panel/monitoring`) with an in-place modal popup and direct retry controls, eliminating navigation clutter from a standalone queue status link.
+- **Streamlined Modules Workbench Interface**:
+  - Refactored `/panel/modules` from a 7-column table into a clean, unified 4-column layout (**Module**, **Status**, **Actions**, **Options**).
+  - Merged module display name and internal identifier, removed the redundant repeating "Built-in" source and version badges across monorepo core modules (retaining version and source tags only for external custom/vendor plugins), and standardized required-module indicators into concise `"Required"` badges (`badge-neutral badge-xs opacity-75`) with clean `—` placeholders in the Actions column.
+  - Set all module category accordions to open by default for immediate at-a-glance visibility and browser searchability (`Ctrl+F`), with a responsive Alpine **"Expand All / Collapse All"** toggle button in the workbench header.
+  - Aligned core PBX telephony engine pillars (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) with `"required": true` alongside `admin`, `auth`, `tenant`, and `backups`, safeguarding critical FreeSWITCH call-processing, SIP registration, and dialplan services from being disabled in the web UI.
+  - Established 100% parity between module manifest categories (`module.json`) and sidebar navigation menu parents (`ModuleServiceProvider.php`) across all telephony modules (`dialplans`, `dialplan-tools`, `time-conditions`, `extension-settings`, `conferences`, `conference-centers`, `transcribe`, `feature-codes`, `click-to-call`, `call-centers`, `call-recordings`, `email-queue`, `operator-panel`, `hot-desking`), relocating **Log Viewer** (`logs`) to **PBX Monitoring** so **Core Administration** consists exclusively of foundational required modules.
+  - Documented the direct correlation to FreeSWITCH v1.11's mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`) in project guidelines and the `tallpbx-custom` skill.
+  - Updated translation key `module_required` to `"Required"` (`"Requerido"`, `"Requis"`), and added `expand_all` and `collapse_all` across `en`, `es`, and `fr` dictionaries.
 - **Telephony Fundamentals Architecture Guide (`docs/telephony-architecture.md`)**:
   - Added a dedicated, beginner-to-advanced architectural guide explaining the relationships and distinctions between **Users** (web portal logins), **Extensions** (dialplan numbers and routing), **SIP Accounts** (cryptographic FreeSWITCH authentication credentials), and **Devices** (hardware endpoints identified by MAC address with zero-touch auto-provisioning).
   - Included everyday office analogies, Mermaid entity-relationship diagrams, an end-to-end employee onboarding workflow, and quick-reference comparison tables. Linked from `README.md` and `docs/modular-architecture.md`.
+- **Demo Custom Extension & Safe Demo Firewall Rules Seeding**:
+  - Automated scaffolding and seeding of a demo third-party custom extension (`demo-webhook`, "Demo Webhook Alerts") under `custom-modules/demo-webhook` whenever demo mode is selected in `DatabaseSeeder`, keeping it installed and active on the demo appliance to showcase custom plugin lifecycle, dynamic autoloading via `CustomModuleAutoloader`, and the custom extension action controls in `/panel/modules`.
+  - Seeded safe demo custom firewall rules in `DatabaseSeeder` referencing only services already permitted by default in the standard PBX service catalog (`ICMP Ping Diagnostics` and `Web Admin Portal` with `accept` actions, plus an inactive `TFTP Provisioning` example), demonstrating sequential firewall rule ordering and service catalog linking without blocking actual traffic or compromising appliance security.
+
+### Security
+- **Hardened Firewall Standard Services Catalog**:
+  - Removed FreeSWITCH ESL (port 8021) from the Standard Services public firewall catalog. FreeSWITCH ESL communicates internally with the web panel and event listeners strictly via loopback (`127.0.0.1`), unconditionally protected by the kernel loopback floor rule (`iif "lo" accept`). Removing it from the standard services list prevents accidental public port exposure, while enterprise multi-server clusters requiring external controller access can still configure targeted custom firewall rules restricted to trusted IP addresses.
 
 ### Fixed
 - **Module Workbench Table Column Alignment & Empty State Colspan**:

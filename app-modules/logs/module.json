@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "namespace": "Modules\\Logs",
     "display_name": "Log Viewer",
-    "category": "core",
+    "category": "monitoring",
     "description": "Tail and filter application log files",
     "required": false,
     "protected": false,

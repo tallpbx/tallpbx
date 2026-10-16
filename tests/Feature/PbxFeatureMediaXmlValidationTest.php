@@ -8,6 +8,7 @@ use App\Services\DialplanContext;
 use App\Services\TenantDefaultsService;
 use App\Services\TenantManager;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Modules\CallCenters\Models\Queue;
 use Modules\IvrMenus\Models\IvrMenu;
@@ -181,3 +182,13 @@ function featureMediaConfigurationXml(string $configuration, string $domain): Te
         'domain' => $domain,
     ]));
 }
+
+it('stores PBX media as file paths instead of database payloads', function (): void {
+    foreach (['call_recordings', 'recordings', 'voicemail_messages'] as $table) {
+        expect(Schema::hasColumn($table, 'file_path'))->toBeTrue();
+
+        foreach (['audio_data', 'media_data', 'file_data', 'content', 'base64'] as $payloadColumn) {
+            expect(Schema::hasColumn($table, $payloadColumn))->toBeFalse();
+        }
+    }
+});

@@ -121,12 +121,20 @@ class ModuleServiceProvider extends ServiceProvider
                 'order' => 36,
             ],
             [
+                'key' => 'modules',
+                'label' => 'admin.modules',
+                'route' => 'panel.modules.index',
+                'permission' => 'admin.modules.view',
+                'icon' => 'heroicon-o-squares-plus',
+                'order' => 37,
+            ],
+            [
                 'key' => 'notifications',
                 'label' => 'admin.notifications',
                 'route' => 'panel.notifications.index',
                 'permission' => 'admin.notifications.view',
                 'icon' => 'heroicon-o-bell',
-                'order' => 37,
+                'order' => 38,
             ],
             [
                 'key' => 'monitoring',
@@ -134,7 +142,7 @@ class ModuleServiceProvider extends ServiceProvider
                 'route' => 'panel.monitoring',
                 'permission' => 'admin.monitoring.view',
                 'icon' => 'heroicon-o-chart-bar',
-                'order' => 38,
+                'order' => 39,
             ],
             [
                 'key' => 'pbx',
@@ -186,6 +194,13 @@ class ModuleServiceProvider extends ServiceProvider
                 'order' => 48,
             ],
             [
+                'key' => 'pbx.monitoring',
+                'label' => 'admin.pbx_monitoring',
+                'icon' => 'heroicon-o-chart-bar',
+                'parent' => 'pbx',
+                'order' => 49,
+            ],
+            [
                 'key' => 'git-update',
                 'label' => 'admin.git_update',
                 'route' => 'panel.git-update',
@@ -194,11 +209,12 @@ class ModuleServiceProvider extends ServiceProvider
                 'order' => 50,
             ],
             [
-                'key' => 'pbx.monitoring',
-                'label' => 'admin.pbx_monitoring',
-                'icon' => 'heroicon-o-chart-bar',
-                'parent' => 'pbx',
-                'order' => 49,
+                'key' => 'settings',
+                'label' => 'admin.settings',
+                'route' => 'panel.settings.index',
+                'permission' => 'admin.settings.view',
+                'icon' => 'heroicon-o-cog-6-tooth',
+                'order' => 51,
             ],
         ]);
     }

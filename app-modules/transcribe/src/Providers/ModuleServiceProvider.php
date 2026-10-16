@@ -52,9 +52,9 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.transcribe.index',
                 'permission' => 'transcribe.view',
                 'icon' => 'heroicon-o-microphone',
-                'parent' => 'pbx.advanced',
+                'parent' => 'pbx.media',
                 'guard' => 'admin',
-                'order' => 110,
+                'order' => 70,
             ],
         ];
     }

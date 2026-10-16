@@ -47,7 +47,7 @@ return [
 
     // Modules workbench (Task 7): category headers, source badges, and
     // the custom-extension deletion flow. No root-dictionary collisions.
-    'modules_category_core' => 'Core Administration',
+    'modules_category_core' => 'Core',
     'modules_category_custom' => 'Custom Extensions',
     'modules_source' => 'Source',
     'modules_builtin' => 'Built-in',

@@ -69,21 +69,35 @@
     {{-- Queue & Backup Row --}}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="card bg-base-100 border border-base-300 p-4" title="Database queue worker stats. Pending jobs are waiting to run. Failed jobs have exhausted retries — investigate on the Queue Status page.">
-            <h4 class="text-sm font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_queues') }}</h4>
-            <div class="flex gap-4">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-medium text-base-content/60">{{ __('admin.monitoring_queues') }}</h4>
+                <button type="button" wire:click="openQueueModal" class="btn btn-ghost btn-xs gap-1 text-primary hover:underline">
+                    {{ __('admin.queue_status') }}
+                    <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                </button>
+            </div>
+            <div class="flex gap-6 items-baseline">
                 <div>
                     <div class="text-2xl font-bold">{{ $pendingJobs }}</div>
-                    <div class="text-xs text-base-content/60">Pending</div>
+                    <div class="text-xs text-base-content/60">{{ __('admin.queue_pending') }}</div>
                 </div>
                 <div>
                     <div class="text-2xl font-bold {{ $failedJobs > 0 ? 'text-error' : '' }}">{{ $failedJobs }}</div>
-                    <div class="text-xs text-base-content/60">Failed</div>
+                    <div class="text-xs text-base-content/60">{{ __('admin.queue_failed') }}</div>
                 </div>
                 <div>
                     <div class="text-2xl font-bold">{{ $backupCount }}</div>
                     <div class="text-xs text-base-content/60">Backups</div>
                 </div>
             </div>
+            @if ($failedJobs > 0)
+                <div class="mt-3 pt-3 border-t border-base-200 flex items-center justify-between">
+                    <span class="text-xs text-error font-medium">{{ $failedJobs }} failed {{ $failedJobs === 1 ? 'job' : 'jobs' }} requiring attention</span>
+                    <button type="button" wire:click="openQueueModal" class="btn btn-outline btn-error btn-xs">
+                        {{ __('admin.queue_retry_all') }}
+                    </button>
+                </div>
+            @endif
         </div>
 
         {{-- Certificate --}}
@@ -105,4 +119,107 @@
             @endif
         </div>
     </div>
+
+    {{-- Interactive Queue Status Modal --}}
+    @if ($showQueueModal)
+        <div class="modal modal-open z-50">
+            <div class="modal-box max-w-4xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <x-heroicon-o-queue-list class="w-6 h-6 text-primary" />
+                        <h3 class="font-bold text-lg text-base-content">{{ __('admin.queue_status') }}</h3>
+                    </div>
+                    <button type="button" wire:click="closeQueueModal" class="btn btn-ghost btn-sm btn-circle" aria-label="{{ __('admin.modal_close') }}">
+                        <x-heroicon-o-x-mark class="w-5 h-5" />
+                    </button>
+                </div>
+
+                {{-- Stats cards inside modal --}}
+                <div class="grid grid-cols-3 gap-3 mb-4">
+                    <div class="card bg-base-200 p-3 text-center">
+                        <div class="text-2xl font-bold">{{ $pendingJobs }}</div>
+                        <div class="text-xs text-base-content/60">{{ __('admin.queue_pending') }}</div>
+                    </div>
+                    <div class="card bg-base-200 p-3 text-center">
+                        <div class="text-2xl font-bold {{ $failedJobs > 0 ? 'text-error' : '' }}">{{ $failedJobs }}</div>
+                        <div class="text-xs text-base-content/60">{{ __('admin.queue_failed') }}</div>
+                    </div>
+                    <div class="card bg-base-200 p-3 text-center">
+                        <div class="text-2xl font-bold">{{ $pendingJobs + $failedJobs }}</div>
+                        <div class="text-xs text-base-content/60">{{ __('admin.queue_total') }}</div>
+                    </div>
+                </div>
+
+                {{-- Actions and alerts --}}
+                <div class="flex items-center justify-between mb-3">
+                    <button type="button" wire:click="loadRecentFailures" class="btn btn-ghost btn-xs gap-1">
+                        <x-heroicon-o-arrow-path class="w-3.5 h-3.5" />
+                        {{ __('admin.refresh') }}
+                    </button>
+                    @if ($failedJobs > 0)
+                        <button type="button" wire:click="retryAll" class="btn btn-outline btn-error btn-xs">
+                            {{ __('admin.queue_retry_all') }}
+                        </button>
+                    @endif
+                </div>
+
+                @if ($retryResult)
+                    <div class="alert alert-success text-xs py-2 mb-3">
+                        <x-heroicon-o-check-circle class="w-4 h-4" />
+                        <span>{{ $retryResult }}</span>
+                    </div>
+                @endif
+                @if ($actionError)
+                    <div class="alert alert-error text-xs py-2 mb-3">
+                        <x-heroicon-o-exclamation-circle class="w-4 h-4" />
+                        <span>{{ $actionError }}</span>
+                    </div>
+                @endif
+
+                {{-- Failed jobs table --}}
+                @if (count($recentFailures) > 0)
+                    <div class="overflow-x-auto max-h-80 border border-base-300 rounded-box">
+                        <table class="table table-zebra table-xs w-full">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('admin.queue_job') }}</th>
+                                    <th>{{ __('admin.queue_failed_at') }}</th>
+                                    <th class="text-right">{{ __('client.actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($recentFailures as $job)
+                                    <tr>
+                                        <td class="max-w-md">
+                                            <div class="font-medium font-mono text-xs text-primary">{{ class_basename($job['payload']) }}</div>
+                                            <div class="text-xs text-base-content/70 truncate mt-0.5" title="{{ $job['exception'] }}">
+                                                {{ $job['exception'] }}
+                                            </div>
+                                        </td>
+                                        <td class="text-xs whitespace-nowrap text-base-content/60">{{ $job['failed_at'] }}</td>
+                                        <td class="text-right">
+                                            <button type="button" wire:click="retry('{{ $job['uuid'] }}')" class="btn btn-ghost btn-xs text-primary">
+                                                {{ __('admin.retry') }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="card bg-base-200 p-6 text-center text-sm text-base-content/60">
+                        {{ __('admin.queue_no_failures') }}
+                    </div>
+                @endif
+
+                <div class="modal-action mt-4">
+                    <button type="button" wire:click="closeQueueModal" class="btn btn-sm">
+                        {{ __('admin.modal_close') }}
+                    </button>
+                </div>
+            </div>
+            <div class="modal-backdrop" wire:click="closeQueueModal"></div>
+        </div>
+    @endif
 </div>

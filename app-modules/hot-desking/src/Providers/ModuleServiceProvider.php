@@ -57,7 +57,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.hot-desking.index',
                 'permission' => 'hot-desking.view',
                 'icon' => 'heroicon-o-computer-desktop',
-                'parent' => 'pbx.features.routing',
+                'parent' => 'pbx.features',
                 'order' => 85,
             ],
         ];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\Group;
+use App\Models\Module;
 use App\Models\Permission;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Modules\Extensions\Models\Extension;
 use Modules\InboundRoutes\Models\InboundRoute;
+use Modules\Security\Models\SecurityRule;
+use Modules\Security\Models\SecurityService;
 use Modules\SipAccounts\Models\SipAccount;
 use Modules\Voicemails\Models\Voicemail;
 
@@ -51,6 +54,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if ($this->isDemoMode()) {
+            $this->ensureDemoCustomModuleInstalled();
+        }
+
         Artisan::call('module:sync', ['--only-local' => true]);
         app(PermissionService::class)->syncToDatabase();
 
@@ -119,6 +126,12 @@ class DatabaseSeeder extends Seeder
         // ── Tenant administrator groups ───────────────────────────────────
         $this->seedTenantAdministratorGroup($tallpbx, $tallAdmin);
         $this->seedTenantAdministratorGroup($acme, $acmeAdmin);
+
+        // ── Demo custom module ───────────────────────────────────────────
+        $this->seedDemoCustomModule();
+
+        // ── Demo firewall rules ───────────────────────────────────────────
+        $this->seedDemoFirewallRules();
     }
 
     /**
@@ -317,5 +330,93 @@ class DatabaseSeeder extends Seeder
     private function isDemoMode(): bool
     {
         return (bool) config('freeswitch.demo_mode', false);
+    }
+
+    /**
+     * Ensure the demo custom module files are scaffolded on disk.
+     */
+    private function ensureDemoCustomModuleInstalled(): void
+    {
+        $customModulePath = base_path('custom-modules/demo-webhook');
+
+        if (! is_dir($customModulePath)) {
+            Artisan::call('make:module', [
+                'name' => 'demo-webhook',
+                '--display-name' => 'Demo Webhook Alerts',
+                '--description' => 'Demo third-party webhook integration for dispatching call event notifications.',
+                '--category' => 'custom',
+            ]);
+        }
+    }
+
+    /**
+     * Seed or ensure the demo custom module is enabled in the registry.
+     */
+    private function seedDemoCustomModule(): void
+    {
+        Module::updateOrCreate(
+            ['name' => 'demo-webhook'],
+            [
+                'display_name' => 'Demo Webhook Alerts',
+                'source' => 'custom',
+                'category' => 'custom',
+                'enabled' => true,
+                'version' => '1.0.0',
+            ],
+        );
+    }
+
+    /**
+     * Seed safe demo custom firewall rules.
+     *
+     * Only references services that are already allowed in the standard PBX
+     * port catalog (ICMP Ping, Web Admin Portal) with accept actions, so it
+     * does not block actual traffic or compromise security.
+     */
+    private function seedDemoFirewallRules(): void
+    {
+        $icmpServiceId = SecurityService::where('name', 'ICMP Ping Diagnostics')->value('id');
+        $webServiceId = SecurityService::where('name', 'Web Admin Portal')->value('id');
+        $tftpServiceId = SecurityService::where('name', 'TFTP Provisioning')->value('id');
+
+        $demoRules = [
+            [
+                'sequence' => 10,
+                'description' => 'Allow ICMP Ping Diagnostics',
+                'source_ip' => 'any',
+                'service_id' => $icmpServiceId,
+                'custom_port' => null,
+                'custom_protocol' => null,
+                'action' => 'accept',
+                'enabled' => true,
+            ],
+            [
+                'sequence' => 20,
+                'description' => 'Allow Web Admin Portal (HTTP/HTTPS)',
+                'source_ip' => 'any',
+                'service_id' => $webServiceId,
+                'custom_port' => null,
+                'custom_protocol' => null,
+                'action' => 'accept',
+                'enabled' => true,
+            ],
+            [
+                'sequence' => 30,
+                'description' => 'Allow TFTP Provisioning (Inactive Example)',
+                'source_ip' => 'any',
+                'service_id' => $tftpServiceId,
+                'custom_port' => null,
+                'custom_protocol' => null,
+                'action' => 'accept',
+                'enabled' => false,
+            ],
+        ];
+
+        foreach ($demoRules as $rule) {
+            SecurityRule::updateOrCreate(
+                ['description' => $rule['description']],
+                $rule,
+            );
+        }
     }
 }

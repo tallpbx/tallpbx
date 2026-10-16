@@ -44,9 +44,9 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.dialplan-tools.index',
                 'permission' => 'dialplan-tools.view',
                 'icon' => 'heroicon-o-wrench',
-                'parent' => 'pbx.advanced',
+                'parent' => 'pbx.routing',
                 'guard' => 'admin',
-                'order' => 90,
+                'order' => 120,
             ],
         ];
     }

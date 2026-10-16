@@ -303,7 +303,7 @@ it('translates every workbench category and workflow string', function () {
     // fail when a key is absent from every dictionary.
     $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class)->instance();
 
-    expect($component->categoryLabel('core'))->toBe('Core Administration')
+    expect($component->categoryLabel('core'))->toBe('Core')
         ->and($component->categoryLabel('custom'))->toBe('Custom Extensions');
 
     foreach (['modules_source', 'modules_builtin', 'modules_custom', 'modules_vendor', 'modules_enabling', 'modules_disabling', 'modules_delete_extension', 'modules_delete_confirm', 'modules_protected_hint'] as $key) {
@@ -350,10 +350,48 @@ it('surfaces translated delete-flow errors', function () {
     }
 });
 
-it('renders table with 7 columns aligning headers with actions dropdown and empty state', function () {
+it('renders table with 3 fixed columns aligned across all sections and empty state', function () {
     Livewire::actingAs($this->admin, 'admin')
         ->test(ModulesList::class)
         ->assertOk()
-        ->assertSeeHtml('<th class="w-12"></th>')
-        ->assertSeeHtml('colspan="7"');
+        ->assertSeeHtml('table-fixed')
+        ->assertSeeHtml('<th class="w-7/12">')
+        ->assertSeeHtml('<th class="w-2/12">')
+        ->assertSeeHtml('<th class="w-3/12 text-right">')
+        ->assertSeeHtml('colspan="3"');
+});
+
+it('displays required badge and suppresses action toggle for required modules', function () {
+    $module = Module::create([
+        'name' => 'extensions',
+        'display_name' => 'Extensions',
+        'version' => '1.0',
+        'category' => 'accounts',
+        'source' => 'core',
+        'enabled' => true,
+        'required' => true,
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->assertOk()
+        ->assertSeeHtml('<span class="badge badge-neutral badge-xs opacity-75">'.__('admin.module_required').'</span>')
+        ->assertDontSeeHtml('wire:click="toggleEnabled(\''.$module->id.'\')"');
+});
+
+it('renders category accordions open by default with an expand and collapse all control', function () {
+    Module::create([
+        'name' => 'extensions',
+        'display_name' => 'Extensions',
+        'version' => '1.0',
+        'category' => 'accounts',
+        'source' => 'core',
+        'enabled' => true,
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->assertOk()
+        ->assertSeeHtml('<details class="collapse collapse-arrow bg-base-100 border border-base-300 mb-3" open>')
+        ->assertSee(__('admin.collapse_all'));
 });

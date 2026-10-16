@@ -878,20 +878,20 @@ it('renders the unified firewall rules table with pipeline stages and core PBX s
 });
 
 it('opens, edits, and saves a core PBX system service with custom port and source restrictions', function (): void {
-    $service = SecurityService::where('name', 'FreeSWITCH ESL')->first();
+    $service = SecurityService::where('name', 'SSH Console')->first();
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)
         ->call('openEditSystemServiceModal', $service->id)
         ->assertSet('showSystemServiceModal', true)
-        ->assertSet('systemServiceName', 'FreeSWITCH ESL')
-        ->assertSet('systemServicePortRange', '8021')
-        ->set('systemServicePortRange', '8022')
+        ->assertSet('systemServiceName', 'SSH Console')
+        ->assertSet('systemServicePortRange', '22')
+        ->set('systemServicePortRange', '2222')
         ->set('systemServiceSourceIp', '10.8.0.0/24')
         ->call('saveSystemService')
         ->assertSet('showSystemServiceModal', false);
 
-    expect($service->fresh()->port_range)->toBe('8022')
+    expect($service->fresh()->port_range)->toBe('2222')
         ->and($service->fresh()->source_ip)->toBe('10.8.0.0/24');
 });
 

@@ -70,12 +70,6 @@ class SecurityService extends Model
             'source_ip' => 'any',
             'description' => 'Secure Shell host administrative terminal access',
         ],
-        'FreeSWITCH ESL' => [
-            'protocol' => 'tcp',
-            'port_range' => '8021',
-            'source_ip' => 'any',
-            'description' => 'Event Socket Layer remote control interface',
-        ],
         'Reverb WebSockets' => [
             'protocol' => 'tcp',
             'port_range' => '8080',

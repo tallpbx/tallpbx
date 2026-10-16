@@ -6,7 +6,7 @@
     "display_name": "SIP Profiles",
     "category": "connectivity",
     "description": "Manage FreeSWITCH Sofia SIP profiles with per-tenant JSON settings.",
-    "required": false,
+    "required": true,
     "protected": true,
     "priority": 100,
     "providers": [

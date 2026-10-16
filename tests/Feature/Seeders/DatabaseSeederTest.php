@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Modules\Extensions\Models\Extension;
 use Modules\Gateways\Models\Gateway;
 use Modules\InboundRoutes\Models\InboundRoute;
+use Modules\Security\Models\SecurityRule;
 use Modules\SipAccounts\Models\SipAccount;
 use Modules\SipTrunks\Models\SipTrunk;
 use Modules\Voicemails\Models\Voicemail;
@@ -194,4 +195,39 @@ it('seeds callable PBX defaults for the customer tenant', function () {
         ->assertOk()
         ->assertSee('application="limit" data="hiredis default pbx:${domain_name}:local_extension:active 100000"', false)
         ->assertSee('application="hiredis_raw" data="default set pbx:mod_hiredis:last_call:${uuid} ${caller_id_number}-&gt;${destination_number}"', false);
+});
+
+it('installs and seeds the demo custom module when demo mode is enabled', function (): void {
+    $this->seed(DatabaseSeeder::class);
+
+    expect(is_dir(base_path('custom-modules/demo-webhook')))->toBeTrue();
+
+    $module = Module::where('name', 'demo-webhook')->first();
+    expect($module)->not->toBeNull()
+        ->and($module->source)->toBe('custom')
+        ->and($module->category)->toBe('custom')
+        ->and($module->display_name)->toBe('Demo Webhook Alerts')
+        ->and((bool) $module->enabled)->toBeTrue();
+});
+
+it('seeds safe demo firewall rules when demo mode is enabled', function (): void {
+    $this->seed(DatabaseSeeder::class);
+
+    $rules = SecurityRule::query()->whereIn('description', [
+        'Allow ICMP Ping Diagnostics',
+        'Allow Web Admin Portal (HTTP/HTTPS)',
+        'Allow TFTP Provisioning (Inactive Example)',
+    ])->get();
+
+    expect($rules)->toHaveCount(3);
+
+    $icmpRule = $rules->firstWhere('description', 'Allow ICMP Ping Diagnostics');
+    expect($icmpRule)->not->toBeNull()
+        ->and($icmpRule->action)->toBe('accept')
+        ->and($icmpRule->enabled)->toBeTrue();
+
+    $inactiveRule = $rules->firstWhere('description', 'Allow TFTP Provisioning (Inactive Example)');
+    expect($inactiveRule)->not->toBeNull()
+        ->and($inactiveRule->action)->toBe('accept')
+        ->and($inactiveRule->enabled)->toBeFalse();
 });

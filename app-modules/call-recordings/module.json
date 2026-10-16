@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "namespace": "Modules\\CallRecordings",
     "display_name": "Call Recordings",
-    "category": "media",
+    "category": "monitoring",
     "description": "Call recording management for FreeSWITCH",
     "required": false,
     "protected": false,

@@ -6,7 +6,7 @@
     "display_name": "SIP Accounts",
     "category": "accounts",
     "description": "Manage FreeSWITCH SIP authentication accounts with identity mode support.",
-    "required": false,
+    "required": true,
     "protected": true,
     "priority": 110,
     "providers": [

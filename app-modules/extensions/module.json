@@ -6,7 +6,7 @@
     "display_name": "Extensions",
     "category": "accounts",
     "description": "Manage tenant-local phone extensions and extension-level settings.",
-    "required": false,
+    "required": true,
     "protected": true,
     "priority": 120,
     "providers": [

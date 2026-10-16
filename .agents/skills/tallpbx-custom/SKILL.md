@@ -923,4 +923,19 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular trans
 - **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` checks root non-collision, peer non-collision, entity naming, and 100% key parity across `en`, `es`, `fr`.
 - Complete architectural reference: [`docs/modular-architecture.md`](docs/modular-architecture.md).
 
+## Module Manifest Taxonomy & Navigation Parity
+
+- **100% Parity Between Manifest Categories and Sidebar Navigation Parents**: Every module's manifest category in `module.json` (`"category": "<group>"`) MUST match its sidebar navigation parent (`'parent' => '<group>'` in `ModuleServiceProvider.php`). An administrator seeing a module under PBX Routing, PBX Accounts, or PBX Monitoring in `/panel/modules` must find it in the exact same category in the navigation menu:
+  - `core` <=> `admin.system`
+  - `accounts` <=> `pbx.accounts`
+  - `connectivity` <=> `pbx.connectivity`
+  - `routing` <=> `pbx.routing`
+  - `features` <=> `pbx.features`
+  - `media` <=> `pbx.media`
+  - `advanced` <=> `pbx.advanced`
+  - `monitoring` <=> `pbx.monitoring`
+  - `custom` <=> Third-party community extensions
+- **FreeSWITCH v1.11 Core Correlation**: The required PBX modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) strictly correlate to FreeSWITCH v1.11's three mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`). All other telephony modules represent optional FreeSWITCH feature modules (`mod_voicemail`, `mod_conference`, `mod_callcenter`, `mod_local_stream`, `mod_xml_cdr`, etc.) and must remain toggleable.
+
+
 

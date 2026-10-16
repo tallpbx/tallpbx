@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "namespace": "Modules\\OperatorPanel",
     "display_name": "Operator Panel",
-    "category": "features",
+    "category": "monitoring",
     "description": "Visual operator panel for FreeSWITCH",
     "required": false,
     "protected": false,

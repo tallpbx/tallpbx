@@ -16,7 +16,6 @@ use Modules\Security\Models\SecuritySetting;
  *   - RTP Voice/Video Media (16384-32768)
  *   - Web Admin Portal (80, 443)
  *   - SSH Console (22)
- *   - FreeSWITCH ESL (8021)
  *   - Reverb WebSockets (8080)
  *   - WebRTC WSS (7443)
  *
@@ -74,15 +73,6 @@ class SecurityServiceSeeder extends Seeder
                 'description' => 'Secure Shell host administrative terminal access',
                 'protocol' => 'tcp',
                 'port_range' => '22',
-                'is_system' => true,
-                'enabled' => true,
-                'source_ip' => 'any',
-            ],
-            [
-                'name' => 'FreeSWITCH ESL',
-                'description' => 'Event Socket Layer remote control interface',
-                'protocol' => 'tcp',
-                'port_range' => '8021',
                 'is_system' => true,
                 'enabled' => true,
                 'source_ip' => 'any',

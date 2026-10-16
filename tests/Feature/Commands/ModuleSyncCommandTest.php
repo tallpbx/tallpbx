@@ -55,9 +55,14 @@ it('sets module metadata from manifest', function () {
     expect($admin->required)->toBeTrue();
     expect($admin->protected)->toBeTrue();
 
-    // Extensions is protected (core PBX spine) but not required
-    expect($extensions->required)->toBeFalse();
+    // Extensions is required + protected (core PBX spine)
+    expect($extensions->required)->toBeTrue();
     expect($extensions->protected)->toBeTrue();
+
+    // Devices is protected but not required
+    $devices = Module::where('name', 'devices')->first();
+    expect($devices->required)->toBeFalse();
+    expect($devices->protected)->toBeTrue();
 });
 
 // ─── Idempotency ────────────────────────────────────────────────
@@ -210,4 +215,21 @@ it('syncs the correct number of core modules', function () {
             "Expected module [{$name}] to be synced."
         );
     }
+});
+
+// ─── Module Schema & Migration ──────────────────────────────────
+
+it('drops the obsolete source_ref column and maintains composer_package on module registry rows', function (): void {
+    expect(Schema::hasColumn('modules', 'source_ref'))->toBeFalse()
+        ->and(Schema::hasColumn('modules', 'composer_package'))->toBeTrue();
+
+    Module::create([
+        'name' => 'private-module',
+        'display_name' => 'Private Module',
+        'version' => '1.0.0',
+        'enabled' => true,
+        'composer_package' => 'acme/private-module',
+    ]);
+
+    expect(Module::where('name', 'private-module')->value('composer_package'))->toBe('acme/private-module');
 });

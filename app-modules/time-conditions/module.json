@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "namespace": "Modules\\TimeConditions",
     "display_name": "Time Conditions",
-    "category": "routing",
+    "category": "features",
     "description": "Time-based call routing conditions for FreeSWITCH",
     "required": false,
     "protected": false,

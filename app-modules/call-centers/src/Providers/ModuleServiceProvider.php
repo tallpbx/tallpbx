@@ -56,7 +56,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      */
     protected function menuItems(): array
     {
-        return [['key' => 'admin.call-centers', 'label' => 'admin.call_centers', 'route' => 'panel.call-centers.queues.index', 'permission' => 'call-centers.view', 'icon' => 'heroicon-o-queue-list', 'parent' => 'pbx.monitoring', 'guard' => 'admin', 'order' => 60]];
+        return [['key' => 'admin.call-centers', 'label' => 'admin.call_centers', 'route' => 'panel.call-centers.queues.index', 'permission' => 'call-centers.view', 'icon' => 'heroicon-o-queue-list', 'parent' => 'pbx.features', 'guard' => 'admin', 'order' => 60]];
     }
 
     /**

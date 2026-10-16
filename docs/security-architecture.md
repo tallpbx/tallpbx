@@ -228,7 +228,7 @@ Pinned directly above the tab strip for immediate visibility:
 * **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
   - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
   - **TFTP Provisioning Defense**: Hardened UDP 69 profile with shield badge showing real-time counters for blocked WRQ uploads, traversal attempts, and flood drops, featuring real-time progress animation and click locking.
-  - Core telephony services: SIP Signaling, RTP Audio Media, Web Admin, SSH, FreeSWITCH ESL, Reverb WebSockets, WebRTC.
+  - Core telephony services: SIP Signaling, RTP Audio Media, Web Admin, SSH, Reverb WebSockets, WebRTC.
 * **Custom Sequential Rules**: Custom port and network rules with priority reordering (Up/Down buttons). Viewport-sticky horizontal floating arrows and header quick-scroll buttons assist in navigation on wide viewports.
 * **Default Inbound Policy**: Final fallback decision (`Drop` or `Accept`).
 
