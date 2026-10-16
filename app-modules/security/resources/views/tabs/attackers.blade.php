@@ -65,7 +65,7 @@
                                wire:target="setAttackProtectionEnabled"
                                type="checkbox" class="toggle toggle-error toggle-sm" @checked($attackProtectionEnabled) />
                         <span wire:loading.remove wire:target="setAttackProtectionEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ __('admin.security_attack_protection_enable') }}
+                            {{ $attackProtectionEnabled ? __('client.disable') : __('client.enable') }}
                         </span>
                         <span wire:loading wire:target="setAttackProtectionEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
                             <span class="loading loading-spinner loading-xs"></span>

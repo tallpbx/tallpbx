@@ -60,7 +60,7 @@
                                wire:target="setWhitelistEnabled"
                                type="checkbox" class="toggle toggle-success toggle-sm" @checked($whitelistEnabled) />
                         <span wire:loading.remove wire:target="setWhitelistEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ __('admin.security_whitelist_enabled_toggle') }}
+                            {{ $whitelistEnabled ? __('client.disable') : __('client.enable') }}
                         </span>
                         <span wire:loading wire:target="setWhitelistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
                             <span class="loading loading-spinner loading-xs"></span>
@@ -222,7 +222,7 @@
                                wire:target="setBlacklistEnabled"
                                type="checkbox" class="toggle toggle-error toggle-sm" @checked($blacklistEnabled) />
                         <span wire:loading.remove wire:target="setBlacklistEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ __('admin.security_blacklist_enabled_toggle') }}
+                            {{ $blacklistEnabled ? __('client.disable') : __('client.enable') }}
                         </span>
                         <span wire:loading wire:target="setBlacklistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
                             <span class="loading loading-spinner loading-xs"></span>

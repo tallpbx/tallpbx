@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modernized External Blocklists (VoIPBL) Workbench & Public Lookup**:
   - Simplified VoIPBL threat feed ingestion to a 100% global feed (`https://www.voipbl.org/update/`), removing ambiguous country filtering options that were previously mistaken for whole-country GeoIP blocking.
   - Relocated the Enable/Disable toggle to the top-right card header with standard `toggle-error toggle-sm` styling, present-continuous status labels ("Enabling...", "Disabling..."), and loading spinners to achieve complete visual parity with the **Attackers** and **Block / Allow** tabs.
+  - Standardized toggle labels across all security workbench tabs (**Attackers**, **Whitelist**, **Blacklist**, and **External Blocklists**) to dynamically read **Enable** when disabled and **Disable** when enabled (`__('client.enable')` / `__('client.disable')`).
   - Added direct external links to the live raw feed (`https://www.voipbl.org/update/`) and VoIPBL's public IP reputation search tool (`https://www.voipbl.org/#check`), an in-panel kernel set inspection CLI hint (`sudo nft list set inet tallpbx_filter external_blocklist_ips`), and a prominent note explaining that any false-positive domestic/customer listings can be bypassed immediately by adding the IP to the **Whitelist** tab.
   - Maintained 100% translation parity across `en`, `es`, and `fr` dictionaries.
 - **Documentation Screenshots Refresh & Security Center Theme Duality**:
