@@ -267,3 +267,13 @@ the "Application files" backup scope: `custom-modules/` is captured into every b
 that scope, included in pre-restore rollback snapshots, and restored module-by-module — extensions
 installed after a backup are left untouched. See the Security Center documentation for
 firewall-adjacent restore safety rules.
+
+---
+
+## 8. Related Documentation
+
+- [Telephony Fundamentals: Users, Extensions, SIP Accounts & Devices](telephony-architecture.md) — Comprehensive, accessible guide to how core VoIP entities relate to one another.
+- [PBX "Hello World" Quickstart](pbx-hello-world.md) — Create an extension and test your first call with an audio echo test (`*9196`).
+- [Security Architecture & Packet Flow Guide](security-architecture.md) — How TallPBX defends phone traffic with kernel-level packet filtering.
+- [User Interface Tour](ui-tour.md) — Visual guide to the TallPBX control panel workbenches.
+

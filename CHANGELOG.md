@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Telephony Fundamentals Architecture Guide (`docs/telephony-architecture.md`)**:
+  - Added a dedicated, beginner-to-advanced architectural guide explaining the relationships and distinctions between **Users** (web portal logins), **Extensions** (dialplan numbers and routing), **SIP Accounts** (cryptographic FreeSWITCH authentication credentials), and **Devices** (hardware endpoints identified by MAC address with zero-touch auto-provisioning).
+  - Included everyday office analogies, Mermaid entity-relationship diagrams, an end-to-end employee onboarding workflow, and quick-reference comparison tables. Linked from `README.md` and `docs/modular-architecture.md`.
+
 ### Fixed
 - **Module Workbench Table Column Alignment & Empty State Colspan**:
   - Aligned table columns in `app-modules/admin/resources/views/modules-list.blade.php` by adding an empty action header column (`<th class="w-12"></th>`) matching the 7th column dropdown action cell in `<tbody>`, and updated empty state spanning from `colspan="6"` to `colspan="7"`.
