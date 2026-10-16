@@ -15,13 +15,20 @@
 
 @layer components {
   .panel-shell {
-    background:
-      linear-gradient(180deg, color-mix(in oklab, var(--color-base-100) 32%, transparent), transparent 14rem),
-      var(--color-base-200);
+    background: var(--color-base-200);
   }
 
   .panel-sidebar {
+    background: var(--color-base-100);
     box-shadow: 1px 0 0 color-mix(in oklab, var(--color-base-300) 70%, transparent);
+  }
+
+  .panel-sidebar > [x-persist] {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .panel-brand-mark {
@@ -37,8 +44,7 @@
   }
 
   .panel-header {
-    background: color-mix(in oklab, var(--color-base-100) 92%, transparent);
-    backdrop-filter: blur(14px);
+    background: var(--color-base-100);
     box-shadow: 0 1px 2px color-mix(in oklab, var(--color-base-content) 7%, transparent);
   }
 

@@ -83,5 +83,13 @@
   animation-play-state: paused !important;
 }
 
+/*
+ * Pinned viewport frame: prevent drawer-side from scrolling.
+ * Scrolling is isolated to nav[data-panel-sidebar-scroll="nav"] inside .panel-sidebar.
+ */
+.drawer-side {
+  overflow: hidden !important;
+}
+
 
 

@@ -245,7 +245,7 @@
                                     </span>
 
                                     <span class="badge badge-ghost badge-sm text-xs font-normal {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
-                                        {{ __('admin.security_invariants_rules_count', ['count' => count($preFilterRows)]) }}
+                                        {{ __('admin.security_invariants_rules_count', ['count' => count($preFilterRows) + 1]) }}
                                     </span>
                                 </div>
                                 <div class="flex items-center gap-3">
@@ -365,6 +365,83 @@
                             </td>
                         </tr>
                     @endforeach
+
+                    {{-- Dedicated Geo-Blocking Row --}}
+                    @php
+                        $geoRuleModel = \Modules\Security\Models\SecurityGeoRule::instance();
+                        $geoActive = $geoRuleModel->enabled && ! empty($geoRuleModel->countries);
+                    @endphp
+                    <tr class="hover transition-opacity duration-200 {{ ! $geoActive ? 'opacity-50 bg-base-200/20' : '' }}"
+                        wire:key="geo-blocking-cockpit-row"
+                        x-show="showSystemPreFilters" x-cloak>
+                        <td class="text-center px-1">
+                            <input wire:click="setGeoEnabled({{ $geoEnabled ? 'false' : 'true' }})"
+                                   wire:loading.attr="disabled"
+                                   wire:target="setGeoEnabled"
+                                   type="checkbox"
+                                   class="toggle toggle-primary toggle-sm"
+                                   @checked($geoEnabled)
+                                   title="{{ $geoEnabled ? __('client.enabled') : __('client.disabled') }}" />
+                        </td>
+                        <td class="px-3">
+                            <div class="flex items-center gap-1.5 font-medium text-base-content">
+                                <span class="{{ ! $geoActive ? 'text-base-content/70' : '' }}">{{ __('admin.security_geo_blocking_title') }}</span>
+                                <x-tooltip :tip="__('admin.security_geo_blocking_tooltip')" align="start" position="right">
+                                    <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                                </x-tooltip>
+                            </div>
+                            <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span class="badge badge-ghost badge-xs font-mono text-[11px] opacity-75" title="@geo_blocked_ips / @geo_allowed_ips">
+                                    {{ $geoMode === 'whitelist' ? '@geo_allowed_ips' : '@geo_blocked_ips' }}
+                                </span>
+                                <span class="badge badge-neutral badge-xs font-mono">
+                                    {{ $geoMode === 'whitelist' ? __('admin.security_geo_mode_whitelist_badge') : __('admin.security_geo_mode_blacklist_badge') }}
+                                </span>
+                            </div>
+                        </td>
+                        <td class="text-center text-xs font-mono font-semibold text-base-content/70 px-1.5">
+                            ALL
+                        </td>
+                        <td class="text-xs text-base-content/60 px-2">
+                            {{ __('admin.security_all_ports') }}
+                        </td>
+                        <td class="px-2">
+                            @if (! empty($geoCountries))
+                                <div class="font-mono text-xs {{ ! $geoActive ? 'text-base-content/50' : 'text-primary font-semibold' }}">
+                                    @if ($geoMode === 'whitelist')
+                                        {{ __('admin.security_geo_target_all_except', ['countries' => implode(', ', array_slice($geoCountries, 0, 3)).(count($geoCountries) > 3 ? '...' : '')]) }}
+                                    @else
+                                        {{ count($geoCountries) }} {{ count($geoCountries) === 1 ? __('admin.security_geo_country_single') : __('admin.security_geo_country_plural') }}
+                                    @endif
+                                </div>
+                                <div class="text-[11px] text-base-content/50 font-mono truncate max-w-[140px]" title="{{ implode(', ', $geoCountries) }}">
+                                    @if ($geoMode === 'whitelist')
+                                        {{ count($geoCountries) }} {{ count($geoCountries) === 1 ? __('admin.security_geo_country_exempt_single') : __('admin.security_geo_country_exempt_plural') }}
+                                    @else
+                                        {{ implode(', ', array_slice($geoCountries, 0, 4)) }}{{ count($geoCountries) > 4 ? '...' : '' }}
+                                    @endif
+                                </div>
+                            @else
+                                <span class="badge badge-ghost badge-xs text-base-content/50">{{ __('admin.security_geo_no_countries') }}</span>
+                            @endif
+                        </td>
+                        <td class="text-center px-1.5">
+                            @if (! $geoActive)
+                                <span class="badge badge-neutral badge-sm font-semibold opacity-75">{{ __('client.disabled') }}</span>
+                            @else
+                                <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                            @endif
+                        </td>
+                        <td class="text-right whitespace-nowrap px-2">
+                            <x-tooltip :tip="__('admin.security_manage_geo_blocking')" position="left">
+                                <button wire:click="$set('activeTab', 'geo-blocking')" type="button"
+                                        aria-label="{{ __('admin.security_manage_geo_blocking') }}"
+                                        class="btn btn-ghost btn-xs btn-square text-primary">
+                                    <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                                </button>
+                            </x-tooltip>
+                        </td>
+                    </tr>
 
                     {{-- Standard Services Section Header --}}
                     <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">

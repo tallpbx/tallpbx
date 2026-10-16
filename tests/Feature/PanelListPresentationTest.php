@@ -18,7 +18,7 @@ it('uses the shared table presentation for every table-backed panel list', funct
         }
 
         expect($contents, basename($listView))
-            ->toMatch('/class="table table-zebra(?: w-full)?"/');
+            ->toMatch('/class="table table-zebra(?:\s+[a-z-]+)*(?:\s+w-full)?"/');
     }
 });
 

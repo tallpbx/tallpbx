@@ -63,6 +63,11 @@
                         </x-tooltip>
                     @endif
                 </button>
+                <button role="tab" type="button" wire:click="$set('activeTab', 'geo-blocking')"
+                        class="tab gap-1.5 {{ $activeTab === 'geo-blocking' ? 'tab-active' : '' }}">
+                    <x-heroicon-o-globe-americas class="w-4 h-4" />
+                    <span>{{ __('admin.security_tab_geo_blocking') }}</span>
+                </button>
             </div>
         </div>
 
@@ -75,6 +80,8 @@
             @include('security::tabs.attackers')
         @elseif (in_array($activeTab, ['external-blocklists', 'threat-feeds'], true))
             @include('security::tabs.external-blocklists')
+        @elseif ($activeTab === 'geo-blocking')
+            @include('security::tabs.geo-blocking')
         @endif
     @endif
 

@@ -19,6 +19,7 @@ use Modules\Security\Livewire\Concerns\ManagesAllowBlockLists;
 use Modules\Security\Livewire\Concerns\ManagesAttackProtection;
 use Modules\Security\Livewire\Concerns\ManagesExternalBlocklists;
 use Modules\Security\Livewire\Concerns\ManagesFirewallRules;
+use Modules\Security\Livewire\Concerns\ManagesGeoBlocking;
 use Modules\Security\Livewire\Concerns\ManagesObserveMode;
 use Modules\Security\Livewire\Concerns\ManagesPreFilters;
 use Modules\Security\Models\SecurityAuditLog;
@@ -48,6 +49,7 @@ class SecurityManager extends Component
     use ManagesAttackProtection;
     use ManagesExternalBlocklists;
     use ManagesFirewallRules;
+    use ManagesGeoBlocking;
     use ManagesObserveMode;
     use ManagesPreFilters;
 
@@ -113,6 +115,7 @@ class SecurityManager extends Component
         $this->checkAdminIpStatus($lockoutGuard);
         $this->loadSettings();
         $this->loadFeedState();
+        $this->loadGeoState();
         $this->refreshLiveFirewallPolicy();
         $this->refreshFirewallSyncState();
     }

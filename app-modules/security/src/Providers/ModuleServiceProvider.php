@@ -12,15 +12,19 @@ use Modules\Security\Console\Commands\SecurityApplyCommand;
 use Modules\Security\Console\Commands\SecurityObserveCommand;
 use Modules\Security\Console\Commands\SecurityReconcileCommand;
 use Modules\Security\Console\Commands\SecurityStatusCommand;
+use Modules\Security\Console\Commands\SecuritySyncGeoIpCommand;
 use Modules\Security\Console\Commands\SecuritySyncThreatFeedsCommand;
 use Modules\Security\Console\Commands\SecurityUnbanCommand;
 use Modules\Security\Console\Commands\SecurityVerifyCommand;
+use Modules\Security\Contracts\GeoBlockingProviderInterface;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 use Modules\Security\Listeners\LogFailedLoginListener;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
 use Modules\Security\Listeners\LogSipScannerListener;
+use Modules\Security\Services\GeoBlockingService;
+use Modules\Security\Services\IpdenyProvider;
 use Modules\Security\Services\SecurityBanService;
 use Modules\Security\Services\SecurityExecutor;
 use Modules\Security\Services\SecurityIncidentService;
@@ -86,6 +90,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         SecurityIncidentServiceInterface::class => SecurityIncidentService::class,
         SecurityBanServiceInterface::class => SecurityBanService::class,
         SecurityExecutorInterface::class => SecurityExecutor::class,
+        GeoBlockingProviderInterface::class => IpdenyProvider::class,
     ];
 
     /**
@@ -101,6 +106,8 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         ThreatFeedManager::class => ThreatFeedManager::class,
         VoipblFeedProvider::class => VoipblFeedProvider::class,
         ThreatFeedIngestionService::class => ThreatFeedIngestionService::class,
+        IpdenyProvider::class => IpdenyProvider::class,
+        GeoBlockingService::class => GeoBlockingService::class,
     ];
 
     /**
@@ -131,6 +138,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             'security.view' => 'View security dashboard, firewall rules, and blocked IP lists',
             'security.edit' => 'Manage firewall rules, trusted/blocked IP lists, and protection settings',
             'security.threat-feeds.manage' => 'Manage public threat feed sources and their kernel block lists',
+            'security.geo-blocking.manage' => 'Manage Geo-Blocking country perimeter rules and IP zones',
         ];
     }
 
@@ -175,6 +183,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             SecurityObserveCommand::class,
             SecurityReconcileCommand::class,
             SecurityStatusCommand::class,
+            SecuritySyncGeoIpCommand::class,
             SecuritySyncThreatFeedsCommand::class,
             SecurityUnbanCommand::class,
             SecurityVerifyCommand::class,

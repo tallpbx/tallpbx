@@ -198,6 +198,20 @@ class ThreatFeedIngestionService
             $lines[] = $line;
         }
 
+        // If geo_blocking.nft.pending or active exists, retain geo elements
+        $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
+        $geoActive = $this->firewallDir.'/geo_blocking.nft';
+        $geoContent = '';
+        if (file_exists($geoPending)) {
+            $geoContent = file_get_contents($geoPending) ?: '';
+        } elseif (file_exists($geoActive)) {
+            $geoContent = file_get_contents($geoActive) ?: '';
+        }
+
+        if ($geoContent !== '') {
+            $lines[] = $geoContent;
+        }
+
         if (! is_dir($this->firewallDir)) {
             @mkdir($this->firewallDir, 0750, true);
         }

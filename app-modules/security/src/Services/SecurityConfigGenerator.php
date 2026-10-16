@@ -7,6 +7,7 @@ namespace Modules\Security\Services;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 use Modules\Security\Models\SecurityBan;
+use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
@@ -250,6 +251,29 @@ class SecurityConfigGenerator
         $lines[] = '    }';
         $lines[] = '';
 
+        // Geo-blocking sets (populated by geo_blocking.nft / external_blocklist.nft)
+        $lines[] = '    # Dedicated Geo-Blocking Sets';
+        $lines[] = '    set geo_blocked_ips {';
+        $lines[] = '        type ipv4_addr';
+        $lines[] = '        flags interval';
+        $lines[] = '    }';
+        $lines[] = '';
+        $lines[] = '    set geo_blocked_ips6 {';
+        $lines[] = '        type ipv6_addr';
+        $lines[] = '        flags interval';
+        $lines[] = '    }';
+        $lines[] = '';
+        $lines[] = '    set geo_allowed_ips {';
+        $lines[] = '        type ipv4_addr';
+        $lines[] = '        flags interval';
+        $lines[] = '    }';
+        $lines[] = '';
+        $lines[] = '    set geo_allowed_ips6 {';
+        $lines[] = '        type ipv6_addr';
+        $lines[] = '        flags interval';
+        $lines[] = '    }';
+        $lines[] = '';
+
         // 9/10. TFTP flood meters. These are memory-bounded dynamic sets: the
         //       `timeout` ages idle source entries out and `size` caps the
         //       table, so a spoofed-source flood cannot grow kernel memory
@@ -270,6 +294,26 @@ class SecurityConfigGenerator
             $lines[] = '        flags dynamic,timeout';
             $lines[] = '        timeout 1m';
             $lines[] = '        size 65535';
+            $lines[] = '    }';
+            $lines[] = '';
+        }
+
+        // Dedicated Geo-Blocking Perimeter Chain (blocks only, never accepts)
+        $geoRule = SecurityGeoRule::instance();
+        if ($firewallEnabled && $geoRule->enabled && ! empty($geoRule->countries)) {
+            $lines[] = '    # Dedicated Geo-Blocking Perimeter Chain (drops unpermitted traffic, never accepts)';
+            $lines[] = '    chain geo_perimeter {';
+            $geoVerdict = $this->dropStatement('geo_blocking', $observeMode, true);
+            if ($geoRule->mode === 'whitelist') {
+                // In "Block All Except Selected" mode, private LAN/CGNAT/loopback traffic bypasses the country drop without accepting
+                $lines[] = '        ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } return';
+                $lines[] = '        ip6 saddr { fc00::/7, fe80::/10 } return';
+                $lines[] = "        ip saddr != @geo_allowed_ips {$geoVerdict}";
+                $lines[] = "        ip6 saddr != @geo_allowed_ips6 {$geoVerdict}";
+            } else {
+                $lines[] = "        ip saddr @geo_blocked_ips {$geoVerdict}";
+                $lines[] = "        ip6 saddr @geo_blocked_ips6 {$geoVerdict}";
+            }
             $lines[] = '    }';
             $lines[] = '';
         }
@@ -381,6 +425,13 @@ class SecurityConfigGenerator
                 //    elements live in the bounded sets declared above.
                 $lines[] = "        udp dport 69 update @tftp_flood4 { ip saddr limit rate over {$tftpLimits['rate_limit']}/minute burst {$tftpLimits['burst']} packets } {$tftpVerdict}";
                 $lines[] = "        udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over {$tftpLimits['rate_limit']}/minute burst {$tftpLimits['burst']} packets } {$tftpVerdict}";
+                $lines[] = '';
+            }
+
+            // STAGE 9.5: Geo-Blocking (evaluated before core PBX services)
+            if ($geoRule->enabled && ! empty($geoRule->countries)) {
+                $lines[] = '        # STAGE 9.5: GEO-BLOCKING';
+                $lines[] = '        jump geo_perimeter';
                 $lines[] = '';
             }
 

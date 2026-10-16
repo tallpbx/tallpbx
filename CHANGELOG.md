@@ -7,9 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-10-16
+
 ### Added
-- **Dedicated PBX Geo-Blocking Implementation Plan (`docs/plan-external-blocklists-and-geoblocking.md`)**:
-  - Authored a comprehensive architectural and operational plan for a dedicated Geo-Blocking subsystem utilizing IPdeny pre-aggregated zone files (`-aggregated.zone`), supporting both Blacklist and Whitelist/Geofence modes, PBX port-scoping (SIP-only vs all-traffic), and administrative lockout prevention.
+- **Dedicated Geo-Blocking Subsystem (IPdeny Aggregated Zones)**:
+  - Implemented a first-class, dedicated **Geo-Blocking** tab and filtering engine in the Security Command Center (`app-modules/security/`).
+  - Pure drop-filter architecture: the geo-blocking rule operates in a dedicated `geo_perimeter` nftables subchain that **only ever blocks, never allows**. Traffic from unblocked countries continues to traverse the rest of the firewall rules (Core PBX telephony ports, custom sequential rules, and default policy).
+  - Supports dual filtering modes: **Block Selected Countries** (drops traffic originating from selected countries) and **Block All Except Selected** (drops traffic originating from outside selected countries).
+  - Covers all inbound traffic unconditionally (eliminating redundant port scope configuration while retaining RFC1918 private LAN and loopback bypasses via `return` without premature `accept`).
+  - Automatically fetches and validates pre-aggregated country zone files from `ipdeny.com` with local caching in `/etc/tallpbx/geoip/` and automated fallback to the GitHub RIR mirror (`herrbischoff/country-ip-blocks`).
+  - Added Artisan CLI sync command `php artisan security:sync-geoip` with `--force` flag for scheduled automated background updates.
+  - Responsive, instant UI with optimistic country badges, DaisyUI in-progress spinners, and pointer-events click locking.
+  - Cleaned up administrative workbench controls: removed manual sync button (managed by automated background task) and renamed "Clear Rules" to "Deselect All".
+  - Master Firewall Rules table always displays `DROP` action for active Geo-Blocking, with explicit target descriptions (e.g., `All except: <countries>`).
+  - Synchronized pre-filters cockpit visibility: hides and shows with the pre-filters section (`x-show="showSystemPreFilters"`), with updated pre-filters rule count.
+  - Added full translation parity across English, Spanish, and French dictionaries (`en`, `es`, `fr`).
 - **Navigation Links for Primary Administrative Workbenches**:
   - Registered missing panel navigation menu items with proper permissions: **Modules** (`panel.modules.index`, permission `admin.modules.view`) positioned prominently in the top administration navigation block (right beside **Permissions** and **Notifications**) and **Settings** (`panel.settings.index`, permission `admin.settings.view`) in the administration section.
   - Consolidated interactive queue job management directly into the **Monitoring** dashboard (`/panel/monitoring`) with an in-place modal popup and direct retry controls.
@@ -33,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed FreeSWITCH ESL (port 8021) from the Standard Services public firewall catalog. FreeSWITCH ESL communicates internally with the web panel and event listeners strictly via loopback (`127.0.0.1`), unconditionally protected by the kernel loopback floor rule (`iif "lo" accept`). Removing it from the standard services list prevents accidental public port exposure, while enterprise multi-server clusters requiring external controller access can still configure targeted custom firewall rules restricted to trusted IP addresses.
 
 ### Fixed
+- **Panel Sidebar & Header Layout Fixes**:
+  - Resolved Livewire 4 `@persist('panel-sidebar')` container expansion issue where an unstyled wrapper caused the outer `.drawer-side` to scroll instead of the inner `<nav>`, preventing the background from breaking or showing uneven darker color seams when scrolling down past Monitoring / Certificates.
+  - Standardized `.panel-header` and `.panel-shell` background colors to solid `base-100` and `base-200` without gradients or semi-transparent blur seams across light and dark themes.
+- **Geo-Blocking Firewall Ruleset Pending Apply Pipeline**:
+  - Fixed a permission error (`file_put_contents(/etc/tallpbx/firewall.nft): Failed to open stream: Permission denied`) when enabling or reconfiguring Geo-Blocking in the Security Command Center. Updated `ManagesGeoBlocking::regenerateAndApplyFirewall()` to route through `SecurityManager::autoApplyFirewallRuleset()`, safely writing to `/etc/tallpbx/firewall.nft.pending` and delegating atomic validation and promotion to the bounded root helper (`/usr/local/sbin/tallpbx-security apply`) rather than attempting direct web-server writes to `/etc/tallpbx/firewall.nft`.
 - **Module Workbench Table Column Alignment & Empty State Colspan**:
   - Aligned table columns in `app-modules/admin/resources/views/modules-list.blade.php` by adding an empty action header column (`<th class="w-12"></th>`) matching the 7th column dropdown action cell in `<tbody>`, and updated empty state spanning from `colspan="6"` to `colspan="7"`.
 - **Dynamic Module Namespace Auto-Registration**:

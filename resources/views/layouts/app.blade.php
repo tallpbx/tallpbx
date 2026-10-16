@@ -65,9 +65,9 @@
     <div class="drawer flex-1 w-full max-w-full overflow-hidden h-full min-h-0"
          :class="{ 'lg:drawer-open': layoutMode === 'sidebar' }">
         <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
-        <aside class="drawer-side z-50 h-full min-h-full" data-panel-sidebar-scroll="drawer">
+        <aside class="drawer-side z-50 h-full min-h-full overflow-hidden" data-panel-sidebar-scroll="drawer">
             <label for="sidebar-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-            <div class="panel-sidebar bg-base-100 border-r border-base-300 flex flex-col h-full min-h-full transition-all duration-200 ease-in-out"
+            <div class="panel-sidebar bg-base-100 border-r border-base-300 flex flex-col h-full min-h-0 overflow-hidden transition-all duration-200 ease-in-out"
                  :class="sidebarCollapsed ? 'w-16' : 'w-64'">
                 <div class="flex items-center gap-3 h-16 border-b border-base-300 shrink-0 transition-all duration-200"
                      :class="sidebarCollapsed ? 'justify-center px-0' : 'px-5'">
