@@ -209,7 +209,12 @@ class GeoBlockingService
             $lines[] = $line;
         }
 
-        file_put_contents($targetFile, implode("\n", $lines)."\n");
+        // Atomic publish: write to a temp sibling then rename, so the hourly
+        // threat-feed sync (which reads this file) never observes a
+        // half-written geo block.
+        $tmpFile = $targetFile.'.tmp';
+        file_put_contents($tmpFile, implode("\n", $lines)."\n");
+        rename($tmpFile, $targetFile);
 
         // Also merge into external_blocklist.nft.pending if it exists or create alongside
         $this->mergeWithExternalBlocklistPending($targetFile);
@@ -217,6 +222,11 @@ class GeoBlockingService
 
     /**
      * Merges geo lines into external_blocklist.nft.pending so updateExternalBlocklist applies both atomically.
+     *
+     * The merge runs under an exclusive flock: the hourly (root, scheduler)
+     * threat-feed sync rewrites this same file through
+     * ThreatFeedIngestionService, and neither writer may lose the other's
+     * elements through an interleaved read-modify-write.
      */
     protected function mergeWithExternalBlocklistPending(string $geoPendingFile): void
     {
@@ -230,27 +240,50 @@ class GeoBlockingService
             $existingContent = file_get_contents($externalActive) ?: '';
         }
 
-        $geoContent = file_get_contents($geoPendingFile) ?: '';
-
-        // Filter out old geo statements if any were in externalPending
+        // Cut everything from the geo header marker onward: the geo block
+        // is always the trailing section, so this removes any previously
+        // merged geo content together with its header line in one stroke.
+        // (Filtering by set names alone let stale header comments survive
+        // every re-merge and accumulate into this root-executed file.)
         $filteredLines = [];
-        if ($existingContent !== '') {
-            $lines = explode("\n", $existingContent);
-            foreach ($lines as $line) {
-                if (str_contains($line, 'geo_blocked_ips') || str_contains($line, 'geo_allowed_ips')) {
-                    continue;
-                }
-                $filteredLines[] = $line;
+        foreach (explode("\n", $existingContent) as $line) {
+            if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
+                break;
             }
-        } else {
+            $filteredLines[] = $line;
+        }
+
+        if (trim(implode("", $filteredLines)) === '') {
             $filteredLines = [
                 'flush set inet tallpbx_filter external_blocklist_ips',
                 'flush set inet tallpbx_filter external_blocklist_ips6',
             ];
         }
 
+        $geoContent = file_get_contents($geoPendingFile) ?: '';
+
         $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
-        file_put_contents($externalPending, $combined);
+
+        // Write the merged result back under the exclusive lock protocol
+        // shared with ThreatFeedIngestionService (fopen 'c+' + LOCK_EX +
+        // ftruncate/rewrite), falling back to a plain write only when the
+        // file cannot be opened at all.
+        $handle = fopen($externalPending, 'c+');
+        if ($handle === false) {
+            file_put_contents($externalPending, $combined);
+
+            return;
+        }
+
+        try {
+            flock($handle, LOCK_EX);
+            ftruncate($handle, 0);
+            rewind($handle);
+            fwrite($handle, $combined);
+            fflush($handle);
+        } finally {
+            fclose($handle); // closing the handle releases the lock
+        }
     }
 
     /**

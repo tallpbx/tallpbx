@@ -204,6 +204,30 @@ it('syncs on demand and reports the compiled entry count', function (): void {
     $this->executor->shouldHaveReceived('updateExternalBlocklist')->once();
 });
 
+it('preserves geo elements when compiling threat feed set files', function (): void {
+    // A geo block compiled earlier by the Geo-Blocking service sits in the
+    // shared pending pipeline; a feed sync rebuild must keep it alongside
+    // its own elements under the shared lock protocol.
+    file_put_contents($this->firewallDir.'/geo_blocking.nft.pending', implode("\n", [
+        '# TallPBX Geo-Blocking kernel elements — generated 2026-10-16T00:00:00+00:00; do not edit.',
+        'flush set inet tallpbx_filter geo_blocked_ips',
+        'flush set inet tallpbx_filter geo_blocked_ips6',
+        'add element inet tallpbx_filter geo_blocked_ips { 1.0.0.0/24 }',
+    ])."\n");
+
+    Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.1/32\n203.0.113.2/32\n203.0.113.3/32\n203.0.113.4/32", 200)]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('activeTab', 'threat-feeds')
+        ->call('syncThreatFeedNow');
+
+    $content = file_get_contents($this->firewallDir.'/external_blocklist.nft.pending');
+    expect($content)->toContain('add element inet tallpbx_filter external_blocklist_ips {')
+        ->and($content)->toContain('add element inet tallpbx_filter geo_blocked_ips { 1.0.0.0/24 }')
+        ->and(substr_count($content, '# TallPBX Geo-Blocking kernel elements'))->toBe(1);
+});
+
 it('removes all feed blocks without disabling the feed', function (): void {
     SecurityThreatFeed::factory()->create([
         'provider' => 'voipbl',

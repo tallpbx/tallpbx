@@ -129,3 +129,36 @@ it('reports a cache write failure instead of silently proceeding', function (): 
     // Restore so the shared afterEach cleanup can remove the cache dir.
     rmdir($this->cacheDir.'/US.v4.zone');
 });
+
+it('repeated merges leave exactly one geo header and keep external elements', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update(['enabled' => true, 'mode' => 'blacklist', 'countries' => ['US']]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => [],
+    ]);
+
+    // Seed an external pending file that already carries feed elements plus
+    // a stale geo block with TWO accumulated header comment lines.
+    file_put_contents($this->tempDir.'/external_blocklist.nft.pending', implode("\n", [
+        '# TallPBX external blocklist kernel elements — generated 2026-10-16T00:00:00+00:00; do not edit.',
+        'flush set inet tallpbx_filter external_blocklist_ips',
+        'flush set inet tallpbx_filter external_blocklist_ips6',
+        'add element inet tallpbx_filter external_blocklist_ips { 6.6.6.0/24 }',
+        '# TallPBX Geo-Blocking kernel elements — generated 2026-10-15T00:00:00+00:00; do not edit.',
+        '# TallPBX Geo-Blocking kernel elements — generated 2026-10-14T00:00:00+00:00; do not edit.',
+        'flush set inet tallpbx_filter geo_blocked_ips',
+    ])."\n");
+
+    // Two syncs exercise the merge path repeatedly.
+    $this->geoService->sync($rule, force: true);
+    $this->geoService->sync($rule, force: true);
+
+    $content = file_get_contents($this->tempDir.'/external_blocklist.nft.pending');
+    expect(substr_count($content, '# TallPBX Geo-Blocking kernel elements'))->toBe(1)
+        ->and($content)->toContain('add element inet tallpbx_filter external_blocklist_ips { 6.6.6.0/24 }')
+        ->and($content)->toContain('add element inet tallpbx_filter geo_blocked_ips { 1.0.0.0/24 }')
+        // The atomic tmp+rename publish must never leave a sibling behind.
+        ->and(file_exists($this->tempDir.'/geo_blocking.nft.pending.tmp'))->toBeFalse();
+});

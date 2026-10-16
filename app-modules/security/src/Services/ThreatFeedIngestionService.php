@@ -216,7 +216,28 @@ class ThreatFeedIngestionService
             @mkdir($this->firewallDir, 0750, true);
         }
 
-        file_put_contents($this->firewallDir.'/external_blocklist.nft.pending', implode("\n", $lines)."\n");
+        // Write under the exclusive lock protocol shared with
+        // GeoBlockingService (fopen 'c+' + LOCK_EX + ftruncate/rewrite):
+        // web-context geo toggles merge into this same file, and neither
+        // writer may lose the other's elements through an interleaved
+        // read-modify-write.
+        $content = implode("\n", $lines)."\n";
+        $handle = fopen($this->firewallDir.'/external_blocklist.nft.pending', 'c+');
+        if ($handle === false) {
+            file_put_contents($this->firewallDir.'/external_blocklist.nft.pending', $content);
+
+            return;
+        }
+
+        try {
+            flock($handle, LOCK_EX);
+            ftruncate($handle, 0);
+            rewind($handle);
+            fwrite($handle, $content);
+            fflush($handle);
+        } finally {
+            fclose($handle); // closing the handle releases the lock
+        }
     }
 
     /**
