@@ -253,7 +253,7 @@ class GeoBlockingService
             $filteredLines[] = $line;
         }
 
-        if (trim(implode("", $filteredLines)) === '') {
+        if (trim(implode('', $filteredLines)) === '') {
             $filteredLines = [
                 'flush set inet tallpbx_filter external_blocklist_ips',
                 'flush set inet tallpbx_filter external_blocklist_ips6',
