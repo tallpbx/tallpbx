@@ -10,11 +10,11 @@ The interface provides instant light and dark color themes, three switchable nav
 
 The public landing page is localized (`/en`, `/es`, `/fr`) and provides direct sign-in access to the unified management panel. It features an interactive SVG telephony network diagram and instant color-theme switching.
 
-### Light Theme
-![TallPBX Landing Page — Light Theme](images/landing-light.png)
-
-### Dark Theme
-![TallPBX Landing Page — Dark Theme](images/landing-dark.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/landing-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/landing-light.png">
+  <img alt="TallPBX Landing Page" src="images/landing-light.png">
+</picture>
 
 ### Color Themes
 
@@ -95,9 +95,11 @@ The **Security Center** (`/panel/security`) provides system administrators with 
   - **Attackers**: Active intrusion bans with entry-point badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, detected attack probes review, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, decoupled dialplan sensor, auto-block firewall toggle, and live conntrack session termination).
   - **External Blocklists**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
 
-| Light Theme | Dark Theme |
-| :---: | :---: |
-| [![TallPBX Security Center (Light)](images/security-dashboard-light.png)](images/security-dashboard-light.png) | [![TallPBX Security Center (Dark)](images/security-dashboard-dark.png)](images/security-dashboard-dark.png) |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/security-dashboard-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="images/security-dashboard-light.png">
+  <img alt="TallPBX Security Center" src="images/security-dashboard-light.png">
+</picture>
 
 ---
 
