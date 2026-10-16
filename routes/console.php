@@ -82,6 +82,13 @@ Schedule::command('security:sync-threat-feeds')
     ->hourly()
     ->withoutOverlapping();
 
+// Weekly Geo-IP zone refresh keeps country allow/deny sets current; the
+// command itself skips disabled or country-less geo rules, so scheduling
+// is safe for every install.
+Schedule::command('security:sync-geoip')
+    ->weekly()
+    ->withoutOverlapping();
+
 Schedule::command('certificates:renew')
     ->dailyAt('03:30')
     ->withoutOverlapping()

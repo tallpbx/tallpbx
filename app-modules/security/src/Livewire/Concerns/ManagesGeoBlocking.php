@@ -259,30 +259,6 @@ trait ManagesGeoBlocking
     }
 
     /**
-     * Trigger an on-demand sync of Geo-IP zones.
-     */
-    public function syncGeoIpNow(): void
-    {
-        $this->ensureGeoManagePermission();
-
-        $rule = SecurityGeoRule::instance();
-        $result = app(GeoBlockingService::class)->sync($rule, force: true);
-
-        if ($result['status'] === 'success') {
-            $this->notifySuccess((string) __('admin.security_geo_sync_success', [
-                'v4' => $result['v4_count'],
-                'v6' => $result['v6_count'],
-            ]));
-        } else {
-            $this->notifyError((string) __('admin.security_geo_sync_failed', [
-                'error' => $result['error'] ?? 'Unknown error',
-            ]));
-        }
-
-        $this->loadGeoState();
-    }
-
-    /**
      * Clear all geo rules and kernel elements.
      */
     public function clearGeoRules(): void
