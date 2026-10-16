@@ -18,10 +18,6 @@ trait ManagesExternalBlocklists
 {
     public bool $feedEnabled = true;
 
-    public string $feedCountryMode = 'all';
-
-    public string $feedCountriesInput = '';
-
     public string $feedSyncInterval = 'hourly';
 
     /**
@@ -32,8 +28,6 @@ trait ManagesExternalBlocklists
         $feed = SecurityThreatFeed::where('provider', 'voipbl')->first();
 
         $this->feedEnabled = $feed?->enabled ?? false;
-        $this->feedCountryMode = $feed?->country_mode ?? 'all';
-        $this->feedCountriesInput = implode(', ', $feed?->countries ?? []);
         $this->feedSyncInterval = $feed?->sync_interval ?? 'daily';
     }
 
@@ -95,31 +89,20 @@ trait ManagesExternalBlocklists
         $this->ensureFeedManagePermission();
 
         $this->validate([
-            'feedCountryMode' => ['required', 'in:all,blacklist,whitelist'],
             'feedSyncInterval' => ['required', 'in:hourly,4_hours,12_hours,daily'],
         ]);
-
-        $countries = $this->parseCountryCodes($this->feedCountriesInput);
-
-        if ($countries === null) {
-            $this->addError('feedCountriesInput', (string) __('admin.security_threat_feed_countries_invalid'));
-
-            return;
-        }
 
         $feed = $this->voipblFeed();
         $feed->update([
             'enabled' => $this->feedEnabled,
-            'country_mode' => $this->feedCountryMode,
-            'countries' => $countries,
             'sync_interval' => $this->feedSyncInterval,
         ]);
 
         SecurityAuditLog::record(
             action: 'threat_feed_updated',
             ipAddress: $this->adminIp,
-            description: "External blocklist '{$feed->name}' settings updated (mode: {$feed->country_mode}, interval: {$feed->sync_interval}, ".($feed->enabled ? 'enabled' : 'disabled').').',
-            details: ['provider' => $feed->provider, 'countries' => $countries],
+            description: "External blocklist '{$feed->name}' settings updated (interval: {$feed->sync_interval}, ".($feed->enabled ? 'enabled' : 'disabled').').',
+            details: ['provider' => $feed->provider],
             adminId: Auth::guard('admin')->id(),
         );
 
@@ -206,32 +189,6 @@ trait ManagesExternalBlocklists
             ['provider' => 'voipbl'],
             ['name' => 'VoIPBL'],
         );
-    }
-
-    /**
-     * Parse the comma-separated country-code input.
-     *
-     * @return array<int, string>|null
-     */
-    private function parseCountryCodes(string $input): ?array
-    {
-        $tokens = preg_split('/[\s,]+/', trim($input)) ?: [];
-        $tokens = array_values(array_filter($tokens, static fn (string $token): bool => $token !== ''));
-
-        $codes = [];
-        foreach ($tokens as $token) {
-            $code = strtoupper($token);
-
-            if (preg_match('/^[A-Z]{2}$/', $code) !== 1) {
-                return null;
-            }
-
-            $codes[] = $code;
-        }
-
-        $codes = array_values(array_unique($codes));
-
-        return count($codes) > 50 ? null : $codes;
     }
 
     /**

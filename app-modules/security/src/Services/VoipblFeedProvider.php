@@ -13,11 +13,14 @@ use Modules\Security\Support\ThreatFeedSyncResult;
  * VoIPBL (voipbl.org) provider driver.
  *
  * Publishes a community-maintained list of hostile VoIP subnets (IPv4
- * ranges only) with optional country filtering: `bc` isolates traffic from
- * the listed countries, `wc` excludes the home countries.
+ * ranges only) to drop known scanners and fraud botnets at the perimeter.
  */
 class VoipblFeedProvider implements ThreatFeedProviderInterface
 {
+    public const FEED_URL = 'https://www.voipbl.org/update/';
+
+    public const SEARCH_URL = 'https://www.voipbl.org/check/';
+
     /**
      * Create the provider instance.
      *
@@ -46,23 +49,11 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
     }
 
     /**
-     * Build the download URL for this feed's country mode.
-     *
-     * Country codes are normalized to uppercase ISO 3166-1 alpha-2 so the
-     * query string is deterministic regardless of how the panel stored them.
+     * Build the download URL for this feed.
      */
     public function fetchUrl(SecurityThreatFeed $feed): string
     {
-        $countries = array_values(array_filter(array_map(
-            static fn (mixed $country): string => strtoupper(trim((string) $country)),
-            $feed->countries ?? []
-        )));
-
-        return match ($feed->country_mode) {
-            'blacklist' => 'https://www.voipbl.org/update/?bc='.implode(',', $countries),
-            'whitelist' => 'https://www.voipbl.org/update/?wc='.implode(',', $countries),
-            default => 'https://www.voipbl.org/update/',
-        };
+        return self::FEED_URL;
     }
 
     /**

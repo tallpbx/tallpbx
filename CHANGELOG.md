@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Dedicated PBX Geo-Blocking Implementation Plan (`docs/plan-external-blocklists-and-geoblocking.md`)**:
+  - Authored a comprehensive architectural and operational plan for a dedicated Geo-Blocking subsystem utilizing IPdeny pre-aggregated zone files (`-aggregated.zone`), supporting both Blacklist and Whitelist/Geofence modes, PBX port-scoping (SIP-only vs all-traffic), and administrative lockout prevention.
 - **Navigation Links for Primary Administrative & PBX Workbenches**:
   - Registered missing panel navigation menu items with proper permissions: **Modules** (`panel.modules.index`, permission `admin.modules.view`) positioned prominently in the top administration navigation block (right beside **Permissions** and **Notifications**), **Settings** (`panel.settings.index`, permission `admin.settings.view`) in the administration section, **SIP Accounts** (`panel.sip-accounts.index`, permission `sip-accounts.view`) under **PBX Accounts**, and **Extension Settings** (`panel.extension-settings.index`, permission `extension-settings.view`) under **PBX Advanced**.
   - Consolidated interactive queue job management directly into the **Monitoring** dashboard (`/panel/monitoring`) with an in-place modal popup and direct retry controls, eliminating navigation clutter from a standalone queue status link.
@@ -41,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Modernized `App\Providers\ModuleServiceProvider::satisfiesVersion()` to evaluate `^0.x` constraints using standard Composer SemVer semantics (`^0.2.3` bounded by `< 0.3.0` and `^0.0.3` bounded by `< 0.0.4`).
 
 ### Changed
+- **Modernized External Blocklists (VoIPBL) Workbench & Public Lookup**:
+  - Simplified VoIPBL threat feed ingestion to a 100% global feed (`https://www.voipbl.org/update/`), removing ambiguous country filtering options that were previously mistaken for whole-country GeoIP blocking.
+  - Relocated the Enable/Disable toggle to the top-right card header with standard `toggle-error toggle-sm` styling, present-continuous status labels ("Enabling...", "Disabling..."), and loading spinners to achieve complete visual parity with the **Attackers** and **Block / Allow** tabs.
+  - Added direct external links to the live raw feed (`https://www.voipbl.org/update/`) and VoIPBL's public IP reputation search tool (`https://www.voipbl.org/check/`), an in-panel kernel set inspection CLI hint (`sudo nft list set inet tallpbx_filter external_blocklist_ips`), and a prominent note explaining that any false-positive domestic/customer listings can be bypassed immediately by adding the IP to the **Whitelist** tab.
+  - Maintained 100% translation parity across `en`, `es`, and `fr` dictionaries.
 - **Documentation Screenshots Refresh & Security Center Theme Duality**:
   - Refreshed all stale documentation screenshots in `docs/images/` using perceptual diff gating to capture the modern v4.x navigation and data views without unnecessary churn (`dashboard-full-sidebar.png`, `dashboard-compressed-sidebar.png`, `dashboard-horizontal-menu.png`, `pbx-tenants.png`, `pbx-devices.png`, `pbx-extensions.png`, `pbx-impersonation.png`, and `pbx-multi-language.png`).
   - Added dual Light and Dark theme screenshot captures for the Security Center (`security-dashboard-light.png` and `security-dashboard-dark.png`) displayed side-by-side in `docs/ui-tour.md` and `docs/security-architecture.md`, matching the Guest Landing Page visual comparison.

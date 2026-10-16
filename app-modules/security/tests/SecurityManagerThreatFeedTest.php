@@ -96,13 +96,12 @@ it('ships every threat feed label in English, Spanish, and French', function ():
         'security_threat_feed_status_stale',
         'security_threat_feed_status_disabled',
         'security_threat_feed_enable',
-        'security_threat_feed_country_mode',
-        'security_threat_feed_mode_all',
-        'security_threat_feed_mode_bc',
-        'security_threat_feed_mode_wc',
-        'security_threat_feed_countries',
-        'security_threat_feed_countries_help',
-        'security_threat_feed_countries_invalid',
+        'security_threat_feed_disable',
+        'security_threat_feed_description',
+        'security_threat_feed_whitelist_hint',
+        'security_threat_feed_search_url_label',
+        'security_threat_feed_raw_url_label',
+        'security_threat_feed_cli_hint',
         'security_threat_feed_interval',
         'security_threat_feed_every_hour',
         'security_threat_feed_every_4h',
@@ -169,17 +168,16 @@ it('renders the threat feeds tab with status, controls, and the IPv4-only note',
         ->assertSee(__('admin.security_threat_feed_sync_now'))
         ->assertSee(__('admin.security_threat_feed_remove_blocks'))
         ->assertSee(__('admin.security_threat_feed_ipv4_note'))
-        ->assertSee(__('admin.security_threat_feed_mode_bc'))
+        ->assertSee(__('admin.security_threat_feed_search_url_label'))
+        ->assertSee(__('admin.security_threat_feed_raw_url_label'))
         ->assertSee('12,345');
 });
 
-it('saves country filtering and sync interval with case normalization and validation', function (): void {
+it('saves sync interval', function (): void {
     $component = Livewire::actingAs($this->admin, 'admin')->test(SecurityManager::class);
 
     $component->set('activeTab', 'threat-feeds')
         ->set('feedEnabled', true)
-        ->set('feedCountryMode', 'blacklist')
-        ->set('feedCountriesInput', 'cn, RU, kr')
         ->set('feedSyncInterval', '12_hours')
         ->call('saveFeedSettings')
         ->assertHasNoErrors();
@@ -187,16 +185,7 @@ it('saves country filtering and sync interval with case normalization and valida
     $feed = SecurityThreatFeed::where('provider', 'voipbl')->first();
     expect($feed)->not->toBeNull()
         ->and($feed->enabled)->toBeTrue()
-        ->and($feed->country_mode)->toBe('blacklist')
-        ->and($feed->countries)->toBe(['CN', 'RU', 'KR'])
         ->and($feed->sync_interval)->toBe('12_hours');
-
-    // Malformed codes are rejected with an inline error and nothing changes.
-    $component->set('feedCountriesInput', 'USA, 1')
-        ->call('saveFeedSettings')
-        ->assertHasErrors('feedCountriesInput');
-
-    expect(SecurityThreatFeed::where('provider', 'voipbl')->first()->countries)->toBe(['CN', 'RU', 'KR']);
 });
 
 it('syncs on demand and reports the compiled entry count', function (): void {

@@ -50,8 +50,17 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_threat_feeds_title') }}</h2>
-                        <span class="badge {{ $feedBadgeClass }} badge-sm" wire:loading.remove wire:target="syncThreatFeedNow">{{ __('admin.security_threat_feed_status_'.$feedStatus) }}</span>
-                        <span class="badge badge-info badge-sm" wire:loading wire:target="syncThreatFeedNow">{{ __('admin.security_threat_feed_status_syncing') }}</span>
+                        <span class="badge {{ $feedBadgeClass }} badge-sm font-semibold" wire:loading.remove wire:target="syncThreatFeedNow">{{ __('admin.security_threat_feed_status_'.$feedStatus) }}</span>
+                        <span class="badge badge-info badge-sm font-semibold" wire:loading wire:target="syncThreatFeedNow">{{ __('admin.security_threat_feed_status_syncing') }}</span>
+                        @if ($feedEnabled)
+                            <span class="badge badge-neutral badge-sm font-mono">{{ number_format($threatFeed?->entries_count ?? 0) }}</span>
+                        @else
+                            <span class="badge badge-neutral badge-sm font-mono">0</span>
+                            @if (($threatFeed?->entries_count ?? 0) > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => number_format($threatFeed->entries_count)]) }})</span>
+                            @endif
+                        @endif
+                        <span class="badge badge-ghost badge-sm font-mono text-[11px] opacity-75" title="@external_blocklist_ips">@external_blocklist_ips</span>
                         @if (! $prefilterEnabled)
                             <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
                         @endif
@@ -59,115 +68,107 @@
                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                         </x-tooltip>
                     </div>
+                    <p class="text-xs text-base-content/60 mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span>{{ __('admin.security_threat_feed_cli_hint') }}</span>
+                        <code class="px-1.5 py-0.5 rounded bg-base-200 text-xs font-mono select-all text-base-content">sudo nft list set inet tallpbx_filter external_blocklist_ips</code>
+                    </p>
                 </div>
-            <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <button wire:click="syncThreatFeedNow"
-                        wire:loading.attr="disabled"
-                        wire:target="syncThreatFeedNow"
-                        type="button" class="btn btn-outline btn-sm gap-1">
-                    <span wire:loading.remove wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
-                        <x-heroicon-o-arrow-path class="w-4 h-4" />
-                        <span>{{ __('admin.security_threat_feed_sync_now') }}</span>
-                    </span>
-                    <span wire:loading wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
-                        <span class="loading loading-spinner loading-xs"></span>
-                        <span>{{ __('admin.security_threat_feed_syncing') }}</span>
-                    </span>
-                </button>
-                <button wire:click="removeAllFeedBlocks"
-                        wire:loading.attr="disabled"
-                        wire:target="removeAllFeedBlocks"
-                        type="button"
-                        wire:confirm="{{ __('admin.security_threat_feed_remove_blocks_confirm') }}"
-                        class="btn btn-outline btn-error btn-sm gap-1">
-                    <span wire:loading.remove wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
-                        <x-heroicon-o-trash class="w-4 h-4" />
-                        <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
-                    </span>
-                    <span wire:loading wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
-                        <span class="loading loading-spinner loading-xs"></span>
-                        <span>{{ __('admin.security_threat_feed_removing_blocks') }}</span>
-                    </span>
-                </button>
+                <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                    <label class="label cursor-pointer justify-start gap-2 p-0 mr-2"
+                           wire:loading.class="opacity-70 pointer-events-none"
+                           wire:target="setFeedEnabled">
+                        <input wire:click="setFeedEnabled({{ $feedEnabled ? 'false' : 'true' }})"
+                               wire:loading.attr="disabled"
+                               wire:target="setFeedEnabled"
+                               type="checkbox" class="toggle toggle-error toggle-sm" @checked($feedEnabled) />
+                        <span wire:loading.remove wire:target="setFeedEnabled" class="label-text font-medium text-xs sm:text-sm">
+                            {{ $feedEnabled ? __('client.disable') : __('client.enable') }}
+                        </span>
+                        <span wire:loading wire:target="setFeedEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ $feedEnabled ? __('admin.security_threat_feed_disabling') : __('admin.security_threat_feed_enabling') }}</span>
+                        </span>
+                    </label>
+                    <button wire:click="syncThreatFeedNow"
+                            wire:loading.attr="disabled"
+                            wire:target="syncThreatFeedNow"
+                            type="button" class="btn btn-outline btn-sm gap-1">
+                        <span wire:loading.remove wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
+                            <x-heroicon-o-arrow-path class="w-4 h-4" />
+                            <span>{{ __('admin.security_threat_feed_sync_now') }}</span>
+                        </span>
+                        <span wire:loading wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ __('admin.security_threat_feed_syncing') }}</span>
+                        </span>
+                    </button>
+                    <button wire:click="removeAllFeedBlocks"
+                            wire:loading.attr="disabled"
+                            wire:target="removeAllFeedBlocks"
+                            type="button"
+                            wire:confirm="{{ __('admin.security_threat_feed_remove_blocks_confirm') }}"
+                            class="btn btn-outline btn-error btn-sm gap-1">
+                        <span wire:loading.remove wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
+                            <x-heroicon-o-trash class="w-4 h-4" />
+                            <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
+                        </span>
+                        <span wire:loading wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ __('admin.security_threat_feed_removing_blocks') }}</span>
+                        </span>
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {{-- Left: feed configuration --}}
-            <div class="space-y-4">
-                <label class="label cursor-pointer justify-start gap-2 p-0"
-                       wire:loading.class="opacity-70 pointer-events-none"
-                       wire:target="setFeedEnabled">
-                    <input wire:click="setFeedEnabled({{ $feedEnabled ? 'false' : 'true' }})"
-                           wire:loading.attr="disabled"
-                           wire:target="setFeedEnabled"
-                           type="checkbox" class="toggle toggle-error toggle-sm" @checked($feedEnabled) />
-                    <span wire:loading.remove wire:target="setFeedEnabled" class="label-text font-medium">
-                        {{ __('admin.security_threat_feed_enable') }}
-                    </span>
-                    <span wire:loading wire:target="setFeedEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-error">
-                        <span class="loading loading-spinner loading-xs"></span>
-                        <span>{{ $feedEnabled ? __('admin.security_threat_feed_disabling') : __('admin.security_threat_feed_enabling') }}</span>
-                    </span>
-                </label>
-
-                <div>
-                    <span class="text-sm font-medium text-base-content block mb-1.5">{{ __('admin.security_threat_feed_country_mode') }}</span>
-                    <div class="space-y-1">
-                        <label class="label cursor-pointer justify-start gap-2 py-0.5">
-                            <input wire:model.live="feedCountryMode" type="radio" value="all" class="radio radio-primary radio-sm" />
-                            <span class="label-text">{{ __('admin.security_threat_feed_mode_all') }}</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0.5">
-                            <input wire:model.live="feedCountryMode" type="radio" value="blacklist" class="radio radio-primary radio-sm" />
-                            <span class="label-text">{{ __('admin.security_threat_feed_mode_bc') }}</span>
-                        </label>
-                        <label class="label cursor-pointer justify-start gap-2 py-0.5">
-                            <input wire:model.live="feedCountryMode" type="radio" value="whitelist" class="radio radio-primary radio-sm" />
-                            <span class="label-text">{{ __('admin.security_threat_feed_mode_wc') }}</span>
-                        </label>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                {{-- Left: feed configuration & information --}}
+                <div class="space-y-4">
+                    <div class="space-y-2 text-xs text-base-content/70 bg-base-200/40 p-3.5 rounded-box border border-base-200">
+                        <p>{{ __('admin.security_threat_feed_description') }}</p>
+                        <p class="text-base-content/60">{{ __('admin.security_threat_feed_whitelist_hint') }}</p>
+                        
+                        <div class="flex flex-wrap items-center gap-3 pt-1 border-t border-base-200/60 mt-2">
+                            <a href="https://www.voipbl.org/check/" target="_blank" rel="noopener noreferrer"
+                               class="link link-primary inline-flex items-center gap-1 font-medium">
+                                <span>{{ __('admin.security_threat_feed_search_url_label') }}</span>
+                                <x-heroicon-m-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                            </a>
+                            <span class="text-base-content/30">•</span>
+                            <a href="https://www.voipbl.org/update/" target="_blank" rel="noopener noreferrer"
+                               class="link link-hover inline-flex items-center gap-1 font-medium text-base-content/70">
+                                <span>{{ __('admin.security_threat_feed_raw_url_label') }}</span>
+                                <x-heroicon-m-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                            </a>
+                        </div>
                     </div>
-                </div>
 
-                @if ($feedCountryMode !== 'all')
                     <div class="form-control">
                         <label class="label justify-start gap-2 pb-1">
-                            <span class="label-text font-medium">{{ __('admin.security_threat_feed_countries') }}</span>
+                            <span class="label-text font-medium">{{ __('admin.security_threat_feed_interval') }}</span>
                         </label>
-                        <input wire:model="feedCountriesInput" type="text" placeholder="US, CA, GB"
-                               class="input input-bordered input-sm font-mono w-full @error('feedCountriesInput') input-error @enderror" />
-                        @error('feedCountriesInput') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
-                        <span class="text-xs text-base-content/60 mt-1">{{ __('admin.security_threat_feed_countries_help') }}</span>
+                        <select wire:model="feedSyncInterval" class="select select-bordered select-sm w-full">
+                            <option value="hourly">{{ __('admin.security_threat_feed_every_hour') }}</option>
+                            <option value="4_hours">{{ __('admin.security_threat_feed_every_4h') }}</option>
+                            <option value="12_hours">{{ __('admin.security_threat_feed_every_12h') }}</option>
+                            <option value="daily">{{ __('admin.security_threat_feed_daily') }}</option>
+                        </select>
                     </div>
-                @endif
 
-                <div class="form-control">
-                    <label class="label justify-start gap-2 pb-1">
-                        <span class="label-text font-medium">{{ __('admin.security_threat_feed_interval') }}</span>
-                    </label>
-                    <select wire:model="feedSyncInterval" class="select select-bordered select-sm w-full">
-                        <option value="hourly">{{ __('admin.security_threat_feed_every_hour') }}</option>
-                        <option value="4_hours">{{ __('admin.security_threat_feed_every_4h') }}</option>
-                        <option value="12_hours">{{ __('admin.security_threat_feed_every_12h') }}</option>
-                        <option value="daily">{{ __('admin.security_threat_feed_daily') }}</option>
-                    </select>
+                    <p class="text-xs text-base-content/60">{{ __('admin.security_threat_feed_ipv4_note') }}</p>
+
+                    <button wire:click="saveFeedSettings"
+                            wire:loading.attr="disabled"
+                            wire:target="saveFeedSettings"
+                            type="button" class="btn btn-primary btn-sm">
+                        <span wire:loading.remove wire:target="saveFeedSettings">
+                            {{ __('client.save') }}
+                        </span>
+                        <span wire:loading wire:target="saveFeedSettings" class="inline-flex items-center gap-1.5">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ __('admin.saving') }}</span>
+                        </span>
+                    </button>
                 </div>
-
-                <p class="text-xs text-base-content/60">{{ __('admin.security_threat_feed_ipv4_note') }}</p>
-
-                <button wire:click="saveFeedSettings"
-                        wire:loading.attr="disabled"
-                        wire:target="saveFeedSettings"
-                        type="button" class="btn btn-primary btn-sm">
-                    <span wire:loading.remove wire:target="saveFeedSettings">
-                        {{ __('client.save') }}
-                    </span>
-                    <span wire:loading wire:target="saveFeedSettings" class="inline-flex items-center gap-1.5">
-                        <span class="loading loading-spinner loading-xs"></span>
-                        <span>{{ __('admin.saving') }}</span>
-                    </span>
-                </button>
-            </div>
 
             {{-- Right: live metrics --}}
             <div class="grid grid-cols-2 gap-3">

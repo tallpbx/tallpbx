@@ -46,21 +46,12 @@ afterEach(function (): void {
     }
 });
 
-it('formats the VoIPBL query URL for every country mode', function (): void {
-    expect($this->provider->fetchUrl(SecurityThreatFeed::factory()->make(['country_mode' => 'all'])))
-        ->toBe('https://www.voipbl.org/update/');
-
-    expect($this->provider->fetchUrl(SecurityThreatFeed::factory()->make([
-        'country_mode' => 'blacklist',
-        'countries' => ['cn', 'RU', 'kr'],
-    ])))->toBe('https://www.voipbl.org/update/?bc=CN,RU,KR');
-
-    expect($this->provider->fetchUrl(SecurityThreatFeed::factory()->make([
-        'country_mode' => 'whitelist',
-        'countries' => ['us', 'CA', 'gb'],
-    ])))->toBe('https://www.voipbl.org/update/?wc=US,CA,GB');
-
-    expect($this->provider->identifier())->toBe('voipbl')
+it('formats the VoIPBL query URL', function (): void {
+    expect($this->provider->fetchUrl(SecurityThreatFeed::factory()->make()))
+        ->toBe('https://www.voipbl.org/update/')
+        ->and(VoipblFeedProvider::FEED_URL)->toBe('https://www.voipbl.org/update/')
+        ->and(VoipblFeedProvider::SEARCH_URL)->toBe('https://www.voipbl.org/check/')
+        ->and($this->provider->identifier())->toBe('voipbl')
         ->and($this->provider->name())->toBe('VoIPBL');
 });
 
