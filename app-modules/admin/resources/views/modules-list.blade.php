@@ -1,8 +1,26 @@
 <div x-data="{
     allOpen: true,
+    openCategories: @js(array_keys($groupedModules)),
     toggleAll() {
         this.allOpen = !this.allOpen;
-        $root.querySelectorAll('details').forEach(el => el.open = this.allOpen);
+        if (this.allOpen) {
+            this.openCategories = @js(array_keys($groupedModules));
+        } else {
+            this.openCategories = [];
+        }
+    },
+    isOpen(category) {
+        return this.openCategories.includes(category);
+    },
+    toggleCategory(category, open) {
+        if (open) {
+            if (!this.openCategories.includes(category)) {
+                this.openCategories.push(category);
+            }
+        } else {
+            this.openCategories = this.openCategories.filter(c => c !== category);
+        }
+        this.allOpen = this.openCategories.length === {{ count($groupedModules) }};
     }
 }">
     <div class="flex items-center justify-between mb-6">
@@ -20,7 +38,9 @@
     </div>
 
     @foreach($groupedModules as $category => $categoryModules)
-        <details class="collapse collapse-arrow bg-base-100 border border-base-300 mb-3" open>
+        <details class="collapse collapse-arrow bg-base-100 border border-base-300 mb-3"
+                 :open="isOpen('{{ $category }}')"
+                 @toggle="toggleCategory('{{ $category }}', $el.open)">
             <summary class="collapse-title">
                 <div class="flex items-center gap-2">
                     <span class="text-lg font-semibold">{{ $this->categoryLabel($category) }}</span>
@@ -62,7 +82,7 @@
                                     <td class="w-2/12">
                                         @if($module->status === \App\Models\Module::StatusUninstalled)
                                             <span class="badge badge-neutral badge-xs">{{ __('admin.uninstalled') }}</span>
-                                        @elseif($module->required)
+                                        @elseif($module->required && $module->enabled)
                                             <span class="badge badge-neutral badge-xs opacity-75">{{ __('admin.module_required') }}</span>
                                         @elseif($module->enabled)
                                             <span class="badge badge-success badge-xs">{{ __('admin.enabled') }}</span>
@@ -76,7 +96,7 @@
                                                 <span class="text-xs text-base-content/60">
                                                     {{ __('admin.module_restore_hint', ['name' => $module->name]) }}
                                                 </span>
-                                            @elseif($module->required)
+                                            @elseif($module->required && $module->enabled)
                                                 <span class="text-base-content/30">—</span>
                                             @else
                                                 <div class="flex items-center gap-2"

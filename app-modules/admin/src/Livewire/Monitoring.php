@@ -54,6 +54,14 @@ class Monitoring extends Component
      */
     public function mount(SystemHealth $health): void
     {
+        $this->loadMetrics($health);
+    }
+
+    /**
+     * Populate system health and queue counters.
+     */
+    private function loadMetrics(SystemHealth $health): void
+    {
         $summary = $health->summary();
 
         $this->disk = $summary['disk'];
@@ -70,10 +78,6 @@ class Monitoring extends Component
         if (class_exists(Backup::class)) {
             $this->backupCount = Backup::count();
         }
-
-        if ($this->showQueueModal) {
-            $this->loadRecentFailures();
-        }
     }
 
     /**
@@ -81,6 +85,10 @@ class Monitoring extends Component
      */
     public function openQueueModal(): void
     {
+        if (! $this->authorizeQueueAction()) {
+            abort(403);
+        }
+
         $this->showQueueModal = true;
         $this->retryResult = null;
         $this->actionError = null;
@@ -102,6 +110,10 @@ class Monitoring extends Component
      */
     public function loadRecentFailures(): void
     {
+        if (! $this->authorizeQueueAction()) {
+            abort(403);
+        }
+
         $this->pendingJobs = (int) DB::table('jobs')->count();
         $this->failedJobs = (int) DB::table('failed_jobs')->count();
 
@@ -129,13 +141,13 @@ class Monitoring extends Component
         $this->actionError = null;
 
         if (! $this->authorizeQueueAction()) {
-            $this->actionError = 'You do not have permission to retry failed jobs.';
+            $this->actionError = (string) __('admin.queue_permission_denied');
 
             return;
         }
 
         if (! Str::isUuid($id) && ! ctype_digit($id)) {
-            $this->actionError = 'The job id is not valid.';
+            $this->actionError = (string) __('admin.queue_invalid_id');
 
             return;
         }
@@ -150,7 +162,7 @@ class Monitoring extends Component
             return;
         }
 
-        $this->retryResult = "Job {$id} pushed back to the queue.";
+        $this->retryResult = (string) __('admin.queue_retried', ['id' => $id]);
         $this->loadRecentFailures();
     }
 
@@ -163,19 +175,19 @@ class Monitoring extends Component
         $this->actionError = null;
 
         if (! $this->authorizeQueueAction()) {
-            $this->actionError = 'You do not have permission to retry failed jobs.';
+            $this->actionError = (string) __('admin.queue_permission_denied');
 
             return;
         }
 
         Artisan::call('queue:retry', ['id' => ['all']]);
 
-        $this->retryResult = 'All failed jobs pushed back to the queue.';
+        $this->retryResult = (string) __('admin.queue_retried_all');
         $this->loadRecentFailures();
     }
 
     /**
-     * Only admins holding the queue view permission may retry jobs.
+     * Only admins holding the queue view permission may inspect or retry jobs.
      */
     private function authorizeQueueAction(): bool
     {
@@ -192,7 +204,7 @@ class Monitoring extends Component
         $data = json_decode($payload, true);
 
         if (! is_array($data)) {
-            return 'Unknown job';
+            return (string) __('admin.queue_unknown_job');
         }
 
         if (isset($data['displayName'])) {
@@ -210,7 +222,7 @@ class Monitoring extends Component
                 return $m[1];
             }
 
-            return 'Unknown job';
+            return (string) __('admin.queue_unknown_job');
         }
     }
 
@@ -229,7 +241,7 @@ class Monitoring extends Component
             }
         }
 
-        return 'Unknown error';
+        return (string) __('admin.queue_unknown_error');
     }
 
     /**
@@ -237,7 +249,11 @@ class Monitoring extends Component
      */
     public function refresh(): void
     {
-        $this->mount(app(SystemHealth::class));
+        $this->loadMetrics(app(SystemHealth::class));
+
+        if ($this->showQueueModal && $this->authorizeQueueAction()) {
+            $this->loadRecentFailures();
+        }
     }
 
     /**

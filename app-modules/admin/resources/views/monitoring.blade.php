@@ -71,10 +71,12 @@
         <div class="card bg-base-100 border border-base-300 p-4" title="Database queue worker stats. Pending jobs are waiting to run. Failed jobs have exhausted retries — investigate on the Queue Status page.">
             <div class="flex items-center justify-between mb-2">
                 <h4 class="text-sm font-medium text-base-content/60">{{ __('admin.monitoring_queues') }}</h4>
-                <button type="button" wire:click="openQueueModal" class="btn btn-ghost btn-xs gap-1 text-primary hover:underline">
-                    {{ __('admin.queue_status') }}
-                    <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
-                </button>
+                @if(auth('admin')->user()?->hasPermission('admin.queue.view'))
+                    <button type="button" wire:click="openQueueModal" class="btn btn-ghost btn-xs gap-1 text-primary hover:underline">
+                        {{ __('admin.queue_status') }}
+                        <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                    </button>
+                @endif
             </div>
             <div class="flex gap-6 items-baseline">
                 <div>
@@ -87,15 +89,17 @@
                 </div>
                 <div>
                     <div class="text-2xl font-bold">{{ $backupCount }}</div>
-                    <div class="text-xs text-base-content/60">Backups</div>
+                    <div class="text-xs text-base-content/60">{{ __('admin.monitoring_backups') }}</div>
                 </div>
             </div>
             @if ($failedJobs > 0)
                 <div class="mt-3 pt-3 border-t border-base-200 flex items-center justify-between">
-                    <span class="text-xs text-error font-medium">{{ $failedJobs }} failed {{ $failedJobs === 1 ? 'job' : 'jobs' }} requiring attention</span>
-                    <button type="button" wire:click="openQueueModal" class="btn btn-outline btn-error btn-xs">
-                        {{ __('admin.queue_retry_all') }}
-                    </button>
+                    <span class="text-xs text-error font-medium">{{ trans_choice('admin.queue_failed_attention', $failedJobs, ['count' => $failedJobs]) }}</span>
+                    @if(auth('admin')->user()?->hasPermission('admin.queue.view'))
+                        <button type="button" wire:click="openQueueModal" class="btn btn-outline btn-error btn-xs">
+                            {{ __('admin.queue_review_failed') }}
+                        </button>
+                    @endif
                 </div>
             @endif
         </div>
@@ -110,12 +114,12 @@
                     <div>
                         <span class="text-base-content/60">Expires:</span>
                         <span class="{{ $certificate['days_remaining'] < 30 ? 'text-error font-medium' : ($certificate['days_remaining'] < 60 ? 'text-warning' : '') }}">
-                            {{ $certificate['days_remaining'] }} days
+                            {{ $certificate['days_remaining'] }} {{ __('admin.monitoring_days') }}
                         </span>
                     </div>
                 </div>
             @else
-                <div class="text-xs text-base-content/60">No TLS certificate detected</div>
+                <div class="text-xs text-base-content/60">{{ __('admin.monitoring_no_certificate') }}</div>
             @endif
         </div>
     </div>

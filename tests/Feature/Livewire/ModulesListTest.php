@@ -361,7 +361,7 @@ it('renders table with 3 fixed columns aligned across all sections and empty sta
         ->assertSeeHtml('colspan="3"');
 });
 
-it('displays required badge and suppresses action toggle for required modules', function () {
+it('displays required badge and suppresses action toggle for enabled required modules', function () {
     $module = Module::create([
         'name' => 'extensions',
         'display_name' => 'Extensions',
@@ -379,6 +379,29 @@ it('displays required badge and suppresses action toggle for required modules', 
         ->assertDontSeeHtml('wire:click="toggleEnabled(\''.$module->id.'\')"');
 });
 
+it('allows re-enabling a required module that was disabled', function () {
+    $module = Module::create([
+        'name' => 'extensions',
+        'display_name' => 'Extensions',
+        'version' => '1.0',
+        'category' => 'accounts',
+        'source' => 'core',
+        'enabled' => false,
+        'required' => true,
+    ]);
+
+    Artisan::shouldReceive('call')->once()->with('optimize:clear');
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->assertOk()
+        ->assertSeeHtml('<span class="badge badge-error badge-xs">'.__('admin.disabled').'</span>')
+        ->assertSeeHtml('wire:click="toggleEnabled(\''.$module->id.'\')"')
+        ->call('toggleEnabled', $module->id);
+
+    expect($module->fresh()->enabled)->toBeTrue();
+});
+
 it('renders category accordions open by default with an expand and collapse all control', function () {
     Module::create([
         'name' => 'extensions',
@@ -392,6 +415,6 @@ it('renders category accordions open by default with an expand and collapse all 
     Livewire::actingAs($this->admin, 'admin')
         ->test(ModulesList::class)
         ->assertOk()
-        ->assertSeeHtml('<details class="collapse collapse-arrow bg-base-100 border border-base-300 mb-3" open>')
+        ->assertSeeHtml(':open="isOpen(\'accounts\')"')
         ->assertSee(__('admin.collapse_all'));
 });

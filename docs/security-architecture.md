@@ -249,7 +249,7 @@ Pinned directly above the tab strip for immediate visibility:
 #### Tab 4: External Blocklists (`?tab=blocklists` or `?tab=feeds`)
 * **Public Threat Feeds (VoIPBL)**: Automated ingestion of public blocklists identifying active VoIP fraud and brute-force scanning networks.
 * **Fail-Open Contract**: Feed downloads are memory-bounded and stream-parsed. If a download fails or is malformed, existing kernel entries remain untouched so the server is never left unprotected.
-* **Country Filter**: Filter feed blocks to specific geographic regions or exclude your domestic operating countries.
+* **Global Scope & Geo-Blocking**: Streamlined 100% global threat feed ingestion (with dedicated IPdeny-based Geo-Blocking planned as a standalone tab; see `docs/plan-external-blocklists-and-geoblocking.md`).
 * **Drop Counters & Emergency Escape**: Live per-feed kernel drop counters, on-demand "Sync Now" action, and a prominent "Remove all feed blocks" button in case of upstream false positives.
 
 ---
@@ -363,7 +363,7 @@ php artisan security:sync-threat-feeds
 # Force sync ignoring HTTP cache
 php artisan security:sync-threat-feeds --force
 ```
-*Downloads the latest IP blocklists from configured threat feed providers (VoIPBL), filters by country, writes `/etc/tallpbx/external_blocklist.nft.pending`, validates syntax with `nft -c`, and atomically promotes elements into kernel sets.*
+*Downloads the latest IP blocklists from configured threat feed providers (VoIPBL), writes `/etc/tallpbx/external_blocklist.nft.pending`, validates syntax with `nft -c`, and atomically promotes elements into kernel sets.*
 
 #### Recompile & Apply Active Ruleset
 ```bash

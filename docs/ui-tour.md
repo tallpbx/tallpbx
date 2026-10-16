@@ -163,7 +163,7 @@ The **Security Center** (`/panel/security`) provides system administrators with 
   - **Firewall Rules** (Default active tab): Interactive, reorderable 7-stage pre-filter pipeline with a dedicated **Pre-Filters** toggle in the section header (pinned loopback rule with lock icon, confirmation modal and warning banner when turned off, and Lockout Guard safety enforcement), PBX port catalog with hardened **TFTP Provisioning Defense** (UDP 69) featuring real-time progress animation and click locking, custom sequential rules with viewport-sticky horizontal navigation controls, and fallback default policy with in-progress animation.
   - **Allow & Block Lists**: Trusted Whitelist with 1-click self-protection for administrator IPs, permanent CIDR-aware Blacklist, and bypassed status badges when pre-filters are disarmed.
   - **Attackers**: Active intrusion bans with entry-point badges (`SIP`, `Web`, `SSH`, `SIP Scanner`), hardware countdown timers, detected attack probes review, and the **SIP Bot & Scanner Signatures** card (curated scanner tool detection, decoupled dialplan sensor, auto-block firewall toggle, and live conntrack session termination).
-  - **External Blocklists**: Automated public VoIP fraud intelligence (VoIPBL) with country filtering, live drop counters, and fail-open resilience.
+  - **External Blocklists**: Automated public VoIP fraud intelligence (VoIPBL) with a global threat feed, live drop counters, and fail-open resilience (with dedicated Geo-Blocking planned as a standalone tab).
 
 ![TallPBX Security Center (Light Theme)](images/security-dashboard-light.png)
 

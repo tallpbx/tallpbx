@@ -77,7 +77,7 @@ class QueueStatus extends Component
         $this->actionError = null;
 
         if (! $this->authorizeRetry()) {
-            $this->actionError = 'You do not have permission to retry failed jobs.';
+            $this->actionError = (string) __('admin.queue_permission_denied');
 
             return;
         }
@@ -85,7 +85,7 @@ class QueueStatus extends Component
         // Only uuid (or numeric, for legacy failer providers) ids are
         // valid; 'all' would requeue every failed job.
         if (! Str::isUuid($id) && ! ctype_digit($id)) {
-            $this->actionError = 'The job id is not valid.';
+            $this->actionError = (string) __('admin.queue_invalid_id');
 
             return;
         }
@@ -101,7 +101,7 @@ class QueueStatus extends Component
             return;
         }
 
-        $this->retryResult = "Job {$id} pushed back to the queue.";
+        $this->retryResult = (string) __('admin.queue_retried', ['id' => $id]);
         $this->refresh();
     }
 
@@ -114,14 +114,14 @@ class QueueStatus extends Component
         $this->actionError = null;
 
         if (! $this->authorizeRetry()) {
-            $this->actionError = 'You do not have permission to retry failed jobs.';
+            $this->actionError = (string) __('admin.queue_permission_denied');
 
             return;
         }
 
         Artisan::call('queue:retry', ['id' => ['all']]);
 
-        $this->retryResult = 'All failed jobs pushed back to the queue.';
+        $this->retryResult = (string) __('admin.queue_retried_all');
         $this->refresh();
     }
 
@@ -143,7 +143,7 @@ class QueueStatus extends Component
         $data = json_decode($payload, true);
 
         if (! is_array($data)) {
-            return 'Unknown job';
+            return (string) __('admin.queue_unknown_job');
         }
 
         $command = $data['data']['command'] ?? '';
@@ -160,7 +160,7 @@ class QueueStatus extends Component
                 return $m[1];
             }
 
-            return 'Unknown job';
+            return (string) __('admin.queue_unknown_job');
         }
     }
 
@@ -179,7 +179,7 @@ class QueueStatus extends Component
             }
         }
 
-        return 'Unknown error';
+        return (string) __('admin.queue_unknown_error');
     }
 
     /**

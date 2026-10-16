@@ -12,6 +12,7 @@ use App\Services\DialplanContext;
 use App\Services\TenantContext;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Modules\Extensions\Models\Extension;
 use Modules\Gateways\Models\Gateway;
 use Modules\InboundRoutes\Models\InboundRoute;
@@ -22,6 +23,11 @@ use Modules\Voicemails\Models\Voicemail;
 
 beforeEach(function (): void {
     config(['freeswitch.demo_mode' => true]);
+    File::deleteDirectory(base_path('custom-modules/demo-webhook'));
+});
+
+afterEach(function (): void {
+    File::deleteDirectory(base_path('custom-modules/demo-webhook'));
 });
 
 it('seeds production defaults without demo data', function (): void {
