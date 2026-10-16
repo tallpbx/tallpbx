@@ -243,6 +243,40 @@ it('captures documentation screenshots', function (): void {
     settleDocumentationPage($page);
     $page->wait(1.2)->screenshot(fullPage: false, filename: 'landing-dark');
 
+    // Helper to capture light and dark variants of a page
+    $capturePageDualTheme = function (object $page, string $baseFilename) {
+        // Light Theme
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'light');
+                document.documentElement.setAttribute('data-theme', 'light');
+            })()
+        JS);
+        $page->wait(0.6);
+        settleDocumentationPage($page);
+        $page->screenshot(fullPage: false, filename: $baseFilename);
+
+        // Dark Theme
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'dark');
+                document.documentElement.setAttribute('data-theme', 'dark');
+            })()
+        JS);
+        $page->wait(0.6);
+        settleDocumentationPage($page);
+        $page->screenshot(fullPage: false, filename: $baseFilename.'-dark');
+
+        // Restore light theme for subsequent interactions
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'light');
+                document.documentElement.setAttribute('data-theme', 'light');
+            })()
+        JS);
+        $page->wait(0.3);
+    };
+
     // 3. Unified Panel Dashboard — Full Sidebar
     $this->admin->update([
         'theme' => 'light',
@@ -261,7 +295,7 @@ it('captures documentation screenshots', function (): void {
         ->and($page->script("localStorage.getItem('tallpbx:sidebar_collapsed')"))->toBe('false')
         ->and($page->script('document.documentElement.getAttribute("data-layout-mode")'))->toBe('sidebar')
         ->and($page->script('document.documentElement.getAttribute("data-sidebar-collapsed")'))->toBe('false');
-    $page->screenshot(fullPage: false, filename: 'dashboard-full-sidebar');
+    $capturePageDualTheme($page, 'dashboard-full-sidebar');
 
     // 4. Unified Panel Dashboard — Compressed Sidebar (Mini Icon Rail)
     $this->admin->update([
@@ -276,7 +310,7 @@ it('captures documentation screenshots', function (): void {
     settleDocumentationPage($page);
     expect($page->script("localStorage.getItem('tallpbx:sidebar_collapsed')"))->toBe('true')
         ->and($page->script('document.documentElement.getAttribute("data-sidebar-collapsed")'))->toBe('true');
-    $page->screenshot(fullPage: false, filename: 'dashboard-compressed-sidebar');
+    $capturePageDualTheme($page, 'dashboard-compressed-sidebar');
 
     // 5. Unified Panel Dashboard — Horizontal Topbar Menu
     $this->admin->update([
@@ -290,7 +324,7 @@ it('captures documentation screenshots', function (): void {
     $page->wait(0.5);
     settleDocumentationPage($page);
     expect($page->script('document.documentElement.getAttribute("data-layout-mode")'))->toBe('horizontal');
-    $page->screenshot(fullPage: false, filename: 'dashboard-horizontal-menu');
+    $capturePageDualTheme($page, 'dashboard-horizontal-menu');
 
     // Reset layout back to standard full sidebar for remaining section pages
     $this->admin->update([
@@ -302,22 +336,19 @@ it('captures documentation screenshots', function (): void {
     $page = visitDocumentationPage($this, '/panel/tenants');
     $page->waitForText('Tenants')
         ->wait(1.2);
-    settleDocumentationPage($page);
-    $page->screenshot(fullPage: false, filename: 'pbx-tenants');
+    $capturePageDualTheme($page, 'pbx-tenants');
 
     // 7. PBX Devices
     $page = visitDocumentationPage($this, '/panel/devices');
     $page->waitForText('Devices')
         ->wait(1.2);
-    settleDocumentationPage($page);
-    $page->screenshot(fullPage: false, filename: 'pbx-devices');
+    $capturePageDualTheme($page, 'pbx-devices');
 
     // 8. PBX Extensions
     $page = visitDocumentationPage($this, '/panel/extensions');
     $page->waitForText('Extensions')
         ->wait(1.2);
-    settleDocumentationPage($page);
-    $page->screenshot(fullPage: false, filename: 'pbx-extensions');
+    $capturePageDualTheme($page, 'pbx-extensions');
 
     // 9. User Impersonation & Support View
     $page = visitDocumentationPage($this, '/panel/users');
@@ -326,29 +357,35 @@ it('captures documentation screenshots', function (): void {
         ->click('form[action*="impersonate"] button')
         ->waitForText('Stop Impersonating')
         ->wait(1.2);
-    settleDocumentationPage($page);
-    $page->screenshot(fullPage: false, filename: 'pbx-impersonation');
+    $capturePageDualTheme($page, 'pbx-impersonation');
 
     // 10. Multi-Language Switcher
     $page->press('Stop Impersonating')
         ->waitForText('Dashboard')
         ->click('div[x-data*="locales"] button')
         ->wait(0.6);
-    settleDocumentationPage($page);
-    $page->screenshot(fullPage: false, filename: 'pbx-multi-language');
+    $capturePageDualTheme($page, 'pbx-multi-language');
 
     // Copy captured screenshots into docs/images/
     $images = [
         'landing-light.png',
         'landing-dark.png',
         'dashboard-full-sidebar.png',
+        'dashboard-full-sidebar-dark.png',
         'dashboard-compressed-sidebar.png',
+        'dashboard-compressed-sidebar-dark.png',
         'dashboard-horizontal-menu.png',
+        'dashboard-horizontal-menu-dark.png',
         'pbx-tenants.png',
+        'pbx-tenants-dark.png',
         'pbx-devices.png',
+        'pbx-devices-dark.png',
         'pbx-extensions.png',
+        'pbx-extensions-dark.png',
         'pbx-impersonation.png',
+        'pbx-impersonation-dark.png',
         'pbx-multi-language.png',
+        'pbx-multi-language-dark.png',
     ];
 
     foreach ($images as $img) {

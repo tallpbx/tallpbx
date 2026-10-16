@@ -36,15 +36,42 @@ The default desktop layout provides an expansive sidebar organized by functional
 
 ![TallPBX Dashboard — Full Sidebar Layout](images/dashboard-full-sidebar.png)
 
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Dashboard — Full Sidebar Layout (Dark)](images/dashboard-full-sidebar-dark.png)
+
+</details>
+
 ### Mode B: Mini Icon-Rail Sidebar (`w-16`)
 For smaller screens or maximized workspace, the sidebar collapses into a compact icon rail. Icons remain fully accessible with instant tooltips, maximizing horizontal data table area.
 
 ![TallPBX Dashboard — Mini Icon Rail Layout](images/dashboard-compressed-sidebar.png)
 
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Dashboard — Mini Icon Rail Layout (Dark)](images/dashboard-compressed-sidebar-dark.png)
+
+</details>
+
 ### Mode C: Horizontal Topbar Navigation
 For administrators accustomed to classic PBX topbars or horizontal workflow menus, the navigation transforms into responsive topbar dropdowns with breadcrumb pathing.
 
 ![TallPBX Dashboard — Horizontal Topbar Menu](images/dashboard-horizontal-menu.png)
+
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Dashboard — Horizontal Topbar Menu (Dark)](images/dashboard-horizontal-menu-dark.png)
+
+</details>
 
 ---
 
@@ -55,15 +82,42 @@ Manage multiple organizations, customer tenants, and internal business units fro
 
 ![TallPBX Multi-Tenant Management](images/pbx-tenants.png)
 
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Multi-Tenant Management (Dark)](images/pbx-tenants-dark.png)
+
+</details>
+
 ### Extension Management
 Configure SIP extensions with custom caller ID, directory display names, voicemail integration, and call forwarding rules.
 
 ![TallPBX Extension Management](images/pbx-extensions.png)
 
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Extension Management (Dark)](images/pbx-extensions-dark.png)
+
+</details>
+
 ### Device Provisioning & Hardware Management
 Assign SIP accounts to physical VoIP desk phones (Yealink, Polycom, Grandstream, Cisco) or softphones with auto-provisioning MAC address tracking and templates.
 
 ![TallPBX Device Provisioning](images/pbx-devices.png)
+
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Device Provisioning (Dark)](images/pbx-devices-dark.png)
+
+</details>
 
 ### User Impersonation & Tenant Support Troubleshooting
 System administrators can troubleshoot tenant issues in real time by impersonating any tenant user with a single click from the Users directory.
@@ -72,12 +126,30 @@ The panel immediately reconfigures into the tenant user's perspective, applying 
 
 ![TallPBX User Impersonation](images/pbx-impersonation.png)
 
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX User Impersonation (Dark)](images/pbx-impersonation-dark.png)
+
+</details>
+
 ### Multi-Language Localization (English, Spanish, French)
 TallPBX provides comprehensive multi-language support across the unified control panel and public interfaces.
 
 Users can toggle their preferred language instantly via the topbar language dropdown menu. The selection is immediately applied to all interface text, labels, and tooltips, while being saved to the user's database record (`HasLocalePreference`) so all system notifications, emails, and voicemail alerts are dispatched in their chosen language.
 
 ![TallPBX Multi-Language Localization](images/pbx-multi-language.png)
+
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX Multi-Language Localization (Dark)](images/pbx-multi-language-dark.png)
+
+</details>
 
 ---
 
