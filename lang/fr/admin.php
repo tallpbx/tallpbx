@@ -209,6 +209,7 @@ return [
     'add_domain' => 'Ajouter un Domaine',
 
     // ─── Common UI ──────────────────────────────────────────────────────────
+    'never' => 'Jamais',
     'light' => 'Clair',
     'dark' => 'Sombre',
     'system' => 'Système',

@@ -389,6 +389,7 @@ return [
     'security_rate_limited_active' => 'Protegido contra inundación',
     'security_unlimited_active' => 'Sin restricciones / Sin límite de velocidad',
     'security_rate_limit_pps' => 'Tasa máx. (paquetes/seg)',
+    'security_rate_burst_packets' => 'Tolerancia de ráfaga (paquetes)',
     'security_icmp_dual_stack_note' => 'Se aplica a solicitudes de eco ICMP IPv4 e IPv6. El descubrimiento de vecinos IPv6 esencial (ND) y los anuncios de enrutador siempre se conservan.',
     'security_tab_geo_blocking' => 'Bloqueo Geográfico',
     'security_geo_blocking_title' => 'Bloqueo Geográfico',

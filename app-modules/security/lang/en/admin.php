@@ -389,6 +389,7 @@ return [
     'security_rate_limited_active' => 'Protected from Flood',
     'security_unlimited_active' => 'Unrestricted / No Rate Limit',
     'security_rate_limit_pps' => 'Max Rate (packets/sec)',
+    'security_rate_burst_packets' => 'Burst Allowance (packets)',
     'security_icmp_dual_stack_note' => 'Applies to IPv4 and IPv6 ICMP echo-requests. Essential IPv6 Neighbor Discovery (ND) and Router Advertisements are always preserved.',
     'security_tab_geo_blocking' => 'Geo-Blocking',
     'security_geo_blocking_title' => 'Geo-Blocking',

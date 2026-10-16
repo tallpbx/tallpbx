@@ -538,6 +538,7 @@ return [
     'add_domain' => 'Add Domain',
 
     // ─── Common UI ──────────────────────────────────────────────────────────
+    'never' => 'Never',
     'light' => 'Light',
     'dark' => 'Dark',
     'system' => 'System',

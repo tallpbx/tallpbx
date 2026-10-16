@@ -208,6 +208,7 @@ return [
     'add_domain' => 'Agregar Dominio',
 
     // ─── Common UI ──────────────────────────────────────────────────────────
+    'never' => 'Nunca',
     'light' => 'Claro',
     'dark' => 'Oscuro',
     'system' => 'Sistema',

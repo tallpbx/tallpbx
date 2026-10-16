@@ -389,6 +389,7 @@ return [
     'security_rate_limited_active' => 'Protégé contre les inondations',
     'security_unlimited_active' => 'Sans restriction / Aucun débit limite',
     'security_rate_limit_pps' => 'Débit max (paquets/sec)',
+    'security_rate_burst_packets' => 'Tolérance de rafale (paquets)',
     'security_icmp_dual_stack_note' => 'S\'applique aux requêtes d\'écho ICMP IPv4 et IPv6. La découverte essentielle de voisins IPv6 (ND) et les annonces de routeur sont toujours préservées.',
     'security_tab_geo_blocking' => 'Géo-Blocage',
     'security_geo_blocking_title' => 'Géo-Blocage',
