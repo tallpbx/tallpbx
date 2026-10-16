@@ -229,9 +229,30 @@ class SecurityManager extends Component
      */
     protected function ensureEditPermission(): void
     {
+        $this->ensureAnyPermission('security.edit');
+    }
+
+    /**
+     * Refuse an action unless the authenticated administrator holds at least
+     * one of the given permissions. Granular feature permissions (such as
+     * geo-blocking management) can authorize their own scoped firewall
+     * applies through this without granting blanket edit access.
+     *
+     * @param  string  ...$permissions  One or more accepted permission names
+     */
+    protected function ensureAnyPermission(string ...$permissions): void
+    {
         $actor = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
 
-        abort_unless($actor !== null && $actor->hasPermission('security.edit'), 403);
+        abort_unless($actor !== null, 403);
+
+        foreach ($permissions as $permission) {
+            if ($actor->hasPermission($permission)) {
+                return;
+            }
+        }
+
+        abort(403);
     }
 
     /**
@@ -302,14 +323,21 @@ class SecurityManager extends Component
 
     /**
      * Automatically compile and atomically apply firewall changes to the Linux kernel.
+     *
+     * @param  array<int, string>|null  $acceptedPermissions  Permission names that may authorize this apply; null keeps the blanket security.edit requirement.
      */
     public function autoApplyFirewallRuleset(
         ?LockoutGuardService $lockoutGuard = null,
         ?SecurityConfigGenerator $generator = null,
         ?SecurityExecutorInterface $executor = null,
-        bool $force = false
+        bool $force = false,
+        ?array $acceptedPermissions = null
     ): bool {
-        $this->ensureEditPermission();
+        // Scoped callers (geo-blocking) pass their own accepted permission
+        // set; everyone else still needs the blanket edit permission.
+        $acceptedPermissions === null
+            ? $this->ensureEditPermission()
+            : $this->ensureAnyPermission(...$acceptedPermissions);
 
         $lockoutGuard ??= app(LockoutGuardService::class);
         $generator ??= app(SecurityConfigGenerator::class);

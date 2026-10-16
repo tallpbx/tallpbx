@@ -232,10 +232,15 @@ trait ManagesGeoBlocking
 
     /**
      * Helper to regenerate the pending firewall ruleset and apply it safely via the bounded helper.
+     *
+     * Geo actions accept the granular geo-blocking permission OR the blanket
+     * security.edit permission so either can authorize the scoped apply.
      */
     protected function regenerateAndApplyFirewall(): bool
     {
-        return $this->autoApplyFirewallRuleset();
+        return $this->autoApplyFirewallRuleset(
+            acceptedPermissions: ['security.geo-blocking.manage', 'security.edit']
+        );
     }
 
     /**

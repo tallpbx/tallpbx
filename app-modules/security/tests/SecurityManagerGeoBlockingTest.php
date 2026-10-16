@@ -110,3 +110,42 @@ it('prevents self-lockout when enabling geofence without whitelist coverage', fu
 
     expect(SecurityGeoRule::instance()->enabled)->toBeTrue();
 });
+
+it('lets an admin with only the granular geo permission toggle geo blocking', function (): void {
+    $geoAdmin = grantAdminPermissions(
+        Admin::factory()->create(['enabled' => true]),
+        ['security.view', 'security.geo-blocking.manage']
+    );
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'blacklist';
+    $rule->countries = ['US'];
+    $rule->save();
+
+    Livewire::actingAs($geoAdmin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->call('setGeoEnabled', true)
+        ->assertOk();
+
+    expect(SecurityGeoRule::instance()->enabled)->toBeTrue();
+});
+
+it('rejects geo mutations from admins without geo permissions before any state change', function (): void {
+    $viewer = grantAdminPermissions(
+        Admin::factory()->create(['enabled' => true]),
+        ['security.view']
+    );
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'blacklist';
+    $rule->countries = ['US'];
+    $rule->enabled = false;
+    $rule->save();
+
+    Livewire::actingAs($viewer, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->call('setGeoEnabled', true)
+        ->assertForbidden();
+
+    expect(SecurityGeoRule::instance()->enabled)->toBeFalse();
+});
