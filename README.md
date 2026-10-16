@@ -46,11 +46,9 @@ See the [Feature and Function Parity Guide](docs/parity-comparison.md) for a dom
 
 TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, Laravel 13) with DaisyUI components, offering a modern responsive control panel with light and dark themes and three switchable navigation layouts:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/landing-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/landing-light.png">
-  <img alt="TallPBX Public Landing Page" src="docs/images/landing-light.png">
-</picture>
+| Public Landing (Light Theme) | Public Landing (Dark Theme) |
+| :---: | :---: |
+| [![TallPBX Landing Page (Light)](docs/images/landing-light.png)](docs/ui-tour.md#1-public-guest-landing-page) | [![TallPBX Landing Page (Dark)](docs/images/landing-dark.png)](docs/ui-tour.md#1-public-guest-landing-page) |
 
 ### Unified Panel & Flexible Navigation Layouts
 
