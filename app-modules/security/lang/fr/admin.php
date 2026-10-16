@@ -440,6 +440,7 @@ return [
     'security_geo_sync_failed' => 'Échec de la synchronisation Géo-IP : :error',
     'security_geo_lockout_warning' => 'Alerte de Sécurité : Le mode "Bloquer tous sauf les sélectionnés" ne peut pas être activé tant que votre connexion actuelle n\'est pas dans la liste de confiance.',
     'security_geo_whitelist_countries_required' => 'Sélectionnez au moins un pays avant d\'activer Bloquer tous sauf les sélectionnés — une sélection vide bloquerait le trafic de tous les pays.',
+    'security_geo_prefilter_required' => 'Les pré-filtres intégrés doivent être activés avant d\'utiliser Bloquer tous sauf les sélectionnés, sinon cet administrateur risque d\'être verrouillé.',
     'security_manage_geo_blocking' => 'Gérer le Géo-Blocage',
     'security_geo_country_single' => 'Pays',
     'security_geo_country_plural' => 'Pays',

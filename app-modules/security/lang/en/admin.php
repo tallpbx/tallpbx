@@ -440,6 +440,7 @@ return [
     'security_geo_sync_failed' => 'Geo-IP sync failed: :error',
     'security_geo_lockout_warning' => 'Zero-Lockout Safety Alert: "Block All Except Selected" mode cannot be enabled unless your current administrator connection IP is in the Trusted Whitelist.',
     'security_geo_whitelist_countries_required' => 'Select at least one country before enabling Block All Except Selected — an empty selection would drop traffic from every country.',
+    'security_geo_prefilter_required' => 'Built-in pre-filters must be enabled before using Block All Except Selected, otherwise this administrator could be locked out.',
     'security_manage_geo_blocking' => 'Manage Geo-Blocking',
     'security_geo_country_single' => 'Country',
     'security_geo_country_plural' => 'Countries',

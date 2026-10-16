@@ -15,6 +15,7 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
+use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\GeoBlockingService;
 use Modules\Security\Services\SecurityConfigGenerator;
 
@@ -230,4 +231,59 @@ it('refuses to enable whitelist geo blocking with no countries selected', functi
         ->assertOk();
 
     expect(SecurityGeoRule::instance()->enabled)->toBeFalse();
+});
+
+it('refuses to enable whitelist geo blocking while pre-filters are disarmed', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    // Disarmed pre-filters remove the trusted-whitelist accept stage, so
+    // the geo drop would precede any accept for this administrator's IP.
+    SecuritySetting::updateOrCreate(['key' => 'prefilter_enabled'], ['value' => '0']);
+
+    // The refusal must happen up front: no zone downloads may be attempted
+    // for a perimeter that can never be armed safely.
+    $this->geoProvider->shouldReceive('fetchCountryRanges')->never();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('setGeoEnabled', true)
+        ->assertOk();
+
+    expect(SecurityGeoRule::instance()->enabled)->toBeFalse();
+});
+
+it('refuses switching an enabled rule into whitelist mode while pre-filters are disarmed', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    SecuritySetting::updateOrCreate(['key' => 'prefilter_enabled'], ['value' => '0']);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'blacklist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    // Same up-front refusal requirement when switching modes on an armed rule.
+    $this->geoProvider->shouldReceive('fetchCountryRanges')->never();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('saveGeoSettings')
+        ->assertOk();
+
+    // The mode must stay blacklist instead of arming a whitelist perimeter
+    // whose trusted-IP accept stage is currently switched off.
+    expect(SecurityGeoRule::instance()->mode)->toBe('blacklist');
 });

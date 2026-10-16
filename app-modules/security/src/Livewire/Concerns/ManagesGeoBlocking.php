@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityGeoRule;
+use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\GeoBlockingService;
 use Modules\Security\Services\LockoutGuardService;
 
@@ -62,6 +63,15 @@ trait ManagesGeoBlocking
             // drop-everything perimeter; refuse until a country is chosen.
             if (empty($this->geoCountries)) {
                 $this->notifyError((string) __('admin.security_geo_whitelist_countries_required'));
+
+                return;
+            }
+
+            // With pre-filters disarmed the trusted-whitelist accept stage is
+            // absent from the ruleset, so the geo drop (stage 9.5) would fire
+            // before any accept for this administrator's own connection.
+            if (! SecuritySetting::getBoolean('prefilter_enabled', true)) {
+                $this->notifyError((string) __('admin.security_geo_prefilter_required'));
 
                 return;
             }
@@ -168,6 +178,14 @@ trait ManagesGeoBlocking
             $lockoutGuard = app(LockoutGuardService::class);
             if (! $lockoutGuard->isWhitelisted($this->adminIp)) {
                 $this->notifyError((string) __('admin.security_geo_lockout_warning'));
+
+                return;
+            }
+
+            // Same stage-9.5 lockout mechanics as enablement: switching an
+            // armed rule into whitelist mode needs the trusted accept stage.
+            if (! SecuritySetting::getBoolean('prefilter_enabled', true)) {
+                $this->notifyError((string) __('admin.security_geo_prefilter_required'));
 
                 return;
             }
