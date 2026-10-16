@@ -50,7 +50,7 @@ it('formats the VoIPBL query URL', function (): void {
     expect($this->provider->fetchUrl(SecurityThreatFeed::factory()->make()))
         ->toBe('https://www.voipbl.org/update/')
         ->and(VoipblFeedProvider::FEED_URL)->toBe('https://www.voipbl.org/update/')
-        ->and(VoipblFeedProvider::SEARCH_URL)->toBe('https://www.voipbl.org/check/')
+        ->and(VoipblFeedProvider::SEARCH_URL)->toBe('https://www.voipbl.org/#check')
         ->and($this->provider->identifier())->toBe('voipbl')
         ->and($this->provider->name())->toBe('VoIPBL');
 });

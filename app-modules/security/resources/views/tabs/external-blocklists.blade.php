@@ -128,7 +128,7 @@
                         <p class="text-base-content/60">{{ __('admin.security_threat_feed_whitelist_hint') }}</p>
                         
                         <div class="flex flex-wrap items-center gap-3 pt-1 border-t border-base-200/60 mt-2">
-                            <a href="https://www.voipbl.org/check/" target="_blank" rel="noopener noreferrer"
+                            <a href="https://www.voipbl.org/#check" target="_blank" rel="noopener noreferrer"
                                class="link link-primary inline-flex items-center gap-1 font-medium">
                                 <span>{{ __('admin.security_threat_feed_search_url_label') }}</span>
                                 <x-heroicon-m-arrow-top-right-on-square class="w-3.5 h-3.5" />

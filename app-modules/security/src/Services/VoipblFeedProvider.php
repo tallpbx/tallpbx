@@ -19,7 +19,7 @@ class VoipblFeedProvider implements ThreatFeedProviderInterface
 {
     public const FEED_URL = 'https://www.voipbl.org/update/';
 
-    public const SEARCH_URL = 'https://www.voipbl.org/check/';
+    public const SEARCH_URL = 'https://www.voipbl.org/#check';
 
     /**
      * Create the provider instance.
