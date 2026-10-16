@@ -349,3 +349,11 @@ it('surfaces translated delete-flow errors', function () {
         App::setLocale('en');
     }
 });
+
+it('renders table with 7 columns aligning headers with actions dropdown and empty state', function () {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(ModulesList::class)
+        ->assertOk()
+        ->assertSeeHtml('<th class="w-12"></th>')
+        ->assertSeeHtml('colspan="7"');
+});

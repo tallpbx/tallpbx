@@ -636,7 +636,7 @@ abstract class ModuleServiceProvider extends ServiceProvider
             return;
         }
 
-        $namespace = "Modules\\{$pascalName}";
+        $namespace = $this->moduleNamespace();
 
         foreach ($groups as $group) {
             if (! ($group['enabled'] ?? false)) {

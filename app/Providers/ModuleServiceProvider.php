@@ -474,12 +474,23 @@ class ModuleServiceProvider extends ServiceProvider
         if (str_starts_with($constraint, '^')) {
             $lower = substr($constraint, 1);
             $parts = explode('.', $lower);
-            // The ^ constraint accepts everything below the next major
-            // version: ^1.2 means >= 1.2 and < 2.0.
-            $nextMajor = ((int) $parts[0] + 1).'.0.0';
+            // The ^ constraint accepts everything below the next breaking version.
+            // Under Composer semantics:
+            // - ^1.2   => >= 1.2   < 2.0.0
+            // - ^0.2.3 => >= 0.2.3 < 0.3.0
+            // - ^0.0.3 => >= 0.0.3 < 0.0.4
+            if ($parts[0] !== '0') {
+                $nextBreaking = ((int) $parts[0] + 1).'.0.0';
+            } elseif (isset($parts[1]) && $parts[1] !== '0') {
+                $nextBreaking = '0.'.((int) $parts[1] + 1).'.0';
+            } elseif (isset($parts[1]) && $parts[1] === '0' && isset($parts[2])) {
+                $nextBreaking = '0.0.'.((int) $parts[2] + 1);
+            } else {
+                $nextBreaking = '1.0.0';
+            }
 
             return version_compare($installed, $lower, '>=')
-                && version_compare($installed, $nextMajor, '<');
+                && version_compare($installed, $nextBreaking, '<');
         }
 
         return version_compare($installed, $constraint, '==');

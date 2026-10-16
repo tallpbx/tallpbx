@@ -223,8 +223,81 @@ it('resolves version constraints with composer semantics', function () {
         // Caret keeps accepting everything below the next major.
         ->and($method->invoke($provider, '1.9.9', '^1.2'))->toBeTrue()
         ->and($method->invoke($provider, '2.0.0', '^1.2'))->toBeFalse()
+        // Caret on 0.x series with composer semantics (breaking changes at minor/patch)
+        ->and($method->invoke($provider, '0.2.3', '^0.2.3'))->toBeTrue()
+        ->and($method->invoke($provider, '0.2.9', '^0.2.3'))->toBeTrue()
+        ->and($method->invoke($provider, '0.3.0', '^0.2.3'))->toBeFalse()
+        ->and($method->invoke($provider, '0.0.3', '^0.0.3'))->toBeTrue()
+        ->and($method->invoke($provider, '0.0.4', '^0.0.3'))->toBeFalse()
         // Exact and wildcard forms stay intact.
         ->and($method->invoke($provider, '1.2.3', '1.2.3'))->toBeTrue()
         ->and($method->invoke($provider, '1.2.4', '1.2.3'))->toBeFalse()
         ->and($method->invoke($provider, '9.9.9', '*'))->toBeTrue();
+});
+
+it('uses moduleNamespace when auto-registering route groups', function () {
+    if (! class_exists('CustomModules\\TestCustom\\Livewire\\TestCustomList')) {
+        eval('namespace CustomModules\\TestCustom\\Livewire; class TestCustomList { public function __invoke() {} }');
+    }
+
+    $fixtureDir = sys_get_temp_dir().'/tallpbx-test-custom-route-'.uniqid();
+    mkdir($fixtureDir.'/src/Livewire', 0755, true);
+    file_put_contents($fixtureDir.'/src/Livewire/TestCustomList.php', '<?php');
+
+    $provider = new class(app(), $fixtureDir) extends \App\Support\ModuleServiceProvider
+    {
+        /**
+         * Test provider constructor.
+         */
+        public function __construct($app, private string $dir)
+        {
+            parent::__construct($app);
+        }
+
+        /**
+         * Return test module name.
+         */
+        protected function moduleName(): string
+        {
+            return 'test-custom';
+        }
+
+        /**
+         * Return custom module namespace.
+         */
+        protected function moduleNamespace(): string
+        {
+            return 'CustomModules\\TestCustom';
+        }
+
+        /**
+         * Return custom module path.
+         */
+        protected function modulePath(): string
+        {
+            return $this->dir;
+        }
+
+        /**
+         * Invoke auto-registration.
+         */
+        public function runAutoRegister(): void
+        {
+            $method = new ReflectionMethod(\App\Support\ModuleServiceProvider::class, 'autoRegisterRouteGroups');
+            $method->invoke($this);
+        }
+    };
+
+    try {
+        $provider->runAutoRegister();
+        Route::getRoutes()->refreshNameLookups();
+        $route = Route::getRoutes()->getByName('panel.test-custom.index');
+        expect($route)->not->toBeNull()
+            ->and($route->getAction('uses'))->toBe('CustomModules\\TestCustom\\Livewire\\TestCustomList@__invoke');
+    } finally {
+        unlink($fixtureDir.'/src/Livewire/TestCustomList.php');
+        rmdir($fixtureDir.'/src/Livewire');
+        rmdir($fixtureDir.'/src');
+        rmdir($fixtureDir);
+    }
 });

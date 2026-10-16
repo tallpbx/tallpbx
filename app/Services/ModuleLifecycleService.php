@@ -597,7 +597,22 @@ class ModuleLifecycleService
     private function appendCrossTestWarnings(string $name, array &$warnings): void
     {
         $studly = Str::studly($name);
-        $needle = "Modules\\{$studly}\\";
+        $needles = [
+            "Modules\\{$studly}\\",
+            "CustomModules\\{$studly}\\",
+        ];
+
+        $customDir = $this->customDir($name);
+        if ($customDir !== null) {
+            $manifest = $this->manifestFor($customDir);
+            if (! empty($manifest['namespace'])) {
+                $customPrefix = rtrim((string) $manifest['namespace'], '\\').'\\';
+                if (! in_array($customPrefix, $needles, true)) {
+                    $needles[] = $customPrefix;
+                }
+            }
+        }
+
         $ownDirs = [
             $this->basePath()."/tests/Feature/Modules/{$studly}",
             $this->basePath()."/custom-modules/{$name}",
@@ -630,8 +645,13 @@ class ModuleLifecycleService
                 }
             }
 
-            if (str_contains((string) $file->getContents(), $needle)) {
-                $hits[] = str_replace($this->basePath().'/', '', $path);
+            $contents = (string) $file->getContents();
+
+            foreach ($needles as $needle) {
+                if (str_contains($contents, $needle)) {
+                    $hits[] = str_replace($this->basePath().'/', '', $path);
+                    break;
+                }
             }
         }
 

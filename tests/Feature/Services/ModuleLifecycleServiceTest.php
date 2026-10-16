@@ -263,6 +263,16 @@ it('scans only module code and central tests for cross-module references, skippi
         ->and($warnings)->not->toContain('.git');
 });
 
+it('detects cross-module test references using CustomModules namespace for custom extensions', function (): void {
+    File::makeDirectory($this->sandbox.'/tests/Feature', 0755, true);
+    File::put($this->sandbox.'/tests/Feature/CustomToolTest.php', "<?php\n\nuse CustomModules\\RogueTool\\Something;\n");
+
+    $preview = $this->service->previewUninstall('rogue-tool');
+    $warnings = implode(' ', $preview['warnings']);
+
+    expect($warnings)->toContain('tests/Feature/CustomToolTest.php');
+});
+
 // ─── Restore: vendor re-require only ─────────────────────────────
 
 it('restores a vendor module through Composer re-require', function (): void {

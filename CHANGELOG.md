@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Module Workbench Table Column Alignment & Empty State Colspan**:
+  - Aligned table columns in `app-modules/admin/resources/views/modules-list.blade.php` by adding an empty action header column (`<th class="w-12"></th>`) matching the 7th column dropdown action cell in `<tbody>`, and updated empty state spanning from `colspan="6"` to `colspan="7"`.
+- **Dynamic Module Namespace Auto-Registration**:
+  - Updated `App\Support\ModuleServiceProvider::autoRegisterRouteGroups()` to dynamically bind components using `$this->moduleNamespace()` instead of a hardcoded `Modules\{PascalName}` prefix, ensuring custom extensions under `CustomModules\` can auto-register convention routes without manual route definitions.
+- **Custom Module Cross-Test Reference Scanning**:
+  - Enhanced `ModuleLifecycleService::appendCrossTestWarnings()` to scan for references under `CustomModules\{Studly}\` in addition to `Modules\{Studly}\`, catching test references to custom extensions during uninstall previews.
+- **Composer SemVer 0.x Caret Constraint Handling**:
+  - Modernized `App\Providers\ModuleServiceProvider::satisfiesVersion()` to evaluate `^0.x` constraints using standard Composer SemVer semantics (`^0.2.3` bounded by `< 0.3.0` and `^0.0.3` bounded by `< 0.0.4`).
+
 ### Changed
 - **Documentation Screenshots Refresh & Security Center Theme Duality**:
   - Refreshed all stale documentation screenshots in `docs/images/` using perceptual diff gating to capture the modern v4.x navigation and data views without unnecessary churn (`dashboard-full-sidebar.png`, `dashboard-compressed-sidebar.png`, `dashboard-horizontal-menu.png`, `pbx-tenants.png`, `pbx-devices.png`, `pbx-extensions.png`, `pbx-impersonation.png`, and `pbx-multi-language.png`).

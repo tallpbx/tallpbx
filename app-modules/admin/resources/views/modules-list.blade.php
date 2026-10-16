@@ -22,6 +22,7 @@
                                 <th>{{ __('admin.modules_source') }}</th>
                                 <th>{{ __('client.status') }}</th>
                                 <th>{{ __('client.actions') }}</th>
+                                <th class="w-12"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -114,7 +115,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center py-6 text-base-content/40">{{ __('admin.no_modules_found') }}</td>
+                                    <td colspan="7" class="text-center py-6 text-base-content/40">{{ __('admin.no_modules_found') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
