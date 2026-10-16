@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Geo-Blocking Safety Hardening**:
+  - Enabling "Block All Except Selected" now downloads and loads the country allow-set into the kernel *before* the perimeter rule takes effect, so inbound traffic is never dropped during the download window. A failed or partial zone sync refuses enablement instead of silently shrinking the allow-set, and the enable audit record now includes the sync outcome.
+  - Administrators granted only the granular Geo-Blocking permission introduced in 4.0.1 can now fully manage Geo-Blocking; previously the firewall apply step rejected them after partially saving their change, leaving the panel and the kernel in disagreement.
+  - Switching an armed Geo-Blocking rule into whitelist mode rolls back automatically when a zone sync fails or the firewall refuses the change, keeping the database and the kernel in agreement.
+  - "Block All Except Selected" now requires at least one selected country and active built-in pre-filters up front, refusing configurations that could lock the administrator out of the panel.
+  - The shared external-blocklist pipeline file is now written under an exclusive lock by both the Geo-Blocking tab and the hourly threat-feed sync, preventing lost updates during concurrent writes, and stale Geo-Blocking header comments no longer accumulate in the generated firewall file.
+  - Restored the Burst Allowance label in the system-service editor and the "Never" fallback in the Geo-Blocking last-synced metric in English, Spanish, and French.
+
+### Changed
+- Geo-IP country zones now refresh automatically every week via the scheduler (`security:sync-geoip`, also available manually with `--force`); the unused manual sync action behind it was removed.
+
 ## [4.0.1] - 2026-10-16
 
 ### Added

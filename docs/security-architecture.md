@@ -249,7 +249,7 @@ Pinned directly above the tab strip for immediate visibility:
 #### Tab 4: External Blocklists (`?tab=blocklists` or `?tab=feeds`)
 * **Public Threat Feeds (VoIPBL)**: Automated ingestion of public blocklists identifying active VoIP fraud and brute-force scanning networks.
 * **Fail-Open Contract**: Feed downloads are memory-bounded and stream-parsed. If a download fails or is malformed, existing kernel entries remain untouched so the server is never left unprotected.
-* **Global Scope & Geo-Blocking**: Streamlined 100% global threat feed ingestion (with dedicated IPdeny-based Geo-Blocking planned as a standalone tab; see `docs/plan-external-blocklists-and-geoblocking.md`).
+* **Global Scope & Geo-Blocking**: Streamlined 100% global threat feed ingestion, complemented by a dedicated Geo-Blocking tab in the Security Command Center — a pure-drop `geo_perimeter` subchain fed by IPdeny aggregated zones (with GitHub-mirror fallback), refreshed weekly via `php artisan security:sync-geoip`.
 * **Drop Counters & Emergency Escape**: Live per-feed kernel drop counters, on-demand "Sync Now" action, and a prominent "Remove all feed blocks" button in case of upstream false positives.
 
 ---
