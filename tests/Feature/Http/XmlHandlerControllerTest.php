@@ -895,6 +895,60 @@ it('excludes disabled accounts from directory domain listing', function () {
         ->assertDontSee('disabled_user', false);
 });
 
+it('eager-loads extensions and settings for domain directory lookups without N+1 queries', function () {
+    $tenant = Tenant::factory()->create();
+    $domain = TenantDomain::factory()->create([
+        'tenant_id' => $tenant->id,
+        'domain' => 'eager-dir.example.com',
+        'enabled' => true,
+    ]);
+
+    for ($i = 1001; $i <= 1005; $i++) {
+        $extension = Extension::factory()->create([
+            'tenant_id' => $tenant->id,
+            'extension_number' => (string) $i,
+            'effective_caller_id_name' => "User {$i}",
+            'effective_caller_id_number' => (string) $i,
+        ]);
+
+        ExtensionSetting::factory()->create([
+            'tenant_id' => $tenant->id,
+            'extension_id' => $extension->id,
+            'key' => 'user_context',
+            'value' => 'custom-context',
+        ]);
+
+        SipAccount::factory()->create([
+            'tenant_id' => $tenant->id,
+            'tenant_domain_id' => $domain->id,
+            'extension_id' => $extension->id,
+            'auth_username' => "user{$i}",
+            'enabled' => true,
+        ]);
+    }
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $response = $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'directory',
+        'tag_name' => 'domain',
+        'domain' => 'eager-dir.example.com',
+    ]));
+
+    $response->assertOk();
+
+    for ($i = 1001; $i <= 1005; $i++) {
+        $response->assertSee("user{$i}")
+            ->assertSee("User {$i}")
+            ->assertSee('custom-context');
+    }
+
+    // Instead of 3 + 2N (13 queries for 5 accounts, 203 for 100), it executes a bounded set of bulk queries (<= 5)
+    $queries = DB::getQueryLog();
+    expect(count($queries))->toBeLessThanOrEqual(5);
+});
+
 // ─── 4.4: Real Dialplan Serving ─────────────────────────────────
 
 it('serves real dialplan rules for tenant context with matching dialplans', function () {

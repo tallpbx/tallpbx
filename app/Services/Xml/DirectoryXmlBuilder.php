@@ -72,8 +72,23 @@ class DirectoryXmlBuilder
                     ->where('enabled', true)
                     ->get();
 
+                $extensionIds = $accounts->pluck('extension_id')->filter()->unique()->values();
+
+                $extensions = $extensionIds->isNotEmpty()
+                    ? Extension::withoutGlobalScope('tenant')->whereIn('id', $extensionIds)->get()->keyBy('id')
+                    : collect();
+
+                $settings = $extensionIds->isNotEmpty()
+                    ? ExtensionSetting::withoutGlobalScope('tenant')
+                        ->where('tenant_id', $tenantId)
+                        ->whereIn('extension_id', $extensionIds)
+                        ->whereIn('key', self::ALLOWED_EXTENSION_SETTINGS)
+                        ->get()
+                        ->groupBy('extension_id')
+                    : collect();
+
                 foreach ($accounts as $account) {
-                    $xml .= $this->buildUserEntryXml($account);
+                    $xml .= $this->buildUserEntryXml($account, $extensions, $settings);
                 }
             }
 
@@ -167,9 +182,15 @@ class DirectoryXmlBuilder
      * Creates a <user> element with the SIP account's authentication
      * params (password), the voicemail storage param, and variables
      * (user_context, tenant_id).
+     *
+     * @param  \Illuminate\Support\Collection<string, Extension>|null  $extensions
+     * @param  \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, ExtensionSetting>>|null  $extensionSettings
      */
-    private function buildUserEntryXml(SipAccount $account): string
-    {
+    private function buildUserEntryXml(
+        SipAccount $account,
+        ?\Illuminate\Support\Collection $extensions = null,
+        ?\Illuminate\Support\Collection $extensionSettings = null
+    ): string {
         $xml = '            <user id="'.$this->escapeXml($account->auth_username).'">'."\n";
         $xml .= '              <params>'."\n";
         $xml .= '                <param name="password" value="'.$this->escapeXml($account->auth_password).'"/>'."\n";
@@ -193,7 +214,9 @@ class DirectoryXmlBuilder
             $xml .= '                <variable name="extension_id" value="'.$this->escapeXml($account->extension_id).'"/>'."\n";
 
             /** @var Extension|null $extension */
-            $extension = Extension::withoutGlobalScope('tenant')->find($account->extension_id);
+            $extension = $extensions !== null
+                ? $extensions->get($account->extension_id)
+                : Extension::withoutGlobalScope('tenant')->find($account->extension_id);
             $extensionVars = [];
 
             if ($extension !== null) {
@@ -212,13 +235,15 @@ class DirectoryXmlBuilder
             }
 
             // Allowlisted extension settings override the account defaults.
-            $extensionSettings = ExtensionSetting::withoutGlobalScope('tenant')
-                ->where('tenant_id', $account->tenant_id)
-                ->where('extension_id', $account->extension_id)
-                ->whereIn('key', self::ALLOWED_EXTENSION_SETTINGS)
-                ->get();
+            $settings = $extensionSettings !== null
+                ? $extensionSettings->get($account->extension_id, collect())
+                : ExtensionSetting::withoutGlobalScope('tenant')
+                    ->where('tenant_id', $account->tenant_id)
+                    ->where('extension_id', $account->extension_id)
+                    ->whereIn('key', self::ALLOWED_EXTENSION_SETTINGS)
+                    ->get();
 
-            foreach ($extensionSettings as $setting) {
+            foreach ($settings as $setting) {
                 $extensionVars[$setting->key] = $setting->value;
             }
 
