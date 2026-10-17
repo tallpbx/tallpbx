@@ -12,7 +12,8 @@
 2. [Stream 2: UI/UX Consistency, Loading Feedback & Typography](#stream-2-uiux-consistency-loading-feedback--typography)
 3. [Stream 3: Real-Time Telephony Push Architecture (Echo/Reverb)](#stream-3-real-time-telephony-push-architecture-echoreverb)
 4. [Stream 4: Shared Kernel Boundary & Modular Discipline](#stream-4-shared-kernel-boundary--modular-discipline)
-5. [Completed & Verified Milestone Log](#completed--verified-milestone-log)
+5. [Stream 5: Application Security Hardening](#stream-5-application-security-hardening)
+6. [Completed & Verified Milestone Log](#completed--verified-milestone-log)
 
 ---
 
@@ -211,6 +212,35 @@
 ### Task 4.7: Environment Variable Documentation Reference (Arch Audit L5)
 - **Implementation**:
   - Document the 227 unique `env()` configuration keys in a categorized reference guide (`docs/env-reference.md`) grouping FreeSWITCH, security, media storage,Reverb, and database settings.
+
+---
+
+## Stream 5: Application Security Hardening
+
+*Source: `project-audit-report.md`*
+
+### Task 5.1: Click-to-Call ESL Command Validation & Socket Sanitization (Security Audit H1)
+- **Problem**: In `ClickToCallForm.php` (`initiateCall()`), `phoneNumber` and `extension` are interpolated into an ESL `originate` string sent via `bgapi()`. A value containing newline (`\n`) characters allows protocol command injection directly into FreeSWITCH's privileged ESL socket.
+- **Implementation**:
+  - Add strict input regex validation in `ClickToCallForm`: `phoneNumber` (`regex:/^\+?[0-9*#]{3,20}$/`) and validate `extension` against the tenant's actual extension numbers.
+  - Defense in depth: in `FreeSwitchService::api()` and `bgapi()`, reject and log any command string containing `\r` or `\n` before transmitting to the ESL socket.
+  - Route click-to-call origination through `FreeSwitchControlService::originate()` which already enforces token sanitization.
+
+### Task 5.2: Open Registration Feature Gate (Security Audit M3)
+- **Problem**: `Register` Livewire component and `panel.register` route are accessible to anyone with no `registration.enabled` configuration switch, allowing arbitrary tenant user registration and potential spam.
+- **Implementation**:
+  - Add a configurable `auth.registration_enabled` setting (default `false`), gating the registration route and displaying a clean disabled state or redirecting to login.
+
+### Task 5.3: XML Handler Rate Limiting & Access Hardening (Security Audit L1 & L2)
+- **Problem**: `/api/v1/xml-handler` has no rate-limiting middleware, allowing unrestricted lookup attempts.
+- **Implementation**:
+  - Attach a dedicated high-throughput rate limiter (e.g. `throttle:600,1`) to `/api/v1/xml-handler` to protect against token brute force without impeding FreeSWITCH operations.
+  - Add failed-token security alerts.
+
+### Task 5.4: Threat Feed Redirect Pinning (Security Audit L3)
+- **Problem**: `ThreatFeedIngestionService` follows HTTP redirects without host pinning when downloading external threat feeds.
+- **Implementation**:
+  - Configure the Guzzle/HTTP client to enforce `allow_redirects` with same-host pinning or disable redirects.
 
 ---
 
