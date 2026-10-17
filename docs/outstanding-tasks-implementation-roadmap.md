@@ -52,7 +52,7 @@
 | 5.1 | Click-to-call ESL command validation | Pending | 2026-10-16 |
 | 5.2 | Open registration feature gate | Pending | 2026-10-16 |
 | 5.3 | XML handler rate limiting & access hardening | Pending | 2026-10-16 |
-| 5.4 | Threat feed redirect pinning | Pending | 2026-10-16 |
+| 5.4 | Threat feed redirect pinning | Verified | 2026-10-17 |
 | 5.5 | Reverse lockout protection for armed whitelist geo-perimeter | Verified | 2026-10-17 |
 | 5.6 | Module management and custom extension lifecycle authorization | Verified | 2026-10-17 |
 | 5.7 | Atomic inter-process lock protocol for shared pending firewall sets | Verified | 2026-10-17 |
@@ -326,6 +326,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `07c9fed0` | **Security / Threat Feeds** | **Threat Feed Redirect Pinning & SSRF Mitigation**: Enforced Guzzle `allow_redirects` with same-host pinning (`on_redirect`) and protocol downgrade protection in `ThreatFeedIngestionService`, refusing cross-host redirects to protect against SSRF and open redirect abuse. *(Resolves Task 5.4 / Security Audit L3)* |
 | **2026-10-17** | `d3bc9496` | **Security / Threat Feeds** | **Atomic Inter-Process Lock Protocol for Shared Pending Sets**: Standardized exclusive file locking across `ThreatFeedIngestionService` and `GeoBlockingService`, acquiring `LOCK_EX` on `external_blocklist.nft.pending` before reading/snapshotting geo elements, and purged obsolete fallback references to separate `.nft` files. *(Resolves Task 5.7 / 4.x Audit M5)* |
 | **2026-10-17** | `f6ade550` | **Security / Geo** | **Geo Cache Freshness & Whitelist Fail-Closed Integrity**: Enhanced `cacheNeedsDownload()` with TTL expiration checking based on `sync_interval`, wired interval checking into `SecuritySyncGeoIpCommand`, prevented partial-fetch cache corruption, and enforced fail-closed refusal when whitelist country zones fail. *(Resolves Task 1.1.3 / 4.x Audit H1 & H2)* |
 | **2026-10-17** | `8ccbbcc9` | **Admin / Modules** | **Module Management Authorization Gate**: Registered `admin.modules.manage` permission and enforced in-component authorization checks inside `ModulesList::toggleEnabled()`, `confirmDeleteCustom()`, and `deleteCustomModule()`. Read-only administrators (`admin.modules.view`) receive read-only badges with interactive mutation controls suppressed. *(Resolves Task 5.6 / 4.x Audit H4)* |

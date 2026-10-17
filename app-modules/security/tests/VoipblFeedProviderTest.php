@@ -249,3 +249,61 @@ it('marks the sync as failed when the kernel refuses to load the compiled list',
     expect($feed->last_status)->toBe('failed')
         ->and((string) $feed->last_error)->toContain('kernel');
 });
+
+it('follows same-host redirects during threat feed download', function (): void {
+    $body = "203.0.113.1/32\n203.0.113.2/32\n203.0.113.3/32";
+    Http::fake([
+        'https://www.voipbl.org/update/' => Http::response('', 302, [
+            'Location' => 'https://www.voipbl.org/update/latest.txt',
+        ]),
+        'https://www.voipbl.org/update/latest.txt' => Http::response($body, 200),
+    ]);
+
+    $feed = SecurityThreatFeed::factory()->create(['enabled' => true]);
+    $result = $this->provider->sync($feed);
+
+    expect($result->status)->toBe('success')
+        ->and($result->entriesCount)->toBe(3);
+});
+
+it('refuses cross-host redirects during threat feed download to prevent SSRF', function (): void {
+    $pending = $this->firewallDir.'/external_blocklist.nft.pending';
+    file_put_contents($pending, "OLD GOOD LIST\n");
+
+    Http::fake([
+        'https://www.voipbl.org/update/' => Http::response('', 302, [
+            'Location' => 'https://evil.attacker.org/update.txt',
+        ]),
+        'https://evil.attacker.org/*' => Http::response("198.51.100.1/32\n198.51.100.2/32\n198.51.100.3/32", 200),
+    ]);
+
+    $feed = SecurityThreatFeed::factory()->create(['enabled' => true]);
+    $result = $this->provider->sync($feed);
+
+    expect($result->status)->toBe('failed')
+        ->and((string) $result->error)->toContain('refused')
+        ->and((string) $result->error)->toContain('evil.attacker.org');
+
+    expect(file_get_contents($pending))->toBe("OLD GOOD LIST\n");
+    $this->executor->shouldNotHaveReceived('updateExternalBlocklist');
+});
+
+it('refuses protocol downgrade redirects during threat feed download', function (): void {
+    $pending = $this->firewallDir.'/external_blocklist.nft.pending';
+    file_put_contents($pending, "OLD GOOD LIST\n");
+
+    Http::fake([
+        'https://www.voipbl.org/update/' => Http::response('', 302, [
+            'Location' => 'http://www.voipbl.org/update/latest.txt',
+        ]),
+        'http://www.voipbl.org/*' => Http::response("203.0.113.1/32\n203.0.113.2/32\n203.0.113.3/32", 200),
+    ]);
+
+    $feed = SecurityThreatFeed::factory()->create(['enabled' => true]);
+    $result = $this->provider->sync($feed);
+
+    expect($result->status)->toBe('failed');
+
+    expect(file_get_contents($pending))->toBe("OLD GOOD LIST\n");
+    $this->executor->shouldNotHaveReceived('updateExternalBlocklist');
+});

@@ -11,6 +11,9 @@ use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Support\AddressFamily;
 use Modules\Security\Support\ThreatFeedSyncResult;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\UriInterface;
 
 /**
  * Streams threat feed downloads to disk and compiles kernel set elements.
@@ -66,10 +69,30 @@ class ThreatFeedIngestionService
         }
 
         try {
+            $initialHost = parse_url($url, PHP_URL_HOST);
+            $initialScheme = parse_url($url, PHP_URL_SCHEME);
+
             $response = Http::timeout(120)
                 // decode_content lets the transport negotiate and decompress
                 // gzip transparently while still streaming to the sink.
-                ->withOptions(['decode_content' => true])
+                // allow_redirects enforces same-host pinning so compromised or
+                // malicious providers cannot redirect to internal SSRF targets.
+                ->withOptions([
+                    'decode_content' => true,
+                    'allow_redirects' => [
+                        'max' => 5,
+                        'strict' => false,
+                        'referer' => false,
+                        'protocols' => $initialScheme === 'https' ? ['https'] : ['https', 'http'],
+                        'track_redirects' => true,
+                        'on_redirect' => function (RequestInterface $request, ResponseInterface $response, UriInterface $targetUri) use ($initialHost): void {
+                            $targetHost = $targetUri->getHost();
+                            if ($initialHost !== null && strcasecmp($targetHost, $initialHost) !== 0) {
+                                throw new \RuntimeException("Threat feed redirect to external host '{$targetHost}' refused; pinned to '{$initialHost}'.");
+                            }
+                        },
+                    ],
+                ])
                 ->withHeaders(array_filter([
                     'Accept-Encoding' => 'gzip',
                     'User-Agent' => 'TallPBX-ThreatFeed/1.0',
