@@ -302,6 +302,20 @@ return [
 
         /*
         |--------------------------------------------------------------------------
+        | Rate Limiting (Throttle)
+        |--------------------------------------------------------------------------
+        |
+        | Rate limiting configuration for the mod_xml_curl XML handler API.
+        | Protects the endpoint against token brute-force attacks and resource
+        | exhaustion while permitting high-throughput legitimate FreeSWITCH queries.
+        |
+        */
+        'throttle_enabled' => filter_var(env('FS_XML_HANDLER_THROTTLE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'throttle_limit' => (int) env('FS_XML_HANDLER_THROTTLE_LIMIT', 600),
+        'throttle_decay_minutes' => (int) env('FS_XML_HANDLER_THROTTLE_DECAY_MINUTES', 1),
+
+        /*
+        |--------------------------------------------------------------------------
         | Request Debug Logging
         |--------------------------------------------------------------------------
         |

@@ -22,5 +22,5 @@ use Illuminate\Support\Facades\Route;
 // This is the primary integration point between the application and
 // the FreeSWITCH telephony engine.
 Route::match(['get', 'post'], '/v1/xml-handler', [XmlHandlerController::class, 'handle'])
-    ->middleware(LogXmlHandlerTiming::class)
+    ->middleware([LogXmlHandlerTiming::class, 'throttle:xml-handler'])
     ->name('api.xml-handler');

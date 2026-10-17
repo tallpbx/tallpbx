@@ -43,6 +43,7 @@ use App\Support\MigrationSafetyGuard;
 use App\Support\PrimaryDatabaseSafety;
 use App\Support\SystemProcessRunner;
 use App\Support\TestDatabaseSafety;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -51,10 +52,12 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Events\MigrationEnded;
 use Illuminate\Database\Events\MigrationStarted;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -220,6 +223,17 @@ class AppServiceProvider extends ServiceProvider
 
         // Keep dialplan XML routing caches reactive: invalidate on telephony model mutations
         $this->registerRoutingCacheObservers();
+
+        RateLimiter::for('xml-handler', function (Request $request) {
+            if (! config('freeswitch.xml_handler.throttle_enabled', true)) {
+                return Limit::none();
+            }
+
+            $limit = (int) config('freeswitch.xml_handler.throttle_limit', 600);
+            $decayMinutes = (int) config('freeswitch.xml_handler.throttle_decay_minutes', 1);
+
+            return Limit::perMinutes($decayMinutes, $limit)->by($request->ip() ?? '127.0.0.1');
+        });
 
         Event::listen([
             ChannelCreate::class,

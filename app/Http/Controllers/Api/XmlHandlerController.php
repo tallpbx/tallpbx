@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\FreeSwitch\XmlHandlerFailedAuth;
 use App\Http\Controllers\Controller;
 use App\Services\DialplanContext;
 use App\Services\TenantIdentityResolverInterface;
@@ -105,9 +106,15 @@ class XmlHandlerController extends Controller
 
             // Reject when the request did not provide any token
             if (! is_string($requestToken) || $requestToken === '') {
-                Log::warning('XML Handler: authentication failed — no token provided.', [
+                Log::alert('SECURITY ALERT: XML Handler authentication failed — no token provided.', [
                     'ip' => $request->ip(),
                 ]);
+
+                event(new XmlHandlerFailedAuth(
+                    ip: (string) ($request->ip() ?? '127.0.0.1'),
+                    reason: 'missing_token',
+                    section: (string) $request->input('section', 'unknown'),
+                ));
 
                 return $this->xmlResponse(
                     $this->errorXml(403, 'Access Denied'),
@@ -117,9 +124,15 @@ class XmlHandlerController extends Controller
 
             // Timing-safe comparison to prevent timing attacks against the shared secret
             if (! hash_equals($expectedToken, $requestToken)) {
-                Log::warning('XML Handler: authentication failed — token mismatch.', [
+                Log::alert('SECURITY ALERT: XML Handler authentication failed — token mismatch.', [
                     'ip' => $request->ip(),
                 ]);
+
+                event(new XmlHandlerFailedAuth(
+                    ip: (string) ($request->ip() ?? '127.0.0.1'),
+                    reason: 'token_mismatch',
+                    section: (string) $request->input('section', 'unknown'),
+                ));
 
                 return $this->xmlResponse(
                     $this->errorXml(403, 'Access Denied'),

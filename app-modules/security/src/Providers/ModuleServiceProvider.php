@@ -7,6 +7,7 @@ namespace Modules\Security\Providers;
 use App\Events\FreeSwitch\CustomEvent;
 use App\Events\FreeSwitch\SipScannerDetected;
 use App\Events\FreeSwitch\SofiaFailedAuth;
+use App\Events\FreeSwitch\XmlHandlerFailedAuth;
 use Illuminate\Auth\Events\Failed;
 use Modules\Security\Console\Commands\SecurityApplyCommand;
 use Modules\Security\Console\Commands\SecurityObserveCommand;
@@ -22,6 +23,7 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 use Modules\Security\Listeners\LogFailedLoginListener;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
+use Modules\Security\Listeners\LogFailedXmlHandlerAuthListener;
 use Modules\Security\Listeners\LogSipScannerListener;
 use Modules\Security\Services\GeoBlockingService;
 use Modules\Security\Services\IpdenyProvider;
@@ -164,6 +166,9 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             ],
             SofiaFailedAuth::class => [
                 LogFailedSipAuthListener::class,
+            ],
+            XmlHandlerFailedAuth::class => [
+                LogFailedXmlHandlerAuthListener::class,
             ],
             SipScannerDetected::class => [
                 LogSipScannerListener::class,
