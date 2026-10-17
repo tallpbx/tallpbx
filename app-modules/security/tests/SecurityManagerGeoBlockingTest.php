@@ -13,6 +13,7 @@ use Mockery;
 use Modules\Security\Contracts\GeoBlockingProviderInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
+use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
@@ -409,4 +410,36 @@ it('refuses clearing countries while a whitelist perimeter is armed', function (
     $fresh = SecurityGeoRule::instance();
     expect($fresh->countries)->toBe(['US'])
         ->and($fresh->enabled)->toBeTrue();
+});
+
+it('surfaces an error notification and records sync status when saveGeoSettings sync fails in blacklist mode', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'blacklist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    // Provider returns empty ranges with no cached zones, causing sync to fail
+    $this->geoProvider->shouldReceive('fetchCountryRanges')->with('CA')->andReturn([
+        'v4' => [],
+        'v6' => [],
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'blacklist')
+        ->set('geoCountries', ['CA'])
+        ->call('saveGeoSettings')
+        ->assertOk()
+        ->assertSet('operationalMessageType', 'error');
+
+    $audit = SecurityAuditLog::where('action', 'geo_blocking_updated')->latest('id')->first();
+    expect($audit)->not->toBeNull()
+        ->and($audit->description)->toContain('sync: failed');
 });

@@ -254,15 +254,22 @@ trait ManagesGeoBlocking
             return;
         }
 
+        $syncDetail = isset($result) ? ", sync: {$result['status']}" : '';
+
         SecurityAuditLog::record(
             action: 'geo_blocking_updated',
             ipAddress: $this->adminIp,
-            description: "Geo-blocking settings saved (mode: {$rule->mode}).",
+            description: "Geo-blocking settings saved (mode: {$rule->mode}{$syncDetail}).",
             adminId: Auth::guard('admin')->id(),
         );
 
         $this->loadGeoState();
-        $this->notifySuccess((string) __('admin.security_geo_saved'));
+
+        if ($this->geoEnabled && ($result['status'] ?? 'success') !== 'success') {
+            $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
+        } else {
+            $this->notifySuccess((string) __('admin.security_geo_saved'));
+        }
     }
 
     /**

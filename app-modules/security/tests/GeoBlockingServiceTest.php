@@ -162,3 +162,27 @@ it('repeated merges leave exactly one geo header and keep external elements', fu
         // The atomic tmp+rename publish must never leave a sibling behind.
         ->and(file_exists($this->tempDir.'/geo_blocking.nft.pending.tmp'))->toBeFalse();
 });
+
+it('seeds from active external blocklist file under lock when pending does not yet exist', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update(['enabled' => true, 'mode' => 'blacklist', 'countries' => ['US']]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => [],
+    ]);
+
+    // Active file exists, but pending does not exist
+    file_put_contents($this->tempDir.'/external_blocklist.nft', implode("\n", [
+        '# TallPBX external blocklist kernel elements — active',
+        'flush set inet tallpbx_filter external_blocklist_ips',
+        'flush set inet tallpbx_filter external_blocklist_ips6',
+        'add element inet tallpbx_filter external_blocklist_ips { 8.8.8.8 }',
+    ])."\n");
+
+    $this->geoService->sync($rule, force: true);
+
+    $content = file_get_contents($this->tempDir.'/external_blocklist.nft.pending');
+    expect($content)->toContain('add element inet tallpbx_filter external_blocklist_ips { 8.8.8.8 }')
+        ->and($content)->toContain('add element inet tallpbx_filter geo_blocked_ips { 1.0.0.0/24 }');
+});

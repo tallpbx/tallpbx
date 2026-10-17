@@ -233,43 +233,29 @@ class GeoBlockingService
         $externalPending = $this->firewallDir.'/external_blocklist.nft.pending';
         $externalActive = $this->firewallDir.'/external_blocklist.nft';
 
-        $existingContent = '';
-        if (file_exists($externalPending)) {
-            $existingContent = file_get_contents($externalPending) ?: '';
-        } elseif (file_exists($externalActive)) {
-            $existingContent = file_get_contents($externalActive) ?: '';
-        }
-
-        // Cut everything from the geo header marker onward: the geo block
-        // is always the trailing section, so this removes any previously
-        // merged geo content together with its header line in one stroke.
-        // (Filtering by set names alone let stale header comments survive
-        // every re-merge and accumulate into this root-executed file.)
-        $filteredLines = [];
-        foreach (explode("\n", $existingContent) as $line) {
-            if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
-                break;
-            }
-            $filteredLines[] = $line;
-        }
-
-        if (trim(implode('', $filteredLines)) === '') {
-            $filteredLines = [
-                'flush set inet tallpbx_filter external_blocklist_ips',
-                'flush set inet tallpbx_filter external_blocklist_ips6',
-            ];
-        }
-
         $geoContent = file_get_contents($geoPendingFile) ?: '';
-
-        $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
 
         // Write the merged result back under the exclusive lock protocol
         // shared with ThreatFeedIngestionService (fopen 'c+' + LOCK_EX +
-        // ftruncate/rewrite), falling back to a plain write only when the
-        // file cannot be opened at all.
+        // stream_get_contents + filter + ftruncate/rewrite), falling back
+        // to a plain write only when the file cannot be opened at all.
         $handle = fopen($externalPending, 'c+');
         if ($handle === false) {
+            $existingContent = file_exists($externalActive) ? (file_get_contents($externalActive) ?: '') : '';
+            $filteredLines = [];
+            foreach (explode("\n", $existingContent) as $line) {
+                if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
+                    break;
+                }
+                $filteredLines[] = $line;
+            }
+            if (trim(implode('', $filteredLines)) === '') {
+                $filteredLines = [
+                    'flush set inet tallpbx_filter external_blocklist_ips',
+                    'flush set inet tallpbx_filter external_blocklist_ips6',
+                ];
+            }
+            $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
             file_put_contents($externalPending, $combined);
 
             return;
@@ -277,6 +263,39 @@ class GeoBlockingService
 
         try {
             flock($handle, LOCK_EX);
+
+            $existingContent = stream_get_contents($handle);
+            if ($existingContent === false || trim($existingContent) === '') {
+                // If pending is freshly created or empty, seed from active external_blocklist.nft if present
+                if (file_exists($externalActive)) {
+                    $existingContent = file_get_contents($externalActive) ?: '';
+                } else {
+                    $existingContent = '';
+                }
+            }
+
+            // Cut everything from the geo header marker onward: the geo block
+            // is always the trailing section, so this removes any previously
+            // merged geo content together with its header line in one stroke.
+            // (Filtering by set names alone let stale header comments survive
+            // every re-merge and accumulate into this root-executed file.)
+            $filteredLines = [];
+            foreach (explode("\n", $existingContent) as $line) {
+                if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
+                    break;
+                }
+                $filteredLines[] = $line;
+            }
+
+            if (trim(implode('', $filteredLines)) === '') {
+                $filteredLines = [
+                    'flush set inet tallpbx_filter external_blocklist_ips',
+                    'flush set inet tallpbx_filter external_blocklist_ips6',
+                ];
+            }
+
+            $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
+
             ftruncate($handle, 0);
             rewind($handle);
             fwrite($handle, $combined);
