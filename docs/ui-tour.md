@@ -189,3 +189,14 @@ The **Certificate Manager** (`/panel/certificates`) provides a unified, web-nati
 * **Self-Signed Certificate Generator**: Instantly generate RSA/ECDSA certificates with SAN extensions for lab testing, development environments, and internal deployments.
 * **Zero-Downtime Atomic Swaps**: Validates cryptographic modulus alignment and Nginx configuration syntax atomically before executing service reloads, preventing web server lockouts or FreeSWITCH crashes.
 
+![TallPBX HTTPS & TLS Certificate Manager (Light Theme)](images/certificates-light.png)
+
+<details>
+<summary><b>🌙 Click to view Dark Theme</b></summary>
+
+<br>
+
+![TallPBX HTTPS & TLS Certificate Manager (Dark Theme)](images/certificates-dark.png)
+
+</details>
+

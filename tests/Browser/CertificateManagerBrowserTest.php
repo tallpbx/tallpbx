@@ -49,6 +49,50 @@ it('renders the certificate manager dashboard with active services and inventory
         ->assertSee('pbx.example.com')
         ->assertSee('Internal SIP TLS Certificate')
         ->assertSee('sip.internal.lan');
+
+    if (getenv('TALLPBX_CAPTURE_DOCS') === '1') {
+        // 1. Light Theme Capture
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'light');
+                document.documentElement.setAttribute('data-theme', 'light');
+            })()
+        JS);
+        $page->wait(0.6);
+
+        $lightImg = 'certificates-light.png';
+        $page->screenshot(filename: $lightImg);
+        $srcLight = base_path("tests/Browser/Screenshots/{$lightImg}");
+        $destLight = base_path("docs/images/{$lightImg}");
+        if (file_exists($srcLight)) {
+            copy($srcLight, $destLight);
+        }
+
+        // 2. Dark Theme Capture
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'dark');
+                document.documentElement.setAttribute('data-theme', 'dark');
+            })()
+        JS);
+        $page->wait(0.6);
+
+        $darkImg = 'certificates-dark.png';
+        $page->screenshot(filename: $darkImg);
+        $srcDark = base_path("tests/Browser/Screenshots/{$darkImg}");
+        $destDark = base_path("docs/images/{$darkImg}");
+        if (file_exists($srcDark)) {
+            copy($srcDark, $destDark);
+        }
+
+        // Restore light theme
+        $page->script(<<<'JS'
+            (() => {
+                localStorage.setItem('theme', 'light');
+                document.documentElement.setAttribute('data-theme', 'light');
+            })()
+        JS);
+    }
 });
 
 it('navigates across all certificate manager tabs seamlessly', function (): void {

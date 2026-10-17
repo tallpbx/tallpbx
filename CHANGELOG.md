@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Certificate Manager Visual Documentation**: Captured and embedded high-resolution Light and Dark theme screenshots (`certificates-light.png` and `certificates-dark.png`) for Section 5 (HTTPS & TLS Certificate Management) in `docs/ui-tour.md`.
+
 ## [4.0.2] - 2026-10-16
 
 ### Fixed
