@@ -85,27 +85,26 @@ flowchart TD
 
 ---
 
-## 4. Modular Translation Architecture (Native Path Cascading)
+## 4. Modular Translation Architecture (Unified Language Files)
 
-TallPBX uses **Native Path Cascading** via Laravel's translation `FileLoader::addPath()`. This design moves module-specific strings out of the monolithic root files while ensuring **zero UI presentation changes, zero template rewrites, and immutable button identifiers**.
+TallPBX allows each module to keep its own translation files while automatically merging them into the main application dictionaries (`admin` and `client`). This keeps module text organized inside each module folder without requiring changes to existing views, buttons, or translation calls.
 
-### 4.1 Why Native Path Cascading?
-- **Zero Template Churn**: Blade views, Livewire components, Form Requests, and models retain their existing `__('admin.key_name')` calls. No view has to be updated to a package namespace like `__('gateways::admin.key')`.
-- **Immutable Button Identifiers**: Core button identifiers (`button_save`, `save`, `cancel`, `edit`, `delete`) remain completely stable. UI presentation in English, Spanish, and French is **100% frozen and identical**.
-- **Physical Module Encapsulation**: Module strings live in `app-modules/{module}/lang/{locale}/admin.php`, allowing developers to inspect and maintain module translations right alongside module views and code.
-- **Native Multi-Path Resolution**: In Laravel 13, `Illuminate\Translation\FileLoader` merges registered paths sequentially via `array_replace_recursive()`. Calling `__('admin.gateway_host')` resolves directly from `app-modules/gateways/lang/en/admin.php` without prefix rewriting.
+### 4.1 How It Works & Why It Matters
+- **Clean Standard Calls**: Templates continue using standard translation calls like `__('admin.gateway_host')`. Developers do not need to add package prefixes like `__('gateways::admin.gateway_host')`.
+- **Consistent UI Buttons**: Common action buttons (`Save`, `Cancel`, `Edit`, `Delete`) remain completely uniform and reliable across English, Spanish, and French.
+- **Module Independence**: Module text lives directly inside `app-modules/{module}/lang/{locale}/admin.php`, so translations stay right beside the views and logic that use them.
+- **Automatic Fallback & Merging**: When a page requests text, the translation system checks the module folder first and falls back to the main system language files.
 
-### 4.2 The Collision Hazard & Strict Key Partitioning
-Because cascading paths merge directly into the global group dictionary (`admin`), any key defined in a module language file that matches a root key would overwrite that root key globally.
+### 4.2 Avoiding Overlapping Names (Key Collisions)
+Because module translations merge into the shared language dictionary (`admin`), a key in a module file could accidentally overwrite a shared system button if both shared the exact same name.
 
-To prevent dictionary corruption:
-1. **Root Global Dictionary Sanctity (`lang/{locale}/admin.php`)**:
-   - Generic actions (`save`, `cancel`, `delete`, `edit`, `filter`, `actions`, `enabled`, `disabled`, `status`, `confirm`, `back`) belong **strictly** to the root dictionary.
-   - Global navigation menu labels (`admin.gateways`, `admin.extensions`, `admin.sip_profiles`) remain in the root dictionary so navigation renders regardless of module load states.
-   - Shell banners, tenant context headers, and global system messages remain in root.
-2. **Module Key Domain Relevance**:
-   - Every key defined in a module language file **must** include the module or entity domain in its identifier (e.g. `gateway_host`, `gateway_name_tooltip`, `create_gateway`, `modal_delete_gateway_title`, `no_gateways_found`, `sip_trunk_port`).
-   - Module language files must **never** define generic action keys like `save` or `delete`.
+To keep translations reliable and safe:
+1. **Shared System Words Stay in Root (`lang/{locale}/admin.php`)**:
+   - Universal action labels (`Save`, `Cancel`, `Delete`, `Edit`, `Filter`, `Actions`, `Enabled`, `Disabled`, `Status`, `Back`) belong exclusively in the main root dictionary.
+   - Main navigation menu names (`Gateways`, `Extensions`, `SIP Profiles`) live in root so menus always display correctly even if a module is temporarily stopped.
+2. **Module Keys Use Descriptive Names**:
+   - Every translation key in a module file must include the feature or entity name (for example: `gateway_host`, `gateway_name_tooltip`, `create_gateway`, `no_gateways_found`).
+   - Module files must never define generic words like `save` or `delete`.
 
 ### 4.3 Mandatory Module Language File Header Comment
 Every module language file (`app-modules/{module}/lang/{en,es,fr}/admin.php`) must begin with the standardized collision warning docblock:
@@ -147,7 +146,7 @@ During module boot, `App\Support\ModuleServiceProvider` validates that module la
     ```
     Module [gateways] language file [admin] collides with root dictionary for key(s): [save, delete]. Refusing to load.
     ```
-  - In `production`: logs a critical alert to `Log::critical()` and skips adding the cascading path, protecting the integrity of the root dictionary.
+  - In `production`: logs a critical alert to `Log::critical()` and skips loading the colliding module file, protecting the integrity of the root dictionary.
 
 ### 4.5 Automated Architecture Test Suite (`TranslationParityTest`)
 The test suite at `tests/Feature/Architecture/TranslationParityTest.php` runs on every CI run and local test cycle:
@@ -177,6 +176,62 @@ php artisan make:module my-crm-connector \
 - **Instant Dynamic Autoloading**: Automatically discovered and autoloaded at runtime via `CustomModuleAutoloader` (`CustomModules\` namespace) without running `composer dump-autoload`.
 - **Component Stubs**: Pre-generates boilerplate Livewire component directories, model factories, Blade views, migration directories, and collision-safe translation files (`lang/{en,es,fr}/admin.php`).
 - **Core Collision Protection**: Rejects names that collide with existing core modules in `app-modules/` (e.g. `php artisan make:module extensions` will fail with an error).
+
+### 5.1 Distributing Custom Modules as Composer Packages (`vendor/`)
+
+While developing locally in `custom-modules/` provides instant zero-build feedback, custom modules can also be packaged and installed as **Composer packages in `vendor/`** (`source: "vendor"`). This allows teams and community authors to distribute modular extensions via private Git repositories, Packagist, or Satis.
+
+#### Step-by-Step Workflow:
+
+1. **Scaffold the Module Locally**:
+   Start by generating the module skeleton in `custom-modules/`:
+   ```bash
+   php artisan make:module my-crm-connector \
+       --display-name="My CRM Connector" \
+       --category="custom"
+   ```
+
+2. **Publish to an External Git Repository**:
+   Initialize a dedicated Git repository (e.g. on GitHub or GitLab) and copy the generated files from `custom-modules/my-crm-connector/` into the new repository.
+
+3. **Add a Root `composer.json` to Your Module Repository**:
+   In the root of your standalone module repository, create a standard `composer.json` defining the package name and PSR-4 autoloading:
+   ```json
+   {
+       "name": "acme/tallpbx-crm-connector",
+       "description": "Third-party CRM connector for TallPBX",
+       "type": "library",
+       "license": "proprietary",
+       "autoload": {
+           "psr-4": {
+               "CustomModules\\MyCrmConnector\\": "src/"
+           }
+       },
+       "extra": {
+           "tallpbx": {
+               "module": true
+           }
+       }
+   }
+   ```
+   *(Note: Set the `"source": "vendor"` field in your module's `module.json` to reflect that it is installed as a Composer package).*
+
+4. **Install via Composer in TallPBX**:
+   Remove the local development folder `custom-modules/my-crm-connector/` to prevent name collision guards from blocking the vendor package. Then add your Git repository and require the package in TallPBX's root `composer.json`:
+   ```bash
+   # Add private repository (if hosted privately on GitHub)
+   composer config repositories.crm-connector vcs https://github.com/your-org/tallpbx-crm-connector.git
+
+   # Install the package
+   composer require acme/tallpbx-crm-connector
+   ```
+
+5. **Discovery & Activation**:
+   TallPBX's discovery scanner inspects `vendor/*/*/module.json` on boot and caches the discovered manifest (`bootstrap/cache/modules.php`). Synchronize and activate the extension:
+   ```bash
+   php artisan module:sync
+   ```
+   The module will appear in `/panel/modules` under the **Custom** category with a `"Vendor"` source tag, and can be enabled, disabled, or uninstalled (`module:uninstall`) directly from the panel or CLI.
 
 ---
 
@@ -239,7 +294,7 @@ Third-party extensions are untrusted code. Before and during registration the ap
 | Module name | A custom module may not shadow an installed module's name — rejected with a logged error | Discovery merge + cached-path validation |
 | Route boundaries | Custom route files may not bind reserved panel URLs (`/panel/login`, `/panel/setup`, `/panel/dashboard`, `/panel/settings`, `/panel/modules`, `/panel/git-update`) or hijack existing route names; offending files are never loaded | Static pre-flight scan + post-load router audit |
 | Database schema | Custom migrations may not create existing tables or touch protected core tables (`users`, `admins`, `tenants`, `groups`, `permissions`, `modules`, `menus`) — the run halts with `MigrationCollisionException` | Static token scan + runtime `beforeExecuting` DDL watch |
-| Language keys | Custom translations colliding with another module's cascading dictionary lose their global cascading path and fall back to namespaced `{module}::` lookups | `App\Support\ModuleServiceProvider` inter-module registry |
+| Language keys | Custom translations colliding with another module's dictionary lose their global shortcut and fall back to namespaced `{module}::` lookups | `App\Support\ModuleServiceProvider` inter-module registry |
 | Permissions | Custom modules cannot claim permissions already owned by another module | `PermissionService` ownership guard |
 | Dependencies | Unmet `requirements.modules` or `requirements.packages` disable the module (manifest + registry + provider skip) with a critical log instead of crashing the appliance — on both boot paths | Discovery fail-soft check |
 
