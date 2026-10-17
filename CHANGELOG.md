@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - **Reverse Lockout Guard for Whitelist Geo-Perimeter**: Refuse disabling defensive pre-filters in the Security Center (`setPrefilterEnabled(false)`) when "Block All Except Selected" (whitelist) Geo-Blocking is armed. Because whitelist geo-blocking relies on pre-filter stage 1 for the administrator's trusted IP accept rule, disabling pre-filters while the stage 9.5 geo drop rule is active would lock the administrator out of the server.
+- **Module Management and Extension Lifecycle Authorization Gate**: Registered dedicated `admin.modules.manage` permission and enforced in-component authorization checks inside `ModulesList::toggleEnabled()`, `confirmDeleteCustom()`, and `deleteCustomModule()`. Administrators with view-only module access (`admin.modules.view`) now see read-only status badges without interactive toggle switches or custom extension deletion controls, preventing unauthorized module changes or destructive data removal.
 
 ## [4.0.2] - 2026-10-16
 

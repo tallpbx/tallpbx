@@ -252,6 +252,7 @@ class ModuleServiceProvider extends ServiceProvider
             'admin.notifications.delete' => 'Delete notifications',
             'admin.settings.view' => 'View application settings',
             'admin.modules.view' => 'View installed modules',
+            'admin.modules.manage' => 'Manage and uninstall modules',
             'admin.monitoring.view' => 'View monitoring dashboard',
             'admin.queue.view' => 'View queue status',
             'admin.git-update.view' => 'View and trigger git updates',

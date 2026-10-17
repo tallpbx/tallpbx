@@ -98,7 +98,7 @@
                                                 </span>
                                             @elseif($module->required && $module->enabled)
                                                 <span class="text-base-content/30">—</span>
-                                            @else
+                                            @elseif($canManage)
                                                 <div class="flex items-center gap-2"
                                                      wire:loading.class="opacity-70 pointer-events-none"
                                                      wire:target="toggleEnabled('{{ $module->id }}')">
@@ -119,9 +119,13 @@
                                                         {{ $module->enabled ? __('admin.modules_disabling') : __('admin.modules_enabling') }}
                                                     </span>
                                                 </div>
+                                            @else
+                                                <span class="text-xs text-base-content/50">
+                                                    {{ $module->enabled ? __('admin.enabled') : __('admin.disabled') }}
+                                                </span>
                                             @endif
 
-                                            @if($module->source === 'custom' && $module->status !== \App\Models\Module::StatusUninstalled)
+                                            @if($canManage && $module->source === 'custom' && $module->status !== \App\Models\Module::StatusUninstalled)
                                                 <div class="dropdown dropdown-end">
                                                     <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label="{{ __('admin.modules_delete_extension') }}">
                                                         <x-heroicon-m-ellipsis-vertical class="w-4 h-4" />

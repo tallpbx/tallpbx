@@ -13,6 +13,7 @@ use Modules\Admin\Livewire\ModulesList;
 
 beforeEach(function () {
     $this->admin = Admin::factory()->create(['enabled' => true]);
+    grantAdminPermissions($this->admin, ['admin.modules.view', 'admin.modules.manage']);
 });
 
 it('renders the modules list', function () {
@@ -417,4 +418,67 @@ it('renders category accordions open by default with an expand and collapse all 
         ->assertOk()
         ->assertSeeHtml(':open="isOpen(\'accounts\')"')
         ->assertSee(__('admin.collapse_all'));
+});
+
+it('hides toggles and delete controls for administrators with view-only module permission', function () {
+    $viewOnlyAdmin = Admin::factory()->create(['enabled' => true]);
+    grantAdminPermissions($viewOnlyAdmin, ['admin.modules.view']);
+
+    $module = Module::create([
+        'name' => 'custom-plugin',
+        'display_name' => 'Custom Plugin',
+        'version' => '1.0',
+        'category' => 'custom',
+        'source' => 'custom',
+        'enabled' => true,
+    ]);
+
+    Livewire::actingAs($viewOnlyAdmin, 'admin')
+        ->test(ModulesList::class)
+        ->assertOk()
+        ->assertSet('canManage', false)
+        ->assertDontSeeHtml('wire:click="toggleEnabled(\''.$module->id.'\')"')
+        ->assertDontSeeHtml('wire:click="confirmDeleteCustom(\''.$module->id.'\')"');
+});
+
+it('forbids view-only administrators from toggling modules', function () {
+    $viewOnlyAdmin = Admin::factory()->create(['enabled' => true]);
+    grantAdminPermissions($viewOnlyAdmin, ['admin.modules.view']);
+
+    $module = Module::create([
+        'name' => 'extensions',
+        'display_name' => 'Extensions',
+        'version' => '1.0',
+        'category' => 'accounts',
+        'source' => 'core',
+        'enabled' => true,
+    ]);
+
+    Livewire::actingAs($viewOnlyAdmin, 'admin')
+        ->test(ModulesList::class)
+        ->call('toggleEnabled', $module->id)
+        ->assertForbidden();
+
+    expect($module->fresh()->enabled)->toBeTrue();
+});
+
+it('forbids view-only administrators from deleting custom modules', function () {
+    $viewOnlyAdmin = Admin::factory()->create(['enabled' => true]);
+    grantAdminPermissions($viewOnlyAdmin, ['admin.modules.view']);
+
+    $module = Module::create([
+        'name' => 'custom-plugin',
+        'display_name' => 'Custom Plugin',
+        'version' => '1.0',
+        'category' => 'custom',
+        'source' => 'custom',
+        'enabled' => true,
+    ]);
+
+    Livewire::actingAs($viewOnlyAdmin, 'admin')
+        ->test(ModulesList::class)
+        ->call('deleteCustomModule', $module->id, 'UNINSTALL custom-plugin')
+        ->assertForbidden();
+
+    expect($module->fresh())->not->toBeNull();
 });

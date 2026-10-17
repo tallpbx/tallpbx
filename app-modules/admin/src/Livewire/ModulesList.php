@@ -9,6 +9,7 @@ use App\Services\ModuleLifecycleService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -50,6 +51,17 @@ class ModulesList extends Component
 
     /** Error surfaced inside the confirmation dialog. */
     public ?string $deleteError = null;
+
+    /** Whether the authenticated administrator can toggle or manage modules. */
+    public bool $canManage = false;
+
+    /**
+     * Mount the component and initialize management permissions.
+     */
+    public function mount(): void
+    {
+        $this->canManage = (bool) Auth::guard('admin')->user()?->hasPermission('admin.modules.manage');
+    }
 
     /**
      * Group the loaded modules by their canonical category, in the
@@ -98,6 +110,8 @@ class ModulesList extends Component
      */
     public function confirmDeleteCustom(string $moduleId): void
     {
+        $this->ensureManagePermission();
+
         $module = Module::findOrFail($moduleId);
 
         if ($module->source !== 'custom') {
@@ -131,6 +145,8 @@ class ModulesList extends Component
      */
     public function deleteCustomModule(string $moduleId, ?string $confirmation = null): void
     {
+        $this->ensureManagePermission();
+
         $module = Module::findOrFail($moduleId);
 
         // Only untracked custom extensions are deletable here; core modules
@@ -164,6 +180,8 @@ class ModulesList extends Component
      */
     public function toggleEnabled(string $moduleId): void
     {
+        $this->ensureManagePermission();
+
         $module = Module::findOrFail($moduleId);
 
         if ($module->status === Module::StatusUninstalled) {
@@ -186,6 +204,16 @@ class ModulesList extends Component
 
         $this->loadModules();
         $this->dispatch('module-toggled');
+    }
+
+    /**
+     * Refuse lifecycle or toggle actions without the module management permission.
+     */
+    protected function ensureManagePermission(): void
+    {
+        $actor = Auth::guard('admin')->user();
+
+        abort_unless($actor !== null && $actor->hasPermission('admin.modules.manage'), 403);
     }
 
     /**
