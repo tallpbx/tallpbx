@@ -350,7 +350,11 @@ trait ManagesGeoBlocking
             return null;
         }
 
-        if (preg_match('/(?:geo_blocked_ips|geo_allowed_ips).*?counter packets (\d+)/s', $status, $matches) === 1) {
+        // Anchor each set name to the counter on its own rule line: chain
+        // rules reference sets as @set_name and carry the counter on that
+        // exact line. Matching across lines could pair a geo set definition
+        // with an unrelated rule's counter further down the dump.
+        if (preg_match('/@(?:geo_blocked_ips|geo_allowed_ips)(?:6)?\s+counter\s+packets\s+(\d+)/', $status, $matches) === 1) {
             return (int) $matches[1];
         }
 

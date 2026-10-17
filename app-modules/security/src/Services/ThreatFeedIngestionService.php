@@ -6,6 +6,7 @@ namespace Modules\Security\Services;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Support\AddressFamily;
@@ -102,7 +103,9 @@ class ThreatFeedIngestionService
      */
     public function clear(): void
     {
-        $this->compileSetElementFile([], []);
+        if (! $this->compileSetElementFile([], [])) {
+            Log::error('Threat feed clear failed: the empty set-element file could not be written.');
+        }
     }
 
     /**
@@ -162,7 +165,9 @@ class ThreatFeedIngestionService
             );
         }
 
-        $this->compileSetElementFile($v4, $v6);
+        if (! $this->compileSetElementFile($v4, $v6)) {
+            return ThreatFeedSyncResult::failed('The pending set-element file could not be written; keeping the previous list.');
+        }
 
         return ThreatFeedSyncResult::success(
             $total,
@@ -181,8 +186,9 @@ class ThreatFeedIngestionService
      *
      * @param  array<int, string>  $v4  Validated IPv4 addresses and ranges
      * @param  array<int, string>  $v6  Validated IPv6 addresses and ranges
+     * @return bool Whether the pending file was written successfully
      */
-    private function compileSetElementFile(array $v4, array $v6): void
+    private function compileSetElementFile(array $v4, array $v6): bool
     {
         $lines = [
             '# TallPBX external blocklist kernel elements — generated '.now()->toIso8601String().'; do not edit.',
@@ -222,19 +228,36 @@ class ThreatFeedIngestionService
         // writer may lose the other's elements through an interleaved
         // read-modify-write.
         $content = implode("\n", $lines)."\n";
-        $handle = fopen($this->firewallDir.'/external_blocklist.nft.pending', 'c+');
-        if ($handle === false) {
-            file_put_contents($this->firewallDir.'/external_blocklist.nft.pending', $content);
 
-            return;
+        // The @ suppresses the stream warning for unwritable paths (such as
+        // a directory) so the plain-write fallback below handles the failure.
+        $handle = @fopen($this->firewallDir.'/external_blocklist.nft.pending', 'c+');
+        if ($handle === false) {
+            // The plain-write fallback is checked too: a silent failure here
+            // would leave the old elements in place while callers report success.
+            if (@file_put_contents($this->firewallDir.'/external_blocklist.nft.pending', $content) === false) {
+                Log::error('Threat feed compile failed: the pending blocklist file is not writable.');
+
+                return false;
+            }
+
+            return true;
         }
 
         try {
             flock($handle, LOCK_EX);
             ftruncate($handle, 0);
             rewind($handle);
-            fwrite($handle, $content);
-            fflush($handle);
+            $written = fwrite($handle, $content);
+            $flushed = fflush($handle);
+
+            if ($written === false || $flushed === false) {
+                Log::error('Threat feed compile failed: the pending blocklist file write failed.');
+
+                return false;
+            }
+
+            return true;
         } finally {
             fclose($handle); // closing the handle releases the lock
         }

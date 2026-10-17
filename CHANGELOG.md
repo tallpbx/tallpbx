@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Saving Geo-Blocking settings in blacklist mode when a zone download fails now notifies the administrator and records the sync outcome in the audit log, maintaining feedback consistency with initial enablement.
   - Switching an armed Geo-Blocking rule between "Block Selected Countries" and "Block All Except Selected" now uses target-mode compilation and dual-set preservation, preventing an empty allow-set drop window during the transition.
   - The privileged security helper now checks for active Geo-Blocking sets when determining whether to reload external blocklist elements after firewall rebuilds and ban restorations, ensuring geo elements are loaded even when external threat feeds are disabled.
+  - Geo-IP zone cache files that are empty or unreadable now trigger a re-download instead of passing the whitelist fail-closed guard as valid content, and a failed re-download refuses a whitelist sync rather than arming an empty allow-set.
+  - Geo-Blocking and threat-feed compilations now fail their sync when the pending set-element file cannot be published or merged, so a disk or permission failure no longer leaves `last_status` reporting success while the kernel keeps stale elements.
+  - The Geo-Blocking drop counter shown in the Security Center now anchors each geo set to the counter on its own rule line, so an unrelated rule's counter can no longer be reported as geo drops.
   - Restored the Burst Allowance label in the system-service editor and the "Never" fallback in the Geo-Blocking last-synced metric in English, Spanish, and French.
 
 ### Security

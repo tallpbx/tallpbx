@@ -171,3 +171,25 @@ it('reports an empty configuration without failing', function (): void {
         ->expectsOutputToContain('No threat feeds are configured')
         ->assertSuccessful();
 });
+
+it('fails the sync when the pending set-element file cannot be written', function (): void {
+    Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.1/32\n203.0.113.2/32\n203.0.113.3/32", 200)]);
+
+    $feed = SecurityThreatFeed::factory()->create([
+        'provider' => 'voipbl',
+        'enabled' => true,
+        'sync_interval' => 'hourly',
+        'last_sync_at' => now()->subHours(2),
+    ]);
+
+    // A directory occupying the pending path makes the locked open and the
+    // plain-write fallback both fail regardless of the running user.
+    mkdir($this->firewallDir.'/external_blocklist.nft.pending');
+
+    $result = $this->ingestion->ingest($feed, 'https://www.voipbl.org/api/voipbl', force: true);
+
+    expect($result->status)->toBe('failed')
+        ->and($result->error)->toContain('pending set-element file');
+
+    rmdir($this->firewallDir.'/external_blocklist.nft.pending');
+});

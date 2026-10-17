@@ -225,3 +225,88 @@ it('seeds from active external blocklist file under lock when pending does not y
     expect($content)->toContain('add element inet tallpbx_filter external_blocklist_ips { 8.8.8.8 }')
         ->and($content)->toContain('add element inet tallpbx_filter geo_blocked_ips { 1.0.0.0/24 }');
 });
+
+it('re-downloads a country zone whose cache file exists but is empty', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update(['enabled' => true, 'mode' => 'whitelist', 'countries' => ['US']]);
+
+    // An existing but empty zone cache carries no usable ranges: it must not
+    // pass the fail-closed whitelist guard as if it held valid content.
+    file_put_contents($this->cacheDir.'/US.v4.zone', '');
+    file_put_contents($this->cacheDir.'/US.v6.zone', '');
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => ['2600::/12'],
+    ]);
+
+    $result = $this->geoService->sync($rule, force: false);
+
+    expect($result['status'])->toBe('success')
+        ->and($result['v4_count'])->toBe(1)
+        ->and($result['v6_count'])->toBe(1);
+});
+
+it('fails a whitelist sync when an empty cached zone cannot be re-downloaded', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update(['enabled' => true, 'mode' => 'whitelist', 'countries' => ['US']]);
+
+    // Empty cache plus a failed re-download leaves no usable content:
+    // arming the perimeter would drop everything not in an empty allow-set.
+    file_put_contents($this->cacheDir.'/US.v4.zone', '');
+    file_put_contents($this->cacheDir.'/US.v6.zone', '');
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => [],
+        'v6' => [],
+    ]);
+
+    $this->executor->shouldReceive('updateExternalBlocklist')->never();
+
+    $result = $this->geoService->sync($rule, force: false);
+
+    expect($result['status'])->toBe('failed')
+        ->and($result['error'])->toContain('US');
+});
+
+it('fails a sync when the compiled pending file cannot be published', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update(['enabled' => true, 'mode' => 'blacklist', 'countries' => ['US']]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => [],
+    ]);
+
+    // A directory occupying the pending path makes the atomic tmp+rename
+    // publish fail regardless of the user running the tests.
+    mkdir($this->tempDir.'/geo_blocking.nft.pending');
+
+    $result = $this->geoService->sync($rule, force: true);
+
+    expect($result['status'])->toBe('failed')
+        ->and($result['error'])->toContain('Failed to write geo set elements');
+
+    rmdir($this->tempDir.'/geo_blocking.nft.pending');
+});
+
+it('fails a sync when the merged pending file cannot be written', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update(['enabled' => true, 'mode' => 'blacklist', 'countries' => ['US']]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => [],
+    ]);
+
+    // A directory occupying the shared pending path defeats both the locked
+    // open and the plain-write fallback.
+    mkdir($this->tempDir.'/external_blocklist.nft.pending');
+
+    $result = $this->geoService->sync($rule, force: true);
+
+    expect($result['status'])->toBe('failed')
+        ->and($result['error'])->toContain('Failed to write geo set elements');
+
+    rmdir($this->tempDir.'/external_blocklist.nft.pending');
+});

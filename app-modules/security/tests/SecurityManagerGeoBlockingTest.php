@@ -40,7 +40,7 @@ beforeEach(function (): void {
     // byDefault keeps this permissive default demoted so individual tests
     // can declare their own scoped apply expectations (counts/sequences).
     $this->executor->shouldReceive('apply')->byDefault()->andReturn(true);
-    $this->executor->shouldReceive('status')->andReturn('');
+    $this->executor->shouldReceive('status')->byDefault()->andReturn('');
     $this->executor->shouldReceive('flushConntrack')->andReturn(true);
     $this->executor->shouldReceive('updateExternalBlocklist')->byDefault()->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $this->executor);
@@ -442,4 +442,29 @@ it('surfaces an error notification and records sync status when saveGeoSettings 
     $audit = SecurityAuditLog::where('action', 'geo_blocking_updated')->latest('id')->first();
     expect($audit)->not->toBeNull()
         ->and($audit->description)->toContain('sync: failed');
+});
+
+it('pairs the geo drop counter with its own rule line', function (): void {
+    // A realistic nft dump: the geo set DEFINITION lines carry no counter,
+    // and an unrelated external-blocklist rule counter precedes the geo
+    // rule. The reported counter must belong to the geo rule itself.
+    $this->executor->shouldReceive('status')->andReturn(implode("\n", [
+        'set geo_blocked_ips {',
+        '    type ipv4_addr',
+        '    flags interval',
+        '}',
+        'set geo_allowed_ips {',
+        '    type ipv4_addr',
+        '    flags interval',
+        '}',
+        'chain input {',
+        '    ip saddr @external_blocklist_ips counter packets 500 bytes 0 drop',
+        '    ip saddr @geo_blocked_ips counter packets 42 bytes 0 drop',
+        '}',
+    ]));
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->call('geoDropCounter')
+        ->assertReturned(42);
 });

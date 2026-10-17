@@ -64,14 +64,17 @@ class GeoBlockingService
             $v4Cache = "{$this->cacheDir}/{$cc}.v4.zone";
             $v6Cache = "{$this->cacheDir}/{$cc}.v6.zone";
 
-            $needsDownload = $force || ! file_exists($v4Cache) || ! file_exists($v6Cache);
+            $needsDownload = $force || $this->cacheNeedsDownload($v4Cache) || $this->cacheNeedsDownload($v6Cache);
 
             if ($needsDownload) {
                 $ranges = $this->provider->fetchCountryRanges($cc);
 
                 if (empty($ranges['v4']) && empty($ranges['v6'])) {
-                    // Fail-open check: if we have existing cached zones, use them rather than failing completely
-                    if (file_exists($v4Cache) || file_exists($v6Cache)) {
+                    // Fail-open check: existing cached zones with usable
+                    // content are reused rather than failing completely.
+                    // Empty or unreadable caches hold no usable content and
+                    // must not masquerade as valid entries.
+                    if (! $this->cacheNeedsDownload($v4Cache) || ! $this->cacheNeedsDownload($v6Cache)) {
                         Log::warning("Could not download fresh zones for {$cc}; using existing cached zones.");
                     } else {
                         $errors[] = "Failed to download IP zones for country: {$cc}";
@@ -140,7 +143,18 @@ class GeoBlockingService
         $rule->save();
 
         // Compile set elements
-        $this->compileSetElementFile($rule, $allV4, $allV6);
+        if (! $this->compileSetElementFile($rule, $allV4, $allV6)) {
+            $rule->last_status = 'failed';
+            $rule->last_error = 'Failed to write geo set elements to disk.';
+            $rule->save();
+
+            return [
+                'status' => 'failed',
+                'v4_count' => count($allV4),
+                'v6_count' => count($allV6),
+                'error' => $rule->last_error,
+            ];
+        }
 
         // Promote set elements via executor
         if (! $this->executor->updateExternalBlocklist()) {
@@ -170,16 +184,38 @@ class GeoBlockingService
     public function clear(): void
     {
         $rule = SecurityGeoRule::instance();
-        $this->compileSetElementFile($rule, [], []);
+
+        if (! $this->compileSetElementFile($rule, [], [])) {
+            Log::error('Geo set clear failed: the empty set-element file could not be written.');
+        }
+
         $this->executor->updateExternalBlocklist();
+    }
+
+    /**
+     * Whether a zone cache file must be re-downloaded: a missing, zero-byte,
+     * or unreadable file cannot contribute ranges and must never pass the
+     * fail-closed whitelist guard as if it held valid content.
+     */
+    private function cacheNeedsDownload(string $path): bool
+    {
+        if (! file_exists($path)) {
+            return true;
+        }
+
+        $size = @filesize($path);
+
+        return $size === false || $size === 0;
     }
 
     /**
      * Write the pending set element file for geo sets.
      * Note: We populate geo_ips and geo_ips6 in the canonical external_blocklist.nft.pending
      * (or load it together with external blocklist) so both share the atomic transaction.
+     *
+     * @return bool Whether the pending file was published and merged successfully
      */
-    public function compileSetElementFile(SecurityGeoRule $rule, array $v4, array $v6): void
+    public function compileSetElementFile(SecurityGeoRule $rule, array $v4, array $v6): bool
     {
         if (! is_dir($this->firewallDir)) {
             @mkdir($this->firewallDir, 0750, true);
@@ -222,13 +258,19 @@ class GeoBlockingService
 
         // Atomic publish: write to a temp sibling then rename, so the hourly
         // threat-feed sync (which reads this file) never observes a
-        // half-written geo block.
+        // half-written geo block. Both steps are checked: a failed publish
+        // must fail the sync instead of reporting success while the helper
+        // loads stale elements.
         $tmpFile = $targetFile.'.tmp';
-        file_put_contents($tmpFile, implode("\n", $lines)."\n");
-        rename($tmpFile, $targetFile);
+        if (@file_put_contents($tmpFile, implode("\n", $lines)."\n") === false
+            || ! @rename($tmpFile, $targetFile)) {
+            Log::error('Geo set compile failed: the pending file could not be published.');
+
+            return false;
+        }
 
         // Also merge into external_blocklist.nft.pending if it exists or create alongside
-        $this->mergeWithExternalBlocklistPending($targetFile);
+        return $this->mergeWithExternalBlocklistPending($targetFile);
     }
 
     /**
@@ -238,8 +280,10 @@ class GeoBlockingService
      * threat-feed sync rewrites this same file through
      * ThreatFeedIngestionService, and neither writer may lose the other's
      * elements through an interleaved read-modify-write.
+     *
+     * @return bool Whether the merged content was written successfully
      */
-    protected function mergeWithExternalBlocklistPending(string $geoPendingFile): void
+    protected function mergeWithExternalBlocklistPending(string $geoPendingFile): bool
     {
         $externalPending = $this->firewallDir.'/external_blocklist.nft.pending';
         $externalActive = $this->firewallDir.'/external_blocklist.nft';
@@ -250,7 +294,9 @@ class GeoBlockingService
         // shared with ThreatFeedIngestionService (fopen 'c+' + LOCK_EX +
         // stream_get_contents + filter + ftruncate/rewrite), falling back
         // to a plain write only when the file cannot be opened at all.
-        $handle = fopen($externalPending, 'c+');
+        // The @ suppresses the stream warning for unwritable paths (such
+        // as a directory) so the fallback branch handles the failure.
+        $handle = @fopen($externalPending, 'c+');
         if ($handle === false) {
             $existingContent = file_exists($externalActive) ? (file_get_contents($externalActive) ?: '') : '';
             $filteredLines = [];
@@ -267,9 +313,16 @@ class GeoBlockingService
                 ];
             }
             $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
-            file_put_contents($externalPending, $combined);
 
-            return;
+            // The plain-write fallback is checked too: a silent failure here
+            // would leave the old elements in place while callers report success.
+            if (@file_put_contents($externalPending, $combined) === false) {
+                Log::error('Geo set merge failed: the shared pending file is not writable.');
+
+                return false;
+            }
+
+            return true;
         }
 
         try {
@@ -309,8 +362,16 @@ class GeoBlockingService
 
             ftruncate($handle, 0);
             rewind($handle);
-            fwrite($handle, $combined);
-            fflush($handle);
+            $written = fwrite($handle, $combined);
+            $flushed = fflush($handle);
+
+            if ($written === false || $flushed === false) {
+                Log::error('Geo set merge failed: the shared pending file write failed.');
+
+                return false;
+            }
+
+            return true;
         } finally {
             fclose($handle); // closing the handle releases the lock
         }
