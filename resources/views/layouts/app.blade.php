@@ -54,7 +54,7 @@
         @php $originalAdmin = $impersonationService->getOriginalAdmin(); @endphp
         <div class="bg-warning text-warning-content px-4 py-2 flex items-center justify-between text-sm shrink-0">
             <span>
-                {!! __('client.impersonating', ['name' => Auth::user()->name, 'admin' => $originalAdmin?->name]) !!}
+                {{ __('client.impersonating', ['name' => Auth::user()->name, 'admin' => $originalAdmin?->name]) }}
             </span>
             <form method="POST" action="{{ route('panel.impersonation.stop') }}">
                 @csrf

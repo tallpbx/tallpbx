@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The privileged security helper now checks for active Geo-Blocking sets when determining whether to reload external blocklist elements after firewall rebuilds and ban restorations, ensuring geo elements are loaded even when external threat feeds are disabled.
   - Restored the Burst Allowance label in the system-service editor and the "Never" fallback in the Geo-Blocking last-synced metric in English, Spanish, and French.
 
+### Security
+- **Impersonation Banner Stored XSS Mitigation**: Escaped user and administrator display names when rendering the active impersonation alert banner in the panel layout and removed raw HTML tags from the underlying translation strings across English, Spanish, and French.
+
 ### Changed
 - Geo-IP country zones now refresh automatically every week via the scheduler (`security:sync-geoip`, also available manually with `--force`); the unused manual sync action behind it was removed.
 

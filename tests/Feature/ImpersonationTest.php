@@ -6,6 +6,7 @@ use App\Exceptions\ImpersonationException;
 use App\Models\Admin;
 use App\Models\Group;
 use App\Models\Permission;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\ImpersonationServiceInterface;
 use App\Services\PermissionService;
@@ -351,4 +352,28 @@ it('stops safely when the original admin was deleted mid-session', function () {
     // and the impersonated web login removed.
     expect($impersonationService->isImpersonating())->toBeFalse();
     $this->assertGuest('web');
+});
+
+it('escapes user and admin display names in the impersonation banner to prevent stored XSS', function () {
+    $tenant = Tenant::factory()->create();
+    $admin = Admin::factory()->create([
+        'name' => '<script>alert("admin-xss")</script>',
+        'enabled' => true,
+    ]);
+    $user = User::factory()->create([
+        'name' => '<img src=x onerror=alert("user-xss")>',
+    ]);
+    $tenant->users()->attach($user, ['role' => 'admin']);
+    giveAdminImpersonatePermission($admin);
+
+    $impersonationService = app(ImpersonationServiceInterface::class);
+    $this->actingAs($admin, 'admin');
+    $impersonationService->impersonate($user);
+
+    $response = $this->withSession(['selected_tenant_id' => (string) $tenant->id])
+        ->get(route('panel.dashboard'));
+    $response->assertOk();
+    $response->assertDontSee('<script>alert("admin-xss")</script>', false);
+    $response->assertDontSee('<img src=x onerror=alert("user-xss")>', false);
+    $response->assertSee('&lt;script&gt;alert(&quot;admin-xss&quot;)&lt;/script&gt;', false);
 });

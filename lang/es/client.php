@@ -106,7 +106,7 @@ return [
     'info' => 'Información',
 
     // ─── Impersonation ──────────────────────────────────────────────────────
-    'impersonating' => 'Está viendo como <strong>:name</strong> &mdash; Suplantado por <strong>:admin</strong>',
+    'impersonating' => 'Está viendo como :name — Suplantado por :admin',
     'stop_impersonating' => 'Dejar de Suplantar',
 
     // ─── Dashboard ──────────────────────────────────────────────────────────
