@@ -6,7 +6,7 @@ This document is the authoritative architectural and developer reference for Tal
 
 ## 1. Domain-Driven Modular Monolith Architecture
 
-TallPBX 4.x organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**. Rather than maintaining all models, controllers, Livewire components, routes, migrations, and translation strings in a single monolithic `app/` directory or treating internal modules as fragile pseudo-packages, each domain feature (such as `gateways`, `extensions`, `sip-profiles`, `voicemails`, `security`, and `firewall`) is encapsulated into a cohesive **bounded context** in `app-modules/`.
+TallPBX 4.x organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**. Rather than maintaining all models, controllers, Livewire components, routes, migrations, and translation strings in a single monolithic `app/` directory or treating internal modules as fragile pseudo-packages, each domain feature (such as `gateways`, `extensions`, `sip-profiles`, `voicemails`, `security`, and `backups`) is encapsulated into a cohesive **bounded context** in `app-modules/`.
 
 ### Core Architectural Principles
 1. **Single Deployable Monolith**: All built-in modules belong to the unified core codebase and update atomically via Git. They are NOT independent microservices or separate Composer packages.
