@@ -157,10 +157,10 @@ case "$ACTION" in
         "$NFT_BIN" -f "$FIREWALL_ACTIVE"
 
         # Step 6: Re-load the external blocklist elements ONLY IF the ruleset
-        # references @external_blocklist_ips (or legacy @threat_feed_ips).
-        # When the firewall is off or pre-filters are disabled, loading 100k+
-        # IPs into unreferenced sets is redundant and wastes several seconds.
-        if grep -qE '@(external_blocklist_ips|threat_feed_ips)' "$FIREWALL_ACTIVE"; then
+        # references @external_blocklist_ips, @geo_allowed_ips, or @geo_blocked_ips
+        # (or legacy @threat_feed_ips). When the firewall is off or features are disabled,
+        # loading 100k+ IPs into unreferenced sets is redundant and wastes several seconds.
+        if grep -qE '@(external_blocklist_ips|threat_feed_ips|geo_allowed_ips|geo_blocked_ips)' "$FIREWALL_ACTIVE"; then
             load_external_blocklist_active
         fi
 
@@ -227,8 +227,8 @@ case "$ACTION" in
                 "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
 
                 # The restore is a full ruleset load ('flush ruleset'), so the
-                # external blocklist elements must be re-loaded with it if referenced.
-                if grep -qE '@(external_blocklist_ips|threat_feed_ips)' "$FIREWALL_ACTIVE"; then
+                # external blocklist and geo elements must be re-loaded with it if referenced.
+                if grep -qE '@(external_blocklist_ips|threat_feed_ips|geo_allowed_ips|geo_blocked_ips)' "$FIREWALL_ACTIVE"; then
                     load_external_blocklist_active
                 fi
             fi
@@ -264,8 +264,8 @@ case "$ACTION" in
                 "$NFT_BIN" -f "$FIREWALL_ACTIVE" 2>/dev/null || true
 
                 # The restore is a full ruleset load ('flush ruleset'), so the
-                # external blocklist elements must be re-loaded with it if referenced.
-                if grep -qE '@(external_blocklist_ips|threat_feed_ips)' "$FIREWALL_ACTIVE"; then
+                # external blocklist and geo elements must be re-loaded with it if referenced.
+                if grep -qE '@(external_blocklist_ips|threat_feed_ips|geo_allowed_ips|geo_blocked_ips)' "$FIREWALL_ACTIVE"; then
                     load_external_blocklist_active
                 fi
             fi

@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The shared external-blocklist pipeline file is now written under an exclusive lock by both the Geo-Blocking tab and the hourly threat-feed sync, preventing lost updates during concurrent writes, and stale Geo-Blocking header comments no longer accumulate in the generated firewall file.
   - Merging Geo-Blocking set elements into the shared external blocklist file now performs the entire read-modify-write cycle inside the exclusive lock, preventing race conditions with concurrent threat-feed ingestion.
   - Saving Geo-Blocking settings in blacklist mode when a zone download fails now notifies the administrator and records the sync outcome in the audit log, maintaining feedback consistency with initial enablement.
+  - Switching an armed Geo-Blocking rule between "Block Selected Countries" and "Block All Except Selected" now uses target-mode compilation and dual-set preservation, preventing an empty allow-set drop window during the transition.
+  - The privileged security helper now checks for active Geo-Blocking sets when determining whether to reload external blocklist elements after firewall rebuilds and ban restorations, ensuring geo elements are loaded even when external threat feeds are disabled.
   - Restored the Burst Allowance label in the system-service editor and the "Never" fallback in the Geo-Blocking last-synced metric in English, Spanish, and French.
 
 ### Changed

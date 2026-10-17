@@ -192,11 +192,22 @@ class GeoBlockingService
 
         $lines = [
             '# TallPBX Geo-Blocking kernel elements — generated '.now()->toIso8601String().'; do not edit.',
-            'flush set inet tallpbx_filter geo_blocked_ips',
-            'flush set inet tallpbx_filter geo_blocked_ips6',
-            'flush set inet tallpbx_filter geo_allowed_ips',
-            'flush set inet tallpbx_filter geo_allowed_ips6',
         ];
+
+        if (empty($v4) && empty($v6)) {
+            // Clearing sets: flush both modes so all kernel geo sets are emptied
+            $lines[] = 'flush set inet tallpbx_filter geo_blocked_ips';
+            $lines[] = 'flush set inet tallpbx_filter geo_blocked_ips6';
+            $lines[] = 'flush set inet tallpbx_filter geo_allowed_ips';
+            $lines[] = 'flush set inet tallpbx_filter geo_allowed_ips6';
+        } else {
+            // Target-mode only flush: never flush the alternate mode's sets
+            // during compilation. When switching between whitelist and blacklist,
+            // the previous mode's kernel set remains populated until the new chain
+            // rule is loaded, preventing an empty allow-set drop window (DM-3).
+            $lines[] = "flush set inet tallpbx_filter {$setNameV4}";
+            $lines[] = "flush set inet tallpbx_filter {$setNameV6}";
+        }
 
         // Elements are compiled whenever a country set is provided, even
         // while the rule is still disabled: populating the kernel sets

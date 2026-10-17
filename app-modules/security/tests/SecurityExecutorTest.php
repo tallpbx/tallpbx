@@ -456,6 +456,47 @@ it('skips reloading external blocklist elements when not referenced in the rules
     }
 });
 
+it('reloads external blocklist elements when geo sets are referenced in the ruleset', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_geo_apply_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/firewall.nft.pending', "#!/usr/sbin/nft -f\n# main ruleset with geo allowed\nip saddr != @geo_allowed_ips counter drop\n");
+    file_put_contents($isolatedDir.'/external_blocklist.nft', "# geo elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'apply'],
+            null,
+            ['TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir, 'TALLPBX_NFT_BIN' => $nftStub],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+
+        $output = $process->getOutput();
+        $mainLoad = strpos($output, "NFT: -f {$isolatedDir}/firewall.nft");
+        $feedLoad = strpos($output, "NFT: -f {$isolatedDir}/external_blocklist.nft");
+
+        expect($mainLoad)->not->toBeFalse()
+            ->and($feedLoad)->not->toBeFalse()
+            ->and($mainLoad)->toBeLessThan($feedLoad);
+    } finally {
+        foreach (glob($isolatedDir.'/*') ?: [] as $file) {
+            @unlink($file);
+        }
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
 it('reloads the last good external blocklist file when ban restores a missing ruleset', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 

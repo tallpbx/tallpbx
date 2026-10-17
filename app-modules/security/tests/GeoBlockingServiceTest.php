@@ -81,6 +81,45 @@ it('clears kernel geo sets when clear is called', function (): void {
         ->and($content)->not->toContain('add element inet tallpbx_filter geo_blocked_ips');
 });
 
+it('only flushes target mode sets during sync to prevent drop window during mode switch (DM-3)', function (): void {
+    $rule = SecurityGeoRule::instance();
+
+    // 1. Blacklist sync should only flush geo_blocked_ips, never geo_allowed_ips
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'blacklist',
+        'countries' => ['US'],
+    ]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')
+        ->with('US')
+        ->andReturn([
+            'v4' => ['1.0.0.0/24'],
+            'v6' => [],
+        ]);
+
+    $this->geoService->sync($rule, force: true);
+
+    $content = file_get_contents($this->tempDir.'/external_blocklist.nft.pending');
+    expect($content)->toContain('flush set inet tallpbx_filter geo_blocked_ips')
+        ->and($content)->toContain('flush set inet tallpbx_filter geo_blocked_ips6')
+        ->and($content)->not->toContain('flush set inet tallpbx_filter geo_allowed_ips');
+
+    // 2. Whitelist sync should only flush geo_allowed_ips, never geo_blocked_ips
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'whitelist',
+        'countries' => ['US'],
+    ]);
+
+    $this->geoService->sync($rule, force: true);
+
+    $content = file_get_contents($this->tempDir.'/external_blocklist.nft.pending');
+    expect($content)->toContain('flush set inet tallpbx_filter geo_allowed_ips')
+        ->and($content)->toContain('flush set inet tallpbx_filter geo_allowed_ips6')
+        ->and($content)->not->toContain('flush set inet tallpbx_filter geo_blocked_ips');
+});
+
 it('fails a whitelist sync when any country yields no entries', function (): void {
     $rule = SecurityGeoRule::instance();
     $rule->update([
