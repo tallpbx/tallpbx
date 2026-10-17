@@ -30,15 +30,16 @@
 | :--- | :--- | :--- | :--- |
 | 1.1.1 | Extract `FirewallApplier` domain service | Pending | 2026-10-16 |
 | 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Pending | 2026-10-16 |
+| 1.1.3 | Geo-blocking cache freshness & whitelist fail-closed integrity | Pending | 2026-10-17 |
 | 1.2.1 | Decompose `SecurityConfigGenerator` | Pending | 2026-10-16 |
 | 1.3.1 | Reorganize `src/` into sub-domain namespaces | Pending | 2026-10-16 |
 | 1.3.2 | Realign domain trait boundaries | Pending | 2026-10-16 |
-| 1.3.3 | Decompose oversized tab views into partials | Pending | 2026-10-16 |
+| 1.3.3 | Decompose oversized tab views into partials | Pending | 2026-10-17 |
 | 2.1 | Standardized form submission loading feedback | Pending | 2026-10-16 |
 | 2.2 | Page-title typography normalization | Pending | 2026-10-16 |
 | 2.3 | Localize hardcoded table headers | Pending | 2026-10-16 |
 | 2.4 | Normalize arbitrary font sizes | Pending | 2026-10-16 |
-| 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-16 |
+| 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-17 |
 | 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Pending | 2026-10-16 |
 | 3.2 | ESL event ingestion overflow & queue buffering | Pending | 2026-10-16 |
 | 4.1 | Shared kernel boundary architecture test & listener migration | Pending | 2026-10-16 |
@@ -52,6 +53,9 @@
 | 5.2 | Open registration feature gate | Pending | 2026-10-16 |
 | 5.3 | XML handler rate limiting & access hardening | Pending | 2026-10-16 |
 | 5.4 | Threat feed redirect pinning | Pending | 2026-10-16 |
+| 5.5 | Reverse lockout protection for armed whitelist geo-perimeter | Pending | 2026-10-17 |
+| 5.6 | Module management and custom extension lifecycle authorization | Pending | 2026-10-17 |
+| 5.7 | Atomic inter-process lock protocol for shared pending firewall sets | Pending | 2026-10-17 |
 
 ---
 
@@ -95,6 +99,16 @@
   - Refactor `tabs/geo-blocking.blade.php` to access `$this->geoRule` directly instead of querying `SecurityGeoRule::instance()` inside the Blade template.
   - Ensure tab views reference these computed properties directly so inactive tabs execute zero DB queries during live updates.
 - **Verification**: Query log assertions verifying requests on one tab execute 0 queries for other tabs, and assert no direct Eloquent queries execute inside Blade tab views.
+ 
+#### Task 1.1.3: Geo-Blocking Cache Freshness & Whitelist Fail-Closed Integrity
+- **Problem**: `GeoBlockingService::cacheNeedsDownload()` checks only whether zone cache files exist and have non-zero file sizes (`filesize === 0`). Once downloaded, country IP zones are never refreshed by the weekly scheduled `security:sync-geoip` run unless `--force` is passed manually, contradicting `CHANGELOG.md` and `docs/security-architecture.md` ("refresh automatically every week"). Additionally, the `sync_interval` setting (`weekly|monthly|on_demand`) is stored but never consulted by `SecuritySyncGeoIpCommand`. Furthermore, in `GeoBlockingService::sync()`, if one address family download fails while the other succeeds, writing `"\n"` into the failed family's cache permanently corrupts it with a 1-byte file that forever bypasses the zero-byte check; in whitelist mode, this can compile a partial allow-set marked as "success", silently dropping legitimate traffic.
+- **Implementation**:
+  - Implement age-aware TTL freshness checking in `cacheNeedsDownload()` based on file modification time (`mtime`) and the configured `sync_interval` (or default 7-day TTL).
+  - Wire `sync_interval` into `SecuritySyncGeoIpCommand` and scheduler logic.
+  - Fix `sync()` to never write cache files for an address family unless valid, non-empty CIDR entries were returned.
+  - Treat zero-entry or whitespace-only cache files as invalid/stale.
+  - Enforce strict fail-closed whitelist integrity: any country in whitelist mode that cannot be fully downloaded or populated from a valid cache must trigger `$whitelistIncomplete`, abort compilation, and report failure.
+- **Verification**: Unit and feature tests verifying automatic download when cache age exceeds TTL, refusal to overwrite caches with empty/corrupt data, and proper fail-closed refusal when a whitelist country has an incomplete zone.
 
 ---
 
@@ -133,7 +147,7 @@
 
 #### Task 1.3.3: Decompose Oversized Tab Views into Partials
 - **Implementation**:
-  - Decompose `resources/views/tabs/firewall-rules.blade.php` (730 LOC; re-verified 2026-10-16) into readable partials:
+  - Decompose `resources/views/tabs/firewall-rules.blade.php` (731 LOC; re-verified 2026-10-17) into readable partials:
     - `partials/prefilter-pipeline.blade.php`
     - `partials/rules-table.blade.php`
     - `partials/system-services.blade.php`
@@ -174,7 +188,7 @@
   - Normalize all occurrences to standard `text-xs` using opacity classes (`text-base-content/60`) for visual hierarchy.
 
 ### Task 2.5: Standardize Toggle Switch Sizing & Loading Locks (UI Audit L4)
-- **Problem**: 12 views render DaisyUI toggle switches; 4 edit views (`tenants-edit`, `admins-edit`, `tenant-domains-edit`, `backups-edit`) still use `toggle toggle-primary` without the standard `toggle-sm` sizing, and 2 of those (`tenants-edit`, `tenant-domains-edit`) carry no `wire:loading.attr` lock at all *(re-measured 2026-10-16; the original audit catalogued 7 of 15 usages)*.
+- **Problem**: 12 views render DaisyUI toggle switches; 4 edit views (`tenants-edit`, `admins-edit`, `tenant-domains-edit`, `backups-edit`) still use `toggle toggle-primary` without the standard `toggle-sm` sizing, and 2 of those (`tenants-edit`, `tenant-domains-edit`) along with `log-viewer.blade.php` carry no `wire:loading.attr` lock at all *(re-measured 2026-10-17; the original audit catalogued 7 of 15 usages)*.
 - **Implementation**:
   - Standardize all toggle switches to `toggle toggle-sm toggle-primary` with pointer-events lock and disabled attribute during mutation.
 
@@ -281,6 +295,28 @@
 - **Problem**: `ThreatFeedIngestionService` follows HTTP redirects without host pinning when downloading external threat feeds.
 - **Implementation**:
   - Configure the Guzzle/HTTP client to enforce `allow_redirects` with same-host pinning or disable redirects.
+
+### Task 5.5: Reverse Lockout Protection for Armed Whitelist Geo-Perimeter (4.x Audit H3)
+- **Problem**: In `ManagesGeoBlocking.php`, arming a whitelist geo perimeter refuses the action if defensive pre-filters are disabled (because pre-filter stage 1 contains the administrator's trusted whitelist accept). However, the reverse path in `ManagesPreFilters.php` (`setPrefilterEnabled(false)`) consults only `LockoutGuardService`, which has no awareness of geo perimeter state. If an administrator disables pre-filters while whitelist geo-blocking is armed, stage 1's trusted accept rule is removed while stage 9.5's geo drop rule fires unconditionally, creating a severe **administrator lockout path**.
+- **Implementation**:
+  - In `ManagesPreFilters::setPrefilterEnabled(false)`, check if `SecurityGeoRule::instance()` is enabled with `mode === 'whitelist'`.
+  - Refuse disabling pre-filters while whitelist geo-blocking is armed, returning a descriptive error notification (`admin.security_geo_prefilter_required` or a specialized lockout notice).
+- **Verification**: Unit and Livewire tests verifying that `setPrefilterEnabled(false)` is blocked when whitelist geo-blocking is enabled, and allowed when disabled or in blacklist mode.
+
+### Task 5.6: Module Management and Custom Extension Lifecycle Authorization (4.x Audit H4)
+- **Problem**: The module workbench route `/panel/modules` (`ModulesList`) is gated solely by the view-only permission `admin.can:admin.modules.view`. However, `ModulesList` provides destructive lifecycle actions (`deleteCustomModule()`, which runs `ModuleLifecycleService::uninstall()` to permanently purge all extension files and database state, and `toggleEnabled()`). Neither action enforces an in-component permission re-check (`ensureManagePermission()` pattern), allowing any administrator with read-only module access to permanently delete custom extensions or toggle core module states.
+- **Implementation**:
+  - Register `admin.modules.manage` permission in root language dictionaries and seed via `AdminSeeder`.
+  - Add `ensureManagePermission()` check inside `ModulesList::deleteCustomModule()` and `toggleEnabled()`.
+  - Hide destructive deletion and toggle UI controls from administrators lacking `admin.modules.manage`.
+- **Verification**: Feature and Livewire authorization tests verifying that users with only `admin.modules.view` cannot delete custom modules or toggle module enablement, and that unauthorized attempts throw `AuthorizationException` / 403.
+
+### Task 5.7: Atomic Inter-Process Lock Protocol for Shared Pending Firewall Sets (4.x Audit M5)
+- **Problem**: In `ThreatFeedIngestionService::compileSetElementFile()`, the service reads `geo_blocking.nft.pending` into memory *before* taking the exclusive file lock (`LOCK_EX`) on `external_blocklist.nft.pending`. If a concurrent geo-blocking toggle executes between the read and lock acquisition, its pending elements can be silently overwritten and reverted by the threat-feed sync.
+- **Implementation**:
+  - Standardize file locking across `ThreatFeedIngestionService` and `GeoBlockingService`: acquire `LOCK_EX` on the shared target before snapshotting and compiling merged pending sets.
+  - Remove dead fallback branches for obsolete separate `.nft` files.
+- **Verification**: Concurrency-safe test verifying that pending geo elements are preserved when threat feeds compile under simulated interleaved writes.
 
 ---
 
