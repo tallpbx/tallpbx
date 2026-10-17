@@ -81,7 +81,7 @@
 - **Verification**: Unit tests with mocked executors asserting all 5 steps, lockout rollback, and error propagation.
 
 #### Task 1.1.2: Lazy `#[Computed]` Properties for Cockpit Tabs
-- **Problem**: `SecurityManager::render()` queries records for all 6 tabs simultaneously on every request (threat feeds, scanner logs, ban records, custom rules, services, whitelist/blacklist), causing unnecessary database queries when viewing a single tab.
+- **Problem**: `SecurityManager::render()` queries records for all cockpit tabs simultaneously on every request (firewall rules, services, whitelist/blacklist, bans, scanner logs, threat feeds), causing unnecessary database queries when viewing an unrelated tab. In addition, `tabs/geo-blocking.blade.php` queries `SecurityGeoRule::instance()` directly within an inline `@php` block inside the view rather than receiving a prepared view-model from the component.
 - **Implementation**:
   - Convert tab record queries to Livewire 4 `#[Computed]` properties:
     - `#[Computed] public function rules(): Collection`
@@ -91,8 +91,10 @@
     - `#[Computed] public function bans(): Collection`
     - `#[Computed] public function scannerIncidents(): Collection`
     - `#[Computed] public function threatFeeds(): Collection`
+    - `#[Computed] public function geoRule(): SecurityGeoRule`
+  - Refactor `tabs/geo-blocking.blade.php` to access `$this->geoRule` directly instead of querying `SecurityGeoRule::instance()` inside the Blade template.
   - Ensure tab views reference these computed properties directly so inactive tabs execute zero DB queries during live updates.
-- **Verification**: Query log assertions verifying requests on one tab execute 0 queries for other tabs.
+- **Verification**: Query log assertions verifying requests on one tab execute 0 queries for other tabs, and assert no direct Eloquent queries execute inside Blade tab views.
 
 ---
 
