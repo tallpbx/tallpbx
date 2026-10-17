@@ -4,22 +4,60 @@
 - **Branch**: `4.x`
 - **Scope**: Comprehensive consolidated master implementation roadmap integrating all architectural analyses, UI design audits, security module refactoring plans, and whole-project Domain-Driven Modular Monolith improvements.
 - **Authority**: This document is the single authoritative source of truth for all outstanding engineering tasks across TallPBX.
+- **Maintenance**: Statuses, audit figures, and the milestone log are maintained together — see [Task Status Index & Maintenance Cadence](#task-status-index--maintenance-cadence).
 
 ---
 
 ## Table of Contents
-1. [Stream 1: Security Module Sub-domain Refactoring & Performance](#stream-1-security-module-sub-domain-refactoring--performance)
-2. [Stream 2: UI/UX Consistency, Loading Feedback & Typography](#stream-2-uiux-consistency-loading-feedback--typography)
-3. [Stream 3: Real-Time Telephony Push Architecture (Echo/Reverb)](#stream-3-real-time-telephony-push-architecture-echoreverb)
-4. [Stream 4: Shared Kernel Boundary & Modular Discipline](#stream-4-shared-kernel-boundary--modular-discipline)
-5. [Stream 5: Application Security Hardening](#stream-5-application-security-hardening)
-6. [Completed & Verified Milestone Log](#completed--verified-milestone-log)
+1. [Task Status Index & Maintenance Cadence](#task-status-index--maintenance-cadence)
+2. [Stream 1: Security Module Sub-domain Refactoring & Performance](#stream-1-security-module-sub-domain-refactoring--performance)
+3. [Stream 2: UI/UX Consistency, Loading Feedback & Typography](#stream-2-uiux-consistency-loading-feedback--typography)
+4. [Stream 3: Real-Time Telephony Push Architecture (Echo/Reverb)](#stream-3-real-time-telephony-push-architecture-echoreverb)
+5. [Stream 4: Shared Kernel Boundary & Modular Discipline](#stream-4-shared-kernel-boundary--modular-discipline)
+6. [Stream 5: Application Security Hardening](#stream-5-application-security-hardening)
+7. [Completed & Verified Milestone Log](#completed--verified-milestone-log)
+
+---
+
+## Task Status Index & Maintenance Cadence
+
+- **Status legend**: `Pending` (not started), `In Progress` (work landed but the task is not closed), `Verified` (task closed — its commit appears in the Completed & Verified Milestone Log).
+- **Refresh cadence**: every quantitative figure in this document (file counts, LOC, occurrence counts) is re-measured against the working tree whenever this document is edited, and carries the date it was measured. When a figure and the code disagree, the code wins.
+- **Close-out rule**: a task is closed only in the same commit that appends its commit SHA to the Milestone Log and flips its status here.
+- **Audit sources**: the original audit reports (`ui-audit-report.md`, `architecture-audit-report.md`, `project-audit-report.md`, `modular-design-analysis.md`, `plan-security-module-performance-refactor.md`) have been consolidated into this roadmap and retired; their surviving findings live on as the tasks below.
+
+| Task | Title | Status | Figures verified |
+| :--- | :--- | :--- | :--- |
+| 1.1.1 | Extract `FirewallApplier` domain service | Pending | 2026-10-16 |
+| 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Pending | 2026-10-16 |
+| 1.2.1 | Decompose `SecurityConfigGenerator` | Pending | 2026-10-16 |
+| 1.3.1 | Reorganize `src/` into sub-domain namespaces | Pending | 2026-10-16 |
+| 1.3.2 | Realign domain trait boundaries | Pending | 2026-10-16 |
+| 1.3.3 | Decompose oversized tab views into partials | Pending | 2026-10-16 |
+| 2.1 | Standardized form submission loading feedback | Pending | 2026-10-16 |
+| 2.2 | Page-title typography normalization | Pending | 2026-10-16 |
+| 2.3 | Localize hardcoded table headers | Pending | 2026-10-16 |
+| 2.4 | Normalize arbitrary font sizes | Pending | 2026-10-16 |
+| 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-16 |
+| 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Pending | 2026-10-16 |
+| 3.2 | ESL event ingestion overflow & queue buffering | Pending | 2026-10-16 |
+| 4.1 | Shared kernel boundary architecture test & listener migration | Pending | 2026-10-16 |
+| 4.2 | Enforce contract seams over cross-module model imports | Pending | 2026-10-16 |
+| 4.3 | Consolidate module route registration | Pending | 2026-10-16 |
+| 4.4 | Clarify disabled module lifecycle semantics | Pending | 2026-10-16 |
+| 4.5 | Clean up `TenantContext::current()` side effects | Pending | 2026-10-16 |
+| 4.6 | Decompose large shared-kernel classes | Pending | 2026-10-16 |
+| 4.7 | Environment variable documentation reference | Pending | 2026-10-16 |
+| 5.1 | Click-to-call ESL command validation | Pending | 2026-10-16 |
+| 5.2 | Open registration feature gate | Pending | 2026-10-16 |
+| 5.3 | XML handler rate limiting & access hardening | Pending | 2026-10-16 |
+| 5.4 | Threat feed redirect pinning | Pending | 2026-10-16 |
 
 ---
 
 ## Stream 1: Security Module Sub-domain Refactoring & Performance
 
-*Source: `modular-design-analysis.md` (Parts 1 & 2) and `plan-security-module-performance-refactor.md`*
+*Source: superseded analyses `modular-design-analysis.md` (Parts 1 & 2; retired in commit `608f3d5b`) and `plan-security-module-performance-refactor.md` (retired in commit `2dfe1bdb`). Their surviving conclusions are preserved as the invariants and tasks below.*
 
 ### Architectural Invariants & Scope Rules
 - **Keep Single Module Boundary**: Retain `app-modules/security/` as a single unified module. External coupling is currently zero (no external PHP code references `Modules\Security`). Splitting into multiple `app-modules/` would fragment the unified Command Center UI or introduce inter-module event latency, break single-artifact firewall generation, and increase lockout risk across shared kernel sets (`external_blocklist.nft.pending`).
@@ -79,8 +117,8 @@
 - **Implementation**:
   - Reorganize flat `app-modules/security/src/Services/` into cohesive sub-domain folders:
     - `src/Firewall/`: `FirewallApplier`, `SecurityConfigGenerator`, `SecurityExecutor`, `LockoutGuardService`, `FirewallBanReconciler`, `FirewallSyncVerifier`.
-    - `src/Geo/`: `GeoBlockingService`, `IpdenyProvider`, `GeoRule` model.
-    - `src/ThreatFeeds/`: `ThreatFeedManager`, `ThreatFeedIngestionService`, `VoipblFeedProvider`, `ThreatFeed` model.
+    - `src/Geo/`: `GeoBlockingService`, `IpdenyProvider`, `SecurityGeoRule` model.
+    - `src/ThreatFeeds/`: `ThreatFeedManager`, `ThreatFeedIngestionService`, `VoipblFeedProvider`, `SecurityThreatFeed` model.
     - `src/Bans/`: `SecurityBanService`, `LogFailedLoginListener`, `LogFailedSipAuthListener`, `SecurityBan` model.
     - `src/Detection/`: `SipScannerSignatures`, `LogSipScannerListener`, `SipScannerDialplanContributor`.
     - `src/Observe/`: `ObserveMetricsParser`, `SecurityObserveCommand`.
@@ -93,7 +131,7 @@
 
 #### Task 1.3.3: Decompose Oversized Tab Views into Partials
 - **Implementation**:
-  - Decompose `resources/views/livewire/tabs/firewall-rules.blade.php` (730 LOC) into readable partials:
+  - Decompose `resources/views/tabs/firewall-rules.blade.php` (730 LOC; re-verified 2026-10-16) into readable partials:
     - `partials/prefilter-pipeline.blade.php`
     - `partials/rules-table.blade.php`
     - `partials/system-services.blade.php`
@@ -103,38 +141,38 @@
 
 ## Stream 2: UI/UX Consistency, Loading Feedback & Typography
 
-*Source: `ui-audit-report.md`*
+*Source: retired `ui-audit-report.md` (untracked working audit, consolidated here). Item IDs (M2, L1, ...) are retained for traceability; all quantitative figures were re-measured against the working tree on 2026-10-16.*
 
 ### Task 2.1: Standardized Form Submission Loading Feedback (`<x-form-submit-button>`) (UI Audit M3 & L3)
-- **Problem**: Approximately 45 edit/create forms (`acl-edit`, `dialplans-edit`, `bridges-edit`, `sip-profiles-edit`, `extensions-edit`, `users-edit`, `tenants-edit`, etc.) submit with no busy state, spinner, or disabled attribute. When saves trigger FreeSWITCH reload jobs or cache invalidation, the screen freezes with zero feedback. In addition, `sip-profiles-edit` and `extensions-edit` have button sizing drift (`btn` instead of standard `btn-sm`).
+- **Problem**: Of the 47 module edit/create views (`acl-edit`, `dialplans-edit`, `bridges-edit`, `sip-profiles-edit`, `extensions-edit`, `users-edit`, `tenants-edit`, etc.), 42 contain no `wire:loading` directive at all *(re-measured 2026-10-16)*, so their submits have no busy state, spinner, or disabled attribute. When saves trigger FreeSWITCH reload jobs or cache invalidation, the screen freezes with zero feedback. In addition, `sip-profiles-edit` and `extensions-edit` have button sizing drift (`btn` instead of standard `btn-sm`).
 - **Implementation**:
   - Create `<x-form-submit-button>` Blade component with built-in:
     - `wire:loading.attr="disabled"`
     - DaisyUI loading spinner (`<span class="loading loading-spinner loading-xs" wire:loading></span>`)
     - Standard `btn btn-primary btn-sm` sizing
     - Dynamic slot text supporting present-continuous busy labels (e.g., "Saving...").
-  - Batch-migrate all ~45 edit/create views to use `<x-form-submit-button>` and normalize cancel links to `btn btn-ghost btn-sm`.
+  - Batch-migrate all 47 edit/create views to use `<x-form-submit-button>` and normalize cancel links to `btn btn-ghost btn-sm`.
 - **Verification**: Browser smoke tests verifying button locks and spinner appears on save.
 
 ### Task 2.2: Page-Title Font Weight & Typography Normalization (UI Audit M2)
-- **Problem**: 81 views use `text-2xl font-semibold` while 27 views use `text-2xl font-bold tracking-tight`.
+- **Problem**: 83 views use `text-2xl font-semibold` while 43 use a `text-2xl font-bold` variant; only 7 views contain `tracking-tight` at all, so the AGENTS.md page-title standard (`text-2xl font-bold tracking-tight text-base-content`) is currently the minority pattern *(re-measured 2026-10-16; the original audit catalogued 81 vs 27)*.
 - **Implementation**:
   - Normalize all module and panel page titles to the established project standard: `text-2xl font-bold tracking-tight text-base-content`.
   - Add a Pest UI architecture test asserting page title headers match the standard pattern across all module views.
 
 ### Task 2.3: Localize Hardcoded Table Header (`<th>`) Contents (UI Audit L1)
-- **Problem**: ~25 table header cells contain raw English strings (`Name`, `Actions`, `Type`, `Status`, `Provider`, `Destination`, `Queue`, `Profile`, `Value`, `Key`, `Strategy`, `Timestamp`, `Rule Stage`, `Proto`, `Message`), rendering untranslated in Spanish and French.
+- **Problem**: 39 table header cells contain raw English strings (`Name`, `Actions`, `Type`, `Status`, `Provider`, `Destination`, `Queue`, `Profile`, `Value`, `Key`, `Strategy`, `Timestamp`, `Rule Stage`, `Proto`, `Message`, plus `Source IP`, `SAN Domains`, `Name / Domain`, `Interface`, and `File`), rendering untranslated in Spanish and French *(re-measured 2026-10-16; the original audit catalogued ~25)*.
 - **Implementation**:
   - Replace unlocalized `<th>` contents with root dictionary keys (`__('client.name')`, `__('client.actions')`, `__('client.status')`, etc.) or module-specific translations where domain-specific.
   - Verify with `TranslationParityTest` (must remain 100% green).
 
 ### Task 2.4: Normalize Arbitrary Font Sizes (UI Audit L2)
-- **Problem**: 21 occurrences of arbitrary one-off font sizes (`text-[11px]` and `text-[10px]`) concentrated in the security module and display-settings drawer violate the design token convention.
+- **Problem**: 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) concentrated in the security module and display-settings drawer violate the design token convention *(re-measured 2026-10-16; the original audit catalogued 21)*.
 - **Implementation**:
   - Normalize all occurrences to standard `text-xs` using opacity classes (`text-base-content/60`) for visual hierarchy.
 
 ### Task 2.5: Standardize Toggle Switch Sizing & Loading Locks (UI Audit L4)
-- **Problem**: 7 of 15 toggle switch usages lack the standard `toggle-sm` sizing class, and some lack `wire:loading.attr="disabled"`.
+- **Problem**: 12 views render DaisyUI toggle switches; 4 edit views (`tenants-edit`, `admins-edit`, `tenant-domains-edit`, `backups-edit`) still use `toggle toggle-primary` without the standard `toggle-sm` sizing, and 2 of those (`tenants-edit`, `tenant-domains-edit`) carry no `wire:loading.attr` lock at all *(re-measured 2026-10-16; the original audit catalogued 7 of 15 usages)*.
 - **Implementation**:
   - Standardize all toggle switches to `toggle toggle-sm toggle-primary` with pointer-events lock and disabled attribute during mutation.
 
@@ -142,7 +180,7 @@
 
 ## Stream 3: Real-Time Telephony Push Architecture (Echo/Reverb)
 
-*Source: `ui-audit-report.md` (M1) and `architecture-audit-report.md` (M4)*
+*Source: retired `ui-audit-report.md` (M1) and `architecture-audit-report.md` (M4), both consolidated here.*
 
 ### Task 3.1: Migrate Runtime Telephony Status Views from `wire:poll` to Echo Push (UI Audit M1)
 - **Problem**: Six runtime telephony status views aggressively poll the backend via `wire:poll` (2s–15s), violating the project mandate to use Reverb/Echo push for real-time tables:
@@ -152,7 +190,7 @@
   - `sip-status-list` (15s)
   - `call-center-active-list` (5s)
   - `operator-panel-index` (5s)
-  *(Note: `git-update` and `restore-archive` poll progress legitimately for long-running batch jobs and are preserved).*
+  *(Note: three non-telephony views poll legitimately and are preserved — `git-update` (1s while an update runs), `restore-archive` (5s during restores), and the log viewer (5s live tail). Poll signatures re-checked 2026-10-16.)*
 - **Implementation**:
   - FreeSWITCH ESL listeners already broadcast typed events (`ChannelCreate`, `ChannelAnswer`, `ChannelHangupComplete`, `SofiaRegister`).
   - Configure the 6 Livewire components to listen on tenant private channels with `#[On('echo:tenant.{tenantId}.telephony,...')]` and refresh data reactively.
@@ -169,7 +207,7 @@
 
 ## Stream 4: Shared Kernel Boundary & Modular Discipline
 
-*Source: `architecture-audit-report.md` (M1–M3, L3–L7) and `modular-design-analysis.md` (Part 2)*
+*Source: retired `architecture-audit-report.md` (M1–M3, L3–L7) and `modular-design-analysis.md` (Part 2; retired in commit `608f3d5b`), both consolidated here.*
 
 ### Task 4.1: Shared Kernel Reverse Dependency Architecture Test & Listener Migration
 - **Problem**: `app/` contains domain leakage where shared kernel classes reach into module models directly (`app/Listeners/FreeSwitch/*`, `app/Services/TenantDefaults/*`, `app/Services/DestinationResolver`, `PbxLoadTestSeedCommand`).
@@ -184,7 +222,7 @@
   - Route cross-module consumers through `MediaStorageServiceInterface`.
 
 ### Task 4.3: Consolidate Module Route Registration (Arch Audit M2)
-- **Problem**: 21 modules use explicit `routes/web.php` while the remaining modules use convention-based auto-registration in `App\Support\ModuleServiceProvider::autoRegisterRouteGroups()`. Maintaining two parallel mechanisms doubles the cognitive overhead.
+- **Problem**: 22 of the 60 modules use explicit `routes/web.php` while the remaining modules use convention-based auto-registration in `App\Support\ModuleServiceProvider::autoRegisterRouteGroups()` *(re-measured 2026-10-16; the original audit catalogued 21)*. Maintaining two parallel mechanisms doubles the cognitive overhead.
 - **Implementation**:
   - Standardize all modules on explicit `routes/web.php` files (easiest to grep, audit, and debug), and retire the reflection-heavy `autoRegisterRouteGroups()` path from `ModuleServiceProvider`.
 
@@ -204,20 +242,20 @@
 - **Problem**: Several large single-purpose classes mix raw protocol handling with business APIs:
   - `FreeSwitchService` (714 LOC): Mixes raw ESL socket framing and reconnects with high-level command APIs.
   - `GitUpdateService` (715 LOC): Mixes Git process execution with status storage and web logging.
-  - `ModuleLifecycleService` (893 LOC): Mixes dependency resolution with DB lifecycle and rollback.
+  - `ModuleLifecycleService` (696 LOC; previously recorded as 893 — re-measured 2026-10-16): Mixes dependency resolution with DB lifecycle and rollback.
 - **Implementation**:
   - Split `FreeSwitchService` into `EslConnection` (protocol framing) + `FreeSwitchApi` (command API).
   - Split `GitUpdateService` into `GitUpdateRunner`, `UpdateStatusStore`, and `UpdateLogWriter`.
 
 ### Task 4.7: Environment Variable Documentation Reference (Arch Audit L5)
 - **Implementation**:
-  - Document the 227 unique `env()` configuration keys in a categorized reference guide (`docs/env-reference.md`) grouping FreeSWITCH, security, media storage,Reverb, and database settings.
+  - Document the 230 unique `env()` configuration keys *(re-measured 2026-10-16)* in a categorized reference guide (`docs/env-reference.md`) grouping FreeSWITCH, security, media storage, Reverb, and database settings.
 
 ---
 
 ## Stream 5: Application Security Hardening
 
-*Source: `project-audit-report.md`*
+*Source: retired `project-audit-report.md` (untracked working audit, consolidated here).*
 
 ### Task 5.1: Click-to-Call ESL Command Validation & Socket Sanitization (Security Audit H1)
 - **Problem**: In `ClickToCallForm.php` (`initiateCall()`), `phoneNumber` and `extension` are interpolated into an ESL `originate` string sent via `bgapi()`. A value containing newline (`\n`) characters allows protocol command injection directly into FreeSWITCH's privileged ESL socket.
@@ -246,10 +284,13 @@
 
 ## Completed & Verified Milestone Log
 
-All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`:
+All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-16** | `08d07b31` | **Security / Browser Tests** | **Geo-Blocking Browser Coverage**: Added read-only browser assertions for the disabled Geo-Blocking tab (status badge, policy mode radios, CLI hint, country picker, operational metrics) and the master Firewall Rules geo row, keeping both surfaces in agreement. |
+| **2026-10-16** | `2d295307` | **Security / Geo** | **Geo Sync Failure Hardening & Drop Counter Fix**: Missing, zero-byte, or unreadable zone caches now force a re-download and refuse whitelist arming when the re-download fails; locked and fallback set-element writes now fail the sync instead of reporting success while the kernel keeps stale elements; the Geo-Blocking drop counter now anchors to its own `@set` rule line so unrelated rules are never reported as geo drops. |
+| **2026-10-16** | `608f3d5b` | **Documentation** | **Roadmap Source Consolidation**: Retired the temporary `modular-design-analysis.md` now that its surviving conclusions live in this roadmap. |
 | **2026-10-16** | `919a7c7c` | **UI / Logs** | **Log Viewer Modernization & Dead Stub Purge**: Restyled `log-viewer.blade.php` with DaisyUI semantic tokens (`bg-base-100`, `border-base-300`, `select-bordered`, `input-bordered`, `toggle-primary`, `loading-spinner`), eliminating legacy Tailwind colors and raw inline SVG spinner. Purged 3 unused scaffolding stubs (`call-blocks`, `call-forwards`, `certificates`). *(Resolves UI Audit M4 & L5)* |
 | **2026-10-16** | `56a1875b` | **FreeSWITCH / XML** | **Directory Lookup Query Optimization**: Bulk eager-loaded extensions and extension settings in `DirectoryXmlBuilder` for domain-wide lookups, bounding queries to a constant maximum ($\le 5$ queries) and eliminating $2N+1$ query degradation. *(Resolves Arch Audit L6)* |
 | **2026-10-16** | `ddb73eb3` | **Security / Panel** | **Impersonation Banner Stored XSS Mitigation**: Escaped user and admin display names in `layouts/app.blade.php` using Blade escaping and removed raw HTML from `client.php` translations across English, Spanish, and French. Added security test verifying script tag escaping. *(Resolves UI Audit L6)* |
