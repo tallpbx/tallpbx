@@ -190,52 +190,53 @@ class ThreatFeedIngestionService
      */
     private function compileSetElementFile(array $v4, array $v6): bool
     {
-        $lines = [
+        $feedLines = [
             '# TallPBX external blocklist kernel elements — generated '.now()->toIso8601String().'; do not edit.',
             'flush set inet tallpbx_filter external_blocklist_ips',
             'flush set inet tallpbx_filter external_blocklist_ips6',
         ];
 
         foreach ($this->chunkedAddElements('external_blocklist_ips', $v4) as $line) {
-            $lines[] = $line;
+            $feedLines[] = $line;
         }
 
         foreach ($this->chunkedAddElements('external_blocklist_ips6', $v6) as $line) {
-            $lines[] = $line;
-        }
-
-        // If geo_blocking.nft.pending or active exists, retain geo elements
-        $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
-        $geoActive = $this->firewallDir.'/geo_blocking.nft';
-        $geoContent = '';
-        if (file_exists($geoPending)) {
-            $geoContent = file_get_contents($geoPending) ?: '';
-        } elseif (file_exists($geoActive)) {
-            $geoContent = file_get_contents($geoActive) ?: '';
-        }
-
-        if ($geoContent !== '') {
-            $lines[] = $geoContent;
+            $feedLines[] = $line;
         }
 
         if (! is_dir($this->firewallDir)) {
             @mkdir($this->firewallDir, 0750, true);
         }
 
+        $pendingFile = $this->firewallDir.'/external_blocklist.nft.pending';
+        $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
+
         // Write under the exclusive lock protocol shared with
-        // GeoBlockingService (fopen 'c+' + LOCK_EX + ftruncate/rewrite):
+        // GeoBlockingService (fopen 'c+' + LOCK_EX + snapshot geo + ftruncate/rewrite):
         // web-context geo toggles merge into this same file, and neither
         // writer may lose the other's elements through an interleaved
         // read-modify-write.
-        $content = implode("\n", $lines)."\n";
-
-        // The @ suppresses the stream warning for unwritable paths (such as
-        // a directory) so the plain-write fallback below handles the failure.
-        $handle = @fopen($this->firewallDir.'/external_blocklist.nft.pending', 'c+');
+        $handle = @fopen($pendingFile, 'c+');
         if ($handle === false) {
+            $geoContent = '';
+            if (is_file($geoPending)) {
+                $geoContent = @file_get_contents($geoPending) ?: '';
+            } elseif (is_file($pendingFile)) {
+                $existing = @file_get_contents($pendingFile) ?: '';
+                if (($pos = strpos($existing, '# TallPBX Geo-Blocking kernel elements')) !== false) {
+                    $geoContent = substr($existing, $pos);
+                }
+            }
+
+            $lines = $feedLines;
+            if (trim($geoContent) !== '') {
+                $lines[] = trim($geoContent);
+            }
+            $content = implode("\n", $lines)."\n";
+
             // The plain-write fallback is checked too: a silent failure here
             // would leave the old elements in place while callers report success.
-            if (@file_put_contents($this->firewallDir.'/external_blocklist.nft.pending', $content) === false) {
+            if (@file_put_contents($pendingFile, $content) === false) {
                 Log::error('Threat feed compile failed: the pending blocklist file is not writable.');
 
                 return false;
@@ -246,6 +247,26 @@ class ThreatFeedIngestionService
 
         try {
             flock($handle, LOCK_EX);
+
+            // Snapshot any pending geo elements under the exclusive lock.
+            // If geo_blocking.nft.pending exists, use its atomic snapshot;
+            // otherwise, preserve any geo elements already merged in the stream.
+            $geoContent = '';
+            if (is_file($geoPending)) {
+                $geoContent = @file_get_contents($geoPending) ?: '';
+            } else {
+                $existing = stream_get_contents($handle);
+                if ($existing !== false && ($pos = strpos($existing, '# TallPBX Geo-Blocking kernel elements')) !== false) {
+                    $geoContent = substr($existing, $pos);
+                }
+            }
+
+            $lines = $feedLines;
+            if (trim($geoContent) !== '') {
+                $lines[] = trim($geoContent);
+            }
+            $content = implode("\n", $lines)."\n";
+
             ftruncate($handle, 0);
             rewind($handle);
             $written = fwrite($handle, $content);

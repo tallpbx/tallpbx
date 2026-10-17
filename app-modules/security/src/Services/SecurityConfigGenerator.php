@@ -251,7 +251,7 @@ class SecurityConfigGenerator
         $lines[] = '    }';
         $lines[] = '';
 
-        // Geo-blocking sets (populated by geo_blocking.nft / external_blocklist.nft)
+        // Geo-blocking sets (populated by external_blocklist.nft)
         $lines[] = '    # Dedicated Geo-Blocking Sets';
         $lines[] = '    set geo_blocked_ips {';
         $lines[] = '        type ipv4_addr';

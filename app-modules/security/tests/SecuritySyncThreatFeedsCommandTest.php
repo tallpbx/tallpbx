@@ -193,3 +193,75 @@ it('fails the sync when the pending set-element file cannot be written', functio
 
     rmdir($this->firewallDir.'/external_blocklist.nft.pending');
 });
+
+it('atomically snapshots and preserves pending geo elements under shared lock protocol', function (): void {
+    Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.10/32\n203.0.113.20/32\n203.0.113.30/32", 200)]);
+
+    $feed = SecurityThreatFeed::factory()->create([
+        'provider' => 'voipbl',
+        'enabled' => true,
+        'sync_interval' => 'hourly',
+        'last_sync_at' => now()->subHours(2),
+    ]);
+
+    $pendingFile = $this->firewallDir.'/external_blocklist.nft.pending';
+    $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
+
+    // Simulate an interleaved geo sync: lock external_blocklist.nft.pending exclusively
+    $lockHandle = fopen($pendingFile, 'c+');
+    expect($lockHandle)->not->toBeFalse();
+    flock($lockHandle, LOCK_EX);
+
+    // Concurrently write new geo elements to geo_blocking.nft.pending
+    file_put_contents($geoPending, implode("\n", [
+        '# TallPBX Geo-Blocking kernel elements — generated 2026-10-17T00:00:00+00:00; do not edit.',
+        'flush set inet tallpbx_filter geo_blocked_ips',
+        'add element inet tallpbx_filter geo_blocked_ips { 198.51.100.0/24 }',
+    ])."\n");
+
+    // Release the simulated lock so ingestion can proceed
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+
+    $result = $this->ingestion->ingest($feed, 'https://www.voipbl.org/api/voipbl', force: true);
+
+    expect($result->status)->toBe('success');
+
+    $content = file_get_contents($pendingFile);
+    expect($content)->toContain('add element inet tallpbx_filter external_blocklist_ips')
+        ->and($content)->toContain('add element inet tallpbx_filter geo_blocked_ips { 198.51.100.0/24 }');
+});
+
+it('preserves existing geo elements from stream when geo_blocking pending file does not exist', function (): void {
+    Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.50/32\n203.0.113.60/32\n203.0.113.70/32", 200)]);
+
+    $feed = SecurityThreatFeed::factory()->create([
+        'provider' => 'voipbl',
+        'enabled' => true,
+        'sync_interval' => 'hourly',
+        'last_sync_at' => now()->subHours(2),
+    ]);
+
+    $pendingFile = $this->firewallDir.'/external_blocklist.nft.pending';
+    $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
+    if (file_exists($geoPending)) {
+        unlink($geoPending);
+    }
+
+    // Pre-populate external_blocklist.nft.pending with existing geo section
+    file_put_contents($pendingFile, implode("\n", [
+        '# TallPBX external blocklist kernel elements — stale',
+        'flush set inet tallpbx_filter external_blocklist_ips',
+        '# TallPBX Geo-Blocking kernel elements — generated 2026-10-17T00:00:00+00:00; do not edit.',
+        'flush set inet tallpbx_filter geo_allowed_ips',
+        'add element inet tallpbx_filter geo_allowed_ips { 192.0.2.0/24 }',
+    ])."\n");
+
+    $result = $this->ingestion->ingest($feed, 'https://www.voipbl.org/api/voipbl', force: true);
+
+    expect($result->status)->toBe('success');
+
+    $content = file_get_contents($pendingFile);
+    expect($content)->toContain('add element inet tallpbx_filter external_blocklist_ips')
+        ->and($content)->toContain('add element inet tallpbx_filter geo_allowed_ips { 192.0.2.0/24 }');
+});
