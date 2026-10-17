@@ -185,3 +185,25 @@ it('allows read-only ESL commands during a test run', function () {
 
     Log::shouldNotHaveReceived('warning', fn (string $message) => str_contains($message, 'Blocked FreeSWITCH ESL mutation'));
 });
+
+it('rejects commands containing newline characters in api()', function () {
+    Log::spy();
+
+    expect(fn () => $this->service->api("status\nshutdown"))
+        ->toThrow(InvalidArgumentException::class, 'FreeSWITCH ESL command cannot contain newline characters.');
+
+    Log::shouldHaveReceived('error')
+        ->withArgs(fn (string $message, array $context) => $message === 'FreeSWITCH ESL: command rejected due to newline injection attempt.'
+            && ($context['command'] ?? null) === "status\nshutdown");
+});
+
+it('rejects commands containing newline characters in bgapi()', function () {
+    Log::spy();
+
+    expect(fn () => $this->service->bgapi("originate ...\r\napi shutdown"))
+        ->toThrow(InvalidArgumentException::class, 'FreeSWITCH ESL command cannot contain newline characters.');
+
+    Log::shouldHaveReceived('error')
+        ->withArgs(fn (string $message, array $context) => $message === 'FreeSWITCH ESL: command rejected due to newline injection attempt.'
+            && ($context['command'] ?? null) === "originate ...\r\napi shutdown");
+});

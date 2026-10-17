@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\ClickToCall\Livewire;
 
+use App\Services\DialplanContext;
+use App\Services\FreeSwitchControlService;
 use App\Services\FreeSwitchServiceInterface;
+use App\Services\TenantContext;
 use App\Support\Concerns\HasOperationalFeedback;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -14,9 +18,9 @@ use Livewire\Component;
  * Admin form for initiating click-to-call phone calls.
  *
  * Provides a simple form where an admin enters a phone number
- * and their extension number. When submitted, it uses the
- * FreeSWITCH ESL bgapi to originate a call that bridges the
- * extension with the target phone number.
+ * and their extension number. When submitted, it originates a call
+ * bridging the extension with the target phone number through
+ * FreeSwitchControlService with strict parameter sanitization.
  */
 #[Layout('layouts.app')]
 class ClickToCallForm extends Component
@@ -35,20 +39,23 @@ class ClickToCallForm extends Component
     /** The FreeSWITCH ESL service instance. */
     private FreeSwitchServiceInterface $fs;
 
+    /** The FreeSWITCH control service instance. */
+    private FreeSwitchControlService $control;
+
     /**
-     * Inject the FreeSWITCH service via Livewire's dependency injection.
+     * Inject services via Livewire's dependency injection.
      */
-    public function boot(FreeSwitchServiceInterface $fs): void
+    public function boot(FreeSwitchServiceInterface $fs, FreeSwitchControlService $control): void
     {
         $this->fs = $fs;
+        $this->control = $control;
     }
 
     /**
-     * Validate input and originate the call through FreeSWITCH ESL.
+     * Validate input and originate the call through FreeSwitchControlService.
      *
-     * Uses bgapi to send an originate command that bridges the
-     * user's extension to the target phone number. Dispatches
-     * a notification on success or error.
+     * Sanitizes inputs and dispatches an originate command that bridges
+     * the user's extension to the target phone number.
      */
     public function initiateCall(): void
     {
@@ -62,20 +69,15 @@ class ClickToCallForm extends Component
             return;
         }
 
-        // Build the FreeSWITCH originate command to bridge the
-        // extension with the target number.
-        $command = sprintf(
-            'originate {origination_caller_id_number=%s}user/%s %s bridge:user/%s inline',
-            $this->extension,
-            $this->extension,
-            $this->phoneNumber,
-            $this->extension
-        );
+        $tenant = app(TenantContext::class)->current();
+        $context = $tenant !== null
+            ? app(DialplanContext::class)->internal((string) $tenant->id)
+            : 'default';
 
-        try {
-            $this->fs->bgapi($command);
-        } catch (\RuntimeException) {
-            $this->showError('The call could not be started. Check FreeSWITCH and try again.');
+        $result = $this->control->originate($this->extension, $this->phoneNumber, $context);
+
+        if (! $result['success']) {
+            $this->showError($result['message'] ?: 'The call could not be started. Check FreeSWITCH and try again.');
             $this->calling = false;
 
             return;
@@ -90,9 +92,25 @@ class ClickToCallForm extends Component
      */
     public function rules(): array
     {
+        $tenant = app(TenantContext::class)->current();
+
+        $extensionRules = [
+            'required',
+            'string',
+            'regex:/^[0-9A-Za-z*#+_.@-]{1,32}$/',
+        ];
+
+        if ($tenant !== null) {
+            $extensionRules[] = Rule::exists('extensions', 'extension_number')->where('tenant_id', $tenant->id);
+        }
+
         return [
-            'phoneNumber' => 'required|string|max:255',
-            'extension' => 'required|string|max:255',
+            'phoneNumber' => [
+                'required',
+                'string',
+                'regex:/^\+?[0-9*#]{3,20}$/',
+            ],
+            'extension' => $extensionRules,
         ];
     }
 

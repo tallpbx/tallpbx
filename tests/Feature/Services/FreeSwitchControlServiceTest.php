@@ -114,6 +114,29 @@ it('originates a call from the operator panel', function (): void {
     expect($result['success'])->toBeTrue();
 });
 
+it('originates a call to an external phone number via loopback', function (): void {
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('api')->once()->with(
+        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge(loopback/+15551234567/tenant_1_internal)',
+    )->andReturn('+OK');
+
+    $result = controlService($mock)->originate('1001', '+15551234567', 'tenant_1_internal');
+
+    expect($result['success'])->toBeTrue();
+});
+
+it('rejects originate when source or destination contains hostile characters', function (): void {
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldNotReceive('api');
+
+    $result = controlService($mock)->originate("1001\napi shutdown", '2001', 'tenant_1_internal');
+
+    expect($result['success'])->toBeFalse()
+        ->and($result['message'])->toContain('not valid');
+});
+
 it('fails cleanly when ESL is not connected', function (): void {
     $mock = Mockery::mock(FreeSwitchServiceInterface::class);
     $mock->shouldReceive('isConnected')->once()->andReturn(false);

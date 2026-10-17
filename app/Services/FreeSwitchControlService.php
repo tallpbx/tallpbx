@@ -184,15 +184,18 @@ class FreeSwitchControlService
             return ['success' => false, 'message' => 'FreeSWITCH is not connected.'];
         }
 
-        $source = $this->validateToken($source);
-        $destination = $this->validateToken($destination);
-        $context = $this->validateToken($context);
-
-        if ($source === null || $destination === null || $context === null) {
+        if (! preg_match('/^[0-9A-Za-z*#+_.@-]{1,64}$/', $source)
+            || ! preg_match('/^[0-9A-Za-z*#+_.@-]{1,64}$/', $destination)
+            || ! preg_match('/^[0-9A-Za-z*#+_.@-]{1,64}$/', $context)
+        ) {
             return ['success' => false, 'message' => 'The source, destination, or context is not valid.'];
         }
 
-        return $this->run("originate {origination_caller_id_number={$source}}user/{$source}@{$context} &bridge(user/{$destination}@{$context})");
+        $bridgeTarget = (str_starts_with($destination, '+') || strlen($destination) > 7)
+            ? "loopback/{$destination}/{$context}"
+            : "user/{$destination}@{$context}";
+
+        return $this->run("originate {origination_caller_id_number={$source}}user/{$source}@{$context} &bridge({$bridgeTarget})");
     }
 
     /**

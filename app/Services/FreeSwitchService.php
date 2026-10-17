@@ -254,6 +254,14 @@ class FreeSwitchService implements FreeSwitchServiceInterface
      */
     public function api(string $command): string
     {
+        if (str_contains($command, "\r") || str_contains($command, "\n")) {
+            $this->logMessage('error', 'FreeSWITCH ESL: command rejected due to newline injection attempt.', [
+                'command' => $command,
+            ]);
+
+            throw new \InvalidArgumentException('FreeSWITCH ESL command cannot contain newline characters.');
+        }
+
         // Safety: never send state-mutating commands to the live FreeSWITCH
         // from an automated test run (unit, feature, or Pest browser tests).
         // On a host where FreeSWITCH runs locally, the reload jobs dispatched
@@ -296,6 +304,13 @@ class FreeSwitchService implements FreeSwitchServiceInterface
      */
     public function bgapi(string $command): string
     {
+        if (str_contains($command, "\r") || str_contains($command, "\n")) {
+            $this->logMessage('error', 'FreeSWITCH ESL: command rejected due to newline injection attempt.', [
+                'command' => $command,
+            ]);
+
+            throw new \InvalidArgumentException('FreeSWITCH ESL command cannot contain newline characters.');
+        }
         // Mirror the api() test-run guard so background jobs cannot mutate a
         // live FreeSWITCH from automated tests either.
         if ($this->isTestRun() && $this->targetsConfiguredEslEndpoint() && $this->isLiveMutationCommand($command)) {
