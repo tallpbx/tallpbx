@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
+use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Models\SecurityThreatFeed;
@@ -45,6 +46,19 @@ trait ManagesPreFilters
             $this->notifyError((string) __('admin.security_prefilter_local_services_refused'));
 
             return;
+        }
+
+        // Whitelist geo-blocking relies on pre-filter stage 1 for the
+        // administrator's trusted IP accept. Disabling pre-filters while
+        // whitelist geo drop (stage 9.5) is armed removes that accept and
+        // locks out the administrator.
+        if (! $enabled) {
+            $geoRule = SecurityGeoRule::instance();
+            if ($geoRule->enabled && $geoRule->mode === 'whitelist') {
+                $this->notifyError((string) __('admin.security_geo_prefilter_required'));
+
+                return;
+            }
         }
 
         SecuritySetting::updateOrCreate(['key' => 'prefilter_enabled'], ['value' => $enabled ? '1' : '0']);

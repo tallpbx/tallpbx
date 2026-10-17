@@ -53,7 +53,7 @@
 | 5.2 | Open registration feature gate | Pending | 2026-10-16 |
 | 5.3 | XML handler rate limiting & access hardening | Pending | 2026-10-16 |
 | 5.4 | Threat feed redirect pinning | Pending | 2026-10-16 |
-| 5.5 | Reverse lockout protection for armed whitelist geo-perimeter | Pending | 2026-10-17 |
+| 5.5 | Reverse lockout protection for armed whitelist geo-perimeter | Verified | 2026-10-17 |
 | 5.6 | Module management and custom extension lifecycle authorization | Pending | 2026-10-17 |
 | 5.7 | Atomic inter-process lock protocol for shared pending firewall sets | Pending | 2026-10-17 |
 
@@ -326,6 +326,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `486f7a54` | **Security / Firewall** | **Reverse Lockout Protection for Whitelist Geo-Perimeter**: Refused `setPrefilterEnabled(false)` when "Block All Except Selected" (whitelist) Geo-Blocking is armed, preventing administrator lockout caused by removing stage 1's trusted IP accept while stage 9.5's geo drop perimeter remains active. *(Resolves Task 5.5 / 4.x Audit H3)* |
 | **2026-10-16** | `4.0.2 Release` | **Security / Geo** | **Geo-Blocking Safety & Catalog Hardening**: Expanded country catalog to all 249 ISO 3166-1 countries, corrected IPdeny IPv6 download URL template, added dual-stack indicator badge in master firewall rules, and implemented atomic zone pre-syncing with automatic rollback. |
 | **2026-10-16** | `08d07b31` | **Security / Browser Tests** | **Geo-Blocking Browser Coverage**: Added read-only browser assertions for the disabled Geo-Blocking tab (status badge, policy mode radios, CLI hint, country picker, operational metrics) and the master Firewall Rules geo row, keeping both surfaces in agreement. |
 | **2026-10-16** | `2d295307` | **Security / Geo** | **Geo Sync Failure Hardening & Drop Counter Fix**: Missing, zero-byte, or unreadable zone caches now force a re-download and refuse whitelist arming when the re-download fails; locked and fallback set-element writes now fail the sync instead of reporting success while the kernel keeps stale elements; the Geo-Blocking drop counter now anchors to its own `@set` rule line so unrelated rules are never reported as geo drops. |

@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Certificate Manager Visual Documentation**: Captured and embedded high-resolution Light and Dark theme screenshots (`certificates-light.png` and `certificates-dark.png`) for Section 5 (HTTPS & TLS Certificate Management) in `docs/ui-tour.md`.
 
+### Security
+- **Reverse Lockout Guard for Whitelist Geo-Perimeter**: Refuse disabling defensive pre-filters in the Security Center (`setPrefilterEnabled(false)`) when "Block All Except Selected" (whitelist) Geo-Blocking is armed. Because whitelist geo-blocking relies on pre-filter stage 1 for the administrator's trusted IP accept rule, disabling pre-filters while the stage 9.5 geo drop rule is active would lock the administrator out of the server.
+
 ## [4.0.2] - 2026-10-16
 
 ### Fixed

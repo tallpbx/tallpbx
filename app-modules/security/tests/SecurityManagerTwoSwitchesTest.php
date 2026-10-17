@@ -12,6 +12,7 @@ use Livewire\Livewire;
 use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
+use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecuritySetting;
@@ -109,6 +110,34 @@ it('refuses to disable the pre-filter when local services would be severed', fun
 
     expect($component->get('operationalMessageType'))->toBe('error')
         ->and((string) $component->get('operationalMessage'))->toContain(__('admin.security_prefilter_local_services_refused'))
+        ->and(SecuritySetting::getBoolean('prefilter_enabled', true))->toBeTrue();
+
+    $this->executor->shouldNotHaveReceived('apply');
+});
+
+it('refuses to disable the pre-filter when whitelist geo-blocking is armed', function (): void {
+    SecuritySetting::set('firewall_default_policy', 'accept');
+
+    SecurityIpList::create([
+        'type' => 'whitelist',
+        'ip_address' => '203.0.113.10',
+        'description' => 'Admin uplink',
+    ]);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->enabled = true;
+    $rule->mode = 'whitelist';
+    $rule->countries = ['US'];
+    $rule->save();
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('adminIp', '203.0.113.10')
+        ->call('setPrefilterEnabled', false)
+        ->assertSet('prefilterEnabled', true);
+
+    expect($component->get('operationalMessageType'))->toBe('error')
+        ->and((string) $component->get('operationalMessage'))->toContain(__('admin.security_geo_prefilter_required'))
         ->and(SecuritySetting::getBoolean('prefilter_enabled', true))->toBeTrue();
 
     $this->executor->shouldNotHaveReceived('apply');
