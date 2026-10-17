@@ -23,4 +23,10 @@ test('geo and service modal keys resolve in all locales', function (string $loca
 
     // "Last Synced" fallback shown on fresh installs in the Geo-Blocking tab.
     expect(__('admin.never'))->not->toBe('admin.never');
+
+    // The French burst label must match its historical dictionary value
+    // verbatim (a misquote once shipped a Spanish word into the French UI).
+    if ($locale === 'fr') {
+        expect(__('admin.security_rate_burst_packets'))->toBe('Tolérance de rafale (paquets)');
+    }
 })->with(['en', 'es', 'fr']);

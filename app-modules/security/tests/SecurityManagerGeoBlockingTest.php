@@ -287,3 +287,126 @@ it('refuses switching an enabled rule into whitelist mode while pre-filters are 
     // whose trusted-IP accept stage is currently switched off.
     expect(SecurityGeoRule::instance()->mode)->toBe('blacklist');
 });
+
+it('restores kernel geo sets when a settings apply fails on an armed whitelist rule', function (): void {
+    // Whitelist the admin IP so the lockout preflight passes and the
+    // refusal demonstrably comes from the kernel apply step below.
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'whitelist';
+    $rule->countries = ['US'];
+    $rule->sync_interval = 'weekly';
+    $rule->enabled = true;
+    $rule->save();
+
+    // Prime the zone cache so both the attempted switch and the rollback
+    // re-promotion compile offline.
+    file_put_contents($this->cacheDir.'/US.v4.zone', "1.0.0.0/24\n");
+    file_put_contents($this->cacheDir.'/US.v6.zone', "2600::/12\n");
+
+    // The kernel apply refuses (e.g. lockout guard): the change must roll
+    // back everywhere, including the promoted kernel sets.
+    $this->executor->shouldReceive('apply')->once()->andReturn(false);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'blacklist')
+        ->set('geoSyncInterval', 'monthly')
+        ->set('geoCountries', ['US'])
+        ->call('saveGeoSettings')
+        ->assertOk();
+
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->mode)->toBe('whitelist')
+        ->and($fresh->sync_interval)->toBe('weekly')
+        ->and($fresh->countries)->toBe(['US'])
+        ->and($fresh->enabled)->toBeTrue();
+
+    // The previously armed allow-set must be re-promoted, not left as the
+    // half-applied blacklist compilation.
+    $content = file_get_contents($this->tempDir.'/geo_blocking.nft.pending');
+    expect($content)->toContain('add element inet tallpbx_filter geo_allowed_ips')
+        ->and($content)->not->toContain('add element inet tallpbx_filter geo_blocked_ips {');
+});
+
+it('restores an armed perimeter when a re-enable with a new mode cannot sync', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'blacklist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    // Provider down with no cache: the new whitelist selection cannot be
+    // downloaded, so enablement must be refused WITHOUT degrading the
+    // already-armed blacklist perimeter.
+    $this->geoProvider->shouldReceive('fetchCountryRanges')->byDefault()->andReturn(['v4' => [], 'v6' => []]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('setGeoEnabled', true)
+        ->assertOk();
+
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->enabled)->toBeTrue()
+        ->and($fresh->mode)->toBe('blacklist')
+        ->and($fresh->countries)->toBe(['US']);
+});
+
+it('refuses saving an empty country selection on an armed whitelist rule', function (): void {
+    // Whitelist the admin IP so the earlier lockout guard does not mask the
+    // empty-selection refusal this test pins.
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'whitelist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    $this->geoProvider->shouldReceive('fetchCountryRanges')->never();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', [])
+        ->call('saveGeoSettings')
+        ->assertOk();
+
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->countries)->toBe(['US'])
+        ->and($fresh->mode)->toBe('whitelist');
+});
+
+it('refuses clearing countries while a whitelist perimeter is armed', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'whitelist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->call('clearGeoRules')
+        ->assertOk();
+
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->countries)->toBe(['US'])
+        ->and($fresh->enabled)->toBeTrue();
+});

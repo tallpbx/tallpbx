@@ -111,6 +111,12 @@ trait ManagesGeoBlocking
         // kernel sets FIRST, so the perimeter chain armed moments later
         // by the ruleset apply never references empty sets — in whitelist
         // mode an empty allow-set would drop all new inbound traffic.
+        // Snapshot the armed state so a refused enablement can restore it
+        // without degrading a perimeter that is already running.
+        $previousEnabled = (bool) $rule->enabled;
+        $previousMode = $rule->mode;
+        $previousCountries = $rule->countries;
+
         $rule->mode = $this->geoMode;
         $rule->countries = array_values(array_unique(array_map('strtoupper', $this->geoCountries)));
         $rule->enabled = false;
@@ -122,6 +128,15 @@ trait ManagesGeoBlocking
         // Blacklist mode stays fail-open: an empty blocked set drops
         // nothing, so enabling with a failed sync is safe to proceed.
         if ($result['status'] !== 'success' && $rule->mode === 'whitelist') {
+            // Restore the previously armed state AND re-promote its kernel
+            // sets: the database must never claim a state the kernel is not
+            // running (the failed sync never promoted anything, so the old
+            // sets are still live — this just reconciles the record).
+            $rule->enabled = $previousEnabled;
+            $rule->mode = $previousMode ?? 'blacklist';
+            $rule->countries = is_array($previousCountries) ? $previousCountries : [];
+            $rule->save();
+
             $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
             $this->loadGeoState();
 
@@ -189,14 +204,25 @@ trait ManagesGeoBlocking
 
                 return;
             }
+
+            // An empty selection on an armed whitelist rule would empty the
+            // allow-set while the running chain still drops everything not
+            // in it — refuse before anything is persisted.
+            if (empty($this->geoCountries)) {
+                $this->notifyError((string) __('admin.security_geo_whitelist_countries_required'));
+
+                return;
+            }
         }
 
         $rule = SecurityGeoRule::instance();
 
-        // Snapshot for rollback: switching an armed whitelist perimeter
-        // must never leave it running with a partial or missing allow-set.
+        // Snapshot for rollback: switching an armed perimeter must never
+        // leave it running with a partial or missing allow-set, and a
+        // refused change must not half-apply the new sync interval either.
         $previousMode = $rule->mode;
         $previousCountries = $rule->countries;
+        $previousInterval = $rule->sync_interval;
 
         $rule->mode = $this->geoMode;
         $rule->sync_interval = $this->geoSyncInterval;
@@ -209,9 +235,7 @@ trait ManagesGeoBlocking
             // Whitelist mode with a failed sync means the allow-set is not
             // fully populated — roll back instead of shrinking the perimeter.
             if ($result['status'] !== 'success' && $rule->mode === 'whitelist') {
-                $rule->mode = $previousMode ?? 'blacklist';
-                $rule->countries = is_array($previousCountries) ? $previousCountries : [];
-                $rule->save();
+                $this->restoreGeoSnapshot($rule, $previousMode, $previousCountries, $previousInterval);
 
                 $this->notifyError((string) __('admin.security_geo_sync_failed', ['error' => $result['error'] ?? 'Unknown error']));
                 $this->loadGeoState();
@@ -221,11 +245,11 @@ trait ManagesGeoBlocking
         }
 
         if (! $this->regenerateAndApplyFirewall()) {
-            // Keep the database truthful about what the kernel is running.
-            $rule->mode = $previousMode ?? 'blacklist';
-            $rule->countries = is_array($previousCountries) ? $previousCountries : [];
-            $rule->save();
-            $this->loadGeoState();
+            // The kernel refused the change: restore the snapshot AND
+            // re-promote the previous sets, because the sync above may
+            // already have swapped the compiled kernel sets for the new
+            // configuration while the running chain is still the old one.
+            $this->restoreGeoSnapshot($rule, $previousMode, $previousCountries, $previousInterval);
 
             return;
         }
@@ -259,6 +283,27 @@ trait ManagesGeoBlocking
     }
 
     /**
+     * Restore a snapshotted Geo-Blocking configuration after a refused or
+     * failed change, then re-promote its kernel sets so the database and
+     * the running perimeter never disagree.
+     *
+     * @param  array<int, string>|null  $countries
+     */
+    private function restoreGeoSnapshot(SecurityGeoRule $rule, ?string $mode, ?array $countries, ?string $interval): void
+    {
+        $rule->mode = $mode ?? 'blacklist';
+        $rule->countries = $countries ?? [];
+        $rule->sync_interval = $interval ?? 'weekly';
+        $rule->save();
+
+        // Re-promote the previous sets from the zone cache: the attempted
+        // change may already have swapped the compiled kernel sets while
+        // the running chain still matches the snapshot above.
+        app(GeoBlockingService::class)->sync($rule);
+        $this->loadGeoState();
+    }
+
+    /**
      * Clear all geo rules and kernel elements.
      */
     public function clearGeoRules(): void
@@ -266,6 +311,15 @@ trait ManagesGeoBlocking
         $this->ensureGeoManagePermission();
 
         $rule = SecurityGeoRule::instance();
+
+        // Clearing an armed whitelist rule would empty its allow-set while
+        // the running chain still drops everything not in it; the perimeter
+        // must be disabled (or switched to blacklist) first.
+        if ($rule->enabled && $rule->mode === 'whitelist') {
+            $this->notifyError((string) __('admin.security_geo_whitelist_countries_required'));
+
+            return;
+        }
         $rule->countries = [];
         $rule->v4_cidrs_count = 0;
         $rule->v6_cidrs_count = 0;
