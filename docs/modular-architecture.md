@@ -87,7 +87,7 @@ flowchart TD
 
 ## 4. Modular Translation Architecture (Native Path Cascading)
 
-TallPBX uses **Option A: Native Path Cascading** via Laravel's translation `FileLoader::addPath()`. This design moves module-specific strings out of the monolithic root files while ensuring **zero UI presentation changes, zero template rewrites, and immutable button identifiers**.
+TallPBX uses **Native Path Cascading** via Laravel's translation `FileLoader::addPath()`. This design moves module-specific strings out of the monolithic root files while ensuring **zero UI presentation changes, zero template rewrites, and immutable button identifiers**.
 
 ### 4.1 Why Native Path Cascading?
 - **Zero Template Churn**: Blade views, Livewire components, Form Requests, and models retain their existing `__('admin.key_name')` calls. No view has to be updated to a package namespace like `__('gateways::admin.key')`.
