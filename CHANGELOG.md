@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Firewall Apply Domain Service (`FirewallApplier`)**: Extracted the safety-critical 5-step firewall apply pipeline (zero-lockout caller & loopback preflight validation, pending configuration writing, `nft -c` syntax preflight validation, bounded sudoers helper apply, enterprise audit logging, pending changes counter reset, and real-time event broadcasting) into dedicated domain service `FirewallApplier` implementing `FirewallApplierInterface` with typed `FirewallApplyResult` value objects. Refactored `SecurityManager::autoApplyFirewallRuleset()`, `SecurityApplyCommand`, and `FirewallBanReconciler` to eliminate pipeline duplication and enforce unified error propagation.
 - **Certificate Manager Visual Documentation**: Captured and embedded high-resolution Light and Dark theme screenshots (`certificates-light.png` and `certificates-dark.png`) for Section 5 (HTTPS & TLS Certificate Management) in `docs/ui-tour.md`.
 
 ### Security

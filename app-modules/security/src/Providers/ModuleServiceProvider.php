@@ -17,6 +17,7 @@ use Modules\Security\Console\Commands\SecuritySyncGeoIpCommand;
 use Modules\Security\Console\Commands\SecuritySyncThreatFeedsCommand;
 use Modules\Security\Console\Commands\SecurityUnbanCommand;
 use Modules\Security\Console\Commands\SecurityVerifyCommand;
+use Modules\Security\Contracts\FirewallApplierInterface;
 use Modules\Security\Contracts\GeoBlockingProviderInterface;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
@@ -25,6 +26,7 @@ use Modules\Security\Listeners\LogFailedLoginListener;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
 use Modules\Security\Listeners\LogFailedXmlHandlerAuthListener;
 use Modules\Security\Listeners\LogSipScannerListener;
+use Modules\Security\Services\Firewall\FirewallApplier;
 use Modules\Security\Services\GeoBlockingService;
 use Modules\Security\Services\IpdenyProvider;
 use Modules\Security\Services\SecurityBanService;
@@ -93,6 +95,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         SecurityBanServiceInterface::class => SecurityBanService::class,
         SecurityExecutorInterface::class => SecurityExecutor::class,
         GeoBlockingProviderInterface::class => IpdenyProvider::class,
+        FirewallApplierInterface::class => FirewallApplier::class,
     ];
 
     /**

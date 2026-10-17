@@ -28,7 +28,7 @@
 
 | Task | Title | Status | Figures verified |
 | :--- | :--- | :--- | :--- |
-| 1.1.1 | Extract `FirewallApplier` domain service | Pending | 2026-10-16 |
+| 1.1.1 | Extract `FirewallApplier` domain service | Verified | 2026-10-17 |
 | 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Pending | 2026-10-16 |
 | 1.1.3 | Geo-blocking cache freshness & whitelist fail-closed integrity | Verified | 2026-10-17 |
 | 1.2.1 | Decompose `SecurityConfigGenerator` | Pending | 2026-10-16 |
@@ -326,6 +326,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `88c6347f` | **Security / Firewall** | **Extract FirewallApplier Domain Service**: Extracted safety-critical 5-step apply pipeline (lockout preflight, pending configuration generation, `nft -c` syntax check, bounded sudoers helper apply, audit logging, pending counter reset, and Reverb broadcasting) into dedicated domain service `FirewallApplier` implementing `FirewallApplierInterface` with typed `FirewallApplyResult` value objects. Refactored `SecurityManager::autoApplyFirewallRuleset()`, `SecurityApplyCommand`, and `FirewallBanReconciler` to eliminate duplicate pipeline logic. *(Resolves Task 1.1.1)* |
 | **2026-10-17** | `b2b0c7cd` | **Security / XML Handler** | **XML Handler Rate Limiting & Security Alerts**: Attached dedicated configurable rate limiter (`throttle:xml-handler`, default 600 req/min per IP) to `/api/v1/xml-handler` to protect against token brute force without impeding FreeSWITCH operations. Dispatched `XmlHandlerFailedAuth` and logged security alerts on failed token validations, integrated with `LogFailedXmlHandlerAuthListener` to record security incidents and trigger kernel bans on repeated failure. *(Resolves Task 5.3 / Security Audit L1 & L2)* |
 | **2026-10-17** | `e3fc7b71` | **Auth / Panel** | **Open Registration Feature Gate**: Gated tenant user registration behind `auth.registration_enabled` (default `false`), redirecting `/panel/register` to login and aborting direct component mount with 404 when disabled. *(Resolves Task 5.2 / Security Audit M3)* |
 | **2026-10-17** | `ac40716b` | **Telephony / ESL** | **Click-to-Call ESL Validation & Socket Sanitization**: Added strict regex validation in `ClickToCallForm`, tenant extension scoping, FreeSwitchControlService loopback bridging, and defense-in-depth newline injection guards in `FreeSwitchService::api()` and `bgapi()`. *(Resolves Task 5.1 / Security Audit H1)* |

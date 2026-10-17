@@ -11,10 +11,9 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Modules\Security\Contracts\FirewallApplierInterface;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
-use Modules\Security\Events\FirewallRulesetUpdated;
-use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Livewire\Concerns\ManagesAllowBlockLists;
 use Modules\Security\Livewire\Concerns\ManagesAttackProtection;
 use Modules\Security\Livewire\Concerns\ManagesExternalBlocklists;
@@ -327,11 +326,11 @@ class SecurityManager extends Component
      * @param  array<int, string>|null  $acceptedPermissions  Permission names that may authorize this apply; null keeps the blanket security.edit requirement.
      */
     public function autoApplyFirewallRuleset(
-        ?LockoutGuardService $lockoutGuard = null,
+        FirewallApplierInterface|LockoutGuardService|null $applier = null,
+        bool $force = false,
+        ?array $acceptedPermissions = null,
         ?SecurityConfigGenerator $generator = null,
         ?SecurityExecutorInterface $executor = null,
-        bool $force = false,
-        ?array $acceptedPermissions = null
     ): bool {
         // Scoped callers (geo-blocking) pass their own accepted permission
         // set; everyone else still needs the blanket edit permission.
@@ -339,63 +338,27 @@ class SecurityManager extends Component
             ? $this->ensureEditPermission()
             : $this->ensureAnyPermission(...$acceptedPermissions);
 
-        $lockoutGuard ??= app(LockoutGuardService::class);
-        $generator ??= app(SecurityConfigGenerator::class);
-        $executor ??= app(SecurityExecutorInterface::class);
+        $realApplier = $applier instanceof FirewallApplierInterface
+            ? $applier
+            : app(FirewallApplierInterface::class);
 
-        // 1. Zero-lockout preflight validation: the administrator's own
-        //    connection AND the server's loopback services (database, cache)
-        //    must both survive the ruleset that is about to be applied.
-        if (! $force) {
-            try {
-                if ($this->adminIp !== null && $this->adminIp !== '') {
-                    $lockoutGuard->assertSafe($this->adminIp, $this->firewallDefaultPolicy);
-                }
-
-                $lockoutGuard->assertLocalServicesSafe();
-            } catch (LockoutException $e) {
-                $this->notifyError($e->getMessage());
-
-                return false;
-            }
-        }
-
-        // 2. Write pending configuration
-        try {
-            $pendingFile = $generator->writePending();
-        } catch (\Throwable $e) {
-            $this->notifyError("Failed to write pending configuration: {$e->getMessage()}");
-
-            return false;
-        }
-
-        // 3. Preflight syntax check
-        if (! $generator->validateSyntax($pendingFile)) {
-            $this->notifyError('Pending firewall configuration failed nftables syntax validation. Kernel ruleset was not modified.');
-
-            return false;
-        }
-
-        // 4. Apply via bounded host helper
-        if (! $executor->apply()) {
-            $this->notifyError('Failed to apply firewall ruleset via bounded helper.');
-
-            return false;
-        }
-
-        // 5. Audit log and reset pending changes counter
-        SecurityAuditLog::record(
-            action: 'firewall_applied_ui',
-            ipAddress: $this->adminIp,
+        $result = $realApplier->apply(
+            adminIp: $this->adminIp,
+            policy: $this->firewallDefaultPolicy,
+            force: $force,
+            source: 'ui',
+            adminId: Auth::guard('admin')->id(),
             description: 'Firewall ruleset applied automatically from Security Command Center UI',
-            adminId: Auth::guard('admin')->id()
+            resetPendingChanges: true,
         );
 
-        $this->pendingChangesCount = 0;
-        SecuritySetting::updateOrCreate(['key' => 'pending_changes_count'], ['value' => '0']);
+        if ($result->failed()) {
+            $this->notifyError($result->errorMessage);
 
-        // Broadcast real-time ruleset update over Laravel Reverb
-        FirewallRulesetUpdated::dispatch('ui');
+            return false;
+        }
+
+        $this->pendingChangesCount = 0;
 
         // The kernel now runs the freshly applied ruleset; keep the drift
         // indicator truthful without a privileged re-read.
@@ -411,14 +374,17 @@ class SecurityManager extends Component
      * Compile and atomically apply firewall changes to the Linux kernel via nftables.
      */
     public function applyFirewallChanges(
+        ?FirewallApplierInterface $applier = null,
+        bool $force = false,
         ?LockoutGuardService $lockoutGuard = null,
         ?SecurityConfigGenerator $generator = null,
         ?SecurityExecutorInterface $executor = null,
-        bool $force = false
     ): void {
         $this->ensureEditPermission();
 
-        if ($this->autoApplyFirewallRuleset($lockoutGuard, $generator, $executor, $force)) {
+        $applier ??= app(FirewallApplierInterface::class);
+
+        if ($this->autoApplyFirewallRuleset($applier, $force)) {
             $this->notifySuccess((string) __('admin.security_firewall_applied_success'));
         }
     }

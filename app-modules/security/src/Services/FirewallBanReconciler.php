@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Security\Services;
 
+use Modules\Security\Contracts\FirewallApplierInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Events\FirewallRulesetUpdated;
 use Modules\Security\Models\SecurityAuditLog;
@@ -35,14 +36,22 @@ class FirewallBanReconciler
     public const SKEW_THRESHOLD = 300;
 
     /**
-     * Create the reconciler with the security executor, lockout guard,
-     * and configuration generator it needs.
+     * The firewall ruleset applier domain service.
+     */
+    protected FirewallApplierInterface $applier;
+
+    /**
+     * Create the reconciler with the security executor and firewall applier.
      */
     public function __construct(
         protected SecurityExecutorInterface $executor,
-        protected LockoutGuardService $lockoutGuard,
-        protected SecurityConfigGenerator $generator,
-    ) {}
+        FirewallApplierInterface|LockoutGuardService|null $applier = null,
+        ?SecurityConfigGenerator $generator = null,
+    ) {
+        $this->applier = $applier instanceof FirewallApplierInterface
+            ? $applier
+            : app(FirewallApplierInterface::class);
+    }
 
     /**
      * Reconcile kernel ban sets with MariaDB and optionally perform boot recovery.
@@ -80,44 +89,27 @@ class FirewallBanReconciler
         $tableAbsent = trim($statusOutput) !== '' && ! str_contains($statusOutput, 'table inet tallpbx_filter');
 
         if ($tableAbsent) {
-            try {
-                // Assert localhost loopback is safe
-                if (! $this->lockoutGuard->isIpSafe('127.0.0.1')) {
-                    $result['errors'][] = 'Boot recovery aborted: localhost safety check failed.';
+            $applyResult = $this->applier->apply(
+                adminIp: '127.0.0.1',
+                source: 'boot_recovery',
+                description: 'Automated boot recovery applied saved firewall ruleset to Linux kernel',
+                dryRun: $dryRun,
+            );
 
-                    return $result;
-                }
+            if ($applyResult->failed()) {
+                $errorMessage = match ($applyResult->stage) {
+                    'lockout_guard' => 'Boot recovery aborted: localhost safety check failed.',
+                    'syntax_validation' => 'Boot recovery aborted: pending ruleset failed syntax check.',
+                    'executor' => 'Boot recovery apply failed via bounded helper.',
+                    default => "Boot recovery error: {$applyResult->errorMessage}",
+                };
 
-                $pendingFile = $this->generator->writePending();
-
-                if (! $this->generator->validateSyntax($pendingFile)) {
-                    $result['errors'][] = 'Boot recovery aborted: pending ruleset failed syntax check.';
-
-                    return $result;
-                }
-
-                if (! $dryRun) {
-                    if ($this->executor->apply()) {
-                        $result['boot_recovered'] = true;
-                        SecurityAuditLog::record(
-                            action: 'firewall_boot_recovered',
-                            ipAddress: '127.0.0.1',
-                            description: 'Automated boot recovery applied saved firewall ruleset to Linux kernel',
-                        );
-                        FirewallRulesetUpdated::dispatch('boot_recovery');
-                    } else {
-                        $result['errors'][] = 'Boot recovery apply failed via bounded helper.';
-
-                        return $result;
-                    }
-                } else {
-                    $result['boot_recovered'] = true;
-                }
-            } catch (\Throwable $e) {
-                $result['errors'][] = "Boot recovery error: {$e->getMessage()}";
+                $result['errors'][] = $errorMessage;
 
                 return $result;
             }
+
+            $result['boot_recovered'] = true;
 
             if ($recoverBootOnly) {
                 return $result;
