@@ -75,7 +75,16 @@ flowchart TD
         S9 -->|Valid RRQ Read| PASS_TFTP["✅ ALLOW TFTP PROVISIONING<br/>(Legitimate Phone Boot)"]:::allow
     end
 
-    S9 -->|Other Ports| S10{"Stage 10 & 11: Core PBX Port or Custom Rule?"}:::spine
+    S9 -->|Other Ports| S9_5{"Stage 9.5: Geo-Blocking Rule Active?<br/>(jump geo_perimeter)"}:::spine
+
+    subgraph GEO_PERIMETER ["Dedicated Geo-Blocking Perimeter Chain (Stage 9.5)"]
+        direction TB
+        S9_5 -->|Mode: Block Selected & Country Match| DROP_GEO_BL["❌ DROP UNWANTED ORIGIN<br/>(@geo_blocked_ips / @geo_blocked_ips6)"]:::drop
+        S9_5 -->|Mode: Block Except Selected & Non-Match| DROP_GEO_WL["❌ DROP UNAPPROVED ORIGIN<br/>(!= @geo_allowed_ips / @geo_allowed_ips6)"]:::drop
+        S9_5 -->|Country Permitted / Geo Disabled| S10
+    end
+
+    S10{"Stage 10 & 11: Core PBX Port or Custom Rule?"}:::spine
 
     %% Subgraph: Application & Services
     subgraph SERVICES ["PBX Services & Application Routing (Stages 10–12)"]
@@ -107,7 +116,7 @@ flowchart TD
 
 ## 2. Inbound Pipeline Stages Detailed
 
-The Linux kernel evaluates rules strictly in order across **12 deterministic stages**:
+The Linux kernel evaluates rules strictly in order across **13 deterministic stages**:
 
 ### 1. Pre-Filter Pipeline (Stages 1–7)
 Toggled and reordered as an administrative unit in the **Firewall Rules** tab:
@@ -119,9 +128,10 @@ Toggled and reordered as an administrative unit in the **Firewall Rules** tab:
 6. **Active Intrusion Bans (`@banned_ips drop`)**: Dynamic hardware-timed bans triggered by authentication failures or scanner probes.
 7. **External Blocklists (`@external_blocklist_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL) dropped at the perimeter.
 
-### 2. Diagnostics & Protocol Defense (Stages 8–9)
+### 2. Diagnostics, Protocol Defense & Perimeter Filtering (Stages 8–9.5)
 8. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
 9. **Hardened TFTP Defense Profile (UDP 69)**: Protects phone provisioning by dropping upload requests (WRQ opcode 2), directory traversal probes (`../`, `/x`), and flood requests.
+9.5. **Dedicated Geo-Blocking Perimeter Chain (`jump geo_perimeter`)**: Pure drop filter evaluated immediately before PBX application ports. Traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through to lower stages; it never issues an unconditional accept.
 
 ### 3. Service Catalog & Fallback (Stages 10–12)
 10. **Core PBX Port Catalog**: Explicit allow rules for SIP (5060/5061/5080), RTP Audio (16384–32768), Web Admin (80/443), and SSH (22).
@@ -199,7 +209,7 @@ sequenceDiagram
 
 ## 5. Security Center Interface
 
-The **Security Center** (`/panel/security`) provides an evaluation-ordered, four-tab interface mirroring the kernel packet filtering pipeline:
+The **Security Center** (`/panel/security`) provides an evaluation-ordered, five-tab interface mirroring the kernel packet filtering pipeline:
 
 ![TallPBX Security Center (Light Theme)](images/security-dashboard-light.png)
 
@@ -219,12 +229,13 @@ Pinned directly above the tab strip for immediate visibility:
 
 ---
 
-### The Four Security Center Tabs
+### The Five Security Center Tabs
 
 #### Tab 1: Firewall Rules (`?tab=rules`)
 * **Pre-Filter Pipeline**: Interactive table showing the exact sequence of stages 1–7 with Up/Down reordering chevrons and a "Reset to recommended order" action:
   - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
   - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
+* **Geo-Blocking Master Cockpit Row**: Positioned following External Blocklists, displays the live state of the dedicated geo perimeter rule, mode indicator (`Block Selected` or `Block All Except`), total count of active ranges, and instant link to Tab 5.
 * **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
   - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
   - **TFTP Provisioning Defense**: Hardened UDP 69 profile with shield badge showing real-time counters for blocked WRQ uploads, traversal attempts, and flood drops, featuring real-time progress animation and click locking.
@@ -249,8 +260,16 @@ Pinned directly above the tab strip for immediate visibility:
 #### Tab 4: External Blocklists (`?tab=blocklists` or `?tab=feeds`)
 * **Public Threat Feeds (VoIPBL)**: Automated ingestion of public blocklists identifying active VoIP fraud and brute-force scanning networks.
 * **Fail-Open Contract**: Feed downloads are memory-bounded and stream-parsed. If a download fails or is malformed, existing kernel entries remain untouched so the server is never left unprotected.
-* **Global Scope & Geo-Blocking**: Streamlined 100% global threat feed ingestion, complemented by a dedicated Geo-Blocking tab in the Security Command Center — a pure-drop `geo_perimeter` subchain fed by IPdeny aggregated zones (with GitHub-mirror fallback), refreshed weekly via `php artisan security:sync-geoip`.
 * **Drop Counters & Emergency Escape**: Live per-feed kernel drop counters, on-demand "Sync Now" action, and a prominent "Remove all feed blocks" button in case of upstream false positives.
+
+#### Tab 5: Geo-Blocking (`?tab=geo-blocking`)
+* **Dedicated Geo-Filter Workbench**: Country-level perimeter defense covering the complete catalog of 249 ISO 3166-1 alpha-2 countries and territories, backed by pre-aggregated IPv4 and IPv6 zone data from IPdeny (with automatic fallback to the community GitHub RIR mirror).
+* **Dual Filtering Modes**:
+  - **Block Selected Countries (`blacklist`)**: Selectively drops traffic originating from specific high-risk jurisdictions.
+  - **Block All Except Selected (`whitelist`)**: Strict allow-list perimeter dropping all traffic outside your operating countries. Protected by fail-closed guards that prevent arming an empty allow-set if zone downloads fail.
+* **Automatic Scheduled Synchronization**: Pre-aggregated country zone files are cached locally in `/etc/tallpbx/geoip/` and automatically refreshed weekly via the scheduler (`php artisan security:sync-geoip`), or on demand via `php artisan security:sync-geoip --force`.
+* **Zero-Lockout Concurrency**: Set compilations merge atomically into the shared kernel set-element pipeline under exclusive file locks (`flock(LOCK_EX)`), preventing race conditions with concurrent threat-feed syncs.
+* **Operational Telemetry & CLI Inspection**: Live packet drop counter anchored to kernel rule counters, and a 1-click CLI hint for terminal inspection (`sudo nft list set inet tallpbx_filter geo_blocked_ips`).
 
 ---
 
@@ -434,6 +453,11 @@ System administrators with root or sudo access can inspect and interact directly
 | **View Whitelist IPs/Subnets** | `sudo nft list set inet tallpbx_filter whitelist_ips` |
 | **View Blacklist IPs/Subnets** | `sudo nft list set inet tallpbx_filter blacklist_ips` |
 | **View External Blocklist IPs** | `sudo nft list set inet tallpbx_filter external_blocklist_ips` |
+| **View Geo-Blocked Country IPs (IPv4)** | `sudo nft list set inet tallpbx_filter geo_blocked_ips` |
+| **View Geo-Blocked Country IPs (IPv6)** | `sudo nft list set inet tallpbx_filter geo_blocked_ips6` |
+| **View Geo-Allowed Country IPs (IPv4)** | `sudo nft list set inet tallpbx_filter geo_allowed_ips` |
+| **View Geo-Allowed Country IPs (IPv6)** | `sudo nft list set inet tallpbx_filter geo_allowed_ips6` |
+| **View Geo Perimeter Subchain** | `sudo nft list chain inet tallpbx_filter geo_perimeter` |
 | **View Inbound Chain & Packet Counters** | `sudo nft list chain inet tallpbx_filter input` |
 
 #### Emergency Recovery: Panel and `php artisan` Unreachable

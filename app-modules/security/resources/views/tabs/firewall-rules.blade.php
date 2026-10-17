@@ -391,7 +391,7 @@
                                 </x-tooltip>
                             </div>
                             <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                <span class="badge badge-ghost badge-xs font-mono text-[11px] opacity-75" title="@geo_blocked_ips / @geo_allowed_ips">
+                                <span class="badge badge-ghost badge-xs font-mono text-[11px] opacity-75" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
                                     {{ $geoMode === 'whitelist' ? '@geo_allowed_ips' : '@geo_blocked_ips' }}
                                 </span>
                                 <span class="badge badge-neutral badge-xs font-mono">
@@ -421,6 +421,7 @@
                                         {{ implode(', ', array_slice($geoCountries, 0, 4)) }}{{ count($geoCountries) > 4 ? '...' : '' }}
                                     @endif
                                 </div>
+                                <span class="badge badge-ghost badge-xs font-mono mt-0.5">{{ __('admin.security_dual_stack_badge') }}</span>
                             @else
                                 <span class="badge badge-ghost badge-xs text-base-content/50">{{ __('admin.security_geo_no_countries') }}</span>
                             @endif

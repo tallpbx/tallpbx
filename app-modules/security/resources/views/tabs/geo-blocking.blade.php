@@ -169,7 +169,7 @@
                 <div class="max-h-56 overflow-y-auto border border-base-200 rounded-box p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1.5 bg-base-100">
                     @foreach ($countriesList as $code => $countryName)
                         @php $isSelected = in_array($code, $geoCountries, true); @endphp
-                        <label x-show="search === '' || '{{ strtolower($countryName) }}'.includes(search.toLowerCase()) || '{{ strtolower($code) }}'.includes(search.toLowerCase())"
+                        <label x-show="search === '' || (countries['{{ $code }}'] || '').toLowerCase().includes(search.toLowerCase()) || '{{ strtolower($code) }}'.includes(search.toLowerCase())"
                                wire:key="geo-chip-{{ $code }}"
                                wire:loading.class="opacity-60 pointer-events-none"
                                wire:target="toggleGeoCountry('{{ $code }}')"

@@ -290,6 +290,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-16** | `4.0.2 Release` | **Security / Geo** | **Geo-Blocking Safety & Catalog Hardening**: Expanded country catalog to all 249 ISO 3166-1 countries, corrected IPdeny IPv6 download URL template, added dual-stack indicator badge in master firewall rules, and implemented atomic zone pre-syncing with automatic rollback. |
 | **2026-10-16** | `08d07b31` | **Security / Browser Tests** | **Geo-Blocking Browser Coverage**: Added read-only browser assertions for the disabled Geo-Blocking tab (status badge, policy mode radios, CLI hint, country picker, operational metrics) and the master Firewall Rules geo row, keeping both surfaces in agreement. |
 | **2026-10-16** | `2d295307` | **Security / Geo** | **Geo Sync Failure Hardening & Drop Counter Fix**: Missing, zero-byte, or unreadable zone caches now force a re-download and refuse whitelist arming when the re-download fails; locked and fallback set-element writes now fail the sync instead of reporting success while the kernel keeps stale elements; the Geo-Blocking drop counter now anchors to its own `@set` rule line so unrelated rules are never reported as geo drops. |
 | **2026-10-16** | `608f3d5b` | **Documentation** | **Roadmap Source Consolidation**: Retired the temporary `modular-design-analysis.md` now that its surviving conclusions live in this roadmap. |

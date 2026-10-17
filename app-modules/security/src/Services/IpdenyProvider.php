@@ -19,7 +19,7 @@ class IpdenyProvider implements GeoBlockingProviderInterface
 {
     public const IPDENY_V4_TEMPLATE = 'https://www.ipdeny.com/ipblocks/data/aggregated/%s-aggregated.zone';
 
-    public const IPDENY_V6_TEMPLATE = 'https://www.ipdeny.com/ipv6/ipblocks/data/aggregated/%s-aggregated.zone';
+    public const IPDENY_V6_TEMPLATE = 'https://www.ipdeny.com/ipv6/ipaddresses/aggregated/%s-aggregated.zone';
 
     public const FALLBACK_V4_TEMPLATE = 'https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/%s.cidr';
 

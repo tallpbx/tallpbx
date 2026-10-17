@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.2] - 2026-10-16
+
 ### Fixed
 - **Geo-Blocking Safety Hardening**:
   - Enabling "Block All Except Selected" now downloads and loads the country allow-set into the kernel *before* the perimeter rule takes effect, so inbound traffic is never dropped during the download window. A failed or partial zone sync refuses enablement instead of silently shrinking the allow-set, and the enable audit record now includes the sync outcome.
@@ -21,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Geo-IP zone cache files that are empty or unreadable now trigger a re-download instead of passing the whitelist fail-closed guard as valid content, and a failed re-download refuses a whitelist sync rather than arming an empty allow-set.
   - Geo-Blocking and threat-feed compilations now fail their sync when the pending set-element file cannot be published or merged, so a disk or permission failure no longer leaves `last_status` reporting success while the kernel keeps stale elements.
   - The Geo-Blocking drop counter shown in the Security Center now anchors each geo set to the counter on its own rule line, so an unrelated rule's counter can no longer be reported as geo drops.
+  - Corrected the IPdeny IPv6 zone download URL template from `ipv6/ipblocks/data/aggregated` to `ipv6/ipaddresses/aggregated`, restoring primary IPv6 country zone downloads directly from IPdeny without failing over to the GitHub RIR mirror.
+  - Expanded the Geo-Blocking country catalog from an arbitrary 52-country subset to the complete standardized ISO 3166-1 alpha-2 catalog of 249 countries and territories (`Modules\Security\Support\IsoCountries`), restoring previously omitted nations (such as Thailand `TH` and Palestine `PS`), sorting the country list alphabetically by name, and safely escaping country names with apostrophes in the client-side search filter.
+  - Added the standard `IPv4 & IPv6` dual-stack indicator badge to the Geo-Blocking row's Source column in the Firewall Rules master table, aligning it with peer pre-filter rows and clearly signaling dual address family coverage.
   - Restored the Burst Allowance label in the system-service editor and the "Never" fallback in the Geo-Blocking last-synced metric in English, Spanish, and French.
 
 ### Security

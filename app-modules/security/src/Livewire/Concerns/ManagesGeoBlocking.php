@@ -11,6 +11,7 @@ use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\GeoBlockingService;
 use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Support\IsoCountries;
 
 /**
  * Livewire component concern for managing Geo-Blocking policies and country allocations.
@@ -375,66 +376,13 @@ trait ManagesGeoBlocking
     }
 
     /**
-     * Common ISO 3166-1 alpha-2 countries catalog for the UI picker.
+     * Complete ISO 3166-1 alpha-2 countries catalog for the UI picker.
      *
      * @return array<string, string> Code => Name
      */
     public function availableCountries(): array
     {
-        return [
-            'US' => 'United States',
-            'CA' => 'Canada',
-            'GB' => 'United Kingdom',
-            'AU' => 'Australia',
-            'DE' => 'Germany',
-            'FR' => 'France',
-            'NL' => 'Netherlands',
-            'CN' => 'China',
-            'RU' => 'Russian Federation',
-            'UA' => 'Ukraine',
-            'BR' => 'Brazil',
-            'IN' => 'India',
-            'SG' => 'Singapore',
-            'JP' => 'Japan',
-            'KR' => 'South Korea',
-            'IL' => 'Israel',
-            'IT' => 'Italy',
-            'ES' => 'Spain',
-            'MX' => 'Mexico',
-            'ZA' => 'South Africa',
-            'TR' => 'Turkey',
-            'PL' => 'Poland',
-            'RO' => 'Romania',
-            'SE' => 'Sweden',
-            'CH' => 'Switzerland',
-            'IE' => 'Ireland',
-            'HK' => 'Hong Kong',
-            'TW' => 'Taiwan',
-            'VN' => 'Vietnam',
-            'ID' => 'Indonesia',
-            'NG' => 'Nigeria',
-            'EG' => 'Egypt',
-            'PK' => 'Pakistan',
-            'BD' => 'Bangladesh',
-            'PH' => 'Philippines',
-            'AR' => 'Argentina',
-            'CO' => 'Colombia',
-            'CL' => 'Chile',
-            'PE' => 'Peru',
-            'NZ' => 'New Zealand',
-            'AT' => 'Austria',
-            'BE' => 'Belgium',
-            'DK' => 'Denmark',
-            'FI' => 'Finland',
-            'NO' => 'Norway',
-            'GR' => 'Greece',
-            'PT' => 'Portugal',
-            'CZ' => 'Czech Republic',
-            'HU' => 'Hungary',
-            'BG' => 'Bulgaria',
-            'AE' => 'United Arab Emirates',
-            'SA' => 'Saudi Arabia',
-        ];
+        return IsoCountries::all();
     }
 
     /**

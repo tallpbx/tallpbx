@@ -10,7 +10,7 @@ use Modules\Security\Services\IpdenyProvider;
 it('fetches aggregated IPv4 and IPv6 country ranges using IpdenyProvider', function (): void {
     Http::fake([
         'https://www.ipdeny.com/ipblocks/data/aggregated/us-aggregated.zone' => Http::response("1.0.0.0/24\n1.0.4.0/22\n# comment\ninvalid-ip\n", 200),
-        'https://www.ipdeny.com/ipv6/ipblocks/data/aggregated/us-aggregated.zone' => Http::response("2600::/12\n2800::/12\n", 200),
+        'https://www.ipdeny.com/ipv6/ipaddresses/aggregated/us-aggregated.zone' => Http::response("2600::/12\n2800::/12\n", 200),
     ]);
 
     $provider = new IpdenyProvider;
@@ -26,7 +26,7 @@ it('falls back to the GitHub RIR mirror if IPdeny primary download fails', funct
     Http::fake([
         'https://www.ipdeny.com/ipblocks/data/aggregated/ca-aggregated.zone' => Http::response(null, 500),
         'https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ca.cidr' => Http::response("24.48.0.0/14\n", 200),
-        'https://www.ipdeny.com/ipv6/ipblocks/data/aggregated/ca-aggregated.zone' => Http::response(null, 500),
+        'https://www.ipdeny.com/ipv6/ipaddresses/aggregated/ca-aggregated.zone' => Http::response(null, 500),
         'https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv6/ca.cidr' => Http::response("2607:f8b0::/32\n", 200),
     ]);
 

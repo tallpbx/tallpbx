@@ -138,7 +138,8 @@ Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails w
 
 TallPBX includes a first-party Security module (`app-modules/security`) providing defense across telephony, web, and network layers:
 
-- **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@blacklist_ips`, `@banned_ips`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
+- **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@blacklist_ips`, `@banned_ips`, `@external_blocklist_ips`, `@geo_blocked_ips`, `@geo_blocked_ips6`, `@geo_allowed_ips`, `@geo_allowed_ips6`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
+- **Dedicated Geo-Blocking (IPdeny Aggregated Zones)**: Pure-drop kernel perimeter (`geo_perimeter`) covering all 249 ISO 3166-1 alpha-2 countries and territories with IPv4 and IPv6 support, dual *Block Selected Countries* and *Block All Except Selected* modes, fail-closed allow-set protection, and automated weekly synchronization.
 - **Real-Time Intrusion Defense**: Scans FreeSWITCH SIP authentication failures in real time via the Event Socket Layer (ESL), intercepts web login and SSH brute-force attempts, and enforces temporary rate-based bans in Redis.
 - **Zero-Lockout Safety Guard**: Prevents administrators from locking themselves out by verifying remote IP, active sessions, and local loopback services (database and Redis connections) before restrictive policies apply.
 - **Hardened System Architecture**: Web processes run under the restricted web user (`www-data`). Privileged firewall operations run through a dedicated root helper (`/usr/local/sbin/tallpbx-security`) with strict input validation.
@@ -149,6 +150,8 @@ Manage security from the web panel's **Security Center** or directly from the te
 php artisan security:status              # Check firewall status, active sets, and banned IPs
 php artisan security:apply               # Atomically recompile and apply pending firewall rules
 php artisan security:unban <IP_ADDRESS>  # Immediately unban an IP address
+php artisan security:sync-geoip          # Synchronize IPdeny country zones for Geo-Blocking
+php artisan security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
 ```
 
 For packet flow diagrams and architecture details, see [docs/security-architecture.md](docs/security-architecture.md).

@@ -28,7 +28,8 @@ TallPBX enforces a strict privilege boundary across its configuration paths usin
 | Path | Mode & Owner | Purpose |
 | :--- | :--- | :--- |
 | `/etc/default/tallpbx` | `0600 root:root` | Root installer state, database passwords, and package tokens. Unreadable by web processes. |
-| `/etc/tallpbx/` | `2775 root:www-data` | Runtime firewall rules (`firewall.nft`, `external_blocklist.nft`) and SSL/TLS certificates (`certs/`). |
+| `/etc/tallpbx/` | `2775 root:www-data` | Runtime firewall rules (`firewall.nft`, `external_blocklist.nft`, `geo_blocking.nft.pending`) and SSL/TLS certificates (`certs/`). |
+| `/etc/tallpbx/geoip/` | `0750 root:www-data` | Pre-aggregated IPdeny Geo-IP country zone caches (`*.v4.zone`, `*.v6.zone`). |
 | `/var/www/tallpbx/` | `0755 root:www-data` | Web application source code, Artisan CLI commands, and web UI. |
 | `/var/lib/tallpbx/media/` | `2775 www-data:www-data` | Call recordings, voicemail audio, and tenant media files. |
 
@@ -126,6 +127,12 @@ When Observe Mode is enabled, the ruleset compiler performs a dynamic transforma
   ```bash
   php artisan security:status
   ```
+* **Synchronize Country IP Zones & Threat Feeds**:
+  ```bash
+  php artisan security:sync-geoip          # Sync IPdeny country zone caches (scheduled weekly)
+  php artisan security:sync-geoip --force  # Force re-download even when cache files exist
+  php artisan security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
+  ```
 
 ##### In Linux System Logs
 Because `nftables` logs are emitted directly by the Linux kernel, you can also view raw packet logs via standard systemd journal commands:
@@ -143,6 +150,7 @@ Kernel log entries contain standard stage tags indicating which rule matched:
 * `tallpbx-observe:blacklist` — Matches against permanent blacklist IPs or CIDR subnets.
 * `tallpbx-observe:bans` — Matches against dynamic brute-force intruder bans.
 * `tallpbx-observe:threat_feeds` — Matches against VoIPBL automated fraud lists.
+* `tallpbx-observe:geo_blocking` — Matches against country-level geo perimeter rules.
 * `tallpbx-observe:tftp` — Unauthorized TFTP write requests (`WRQ`), directory traversal (`../`), or floods.
 * `tallpbx-observe:custom` — Matches against administrator-defined custom drop rules.
 
