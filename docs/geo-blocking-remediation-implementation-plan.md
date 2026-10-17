@@ -28,6 +28,32 @@
 
 Not planned (documented rationale): migration filename `2026_10_16_000002` suffix (harmless, order is timestamp-governed); `DatabaseSeederTest` host-tree teardown parallel caveat (serial runs unaffected; a `setBasePath` sandbox is a separate refactor).
 
+## Deferred Findings (Final-Review Minors — accepted, not yet implemented)
+
+Identified by the whole-branch review after Tasks 1–8 completed, graded Minor by
+effect, and deliberately left unfixed per the one-fix-pass rule. They are tracked
+here so a future session can pick them up; TDD applies to each when taken.
+
+| ID | Severity | Location | Summary |
+| --- | --- | --- | --- |
+| DM-1 | Minor | `ManagesGeoBlocking::saveGeoSettings` (blacklist branch after the whitelist check at ~L237) | A failed blacklist-mode sync falls through to the success toast and audit log — the admin sees "settings saved" while the new country's zones failed to download (fail-open by design, but `setGeoEnabled` does notify in the same situation; inconsistent surfacing) |
+| DM-2 | Minor | `GeoBlockingService::mergeWithExternalBlocklistPending` (read at ~L236–L241, lock at ~L271) | The existing content is read *before* the exclusive flock is acquired, so a `ThreatFeedIngestionService` rebuild landing between the unlocked read and the locked write is lost (merge written from a stale snapshot). The write itself stays atomic and lost feed elements self-heal on the next hourly threat-feed rebuild |
+| DM-3 | Minor | `GeoBlockingService::sync` promotion (`compileSetElementFile` + `updateExternalBlocklist` at ~L143–L146) vs the later ruleset apply | Even on a successful whitelist→blacklist mode switch there is a bounded (apply-latency, milliseconds-scale) window where the kernel sets already hold the new-mode compilation while the running chain still references the previous mode's sets. Eliminating it requires per-mode set namespaces (e.g. `geo_allowed_ips` and `geo_blocked_ips` both populated with the chain choosing by mode) — a redesign, not a remediation |
+
+**Suggested fixes when picked up:**
+
+- **DM-1**: in `saveGeoSettings`, after the sync call, notify a warning toast when
+  `$result['status'] !== 'success'` in blacklist mode (mirror the `setGeoEnabled`
+  blacklist branch at ~L154–L158) and record the partial-failure detail in the
+  existing `geo_blocking_updated` audit description.
+- **DM-2**: move the read inside the lock — `fopen('c+')` first, `flock(LOCK_EX)`,
+  then `stream_get_contents`, filter, `ftruncate`/`rewind`/`fwrite` — so the whole
+  read-modify-write is protected (matching the protocol comment already in the
+  method).
+- **DM-3**: design task, not a patch: either dual-populated mode sets selected by
+  the chain, or a pre-provisioned next-generation set pair swapped by a single
+  rule edit. Needs its own plan; do not attempt inline.
+
 ## Global Constraints
 
 - `declare(strict_types=1)`, native type hints, PHPDoc on every touched class/method; PSR-12/PER via `./vendor/bin/pint --dirty` (PHP files only).
@@ -285,4 +311,4 @@ Run: `php artisan test --compact --parallel --filter="LocalizationTest|Translati
 
 ## Post-Execution Cleanup
 
-This plan follows the documentation lifecycle convention: once every task is verified and the user accepts the work, delete `docs/geo-blocking-remediation-implementation-plan.md` (untracked-style cleanup, same as completed plans).
+This plan follows the documentation lifecycle convention: once every task is verified and the user accepts the work, delete `docs/geo-blocking-remediation-implementation-plan.md` (untracked-style cleanup, same as completed plans) — **but first migrate any still-open Deferred Findings (DM-1..DM-3) to their own tracking location** (a follow-up plan or the next remediation document), so deleting this file never loses them.
