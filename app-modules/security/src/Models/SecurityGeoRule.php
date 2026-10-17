@@ -83,4 +83,32 @@ class SecurityGeoRule extends Model
     {
         return $this->v4_cidrs_count + $this->v6_cidrs_count;
     }
+
+    /**
+     * The configured sync interval expressed in seconds.
+     */
+    public function syncIntervalSeconds(): int
+    {
+        return match ($this->sync_interval) {
+            'monthly' => 30 * 86400,
+            'on_demand' => PHP_INT_MAX,
+            default => 7 * 86400, // 'weekly'
+        };
+    }
+
+    /**
+     * Whether the geo-ip rule is due for automated refresh based on its interval.
+     */
+    public function isDue(): bool
+    {
+        if ($this->sync_interval === 'on_demand') {
+            return false;
+        }
+
+        if ($this->last_sync_at === null || $this->last_status === 'failed') {
+            return true;
+        }
+
+        return $this->last_sync_at->addSeconds($this->syncIntervalSeconds())->lte(now());
+    }
 }

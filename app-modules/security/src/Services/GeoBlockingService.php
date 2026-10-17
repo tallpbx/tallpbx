@@ -55,6 +55,11 @@ class GeoBlockingService
         $allV6 = [];
         $errors = [];
 
+        $ttlSeconds = $rule->syncIntervalSeconds();
+        if ($ttlSeconds === PHP_INT_MAX) {
+            $ttlSeconds = 7 * 86400; // default 7 days TTL for cache freshness on manual/on_demand triggers
+        }
+
         foreach ($countries as $countryCode) {
             $cc = strtoupper(trim((string) $countryCode));
             if ($cc === '') {
@@ -64,16 +69,17 @@ class GeoBlockingService
             $v4Cache = "{$this->cacheDir}/{$cc}.v4.zone";
             $v6Cache = "{$this->cacheDir}/{$cc}.v6.zone";
 
-            $needsDownload = $force || $this->cacheNeedsDownload($v4Cache) || $this->cacheNeedsDownload($v6Cache);
+            $v4NeedsDownload = $force || $this->cacheNeedsDownload($v4Cache, $ttlSeconds);
+            $v6NeedsDownload = $force || $this->cacheNeedsDownload($v6Cache, $ttlSeconds);
 
-            if ($needsDownload) {
+            if ($v4NeedsDownload || $v6NeedsDownload) {
                 $ranges = $this->provider->fetchCountryRanges($cc);
 
-                if (empty($ranges['v4']) && empty($ranges['v6'])) {
-                    // Fail-open check: existing cached zones with usable
-                    // content are reused rather than failing completely.
-                    // Empty or unreadable caches hold no usable content and
-                    // must not masquerade as valid entries.
+                $fetchedV4 = ! empty($ranges['v4']);
+                $fetchedV6 = ! empty($ranges['v6']);
+
+                if (! $fetchedV4 && ! $fetchedV6) {
+                    // Both families failed to fetch. Check if usable non-empty cache exists.
                     if (! $this->cacheNeedsDownload($v4Cache) || ! $this->cacheNeedsDownload($v6Cache)) {
                         Log::warning("Could not download fresh zones for {$cc}; using existing cached zones.");
                     } else {
@@ -82,35 +88,48 @@ class GeoBlockingService
                         continue;
                     }
                 } else {
-                    // Zone cache writes must succeed: a silently missing cache
-                    // file would shrink the allow-set on the next whitelist sync.
-                    if (@file_put_contents($v4Cache, implode("\n", $ranges['v4'])."\n") === false
-                        || @file_put_contents($v6Cache, implode("\n", $ranges['v6'])."\n") === false) {
-                        $errors[] = "Failed to write zone cache for country: {$cc}";
+                    // Write only families that fetched successfully: never overwrite a valid cache
+                    // with an empty string or empty line when one family fails.
+                    if ($fetchedV4) {
+                        if (@file_put_contents($v4Cache, implode("\n", $ranges['v4'])."\n") === false) {
+                            $errors[] = "Failed to write zone cache for country: {$cc}";
+                        }
+                    }
 
-                        continue;
+                    if ($fetchedV6) {
+                        if (@file_put_contents($v6Cache, implode("\n", $ranges['v6'])."\n") === false) {
+                            $errors[] = "Failed to write zone cache for country: {$cc}";
+                        }
                     }
                 }
             }
 
-            if (file_exists($v4Cache)) {
+            $countryHasEntries = false;
+
+            if (is_file($v4Cache)) {
                 $lines = file($v4Cache, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
                 foreach ($lines as $line) {
                     $entry = trim($line);
                     if ($entry !== '') {
                         $allV4[] = $entry;
+                        $countryHasEntries = true;
                     }
                 }
             }
 
-            if (file_exists($v6Cache)) {
+            if (is_file($v6Cache)) {
                 $lines = file($v6Cache, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
                 foreach ($lines as $line) {
                     $entry = trim($line);
                     if ($entry !== '') {
                         $allV6[] = $entry;
+                        $countryHasEntries = true;
                     }
                 }
+            }
+
+            if (! $countryHasEntries) {
+                $errors[] = "Failed to download IP zones for country: {$cc}";
             }
         }
 
@@ -118,13 +137,14 @@ class GeoBlockingService
         $allV6 = array_values(array_unique($allV6));
 
         // Whitelist mode must never compile a partial allow-set: every
-        // country that yielded no entries would be silently dropped at
+        // country that yielded an error or no entries would be silently dropped at
         // the perimeter while the UI reports success.
-        $whitelistIncomplete = $rule->mode === 'whitelist' && ! empty($errors) && ! empty($countries);
+        // Also, cache write failures or total download failures must fail the sync in any mode.
+        $hasFatalErrors = ! empty($errors) && ($rule->mode === 'whitelist' || empty($allV4) && empty($allV6) || in_array('Failed to write zone cache for country: '.$cc, $errors, true));
 
-        if ($whitelistIncomplete || (! empty($errors) && empty($allV4) && empty($allV6) && ! empty($countries))) {
+        if ($hasFatalErrors && ! empty($countries)) {
             $rule->last_status = 'failed';
-            $rule->last_error = implode('; ', $errors);
+            $rule->last_error = implode('; ', array_unique($errors));
             $rule->save();
 
             return [
@@ -194,10 +214,10 @@ class GeoBlockingService
 
     /**
      * Whether a zone cache file must be re-downloaded: a missing, zero-byte,
-     * or unreadable file cannot contribute ranges and must never pass the
-     * fail-closed whitelist guard as if it held valid content.
+     * unreadable, or expired file cannot contribute ranges and must never pass
+     * the fail-closed whitelist guard as if it held valid content.
      */
-    private function cacheNeedsDownload(string $path): bool
+    public function cacheNeedsDownload(string $path, ?int $ttlSeconds = null): bool
     {
         if (! file_exists($path)) {
             return true;
@@ -205,7 +225,18 @@ class GeoBlockingService
 
         $size = @filesize($path);
 
-        return $size === false || $size === 0;
+        if ($size === false || $size === 0) {
+            return true;
+        }
+
+        if ($ttlSeconds !== null && $ttlSeconds > 0) {
+            $mtime = @filemtime($path);
+            if ($mtime === false || (time() - $mtime) > $ttlSeconds) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

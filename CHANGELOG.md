@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reverse Lockout Guard for Whitelist Geo-Perimeter**: Refuse disabling defensive pre-filters in the Security Center (`setPrefilterEnabled(false)`) when "Block All Except Selected" (whitelist) Geo-Blocking is armed. Because whitelist geo-blocking relies on pre-filter stage 1 for the administrator's trusted IP accept rule, disabling pre-filters while the stage 9.5 geo drop rule is active would lock the administrator out of the server.
 - **Module Management and Extension Lifecycle Authorization Gate**: Registered dedicated `admin.modules.manage` permission and enforced in-component authorization checks inside `ModulesList::toggleEnabled()`, `confirmDeleteCustom()`, and `deleteCustomModule()`. Administrators with view-only module access (`admin.modules.view`) now see read-only status badges without interactive toggle switches or custom extension deletion controls, preventing unauthorized module changes or destructive data removal.
 
+### Fixed
+- **Geo-Blocking Cache Freshness & Whitelist Fail-Closed Integrity**:
+  - `GeoBlockingService::cacheNeedsDownload()` now checks file modification age (`mtime`) against the configured sync interval TTL (or default 7-day TTL), ensuring scheduled runs automatically re-download stale zone data without requiring `--force`.
+  - `SecuritySyncGeoIpCommand` now honours `SecurityGeoRule`'s configured `sync_interval` (`weekly|monthly|on_demand`), skipping runs that are not yet due unless `--force` is specified.
+  - Partial family downloads no longer overwrite valid cached files with empty data, and any country in whitelist mode with missing or failed IP ranges triggers `$whitelistIncomplete`, aborting compilation to prevent partial allow-sets from being armed with status "success".
+
 ## [4.0.2] - 2026-10-16
 
 ### Fixed

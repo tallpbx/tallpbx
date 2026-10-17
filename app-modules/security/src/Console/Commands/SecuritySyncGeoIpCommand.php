@@ -47,9 +47,17 @@ class SecuritySyncGeoIpCommand extends Command
             return self::SUCCESS;
         }
 
+        $force = (bool) $this->option('force');
+
+        if (! $force && ! $rule->isDue()) {
+            $this->line('Geo-Blocking sync is not due yet (interval: '.$rule->sync_interval.'), skipping.');
+
+            return self::SUCCESS;
+        }
+
         $this->info('Syncing Geo-Blocking country allocations for: '.implode(', ', $rule->countries));
 
-        $result = $geoService->sync($rule, (bool) $this->option('force'));
+        $result = $geoService->sync($rule, $force);
 
         if ($result['status'] === 'success') {
             $this->info("Geo-Blocking sync completed successfully. IPv4 CIDRs: {$result['v4_count']}, IPv6 CIDRs: {$result['v6_count']}.");

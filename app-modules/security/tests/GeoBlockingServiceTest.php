@@ -310,3 +310,57 @@ it('fails a sync when the merged pending file cannot be written', function (): v
 
     rmdir($this->tempDir.'/external_blocklist.nft.pending');
 });
+
+it('re-downloads when cache file is older than configured sync interval TTL', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'blacklist',
+        'countries' => ['US'],
+        'sync_interval' => 'weekly',
+    ]);
+
+    // Create existing cache files but with mtime 8 days ago (> 7 days TTL)
+    file_put_contents($this->cacheDir.'/US.v4.zone', "1.0.0.0/24\n");
+    file_put_contents($this->cacheDir.'/US.v6.zone', "2600::/12\n");
+    touch($this->cacheDir.'/US.v4.zone', time() - (8 * 86400));
+    touch($this->cacheDir.'/US.v6.zone', time() - (8 * 86400));
+
+    // Because the files are older than 7 days, fetchCountryRanges must be called even without force
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24', '1.0.1.0/24'],
+        'v6' => ['2600::/12'],
+    ]);
+
+    $result = $this->geoService->sync($rule, force: false);
+
+    expect($result['status'])->toBe('success')
+        ->and($result['v4_count'])->toBe(2)
+        ->and($result['v6_count'])->toBe(1);
+});
+
+it('does not overwrite valid existing cache when a single family fetch returns empty', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'blacklist',
+        'countries' => ['US'],
+    ]);
+
+    // Pre-populate valid v6 cache
+    file_put_contents($this->cacheDir.'/US.v6.zone', "2600::/12\n");
+
+    // Fetch returns fresh v4, but empty v6 (e.g. temporary upstream v6 failure)
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => [],
+    ]);
+
+    $result = $this->geoService->sync($rule, force: true);
+
+    expect($result['status'])->toBe('success');
+
+    // The existing valid v6 cache must NOT be wiped or overwritten with empty content
+    $v6Content = file_get_contents($this->cacheDir.'/US.v6.zone');
+    expect($v6Content)->toContain('2600::/12');
+});

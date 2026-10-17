@@ -9,7 +9,9 @@ use Mockery;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Exceptions\LockoutException;
+use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Services\GeoBlockingService;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 
@@ -181,4 +183,31 @@ it('rejects invalid IP address in security:unban', function (): void {
     $this->artisan('security:unban', ['ip' => 'invalid-ip-format'])
         ->expectsOutputToContain("Invalid IP address format: 'invalid-ip-format'")
         ->assertFailed();
+});
+
+it('skips security:sync-geoip when not due unless force is specified', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'countries' => ['US'],
+        'sync_interval' => 'weekly',
+        'last_sync_at' => now()->subDays(2),
+        'last_status' => 'success',
+    ]);
+
+    $this->artisan('security:sync-geoip')
+        ->expectsOutputToContain('Geo-Blocking sync is not due yet')
+        ->assertSuccessful();
+
+    $mockGeo = Mockery::mock(GeoBlockingService::class);
+    $mockGeo->shouldReceive('sync')->once()->andReturn([
+        'status' => 'success',
+        'v4_count' => 10,
+        'v6_count' => 5,
+    ]);
+    $this->app->instance(GeoBlockingService::class, $mockGeo);
+
+    $this->artisan('security:sync-geoip', ['--force' => true])
+        ->expectsOutputToContain('Geo-Blocking sync completed successfully')
+        ->assertSuccessful();
 });

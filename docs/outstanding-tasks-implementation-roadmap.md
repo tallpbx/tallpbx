@@ -30,7 +30,7 @@
 | :--- | :--- | :--- | :--- |
 | 1.1.1 | Extract `FirewallApplier` domain service | Pending | 2026-10-16 |
 | 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Pending | 2026-10-16 |
-| 1.1.3 | Geo-blocking cache freshness & whitelist fail-closed integrity | Pending | 2026-10-17 |
+| 1.1.3 | Geo-blocking cache freshness & whitelist fail-closed integrity | Verified | 2026-10-17 |
 | 1.2.1 | Decompose `SecurityConfigGenerator` | Pending | 2026-10-16 |
 | 1.3.1 | Reorganize `src/` into sub-domain namespaces | Pending | 2026-10-16 |
 | 1.3.2 | Realign domain trait boundaries | Pending | 2026-10-16 |
@@ -326,6 +326,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `f6ade550` | **Security / Geo** | **Geo Cache Freshness & Whitelist Fail-Closed Integrity**: Enhanced `cacheNeedsDownload()` with TTL expiration checking based on `sync_interval`, wired interval checking into `SecuritySyncGeoIpCommand`, prevented partial-fetch cache corruption, and enforced fail-closed refusal when whitelist country zones fail. *(Resolves Task 1.1.3 / 4.x Audit H1 & H2)* |
 | **2026-10-17** | `8ccbbcc9` | **Admin / Modules** | **Module Management Authorization Gate**: Registered `admin.modules.manage` permission and enforced in-component authorization checks inside `ModulesList::toggleEnabled()`, `confirmDeleteCustom()`, and `deleteCustomModule()`. Read-only administrators (`admin.modules.view`) receive read-only badges with interactive mutation controls suppressed. *(Resolves Task 5.6 / 4.x Audit H4)* |
 | **2026-10-17** | `486f7a54` | **Security / Firewall** | **Reverse Lockout Protection for Whitelist Geo-Perimeter**: Refused `setPrefilterEnabled(false)` when "Block All Except Selected" (whitelist) Geo-Blocking is armed, preventing administrator lockout caused by removing stage 1's trusted IP accept while stage 9.5's geo drop perimeter remains active. *(Resolves Task 5.5 / 4.x Audit H3)* |
 | **2026-10-16** | `4.0.2 Release` | **Security / Geo** | **Geo-Blocking Safety & Catalog Hardening**: Expanded country catalog to all 249 ISO 3166-1 countries, corrected IPdeny IPv6 download URL template, added dual-stack indicator badge in master firewall rules, and implemented atomic zone pre-syncing with automatic rollback. |
