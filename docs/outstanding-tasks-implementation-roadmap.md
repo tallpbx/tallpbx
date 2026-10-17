@@ -50,7 +50,7 @@
 | 4.6 | Decompose large shared-kernel classes | Pending | 2026-10-16 |
 | 4.7 | Environment variable documentation reference | Pending | 2026-10-16 |
 | 5.1 | Click-to-call ESL command validation | Verified | 2026-10-17 |
-| 5.2 | Open registration feature gate | Pending | 2026-10-16 |
+| 5.2 | Open registration feature gate | Verified | 2026-10-17 |
 | 5.3 | XML handler rate limiting & access hardening | Pending | 2026-10-16 |
 | 5.4 | Threat feed redirect pinning | Verified | 2026-10-17 |
 | 5.5 | Reverse lockout protection for armed whitelist geo-perimeter | Verified | 2026-10-17 |
@@ -326,6 +326,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `e3fc7b71` | **Auth / Panel** | **Open Registration Feature Gate**: Gated tenant user registration behind `auth.registration_enabled` (default `false`), redirecting `/panel/register` to login and aborting direct component mount with 404 when disabled. *(Resolves Task 5.2 / Security Audit M3)* |
 | **2026-10-17** | `ac40716b` | **Telephony / ESL** | **Click-to-Call ESL Validation & Socket Sanitization**: Added strict regex validation in `ClickToCallForm`, tenant extension scoping, FreeSwitchControlService loopback bridging, and defense-in-depth newline injection guards in `FreeSwitchService::api()` and `bgapi()`. *(Resolves Task 5.1 / Security Audit H1)* |
 | **2026-10-17** | `07c9fed0` | **Security / Threat Feeds** | **Threat Feed Redirect Pinning & SSRF Mitigation**: Enforced Guzzle `allow_redirects` with same-host pinning (`on_redirect`) and protocol downgrade protection in `ThreatFeedIngestionService`, refusing cross-host redirects to protect against SSRF and open redirect abuse. *(Resolves Task 5.4 / Security Audit L3)* |
 | **2026-10-17** | `d3bc9496` | **Security / Threat Feeds** | **Atomic Inter-Process Lock Protocol for Shared Pending Sets**: Standardized exclusive file locking across `ThreatFeedIngestionService` and `GeoBlockingService`, acquiring `LOCK_EX` on `external_blocklist.nft.pending` before reading/snapshotting geo elements, and purged obsolete fallback references to separate `.nft` files. *(Resolves Task 5.7 / 4.x Audit M5)* |

@@ -98,7 +98,13 @@ Route::prefix('panel')->name('panel.')->middleware('panel.ip')->group(function (
         Route::post('/login/tenant', [AuthenticatedSessionController::class, 'store'])
             ->middleware('throttle:10,1')
             ->name('login.tenant.store');
-        Route::get('/register', fn () => app()->call(Register::class))->name('register');
+        Route::get('/register', function () {
+            if (! config('auth.registration_enabled', false)) {
+                return redirect()->route('panel.login');
+            }
+
+            return app()->call(Register::class);
+        })->name('register');
         Route::get('/forgot-password', fn () => app()->call(ForgotPassword::class))->name('password.request');
         Route::get('/reset-password/{token}', fn (string $token) => app()->call(ResetPassword::class, ['token' => $token]))->name('password.reset');
     });

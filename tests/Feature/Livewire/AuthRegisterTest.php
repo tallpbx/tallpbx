@@ -6,6 +6,24 @@ use App\Models\User;
 use Livewire\Livewire;
 use Modules\Auth\Livewire\Register;
 
+beforeEach(function () {
+    config()->set('auth.registration_enabled', true);
+});
+
+it('redirects /panel/register to login when registration is disabled', function () {
+    config()->set('auth.registration_enabled', false);
+
+    $this->get(route('panel.register'))
+        ->assertRedirect(route('panel.login'));
+});
+
+it('aborts with 404 when component is mounted while registration is disabled', function () {
+    config()->set('auth.registration_enabled', false);
+
+    Livewire::test(Register::class)
+        ->assertNotFound();
+});
+
 it('renders the register form', function () {
     Livewire::test(Register::class)
         ->assertOk()

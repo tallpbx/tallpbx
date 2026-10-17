@@ -28,10 +28,23 @@ class Register extends Component
     public string $password_confirmation = '';
 
     /**
+     * Ensure registration is enabled before mounting.
+     */
+    public function mount(): void
+    {
+        if (! config('auth.registration_enabled', false)) {
+            abort(404, 'Registration is currently disabled.');
+        }
+    }
+
+    /**
      * Register a new user and log them in.
      */
     public function register(): void
     {
+        if (! config('auth.registration_enabled', false)) {
+            abort(404, 'Registration is currently disabled.');
+        }
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
