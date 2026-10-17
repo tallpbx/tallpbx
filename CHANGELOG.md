@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Impersonation Banner Stored XSS Mitigation**: Escaped user and administrator display names when rendering the active impersonation alert banner in the panel layout and removed raw HTML tags from the underlying translation strings across English, Spanish, and French.
 
 ### Changed
+- **Log Viewer UI Modernization**: Restyled the application log viewer with DaisyUI semantic tokens, inputs, and loading spinner component, and removed unused scaffolded placeholder views in `call-blocks`, `call-forwards`, and `certificates`.
 - **FreeSWITCH Directory Lookup Query Optimization**: `DirectoryXmlBuilder` now bulk eager-loads extensions and extension settings for all enabled accounts during domain-wide lookups, reducing query volume from $2N+1$ down to constant bounded bulk queries.
 - Geo-IP country zones now refresh automatically every week via the scheduler (`security:sync-geoip`, also available manually with `--force`); the unused manual sync action behind it was removed.
 
