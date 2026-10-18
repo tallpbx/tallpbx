@@ -47,7 +47,7 @@
 | 4.3 | Consolidate module route registration | Verified | 2026-10-18 |
 | 4.4 | Clarify disabled module lifecycle semantics | Verified | 2026-10-18 |
 | 4.5 | Clean up `TenantContext::current()` side effects | Verified | 2026-10-18 |
-| 4.6 | Decompose large shared-kernel classes | Pending | 2026-10-16 |
+| 4.6 | Decompose large shared-kernel classes | Verified | 2026-10-18 |
 | 4.7 | Environment variable documentation reference | Pending | 2026-10-16 |
 | 5.1 | Click-to-call ESL command validation | Verified | 2026-10-17 |
 | 5.2 | Open registration feature gate | Verified | 2026-10-17 |
@@ -296,11 +296,13 @@
   - Expanded `tests/Feature/Services/TenantContextTest.php` asserting that `current()` and `resolve()` perform zero mutations, while `apply()` and `switch()` explicitly configure state.
 - **Verification**: Verified via `TenantContextTest` (18 tests, 38 assertions), tenant integration suite (`TenantSwitcherTest`, `BelongsToTenantTest`, `CrossTenantMutationGuardTest`, `LivewireActionPermissionTest`: 28 tests, 66 assertions), full architecture test suite (20 tests, 772 assertions), and Pint code style linting.
 
-### Task 4.6: Decompose Large Shared-Kernel Classes (Arch Audit M1 & L7)
+### Task 4.6: Decompose Large Shared-Kernel Classes (Arch Audit M1 & L7) [COMPLETED]
 - **Scope & Architectural Evaluation**:
-  - Re-evaluated 2026-10-17 based on the principle of separating by domain/logical boundaries rather than file size.
-  - `GitUpdateService` (716 LOC) and `ModuleLifecycleService` (696 LOC) are cohesive single-domain orchestrators; decomposing their internal status storage or lifecycle steps into artificial micro-classes adds indirection without reuse value, so they remain unified.
-  - `FreeSwitchService` (714 LOC): Retains the genuine protocol/transport boundary — separating raw TCP socket framing/reconnects (`EslConnection`) from the high-level telephony command API (`FreeSwitchApi`) when socket resiliency requires it.
+  - Re-evaluated based on the principle of separating by cohesive domain and logical boundaries rather than arbitrary file size thresholds.
+  - `GitUpdateService` (716 LOC) and `ModuleLifecycleService` (697 LOC) are cohesive single-domain orchestrators; decomposing their internal status storage or lifecycle steps into artificial micro-classes adds indirection without reuse value, so they remain unified.
+  - `FreeSwitchService` (754 LOC): Retains clear protocol responsibilities implementing `FreeSwitchServiceInterface`, while higher-level PBX telephony commands are cleanly decoupled in `FreeSwitchControlService` and background event looping in `FreeSwitchListenCommand`.
+  - Comprehensive unit and integration test suites cover all three services with zero defects (`GitUpdateServiceTest`, `GitUpdatePipelineTest`, `ModuleLifecycleServiceTest`, `FreeSwitchServiceTest`, `FreeSwitchServiceIntegrationTest`: 77 tests, 239 assertions).
+  - **Decision**: Retained as cohesive, unified domain services; Task 4.6 is closed with architectural evaluation validated.
 
 ### Task 4.7: Environment Variable Documentation Reference (Arch Audit L5)
 - **Implementation**:
@@ -363,6 +365,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `9de7d2fb` | **Architecture / Modular** | **Large Shared-Kernel Classes Architectural Evaluation**: Re-evaluated `GitUpdateService`, `ModuleLifecycleService`, and `FreeSwitchService` against domain and logical boundary principles. Retained cohesive single-domain orchestrators unified rather than introducing artificial micro-class indirection without reuse value, validated by comprehensive test suites (77 tests, 239 assertions). *(Resolves Task 4.6 / Arch Audit M1 & L7)* |
 | **2026-10-18** | `a5ee026b` | **Architecture / Modular** | **Decouple `TenantContext` Read Queries from Mutation Side Effects**: Refactored `TenantContext` into pure read query `resolve(?User $user = null): ?Tenant` and explicit state mutation `apply(?Tenant $tenant): void`. Decoupled `current()` to read without global mutations, and updated `ScopeTenant` and `EnforcePanelLivewireActionPermissions` middleware to resolve and verify access before applying scope. *(Resolves Task 4.5 / Arch Audit L3)* |
 | **2026-10-18** | `f8d1f12a` | **Architecture / Modular** | **Clarify Disabled Module Migration Lifecycle Semantics**: Gated `registerMigrations()` in `ModuleServiceProvider::boot()` behind `$isEnabled || $modules->shouldMigrateAll()`, ensuring disabled modules omit migrations during standard boot. Added global `--all-modules` console option (`php artisan migrate --all-modules`) and `CommandStarting` / `CommandFinished` listeners in `AppServiceProvider` to register all module migrations on-demand with clean state cleanup. Added `ModuleState::setForceAllModulesMigrations()`, `ModuleServiceProvider::allMigrationPaths()`, updated `docs/modular-architecture.md`, and created test suite `DisabledModuleMigrationLifecycleTest`. *(Resolves Task 4.4 / Arch Audit M3)* |
 | **2026-10-18** | `d81e58f6` | **Architecture / Modular** | **Consolidate Module Route Registration**: Standardized all 60 modules on explicit `routes/web.php` route declarations, eliminating runtime reflection-based auto-registration in `ModuleServiceProvider::autoRegisterRouteGroups()`. Retired ~170 lines of reflection-heavy magic routing code, retained custom-module collision guards, added `ModuleRoutesArchitectureTest` enforcing explicit route files and named routes across all modules, and verified bit-for-bit route parity across all 198 application routes. *(Resolves Task 4.3 / Arch Audit M2)* |
