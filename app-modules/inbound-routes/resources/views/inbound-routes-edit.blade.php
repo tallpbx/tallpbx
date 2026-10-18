@@ -1,6 +1,6 @@
 <div>
     <div class="mb-6">
-        <h2 class="text-2xl font-semibold">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.inbound_routes_title') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.inbound_routes_title') }}</h2>
     </div>
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">

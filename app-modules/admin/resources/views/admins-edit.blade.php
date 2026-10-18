@@ -1,6 +1,6 @@
 <div class="max-w-3xl">
     <div class="mb-6">
-        <h2 class="text-2xl font-semibold">
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">
             {{ $adminId ? __('admin.admin_edit') : __('admin.admin_add') }}
         </h2>
         <p class="text-sm text-base-content/60 mt-1">

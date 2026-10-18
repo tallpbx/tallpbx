@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold">
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">
             {{ $this->isEdit ? 'Edit User' : 'Create User' }}
         </h2>
     </div>

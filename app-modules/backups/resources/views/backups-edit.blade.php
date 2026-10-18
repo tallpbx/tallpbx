@@ -1,6 +1,6 @@
 <div class="max-w-2xl">
     <div class="flex items-center gap-2 mb-6">
-        <h2 class="text-2xl font-semibold">{{ __('admin.backup_configuration') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.backup_configuration') }}</h2>
         <x-tooltip :tip="__('admin.backup_config_tooltip')" position="right">
             <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
         </x-tooltip>

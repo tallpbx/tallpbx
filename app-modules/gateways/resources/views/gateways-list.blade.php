@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold">{{ __('admin.gateways_title') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.gateways_title') }}</h2>
         <a href="{{ route('panel.gateways.create') }}" class="btn btn-primary btn-sm">
             <x-heroicon-o-plus class="w-4 h-4" />
             {{ __('admin.create_gateway') }}

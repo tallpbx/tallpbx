@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center gap-2 mb-6">
-        <h2 class="text-2xl font-semibold">
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">
             {{ $this->isEdit ? 'Edit SIP Profile' : 'Create SIP Profile' }}
         </h2>
         <x-tooltip :tip="__('admin.sip_profile_header_tooltip')" align="start" position="right">

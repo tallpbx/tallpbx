@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-semibold">{{ __('admin.devices_title') }}</h2><x-tooltip :tip="__('admin.device_header_tooltip')" align="start" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
+        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.devices_title') }}</h2><x-tooltip :tip="__('admin.device_header_tooltip')" align="start" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
         <a href="{{ route('panel.devices.create') }}" class="btn btn-primary btn-sm">
             <x-heroicon-o-plus class="w-4 h-4" />
             {{ __('admin.create_device') }}

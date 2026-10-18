@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center gap-2 mb-6">
-        <h2 class="text-2xl font-semibold">
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">
             {{ $this->isEdit ? 'Edit Extension' : 'Create Extension' }}
         </h2>
         <x-tooltip :tip="__('admin.extension_header_tooltip')" align="start" position="right">

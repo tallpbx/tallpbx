@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h2 class="text-2xl font-semibold">{{ __('admin.administrators') }}</h2>
+            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.administrators') }}</h2>
             <p class="text-sm text-base-content/60 mt-1">{{ __('admin.administrators_description') }}</p>
         </div>
         <x-tooltip :tip="__('admin.create_admin_tooltip')" position="left">

@@ -8,7 +8,7 @@
 
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold">{{ __('admin.notifications_title') }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.notifications_title') }}</h1>
             <p class="text-sm text-base-content/60 mt-1">
                 {{ trans_choice('admin.unread_notifications', $unreadCount, ['count' => $unreadCount]) }}
             </p>

@@ -1,6 +1,6 @@
 <div wire:poll.5s="refresh">
     <div class="mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-semibold">{{ __('admin.call_center_active_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
+        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.call_center_active_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
     </div>
 
     @if (!$fsConnected)

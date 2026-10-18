@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-semibold">{{ __('admin.outbound_routes_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
+        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.outbound_routes_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
     </div>
 
     <div class="card bg-base-100 border border-base-300">

@@ -1,7 +1,7 @@
 <div class="max-w-3xl space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold">{{ $fileStoreId === null ? 'Add file store' : 'Edit file store' }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ $fileStoreId === null ? 'Add file store' : 'Edit file store' }}</h1>
             <p class="text-sm text-base-content/60">Credentials remain write-only after they are saved.</p>
         </div>
 

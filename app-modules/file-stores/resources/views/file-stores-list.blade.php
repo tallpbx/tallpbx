@@ -1,7 +1,7 @@
 <div class="max-w-6xl space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-semibold">File Stores</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-base-content">File Stores</h1>
             <p class="text-sm text-base-content/60">Remote storage locations for media archives and backups.</p>
         </div>
 

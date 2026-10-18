@@ -1,7 +1,7 @@
 <div class="max-w-3xl space-y-6" @if ($updating) wire:poll.1s="pollProgress" @endif>
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-2xl font-semibold">{{ __('admin.git_update') }}</h2>
+            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.git_update') }}</h2>
             <p class="text-sm text-base-content/60 mt-1">{{ __('admin.git_channel') }}</p>
         </div>
         <button wire:click="fetch"

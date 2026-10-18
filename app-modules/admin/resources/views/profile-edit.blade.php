@@ -1,6 +1,6 @@
 <div class="max-w-4xl space-y-6">
     <div>
-        <h2 class="text-2xl font-semibold tracking-tight">{{ __('admin.my_profile') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.my_profile') }}</h2>
         <p class="text-sm text-base-content/60 mt-1">{{ __('admin.profile_description') }}</p>
     </div>
 

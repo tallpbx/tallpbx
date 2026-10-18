@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold">{{ __('admin.settings_title') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.settings_title') }}</h2>
     </div>
 
     @if ($operationalMessage !== null)

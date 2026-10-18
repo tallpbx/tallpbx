@@ -1,7 +1,7 @@
 <div class="max-w-4xl space-y-6">
     <div class="flex items-center justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-semibold">Restore backup</h2>
+            <h2 class="text-2xl font-bold tracking-tight text-base-content">Restore backup</h2>
             <p class="mt-1 text-sm text-base-content/70">A restore replaces the selected database and file scopes on this PBX.</p>
         </div>
         <a href="{{ route('panel.backups.index') }}" class="btn btn-ghost" wire:navigate>Back to backups</a>

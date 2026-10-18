@@ -36,7 +36,7 @@
 | 1.3.2 | Realign domain trait boundaries | Verified | 2026-10-17 |
 | 1.3.3 | Retain unified firewall pipeline table (evaluated & consolidated) | Verified | 2026-10-17 |
 | 2.1 | Standardized form submission loading feedback | Verified | 2026-10-17 |
-| 2.2 | Page-title typography normalization | Pending | 2026-10-16 |
+| 2.2 | Page-title typography normalization | Verified | 2026-10-17 |
 | 2.3 | Localize hardcoded table headers | Pending | 2026-10-16 |
 | 2.4 | Normalize arbitrary font sizes | Pending | 2026-10-16 |
 | 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-17 |
@@ -170,11 +170,12 @@
   - Added unit test `FormSubmitButtonTest` and architecture test `FormSubmitButtonArchitectureTest` verifying 100% compliance across all edit views.
 - **Verification**: Verified via `FormSubmitButtonTest`, `FormSubmitButtonArchitectureTest`, Playwright browser tests (`PanelRoutingSmokeTest`, `PanelCoreSmokeTest`), and full parallel test suite (2,923 tests, 19,724 assertions).
 
-### Task 2.2: Page-Title Font Weight & Typography Normalization (UI Audit M2)
-- **Problem**: 83 views use `text-2xl font-semibold` while 43 use a `text-2xl font-bold` variant; only 7 views contain `tracking-tight` at all, so the AGENTS.md page-title standard (`text-2xl font-bold tracking-tight text-base-content`) is currently the minority pattern *(re-measured 2026-10-16; the original audit catalogued 81 vs 27)*.
+### Task 2.2: Page-Title Font Weight & Typography Normalization (UI Audit M2) [COMPLETED]
+- **Problem**: 83 views used `text-2xl font-semibold` while 43 used a `text-2xl font-bold` variant; only 7 views contained `tracking-tight` at all, so the AGENTS.md page-title standard (`text-2xl font-bold tracking-tight text-base-content`) was the minority pattern.
 - **Implementation**:
-  - Normalize all module and panel page titles to the established project standard: `text-2xl font-bold tracking-tight text-base-content`.
-  - Add a Pest UI architecture test asserting page title headers match the standard pattern across all module views.
+  - Normalized all 125 module and panel page-title headings (`<h1>` / `<h2>` with `text-2xl`) across `app-modules/` and `resources/views/` to match the established design standard: `text-2xl font-bold tracking-tight text-base-content`, preserving layout spacing utilities (`mb-6`, `mb-4`, etc.).
+  - Added Pest UI architecture test `PageTitleTypographyArchitectureTest` enforcing that all page-title headings across all views strictly adhere to the standard.
+- **Verification**: Verified via `PageTitleTypographyArchitectureTest` (scanned 127 matching page titles across 127 views), Pest Browser suite (53 passed, 273 assertions), and Pint code style linting.
 
 ### Task 2.3: Localize Hardcoded Table Header (`<th>`) Contents (UI Audit L1)
 - **Problem**: 39 table header cells contain raw English strings (`Name`, `Actions`, `Type`, `Status`, `Provider`, `Destination`, `Queue`, `Profile`, `Value`, `Key`, `Strategy`, `Timestamp`, `Rule Stage`, `Proto`, `Message`, plus `Source IP`, `SAN Domains`, `Name / Domain`, `Interface`, and `File`), rendering untranslated in Spanish and French *(re-measured 2026-10-16; the original audit catalogued ~25)*.
@@ -323,6 +324,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `e972ff44` | **UI / Typography** | **Page-Title Typography Normalization**: Normalized 125 module and panel page-title headings (`<h1>` / `<h2>` with `text-2xl`) across `app-modules/` and `resources/views/` to strictly match the established design standard in `AGENTS.md` (`text-2xl font-bold tracking-tight text-base-content`), eliminating non-standard `font-semibold` and untightened variants while preserving layout spacing utilities (`mb-6`, `mb-4`, etc.). Added architecture test `PageTitleTypographyArchitectureTest` enforcing 100% compliance across all views. *(Resolves Task 2.2)* |
 | **2026-10-17** | `f50c2347` | **UI / Components** | **Standardized Form Submission Loading Feedback (`<x-form-submit-button>`)**: Created `<x-form-submit-button>` Blade component with built-in DaisyUI loading spinner, disabled state lock, standard `btn-sm` sizing, and dynamic present-continuous busy text. Batch-migrated all 47 edit/create views (plus fax send and dialplan tester) to `<x-form-submit-button>`, normalized cancel links to `btn btn-ghost btn-sm` with `wire:navigate`, and added unit and architecture tests. *(Resolves Task 2.1)* |
 | **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Firewall Rules Unified Table Architecture**: Evaluated `firewall-rules.blade.php` against logical boundary principles; retained the single cohesive HTML table and unified Alpine scroller rather than fragmenting into headless `<tr>` partials. *(Resolves Task 1.3.3; Stream 1 100% complete)* |
 | **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Realign Domain Trait Boundaries**: Relocated `$tftpDefenseEnabled`, `setTftpDefense()`, and `tftpDefenseCounters()` from `ManagesAttackProtection` into `ManagesFirewallRules`, aligning component concerns with the visual TFTP workbench in the Firewall Rules tab. *(Resolves Task 1.3.2)* |

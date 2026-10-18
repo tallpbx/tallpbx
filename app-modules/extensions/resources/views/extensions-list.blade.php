@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-semibold">{{ __('admin.extensions_title') }}</h2><x-tooltip :tip="__('admin.extension_header_tooltip')" align="start" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
+        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.extensions_title') }}</h2><x-tooltip :tip="__('admin.extension_header_tooltip')" align="start" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
         <div class="flex gap-2">
             @if(\Illuminate\Support\Facades\Route::has('panel.extensions.create-multiple'))
                 <a href="{{ route('panel.extensions.create-multiple') }}" class="btn btn-primary btn-sm">

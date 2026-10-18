@@ -1,7 +1,7 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold">{{ __('admin.cdr_detail_title') }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.cdr_detail_title') }}</h1>
             <a href="{{ route('panel.cdr.index') }}" class="btn btn-ghost">{{ __('client.back') }}</a>
         </div>
 

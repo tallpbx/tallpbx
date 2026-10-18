@@ -5,7 +5,7 @@
                 <a href="{{ route('panel.users.index') }}" class="btn btn-ghost btn-xs btn-circle">
                     <x-heroicon-o-arrow-left class="w-4 h-4" />
                 </a>
-                <h1 class="text-2xl font-bold">{{ __('admin.impersonation_logs_title') }}</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.impersonation_logs_title') }}</h1>
             </div>
             <p class="text-sm text-base-content/60 mt-1">
                 {{ __('admin.impersonation_logs_description') }}

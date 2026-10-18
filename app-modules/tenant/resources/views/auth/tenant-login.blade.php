@@ -22,7 +22,7 @@
     <div class="w-full max-w-md mx-4">
         <div class="text-center mb-8">
             <x-heroicon-o-phone class="w-12 h-12 text-primary mx-auto mb-3" />
-            <h1 class="text-2xl font-bold">{{ config('app.name', 'TallPBX') }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ config('app.name', 'TallPBX') }}</h1>
             <p class="text-sm text-base-content/60 mt-1">{{ __('client.sign_in_title') }}</p>
         </div>
 

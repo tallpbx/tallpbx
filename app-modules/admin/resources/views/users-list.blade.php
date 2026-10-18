@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold">{{ __('admin.users_title') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.users_title') }}</h2>
         <div class="flex items-center gap-2">
             @if(Auth::guard('admin')->user()?->hasPermission('admin.impersonate'))
                 <x-tooltip :tip="__('admin.impersonation_logs_tooltip')" position="left">

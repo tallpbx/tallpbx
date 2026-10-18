@@ -1,6 +1,6 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold mb-6">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.tenant_limit') }}</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.tenant_limit') }}</h1>
         <form wire:submit="save" class="space-y-6">
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="tenantId">

@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Standardized Form Submit Button Component (`<x-form-submit-button>`)**: Created reusable Blade component with built-in DaisyUI loading spinner (`loading-spinner loading-xs`), `wire:loading.attr="disabled"` submission lock, standard `btn btn-primary btn-sm` sizing, and dynamic present-continuous busy text (`Saving...` localized across English, Spanish, and French).
 - **Form Submit Button Architecture Enforcement Test**: Added `FormSubmitButtonArchitectureTest` ensuring all module create/edit views use `<x-form-submit-button>` and standard `btn btn-ghost btn-sm` cancel links with `wire:navigate`.
+- **Page-Title Typography Architecture Test**: Added `PageTitleTypographyArchitectureTest` verifying 100% of module and panel page-title headings (`<h1>` and `<h2>` with `text-2xl`) adhere strictly to the established design standard: `text-2xl font-bold tracking-tight text-base-content`.
 
 ### Changed
 - **Form Submission Loading Feedback & Cancel Link Standardization**: Migrated all 47 module create and edit views (plus fax send and dialplan tester) to `<x-form-submit-button>`, eliminating submission freeze during FreeSWITCH reload jobs or cache invalidation, and normalized all cancel links to `btn btn-ghost btn-sm` with `wire:navigate`.
+- **Page-Title Typography Normalization**: Normalized 125 module and panel page-title headings across `app-modules/` and `resources/views/` to the established design standard (`text-2xl font-bold tracking-tight text-base-content`), eliminating non-standard `font-semibold` and untightened variants while preserving layout spacing utilities (`mb-6`, `mb-4`, etc.).
 
 ## [4.0.3] - 2026-10-17
 

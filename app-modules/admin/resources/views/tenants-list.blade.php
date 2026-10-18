@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold">{{ __('admin.tenants_title') }}</h2>
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.tenants_title') }}</h2>
         <x-tooltip :tip="__('admin.create_tenant_tooltip')" position="left">
             <a href="{{ route('panel.tenants.create') }}" class="btn btn-primary btn-sm">
                 <x-heroicon-o-plus class="w-4 h-4" />

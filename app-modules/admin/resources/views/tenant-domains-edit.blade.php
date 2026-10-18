@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-semibold">
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">
             {{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.tenant_domains_title') }}
         </h2>
     </div>

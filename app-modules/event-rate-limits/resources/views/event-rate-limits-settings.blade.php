@@ -1,7 +1,7 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
         <div class="flex items-center gap-2 mb-6">
-            <h1 class="text-2xl font-bold">{{ __('admin.event_rate_limits_title') }}</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.event_rate_limits_title') }}</h1>
             <x-tooltip :tip="__('admin.event_rate_limits_tooltip')" align="start" position="right">
                 <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
             </x-tooltip>

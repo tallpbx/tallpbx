@@ -1,6 +1,6 @@
 <div>
     <div class="mb-6">
-        <h2 class="text-2xl font-semibold">
+        <h2 class="text-2xl font-bold tracking-tight text-base-content">
             {{ $this->isEdit ? 'Edit SIP Account' : 'Create SIP Account' }}
         </h2>
     </div>

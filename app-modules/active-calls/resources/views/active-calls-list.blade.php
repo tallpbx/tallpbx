@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-semibold">{{ __('admin.active_calls_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
+        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.active_calls_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
         @if ($fsConnected)
             <span class="badge badge-success gap-1">
                 <x-heroicon-o-arrow-path class="w-3 h-3 animate-spin" />

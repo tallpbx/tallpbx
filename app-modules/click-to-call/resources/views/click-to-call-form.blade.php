@@ -1,6 +1,6 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold mb-6">{{ __('admin.click_to_call_title') }}</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ __('admin.click_to_call_title') }}</h1>
         <p class="text-base-content/60 mb-6">{{ __('admin.click_to_call_description') }}</p>
         @if ($operationalMessage !== null)
             <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">

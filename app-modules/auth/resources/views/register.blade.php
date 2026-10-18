@@ -1,7 +1,7 @@
 <div class="min-h-screen flex items-center justify-center bg-base-200">
     <div class="card bg-base-100 border border-base-300 w-full max-w-md">
         <div class="card-body">
-            <h2 class="card-title text-2xl mb-4">{{ __('client.create_account') }}</h2>
+            <h2 class="card-title text-2xl font-bold tracking-tight text-base-content mb-4">{{ __('client.create_account') }}</h2>
 
             <form wire:submit="register">
                 {{-- Name --}}

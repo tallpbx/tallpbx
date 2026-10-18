@@ -1,6 +1,6 @@
 <div>
     <div class="mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-semibold">{{ __('admin.permissions_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
+        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.permissions_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
         <p class="text-sm text-base-content/50 mt-1">
             {{ __('admin.permissions_description') }}
             <a href="{{ route('panel.groups.index') }}" class="link link-primary">{{ __('admin.groups') }}</a> {{ __('admin.permissions_page') }}.

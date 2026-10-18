@@ -1,7 +1,7 @@
 <div class="max-w-5xl">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h2 class="text-2xl font-semibold">{{ __('admin.monitoring') }}</h2>
+            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.monitoring') }}</h2>
             <p class="text-sm text-base-content/60 mt-1">
                 Real-time system health overview — disk and memory usage, essential service status,
                 FreeSWITCH telephony engine runtime, queue worker backlog, and TLS certificate expiry.

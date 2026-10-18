@@ -1,7 +1,7 @@
 <div class="min-h-screen flex items-center justify-center bg-base-200">
     <div class="card bg-base-100 border border-base-300 w-full max-w-md">
         <div class="card-body">
-            <h2 class="card-title text-2xl mb-4">{{ __('client.forgot_password') }}</h2>
+            <h2 class="card-title text-2xl font-bold tracking-tight text-base-content mb-4">{{ __('client.forgot_password') }}</h2>
             <p class="text-sm text-base-content/60 mb-4">
                 {{ __('client.forgot_password_intro') }}
             </p>

@@ -1,5 +1,5 @@
 <div class="max-w-4xl">
-    <h2 class="text-2xl font-semibold mb-6">{{ __('admin.queue_status') }}</h2>
+    <h2 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ __('admin.queue_status') }}</h2>
 
     {{-- Stats cards --}}
     <div class="grid grid-cols-3 gap-4 mb-6">
