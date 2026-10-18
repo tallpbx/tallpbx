@@ -31,7 +31,7 @@
 | 1.1.1 | Extract `FirewallApplier` domain service | Verified | 2026-10-17 |
 | 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Verified | 2026-10-17 |
 | 1.1.3 | Geo-blocking cache freshness & whitelist fail-closed integrity | Verified | 2026-10-17 |
-| 1.2.1 | Decompose `SecurityConfigGenerator` | Pending | 2026-10-16 |
+| 1.2.1 | Decompose `SecurityConfigGenerator` | Verified | 2026-10-17 |
 | 1.3.1 | Reorganize `src/` into sub-domain namespaces | Pending | 2026-10-16 |
 | 1.3.2 | Realign domain trait boundaries | Pending | 2026-10-16 |
 | 1.3.3 | Decompose oversized tab views into partials | Pending | 2026-10-17 |
@@ -326,6 +326,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `ad7e9697` | **Security / Architecture** | **Decompose SecurityConfigGenerator**: Decomposed monolithic 1,045 LOC compiler god-class into four stage-specific compiler domain classes (`BlocklistCompiler`, `GeoPerimeterCompiler`, `PreFilterCompiler`, `ServiceRulesCompiler`) under `Modules\Security\Services\Firewall\Compilers`, retaining `SecurityConfigGenerator` as a lean coordinator (~400 LOC) with 100% bit-for-bit ruleset parity and backward-compatible delegation APIs. *(Resolves Task 1.2.1)* |
 | **2026-10-17** | `ac6ce11d` | **Security / Performance** | **Lazy Computed Properties for Cockpit Tabs**: Converted all cockpit tab records and counts (`rules`, `serviceRules`, `whitelist`, `blacklist`, `bans`, `scannerIncidents`, `threatFeeds`, `threatFeed`, `geoRule`, `bannedCount`, `whitelistCount`, `blacklistCount`, `preFilterRows`) into Livewire 4 `#[Computed]` properties, eliminating up to 14 eager database queries per render in `SecurityManager::render()`. Inactive tabs now execute 0 queries during live updates, and direct `SecurityGeoRule::instance()` calls were purged from Blade views. *(Resolves Task 1.1.2)* |
 | **2026-10-17** | `f674ef98` | **Security / Firewall** | **Extract FirewallApplier Domain Service**: Extracted safety-critical 5-step apply pipeline (lockout preflight, pending configuration generation, `nft -c` syntax check, bounded sudoers helper apply, audit logging, pending counter reset, and Reverb broadcasting) into dedicated domain service `FirewallApplier` implementing `FirewallApplierInterface` with typed `FirewallApplyResult` value objects. Refactored `SecurityManager::autoApplyFirewallRuleset()`, `SecurityApplyCommand`, and `FirewallBanReconciler` to eliminate duplicate pipeline logic. *(Resolves Task 1.1.1)* |
 | **2026-10-17** | `b2b0c7cd` | **Security / XML Handler** | **XML Handler Rate Limiting & Security Alerts**: Attached dedicated configurable rate limiter (`throttle:xml-handler`, default 600 req/min per IP) to `/api/v1/xml-handler` to protect against token brute force without impeding FreeSWITCH operations. Dispatched `XmlHandlerFailedAuth` and logged security alerts on failed token validations, integrated with `LogFailedXmlHandlerAuthListener` to record security incidents and trigger kernel bans on repeated failure. *(Resolves Task 5.3 / Security Audit L1 & L2)* |
