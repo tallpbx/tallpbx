@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Events\FreeSwitch\ChannelExecuteComplete;
-use App\Listeners\FreeSwitch\RegisterCompletedVoicemailMessage;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\File;
+use Modules\VoicemailMessages\Listeners\RegisterCompletedVoicemailMessage;
 use Modules\VoicemailMessages\Models\VoicemailMessage;
 use Modules\Voicemails\Models\Voicemail;
 

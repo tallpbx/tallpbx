@@ -10,15 +10,15 @@ use App\Events\FreeSwitch\Heartbeat;
 use App\Events\FreeSwitch\RecordStop;
 use App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
 use App\Listeners\BroadcastTelephonyOnFreeSwitchEvent;
-use App\Listeners\FreeSwitch\MarkBroadcastRecipientOutcome;
-use App\Listeners\FreeSwitch\RegisterCompletedCallRecording;
-use App\Listeners\FreeSwitch\RegisterCompletedVoicemailMessage;
 use App\Services\FreeSwitchService;
 use App\Services\FreeSwitchServiceInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Event;
+use Modules\CallBroadcast\Listeners\MarkBroadcastRecipientOutcome;
+use Modules\CallRecordings\Listeners\RegisterCompletedCallRecording;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
 use Modules\Security\Listeners\LogSipScannerListener;
+use Modules\VoicemailMessages\Listeners\RegisterCompletedVoicemailMessage;
 
 beforeEach(function () {
     Event::fake();

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Listeners\FreeSwitch;
+namespace Modules\CallRecordings\Listeners;
 
 use App\Events\FreeSwitch\RecordStop;
 use App\Models\Tenant;

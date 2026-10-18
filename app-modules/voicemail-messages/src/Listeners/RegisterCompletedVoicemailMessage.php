@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Listeners\FreeSwitch;
+namespace Modules\VoicemailMessages\Listeners;
 
 use App\Events\FreeSwitch\ChannelExecuteComplete;
 use App\Models\Tenant;

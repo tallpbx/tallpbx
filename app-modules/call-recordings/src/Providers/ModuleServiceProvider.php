@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\CallRecordings\Providers;
 
+use App\Events\FreeSwitch\RecordStop;
+use Modules\CallRecordings\Listeners\RegisterCompletedCallRecording;
+
 /**
  * Service provider for the call-recordings module.
  */
@@ -64,6 +67,20 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         return [
             'call-recordings.view' => 'View call recordings',
             'call-recordings.delete' => 'Delete call recordings',
+        ];
+    }
+
+    /**
+     * Register event listeners for the call-recordings module.
+     *
+     * @return array<class-string, array<int, class-string>>
+     */
+    protected function listeners(): array
+    {
+        return [
+            RecordStop::class => [
+                RegisterCompletedCallRecording::class,
+            ],
         ];
     }
 }

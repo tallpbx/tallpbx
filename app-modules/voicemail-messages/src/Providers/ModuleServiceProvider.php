@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VoicemailMessages\Providers;
 
+use App\Events\FreeSwitch\ChannelExecuteComplete;
+use Modules\VoicemailMessages\Listeners\RegisterCompletedVoicemailMessage;
+
 /**
  * Service provider for the voicemail-messages module.
  */
@@ -64,6 +67,20 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         return [
             'voicemail-messages.view' => 'View voicemail messages',
             'voicemail-messages.delete' => 'Delete voicemail messages',
+        ];
+    }
+
+    /**
+     * Register event listeners for the voicemail-messages module.
+     *
+     * @return array<class-string, array<int, class-string>>
+     */
+    protected function listeners(): array
+    {
+        return [
+            ChannelExecuteComplete::class => [
+                RegisterCompletedVoicemailMessage::class,
+            ],
         ];
     }
 }

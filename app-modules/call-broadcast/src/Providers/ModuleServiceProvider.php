@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\CallBroadcast\Providers;
 
+use App\Events\FreeSwitch\ChannelHangupComplete;
+use Modules\CallBroadcast\Listeners\MarkBroadcastRecipientOutcome;
 use Modules\CallBroadcast\Support\CallBroadcastUninstaller;
 
 /**
@@ -77,6 +79,20 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
             'call-broadcast.view' => 'View call broadcasts',
             'call-broadcast.create' => 'Create new call broadcasts',
             'call-broadcast.delete' => 'Delete call broadcasts',
+        ];
+    }
+
+    /**
+     * Register event listeners for the call-broadcast module.
+     *
+     * @return array<class-string, array<int, class-string>>
+     */
+    protected function listeners(): array
+    {
+        return [
+            ChannelHangupComplete::class => [
+                MarkBroadcastRecipientOutcome::class,
+            ],
         ];
     }
 }

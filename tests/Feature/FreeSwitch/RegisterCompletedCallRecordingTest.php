@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Events\FreeSwitch\RecordStop;
-use App\Listeners\FreeSwitch\RegisterCompletedCallRecording;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\File;
+use Modules\CallRecordings\Listeners\RegisterCompletedCallRecording;
 use Modules\CallRecordings\Models\CallRecording;
 use Modules\FileStores\Enums\MediaAssetStatus;
 

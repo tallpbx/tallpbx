@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Listeners\FreeSwitch;
+namespace Modules\CallBroadcast\Listeners;
 
 use App\Events\FreeSwitch\ChannelHangupComplete;
 use App\Support\BroadcastSettlement;
