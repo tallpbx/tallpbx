@@ -7,7 +7,7 @@ namespace Modules\CallForwards\Services;
 use App\Contracts\ContextWideDialplanXmlContributor;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\CallForwards\Models\CallForward;
-use Modules\Extensions\Models\Extension;
+use Modules\Extensions\Services\ExtensionServiceInterface;
 
 /**
  * Service implementing call forward CRUD operations with
@@ -15,6 +15,13 @@ use Modules\Extensions\Models\Extension;
  */
 class CallForwardService implements CallForwardServiceInterface, ContextWideDialplanXmlContributor
 {
+    /**
+     * Create the service with extension lookup capability.
+     */
+    public function __construct(
+        private readonly ExtensionServiceInterface $extensionService,
+    ) {}
+
     /**
      * Feature-level routing — call forwards run after emergency/blocks/DID matching.
      */
@@ -79,7 +86,7 @@ class CallForwardService implements CallForwardServiceInterface, ContextWideDial
         foreach ($forwards as $fw) {
             // The condition must match the dialed extension number; the
             // internal extension uuid is not what callers dial.
-            $extension = Extension::withoutGlobalScope('tenant')->find($fw->extension_uuid);
+            $extension = $this->extensionService->find($fw->extension_uuid);
             if ($extension === null || $extension->extension_number === null) {
                 continue;
             }

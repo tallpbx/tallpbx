@@ -7,7 +7,6 @@ namespace Modules\HotDesking\Services;
 use App\Contracts\ContextWideDialplanXmlContributor;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Modules\Extensions\Models\Extension;
 use Modules\HotDesking\Models\HotDeskSession;
 
 /**

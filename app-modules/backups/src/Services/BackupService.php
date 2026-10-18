@@ -512,19 +512,7 @@ class BackupService implements BackupServiceInterface
      */
     private function defaultLocalFileStore(): FileStore
     {
-        $fileStore = FileStore::query()->firstOrCreate(
-            ['name' => 'Local storage - backups'],
-            [
-                'provider' => 'local',
-                'settings' => ['root' => config('backup-storage.root')],
-            ],
-        );
-
-        if (($fileStore->settings['root'] ?? null) !== config('backup-storage.root')) {
-            $fileStore->update(['settings' => ['root' => config('backup-storage.root')]]);
-        }
-
-        return $fileStore;
+        return $this->fileStoreService->getOrCreateLocal('Local storage - backups', (string) config('backup-storage.root'));
     }
 
     /**

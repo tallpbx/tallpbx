@@ -57,4 +57,9 @@ interface ExtensionServiceInterface
      * @return Collection<int, Extension>
      */
     public function getByTenant(int $tenantId): Collection;
+
+    /**
+     * Find an extension by its primary key without tenant scope.
+     */
+    public function find(string $id): ?Extension;
 }

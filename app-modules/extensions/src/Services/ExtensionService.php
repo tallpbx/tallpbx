@@ -100,6 +100,14 @@ class ExtensionService implements ExtensionServiceInterface
     }
 
     /**
+     * Find an extension by its primary key without tenant scope.
+     */
+    public function find(string $id): ?Extension
+    {
+        return Extension::withoutGlobalScope('tenant')->find($id);
+    }
+
+    /**
      * Ensure the extension number is unique within the tenant.
      *
      * @throws ValidationException

@@ -7,7 +7,7 @@ namespace Modules\Provision\Services;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Modules\Devices\Models\Device;
-use Modules\Extensions\Models\Extension;
+use Modules\Extensions\Services\ExtensionServiceInterface;
 use Modules\Provision\Models\ProvisionTemplate;
 
 /**
@@ -21,6 +21,13 @@ class ProvisionService implements ProvisionServiceInterface
 {
     /** @var array<string, array<string, string>> */
     private array $registeredTemplates = [];
+
+    /**
+     * Create the provisioning service with extension contract support.
+     */
+    public function __construct(
+        private readonly ExtensionServiceInterface $extensionService,
+    ) {}
 
     /**
      * Create a new provisioning template.
@@ -172,9 +179,8 @@ class ProvisionService implements ProvisionServiceInterface
         $displayName = $settings['display_name'] ?? 'IP Phone';
 
         if ($account !== null && $account->extension_id !== null) {
-            $extensionName = Extension::withoutGlobalScope('tenant')
-                ->whereKey($account->extension_id)
-                ->value('display_name');
+            $extension = $this->extensionService->find($account->extension_id);
+            $extensionName = $extension?->display_name;
 
             if ($extensionName !== null) {
                 $displayName = $extensionName;

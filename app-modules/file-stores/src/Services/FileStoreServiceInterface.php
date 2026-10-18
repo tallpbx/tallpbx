@@ -85,4 +85,14 @@ interface FileStoreServiceInterface
      * Resolve an existing local object without allowing root or symlink escape.
      */
     public function resolveLocalPath(FileStore $fileStore, string $path): ?string;
+
+    /**
+     * Find a file store by its primary key.
+     */
+    public function find(string $id): ?FileStore;
+
+    /**
+     * Resolve or create an idempotent local file store profile by name and root path.
+     */
+    public function getOrCreateLocal(string $name, string $root): FileStore;
 }

@@ -311,4 +311,32 @@ class FileStoreService implements FileStoreServiceInterface
     {
         return $path === $root || str_starts_with($path, $root.DIRECTORY_SEPARATOR);
     }
+
+    /**
+     * Find a file store by its primary key.
+     */
+    public function find(string $id): ?FileStore
+    {
+        return FileStore::query()->find($id);
+    }
+
+    /**
+     * Resolve or create an idempotent local file store profile by name and root path.
+     */
+    public function getOrCreateLocal(string $name, string $root): FileStore
+    {
+        $fileStore = FileStore::query()->firstOrCreate(
+            ['name' => $name],
+            [
+                'provider' => 'local',
+                'settings' => ['root' => $root],
+            ],
+        );
+
+        if (($fileStore->settings['root'] ?? null) !== $root) {
+            $fileStore->update(['settings' => ['root' => $root]]);
+        }
+
+        return $fileStore;
+    }
 }
