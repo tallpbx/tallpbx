@@ -235,14 +235,17 @@ it('resolves version constraints with composer semantics', function () {
         ->and($method->invoke($provider, '9.9.9', '*'))->toBeTrue();
 });
 
-it('uses moduleNamespace when auto-registering route groups', function () {
+it('loads routes from routes/web.php during route registration', function () {
     if (! class_exists('CustomModules\\TestCustom\\Livewire\\TestCustomList')) {
         eval('namespace CustomModules\\TestCustom\\Livewire; class TestCustomList { public function __invoke() {} }');
     }
 
     $fixtureDir = sys_get_temp_dir().'/tallpbx-test-custom-route-'.uniqid();
-    mkdir($fixtureDir.'/src/Livewire', 0755, true);
-    file_put_contents($fixtureDir.'/src/Livewire/TestCustomList.php', '<?php');
+    mkdir($fixtureDir.'/routes', 0755, true);
+    file_put_contents(
+        $fixtureDir.'/routes/web.php',
+        "<?php\n\nuse Illuminate\Support\Facades\Route;\nRoute::get('/panel/test-custom', CustomModules\\TestCustom\\Livewire\\TestCustomList::class)->name('panel.test-custom.index');\n"
+    );
 
     $provider = new class(app(), $fixtureDir) extends \App\Support\ModuleServiceProvider
     {
@@ -279,25 +282,24 @@ it('uses moduleNamespace when auto-registering route groups', function () {
         }
 
         /**
-         * Invoke auto-registration.
+         * Invoke route registration.
          */
-        public function runAutoRegister(): void
+        public function runRegisterRoutes(): void
         {
-            $method = new ReflectionMethod(\App\Support\ModuleServiceProvider::class, 'autoRegisterRouteGroups');
+            $method = new ReflectionMethod(\App\Support\ModuleServiceProvider::class, 'registerRoutes');
             $method->invoke($this);
         }
     };
 
     try {
-        $provider->runAutoRegister();
+        $provider->runRegisterRoutes();
         Route::getRoutes()->refreshNameLookups();
         $route = Route::getRoutes()->getByName('panel.test-custom.index');
         expect($route)->not->toBeNull()
             ->and($route->getAction('uses'))->toBe('CustomModules\\TestCustom\\Livewire\\TestCustomList@__invoke');
     } finally {
-        unlink($fixtureDir.'/src/Livewire/TestCustomList.php');
-        rmdir($fixtureDir.'/src/Livewire');
-        rmdir($fixtureDir.'/src');
+        unlink($fixtureDir.'/routes/web.php');
+        rmdir($fixtureDir.'/routes');
         rmdir($fixtureDir);
     }
 });

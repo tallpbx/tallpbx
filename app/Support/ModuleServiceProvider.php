@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 /**
@@ -498,84 +497,44 @@ abstract class ModuleServiceProvider extends ServiceProvider
     }
 
     /**
-     * Define the route groups to auto-register for this module.
+     * Register the module's web routes from routes/web.php.
      *
-     * Each group is an associative array with:
-     *   - enabled: Whether this group's routes are active
-     *   - prefix: URL prefix (e.g., 'panel')
-     *   - middleware: Middleware stack for the group
-     *   - name_prefix: Route name prefix (e.g., 'panel.')
-     *   - permission_callback: Closure that returns the permission string
-     *     for a given action (e.g., fn($action) => "admin.can:bridges.$action")
-     *   - component_suffixes: Livewire component suffixes to look for
-     *     (e.g., ['List', 'Edit'] registers index/create/edit routes)
-     *
-     * Modules can override this to customize routing. Groups with enabled
-     * set to false are skipped. The default single group uses the neutral
-     * /panel prefix accessible by both Admin and User models.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    protected function routeGroups(): array
-    {
-        $moduleName = $this->moduleName();
-
-        return [
-            [
-                'enabled' => true,
-                'prefix' => 'panel',
-                'middleware' => ['web', 'auth.panel', 'throttle:60,1'],
-                'name_prefix' => 'panel.',
-                'permission_callback' => fn (string $action): string => "admin.can:{$moduleName}.{$action}",
-                'component_suffixes' => ['List', 'Edit'],
-            ],
-        ];
-    }
-
-    /**
-     * Register the module's web routes.
-     *
-     * If a routes/web.php file exists, it is loaded as-is, giving modules
-     * full control over their routing. Otherwise, route groups defined by
-     * routeGroups() are auto-registered by convention.
-     *
-     * Modules with non-standard routing (admin, auth, provision, etc.)
-     * keep their route files and are loaded normally.
+     * Every module defines its routes explicitly in routes/web.php.
+     * Custom modules are subjected to pre-flight safety and post-load
+     * collision enforcement against reserved URLs and system routes.
      */
     private function registerRoutes(): void
     {
         $routesPath = $this->modulePath().'/routes/web.php';
 
-        if (file_exists($routesPath)) {
-            $isCustom = $this->moduleSource() === 'custom';
-
-            // With cached routes the router holds a compiled collection that
-            // never loads this file anyway (loadRoutesFrom is a no-op), so
-            // there is no snapshot to take and no audit to run.
-            $routesCached = $this->app instanceof CachesRoutes
-                && $this->app->routesAreCached();
-
-            // Snapshot the router before a custom module loads its route file
-            // so the post-load audit can identify and undo anything it hijacked.
-            $snapshot = ($isCustom && ! $routesCached) ? Route::getRoutes()->getRoutes() : [];
-
-            // Static pre-flight (§1.7.2) stays as the cheap first line of
-            // defense; the post-load router audit catches every registration
-            // style it cannot see statically.
-            if ($isCustom && ! $this->assertRouteFileIsSafe($routesPath)) {
-                return;
-            }
-
-            $this->loadRoutesFrom($routesPath);
-
-            if ($isCustom && ! $routesCached) {
-                (new ModuleCollisionGuard)->enforceRouteBoundaries($snapshot);
-            }
-
+        if (! file_exists($routesPath)) {
             return;
         }
 
-        $this->autoRegisterRouteGroups();
+        $isCustom = $this->moduleSource() === 'custom';
+
+        // With cached routes the router holds a compiled collection that
+        // never loads this file anyway (loadRoutesFrom is a no-op), so
+        // there is no snapshot to take and no audit to run.
+        $routesCached = $this->app instanceof CachesRoutes
+            && $this->app->routesAreCached();
+
+        // Snapshot the router before a custom module loads its route file
+        // so the post-load audit can identify and undo anything it hijacked.
+        $snapshot = ($isCustom && ! $routesCached) ? Route::getRoutes()->getRoutes() : [];
+
+        // Static pre-flight (§1.7.2) stays as the cheap first line of
+        // defense; the post-load router audit catches every registration
+        // style it cannot see statically.
+        if ($isCustom && ! $this->assertRouteFileIsSafe($routesPath)) {
+            return;
+        }
+
+        $this->loadRoutesFrom($routesPath);
+
+        if ($isCustom && ! $routesCached) {
+            (new ModuleCollisionGuard)->enforceRouteBoundaries($snapshot);
+        }
     }
 
     /**
@@ -602,106 +561,6 @@ abstract class ModuleServiceProvider extends ServiceProvider
                 'names' => $registeredNames,
             ],
         );
-    }
-
-    /**
-     * Auto-register routes from each enabled route group based on which
-     * Livewire component files exist in the module's src/Livewire directory.
-     *
-     * For each group, {PascalModule}{Suffix}.php components are detected
-     * and standard CRUD or read-only routes are created:
-     * - List suffix registers an index route
-     * - Edit suffix registers create and edit routes
-     * - Only index route is created if no Edit component exists
-     */
-    private function autoRegisterRouteGroups(): void
-    {
-        $modulePath = $this->modulePath();
-        $moduleName = $this->moduleName();
-        $pascalName = str_replace(' ', '', ucwords(str_replace('-', ' ', $moduleName)));
-        // Support both new (src/Livewire/) and legacy (src/Http/Livewire/) paths
-        $usingNewPath = is_dir($modulePath.'/src/Livewire');
-        $livewireDir = $usingNewPath
-            ? $modulePath.'/src/Livewire'
-            : $modulePath.'/src/Http/Livewire';
-        $livewireSubnamespace = $usingNewPath ? 'Livewire' : 'Http\Livewire';
-
-        if (! is_dir($livewireDir)) {
-            return;
-        }
-
-        $groups = $this->routeGroups();
-
-        if ($groups === []) {
-            return;
-        }
-
-        $namespace = $this->moduleNamespace();
-
-        foreach ($groups as $group) {
-            if (! ($group['enabled'] ?? false)) {
-                continue;
-            }
-
-            $prefix = $group['prefix'] ?? '';
-            $middleware = $group['middleware'] ?? [];
-            $namePrefix = $group['name_prefix'] ?? '';
-            $permissionCallback = $group['permission_callback'] ?? fn () => '';
-            $suffixes = $group['component_suffixes'] ?? ['List', 'Edit'];
-
-            $hasList = in_array('List', $suffixes, true)
-                && file_exists("{$livewireDir}/{$pascalName}List.php");
-            $hasEdit = in_array('Edit', $suffixes, true)
-                && file_exists("{$livewireDir}/{$pascalName}Edit.php");
-
-            if (! $hasList && ! $hasEdit) {
-                continue;
-            }
-
-            $singularSlug = Str::singular($moduleName);
-
-            Route::prefix($prefix)->name($namePrefix)->middleware($middleware)->group(function () use ($moduleName, $namespace, $pascalName, $singularSlug, $hasList, $hasEdit, $permissionCallback, $livewireSubnamespace): void {
-                if ($hasList) {
-                    $listClass = $namespace.'\\'.$livewireSubnamespace.'\\'.$pascalName.'List';
-
-                    Route::get("/{$moduleName}", $listClass)
-                        ->middleware(array_filter([$permissionCallback('view')]))
-                        ->name("{$moduleName}.index");
-                }
-
-                if ($hasEdit) {
-                    $editClass = $namespace.'\\'.$livewireSubnamespace.'\\'.$pascalName.'Edit';
-                    $routeParameter = $this->editRouteParameterName($editClass, $singularSlug);
-
-                    Route::get("/{$moduleName}/create", $editClass)
-                        ->middleware(array_filter([$permissionCallback('create')]))
-                        ->name("{$moduleName}.create");
-
-                    Route::get("/{$moduleName}/{{$routeParameter}}/edit", $editClass)
-                        ->middleware(array_filter([$permissionCallback('edit')]))
-                        ->name("{$moduleName}.edit");
-                }
-            });
-        }
-    }
-
-    /**
-     * Resolve the route parameter name expected by an edit Livewire component.
-     *
-     * Livewire full-page components receive route parameters by matching the
-     * parameter name to mount() arguments. Most modules use a domain-specific
-     * argument such as $extensionId instead of the URL slug's singular name.
-     */
-    private function editRouteParameterName(string $editClass, string $fallback): string
-    {
-        if (! class_exists($editClass) || ! method_exists($editClass, 'mount')) {
-            return $fallback;
-        }
-
-        $method = new \ReflectionMethod($editClass, 'mount');
-        $parameter = $method->getParameters()[0] ?? null;
-
-        return $parameter?->getName() ?? $fallback;
     }
 
     /**
