@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.5] - 2026-10-18
+
 ### Added
 - **Environment Variable Reference Documentation (`docs/env-reference.md`)**: Authored comprehensive reference guide cataloging 242 environment variables across 15 domain sections (FreeSWITCH, Event Socket Layer, Sofia SIP, XML curl handler caching, primary database, SSL/TLS attributes, Redis cluster and key-value stores, Laravel Reverb WebSockets, local and S3 media/backup storage, background queue workers, session security and cookies, logging and Slack alerts, mail transports, SIP phone auto-provisioning, Git updater, and production deployment sizing presets). Documented types, defaults, configuration mapping, security-critical secrets, and operational best practices.
 - **Disabled Module Migration Lifecycle Test Suite (`DisabledModuleMigrationLifecycleTest`)**: Added comprehensive test suite validating that disabled modules omit migration registration during standard application boot, while active modules register migrations, that `--all-modules` CLI flag and `ModuleState::setForceAllModulesMigrations()` override successfully force all module migrations, and that `ModuleServiceProvider::allMigrationPaths()` discovers all migration paths across installed modules.
@@ -33,7 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `MarkBroadcastRecipientOutcome` moved to `Modules\CallBroadcast\Listeners\MarkBroadcastRecipientOutcome` (registered in `CallBroadcast` service provider for `ChannelHangupComplete`).
   Retired `app/Listeners/FreeSwitch/`, ensuring `app/Listeners/` retains strictly shared real-time telemetry broadcasters.
 - **Heavyweight FreeSWITCH Event Listener Queue Offloading**: Converted heavyweight database-writing and ban-evaluating event listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`, `RegisterCompletedCallRecording`, `MarkBroadcastRecipientOutcome`, `RegisterCompletedVoicemailMessage`) to implement `ShouldQueue`, offloading heavy file I/O and SQL queries onto asynchronous background queue workers (`config('freeswitch.esl.queue_name')`) while lightweight state telemetry listeners (`BroadcastDashboardStatsOnFreeSwitchEvent`, `BroadcastTelephonyOnFreeSwitchEvent`) execute inline without latency.
+- **Global Test Suite Rebalancing & Parallel Execution Optimization**: Consolidated 84 scattered micro-files (files with 1–4 tests) across `tests/Unit/` and `tests/Feature/` into 27 cohesive, domain-focused test files (~12–30 tests per file), reducing the test file count by 57 files (from 181 down to 124). Eliminated over 50 redundant Paratest worker process bootstraps while maintaining 100% of test cases and assertions with zero coverage loss across PBX Livewire components, global CRUD management, architecture enforcement, Blade components, console commands, PBX load/XML validation scripts, entity services, tenant isolation, and FreeSWITCH unit jobs.
 - **Runtime Telephony Status View Migration (`wire:poll` to Echo Push)**: Completely eliminated aggressive HTTP polling (2s–15s) from all 6 runtime telephony status views (`active-calls-list`, `active-conferences-list`, `registrations-list`, `sip-status-list`, `call-center-active-list`, `operator-panel-index`), migrating them to real-time Echo push listeners with dual-event binding (`TelephonyUpdated` and `DashboardStatsUpdated`) and public `$tenantId` property bindings for instant zero-lag UI updates and reduced server load.
+
+## [4.0.4] - 2026-10-18
 
 ### Added
 - **Toggle Switch Architecture Enforcement Test**: Added `ToggleSwitchArchitectureTest` verifying 100% of DaisyUI toggle switches across `app-modules/` and `resources/views/` specify standard size tokens (`toggle-sm` or table `toggle-xs`) and enforce `wire:loading.attr="disabled"` mutation locks.

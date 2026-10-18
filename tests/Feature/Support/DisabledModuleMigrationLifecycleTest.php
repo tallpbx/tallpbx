@@ -129,21 +129,33 @@ function createDemoLifecycleProvider(string $sandboxPath): ModuleServiceProvider
 {
     return new class(app(), $sandboxPath) extends ModuleServiceProvider
     {
+        /**
+         * Initialize the provider with application and sandbox path.
+         */
         public function __construct(Application $app, private readonly string $sandboxPath)
         {
             parent::__construct($app);
         }
 
+        /**
+         * Return the test module name.
+         */
         protected function moduleName(): string
         {
             return 'demo-lifecycle';
         }
 
+        /**
+         * Return the test module namespace.
+         */
         protected function moduleNamespace(): string
         {
             return 'Modules\\DemoLifecycle';
         }
 
+        /**
+         * Return the test sandbox path.
+         */
         protected function modulePath(): string
         {
             return $this->sandboxPath;
