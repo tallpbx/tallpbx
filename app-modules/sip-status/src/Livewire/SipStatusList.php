@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\SipStatus\Livewire;
 
 use App\Services\FreeSwitchServiceInterface;
+use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
@@ -15,6 +16,8 @@ use Livewire\Attributes\On;
 class SipStatusList extends BaseListComponent
 {
     public bool $fsConnected = false;
+
+    public string $tenantId = 'global';
 
     public array $profiles = [];
 
@@ -33,7 +36,19 @@ class SipStatusList extends BaseListComponent
      */
     public function mount(): void
     {
+        $id = $this->tenantId();
+        $this->tenantId = $id !== null ? (string) $id : 'global';
         $this->refresh();
+    }
+
+    /**
+     * The current tenant id for tenant users, null for admins.
+     */
+    private function tenantId(): ?int
+    {
+        $id = app(TenantManager::class)->getTenantId();
+
+        return $id !== null ? (int) $id : null;
     }
 
     /**
@@ -41,6 +56,8 @@ class SipStatusList extends BaseListComponent
      * the list.
      */
     #[On('refresh')]
+    #[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]
+    #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
     public function refresh(): void
     {
         $this->fsConnected = $this->fs->isConnected();

@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.0.4] - 2026-10-18
+### Added
+- **Real-Time Telephony Status Broadcasting (`TelephonyUpdated`)**: Created `App\Events\Telephony\TelephonyUpdated` broadcasting event implementing `ShouldBroadcastNow` and private channel `tenant.{tenantId}.telephony` (plus `tenant.global.telephony`), providing immediate push updates over Laravel Reverb and Echo WebSockets on FreeSWITCH ESL channel, registration, conference, and heartbeat events without queue delay.
+- **Telephony ESL Event Listener (`BroadcastTelephonyOnFreeSwitchEvent`)**: Created dedicated listener registered across 14 FreeSWITCH ESL events (`ChannelCreate`, `ChannelAnswer`, `ChannelHangup`, `ChannelHangupComplete`, `ChannelDestroy`, `ChannelBridge`, `ChannelUnbridge`, `ChannelState`, `CallUpdate`, `SofiaRegister`, `SofiaExpire`, `ConferenceEvent`, `CallCenterEvent`, `Heartbeat`) to resolve tenant context and dispatch `TelephonyUpdated`.
+- **Telephony Push Broadcasting Feature Test Suite**: Added `TelephonyPushBroadcastingTest` verifying `assertDontSee('wire:poll')` on all 6 runtime telephony status views, asserting that only legitimate non-telephony views (`git-update`, `restore-archive`, `log-viewer`) retain polling, verifying Livewire dynamic Echo push listeners (`#[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]`), testing broadcast payloads, and enforcing strict tenant channel authorization boundaries.
+
+### Changed
+- **Runtime Telephony Status View Migration (`wire:poll` to Echo Push)**: Completely eliminated aggressive HTTP polling (2s–15s) from all 6 runtime telephony status views (`active-calls-list`, `active-conferences-list`, `registrations-list`, `sip-status-list`, `call-center-active-list`, `operator-panel-index`), migrating them to real-time Echo push listeners with dual-event binding (`TelephonyUpdated` and `DashboardStatsUpdated`) and public `$tenantId` property bindings for instant zero-lag UI updates and reduced server load.
 
 ### Added
 - **Toggle Switch Architecture Enforcement Test**: Added `ToggleSwitchArchitectureTest` verifying 100% of DaisyUI toggle switches across `app-modules/` and `resources/views/` specify standard size tokens (`toggle-sm` or table `toggle-xs`) and enforce `wire:loading.attr="disabled"` mutation locks.

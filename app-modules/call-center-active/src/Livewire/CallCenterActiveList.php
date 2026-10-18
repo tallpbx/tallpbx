@@ -22,6 +22,8 @@ class CallCenterActiveList extends BaseListComponent
 
     public bool $fsConnected = false;
 
+    public string $tenantId = 'global';
+
     /** @var list<array{name: string, strategy: string}> */
     public array $queues = [];
 
@@ -50,6 +52,8 @@ class CallCenterActiveList extends BaseListComponent
      */
     public function mount(): void
     {
+        $id = $this->tenantId();
+        $this->tenantId = $id !== null ? (string) $id : 'global';
         $this->refresh();
     }
 
@@ -58,6 +62,8 @@ class CallCenterActiveList extends BaseListComponent
      * tenant's data, and refresh the list.
      */
     #[On('refresh')]
+    #[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]
+    #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
     public function refresh(): void
     {
         $this->fsConnected = $this->fs->isConnected();

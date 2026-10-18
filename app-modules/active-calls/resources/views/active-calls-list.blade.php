@@ -26,7 +26,7 @@
                 <div class="alert alert-error rounded-none"><span>{{ $actionError }}</span></div>
             @endif
             <div class="overflow-x-auto">
-                <table class="table table-zebra" wire:poll.2s="refreshCalls">
+                <table class="table table-zebra">
                     <thead>
                         <tr>
                             <th>{{ __('admin.cdr_caller') }}</th>

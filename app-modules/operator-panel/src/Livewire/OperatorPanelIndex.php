@@ -32,6 +32,8 @@ class OperatorPanelIndex extends Component
 
     public bool $fsConnected = false;
 
+    public string $tenantId = 'global';
+
     /** @var Collection<int, Extension> */
     public Collection $extensions;
 
@@ -66,6 +68,8 @@ class OperatorPanelIndex extends Component
      */
     public function mount(): void
     {
+        $id = $this->tenantId();
+        $this->tenantId = $id !== null ? (string) $id : 'global';
         $this->fsConnected = $this->fs->isConnected();
         $this->extensions = Extension::withoutGlobalScope('tenant')
             ->when(! $this->isAdminGuard(), fn ($q) => $q->where('tenant_id', $this->tenantId()))
@@ -79,6 +83,8 @@ class OperatorPanelIndex extends Component
      * Re-check the FreeSWITCH connection and reload active calls.
      */
     #[On('refresh')]
+    #[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]
+    #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
     public function refresh(): void
     {
         $this->fsConnected = $this->fs->isConnected();

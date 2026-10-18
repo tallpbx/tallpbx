@@ -23,6 +23,8 @@ class ActiveCallsList extends BaseListComponent
 
     public bool $fsConnected = false;
 
+    public string $tenantId = 'global';
+
     /** The destination typed for a transfer action. */
     public string $transferDestination = '';
 
@@ -51,6 +53,8 @@ class ActiveCallsList extends BaseListComponent
      */
     public function mount(): void
     {
+        $id = $this->tenantId();
+        $this->tenantId = $id !== null ? (string) $id : 'global';
         $this->refreshCalls();
     }
 
@@ -59,6 +63,8 @@ class ActiveCallsList extends BaseListComponent
      * tenant's calls, and refresh the list (also used for event-driven refreshes).
      */
     #[On('refresh-calls')]
+    #[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]
+    #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
     public function refreshCalls(): void
     {
         $this->fsConnected = $this->fs->isConnected();

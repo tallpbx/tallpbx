@@ -18,7 +18,7 @@
                 <div class="alert alert-error rounded-none"><span>{{ $actionError }}</span></div>
             @endif
             <div class="overflow-x-auto">
-                <table class="table table-zebra" wire:poll.5s="refresh">
+                <table class="table table-zebra">
                     <thead>
                         <tr>
                             <th>{{ __('client.name') }}</th>

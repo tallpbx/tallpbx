@@ -40,7 +40,7 @@
 | 2.3 | Localize hardcoded table headers | Verified | 2026-10-18 |
 | 2.4 | Normalize arbitrary font sizes | Verified | 2026-10-18 |
 | 2.5 | Standardize toggle switch sizing & loading locks | Verified | 2026-10-18 |
-| 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Pending | 2026-10-16 |
+| 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Verified | 2026-10-18 |
 | 3.2 | ESL event ingestion overflow & queue buffering | Pending | 2026-10-16 |
 | 4.1 | Shared kernel boundary architecture test & listener migration | Pending | 2026-10-16 |
 | 4.2 | Enforce contract seams over cross-module model imports | Pending | 2026-10-16 |
@@ -206,7 +206,7 @@
 
 *Source: retired `ui-audit-report.md` (M1) and `architecture-audit-report.md` (M4), both consolidated here.*
 
-### Task 3.1: Migrate Runtime Telephony Status Views from `wire:poll` to Echo Push (UI Audit M1)
+### Task 3.1: Migrate Runtime Telephony Status Views from `wire:poll` to Echo Push (UI Audit M1) [COMPLETED]
 - **Problem**: Six runtime telephony status views aggressively poll the backend via `wire:poll` (2s–15s), violating the project mandate to use Reverb/Echo push for real-time tables:
   - `active-calls-list` (2s)
   - `active-conferences-list` (5s)
@@ -216,10 +216,11 @@
   - `operator-panel-index` (5s)
   *(Note: three non-telephony views poll legitimately and are preserved — `git-update` (1s while an update runs), `restore-archive` (5s during restores), and the log viewer (5s live tail). Poll signatures re-checked 2026-10-16.)*
 - **Implementation**:
-  - FreeSWITCH ESL listeners already broadcast typed events (`ChannelCreate`, `ChannelAnswer`, `ChannelHangupComplete`, `SofiaRegister`).
-  - Configure the 6 Livewire components to listen on tenant private channels with `#[On('echo:tenant.{tenantId}.telephony,...')]` and refresh data reactively.
-  - Remove all `wire:poll` directives from the 6 views.
-  - Add tests asserting `assertDontSee('wire:poll')` on all 6 views (mirroring existing dashboard tests).
+  - Created `TelephonyUpdated` broadcasting event implementing `ShouldBroadcastNow` and private channel `tenant.{tenantId}.telephony` (plus `tenant.global.telephony`).
+  - Created `BroadcastTelephonyOnFreeSwitchEvent` listener and wired 14 FreeSWITCH ESL events to dispatch `TelephonyUpdated`.
+  - Configured all 6 Livewire components to listen on tenant private channels with `#[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]` and dual-binding `#[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]`.
+  - Removed all `wire:poll` directives from the 6 views.
+  - Added feature test suite `TelephonyPushBroadcastingTest` asserting `assertDontSee('wire:poll')` on all 6 views, verifying Echo push listeners, broadcast payloads, and strict tenant channel isolation boundaries.
 
 ### Task 3.2: ESL Event Ingestion Overflow & Queue Buffering (Arch Audit M4)
 - **Problem**: `FreeSwitchListenCommand` dispatches every ESL event inline in a single-threaded loop; heavy event storms could create backpressure on the FreeSWITCH socket.
@@ -331,6 +332,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-18** | `20f4913f` | **Telephony / Broadcasting** | **Migrate Runtime Telephony Status Views from `wire:poll` to Echo Push**: Eliminated aggressive HTTP polling (2s–15s) from all 6 runtime telephony status views (`active-calls-list`, `active-conferences-list`, `registrations-list`, `sip-status-list`, `call-center-active-list`, `operator-panel-index`), migrating them to real-time Echo push listeners with dual-event binding (`TelephonyUpdated` and `DashboardStatsUpdated`) and public `$tenantId` property bindings. Created `TelephonyUpdated` event with `ShouldBroadcastNow`, authorized `tenant.{tenantId}.telephony` private channels with admin bypass and strict tenant isolation, wired 14 FreeSWITCH ESL events to `BroadcastTelephonyOnFreeSwitchEvent`, and added feature test suite `TelephonyPushBroadcastingTest`. *(Resolves Task 3.1 / UI Audit M1)* |
 | **2026-10-18** | `fc1ca33e` | **UI / Components** | **Standardize Toggle Switch Sizing & Mutation Locks**: Standardized all 19 toggle switch inputs across 12 views (`backups-edit`, `tenants-edit`, `tenant-domains-edit`, `admins-edit`, `log-viewer`, `modules-list`, `geo-blocking`, `external-blocklists`, `attackers`, `block-allow`, `firewall-rules`, `firewall-switches`) to DaisyUI `toggle-sm` (or compact table `toggle-xs`), adding `wire:loading.attr="disabled"` and pointer-events locks to prevent double-submit races and rapid-click desync. Added architecture test `ToggleSwitchArchitectureTest` enforcing explicit sizing and loading locks across all views. *(Resolves Task 2.5 / UI Audit L4; Stream 2 100% complete)* |
 | **2026-10-18** | `4bf90759` | **UI / Typography** | **Normalize Arbitrary Font Sizes to Standard Design Tokens**: Normalized all 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) across 10 Blade views in `app-modules/security`, `app-modules/admin`, and `resources/views` to standard Tailwind / DaisyUI `text-xs` design tokens with semantic opacity utilities (`text-base-content/60`, `text-base-content/50`, `opacity-75`). Added architecture test `ArbitraryFontSizesArchitectureTest` enforcing zero arbitrary font-size utility classes in any Blade template. *(Resolves Task 2.4 / UI Audit L2)* |
 | **2026-10-18** | `4734ba20` | **UI / Localization** | **Localize Hardcoded Table Header (`<th>`) Contents**: Localized all 39 previously hardcoded English `<th>` cells across 7 views (`file-stores-list`, `observe-activity`, `certificate-manager`, `settings-edit`, `call-center-active-list`, `gateways-list`, and `active-conferences-list`) using root `client` keys and module domain keys with 100% parity across English, Spanish, and French. Extended `TranslationParityTest` to enforce 100% parity across `client.php`, and added architecture test `TableHeadersLocalizationArchitectureTest` ensuring zero unlocalized table headers across all views. *(Resolves Task 2.3 / UI Audit L1)* |

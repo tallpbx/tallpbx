@@ -6,11 +6,22 @@ namespace App\Providers;
 
 use App\Contracts\ProcessRunner;
 use App\Database\SafeMigrator;
+use App\Events\FreeSwitch\CallCenterEvent;
+use App\Events\FreeSwitch\CallUpdate;
 use App\Events\FreeSwitch\ChannelAnswer;
+use App\Events\FreeSwitch\ChannelBridge;
 use App\Events\FreeSwitch\ChannelCreate;
 use App\Events\FreeSwitch\ChannelDestroy;
+use App\Events\FreeSwitch\ChannelHangup;
+use App\Events\FreeSwitch\ChannelHangupComplete;
+use App\Events\FreeSwitch\ChannelState;
+use App\Events\FreeSwitch\ChannelUnbridge;
+use App\Events\FreeSwitch\ConferenceEvent;
 use App\Events\FreeSwitch\Heartbeat;
+use App\Events\FreeSwitch\SofiaExpire;
+use App\Events\FreeSwitch\SofiaRegister;
 use App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
+use App\Listeners\BroadcastTelephonyOnFreeSwitchEvent;
 use App\Models\Admin;
 use App\Models\Tenant;
 use App\Models\User;
@@ -241,6 +252,23 @@ class AppServiceProvider extends ServiceProvider
             ChannelDestroy::class,
             Heartbeat::class,
         ], BroadcastDashboardStatsOnFreeSwitchEvent::class);
+
+        Event::listen([
+            ChannelCreate::class,
+            ChannelAnswer::class,
+            ChannelHangup::class,
+            ChannelHangupComplete::class,
+            ChannelDestroy::class,
+            ChannelBridge::class,
+            ChannelUnbridge::class,
+            ChannelState::class,
+            CallUpdate::class,
+            SofiaRegister::class,
+            SofiaExpire::class,
+            ConferenceEvent::class,
+            CallCenterEvent::class,
+            Heartbeat::class,
+        ], BroadcastTelephonyOnFreeSwitchEvent::class);
 
         // Keep the backups module's file-store deletion guard active even
         // while that module is disabled: the guard prevents backup profiles

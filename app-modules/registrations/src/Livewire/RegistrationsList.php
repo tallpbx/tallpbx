@@ -18,6 +18,8 @@ class RegistrationsList extends BaseListComponent
 {
     public bool $fsConnected = false;
 
+    public string $tenantId = 'global';
+
     public array $registrations = [];
 
     private FreeSwitchServiceInterface $fs;
@@ -39,6 +41,8 @@ class RegistrationsList extends BaseListComponent
      */
     public function mount(): void
     {
+        $id = $this->tenantId();
+        $this->tenantId = $id !== null ? (string) $id : 'global';
         $this->refresh();
     }
 
@@ -47,6 +51,8 @@ class RegistrationsList extends BaseListComponent
      * tenant's entries, and refresh the list.
      */
     #[On('refresh')]
+    #[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]
+    #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
     public function refresh(): void
     {
         $this->fsConnected = $this->fs->isConnected();

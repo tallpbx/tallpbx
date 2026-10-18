@@ -27,7 +27,7 @@
                 </div>
             @endif
 
-            <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3" wire:poll.5s="refresh">
+            <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
                 @forelse ($extensions as $ext)
                     @php($active = $activeCalls[$ext->extension_number] ?? null)
                     <div class="card @if($active) bg-success text-success-content @elseif($ext->extension_number === $selectedExtension) bg-primary text-primary-content @else bg-base-200 @endif compact @if($this->canOriginate) cursor-pointer @endif"

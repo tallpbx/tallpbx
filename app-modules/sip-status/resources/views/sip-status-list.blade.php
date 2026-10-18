@@ -12,7 +12,7 @@
     @else
         <div class="card bg-base-100 border border-base-300">
             <div class="overflow-x-auto">
-                <table class="table table-zebra" wire:poll.15s="refresh">
+                <table class="table table-zebra">
                     <thead>
                         <tr>
                             <th>{{ __('admin.profile_name') }}</th>

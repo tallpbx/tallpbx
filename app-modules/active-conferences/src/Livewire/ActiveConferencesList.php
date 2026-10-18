@@ -23,6 +23,8 @@ class ActiveConferencesList extends BaseListComponent
 
     public bool $fsConnected = false;
 
+    public string $tenantId = 'global';
+
     /** @var list<array{name: string, members: int, status: string, members_list: list<array{id: string, uuid: string, caller_id: string}>}> */
     public array $conferences = [];
 
@@ -48,6 +50,8 @@ class ActiveConferencesList extends BaseListComponent
      */
     public function mount(): void
     {
+        $id = $this->tenantId();
+        $this->tenantId = $id !== null ? (string) $id : 'global';
         $this->refresh();
     }
 
@@ -56,6 +60,8 @@ class ActiveConferencesList extends BaseListComponent
      * tenant's conferences, and refresh the list.
      */
     #[On('refresh')]
+    #[On('echo-private:tenant.{tenantId}.telephony,.TelephonyUpdated')]
+    #[On('echo:dashboard.monitoring,.DashboardStatsUpdated')]
     public function refresh(): void
     {
         $this->fsConnected = $this->fs->isConnected();
