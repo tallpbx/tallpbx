@@ -175,7 +175,8 @@ class EnforcePanelLivewireActionPermissions
             return;
         }
 
-        $tenant = app(TenantContext::class)->current();
+        $context = app(TenantContext::class);
+        $tenant = $context->resolve();
 
         if ($tenant === null) {
             abort(403, 'No enabled tenant is available for this account.');
@@ -184,6 +185,8 @@ class EnforcePanelLivewireActionPermissions
         if (! $user->isInTenant((int) $tenant->id)) {
             abort(403, 'You do not have access to the requested tenant.');
         }
+
+        $context->apply($tenant);
     }
 
     /**

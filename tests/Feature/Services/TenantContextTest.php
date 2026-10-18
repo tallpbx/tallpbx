@@ -9,9 +9,10 @@ use App\Services\TenantManager;
 
 beforeEach(function () {
     app(TenantManager::class)->clear();
+    session()->forget('selected_tenant_id');
 });
 
-// ─── TenantContext::current() — Session path ────────────────────
+// ─── TenantContext::current() — Read Without Mutation Side Effects ──
 
 it('returns null when no session, no auth, and multiple tenants exist', function () {
     Tenant::factory()->count(2)->create();
@@ -29,7 +30,7 @@ it('returns null when no tenants exist', function () {
     expect($tenant)->toBeNull();
 });
 
-it('returns the session-stored tenant', function () {
+it('returns the session-stored tenant without mutating TenantManager', function () {
     $tenant = Tenant::factory()->create();
     session()->put('selected_tenant_id', $tenant->id);
 
@@ -37,21 +38,11 @@ it('returns the session-stored tenant', function () {
     $result = $context->current();
 
     expect($result)->not->toBeNull()
-        ->and((string) $result->id)->toBe((string) $tenant->id);
+        ->and((string) $result->id)->toBe((string) $tenant->id)
+        ->and(app(TenantManager::class)->getTenantId())->toBeNull();
 });
 
-it('sets TenantManager from session-stored tenant', function () {
-    $tenant = Tenant::factory()->create();
-    session()->put('selected_tenant_id', $tenant->id);
-
-    app(TenantContext::class)->current();
-
-    expect(app(TenantManager::class)->getTenantId())->toBe((string) $tenant->id);
-});
-
-// ─── TenantContext::current() — Authenticated user path ──────────
-
-it('returns authenticated users primary tenant', function () {
+it('returns authenticated users primary tenant without mutating TenantManager or session', function () {
     $tenant = Tenant::factory()->create();
     $user = User::factory()->create();
     $user->tenants()->attach($tenant, ['primary' => true]);
@@ -61,7 +52,9 @@ it('returns authenticated users primary tenant', function () {
     $result = $context->current();
 
     expect($result)->not->toBeNull()
-        ->and((string) $result->id)->toBe((string) $tenant->id);
+        ->and((string) $result->id)->toBe((string) $tenant->id)
+        ->and(app(TenantManager::class)->getTenantId())->toBeNull()
+        ->and(session()->has('selected_tenant_id'))->toBeFalse();
 });
 
 it('returns the first tenant when authenticated user has no primary', function () {
@@ -74,41 +67,33 @@ it('returns the first tenant when authenticated user has no primary', function (
     $context = app(TenantContext::class);
     $result = $context->current();
 
-    // Should return first attached tenant (Alpha, since tenant_user was inserted first)
     expect($result)->not->toBeNull()
-        ->and((string) $result->id)->toBe((string) $tenantA->id);
+        ->and((string) $result->id)->toBe((string) $tenantA->id)
+        ->and(app(TenantManager::class)->getTenantId())->toBeNull();
 });
 
-it('sets TenantManager for authenticated users tenant', function () {
+it('falls back to single tenant without mutating TenantManager', function () {
     $tenant = Tenant::factory()->create();
-    $user = User::factory()->create();
-    $user->tenants()->attach($tenant, ['primary' => true]);
-    $this->actingAs($user, 'web');
-
-    app(TenantContext::class)->current();
-
-    expect(app(TenantManager::class)->getTenantId())->toBe((string) $tenant->id);
-});
-
-// ─── TenantContext::current() — Single-tenant fallback ───────────
-
-it('falls back to single tenant when only one exists', function () {
-    $tenant = Tenant::factory()->create();
-    // No auth, no session — but only one tenant exists
 
     $context = app(TenantContext::class);
     $result = $context->current();
 
     expect($result)->not->toBeNull()
-        ->and((string) $result->id)->toBe((string) $tenant->id);
+        ->and((string) $result->id)->toBe((string) $tenant->id)
+        ->and(app(TenantManager::class)->getTenantId())->toBeNull();
 });
 
-it('sets TenantManager from single-tenant fallback', function () {
-    Tenant::factory()->create();
+it('returns applied tenant when TenantManager is already configured', function () {
+    $tenantA = Tenant::factory()->create(['name' => 'Alpha']);
+    $tenantB = Tenant::factory()->create(['name' => 'Beta']);
 
-    app(TenantContext::class)->current();
+    app(TenantManager::class)->setTenantId((string) $tenantB->id);
 
-    expect(app(TenantManager::class)->getTenantId())->not->toBeNull();
+    $context = app(TenantContext::class);
+    $result = $context->current();
+
+    expect($result)->not->toBeNull()
+        ->and((string) $result->id)->toBe((string) $tenantB->id);
 });
 
 // ─── Resolution order ───────────────────────────────────────────
@@ -126,7 +111,6 @@ it('prefers session tenant over authenticated users tenant', function () {
     $context = app(TenantContext::class);
     $result = $context->current();
 
-    // Session should win over auth
     expect((string) $result->id)->toBe((string) $tenantA->id);
 });
 
@@ -141,6 +125,33 @@ it('prefers authenticated users tenant over single-tenant fallback', function ()
     $result = $context->current();
 
     expect((string) $result->id)->toBe((string) $onlyTenant->id);
+});
+
+// ─── TenantContext::apply() ──────────────────────────────────────
+
+it('apply sets TenantManager and persists to session', function () {
+    $tenant = Tenant::factory()->create();
+
+    $context = app(TenantContext::class);
+    $context->apply($tenant);
+
+    expect(app(TenantManager::class)->getTenantId())->toBe((string) $tenant->id)
+        ->and(session()->get('selected_tenant_id'))->toBe((string) $tenant->id);
+});
+
+it('apply with null clears TenantManager and session', function () {
+    $tenant = Tenant::factory()->create();
+
+    $context = app(TenantContext::class);
+    $context->apply($tenant);
+
+    expect(app(TenantManager::class)->hasTenant())->toBeTrue()
+        ->and(session()->has('selected_tenant_id'))->toBeTrue();
+
+    $context->apply(null);
+
+    expect(app(TenantManager::class)->hasTenant())->toBeFalse()
+        ->and(session()->has('selected_tenant_id'))->toBeFalse();
 });
 
 // ─── TenantContext::switch() ─────────────────────────────────────
@@ -164,10 +175,23 @@ it('switch overwrites previous session tenant', function () {
     $context = app(TenantContext::class);
     $context->switch($tenantB);
 
-    expect(session()->get('selected_tenant_id'))->toBe((string) $tenantB->id);
+    expect(session()->get('selected_tenant_id'))->toBe((string) $tenantB->id)
+        ->and(app(TenantManager::class)->getTenantId())->toBe((string) $tenantB->id);
 });
 
 // ─── TenantContext::resolve() ────────────────────────────────────
+
+it('resolve with no arguments resolves candidate tenant without mutating state', function () {
+    $tenant = Tenant::factory()->create();
+    session()->put('selected_tenant_id', $tenant->id);
+
+    $context = app(TenantContext::class);
+    $result = $context->resolve();
+
+    expect($result)->not->toBeNull()
+        ->and((string) $result->id)->toBe((string) $tenant->id)
+        ->and(app(TenantManager::class)->getTenantId())->toBeNull();
+});
 
 it('resolve returns users primary tenant', function () {
     $tenant = Tenant::factory()->create();

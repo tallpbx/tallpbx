@@ -27,14 +27,18 @@ class ScopeTenant
     public function handle(Request $request, Closure $next): Response
     {
         $context = app(TenantContext::class);
-        $tenant = $context->current();
+        $tenant = $context->resolve();
 
         if ($tenant !== null) {
             if (! $this->verifyTenantAccess($request, (string) $tenant->id)) {
                 abort(403, 'You do not have access to the requested tenant.');
             }
+
+            $context->apply($tenant);
         } elseif (Auth::guard('web')->check()) {
             abort(403, 'No enabled tenant is available for this account.');
+        } else {
+            $context->apply(null);
         }
 
         return $next($request);
