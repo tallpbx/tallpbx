@@ -48,7 +48,7 @@
 | 4.4 | Clarify disabled module lifecycle semantics | Verified | 2026-10-18 |
 | 4.5 | Clean up `TenantContext::current()` side effects | Verified | 2026-10-18 |
 | 4.6 | Decompose large shared-kernel classes | Verified | 2026-10-18 |
-| 4.7 | Environment variable documentation reference | Pending | 2026-10-16 |
+| 4.7 | Environment variable documentation reference | Verified | 2026-10-18 |
 | 5.1 | Click-to-call ESL command validation | Verified | 2026-10-17 |
 | 5.2 | Open registration feature gate | Verified | 2026-10-17 |
 | 5.3 | XML handler rate limiting & access hardening | Verified | 2026-10-17 |
@@ -304,9 +304,12 @@
   - Comprehensive unit and integration test suites cover all three services with zero defects (`GitUpdateServiceTest`, `GitUpdatePipelineTest`, `ModuleLifecycleServiceTest`, `FreeSwitchServiceTest`, `FreeSwitchServiceIntegrationTest`: 77 tests, 239 assertions).
   - **Decision**: Retained as cohesive, unified domain services; Task 4.6 is closed with architectural evaluation validated.
 
-### Task 4.7: Environment Variable Documentation Reference (Arch Audit L5)
+### Task 4.7: Environment Variable Documentation Reference (Arch Audit L5) [COMPLETED]
 - **Implementation**:
-  - Document the 230 unique `env()` configuration keys *(re-measured 2026-10-16)* in a categorized reference guide (`docs/env-reference.md`) grouping FreeSWITCH, security, media storage, Reverb, and database settings.
+  - Authored comprehensive environment variable reference documentation in [`docs/env-reference.md`](env-reference.md), cataloging 242 environment variables (231 in `config/*.php`, plus installer CLI credentials, build tooling, and test flags).
+  - Categorized into 15 domain sections covering FreeSWITCH telephony, Event Socket Layer (ESL), Sofia SIP, XML curl handler caching, primary database, SSL/TLS attributes, Redis cluster and key-value stores, Laravel Reverb WebSockets, local and S3 media/backup storage, background queue workers, session security and cookies, logging and Slack alerts, mail transports, SIP phone auto-provisioning, Git updater, and production deployment sizing guidelines.
+  - Documented variable types, defaults, configuration paths (`config/*.php`), descriptions, and highlighted security-critical secrets and live-firewall safety considerations.
+- **Verification**: Verified file structure, completeness across all 19 configuration files, line count (671 lines, 54 KB), and cross-referenced with `.env.example`.
 
 ---
 
@@ -365,6 +368,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `4ebe5e7a` | **Architecture / Documentation** | **Environment Variable Reference Documentation**: Authored comprehensive reference guide `docs/env-reference.md` cataloging 242 environment variables across 15 domain sections (FreeSWITCH, ESL, Sofia, XML handler caching, Redis cluster, Reverb WebSockets, S3 storage, queues, session security, mail transports, phone auto-provisioning, updater, and production sizing presets). Documented types, defaults, configuration mapping, security notes, and operational best practices. *(Resolves Task 4.7 / Arch Audit L5; Stream 4 100% complete)* |
 | **2026-10-18** | `9de7d2fb` | **Architecture / Modular** | **Large Shared-Kernel Classes Architectural Evaluation**: Re-evaluated `GitUpdateService`, `ModuleLifecycleService`, and `FreeSwitchService` against domain and logical boundary principles. Retained cohesive single-domain orchestrators unified rather than introducing artificial micro-class indirection without reuse value, validated by comprehensive test suites (77 tests, 239 assertions). *(Resolves Task 4.6 / Arch Audit M1 & L7)* |
 | **2026-10-18** | `a5ee026b` | **Architecture / Modular** | **Decouple `TenantContext` Read Queries from Mutation Side Effects**: Refactored `TenantContext` into pure read query `resolve(?User $user = null): ?Tenant` and explicit state mutation `apply(?Tenant $tenant): void`. Decoupled `current()` to read without global mutations, and updated `ScopeTenant` and `EnforcePanelLivewireActionPermissions` middleware to resolve and verify access before applying scope. *(Resolves Task 4.5 / Arch Audit L3)* |
 | **2026-10-18** | `f8d1f12a` | **Architecture / Modular** | **Clarify Disabled Module Migration Lifecycle Semantics**: Gated `registerMigrations()` in `ModuleServiceProvider::boot()` behind `$isEnabled || $modules->shouldMigrateAll()`, ensuring disabled modules omit migrations during standard boot. Added global `--all-modules` console option (`php artisan migrate --all-modules`) and `CommandStarting` / `CommandFinished` listeners in `AppServiceProvider` to register all module migrations on-demand with clean state cleanup. Added `ModuleState::setForceAllModulesMigrations()`, `ModuleServiceProvider::allMigrationPaths()`, updated `docs/modular-architecture.md`, and created test suite `DisabledModuleMigrationLifecycleTest`. *(Resolves Task 4.4 / Arch Audit M3)* |
