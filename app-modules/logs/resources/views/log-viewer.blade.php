@@ -81,10 +81,14 @@
 
                 {{-- Auto-Refresh Toggle --}}
                 <div class="flex items-end pb-1">
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <label class="inline-flex items-center gap-2 cursor-pointer"
+                           wire:loading.class="opacity-70 pointer-events-none"
+                           wire:target="autoRefresh">
                         <input
                             type="checkbox"
                             wire:model.live="autoRefresh"
+                            wire:loading.attr="disabled"
+                            wire:target="autoRefresh"
                             class="toggle toggle-primary toggle-sm"
                         />
                         <span class="text-sm font-medium">

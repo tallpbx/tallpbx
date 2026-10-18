@@ -55,10 +55,14 @@
 
             {{-- Enabled --}}
             <div class="form-control w-full mt-4">
-                <label class="label cursor-pointer justify-start gap-4">
+                <label class="label cursor-pointer justify-start gap-4"
+                       wire:loading.class="opacity-70 pointer-events-none"
+                       wire:target="enabled">
                     <input type="checkbox" wire:model="enabled"
-                           class="toggle toggle-primary" />
-                    <span class="label-text font-medium">Enabled</span>
+                           wire:loading.attr="disabled"
+                           wire:target="enabled"
+                           class="toggle toggle-sm toggle-primary" />
+                    <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                 </label>
             </div>
 

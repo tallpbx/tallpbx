@@ -67,8 +67,13 @@
 
         {{-- Compression toggle --}}
         <div class="form-control w-full">
-            <label class="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" wire:model="compression" class="toggle toggle-primary">
+            <label class="flex items-center gap-3 cursor-pointer"
+                   wire:loading.class="opacity-70 pointer-events-none"
+                   wire:target="compression">
+                <input type="checkbox" wire:model="compression"
+                       wire:loading.attr="disabled"
+                       wire:target="compression"
+                       class="toggle toggle-sm toggle-primary">
                 <span class="text-sm font-medium">{{ __('admin.backup_compression') }}</span>
                 <x-tooltip :tip="__('admin.backup_compression_tooltip')" position="right">
                     <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />

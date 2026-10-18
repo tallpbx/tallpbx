@@ -48,8 +48,13 @@
 
                 {{-- Enabled Toggle --}}
                 <div class="form-control w-full">
-                    <label class="label cursor-pointer justify-start gap-3">
-                        <input type="checkbox" wire:model="enabled" class="toggle toggle-primary" />
+                    <label class="label cursor-pointer justify-start gap-3"
+                           wire:loading.class="opacity-70 pointer-events-none"
+                           wire:target="enabled">
+                        <input type="checkbox" wire:model="enabled"
+                               wire:loading.attr="disabled"
+                               wire:target="enabled"
+                               class="toggle toggle-sm toggle-primary" />
                         <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                     </label>
                     @error('enabled') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror

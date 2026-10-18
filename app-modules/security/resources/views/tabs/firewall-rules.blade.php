@@ -464,6 +464,8 @@
                             wire:target="toggleSystemService({{ $service->id }}), openEditSystemServiceModal({{ $service->id }})">
                             <td class="text-center px-1">
                                 <input wire:click="toggleSystemService({{ $service->id }})" type="checkbox"
+                                       wire:loading.attr="disabled"
+                                       wire:target="toggleSystemService({{ $service->id }})"
                                        class="toggle toggle-success toggle-sm"
                                        @checked($service->enabled)
                                        title="{{ $service->enabled ? __('client.enabled') : __('client.disabled') }}" />
@@ -591,6 +593,8 @@
                             {{-- Status Toggle --}}
                             <td class="text-center px-1">
                                 <input wire:click="toggleRule({{ $rule->id }})" type="checkbox"
+                                       wire:loading.attr="disabled"
+                                       wire:target="toggleRule({{ $rule->id }})"
                                        class="toggle toggle-primary toggle-sm"
                                        @checked($rule->enabled) />
                             </td>

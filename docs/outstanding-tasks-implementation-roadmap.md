@@ -39,7 +39,7 @@
 | 2.2 | Page-title typography normalization | Verified | 2026-10-17 |
 | 2.3 | Localize hardcoded table headers | Verified | 2026-10-18 |
 | 2.4 | Normalize arbitrary font sizes | Verified | 2026-10-18 |
-| 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-17 |
+| 2.5 | Standardize toggle switch sizing & loading locks | Verified | 2026-10-18 |
 | 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Pending | 2026-10-16 |
 | 3.2 | ESL event ingestion overflow & queue buffering | Pending | 2026-10-16 |
 | 4.1 | Shared kernel boundary architecture test & listener migration | Pending | 2026-10-16 |
@@ -193,10 +193,12 @@
   - Added architecture test `ArbitraryFontSizesArchitectureTest` asserting zero arbitrary font size utility classes (`text-[...px]` or `text-[...rem]`) exist in any Blade template across `app-modules/` and `resources/views/`.
 - **Verification**: Verified via `ArbitraryFontSizesArchitectureTest` (>100 Blade templates scanned, 0 violations), full architecture test suite (10 tests, 709 assertions), and Pint code style linting.
 
-### Task 2.5: Standardize Toggle Switch Sizing & Loading Locks (UI Audit L4)
+### Task 2.5: Standardize Toggle Switch Sizing & Loading Locks (UI Audit L4) [COMPLETED]
 - **Problem**: 12 views render DaisyUI toggle switches; 4 edit views (`tenants-edit`, `admins-edit`, `tenant-domains-edit`, `backups-edit`) still use `toggle toggle-primary` without the standard `toggle-sm` sizing, and 2 of those (`tenants-edit`, `tenant-domains-edit`) along with `log-viewer.blade.php` carry no `wire:loading.attr` lock at all *(re-measured 2026-10-17; the original audit catalogued 7 of 15 usages)*.
 - **Implementation**:
-  - Standardize all toggle switches to `toggle toggle-sm toggle-primary` with pointer-events lock and disabled attribute during mutation.
+  - Standardized all 19 toggle switch inputs across 12 views to explicit DaisyUI sizing (`toggle-sm` or compact table `toggle-xs`), adding `wire:loading.attr="disabled"` and pointer-events locks (`wire:loading.class="opacity-70 pointer-events-none"`) to prevent state desync and double-click race conditions.
+  - Added architecture test `ToggleSwitchArchitectureTest` asserting 100% of DaisyUI toggle switches across `app-modules/` and `resources/views/` specify standard size tokens and enforce `wire:loading.attr="disabled"`.
+- **Verification**: Verified via `ToggleSwitchArchitectureTest` (19 toggles scanned, 0 violations), full architecture test suite (11 tests, 713 assertions), targeted Livewire feature tests (66 tests, 274 assertions), and Pint code style linting. Stream 2 is now 100% complete.
 
 ---
 
@@ -329,7 +331,8 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
-| **2026-10-18** | `ed52adbe` | **UI / Typography** | **Normalize Arbitrary Font Sizes to Standard Design Tokens**: Normalized all 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) across 10 Blade views in `app-modules/security`, `app-modules/admin`, and `resources/views` to standard Tailwind / DaisyUI `text-xs` design tokens with semantic opacity utilities (`text-base-content/60`, `text-base-content/50`, `opacity-75`). Added architecture test `ArbitraryFontSizesArchitectureTest` enforcing zero arbitrary font-size utility classes in any Blade template. *(Resolves Task 2.4 / UI Audit L2)* |
+| **2026-10-18** | `fc1ca33e` | **UI / Components** | **Standardize Toggle Switch Sizing & Mutation Locks**: Standardized all 19 toggle switch inputs across 12 views (`backups-edit`, `tenants-edit`, `tenant-domains-edit`, `admins-edit`, `log-viewer`, `modules-list`, `geo-blocking`, `external-blocklists`, `attackers`, `block-allow`, `firewall-rules`, `firewall-switches`) to DaisyUI `toggle-sm` (or compact table `toggle-xs`), adding `wire:loading.attr="disabled"` and pointer-events locks to prevent double-submit races and rapid-click desync. Added architecture test `ToggleSwitchArchitectureTest` enforcing explicit sizing and loading locks across all views. *(Resolves Task 2.5 / UI Audit L4; Stream 2 100% complete)* |
+| **2026-10-18** | `4bf90759` | **UI / Typography** | **Normalize Arbitrary Font Sizes to Standard Design Tokens**: Normalized all 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) across 10 Blade views in `app-modules/security`, `app-modules/admin`, and `resources/views` to standard Tailwind / DaisyUI `text-xs` design tokens with semantic opacity utilities (`text-base-content/60`, `text-base-content/50`, `opacity-75`). Added architecture test `ArbitraryFontSizesArchitectureTest` enforcing zero arbitrary font-size utility classes in any Blade template. *(Resolves Task 2.4 / UI Audit L2)* |
 | **2026-10-18** | `4734ba20` | **UI / Localization** | **Localize Hardcoded Table Header (`<th>`) Contents**: Localized all 39 previously hardcoded English `<th>` cells across 7 views (`file-stores-list`, `observe-activity`, `certificate-manager`, `settings-edit`, `call-center-active-list`, `gateways-list`, and `active-conferences-list`) using root `client` keys and module domain keys with 100% parity across English, Spanish, and French. Extended `TranslationParityTest` to enforce 100% parity across `client.php`, and added architecture test `TableHeadersLocalizationArchitectureTest` ensuring zero unlocalized table headers across all views. *(Resolves Task 2.3 / UI Audit L1)* |
 | **2026-10-17** | `e972ff44` | **UI / Typography** | **Page-Title Typography Normalization**: Normalized 125 module and panel page-title headings (`<h1>` / `<h2>` with `text-2xl`) across `app-modules/` and `resources/views/` to strictly match the established design standard in `AGENTS.md` (`text-2xl font-bold tracking-tight text-base-content`), eliminating non-standard `font-semibold` and untightened variants while preserving layout spacing utilities (`mb-6`, `mb-4`, etc.). Added architecture test `PageTitleTypographyArchitectureTest` enforcing 100% compliance across all views. *(Resolves Task 2.2)* |
 | **2026-10-17** | `f50c2347` | **UI / Components** | **Standardized Form Submission Loading Feedback (`<x-form-submit-button>`)**: Created `<x-form-submit-button>` Blade component with built-in DaisyUI loading spinner, disabled state lock, standard `btn-sm` sizing, and dynamic present-continuous busy text. Batch-migrated all 47 edit/create views (plus fax send and dialplan tester) to `<x-form-submit-button>`, normalized cancel links to `btn btn-ghost btn-sm` with `wire:navigate`, and added unit and architecture tests. *(Resolves Task 2.1)* |
