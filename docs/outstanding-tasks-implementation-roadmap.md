@@ -41,7 +41,7 @@
 | 2.4 | Normalize arbitrary font sizes | Verified | 2026-10-18 |
 | 2.5 | Standardize toggle switch sizing & loading locks | Verified | 2026-10-18 |
 | 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Verified | 2026-10-18 |
-| 3.2 | ESL event ingestion overflow & queue buffering | Pending | 2026-10-16 |
+| 3.2 | ESL event ingestion overflow & queue buffering | Verified | 2026-10-18 |
 | 4.1 | Shared kernel boundary architecture test & listener migration | Pending | 2026-10-16 |
 | 4.2 | Enforce contract seams over cross-module model imports | Pending | 2026-10-16 |
 | 4.3 | Consolidate module route registration | Pending | 2026-10-16 |
@@ -222,11 +222,14 @@
   - Removed all `wire:poll` directives from the 6 views.
   - Added feature test suite `TelephonyPushBroadcastingTest` asserting `assertDontSee('wire:poll')` on all 6 views, verifying Echo push listeners, broadcast payloads, and strict tenant channel isolation boundaries.
 
-### Task 3.2: ESL Event Ingestion Overflow & Queue Buffering (Arch Audit M4)
+### Task 3.2: ESL Event Ingestion Overflow & Queue Buffering (Arch Audit M4) [COMPLETED]
 - **Problem**: `FreeSwitchListenCommand` dispatches every ESL event inline in a single-threaded loop; heavy event storms could create backpressure on the FreeSWITCH socket.
 - **Implementation**:
-  - Retain inline dispatch for lightweight state events.
-  - Implement a bounded in-memory buffer or Redis queue push for heavyweight listeners (XML reloads, complex DB aggregations) to ensure the ESL socket never stalls during high call volume.
+  - Implemented bounded in-memory buffer queue (`SplQueue`) in `FreeSwitchListenCommand` with configurable capacity (`--buffer-size` and `config('freeswitch.esl.buffer_size', 1000)`), dropping stale events on overflow with warning logs and diagnostics.
+  - Added non-blocking socket draining via `FreeSwitchServiceInterface::hasPendingData()` to drain kernel socket buffers immediately.
+  - Converted heavyweight database-writing and ban-evaluating event listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`, `RegisterCompletedCallRecording`, `MarkBroadcastRecipientOutcome`, `RegisterCompletedVoicemailMessage`) to implement `ShouldQueue`, offloading heavy file I/O and SQL queries onto asynchronous background queue workers.
+  - Retained synchronous inline dispatch for lightweight real-time state telemetry (`BroadcastDashboardStatsOnFreeSwitchEvent`, `BroadcastTelephonyOnFreeSwitchEvent`).
+  - Added unit and feature tests covering socket draining, bounded buffer capacity, overflow drop behavior, and listener queue contracts.
 
 ---
 
@@ -332,6 +335,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-18** | `In branch` | **FreeSWITCH / Queue** | **ESL Event Ingestion Bounded Buffer & Heavyweight Listener Queue Offloading**: Implemented bounded in-memory buffer (`SplQueue`) with overflow dropping and socket draining via `hasPendingData()` in `FreeSwitchListenCommand`. Offloaded heavyweight listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`, `RegisterCompletedCallRecording`, `MarkBroadcastRecipientOutcome`, `RegisterCompletedVoicemailMessage`) to `ShouldQueue` background workers while keeping real-time telemetry inline, completely eliminating ESL socket backpressure during high-concurrency event storms. *(Resolves Task 3.2 / Arch Audit M4; Stream 3 100% complete)* |
 | **2026-10-18** | `20f4913f` | **Telephony / Broadcasting** | **Migrate Runtime Telephony Status Views from `wire:poll` to Echo Push**: Eliminated aggressive HTTP polling (2s–15s) from all 6 runtime telephony status views (`active-calls-list`, `active-conferences-list`, `registrations-list`, `sip-status-list`, `call-center-active-list`, `operator-panel-index`), migrating them to real-time Echo push listeners with dual-event binding (`TelephonyUpdated` and `DashboardStatsUpdated`) and public `$tenantId` property bindings. Created `TelephonyUpdated` event with `ShouldBroadcastNow`, authorized `tenant.{tenantId}.telephony` private channels with admin bypass and strict tenant isolation, wired 14 FreeSWITCH ESL events to `BroadcastTelephonyOnFreeSwitchEvent`, and added feature test suite `TelephonyPushBroadcastingTest`. *(Resolves Task 3.1 / UI Audit M1)* |
 | **2026-10-18** | `fc1ca33e` | **UI / Components** | **Standardize Toggle Switch Sizing & Mutation Locks**: Standardized all 19 toggle switch inputs across 12 views (`backups-edit`, `tenants-edit`, `tenant-domains-edit`, `admins-edit`, `log-viewer`, `modules-list`, `geo-blocking`, `external-blocklists`, `attackers`, `block-allow`, `firewall-rules`, `firewall-switches`) to DaisyUI `toggle-sm` (or compact table `toggle-xs`), adding `wire:loading.attr="disabled"` and pointer-events locks to prevent double-submit races and rapid-click desync. Added architecture test `ToggleSwitchArchitectureTest` enforcing explicit sizing and loading locks across all views. *(Resolves Task 2.5 / UI Audit L4; Stream 2 100% complete)* |
 | **2026-10-18** | `4bf90759` | **UI / Typography** | **Normalize Arbitrary Font Sizes to Standard Design Tokens**: Normalized all 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) across 10 Blade views in `app-modules/security`, `app-modules/admin`, and `resources/views` to standard Tailwind / DaisyUI `text-xs` design tokens with semantic opacity utilities (`text-base-content/60`, `text-base-content/50`, `opacity-75`). Added architecture test `ArbitraryFontSizesArchitectureTest` enforcing zero arbitrary font-size utility classes in any Blade template. *(Resolves Task 2.4 / UI Audit L2)* |

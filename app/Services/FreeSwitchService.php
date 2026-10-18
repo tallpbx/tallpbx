@@ -493,6 +493,30 @@ class FreeSwitchService implements FreeSwitchServiceInterface
     }
 
     /**
+     * Check whether unread data is currently available on the ESL socket.
+     *
+     * Checks PHP's internal stream buffer first, then polls the underlying
+     * socket descriptor non-blockingly via stream_select().
+     */
+    public function hasPendingData(): bool
+    {
+        if ($this->socket === null || ! is_resource($this->socket) || feof($this->socket)) {
+            return false;
+        }
+
+        $meta = stream_get_meta_data($this->socket);
+        if (($meta['unread_bytes'] ?? 0) > 0) {
+            return true;
+        }
+
+        $read = [$this->socket];
+        $write = null;
+        $except = null;
+
+        return @stream_select($read, $write, $except, 0, 0) > 0;
+    }
+
+    /**
      * Parse the payload of a content-length framed ESL event message.
      *
      * The payload starts with the event headers (Event-Name first), then an

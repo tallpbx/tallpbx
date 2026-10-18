@@ -7,13 +7,17 @@ namespace App\Listeners\FreeSwitch;
 use App\Events\FreeSwitch\ChannelExecuteComplete;
 use App\Models\Tenant;
 use App\Services\DialplanContext;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Modules\VoicemailMessages\Services\VoicemailMessageService;
 use Modules\Voicemails\Models\Voicemail;
 
 /** Registers completed FreeSWITCH voicemail files as local-only media. */
-class RegisterCompletedVoicemailMessage
+class RegisterCompletedVoicemailMessage implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     /**
      * Create the listener with trusted tenant-context resolution.
      */

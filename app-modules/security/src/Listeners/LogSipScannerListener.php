@@ -6,6 +6,8 @@ namespace Modules\Security\Listeners;
 
 use App\Events\FreeSwitch\FreeSwitchEvent;
 use App\Events\FreeSwitch\SipScannerDetected;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
@@ -48,8 +50,10 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * on the shared event socket), so the trusted list is the exemption path —
  * the ban service itself refuses whitelisted addresses as well.
  */
-class LogSipScannerListener
+class LogSipScannerListener implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     /**
      * Create the event listener.
      *

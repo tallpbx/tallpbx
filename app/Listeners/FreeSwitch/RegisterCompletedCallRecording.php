@@ -7,6 +7,8 @@ namespace App\Listeners\FreeSwitch;
 use App\Events\FreeSwitch\RecordStop;
 use App\Models\Tenant;
 use App\Services\DialplanContext;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Modules\CallRecordings\Services\CallRecordingService;
 use Throwable;
@@ -14,8 +16,10 @@ use Throwable;
 /**
  * Registers completed call recordings from trusted FreeSWITCH spool paths.
  */
-class RegisterCompletedCallRecording
+class RegisterCompletedCallRecording implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     /**
      * Create the listener with tenant-context and media lifecycle services.
      */

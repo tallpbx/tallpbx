@@ -6,6 +6,8 @@ namespace App\Listeners\FreeSwitch;
 
 use App\Events\FreeSwitch\ChannelHangupComplete;
 use App\Support\BroadcastSettlement;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Modules\CallBroadcast\Models\CallBroadcast;
 use Modules\CallBroadcast\Models\CallBroadcastRecipient;
@@ -18,8 +20,10 @@ use Modules\CallBroadcast\Models\CallBroadcastRecipient;
  * Unique-ID back to that recipient and resolves answered/failed with the
  * hangup cause and billsec. Events for unrelated calls no-op.
  */
-class MarkBroadcastRecipientOutcome
+class MarkBroadcastRecipientOutcome implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     /**
      * Handle a channel hangup event for a broadcast call.
      */

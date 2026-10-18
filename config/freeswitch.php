@@ -98,6 +98,19 @@ return [
         |
         */
         'timeout' => (int) env('FS_ESL_TIMEOUT', 10),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Ingestion Buffer Size & Queue
+        |--------------------------------------------------------------------------
+        |
+        | Maximum in-memory event buffer capacity before oldest events are dropped
+        | under extreme event storms to prevent memory leaks and ESL backpressure.
+        | Heavyweight event listeners use the configured queue name.
+        |
+        */
+        'buffer_size' => (int) env('FS_ESL_BUFFER_SIZE', 1000),
+        'queue_name' => env('FS_ESL_QUEUE_NAME', 'default'),
     ],
 
     /*

@@ -58,12 +58,30 @@ class FreeSwitchListenCommand extends Command
      */
     protected $signature = 'freeswitch:listen
         {--once : Process a single event and exit (useful for testing)}
-        {--timeout=0 : Maximum seconds to run before exiting (0 = forever)}';
+        {--timeout=0 : Maximum seconds to run before exiting (0 = forever)}
+        {--buffer-size= : Maximum in-memory event buffer capacity before overflow drop}';
 
     /**
      * The console command description.
      */
     protected $description = 'Listen for FreeSWITCH ESL events and dispatch them as Laravel events';
+
+    /**
+     * In-memory event buffer holding raw ESL events before dispatch.
+     *
+     * @var \SplQueue<array{event_name: string, headers: array<string, string>, body: string}>
+     */
+    private \SplQueue $buffer;
+
+    /**
+     * Maximum capacity of the in-memory event buffer.
+     */
+    private int $maxBufferSize = 1000;
+
+    /**
+     * Total count of dropped events due to buffer overflow.
+     */
+    private int $droppedEventsCount = 0;
 
     /**
      * Event name to Laravel event class mapping.
@@ -117,6 +135,14 @@ class FreeSwitchListenCommand extends Command
         $once = (bool) $this->option('once');
         $reconnectInterval = (int) config('freeswitch.esl.reconnect_interval', 5);
 
+        $bufferOption = $this->option('buffer-size');
+        $this->maxBufferSize = $bufferOption !== null && $bufferOption !== ''
+            ? (int) $bufferOption
+            : (int) config('freeswitch.esl.buffer_size', 1000);
+
+        $this->buffer = new \SplQueue;
+        $this->droppedEventsCount = 0;
+
         // ── Establish initial connection ──────────────────────────
         if (! $freeswitch->connect()) {
             $this->components->error('Failed to connect to FreeSWITCH ESL.');
@@ -158,17 +184,49 @@ class FreeSwitchListenCommand extends Command
                 $this->components->info('Reconnected to FreeSWITCH ESL.');
             }
 
-            // Read next event
-            $event = $freeswitch->recvEvent();
+            // 1. If buffer is empty, read next event from socket (blocking up to timeout)
+            if ($this->buffer->isEmpty()) {
+                $event = $freeswitch->recvEvent();
 
-            if ($event === null) {
-                // Socket timed out or was closed; loop back to check connection
-                usleep(100000); // 100ms pause to prevent tight loop
+                if ($event === null) {
+                    // Socket timed out or was closed; loop back to check connection
+                    usleep(100000); // 100ms pause to prevent tight loop
 
-                continue;
+                    continue;
+                }
+
+                $this->enqueueEvent($event);
             }
 
-            $this->dispatchEvent($event);
+            // 2. Drain any additional pending events immediately from socket into buffer
+            $hasPending = false;
+            if (method_exists($freeswitch, 'hasPendingData')) {
+                try {
+                    $hasPending = $freeswitch->hasPendingData();
+                } catch (\Throwable) {
+                    $hasPending = false;
+                }
+            }
+
+            while ($hasPending && $this->buffer->count() < $this->maxBufferSize) {
+                $pendingEvent = $freeswitch->recvEvent();
+                if ($pendingEvent === null) {
+                    break;
+                }
+                $this->enqueueEvent($pendingEvent);
+
+                try {
+                    $hasPending = $freeswitch->hasPendingData();
+                } catch (\Throwable) {
+                    $hasPending = false;
+                }
+            }
+
+            // 3. Dispatch next event from buffer
+            if (! $this->buffer->isEmpty()) {
+                $eventToDispatch = $this->buffer->dequeue();
+                $this->dispatchEvent($eventToDispatch);
+            }
 
             if ($once) {
                 break;
@@ -179,6 +237,44 @@ class FreeSwitchListenCommand extends Command
         $this->components->info('FreeSWITCH Event Listener stopped.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Enqueue a raw ESL event into the bounded buffer, dropping the oldest
+     * event if capacity is reached to prevent unbounded memory growth.
+     *
+     * @param  array{event_name: string, headers: array<string, string>, body: string}  $event
+     */
+    public function enqueueEvent(array $event): void
+    {
+        if ($this->buffer->count() >= $this->maxBufferSize) {
+            $dropped = $this->buffer->dequeue();
+            $this->droppedEventsCount++;
+
+            Log::warning('FreeSWITCH ESL event buffer overflow. Dropped oldest unconsumed event.', [
+                'dropped_event' => $dropped['event_name'] ?? 'UNKNOWN',
+                'buffer_size' => $this->maxBufferSize,
+                'total_dropped' => $this->droppedEventsCount,
+            ]);
+        }
+
+        $this->buffer->enqueue($event);
+    }
+
+    /**
+     * Get the current count of events in the buffer.
+     */
+    public function getBufferSize(): int
+    {
+        return $this->buffer->count();
+    }
+
+    /**
+     * Get the count of dropped events due to buffer overflow.
+     */
+    public function getDroppedEventsCount(): int
+    {
+        return $this->droppedEventsCount;
     }
 
     /**

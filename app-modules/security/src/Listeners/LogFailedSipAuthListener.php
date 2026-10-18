@@ -6,6 +6,8 @@ namespace Modules\Security\Listeners;
 
 use App\Events\FreeSwitch\CustomEvent;
 use App\Events\FreeSwitch\SofiaFailedAuth;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 
 /**
@@ -15,8 +17,10 @@ use Modules\Security\Contracts\SecurityIncidentServiceInterface;
  * (unauthorized SIP REGISTER and INVITE attempts) and forwards offending
  * client IPs to SecurityIncidentServiceInterface to enforce kernel intrusion bans.
  */
-class LogFailedSipAuthListener
+class LogFailedSipAuthListener implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     /**
      * Create the event listener.
      *

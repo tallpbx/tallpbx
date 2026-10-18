@@ -2,13 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Console\Commands\FreeSwitchListenCommand;
 use App\Events\FreeSwitch\ChannelCreate;
 use App\Events\FreeSwitch\ChannelHangup;
 use App\Events\FreeSwitch\CustomEvent;
 use App\Events\FreeSwitch\Heartbeat;
 use App\Events\FreeSwitch\RecordStop;
+use App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
+use App\Listeners\BroadcastTelephonyOnFreeSwitchEvent;
+use App\Listeners\FreeSwitch\MarkBroadcastRecipientOutcome;
+use App\Listeners\FreeSwitch\RegisterCompletedCallRecording;
+use App\Listeners\FreeSwitch\RegisterCompletedVoicemailMessage;
+use App\Services\FreeSwitchService;
 use App\Services\FreeSwitchServiceInterface;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Event;
+use Modules\Security\Listeners\LogFailedSipAuthListener;
+use Modules\Security\Listeners\LogSipScannerListener;
 
 beforeEach(function () {
     Event::fake();
@@ -165,4 +175,106 @@ it('calls disconnect after processing completes', function () {
 
     $this->artisan('freeswitch:listen', ['--once' => true])
         ->assertSuccessful();
+});
+
+// ─── Event Ingestion Buffer & Queue Tests ───────────────────────
+
+it('drains pending socket events into bounded buffer when hasPendingData is true', function () {
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('connect')->once()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->once();
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')
+        ->once()
+        ->andReturn([
+            'event_name' => 'CHANNEL_CREATE',
+            'headers' => ['Unique-ID' => 'uuid-1', 'Event-Name' => 'CHANNEL_CREATE'],
+            'body' => '',
+        ]);
+    $mock->shouldReceive('hasPendingData')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')
+        ->once()
+        ->andReturn([
+            'event_name' => 'CHANNEL_ANSWER',
+            'headers' => ['Unique-ID' => 'uuid-1', 'Event-Name' => 'CHANNEL_ANSWER'],
+            'body' => '',
+        ]);
+    $mock->shouldReceive('hasPendingData')->once()->andReturn(false);
+    $mock->shouldReceive('disconnect')->once();
+
+    app()->instance(FreeSwitchServiceInterface::class, $mock);
+
+    $this->artisan('freeswitch:listen', ['--once' => true])
+        ->assertSuccessful();
+
+    Event::assertDispatched(ChannelCreate::class);
+});
+
+it('drops oldest event when in-memory buffer exceeds maximum capacity', function () {
+    $command = new FreeSwitchListenCommand;
+
+    // Use reflection to initialize command buffer with capacity 2
+    $ref = new ReflectionClass($command);
+    $propBuffer = $ref->getProperty('buffer');
+    $propBuffer->setValue($command, new SplQueue);
+
+    $propMax = $ref->getProperty('maxBufferSize');
+    $propMax->setValue($command, 2);
+
+    $command->enqueueEvent(['event_name' => 'FIRST_EVENT', 'headers' => [], 'body' => '']);
+    $command->enqueueEvent(['event_name' => 'SECOND_EVENT', 'headers' => [], 'body' => '']);
+
+    expect($command->getBufferSize())->toBe(2);
+    expect($command->getDroppedEventsCount())->toBe(0);
+
+    // Enqueue 3rd event: capacity is 2, so FIRST_EVENT must be dropped
+    $command->enqueueEvent(['event_name' => 'THIRD_EVENT', 'headers' => [], 'body' => '']);
+
+    expect($command->getBufferSize())->toBe(2);
+    expect($command->getDroppedEventsCount())->toBe(1);
+
+    /** @var SplQueue $queue */
+    $queue = $propBuffer->getValue($command);
+    $firstInQueue = $queue->dequeue();
+    expect($firstInQueue['event_name'])->toBe('SECOND_EVENT');
+    $secondInQueue = $queue->dequeue();
+    expect($secondInQueue['event_name'])->toBe('THIRD_EVENT');
+});
+
+it('ensures heavyweight listeners implement ShouldQueue while telemetry listeners remain inline', function () {
+    $heavyweightListeners = [
+        LogFailedSipAuthListener::class,
+        LogSipScannerListener::class,
+        RegisterCompletedCallRecording::class,
+        MarkBroadcastRecipientOutcome::class,
+        RegisterCompletedVoicemailMessage::class,
+    ];
+
+    foreach ($heavyweightListeners as $listenerClass) {
+        $reflection = new ReflectionClass($listenerClass);
+        expect($reflection->implementsInterface(ShouldQueue::class))
+            ->toBeTrue("Heavyweight listener {$listenerClass} must implement ShouldQueue to protect ESL event loop.");
+    }
+
+    $lightweightListeners = [
+        BroadcastDashboardStatsOnFreeSwitchEvent::class,
+        BroadcastTelephonyOnFreeSwitchEvent::class,
+    ];
+
+    foreach ($lightweightListeners as $listenerClass) {
+        $reflection = new ReflectionClass($listenerClass);
+        expect($reflection->implementsInterface(ShouldQueue::class))
+            ->toBeFalse("Lightweight listener {$listenerClass} must execute inline without queue latency.");
+    }
+});
+
+it('reports hasPendingData as false when FreeSwitchService is disconnected', function () {
+    $fs = new FreeSwitchService(
+        host: '127.0.0.1',
+        port: 8021,
+        password: 'test',
+        timeout: 1
+    );
+
+    expect($fs->hasPendingData())->toBeFalse();
 });

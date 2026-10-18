@@ -73,6 +73,14 @@ interface FreeSwitchServiceInterface
     public function recvEvent(): ?array;
 
     /**
+     * Check whether unread data is currently available on the ESL socket.
+     *
+     * Non-blocking check returning true if data can be read immediately
+     * without stalling the listener process.
+     */
+    public function hasPendingData(): bool;
+
+    /**
      * Subscribe to a FreeSWITCH event type.
      *
      * @param  string  $eventType  The event type (e.g., 'CHANNEL_HANGUP')
