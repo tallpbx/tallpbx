@@ -12,8 +12,8 @@ use Livewire\Livewire;
 use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
-use Modules\Security\Services\SecurityConfigGenerator;
-use Modules\Security\Services\SecurityExecutor;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityExecutor;
 
 /**
  * Call-budget tests for the Security Center's live kernel status reads.

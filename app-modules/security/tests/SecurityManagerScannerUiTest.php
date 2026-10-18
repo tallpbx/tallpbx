@@ -14,7 +14,7 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 use Modules\Security\Support\SipScannerSignatures;
 
 /**

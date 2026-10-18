@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Modules\Security;
 
-use Modules\Security\Services\SecurityExecutor;
+use Modules\Security\Services\Firewall\SecurityExecutor;
 use Symfony\Component\Process\Process;
 
 /**

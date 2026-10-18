@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules\Security;
 
 use Illuminate\Support\Facades\Http;
-use Modules\Security\Services\IpdenyProvider;
+use Modules\Security\Services\Geo\IpdenyProvider;
 
 it('fetches aggregated IPv4 and IPv6 country ranges using IpdenyProvider', function (): void {
     Http::fake([

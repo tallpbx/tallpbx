@@ -8,8 +8,8 @@ use Illuminate\Console\Command;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityThreatFeed;
-use Modules\Security\Services\ThreatFeedIngestionService;
-use Modules\Security\Services\ThreatFeedManager;
+use Modules\Security\Services\ThreatFeeds\ThreatFeedIngestionService;
+use Modules\Security\Services\ThreatFeeds\ThreatFeedManager;
 
 /**
  * Sync due public threat feeds on the hourly schedule.

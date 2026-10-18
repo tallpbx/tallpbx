@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Bans;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;

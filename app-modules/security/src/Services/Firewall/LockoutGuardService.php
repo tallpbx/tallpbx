@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Firewall;
 
 use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Models\SecurityIpList;

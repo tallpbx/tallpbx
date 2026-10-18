@@ -10,7 +10,7 @@ use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Rules\ValidFirewallAddress;
-use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Services\Firewall\LockoutGuardService;
 
 /**
  * Livewire component concern for managing IP allow and block lists.

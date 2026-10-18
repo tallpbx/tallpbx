@@ -10,8 +10,6 @@ use Modules\Security\Events\FirewallRulesetUpdated;
 use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\LockoutGuardService;
-use Modules\Security\Services\SecurityConfigGenerator;
 
 /**
  * Domain service coordinating the safety-critical 5-step firewall apply pipeline.

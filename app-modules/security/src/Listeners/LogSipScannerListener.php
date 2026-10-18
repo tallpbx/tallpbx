@@ -12,7 +12,7 @@ use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
-use Modules\Security\Services\SipScannerDialplanContributor;
+use Modules\Security\Services\Detection\SipScannerDialplanContributor;
 use Modules\Security\Support\AddressFamily;
 use Modules\Security\Support\SipScannerSignatures;
 use Symfony\Component\HttpFoundation\IpUtils;

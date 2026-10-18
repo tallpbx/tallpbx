@@ -10,8 +10,8 @@ use Livewire\Attributes\Computed;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\LockoutGuardService;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\LockoutGuardService;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 /**
  * Livewire component concern for kernel defensive pre-filters and rate limiting.

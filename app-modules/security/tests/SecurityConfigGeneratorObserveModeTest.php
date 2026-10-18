@@ -7,7 +7,7 @@ namespace Tests\Feature\Modules\Security;
 use Database\Seeders\SecurityServiceSeeder;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 /**
  * Feature tests for the global observe mode.

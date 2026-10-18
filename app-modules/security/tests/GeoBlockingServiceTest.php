@@ -8,7 +8,7 @@ use Mockery;
 use Modules\Security\Contracts\GeoBlockingProviderInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityGeoRule;
-use Modules\Security\Services\GeoBlockingService;
+use Modules\Security\Services\Geo\GeoBlockingService;
 
 beforeEach(function (): void {
     $this->tempDir = sys_get_temp_dir().'/tallpbx_geo_test_'.uniqid();

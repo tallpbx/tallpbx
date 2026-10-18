@@ -6,7 +6,7 @@ namespace Modules\Security\Console\Commands;
 
 use Illuminate\Console\Command;
 use Modules\Security\Models\SecurityGeoRule;
-use Modules\Security\Services\GeoBlockingService;
+use Modules\Security\Services\Geo\GeoBlockingService;
 
 /**
  * Sync Geo-Blocking country IP ranges and update kernel firewall sets.

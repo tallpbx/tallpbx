@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Geo;
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;

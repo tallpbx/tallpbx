@@ -7,8 +7,8 @@ namespace Tests\Feature\Modules\Security;
 use Database\Seeders\SecurityServiceSeeder;
 use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
-use Modules\Security\Services\FirewallSyncVerifier;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\FirewallSyncVerifier;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 use Modules\Security\Support\FirewallSyncStatus;
 
 /**

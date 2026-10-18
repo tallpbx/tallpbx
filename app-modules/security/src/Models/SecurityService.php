@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 /**
  * Model representing a network service in the PBX Port Catalog.

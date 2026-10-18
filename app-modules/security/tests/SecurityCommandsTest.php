@@ -11,9 +11,9 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\GeoBlockingService;
-use Modules\Security\Services\LockoutGuardService;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\LockoutGuardService;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
+use Modules\Security\Services\Geo\GeoBlockingService;
 
 /**
  * Feature tests for Security console commands (security:apply, security:status, security:unban).

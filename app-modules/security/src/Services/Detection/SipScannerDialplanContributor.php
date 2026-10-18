@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Detection;
 
 use App\Contracts\ContextWideDialplanXmlContributor;
 use App\Contracts\DialplanGuardXmlContributor;

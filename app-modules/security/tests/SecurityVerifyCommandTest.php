@@ -7,7 +7,7 @@ namespace Tests\Feature\Modules\Security;
 use Database\Seeders\SecurityServiceSeeder;
 use Illuminate\Support\Facades\Log;
 use Mockery;
-use Modules\Security\Services\FirewallSyncVerifier;
+use Modules\Security\Services\Firewall\FirewallSyncVerifier;
 use Modules\Security\Support\FirewallSyncStatus;
 
 /**

@@ -6,7 +6,7 @@ namespace Modules\Security\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Modules\Security\Services\FirewallSyncVerifier;
+use Modules\Security\Services\Firewall\FirewallSyncVerifier;
 use Modules\Security\Support\FirewallSyncStatus;
 
 /**

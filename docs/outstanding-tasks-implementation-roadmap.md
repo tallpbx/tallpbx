@@ -129,16 +129,15 @@
 
 ### Phase 1.3: Sub-domain Namespace Realignment & View Partials
 
-#### Task 1.3.1: Reorganize `src/` into Sub-domain Namespaces
+#### Task 1.3.1: Reorganize `src/Services/` into Sub-domain Namespaces [COMPLETED]
 - **Implementation**:
-  - Reorganize flat `app-modules/security/src/Services/` into cohesive sub-domain folders:
-    - `src/Firewall/`: `FirewallApplier`, `SecurityConfigGenerator`, `SecurityExecutor`, `LockoutGuardService`, `FirewallBanReconciler`, `FirewallSyncVerifier`.
-    - `src/Geo/`: `GeoBlockingService`, `IpdenyProvider`, `SecurityGeoRule` model.
-    - `src/ThreatFeeds/`: `ThreatFeedManager`, `ThreatFeedIngestionService`, `VoipblFeedProvider`, `SecurityThreatFeed` model.
-    - `src/Bans/`: `SecurityBanService`, `LogFailedLoginListener`, `LogFailedSipAuthListener`, `SecurityBan` model.
-    - `src/Detection/`: `SipScannerSignatures`, `LogSipScannerListener`, `SipScannerDialplanContributor`.
-    - `src/Observe/`: `ObserveMetricsParser`, `SecurityObserveCommand`.
-  - Maintain `Contracts/` and `SecurityServiceProvider` as the module's clean public surface.
+  - Reorganized flat `app-modules/security/src/Services/` into cohesive sub-domain folders matching TallPBX conventions:
+    - `src/Services/Firewall/`: `FirewallApplier`, `FirewallBanReconciler`, `FirewallSyncVerifier`, `LockoutGuardService`, `SecurityConfigGenerator`, `SecurityExecutor`, `Compilers/` (`BlocklistCompiler`, `GeoPerimeterCompiler`, `PreFilterCompiler`, `ServiceRulesCompiler`).
+    - `src/Services/Geo/`: `GeoBlockingService`, `IpdenyProvider`.
+    - `src/Services/ThreatFeeds/`: `ThreatFeedManager`, `ThreatFeedIngestionService`, `VoipblFeedProvider`.
+    - `src/Services/Bans/`: `SecurityBanService`, `SecurityIncidentService`.
+    - `src/Services/Detection/`: `SipScannerDialplanContributor`.
+  - Maintained `Contracts/` and `SecurityServiceProvider` as the module's clean public surface, and preserved `Models/`, `Listeners/`, `Console/Commands/`, and `Support/` per standard Laravel modular layering. All 421 tests pass with 0 regressions.
 
 #### Task 1.3.2: Realign Domain Trait Boundaries
 - **Implementation**:

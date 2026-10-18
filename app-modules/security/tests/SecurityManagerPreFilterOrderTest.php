@@ -13,7 +13,7 @@ use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 /**
  * Feature tests for the pre-filter reordering controls in the Security Manager.

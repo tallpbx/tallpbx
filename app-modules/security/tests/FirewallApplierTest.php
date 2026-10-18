@@ -17,8 +17,8 @@ use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\Firewall\FirewallApplier;
 use Modules\Security\Services\Firewall\FirewallApplyResult;
-use Modules\Security\Services\LockoutGuardService;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\LockoutGuardService;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');

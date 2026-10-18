@@ -26,16 +26,16 @@ use Modules\Security\Listeners\LogFailedLoginListener;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
 use Modules\Security\Listeners\LogFailedXmlHandlerAuthListener;
 use Modules\Security\Listeners\LogSipScannerListener;
+use Modules\Security\Services\Bans\SecurityBanService;
+use Modules\Security\Services\Bans\SecurityIncidentService;
+use Modules\Security\Services\Detection\SipScannerDialplanContributor;
 use Modules\Security\Services\Firewall\FirewallApplier;
-use Modules\Security\Services\GeoBlockingService;
-use Modules\Security\Services\IpdenyProvider;
-use Modules\Security\Services\SecurityBanService;
-use Modules\Security\Services\SecurityExecutor;
-use Modules\Security\Services\SecurityIncidentService;
-use Modules\Security\Services\SipScannerDialplanContributor;
-use Modules\Security\Services\ThreatFeedIngestionService;
-use Modules\Security\Services\ThreatFeedManager;
-use Modules\Security\Services\VoipblFeedProvider;
+use Modules\Security\Services\Firewall\SecurityExecutor;
+use Modules\Security\Services\Geo\GeoBlockingService;
+use Modules\Security\Services\Geo\IpdenyProvider;
+use Modules\Security\Services\ThreatFeeds\ThreatFeedIngestionService;
+use Modules\Security\Services\ThreatFeeds\ThreatFeedManager;
+use Modules\Security\Services\ThreatFeeds\VoipblFeedProvider;
 
 /**
  * Service provider for the security module.

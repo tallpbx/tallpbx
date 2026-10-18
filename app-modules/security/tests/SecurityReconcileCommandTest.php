@@ -7,7 +7,7 @@ namespace Tests\Feature\Modules\Security;
 use Database\Seeders\AdminSeeder;
 use Database\Seeders\SecurityServiceSeeder;
 use Mockery;
-use Modules\Security\Services\FirewallBanReconciler;
+use Modules\Security\Services\Firewall\FirewallBanReconciler;
 
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');

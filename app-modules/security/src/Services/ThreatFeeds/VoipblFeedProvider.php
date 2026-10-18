@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\ThreatFeeds;
 
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Contracts\ThreatFeedProviderInterface;

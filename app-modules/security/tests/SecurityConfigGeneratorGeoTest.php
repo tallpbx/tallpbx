@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules\Security;
 
 use Modules\Security\Models\SecurityGeoRule;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 it('generates geo set declarations in nftables ruleset', function (): void {
     $generator = new SecurityConfigGenerator;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Bans;
 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;

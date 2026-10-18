@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Security\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Security\Services\FirewallBanReconciler;
+use Modules\Security\Services\Firewall\FirewallBanReconciler;
 
 /**
  * Artisan command to reconcile Linux kernel dynamic ban sets with MariaDB.

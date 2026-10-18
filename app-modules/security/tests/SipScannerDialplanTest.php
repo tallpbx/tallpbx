@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules\Security;
 
 use Database\Seeders\SecurityServiceSeeder;
-use Modules\Security\Services\SipScannerDialplanContributor;
+use Modules\Security\Services\Detection\SipScannerDialplanContributor;
 use Modules\Security\Support\SipScannerSignatures;
 
 /**

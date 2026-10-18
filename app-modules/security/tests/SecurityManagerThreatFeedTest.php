@@ -16,10 +16,10 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Models\SecurityThreatFeed;
-use Modules\Security\Services\SecurityConfigGenerator;
-use Modules\Security\Services\ThreatFeedIngestionService;
-use Modules\Security\Services\ThreatFeedManager;
-use Modules\Security\Services\VoipblFeedProvider;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
+use Modules\Security\Services\ThreatFeeds\ThreatFeedIngestionService;
+use Modules\Security\Services\ThreatFeeds\ThreatFeedManager;
+use Modules\Security\Services\ThreatFeeds\VoipblFeedProvider;
 
 /**
  * Feature tests for the Threat Feeds tab of the Security Center.

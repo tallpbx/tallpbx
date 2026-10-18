@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\ThreatFeeds;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;

@@ -9,7 +9,7 @@ use Modules\Security\Exceptions\LockoutException;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Services\Firewall\LockoutGuardService;
 
 /**
  * Feature tests for LockoutGuardService.

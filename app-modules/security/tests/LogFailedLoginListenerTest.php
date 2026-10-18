@@ -13,7 +13,7 @@ use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityIncidentService;
+use Modules\Security\Services\Bans\SecurityIncidentService;
 
 /**
  * Feature tests for the in-process authentication failure listener (Web UI Vector).

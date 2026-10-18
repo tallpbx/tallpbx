@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Services\Firewall\LockoutGuardService;
 use Modules\Security\Support\ObserveMetricsParser;
 
 /**

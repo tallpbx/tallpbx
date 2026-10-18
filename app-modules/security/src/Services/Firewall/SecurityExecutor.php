@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Firewall;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;

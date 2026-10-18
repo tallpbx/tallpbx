@@ -11,7 +11,7 @@ use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 /**
  * Feature tests for SecurityConfigGenerator.

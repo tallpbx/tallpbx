@@ -31,9 +31,9 @@ use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Models\SecurityThreatFeed;
-use Modules\Security\Services\FirewallSyncVerifier;
-use Modules\Security\Services\LockoutGuardService;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\FirewallSyncVerifier;
+use Modules\Security\Services\Firewall\LockoutGuardService;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 use Modules\Security\Support\SipScannerSignatures;
 
 #[Layout('layouts.app')]

@@ -15,7 +15,7 @@ use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 /**
  * Feature tests for the evaluation-ordered tab restructure.

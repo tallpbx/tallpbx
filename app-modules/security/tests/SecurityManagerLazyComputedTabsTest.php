@@ -15,7 +15,7 @@ use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Livewire\SecurityManager;
 use Modules\Security\Models\SecurityGeoRule;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');

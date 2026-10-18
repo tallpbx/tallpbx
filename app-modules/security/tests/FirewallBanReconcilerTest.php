@@ -11,9 +11,9 @@ use Mockery;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
-use Modules\Security\Services\FirewallBanReconciler;
-use Modules\Security\Services\LockoutGuardService;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\FirewallBanReconciler;
+use Modules\Security\Services\Firewall\LockoutGuardService;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');

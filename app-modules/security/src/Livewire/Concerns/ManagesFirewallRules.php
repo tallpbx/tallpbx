@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Services\Firewall\LockoutGuardService;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 /**

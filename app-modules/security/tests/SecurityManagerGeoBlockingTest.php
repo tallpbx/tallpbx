@@ -17,8 +17,8 @@ use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\GeoBlockingService;
-use Modules\Security\Services\SecurityConfigGenerator;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
+use Modules\Security\Services\Geo\GeoBlockingService;
 
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');

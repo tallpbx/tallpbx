@@ -12,7 +12,7 @@ use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Rules\ValidFirewallAddress;
-use Modules\Security\Services\LockoutGuardService;
+use Modules\Security\Services\Firewall\LockoutGuardService;
 use Modules\Security\Support\SipScannerSignatures;
 
 /**

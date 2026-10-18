@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Security\Services;
+namespace Modules\Security\Services\Firewall;
 
 use Illuminate\Support\Facades\Log;
 use Modules\Security\Models\SecurityGeoRule;

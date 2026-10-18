@@ -14,8 +14,8 @@ use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Services\SecurityBanService;
-use Modules\Security\Services\SecurityIncidentService;
+use Modules\Security\Services\Bans\SecurityBanService;
+use Modules\Security\Services\Bans\SecurityIncidentService;
 
 /**
  * Feature tests for SecurityBanService and host ban management.
