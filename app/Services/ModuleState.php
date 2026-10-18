@@ -41,6 +41,41 @@ class ModuleState
     private array $enabledModules = [];
 
     /**
+     * Explicit override for test suites or programmatic calls to migrate all modules.
+     */
+    private static ?bool $forceAllModulesMigrations = null;
+
+    /**
+     * Set a static override for whether all modules should register migrations regardless of enabled state.
+     */
+    public static function setForceAllModulesMigrations(?bool $force): void
+    {
+        self::$forceAllModulesMigrations = $force;
+    }
+
+    /**
+     * Determine whether all modules should register migrations regardless of enabled state.
+     */
+    public function shouldMigrateAll(): bool
+    {
+        if (self::$forceAllModulesMigrations !== null) {
+            return self::$forceAllModulesMigrations;
+        }
+
+        if (function_exists('app') && app()->runningInConsole()) {
+            $argv = $_SERVER['argv'] ?? [];
+
+            foreach ($argv as $arg) {
+                if ($arg === '--all-modules' || str_starts_with($arg, '--all-modules=')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Determine whether a module should participate in runtime registration.
      */
     public function isEnabled(string $module): bool

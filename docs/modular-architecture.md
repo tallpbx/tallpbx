@@ -70,18 +70,32 @@ flowchart TD
     B --> C["2. registerTranslations()<br/>lang/ or resources/lang/"]:::step
     
     C --> D{"Translations Exist?"}:::guard
-    D -->|No| E["3. registerMigrations()"]:::step
+    D -->|No| E["3. registerConfig()<br/>config/module.php"]:::step
     D -->|Yes| F["validateNoCollisions()<br/>Check against root lang/en/admin.php"]:::guard
     
     F -->|Collision Detected| G["❌ REJECT MODULE LANGUAGE FILE<br/>Throw LogicException in local/test<br/>Log critical error in production"]:::reject
     F -->|Zero Collisions| H["✅ Register Multi-Path<br/>loader->addPath(path)<br/>loadTranslationsFrom(path, module)"]:::pass
     
     H --> E
-    E --> I["4. registerConfig()<br/>config/module.php"]:::step
-    I --> J{"Module Enabled in ModuleState?"}:::guard
-    J -->|No| K["Halt Further Registration"]:::step
-    J -->|Yes| L["5. Register Routes, Livewire, Menu, Permissions, Listeners, Commands"]:::pass
+    E --> I{"Module Enabled or<br/>--all-modules / shouldMigrateAll()?"}:::guard
+    I -->|Yes| J["4. registerMigrations()<br/>database/migrations -> migrator"]:::pass
+    I -->|No| K["Skip registerMigrations()"]:::step
+    
+    J --> L{"Module Enabled in ModuleState?"}:::guard
+    K --> L
+    L -->|No| M["Halt Further Registration"]:::step
+    L -->|Yes| N["5. Register Routes, Livewire, Menu, Permissions, Listeners, Commands"]:::pass
 ```
+
+### 3.1 Migration Gating and `--all-modules` Flag
+
+By default, disabled modules do not register their database migrations. This ensures standard maintenance commands like `php artisan migrate` only mutate the database schema for active, enabled modules and the shared kernel.
+
+When an administrator or automated deployment script needs to retain or run database migrations across all installed modules regardless of enablement state, pass the global `--all-modules` flag:
+```bash
+php artisan migrate --all-modules
+```
+Programmatic tests and maintenance jobs can control this behavior using `ModuleState::setForceAllModulesMigrations(true)`.
 
 ---
 

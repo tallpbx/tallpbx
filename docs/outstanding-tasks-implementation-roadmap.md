@@ -45,7 +45,7 @@
 | 4.1 | Shared kernel boundary architecture test & listener migration | Verified | 2026-10-18 |
 | 4.2 | Enforce contract seams over cross-module model imports | Verified | 2026-10-18 |
 | 4.3 | Consolidate module route registration | Verified | 2026-10-18 |
-| 4.4 | Clarify disabled module lifecycle semantics | Pending | 2026-10-16 |
+| 4.4 | Clarify disabled module lifecycle semantics | Verified | 2026-10-18 |
 | 4.5 | Clean up `TenantContext::current()` side effects | Pending | 2026-10-16 |
 | 4.6 | Decompose large shared-kernel classes | Pending | 2026-10-16 |
 | 4.7 | Environment variable documentation reference | Pending | 2026-10-16 |
@@ -272,11 +272,17 @@
   - Verified 100% bit-for-bit route parity across all 198 application routes (`routes_before.json` vs `routes_after.json` diff was 0 differences).
 - **Verification**: Verified via `ModuleRoutesArchitectureTest` (3 tests, 5 assertions), `ModuleServiceProviderTest` (21 tests, 243 assertions), all architecture tests (20 tests, 772 assertions), and Pint code style linting.
 
-### Task 4.4: Clarify Disabled Module Lifecycle Semantics (Arch Audit M3)
-- **Problem**: `ModuleServiceProvider::boot()` registers views, translations, migrations, and config before the `ModuleState::isEnabled()` gate. `php artisan migrate` creates schema for disabled modules.
+### Task 4.4: Clarify Disabled Module Lifecycle Semantics (Arch Audit M3) [COMPLETED]
+- **Problem**: `ModuleServiceProvider::boot()` registered views, translations, migrations, and config before the `ModuleState::isEnabled()` gate. `php artisan migrate` created database schema for disabled modules by default.
 - **Implementation**:
-  - Move migration and route registration behind the `isEnabled()` check, providing an explicit `--all-modules` flag for migrations if schema retention is desired.
-  - Align documentation in `docs/modular-architecture.md` with the exact execution order.
+  - Gated `registerMigrations()` in `App\Support\ModuleServiceProvider::boot()` behind `$isEnabled || $modules->shouldMigrateAll()`, ensuring disabled modules omit migrations during standard application boot.
+  - Added global `--all-modules` option to Artisan console definition via `ConsoleApplication::starting()`, allowing operators and scripts to migrate all modules explicitly (`php artisan migrate --all-modules`).
+  - Added `CommandStarting` and `CommandFinished` lifecycle listeners in `AppServiceProvider` to register all module migrations on-demand when `--all-modules` is passed, with clean state reset on completion.
+  - Added programmatic control helpers `ModuleState::setForceAllModulesMigrations(?bool $force)` and `ModuleState::shouldMigrateAll(): bool`.
+  - Added `ModuleServiceProvider::allMigrationPaths()` helper discovering all `database/migrations` across `app-modules/`, `custom-modules/`, and `vendor/`.
+  - Updated Mermaid sequence diagram and documentation in `docs/modular-architecture.md` Section 3.
+  - Added Pest test suite `tests/Feature/Support/DisabledModuleMigrationLifecycleTest.php` testing enabled, disabled, forced, CLI parameter, and command execution scenarios.
+- **Verification**: Verified via `DisabledModuleMigrationLifecycleTest` (7 tests, 107 assertions), `tests/Feature/Support/` (27 tests, 146 assertions), `ModuleServiceProviderTest` (18 tests, 238 assertions), all architecture tests (20 tests, 772 assertions), Pint code style linting, and Artisan CLI help inspection.
 
 ### Task 4.5: Clean up `TenantContext::current()` Read-vs-Mutation Side Effects (Arch Audit L3)
 - **Problem**: `TenantContext::current()` mutates global `TenantManager` state as a side effect of a read operation.
@@ -351,6 +357,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `f8d1f12a` | **Architecture / Modular** | **Clarify Disabled Module Migration Lifecycle Semantics**: Gated `registerMigrations()` in `ModuleServiceProvider::boot()` behind `$isEnabled || $modules->shouldMigrateAll()`, ensuring disabled modules omit migrations during standard boot. Added global `--all-modules` console option (`php artisan migrate --all-modules`) and `CommandStarting` / `CommandFinished` listeners in `AppServiceProvider` to register all module migrations on-demand with clean state cleanup. Added `ModuleState::setForceAllModulesMigrations()`, `ModuleServiceProvider::allMigrationPaths()`, updated `docs/modular-architecture.md`, and created test suite `DisabledModuleMigrationLifecycleTest`. *(Resolves Task 4.4 / Arch Audit M3)* |
 | **2026-10-18** | `d81e58f6` | **Architecture / Modular** | **Consolidate Module Route Registration**: Standardized all 60 modules on explicit `routes/web.php` route declarations, eliminating runtime reflection-based auto-registration in `ModuleServiceProvider::autoRegisterRouteGroups()`. Retired ~170 lines of reflection-heavy magic routing code, retained custom-module collision guards, added `ModuleRoutesArchitectureTest` enforcing explicit route files and named routes across all modules, and verified bit-for-bit route parity across all 198 application routes. *(Resolves Task 4.3 / Arch Audit M2)* |
 | **2026-10-18** | `513afcae` | **Architecture / Modular** | **Enforce Contract Seams Over Cross-Module Model Imports**: Established directional architecture test `ContractSeamsArchitectureTest` forbidding direct instantiation or persistence of `FileStore` or `MediaAsset` outside `Modules\FileStores`, and `Extension` outside `Modules\Extensions`. Injected and wired `ExtensionServiceInterface` across `call-forwards` (`CallForwardService`) and `provision` (`ProvisionService`), expanded `FileStoreServiceInterface` and `ExtensionServiceInterface` with contract query APIs (`find()`, `getOrCreateLocal()`), and refactored `BackupService` to route through contract seams. *(Resolves Task 4.2 / Arch Audit M1)* |
 | **2026-10-18** | `e4e06923` | **Architecture / Modular** | **Shared Kernel Boundary Architecture Test & Listener Modularization**: Added Pest architecture test `SharedKernelBoundaryTest` enforcing that `app/` does not import `Modules\*` outside an explicit, documented allowlist with verified justifications. Migrated 3 domain listeners out of `app/Listeners/FreeSwitch/` (`RegisterCompletedCallRecording`, `RegisterCompletedVoicemailMessage`, `MarkBroadcastRecipientOutcome`) into their respective module boundaries (`CallRecordings`, `VoicemailMessages`, `CallBroadcast`), retired `app/Listeners/FreeSwitch/`, and added unit test `MarkBroadcastRecipientOutcomeTest`. *(Resolves Task 4.1 / Arch Audit M5)* |

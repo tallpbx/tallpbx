@@ -51,11 +51,14 @@ use App\Services\UserService;
 use App\Services\UserServiceInterface;
 use App\Support\GeneratedFilePermissions;
 use App\Support\MigrationSafetyGuard;
+use App\Support\ModuleServiceProvider as BaseModuleServiceProvider;
 use App\Support\PrimaryDatabaseSafety;
 use App\Support\SystemProcessRunner;
 use App\Support\TestDatabaseSafety;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
@@ -109,6 +112,7 @@ use Modules\TenantLimits\Models\TenantLimit;
 use Modules\TimeConditions\Models\TimeCondition;
 use Modules\VoicemailMessages\Models\VoicemailMessage;
 use Modules\Voicemails\Models\Voicemail;
+use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Application service provider.
@@ -286,6 +290,22 @@ class AppServiceProvider extends ServiceProvider
         Model::preventLazyLoading(! $this->app->isProduction());
 
         if ($this->app->runningInConsole()) {
+            ConsoleApplication::starting(function ($artisan): void {
+                $artisan->getDefinition()->addOption(
+                    new InputOption('all-modules', null, InputOption::VALUE_NONE, 'Run migrations for all modules, including disabled modules')
+                );
+            });
+
+            Event::listen(CommandStarting::class, function (CommandStarting $event): void {
+                if ($event->input->hasParameterOption('--all-modules')) {
+                    ModuleState::setForceAllModulesMigrations(true);
+                    $migrator = $this->app->make('migrator');
+                    foreach (BaseModuleServiceProvider::allMigrationPaths() as $path) {
+                        $migrator->path($path);
+                    }
+                }
+            });
+
             Event::listen(MigrationStarted::class, function (MigrationStarted $event): void {
                 if ($event->method === 'up') {
                     $this->app->make(MigrationSafetyGuard::class)->startMigration((string) $event->name);
@@ -299,6 +319,8 @@ class AppServiceProvider extends ServiceProvider
             });
 
             Event::listen(CommandFinished::class, function (CommandFinished $event): void {
+                ModuleState::setForceAllModulesMigrations(null);
+
                 // The full repair already includes generated paths. Avoid a
                 // redundant second pass when the repair command itself exits.
                 if ($event->command === 'permissions:repair') {

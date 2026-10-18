@@ -66,10 +66,15 @@ abstract class ModuleServiceProvider extends ServiceProvider
     {
         $this->registerViews();
         $this->registerTranslations();
-        $this->registerMigrations();
         $this->registerConfig();
 
-        if (! $modules->isEnabled($this->moduleName())) {
+        $isEnabled = $modules->isEnabled($this->moduleName());
+
+        if ($isEnabled || $modules->shouldMigrateAll()) {
+            $this->registerMigrations();
+        }
+
+        if (! $isEnabled) {
             return;
         }
 
@@ -459,6 +464,29 @@ abstract class ModuleServiceProvider extends ServiceProvider
         }
 
         return $collisions;
+    }
+
+    /**
+     * Resolve all migration paths across all installed modules.
+     *
+     * @return array<int, string>
+     */
+    public static function allMigrationPaths(): array
+    {
+        $paths = [];
+        $candidates = array_merge(
+            glob(base_path('app-modules/*/database/migrations')) ?: [],
+            glob(base_path('custom-modules/*/database/migrations')) ?: [],
+            glob(base_path('vendor/*/*/database/migrations')) ?: [],
+        );
+
+        foreach ($candidates as $dir) {
+            if (is_dir($dir)) {
+                $paths[] = $dir;
+            }
+        }
+
+        return $paths;
     }
 
     /**
