@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Security\Livewire\Concerns;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Modules\Security\Contracts\SecurityExecutorInterface;
+use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
 use Modules\Security\Models\SecuritySetting;
@@ -17,6 +20,8 @@ use Symfony\Component\HttpFoundation\IpUtils;
 trait ManagesFirewallRules
 {
     public string $firewallDefaultPolicy = 'drop';
+
+    public bool $tftpDefenseEnabled = true;
 
     public bool $showDefaultPolicyModal = false;
 
@@ -458,5 +463,66 @@ trait ManagesFirewallRules
         if ($this->autoApplyFirewallRuleset()) {
             $this->notifySuccess((string) __('admin.security_rule_created'));
         }
+    }
+
+    /**
+     * Turn the hardened TFTP defense profile on or off.
+     */
+    public function setTftpDefense(bool $enabled, LockoutGuardService $lockoutGuard): void
+    {
+        $this->ensureEditPermission();
+
+        SecuritySetting::updateOrCreate(['key' => 'tftp_defense_enabled'], ['value' => $enabled ? '1' : '0']);
+        $this->tftpDefenseEnabled = $enabled;
+
+        SecurityAuditLog::record(
+            action: $enabled ? 'tftp_defense_enabled' : 'tftp_defense_disabled',
+            ipAddress: $this->adminIp,
+            description: $enabled
+                ? 'Hardened TFTP Defense Profile enabled: write uploads, traversal probes, and floods are blocked before the port catalog'
+                : 'Hardened TFTP Defense Profile disabled: TFTP provisioning is accepted without the defensive rules',
+            adminId: Auth::guard('admin')->id(),
+        );
+
+        if ($this->autoApplyFirewallRuleset($lockoutGuard)) {
+            $this->notifySuccess((string) __('admin.security_tftp_defense_saved'));
+        }
+    }
+
+    /**
+     * Read the per-rule TFTP defense counters from the live kernel ruleset.
+     *
+     * @return array{uploads: int|null, traversal: int|null, probes: int|null, flood: int|null}
+     */
+    public function tftpDefenseCounters(): array
+    {
+        $status = app(SecurityExecutorInterface::class)->status();
+
+        $counters = [
+            'uploads' => null,
+            'traversal' => null,
+            'probes' => null,
+            'flood' => null,
+        ];
+
+        if ($status === '') {
+            return $counters;
+        }
+
+        $extract = static function (string $pattern) use ($status): ?int {
+            return preg_match($pattern, $status, $matches) === 1 ? (int) $matches[1] : null;
+        };
+
+        $counters['uploads'] = $extract('/@th,64,16 0x0*2 counter packets (\d+)/');
+        $counters['traversal'] = $extract('/@th,80,24 0x2e2e2f counter packets (\d+)/');
+        $counters['probes'] = $extract('/(?:@th,80,16 0x2f78|@th,64,32 0x12f78) counter packets (\d+)/');
+
+        $floodV4 = $extract('/@tftp_flood4 .* counter packets (\d+)/');
+        $floodV6 = $extract('/@tftp_flood6 .* counter packets (\d+)/');
+        $counters['flood'] = ($floodV4 === null && $floodV6 === null)
+            ? null
+            : (int) (($floodV4 ?? 0) + ($floodV6 ?? 0));
+
+        return $counters;
     }
 }

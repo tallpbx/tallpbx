@@ -139,10 +139,10 @@
     - `src/Services/Detection/`: `SipScannerDialplanContributor`.
   - Maintained `Contracts/` and `SecurityServiceProvider` as the module's clean public surface, and preserved `Models/`, `Listeners/`, `Console/Commands/`, and `Support/` per standard Laravel modular layering. All 421 tests pass with 0 regressions.
 
-#### Task 1.3.2: Realign Domain Trait Boundaries
+#### Task 1.3.2: Realign Domain Trait Boundaries [COMPLETED]
 - **Implementation**:
-  - Move misplaced methods in `SecurityManager` concern traits to their visual domain match:
-    - Move `setTftpDefense()` and `tftpDefenseCounters()` from `ManagesAttackProtection` into `ManagesFirewallRules` (where the TFTP workbench is visually rendered).
+  - Moved misplaced methods in `SecurityManager` concern traits to their visual domain match:
+    - Moved `$tftpDefenseEnabled`, `setTftpDefense()`, and `tftpDefenseCounters()` from `ManagesAttackProtection` into `ManagesFirewallRules` (where the TFTP workbench is visually rendered). Verified with targeted `SecurityManagerTftpTest` and full 421-test suite.
 
 #### Task 1.3.3: Decompose Oversized Tab Views into Partials
 - **Implementation**:
