@@ -42,6 +42,21 @@ beforeEach(function (): void {
     $this->executor->shouldReceive('unban')->andReturn(true);
     $this->executor->shouldReceive('apply')->andReturn(true);
     $this->executor->shouldReceive('status')->andReturnUsing(fn (): string => $this->statusOutput);
+    $this->executor->shouldReceive('observeEvents')->andReturn([
+        [
+            'timestamp' => '2026-10-08 22:44:33',
+            'raw_timestamp' => '2026-10-08T22:44:33-07:00',
+            'stage' => 'bans',
+            'stage_label' => 'Banned Attacker',
+            'interface' => 'veth-host',
+            'src_ip' => '10.254.254.2',
+            'dst_ip' => '10.254.254.1',
+            'proto' => 'UDP',
+            'spt' => '43032',
+            'dpt' => '69',
+            'raw' => 'raw-line',
+        ],
+    ]);
     $this->executor->shouldReceive('flushConntrack')->andReturn(true);
     $this->app->instance(SecurityExecutorInterface::class, $this->executor);
 
@@ -333,4 +348,54 @@ it('explains in the UI where banned IPs are put in the firewall', function (): v
         ->assertSee(__('admin.security_no_attackers_help'))
         ->call('openManualBanModal')
         ->assertSee(__('admin.security_manual_ban_desc'));
+});
+
+/*
+|--------------------------------------------------------------------------
+| Observed Traffic Activity Drawer Tests
+|--------------------------------------------------------------------------
+*/
+
+it('renders the observe banner with live packet hits when observe mode is active', function (): void {
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    $this->statusOutput = "table inet tallpbx_filter {\n chain input {\n ip saddr @banned_ips counter packets 15 bytes 750 log prefix \"tallpbx-observe:bans \" limit rate 100/minute\n }\n}";
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('firewallObserveMode', true)
+        ->assertSee(__('admin.security_observe_banner_title'))
+        ->assertSee(__('admin.security_observe_banner_view_activity'))
+        ->assertSee('15 would-be drops');
+});
+
+it('opens and closes the observed traffic activity drawer without polling or manual refresh', function (): void {
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->assertSet('showObserveDrawer', false)
+        ->call('openObserveDrawer')
+        ->assertSet('showObserveDrawer', true)
+        ->assertSee(__('admin.security_observe_drawer_title'))
+        ->assertSee('Banned Attackers')
+        ->assertSee('10.254.254.2')
+        ->assertSee('LIVE ECHO')
+        ->assertDontSee('wire:click="$refresh"', false)
+        ->assertDontSee('wire:poll', false)
+        ->call('closeObserveDrawer')
+        ->assertSet('showObserveDrawer', false);
+});
+
+it('reacts to ObserveTrafficLogged echo push event while drawer is open', function (): void {
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->call('openObserveDrawer')
+        ->assertSet('showObserveDrawer', true);
+
+    $component->dispatch('echo-private:security.alerts,.ObserveTrafficLogged')
+        ->assertSet('showObserveDrawer', true)
+        ->assertSee('10.254.254.2');
 });

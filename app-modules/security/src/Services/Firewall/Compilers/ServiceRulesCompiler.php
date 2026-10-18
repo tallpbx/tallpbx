@@ -14,6 +14,9 @@ use Modules\Security\Models\SecurityService;
  */
 class ServiceRulesCompiler
 {
+    /**
+     * Create a new ServiceRulesCompiler instance.
+     */
     public function __construct(
         protected BlocklistCompiler $blocklistCompiler = new BlocklistCompiler,
     ) {}

@@ -51,21 +51,33 @@ class SecurityConfigGenerator
 
     protected ?ServiceRulesCompiler $serviceRulesCompiler = null;
 
+    /**
+     * Get the BlocklistCompiler instance.
+     */
     public function getBlocklistCompiler(): BlocklistCompiler
     {
         return $this->blocklistCompiler ??= new BlocklistCompiler;
     }
 
+    /**
+     * Get the GeoPerimeterCompiler instance.
+     */
     public function getGeoPerimeterCompiler(): GeoPerimeterCompiler
     {
         return $this->geoPerimeterCompiler ??= new GeoPerimeterCompiler($this->getBlocklistCompiler());
     }
 
+    /**
+     * Get the PreFilterCompiler instance.
+     */
     public function getPreFilterCompiler(): PreFilterCompiler
     {
         return $this->preFilterCompiler ??= new PreFilterCompiler($this->getBlocklistCompiler());
     }
 
+    /**
+     * Get the ServiceRulesCompiler instance.
+     */
     public function getServiceRulesCompiler(): ServiceRulesCompiler
     {
         return $this->serviceRulesCompiler ??= new ServiceRulesCompiler($this->getBlocklistCompiler());

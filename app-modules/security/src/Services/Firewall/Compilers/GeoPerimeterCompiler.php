@@ -11,6 +11,9 @@ use Modules\Security\Models\SecurityGeoRule;
  */
 class GeoPerimeterCompiler
 {
+    /**
+     * Create a new GeoPerimeterCompiler instance.
+     */
     public function __construct(
         protected BlocklistCompiler $blocklistCompiler = new BlocklistCompiler,
     ) {}

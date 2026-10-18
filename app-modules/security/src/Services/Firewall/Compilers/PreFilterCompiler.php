@@ -44,6 +44,9 @@ class PreFilterCompiler
      */
     private const TFTP_FLOOD_MAX = 10000;
 
+    /**
+     * Create a new PreFilterCompiler instance.
+     */
     public function __construct(
         protected BlocklistCompiler $blocklistCompiler = new BlocklistCompiler,
     ) {}

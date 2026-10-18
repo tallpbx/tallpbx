@@ -7,6 +7,7 @@ namespace Tests\Feature\Modules\Security;
 use Database\Seeders\SecurityServiceSeeder;
 use Illuminate\Support\Carbon;
 use Modules\Security\Models\SecurityBan;
+use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
@@ -533,4 +534,504 @@ it('formats concise nftables match expressions for services and rules', function
     ]);
     $linkedRule->setRelation('service', $webService);
     expect($linkedRule->nftables_rule)->toBe('tcp dport { 80, 443 }');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Geo-Blocking Ruleset Generation Tests
+|--------------------------------------------------------------------------
+*/
+
+it('generates geo set declarations in nftables ruleset', function (): void {
+    $generator = new SecurityConfigGenerator;
+    $nft = $generator->generate();
+
+    expect($nft)->toContain('set geo_blocked_ips {')
+        ->and($nft)->toContain('set geo_blocked_ips6 {')
+        ->and($nft)->toContain('set geo_allowed_ips {')
+        ->and($nft)->toContain('set geo_allowed_ips6 {');
+});
+
+it('emits blacklist geo drop rules for all traffic when enabled', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'blacklist',
+        'countries' => ['CN', 'RU'],
+    ]);
+
+    $generator = new SecurityConfigGenerator;
+    $nft = $generator->generate();
+
+    expect($nft)->toContain('# STAGE 9.5: GEO-BLOCKING')
+        ->and($nft)->toContain('jump geo_perimeter')
+        ->and($nft)->toContain('chain geo_perimeter {')
+        ->and($nft)->toContain('ip saddr @geo_blocked_ips counter drop')
+        ->and($nft)->toContain('ip6 saddr @geo_blocked_ips6 counter drop')
+        ->and($nft)->not->toContain('ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } accept');
+});
+
+it('emits all-traffic whitelist geo drop rules when in geofence mode', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'whitelist',
+        'countries' => ['US', 'CA'],
+    ]);
+
+    $generator = new SecurityConfigGenerator;
+    $nft = $generator->generate();
+
+    expect($nft)->toContain('# STAGE 9.5: GEO-BLOCKING')
+        ->and($nft)->toContain('jump geo_perimeter')
+        ->and($nft)->toContain('chain geo_perimeter {')
+        ->and($nft)->toContain('ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } return')
+        ->and($nft)->toContain('ip saddr != @geo_allowed_ips counter drop')
+        ->and($nft)->toContain('ip6 saddr != @geo_allowed_ips6 counter drop')
+        ->and($nft)->not->toContain('ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } accept');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Global Observe Mode Ruleset Generation Tests
+|--------------------------------------------------------------------------
+*/
+
+it('converts every drop rule into a rate-limited counter log without verdicts', function (): void {
+    SecurityRule::create([
+        'sequence' => 7,
+        'description' => 'Observed custom drop',
+        'source_ip' => '192.0.2.0/24',
+        'custom_port' => '3000',
+        'custom_protocol' => 'udp',
+        'action' => 'drop',
+        'enabled' => true,
+    ]);
+
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    expect($nft)->toContain('iif "lo" accept')
+        ->and($nft)->toContain('ip saddr @whitelist_ips accept')
+        ->and($nft)->toContain('ct state established,related accept')
+        ->and($nft)->toContain('icmp type echo-request limit rate 5/second burst 5 packets accept');
+
+    expect($nft)->not->toContain('ct state invalid drop')
+        ->and($nft)->toContain('ct state invalid counter log prefix "tallpbx-observe:invalid " limit rate 100/minute')
+        ->and($nft)->not->toContain('ip saddr @blacklist_ips drop')
+        ->and($nft)->toContain('ip saddr @blacklist_ips counter log prefix "tallpbx-observe:blacklist " limit rate 100/minute')
+        ->and($nft)->toContain('ip6 saddr @blacklist_ips6 counter log prefix "tallpbx-observe:blacklist " limit rate 100/minute')
+        ->and($nft)->toContain('ip saddr @banned_ips counter log prefix "tallpbx-observe:bans " limit rate 100/minute')
+        ->and($nft)->toContain('ip saddr @external_blocklist_ips counter log prefix "tallpbx-observe:threat_feeds " limit rate 100/minute');
+
+    expect($nft)->not->toContain('udp dport 3000 drop')
+        ->and($nft)->toContain('ip saddr 192.0.2.0/24 udp dport 3000 counter log prefix "tallpbx-observe:custom " limit rate 100/minute');
+});
+
+it('forces the chain policy to accept and validates against the real nft parser', function (): void {
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    $tempDir = sys_get_temp_dir().'/tallpbx_observe_mode_test_'.uniqid();
+    $generator = new SecurityConfigGenerator($tempDir);
+    $nft = $generator->generate();
+
+    expect($nft)->toContain('type filter hook input priority -10; policy accept;')
+        ->and($nft)->toContain('# tallpbx-policy: accept')
+        ->and($nft)->toContain('# STAGE 12: DEFAULT INBOUND POLICY');
+
+    $pending = $generator->writePending();
+    try {
+        expect($generator->validateSyntax($pending))->toBeTrue();
+    } finally {
+        @unlink($pending);
+        @rmdir($tempDir);
+    }
+});
+
+it('restores the enforcing ruleset when observe mode is turned off', function (): void {
+    $baseline = (new SecurityConfigGenerator)->generate();
+
+    SecuritySetting::set('firewall_observe_mode', true);
+    $observed = (new SecurityConfigGenerator)->generate();
+    expect($observed)->not->toBe($baseline);
+
+    SecuritySetting::set('firewall_observe_mode', false);
+    expect((new SecurityConfigGenerator)->generate())->toBe($baseline);
+});
+
+it('keeps the ruleset byte-identical when firewall_observe_mode is absent or false', function (): void {
+    $default = (new SecurityConfigGenerator)->generate();
+
+    SecuritySetting::set('firewall_observe_mode', false);
+
+    expect((new SecurityConfigGenerator)->generate())->toBe($default);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Two-Switches (Firewall & Pre-filter Enabled/Disabled) Tests
+|--------------------------------------------------------------------------
+*/
+
+it('skips the protection stages, keeps the stored policy, and documents the remaining drop rules', function (): void {
+    SecurityRule::create([
+        'sequence' => 5,
+        'description' => 'Kept custom rule',
+        'source_ip' => '203.0.113.77',
+        'custom_port' => '9443',
+        'custom_protocol' => 'tcp',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    SecuritySetting::set('prefilter_enabled', false);
+
+    $tempDir = sys_get_temp_dir().'/tallpbx_prefilter_off_test_'.uniqid();
+    $generator = new SecurityConfigGenerator($tempDir);
+    $nft = $generator->generate();
+
+    expect($nft)->not->toContain('iif "lo" accept')
+        ->and($nft)->not->toContain('ip saddr @whitelist_ips accept')
+        ->and($nft)->not->toContain('ip6 saddr @whitelist_ips6 accept')
+        ->and($nft)->not->toContain('ct state invalid drop')
+        ->and($nft)->not->toContain('ct state established,related accept')
+        ->and($nft)->not->toContain('ip saddr @blacklist_ips drop')
+        ->and($nft)->not->toContain('ip saddr @banned_ips drop')
+        ->and($nft)->not->toContain('ip saddr @external_blocklist_ips counter drop')
+        ->and($nft)->toContain('type filter hook input priority -10; policy drop;')
+        ->and($nft)->toContain('# tallpbx-policy: drop')
+        ->and($nft)->toContain('ip protocol icmp icmp type echo-request')
+        ->and($nft)->toContain('udp dport { 5060, 5061, 5080 } accept')
+        ->and($nft)->toContain('# Rule 5: Kept custom rule')
+        ->and($nft)->toContain('# STAGE 12: DEFAULT INBOUND POLICY')
+        ->and($nft)->toContain('tcp dport { 80, 443 }')
+        ->and($nft)->toContain('tcp dport 22');
+
+    $dropRules = array_values(array_filter(
+        explode("\n", $nft),
+        static fn (string $line): bool => str_contains($line, ' drop')
+            && ! str_starts_with(ltrim($line), '#')
+            && ! str_contains($line, 'policy')
+            && trim($line) !== 'drop',
+    ));
+    expect($dropRules)->toHaveCount(5);
+    foreach ($dropRules as $rule) {
+        expect(trim($rule))->toStartWith('udp dport 69');
+    }
+
+    expect($nft)->toContain('set whitelist_ips {')
+        ->and($nft)->toContain('set external_blocklist_ips {');
+
+    $pending = $generator->writePending();
+    try {
+        expect($generator->validateSyntax($pending))->toBeTrue();
+    } finally {
+        @unlink($pending);
+        @rmdir($tempDir);
+    }
+});
+
+it('keeps explicitly authored custom drop rules in force while the pre-filter is off', function (): void {
+    SecurityRule::create([
+        'sequence' => 30,
+        'description' => 'Block RDP scanners',
+        'source_ip' => 'any',
+        'custom_port' => '3389',
+        'custom_protocol' => 'tcp',
+        'action' => 'drop',
+        'enabled' => true,
+    ]);
+
+    SecuritySetting::set('prefilter_enabled', false);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    $dropRules = array_values(array_filter(
+        explode("\n", $nft),
+        static fn (string $line): bool => str_contains($line, ' drop')
+            && ! str_starts_with(ltrim($line), '#')
+            && ! str_contains($line, 'policy')
+            && trim($line) !== 'drop',
+    ));
+    expect($dropRules)->toHaveCount(6);
+
+    $authoredDrops = array_values(array_filter(
+        $dropRules,
+        static fn (string $rule): bool => ! str_starts_with(trim($rule), 'udp dport 69'),
+    ));
+
+    expect($authoredDrops)->toHaveCount(1)
+        ->and(trim($authoredDrops[0]))->toBe('tcp dport 3389 drop');
+});
+
+it('keeps the ruleset byte-identical when prefilter_enabled is absent or true', function (): void {
+    $default = (new SecurityConfigGenerator)->generate();
+
+    SecuritySetting::set('prefilter_enabled', true);
+
+    expect((new SecurityConfigGenerator)->generate())->toBe($default);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Pre-Filter Stage Order and Validation Tests
+|--------------------------------------------------------------------------
+*/
+
+it('accepts exactly the permutations that satisfy the safety constraints', function (): void {
+    $generator = new SecurityConfigGenerator;
+    $dropStages = ['invalid', 'blacklist', 'banned', 'threat_feeds'];
+    $accepted = 0;
+    $rejected = 0;
+
+    $permutations = function (?array $items = null) use (&$permutations): array {
+        $items ??= SecurityConfigGenerator::DEFAULT_PRE_FILTER_ORDER;
+        if (count($items) <= 1) {
+            return [$items];
+        }
+        $result = [];
+        foreach ($items as $index => $item) {
+            $rest = $items;
+            array_splice($rest, $index, 1);
+            foreach ($permutations($rest) as $tail) {
+                $result[] = array_merge([$item], $tail);
+            }
+        }
+
+        return $result;
+    };
+
+    foreach ($permutations() as $permutation) {
+        $whitelistPosition = array_search('whitelist', $permutation, true);
+        $expected = $permutation[0] === 'loopback';
+
+        foreach ($dropStages as $dropStage) {
+            if (array_search($dropStage, $permutation, true) < $whitelistPosition) {
+                $expected = false;
+            }
+        }
+
+        try {
+            $generator->assertValidPreFilterOrder($permutation);
+            $isValid = true;
+        } catch (\RuntimeException) {
+            $isValid = false;
+        }
+
+        expect($isValid)->toBe($expected);
+        $expected ? $accepted++ : $rejected++;
+    }
+
+    expect($accepted)->toBeGreaterThan(0)->and($rejected)->toBeGreaterThan(0);
+});
+
+it('emits the pre-filter stages in the stored order', function (): void {
+    $order = ['loopback', 'whitelist', 'fast_path', 'invalid', 'banned', 'blacklist', 'threat_feeds'];
+    SecuritySetting::set('pre_filter_order', json_encode($order));
+
+    $tempDir = sys_get_temp_dir().'/tallpbx_prefilter_order_test_'.uniqid();
+    $generator = new SecurityConfigGenerator($tempDir);
+    $nft = $generator->generate();
+
+    $whitelistAccept = strpos($nft, 'ip saddr @whitelist_ips accept');
+    $fastPath = strpos($nft, 'ct state established,related accept');
+    $invalidDrop = strpos($nft, 'ct state invalid drop');
+    $bannedDrop = strpos($nft, 'ip saddr @banned_ips drop');
+    $blacklistDrop = strpos($nft, 'ip saddr @blacklist_ips drop');
+
+    expect($whitelistAccept)->toBeLessThan($fastPath)
+        ->and($fastPath)->toBeLessThan($invalidDrop)
+        ->and($invalidDrop)->toBeLessThan($bannedDrop)
+        ->and($bannedDrop)->toBeLessThan($blacklistDrop)
+        ->and($nft)->toContain('# STAGE 3: STATEFUL FAST PATH')
+        ->and($nft)->toContain('# STAGE 4: DROP INVALID PACKETS');
+
+    $pending = $generator->writePending();
+    try {
+        expect($generator->validateSyntax($pending))->toBeTrue();
+    } finally {
+        @unlink($pending);
+        @rmdir($tempDir);
+    }
+});
+
+it('refuses to compile a stored order placing a drop stage above the whitelist', function (): void {
+    SecuritySetting::set('pre_filter_order', json_encode([
+        'loopback', 'invalid', 'whitelist', 'fast_path', 'blacklist', 'banned', 'threat_feeds',
+    ]));
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, 'whitelist');
+});
+
+it('refuses a stored order that is not exactly the seven known stages', function (): void {
+    SecuritySetting::set('pre_filter_order', json_encode([
+        'loopback', 'whitelist', 'invalid', 'fast_path', 'blacklist', 'banned',
+    ]));
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, 'pre-filter order');
+
+    SecuritySetting::set('pre_filter_order', json_encode([
+        'loopback', 'loopback', 'whitelist', 'invalid', 'fast_path', 'blacklist', 'banned',
+    ]));
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, 'pre-filter order');
+
+    SecuritySetting::set('pre_filter_order', '{not-json');
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, 'pre-filter order');
+});
+
+it('refuses a stored order that does not start with loopback', function (): void {
+    SecuritySetting::set('pre_filter_order', json_encode([
+        'whitelist', 'loopback', 'invalid', 'fast_path', 'blacklist', 'banned', 'threat_feeds',
+    ]));
+
+    expect(fn () => (new SecurityConfigGenerator)->generate())
+        ->toThrow(\RuntimeException::class, 'loopback');
+});
+
+it('keeps the ruleset byte-identical when the default order is stored explicitly', function (): void {
+    $default = (new SecurityConfigGenerator)->generate();
+
+    SecuritySetting::set('pre_filter_order', json_encode(SecurityConfigGenerator::DEFAULT_PRE_FILTER_ORDER));
+
+    expect((new SecurityConfigGenerator)->generate())->toBe($default);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Hardened TFTP Defense Profile (STAGE 9) Tests
+|--------------------------------------------------------------------------
+*/
+
+it('emits the hardened tftp defense rules before the port catalog accept', function (): void {
+    $tempDir = sys_get_temp_dir().'/tallpbx_tftp_defense_test_'.uniqid();
+    $generator = new SecurityConfigGenerator($tempDir);
+    $nft = $generator->generate();
+
+    expect($nft)->toContain('# STAGE 9: HARDENED TFTP DEFENSE PROFILE')
+        ->and($nft)->toContain('udp dport 69 @th,64,16 0x0002 counter drop')
+        ->and($nft)->toContain('udp dport 69 @th,64,16 0x0001 @th,80,24 0x2e2e2f counter drop')
+        ->and($nft)->toContain('udp dport 69 @th,64,16 0x0001 @th,80,16 0x2f78 counter drop')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter drop')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter drop');
+
+    $wrqPos = strpos($nft, '0x0002 counter drop');
+    $acceptPos = strpos($nft, 'udp dport 69 accept');
+    expect($acceptPos)->not->toBeFalse()
+        ->and($wrqPos)->not->toBeFalse()
+        ->and($wrqPos)->toBeLessThan($acceptPos);
+
+    $pending = $generator->writePending();
+    try {
+        expect($generator->validateSyntax($pending))->toBeTrue();
+    } finally {
+        @unlink($pending);
+        @rmdir($tempDir);
+    }
+});
+
+it('declares the flood meters with a size cap and an element timeout', function (): void {
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    foreach (['tftp_flood4', 'tftp_flood6'] as $setName) {
+        $needle = "set {$setName} {";
+        $start = strpos($nft, $needle);
+        expect($start)->not->toBeFalse();
+
+        $block = substr($nft, $start, 220);
+
+        expect($block)->toContain('flags dynamic,timeout')
+            ->and($block)->toContain('timeout 1m')
+            ->and($block)->toContain('size 65535');
+    }
+
+    expect($nft)->toContain('set tftp_flood4 {')
+        ->and($nft)->toContain('set tftp_flood6 {')
+        ->and($nft)->toContain('type ipv4_addr', false)
+        ->and($nft)->toContain('type ipv6_addr', false);
+});
+
+it('honours the administrator rate limit and burst settings', function (): void {
+    SecuritySetting::set('tftp_defense_rate_limit', 30);
+    SecuritySetting::set('tftp_defense_burst', 60);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    expect($nft)->toContain('udp dport 69 update @tftp_flood4 { ip saddr limit rate over 30/minute burst 60 packets } counter drop')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 30/minute burst 60 packets } counter drop')
+        ->and($nft)->not->toContain('limit rate over 10/minute');
+});
+
+it('clamps nonsensical rate limit and burst values to sensible bounds', function (): void {
+    SecuritySetting::set('tftp_defense_rate_limit', 0);
+    SecuritySetting::set('tftp_defense_burst', -5);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+    expect($nft)->toContain('limit rate over 10/minute burst 20 packets');
+
+    SecuritySetting::set('tftp_defense_rate_limit', 999999999);
+    SecuritySetting::set('tftp_defense_burst', 999999999);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+    expect($nft)->toContain('limit rate over 10000/minute burst 10000 packets');
+});
+
+it('emits no tftp defense rules when the profile is disabled', function (): void {
+    SecuritySetting::set('tftp_defense_enabled', false);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    expect($nft)->not->toContain('# STAGE 9')
+        ->and($nft)->not->toContain('0x0002 counter drop')
+        ->and($nft)->not->toContain('@tftp_flood4')
+        ->and($nft)->not->toContain('@tftp_flood6')
+        ->and($nft)->toContain('udp dport 69 accept');
+});
+
+it('keeps the ruleset byte-identical when the setting is absent or true', function (): void {
+    $default = (new SecurityConfigGenerator)->generate();
+
+    SecuritySetting::set('tftp_defense_enabled', true);
+
+    expect((new SecurityConfigGenerator)->generate())->toBe($default);
+});
+
+it('observes the tftp defense rules without verdicts in global observe mode', function (): void {
+    SecuritySetting::set('firewall_observe_mode', true);
+
+    $nft = (new SecurityConfigGenerator)->generate();
+
+    expect($nft)->not->toContain('0x0002 counter drop')
+        ->and($nft)->not->toContain('0x2e2e2f counter drop')
+        ->and($nft)->not->toContain('0x2f78 counter drop')
+        ->and($nft)->not->toContain('} counter drop')
+        ->and($nft)->toContain('udp dport 69 @th,64,16 0x0002 counter log prefix "tallpbx-observe:tftp " limit rate 100/minute')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter log prefix "tallpbx-observe:tftp " limit rate 100/minute')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter log prefix "tallpbx-observe:tftp " limit rate 100/minute');
+});
+
+it('merges the reserved custom pattern setting into the read-request rules', function (): void {
+    SecuritySetting::set('tftp_defense_custom_patterns', json_encode(['busybox']));
+
+    $tempDir = sys_get_temp_dir().'/tallpbx_tftp_custom_test_'.uniqid();
+    $generator = new SecurityConfigGenerator($tempDir);
+    $nft = $generator->generate();
+
+    expect($nft)->toContain('udp dport 69 @th,64,16 0x0001 @th,80,56 0x62757379626f78 counter drop')
+        ->and($nft)->toContain('0x2e2e2f counter drop')
+        ->and($nft)->toContain('0x2f78 counter drop');
+
+    $pending = $generator->writePending();
+    try {
+        expect($generator->validateSyntax($pending))->toBeTrue();
+    } finally {
+        @unlink($pending);
+        @rmdir($tempDir);
+    }
 });

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Modules\Security;
 
+use Illuminate\Support\Facades\Http;
 use Mockery;
 use Modules\Security\Contracts\GeoBlockingProviderInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Services\Geo\GeoBlockingService;
+use Modules\Security\Services\Geo\IpdenyProvider;
+use Modules\Security\Support\IsoCountries;
 
 beforeEach(function (): void {
     $this->tempDir = sys_get_temp_dir().'/tallpbx_geo_test_'.uniqid();
@@ -363,4 +366,78 @@ it('does not overwrite valid existing cache when a single family fetch returns e
     // The existing valid v6 cache must NOT be wiped or overwritten with empty content
     $v6Content = file_get_contents($this->cacheDir.'/US.v6.zone');
     expect($v6Content)->toContain('2600::/12');
+});
+
+/*
+|--------------------------------------------------------------------------
+| IpdenyProvider Tests
+|--------------------------------------------------------------------------
+*/
+
+it('fetches aggregated IPv4 and IPv6 country ranges using IpdenyProvider', function (): void {
+    Http::fake([
+        'https://www.ipdeny.com/ipblocks/data/aggregated/us-aggregated.zone' => Http::response("1.0.0.0/24\n1.0.4.0/22\n# comment\ninvalid-ip\n", 200),
+        'https://www.ipdeny.com/ipv6/ipaddresses/aggregated/us-aggregated.zone' => Http::response("2600::/12\n2800::/12\n", 200),
+    ]);
+
+    $provider = new IpdenyProvider;
+    $ranges = $provider->fetchCountryRanges('US');
+
+    expect($ranges['v4'])->toBe(['1.0.0.0/24', '1.0.4.0/22'])
+        ->and($ranges['v6'])->toBe(['2600::/12', '2800::/12'])
+        ->and($provider->identifier())->toBe('ipdeny')
+        ->and($provider->name())->toBe('IPdeny Aggregated Zones');
+});
+
+it('falls back to the GitHub RIR mirror if IPdeny primary download fails', function (): void {
+    Http::fake([
+        'https://www.ipdeny.com/ipblocks/data/aggregated/ca-aggregated.zone' => Http::response(null, 500),
+        'https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/ca.cidr' => Http::response("24.48.0.0/14\n", 200),
+        'https://www.ipdeny.com/ipv6/ipaddresses/aggregated/ca-aggregated.zone' => Http::response(null, 500),
+        'https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv6/ca.cidr' => Http::response("2607:f8b0::/32\n", 200),
+    ]);
+
+    $provider = new IpdenyProvider;
+    $ranges = $provider->fetchCountryRanges('CA');
+
+    expect($ranges['v4'])->toBe(['24.48.0.0/14'])
+        ->and($ranges['v6'])->toBe(['2607:f8b0::/32']);
+});
+
+it('returns empty ranges for invalid country codes', function (): void {
+    $provider = new IpdenyProvider;
+
+    expect($provider->fetchCountryRanges('USA')['v4'])->toBeEmpty()
+        ->and($provider->fetchCountryRanges('12')['v4'])->toBeEmpty()
+        ->and($provider->fetchCountryRanges('')['v4'])->toBeEmpty();
+});
+
+/*
+|--------------------------------------------------------------------------
+| IsoCountries Standardized Catalog Tests
+|--------------------------------------------------------------------------
+*/
+
+it('provides the complete standardized ISO 3166-1 alpha-2 countries catalog', function (): void {
+    $countries = IsoCountries::all();
+
+    expect($countries)->toBeArray()
+        ->and(count($countries))->toBe(249)
+        ->and($countries['TH'])->toBe('Thailand')
+        ->and($countries['PH'])->toBe('Philippines')
+        ->and($countries['PS'])->toBe('Palestine')
+        ->and($countries['US'])->toBe('United States');
+
+    foreach ($countries as $code => $name) {
+        expect($code)->toMatch('/^[A-Z]{2}$/')
+            ->and($name)->toBeString()->not->toBeEmpty();
+    }
+});
+
+it('resolves country names and checks existence case-insensitively', function (): void {
+    expect(IsoCountries::name('th'))->toBe('Thailand')
+        ->and(IsoCountries::name('PS'))->toBe('Palestine')
+        ->and(IsoCountries::name('XX'))->toBeNull()
+        ->and(IsoCountries::has('ph'))->toBeTrue()
+        ->and(IsoCountries::has('ZZ'))->toBeFalse();
 });

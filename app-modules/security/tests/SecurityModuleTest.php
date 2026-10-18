@@ -93,3 +93,20 @@ it('renders the SecurityManager Livewire component', function (): void {
         ->assertSee('Security Center')
         ->assertSee('nftables');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Security Module Localization Keys Tests
+|--------------------------------------------------------------------------
+*/
+
+test('geo and service modal keys resolve in all locales', function (string $locale): void {
+    app()->setLocale($locale);
+
+    expect(__('admin.security_rate_burst_packets'))->not->toBe('admin.security_rate_burst_packets');
+    expect(__('admin.never'))->not->toBe('admin.never');
+
+    if ($locale === 'fr') {
+        expect(__('admin.security_rate_burst_packets'))->toBe('Tolérance de rafale (paquets)');
+    }
+})->with(['en', 'es', 'fr']);

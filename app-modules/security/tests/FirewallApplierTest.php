@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules\Security;
 
 use App\Models\Admin;
-use Database\Seeders\AdminSeeder;
 use Database\Seeders\SecurityServiceSeeder;
 use Illuminate\Support\Facades\Event;
 use Mockery;
@@ -21,8 +20,6 @@ use Modules\Security\Services\Firewall\LockoutGuardService;
 use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 
 beforeEach(function (): void {
-    $this->artisan('module:sync --only-local');
-    $this->seed(AdminSeeder::class);
     $this->seed(SecurityServiceSeeder::class);
 
     $this->lockoutGuard = Mockery::mock(LockoutGuardService::class);

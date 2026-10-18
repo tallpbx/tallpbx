@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules\Security;
 
 use Modules\Security\Models\SecuritySetting;
+use Modules\Security\Services\Detection\SipScannerDialplanContributor;
 use Modules\Security\Support\SipScannerSignatures;
 
 /**
@@ -147,4 +148,75 @@ it('resolves the low-confidence escalation window and the enforcement toggle', f
 
     SecuritySetting::set('sip_scanner_enforcement_enabled', true);
     expect(SipScannerSignatures::enforcementEnabled())->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| SIP Scanner Dialplan Contributor Tests
+|--------------------------------------------------------------------------
+*/
+
+it('runs before call blocks and emits detection for public contexts only', function (): void {
+    $contributor = new SipScannerDialplanContributor;
+
+    expect($contributor->getDialplanPriority())->toBe(15);
+
+    $public = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
+    $internal = $contributor->generateDialplanXml(1, 'tenant_abc_internal', '1234');
+
+    expect($public)->not->toBeNull()
+        ->and($internal)->toBeNull()
+        ->and($public)->toContain('<extension name="tallpbx_sip_scanner_detection">')
+        ->and($public)->toContain('field="${sip_user_agent}" expression="friendly\-scanner|VaxSIPUserAgent|sipcli|Ozeki"')
+        ->and($public)->toContain('field="${sip_from_user}" expression="sipvicious"')
+        ->and($public)->toContain('field="${sip_user_agent}" expression="SIP Call"')
+        ->and($public)->toContain('Scanner-Confidence=high')
+        ->and($public)->toContain('Scanner-Confidence=low');
+});
+
+it('emits detection events without responding or hanging up in the dialplan', function (): void {
+    $contributor = new SipScannerDialplanContributor;
+    $xml = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
+
+    expect($xml)->not->toContain('application="respond"')
+        ->and($xml)->not->toContain('application="hangup"')
+        ->and($xml)->not->toContain('proto_security_violation')
+        ->and(substr_count($xml, 'application="event"'))->toBe(3);
+});
+
+it('carries the socket peer address and never a header-derived address in dialplan', function (): void {
+    $contributor = new SipScannerDialplanContributor;
+    $xml = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
+
+    expect($xml)->toContain('Attacker-IP=${sip_network_ip}')
+        ->and($xml)->not->toContain('${sip_contact_host}')
+        ->and($xml)->not->toContain('${sip_via_host}');
+});
+
+it('escapes custom signatures as literal XML-safe substrings', function (): void {
+    SipScannerSignatures::saveCustom(['Zoiper.', 'a|b', 'x<y&z']);
+
+    $contributor = new SipScannerDialplanContributor;
+    $xml = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
+
+    expect($xml)->toContain('Zoiper\.')
+        ->and($xml)->toContain('a\|b')
+        ->and($xml)->toContain('x\&lt;y&amp;z')
+        ->and($xml)->toContain('sipcli|Ozeki|Zoiper\.|a\|b|x\&lt;y&amp;z')
+        ->and($xml)->toContain('sipvicious|Zoiper\.|a\|b|x\&lt;y&amp;z')
+        ->and($xml)->toContain('expression="SIP Call"');
+});
+
+it('reads the custom signature list at render time', function (): void {
+    SipScannerSignatures::saveCustom(['Grandstream*']);
+
+    $contributor = new SipScannerDialplanContributor;
+    $withCustom = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
+    expect($withCustom)->toContain('Grandstream\*');
+
+    SipScannerSignatures::saveCustom([]);
+
+    $withoutCustom = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
+    expect($withoutCustom)->not->toContain('Grandstream')
+        ->and($withoutCustom)->toContain('friendly\-scanner');
 });
