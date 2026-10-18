@@ -288,7 +288,7 @@
                                     @endif
                                 </div>
                                 <div class="mt-0.5">
-                                    <span class="badge badge-ghost badge-xs font-mono text-[11px] opacity-75" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono opacity-75" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
                                 </div>
                             </td>
                             <td class="text-center text-xs font-mono font-semibold text-base-content/70 px-1.5">
@@ -309,7 +309,7 @@
                                         {{ number_format($preFilterRow['count']) }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
                                     </span>
                                     @if (! $rowActive && ! empty($preFilterRow['downloaded_count']))
-                                        <div class="text-[11px] text-base-content/50 font-normal">
+                                        <div class="text-xs text-base-content/50 font-normal">
                                             ({{ __('admin.security_in_list_note', ['count' => number_format($preFilterRow['downloaded_count'])]) }})
                                         </div>
                                     @endif
@@ -391,7 +391,7 @@
                                 </x-tooltip>
                             </div>
                             <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                <span class="badge badge-ghost badge-xs font-mono text-[11px] opacity-75" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
+                                <span class="badge badge-ghost badge-xs font-mono opacity-75" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
                                     {{ $geoMode === 'whitelist' ? '@geo_allowed_ips' : '@geo_blocked_ips' }}
                                 </span>
                                 <span class="badge badge-neutral badge-xs font-mono">
@@ -414,7 +414,7 @@
                                         {{ count($geoCountries) }} {{ count($geoCountries) === 1 ? __('admin.security_geo_country_single') : __('admin.security_geo_country_plural') }}
                                     @endif
                                 </div>
-                                <div class="text-[11px] text-base-content/50 font-mono truncate max-w-[140px]" title="{{ implode(', ', $geoCountries) }}">
+                                <div class="text-xs text-base-content/50 font-mono truncate max-w-[140px]" title="{{ implode(', ', $geoCountries) }}">
                                     @if ($geoMode === 'whitelist')
                                         {{ count($geoCountries) }} {{ count($geoCountries) === 1 ? __('admin.security_geo_country_exempt_single') : __('admin.security_geo_country_exempt_plural') }}
                                     @else
@@ -499,10 +499,10 @@
                                                        wire:loading.attr="disabled"
                                                        wire:target="setTftpDefense"
                                                        type="checkbox" class="toggle toggle-warning toggle-xs" @checked($tftpDefense['enabled']) />
-                                                <span wire:loading.remove wire:target="setTftpDefense" class="label-text text-[11px]">
+                                                <span wire:loading.remove wire:target="setTftpDefense" class="label-text text-xs">
                                                     {{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}
                                                 </span>
-                                                <span wire:loading wire:target="setTftpDefense" class="inline-flex items-center gap-1 text-[11px] text-warning">
+                                                <span wire:loading wire:target="setTftpDefense" class="inline-flex items-center gap-1 text-xs text-warning">
                                                     <span class="loading loading-spinner loading-xs"></span>
                                                     <span>{{ $tftpDefense['enabled'] ? __('admin.security_tftp_disabling') : __('admin.security_tftp_enabling') }}</span>
                                                 </span>
@@ -541,7 +541,7 @@
                                     <div>
                                         <span class="font-mono text-xs font-semibold text-base-content">echo-request</span>
                                         @if ($service->rate_limit)
-                                            <div class="font-mono text-[11px] text-base-content/60">
+                                            <div class="font-mono text-xs text-base-content/60">
                                                 {{ $service->rate_limit }}/s (burst {{ $service->burst ?? $service->rate_limit }})
                                             </div>
                                         @endif

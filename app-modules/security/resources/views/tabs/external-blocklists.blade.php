@@ -61,7 +61,7 @@
                                 <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => number_format($threatFeed->entries_count)]) }})</span>
                             @endif
                         @endif
-                        <span class="badge badge-ghost badge-sm font-mono text-[11px] opacity-75" title="@external_blocklist_ips">@external_blocklist_ips</span>
+                        <span class="badge badge-ghost badge-sm font-mono opacity-75" title="@external_blocklist_ips">@external_blocklist_ips</span>
                         @if (! $prefilterEnabled)
                             <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
                         @endif
@@ -183,7 +183,7 @@
                             <span class="badge badge-neutral badge-xs opacity-75">{{ __('admin.security_threat_feed_status_disabled') }}</span>
                         </div>
                         @if (($threatFeed?->entries_count ?? 0) > 0)
-                            <div class="text-[11px] text-base-content/60 mt-0.5">
+                            <div class="text-xs text-base-content/60 mt-0.5">
                                 {{ __('admin.security_threat_feed_downloaded_count', ['count' => number_format($threatFeed->entries_count)]) }}
                             </div>
                         @endif

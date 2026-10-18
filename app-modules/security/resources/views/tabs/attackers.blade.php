@@ -43,7 +43,7 @@
                                 <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $this->bans->count()]) }})</span>
                             @endif
                         @endif
-                        <span class="badge badge-ghost badge-sm font-mono text-[11px] opacity-75" title="@banned_ips">@banned_ips</span>
+                        <span class="badge badge-ghost badge-sm font-mono opacity-75" title="@banned_ips">@banned_ips</span>
                         @if (! $prefilterEnabled)
                             <span class="badge badge-warning badge-xs font-semibold">{{ __('admin.security_bypassed_badge') }}</span>
                         @endif

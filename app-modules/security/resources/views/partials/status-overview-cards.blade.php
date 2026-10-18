@@ -42,7 +42,7 @@
                             $syncDisplayTime = $firewallSyncAppliedAt;
                         }
                     @endphp
-                    <span class="text-[10px] opacity-75 font-mono">{{ $syncDisplayTime }}</span>
+                    <span class="text-xs opacity-75 font-mono">{{ $syncDisplayTime }}</span>
                 @endif
             </div>
         </div>

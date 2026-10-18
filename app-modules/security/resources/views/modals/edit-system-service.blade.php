@@ -20,7 +20,7 @@
                 <div class="space-y-1">
                     <div class="font-semibold">{{ __('admin.security_edit_service_warning') }}</div>
                     @if (in_array($systemServiceName, ['Web Admin Portal', 'SSH Console'], true))
-                        <div class="text-[11px] opacity-90">{{ __('admin.security_edit_service_lockout_note', ['ip' => $adminIp]) }}</div>
+                        <div class="text-xs opacity-90">{{ __('admin.security_edit_service_lockout_note', ['ip' => $adminIp]) }}</div>
                     @endif
                 </div>
             </div>
@@ -51,7 +51,7 @@
                                 <input wire:model.live="systemServiceRateLimitEnabled" type="checkbox" class="checkbox checkbox-primary checkbox-xs" />
                                 <span class="label-text font-semibold text-xs">{{ __('admin.security_enable_rate_limit') }}</span>
                             </label>
-                            <span class="text-[11px] font-mono px-2 py-0.5 rounded {{ $systemServiceRateLimitEnabled ? 'bg-success/10 text-success' : 'bg-base-content/10 text-base-content/70' }}">
+                            <span class="text-xs font-mono px-2 py-0.5 rounded {{ $systemServiceRateLimitEnabled ? 'bg-success/10 text-success' : 'bg-base-content/10 text-base-content/70' }}">
                                 {{ $systemServiceRateLimitEnabled ? __('admin.security_rate_limited_active') : __('admin.security_unlimited_active') }}
                             </span>
                         </div>
@@ -71,7 +71,7 @@
                                 </div>
                             </div>
                         @endif
-                        <div class="text-[11px] text-base-content/60 italic pt-1 border-t border-base-200/50">
+                        <div class="text-xs text-base-content/60 italic pt-1 border-t border-base-200/50">
                             {{ __('admin.security_icmp_dual_stack_note') }}
                         </div>
                     </div>

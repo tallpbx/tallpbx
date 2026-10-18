@@ -14,7 +14,7 @@
         <div class="flex flex-col gap-4">
             {{-- Layout Style Selector --}}
             <div class="flex flex-col gap-1.5">
-                <span class="text-base-content/60 uppercase tracking-wider text-[11px] font-semibold flex items-center gap-1.5">
+                <span class="text-base-content/60 uppercase tracking-wider text-xs font-semibold flex items-center gap-1.5">
                     <x-heroicon-o-view-columns class="w-3.5 h-3.5" />
                     {{ __('admin.layout_style') }}
                 </span>
@@ -41,7 +41,7 @@
             {{-- Sidebar Size (Only relevant when in sidebar mode) --}}
             @if ($layoutMode === 'sidebar')
                 <div class="flex flex-col gap-1.5">
-                    <span class="text-base-content/60 uppercase tracking-wider text-[11px] font-semibold flex items-center gap-1.5">
+                    <span class="text-base-content/60 uppercase tracking-wider text-xs font-semibold flex items-center gap-1.5">
                         <x-heroicon-o-arrows-pointing-in class="w-3.5 h-3.5" />
                         {{ __('admin.sidebar_size') }}
                     </span>
@@ -66,7 +66,7 @@
 
             {{-- Color Theme Selector --}}
             <div class="flex flex-col gap-1.5">
-                <span class="text-base-content/60 uppercase tracking-wider text-[11px] font-semibold flex items-center gap-1.5">
+                <span class="text-base-content/60 uppercase tracking-wider text-xs font-semibold flex items-center gap-1.5">
                     <x-heroicon-o-sun class="w-3.5 h-3.5" />
                     {{ __('admin.theme') ?? 'Theme' }}
                 </span>

@@ -29,7 +29,7 @@
                         <span class="badge badge-neutral badge-sm font-mono">
                             {{ number_format($geoRuleModel->totalCidrsCount()) }} {{ $geoMode === 'whitelist' ? __('admin.security_geo_ranges_exempt') : __('admin.security_geo_ranges_blocked') }}
                         </span>
-                        <span class="badge badge-ghost badge-sm font-mono text-[11px] opacity-75">
+                        <span class="badge badge-ghost badge-sm font-mono opacity-75">
                             {{ $geoMode === 'whitelist' ? __('admin.security_geo_rule_drop_except') : __('admin.security_geo_rule_drop_selected') }}
                         </span>
 
@@ -85,14 +85,14 @@
                         <input type="radio" wire:model="geoMode" wire:change="saveGeoSettings" value="blacklist" class="radio radio-primary radio-sm mt-0.5" />
                         <div>
                             <div class="text-xs font-bold text-base-content">{{ __('admin.security_geo_mode_blacklist') }}</div>
-                            <div class="text-[11px] text-base-content/60 mt-0.5">{{ __('admin.security_geo_mode_blacklist_desc') }}</div>
+                            <div class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_geo_mode_blacklist_desc') }}</div>
                         </div>
                     </label>
                     <label class="cursor-pointer border rounded-lg p-2.5 flex items-start gap-2.5 transition-colors {{ $geoMode === 'whitelist' ? 'border-primary bg-primary/5' : 'border-base-200 hover:bg-base-200/40' }}">
                         <input type="radio" wire:model="geoMode" wire:change="saveGeoSettings" value="whitelist" class="radio radio-primary radio-sm mt-0.5" />
                         <div>
                             <div class="text-xs font-bold text-base-content">{{ __('admin.security_geo_mode_whitelist') }}</div>
-                            <div class="text-[11px] text-base-content/60 mt-0.5">{{ __('admin.security_geo_mode_whitelist_desc') }}</div>
+                            <div class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_geo_mode_whitelist_desc') }}</div>
                         </div>
                     </label>
                 </div>
@@ -117,7 +117,7 @@
                         <span class="text-xs font-semibold uppercase tracking-wider text-base-content/70">
                             {{ __('admin.security_geo_countries_selected', ['count' => count($geoCountries)]) }}
                         </span>
-                        <p class="text-[11px] text-base-content/60 mt-0.5">
+                        <p class="text-xs text-base-content/60 mt-0.5">
                             {{ __('admin.security_geo_countries_help') }}
                         </p>
                     </div>
@@ -188,7 +188,7 @@
                                       wire:loading
                                       wire:target="toggleGeoCountry('{{ $code }}')"></span>
                             </span>
-                            <span class="font-mono text-[11px] opacity-75">{{ $code }}</span>
+                            <span class="font-mono text-xs opacity-75">{{ $code }}</span>
                             <span class="truncate" title="{{ $countryName }}">{{ $countryName }}</span>
                         </label>
                     @endforeach
@@ -201,7 +201,7 @@
                     <span class="text-base-content/60">{{ $geoMode === 'whitelist' ? __('admin.security_geo_metric_v4_allowed') : __('admin.security_geo_metric_v4_blocked') }}:</span>
                     <span class="font-mono font-semibold ml-1">{{ number_format($geoRuleModel->v4_cidrs_count) }}</span>
                     @if ($geoMode === 'whitelist')
-                        <div class="text-[10px] text-base-content/50 mt-0.5">{{ __('admin.security_geo_metric_others_dropped') }}</div>
+                        <div class="text-xs text-base-content/50 mt-0.5">{{ __('admin.security_geo_metric_others_dropped') }}</div>
                     @endif
                 </div>
                 <div>

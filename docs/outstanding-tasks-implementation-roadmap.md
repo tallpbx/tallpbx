@@ -38,7 +38,7 @@
 | 2.1 | Standardized form submission loading feedback | Verified | 2026-10-17 |
 | 2.2 | Page-title typography normalization | Verified | 2026-10-17 |
 | 2.3 | Localize hardcoded table headers | Verified | 2026-10-18 |
-| 2.4 | Normalize arbitrary font sizes | Pending | 2026-10-16 |
+| 2.4 | Normalize arbitrary font sizes | Verified | 2026-10-18 |
 | 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-17 |
 | 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Pending | 2026-10-16 |
 | 3.2 | ESL event ingestion overflow & queue buffering | Pending | 2026-10-16 |
@@ -186,10 +186,12 @@
   - Created architecture test `TableHeadersLocalizationArchitectureTest` scanning all Blade views across `app-modules/` and `resources/views/` to assert zero unlocalized `<th>` cells.
 - **Verification**: Verified via `TableHeadersLocalizationArchitectureTest` (200+ headers scanned, 0 violations), `TranslationParityTest` (6 tests, 698 assertions), targeted module tests (file-stores, certificates, gateways, call-center-active, active-conferences: 168 tests, 614 assertions), and Pint code style linting.
 
-### Task 2.4: Normalize Arbitrary Font Sizes (UI Audit L2)
+### Task 2.4: Normalize Arbitrary Font Sizes (UI Audit L2) [COMPLETED]
 - **Problem**: 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) concentrated in the security module and display-settings drawer violate the design token convention *(re-measured 2026-10-16; the original audit catalogued 21)*.
 - **Implementation**:
-  - Normalize all occurrences to standard `text-xs` using opacity classes (`text-base-content/60`) for visual hierarchy.
+  - Normalized all 30 occurrences across 10 Blade templates to standard `text-xs` paired with semantic opacity utilities (`text-base-content/60`, `text-base-content/50`, `opacity-75`) and standard DaisyUI badge sizing (`badge-sm`, `badge-xs`), eliminating one-off font sizes.
+  - Added architecture test `ArbitraryFontSizesArchitectureTest` asserting zero arbitrary font size utility classes (`text-[...px]` or `text-[...rem]`) exist in any Blade template across `app-modules/` and `resources/views/`.
+- **Verification**: Verified via `ArbitraryFontSizesArchitectureTest` (>100 Blade templates scanned, 0 violations), full architecture test suite (10 tests, 709 assertions), and Pint code style linting.
 
 ### Task 2.5: Standardize Toggle Switch Sizing & Loading Locks (UI Audit L4)
 - **Problem**: 12 views render DaisyUI toggle switches; 4 edit views (`tenants-edit`, `admins-edit`, `tenant-domains-edit`, `backups-edit`) still use `toggle toggle-primary` without the standard `toggle-sm` sizing, and 2 of those (`tenants-edit`, `tenant-domains-edit`) along with `log-viewer.blade.php` carry no `wire:loading.attr` lock at all *(re-measured 2026-10-17; the original audit catalogued 7 of 15 usages)*.
@@ -327,6 +329,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-18** | `ed52adbe` | **UI / Typography** | **Normalize Arbitrary Font Sizes to Standard Design Tokens**: Normalized all 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) across 10 Blade views in `app-modules/security`, `app-modules/admin`, and `resources/views` to standard Tailwind / DaisyUI `text-xs` design tokens with semantic opacity utilities (`text-base-content/60`, `text-base-content/50`, `opacity-75`). Added architecture test `ArbitraryFontSizesArchitectureTest` enforcing zero arbitrary font-size utility classes in any Blade template. *(Resolves Task 2.4 / UI Audit L2)* |
 | **2026-10-18** | `4734ba20` | **UI / Localization** | **Localize Hardcoded Table Header (`<th>`) Contents**: Localized all 39 previously hardcoded English `<th>` cells across 7 views (`file-stores-list`, `observe-activity`, `certificate-manager`, `settings-edit`, `call-center-active-list`, `gateways-list`, and `active-conferences-list`) using root `client` keys and module domain keys with 100% parity across English, Spanish, and French. Extended `TranslationParityTest` to enforce 100% parity across `client.php`, and added architecture test `TableHeadersLocalizationArchitectureTest` ensuring zero unlocalized table headers across all views. *(Resolves Task 2.3 / UI Audit L1)* |
 | **2026-10-17** | `e972ff44` | **UI / Typography** | **Page-Title Typography Normalization**: Normalized 125 module and panel page-title headings (`<h1>` / `<h2>` with `text-2xl`) across `app-modules/` and `resources/views/` to strictly match the established design standard in `AGENTS.md` (`text-2xl font-bold tracking-tight text-base-content`), eliminating non-standard `font-semibold` and untightened variants while preserving layout spacing utilities (`mb-6`, `mb-4`, etc.). Added architecture test `PageTitleTypographyArchitectureTest` enforcing 100% compliance across all views. *(Resolves Task 2.2)* |
 | **2026-10-17** | `f50c2347` | **UI / Components** | **Standardized Form Submission Loading Feedback (`<x-form-submit-button>`)**: Created `<x-form-submit-button>` Blade component with built-in DaisyUI loading spinner, disabled state lock, standard `btn-sm` sizing, and dynamic present-continuous busy text. Batch-migrated all 47 edit/create views (plus fax send and dialplan tester) to `<x-form-submit-button>`, normalized cancel links to `btn btn-ghost btn-sm` with `wire:navigate`, and added unit and architecture tests. *(Resolves Task 2.1)* |

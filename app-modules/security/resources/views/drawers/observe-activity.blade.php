@@ -14,7 +14,7 @@
                     <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_observe_drawer_subtitle') }}</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="badge badge-success/15 border-success/30 text-success badge-xs gap-1 py-2 px-2.5 font-mono text-[10px]">
+                    <span class="badge badge-success/15 border-success/30 text-success badge-xs gap-1 py-2 px-2.5 font-mono">
                         <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
                         <span>LIVE ECHO</span>
                     </span>
@@ -33,7 +33,7 @@
                     <span class="text-xs font-semibold text-base-content/80">
                         {{ __('admin.security_observe_drawer_total_drops') }}
                     </span>
-                    <span class="text-[11px] font-mono text-base-content/60">
+                    <span class="text-xs font-mono text-base-content/60">
                         ({{ $observeMetrics['total_bytes'] > 0 ? number_format($observeMetrics['total_bytes']).' B' : '0 B' }})
                     </span>
                 </div>
@@ -41,11 +41,11 @@
                 {{-- Stage Breakdown Badges --}}
                 <div class="flex flex-wrap items-center gap-1.5">
                     @foreach ($observeMetrics['stages'] as $stage)
-                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] {{ $stage['packets'] > 0 ? 'bg-warning/15 border-warning/40 text-warning-content font-medium' : 'bg-base-100 border-base-200 text-base-content/50' }}">
+                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-xs {{ $stage['packets'] > 0 ? 'bg-warning/15 border-warning/40 text-warning-content font-medium' : 'bg-base-100 border-base-200 text-base-content/50' }}">
                             <span>{{ $stage['label'] }}:</span>
                             <span class="font-mono font-bold {{ $stage['packets'] > 0 ? 'text-warning-content' : 'text-base-content/70' }}">{{ number_format($stage['packets']) }}</span>
                             @if ($stage['stage'] === 'tftp' && isset($stage['details']) && $stage['packets'] > 0)
-                                <span class="text-[10px] opacity-75">(T:{{ $stage['details']['traversal'] }} · F:{{ $stage['details']['flood'] }})</span>
+                                <span class="text-xs opacity-75">(T:{{ $stage['details']['traversal'] }} · F:{{ $stage['details']['flood'] }})</span>
                             @endif
                         </div>
                     @endforeach
@@ -61,7 +61,7 @@
                         </span>
                         <span class="badge badge-ghost badge-xs font-mono">{{ count($observeEvents) }}</span>
                     </div>
-                    <span class="text-[11px] text-base-content/50">Journal entries (newest first)</span>
+                    <span class="text-xs text-base-content/50">Journal entries (newest first)</span>
                 </div>
 
                 <div class="overflow-x-auto overflow-y-auto flex-1 min-h-[350px] border border-base-200 rounded-box bg-base-100">

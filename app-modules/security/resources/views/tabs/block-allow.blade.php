@@ -115,7 +115,7 @@
                                     <x-heroicon-o-exclamation-triangle class="w-3.5 h-3.5 text-warning shrink-0" />
                                     <span>Lockout Safety</span>
                                 </div>
-                                <div class="text-base-content/70 text-[11px] mt-0.5">Your IP (<span class="font-mono">{{ $adminIp }}</span>) is not whitelisted.</div>
+                                <div class="text-base-content/70 text-xs mt-0.5">Your IP (<span class="font-mono">{{ $adminIp }}</span>) is not whitelisted.</div>
                             </div>
                             <button wire:click="whitelistCurrentIp"
                                     wire:loading.attr="disabled"

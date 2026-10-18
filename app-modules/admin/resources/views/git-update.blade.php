@@ -210,7 +210,7 @@
                                     <div class="flex items-start gap-2 text-xs">
                                         <code class="text-primary font-mono shrink-0">{{ $commit['hash'] }}</code>
                                         <span class="text-base-content/80 flex-1 truncate" title="{{ $commit['message'] }}">{{ $commit['message'] }}</span>
-                                        <span class="text-base-content/40 text-[11px] shrink-0">{{ $commit['time'] }}</span>
+                                        <span class="text-base-content/40 text-xs shrink-0">{{ $commit['time'] }}</span>
                                     </div>
                                 @endforeach
                             </div>
