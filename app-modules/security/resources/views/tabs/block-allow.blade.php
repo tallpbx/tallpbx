@@ -36,11 +36,11 @@
                             {{ $whitelistEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
                         </span>
                         @if ($whitelistEnabled)
-                            <span class="badge badge-neutral badge-sm font-mono">{{ $whitelistCount }}</span>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $this->whitelistCount }}</span>
                         @else
                             <span class="badge badge-neutral badge-sm font-mono">0</span>
-                            @if ($whitelistCount > 0)
-                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $whitelistCount]) }})</span>
+                            @if ($this->whitelistCount > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $this->whitelistCount]) }})</span>
                             @endif
                         @endif
                         @if (! $prefilterEnabled)
@@ -153,7 +153,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($whitelistIps as $item)
+                                @forelse ($this->whitelist as $item)
                                     <tr class="hover" wire:loading.class="opacity-40 pointer-events-none" wire:target="deleteIp({{ $item->id }})">
                                         <td class="font-mono font-medium text-success whitespace-nowrap">
                                             {{ $item->ip_address }}
@@ -198,11 +198,11 @@
                             {{ $blacklistEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
                         </span>
                         @if ($blacklistEnabled)
-                            <span class="badge badge-neutral badge-sm font-mono">{{ $blacklistCount }}</span>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $this->blacklistCount }}</span>
                         @else
                             <span class="badge badge-neutral badge-sm font-mono">0</span>
-                            @if ($blacklistCount > 0)
-                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $blacklistCount]) }})</span>
+                            @if ($this->blacklistCount > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $this->blacklistCount]) }})</span>
                             @endif
                         @endif
                         @if (! $prefilterEnabled)
@@ -289,7 +289,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($blacklistIps as $item)
+                                @forelse ($this->blacklist as $item)
                                     <tr class="hover" wire:loading.class="opacity-40 pointer-events-none" wire:target="deleteIp({{ $item->id }})">
                                         <td class="font-mono font-medium text-error whitespace-nowrap">
                                             {{ $item->ip_address }}

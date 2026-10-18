@@ -1,4 +1,5 @@
 @php
+    $threatFeed = $this->threatFeed;
     // Derive the single status badge the panel shows: disabled beats
     // failed beats stale beats never-synced beats active. The badge
     // temporarily reads "Syncing" (client-side, via wire:loading)

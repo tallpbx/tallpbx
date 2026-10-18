@@ -1,5 +1,5 @@
 @php
-    $geoRuleModel = \Modules\Security\Models\SecurityGeoRule::instance();
+    $geoRuleModel = $this->geoRule;
     $geoStatus = match (true) {
         ! $geoEnabled => 'disabled',
         $geoRuleModel->last_status === 'failed' => 'error',

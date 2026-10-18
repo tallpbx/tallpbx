@@ -36,11 +36,11 @@
                             {{ $attackProtectionEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
                         </span>
                         @if ($attackProtectionEnabled)
-                            <span class="badge badge-neutral badge-sm font-mono">{{ $activeBans->count() }}</span>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $this->bans->count() }}</span>
                         @else
                             <span class="badge badge-neutral badge-sm font-mono">0</span>
-                            @if ($activeBans->count() > 0)
-                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $activeBans->count()]) }})</span>
+                            @if ($this->bans->count() > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $this->bans->count()]) }})</span>
                             @endif
                         @endif
                         <span class="badge badge-ghost badge-sm font-mono text-[11px] opacity-75" title="@banned_ips">@banned_ips</span>
@@ -96,7 +96,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse ($activeBans as $ban)
+                        @forelse ($this->bans as $ban)
                             <tr class="hover"
                                 wire:key="active-ban-{{ $ban->ip_address }}"
                                 wire:loading.class="opacity-40 pointer-events-none"
@@ -294,9 +294,9 @@
             <div class="border-t border-base-200 pt-3">
                 <div class="flex items-center gap-2 mb-2">
                     <span class="text-sm font-medium">{{ __('admin.security_scanner_incidents') }}</span>
-                    <span class="badge badge-warning badge-sm font-mono">{{ $sipScanner['incidents']->count() }}</span>
+                    <span class="badge badge-warning badge-sm font-mono">{{ $this->scannerIncidents->count() }}</span>
                 </div>
-                @if ($sipScanner['incidents']->isNotEmpty())
+                @if ($this->scannerIncidents->isNotEmpty())
                     <div class="overflow-x-auto max-h-60 overflow-y-auto border border-base-200 rounded-box">
                         <table class="table table-sm table-pin-rows">
                             <thead>
@@ -308,7 +308,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($sipScanner['incidents'] as $incident)
+                                @foreach ($this->scannerIncidents as $incident)
                                     <tr class="hover"
                                         wire:key="scanner-incident-{{ $incident->ip_address }}"
                                         wire:loading.class="opacity-40 pointer-events-none"

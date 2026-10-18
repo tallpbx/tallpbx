@@ -74,9 +74,9 @@
         <div class="card-body p-4">
             <div class="flex items-start justify-between gap-2">
                 <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_blocked_attackers') }}</span>
-                <span class="badge badge-neutral badge-sm shrink-0">{{ $bannedCount }}</span>
+                <span class="badge badge-neutral badge-sm shrink-0">{{ $this->bannedCount }}</span>
             </div>
-            <div class="mt-2 text-lg font-semibold text-base-content">{{ $bannedCount }} {{ __('admin.security_active_bans') }}</div>
+            <div class="mt-2 text-lg font-semibold text-base-content">{{ $this->bannedCount }} {{ __('admin.security_active_bans') }}</div>
             <p class="text-xs text-base-content/60">{{ __('admin.security_bans_help') }}</p>
         </div>
     </div>

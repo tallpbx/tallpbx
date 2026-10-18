@@ -6,12 +6,10 @@ namespace Modules\Security\Livewire\Concerns;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Modules\Security\Models\SecurityAuditLog;
-use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityGeoRule;
-use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
-use Modules\Security\Models\SecurityThreatFeed;
 use Modules\Security\Services\LockoutGuardService;
 use Modules\Security\Services\SecurityConfigGenerator;
 
@@ -105,19 +103,22 @@ trait ManagesPreFilters
 
     /**
      * Build the presentation rows for the sequential pre-filter stages.
+     *
+     * @return array<int, array<string, mixed>>
      */
+    #[Computed]
     public function preFilterRows(): array
     {
         $whitelistEnabled = SecuritySetting::getBoolean('whitelist_enabled', true);
         $blacklistEnabled = SecuritySetting::getBoolean('blacklist_enabled', true);
         $attackProtectionEnabled = SecuritySetting::getBoolean('attack_protection_enabled', true)
             && SecuritySetting::getBoolean('intrusion_detection_enabled', true);
-        $threatFeed = SecurityThreatFeed::where('provider', 'voipbl')->first();
+        $threatFeed = $this->threatFeed;
         $threatFeedEnabled = $threatFeed?->enabled ?? false;
 
-        $whitelistDbCount = SecurityIpList::whitelist()->count();
-        $blacklistDbCount = SecurityIpList::blacklist()->count();
-        $bannedDbCount = SecurityBan::active()->count();
+        $whitelistDbCount = $this->whitelistCount;
+        $blacklistDbCount = $this->blacklistCount;
+        $bannedDbCount = $this->bannedCount;
         $threatFeedDownloadedCount = (int) ($threatFeed?->entries_count ?? 0);
 
         $whitelistCount = $whitelistEnabled ? $whitelistDbCount : 0;

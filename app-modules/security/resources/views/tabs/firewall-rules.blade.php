@@ -245,7 +245,7 @@
                                     </span>
 
                                     <span class="badge badge-ghost badge-sm text-xs font-normal {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
-                                        {{ __('admin.security_invariants_rules_count', ['count' => count($preFilterRows) + 1]) }}
+                                        {{ __('admin.security_invariants_rules_count', ['count' => count($this->preFilterRows) + 1]) }}
                                     </span>
                                 </div>
                                 <div class="flex items-center gap-3">
@@ -269,7 +269,7 @@
                     </tr>
 
                     {{-- Pre-Filter Rows (rendered in the stored evaluation order) --}}
-                    @foreach ($preFilterRows as $preFilterRow)
+                    @foreach ($this->preFilterRows as $preFilterRow)
                         @php
                             $rowActive = $prefilterEnabled && ($preFilterRow['enabled'] ?? true);
                         @endphp
@@ -368,7 +368,7 @@
 
                     {{-- Dedicated Geo-Blocking Row --}}
                     @php
-                        $geoRuleModel = \Modules\Security\Models\SecurityGeoRule::instance();
+                        $geoRuleModel = $this->geoRule;
                         $geoActive = $geoRuleModel->enabled && ! empty($geoRuleModel->countries);
                     @endphp
                     <tr class="hover transition-opacity duration-200 {{ ! $geoActive ? 'opacity-50 bg-base-200/20' : '' }}"
@@ -457,7 +457,7 @@
                     </tr>
 
                     {{-- Core PBX Services Rows --}}
-                    @foreach ($catalogServices as $service)
+                    @foreach ($this->serviceRules as $service)
                         <tr class="hover {{ ! $service->enabled ? 'opacity-50' : '' }}"
                             wire:key="sys-service-{{ $service->id }}"
                             wire:loading.class="opacity-40 pointer-events-none"
@@ -583,7 +583,7 @@
                     </tr>
 
                     {{-- Custom Sequential Rules Rows --}}
-                    @forelse ($firewallRules as $rule)
+                    @forelse ($this->rules as $rule)
                         <tr class="hover {{ ! $rule->enabled ? 'opacity-50' : '' }}"
                             wire:key="firewall-rule-{{ $rule->id }}"
                             wire:loading.class="opacity-40 pointer-events-none"

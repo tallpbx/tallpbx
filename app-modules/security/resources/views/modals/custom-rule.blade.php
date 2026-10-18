@@ -24,7 +24,7 @@
                     <label class="label"><span class="label-text font-medium">{{ __('admin.security_service_port') }}</span></label>
                     <select wire:model.live="ruleServiceId" class="select select-bordered select-sm">
                         <option value="">Custom Port / Protocol</option>
-                        @foreach ($catalogServices as $service)
+                        @foreach ($this->serviceRules as $service)
                             <option value="{{ $service->id }}">{{ $service->name }} ({{ $service->port_range }}/{{ strtoupper($service->protocol) }})</option>
                         @endforeach
                     </select>

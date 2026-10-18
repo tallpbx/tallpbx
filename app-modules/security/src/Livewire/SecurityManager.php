@@ -6,7 +6,9 @@ namespace Modules\Security\Livewire;
 
 use App\Support\Concerns\HasOperationalFeedback;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -23,6 +25,7 @@ use Modules\Security\Livewire\Concerns\ManagesObserveMode;
 use Modules\Security\Livewire\Concerns\ManagesPreFilters;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
+use Modules\Security\Models\SecurityGeoRule;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecurityRule;
 use Modules\Security\Models\SecurityService;
@@ -420,23 +423,41 @@ class SecurityManager extends Component
     }
 
     /**
-     * Render the Security Command Center Blade view.
+     * Custom and sequential firewall rules with associated service definitions.
+     *
+     * @return Collection<int, SecurityRule>
      */
-    public function render(SecurityBanServiceInterface $banService): View
+    #[Computed]
+    public function rules(): Collection
     {
-        $blacklistIps = SecurityIpList::query()
-            ->where('type', 'blacklist')
-            ->when($this->blacklistSearch ?: $this->ipSearch, function ($query): void {
-                $search = $this->blacklistSearch ?: $this->ipSearch;
-                $query->where(function ($q) use ($search): void {
-                    $q->where('ip_address', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
-                });
-            })
-            ->orderBy('id', 'desc')
+        return SecurityRule::with('service')
+            ->orderBy('sequence', 'asc')
             ->get();
+    }
 
-        $whitelistIps = SecurityIpList::query()
+    /**
+     * Standard PBX catalog and system services for stage 10–12 inspection.
+     *
+     * @return Collection<int, SecurityService>
+     */
+    #[Computed]
+    public function serviceRules(): Collection
+    {
+        return SecurityService::where('is_system', true)
+            // Show ICMP rules first so the related group stays together in the table.
+            ->orderByRaw("CASE WHEN protocol = 'icmp' THEN 0 ELSE 1 END, name ASC")
+            ->get();
+    }
+
+    /**
+     * Trusted whitelist IP entries matching active filters.
+     *
+     * @return Collection<int, SecurityIpList>
+     */
+    #[Computed]
+    public function whitelist(): Collection
+    {
+        return SecurityIpList::query()
             ->where('type', 'whitelist')
             ->when($this->whitelistSearch ?: $this->ipSearch, function ($query): void {
                 $search = $this->whitelistSearch ?: $this->ipSearch;
@@ -447,49 +468,123 @@ class SecurityManager extends Component
             })
             ->orderBy('id', 'desc')
             ->get();
+    }
 
-        $activeBans = $banService->getActiveBans();
-
-        $firewallRules = SecurityRule::with('service')
-            ->orderBy('sequence', 'asc')
+    /**
+     * Blocklist IP entries matching active filters.
+     *
+     * @return Collection<int, SecurityIpList>
+     */
+    #[Computed]
+    public function blacklist(): Collection
+    {
+        return SecurityIpList::query()
+            ->where('type', 'blacklist')
+            ->when($this->blacklistSearch ?: $this->ipSearch, function ($query): void {
+                $search = $this->blacklistSearch ?: $this->ipSearch;
+                $query->where(function ($q) use ($search): void {
+                    $q->where('ip_address', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('id', 'desc')
             ->get();
+    }
 
-        $catalogServices = SecurityService::where('is_system', true)
-            // Show ICMP rules first so the related group stays together in the table.
-            ->orderByRaw("CASE WHEN protocol = 'icmp' THEN 0 ELSE 1 END, name ASC")
-            ->get();
+    /**
+     * Active security bans across all protection vectors.
+     *
+     * @return Collection<int, SecurityBan>
+     */
+    #[Computed]
+    public function bans(): Collection
+    {
+        return app(SecurityBanServiceInterface::class)->getActiveBans();
+    }
 
-        $bannedCount = SecurityBan::active()->count();
-        $whitelistCount = SecurityIpList::whitelist()->count();
-        $blacklistCount = SecurityIpList::blacklist()->count();
-
-        // The panel displays the same clamped limits the kernel is actually
-        // running (zero or missing settings fall back to the defaults).
-        $tftpLimits = SecurityConfigGenerator::tftpLimits();
-
-        // Detected-but-unblocked scanner incidents: inactive incident rows
-        // whose address is not already covered by an active ban.
-        $scannerIncidents = SecurityBan::where('is_active', false)
+    /**
+     * Detected-but-unblocked scanner incidents: inactive incident rows
+     * whose address is not already covered by an active ban.
+     *
+     * @return Collection<int, SecurityBan>
+     */
+    #[Computed]
+    public function scannerIncidents(): Collection
+    {
+        return SecurityBan::where('is_active', false)
             ->where('vector', 'sip_scanner')
             ->whereNotIn('ip_address', SecurityBan::active()->pluck('ip_address'))
             ->orderByDesc('updated_at')
             ->limit(20)
             ->get();
+    }
 
-        $threatFeed = SecurityThreatFeed::where('provider', 'voipbl')->first();
+    /**
+     * Configured external IP threat feeds.
+     *
+     * @return Collection<int, SecurityThreatFeed>
+     */
+    #[Computed]
+    public function threatFeeds(): Collection
+    {
+        return SecurityThreatFeed::all();
+    }
+
+    /**
+     * Primary threat feed (voipbl).
+     */
+    #[Computed]
+    public function threatFeed(): ?SecurityThreatFeed
+    {
+        return SecurityThreatFeed::where('provider', 'voipbl')->first();
+    }
+
+    /**
+     * Stored geo-blocking perimeter rules and sync state.
+     */
+    #[Computed]
+    public function geoRule(): SecurityGeoRule
+    {
+        return SecurityGeoRule::instance();
+    }
+
+    /**
+     * Total number of active bans across the host.
+     */
+    #[Computed]
+    public function bannedCount(): int
+    {
+        return SecurityBan::active()->count();
+    }
+
+    /**
+     * Total number of whitelisted IPs across the host.
+     */
+    #[Computed]
+    public function whitelistCount(): int
+    {
+        return SecurityIpList::whitelist()->count();
+    }
+
+    /**
+     * Total number of blacklisted IPs across the host.
+     */
+    #[Computed]
+    public function blacklistCount(): int
+    {
+        return SecurityIpList::blacklist()->count();
+    }
+
+    /**
+     * Render the Security Command Center Blade view.
+     */
+    public function render(?SecurityBanServiceInterface $banService = null): View
+    {
+        // The panel displays the same clamped limits the kernel is actually
+        // running (zero or missing settings fall back to the defaults).
+        $tftpLimits = SecurityConfigGenerator::tftpLimits();
 
         return view('security::security-manager', [
-            'blacklistIps' => $blacklistIps,
-            'whitelistIps' => $whitelistIps,
-            'activeBans' => $activeBans,
-            'firewallRules' => $firewallRules,
-            'catalogServices' => $catalogServices,
-            'bannedCount' => $bannedCount,
-            'whitelistCount' => $whitelistCount,
-            'blacklistCount' => $blacklistCount,
-            'preFilterRows' => $this->preFilterRows(),
-            'threatFeed' => $threatFeed,
-            'externalBlocklist' => $threatFeed,
             'feedDropCounter' => $this->feedDropCounter(),
             'tftpDefense' => [
                 'enabled' => $this->tftpDefenseEnabled,
@@ -502,7 +597,6 @@ class SecurityManager extends Component
                 'ban_seconds' => $this->sipScannerBanSeconds,
                 'defaults' => SipScannerSignatures::defaults(),
                 'custom' => SipScannerSignatures::custom(),
-                'incidents' => $scannerIncidents,
             ],
             'observeMetrics' => $this->observeCounters(),
             'observeEvents' => $this->showObserveDrawer ? $this->observeEvents(50) : [],
