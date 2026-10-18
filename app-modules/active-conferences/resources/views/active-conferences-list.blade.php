@@ -21,7 +21,7 @@
                 <table class="table table-zebra" wire:poll.5s="refresh">
                     <thead>
                         <tr>
-                            <th>Name</th>
+                            <th>{{ __('client.name') }}</th>
                             <th>{{ __('admin.conference_members') }}</th>
                             <th>{{ __('client.status') }}</th>
                             @if ($this->canMute || $this->canKick)

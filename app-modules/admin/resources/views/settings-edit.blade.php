@@ -46,10 +46,10 @@
             <table class="table table-zebra">
                 <thead>
                     <tr>
-                        <th>Key</th>
-                        <th>Value</th>
-                        <th>Type</th>
-                        <th>Actions</th>
+                        <th>{{ __('client.key') }}</th>
+                        <th>{{ __('client.value') }}</th>
+                        <th>{{ __('client.type') }}</th>
+                        <th>{{ __('client.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

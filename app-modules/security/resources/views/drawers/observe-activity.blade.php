@@ -68,12 +68,12 @@
                     <table class="table table-xs table-pin-rows">
                         <thead>
                             <tr class="bg-base-200/80 text-base-content/70 sticky top-0">
-                                <th>Timestamp</th>
-                                <th>Rule Stage</th>
-                                <th>Interface</th>
-                                <th>Source IP</th>
-                                <th>Destination</th>
-                                <th>Proto</th>
+                                <th>{{ __('client.timestamp') }}</th>
+                                <th>{{ __('admin.security_rule_stage') }}</th>
+                                <th>{{ __('client.interface') }}</th>
+                                <th>{{ __('admin.security_source_ip') }}</th>
+                                <th>{{ __('client.destination') }}</th>
+                                <th>{{ __('client.proto') }}</th>
                             </tr>
                         </thead>
                         <tbody>

@@ -23,8 +23,8 @@
                     <table class="table table-zebra">
                         <thead>
                             <tr>
-                                <th>Queue</th>
-                                <th>Strategy</th>
+                                <th>{{ __('client.queue') }}</th>
+                                <th>{{ __('client.strategy') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -46,7 +46,7 @@
                     <table class="table table-zebra">
                         <thead>
                             <tr>
-                                <th>Agent</th>
+                                <th>{{ __('client.agent') }}</th>
                                 <th>{{ __('client.status') }}</th>
                                 @if ($this->canControl)
                                     <th></th>

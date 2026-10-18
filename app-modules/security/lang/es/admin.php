@@ -157,6 +157,7 @@ return [
     'security_observe_drawer_bytes' => 'Total de bytes registrados',
     'security_observe_drawer_stage_summary' => 'Impactos observados por etapa del cortafuegos',
     'security_observe_drawer_recent_events' => 'Paquetes observados recientes',
+    'security_rule_stage' => 'Etapa de regla',
     'security_observe_drawer_no_events' => 'Aún no se han registrado eventos de bloqueo en el registro del núcleo.',
     'security_observe_drawer_cli_tip' => 'Transmitir eventos en vivo en la terminal:',
     'security_observe_drawer_refresh' => 'Actualizar',

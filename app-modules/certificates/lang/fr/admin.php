@@ -33,4 +33,8 @@ return [
     'certificates_active_telephony' => 'Téléphonie (SIP TLS et WebRTC)',
     'certificates_active_badge' => 'Actif',
     'certificates_no_certificates' => 'Aucun certificat installé pour le moment.',
+    'certificates_name_domain' => 'Nom / Domaine',
+    'certificates_san_domains' => 'Domaines SAN',
+    'certificates_expires_in' => 'Expire dans',
+    'certificates_assigned_services' => 'Services Assignés',
 ];

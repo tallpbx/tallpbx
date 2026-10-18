@@ -37,7 +37,7 @@
 | 1.3.3 | Retain unified firewall pipeline table (evaluated & consolidated) | Verified | 2026-10-17 |
 | 2.1 | Standardized form submission loading feedback | Verified | 2026-10-17 |
 | 2.2 | Page-title typography normalization | Verified | 2026-10-17 |
-| 2.3 | Localize hardcoded table headers | Pending | 2026-10-16 |
+| 2.3 | Localize hardcoded table headers | Verified | 2026-10-18 |
 | 2.4 | Normalize arbitrary font sizes | Pending | 2026-10-16 |
 | 2.5 | Standardize toggle switch sizing & loading locks | Pending | 2026-10-17 |
 | 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Pending | 2026-10-16 |
@@ -177,11 +177,14 @@
   - Added Pest UI architecture test `PageTitleTypographyArchitectureTest` enforcing that all page-title headings across all views strictly adhere to the standard.
 - **Verification**: Verified via `PageTitleTypographyArchitectureTest` (scanned 127 matching page titles across 127 views), Pest Browser suite (53 passed, 273 assertions), and Pint code style linting.
 
-### Task 2.3: Localize Hardcoded Table Header (`<th>`) Contents (UI Audit L1)
-- **Problem**: 39 table header cells contain raw English strings (`Name`, `Actions`, `Type`, `Status`, `Provider`, `Destination`, `Queue`, `Profile`, `Value`, `Key`, `Strategy`, `Timestamp`, `Rule Stage`, `Proto`, `Message`, plus `Source IP`, `SAN Domains`, `Name / Domain`, `Interface`, and `File`), rendering untranslated in Spanish and French *(re-measured 2026-10-16; the original audit catalogued ~25)*.
+### Task 2.3: Localize Hardcoded Table Header (`<th>`) Contents (UI Audit L1) [COMPLETED]
+- **Problem**: 39 table header cells contained raw English strings (`Name`, `Actions`, `Type`, `Status`, `Provider`, `Destination`, `Queue`, `Profile`, `Value`, `Key`, `Strategy`, `Timestamp`, `Rule Stage`, `Proto`, `Message`, plus `Source IP`, `SAN Domains`, `Name / Domain`, `Interface`, and `File`), rendering untranslated in Spanish and French.
 - **Implementation**:
-  - Replace unlocalized `<th>` contents with root dictionary keys (`__('client.name')`, `__('client.actions')`, `__('client.status')`, etc.) or module-specific translations where domain-specific.
-  - Verify with `TranslationParityTest` (must remain 100% green).
+  - Replaced all 39 unlocalized `<th>` cells across 7 views (`file-stores-list`, `observe-activity`, `certificate-manager`, `settings-edit`, `call-center-active-list`, `gateways-list`, and `active-conferences-list`) with root `client` translation keys (`__('client.name')`, `__('client.actions')`, `__('client.status')`, `__('client.file')`, `__('client.destination')`, `__('client.attempts')`, `__('client.provider')`, `__('client.connection')`, `__('client.timestamp')`, `__('client.interface')`, `__('client.proto')`, `__('client.action')`, `__('client.administrator')`, `__('client.message')`, `__('client.queue')`, `__('client.strategy')`, `__('client.agent')`, `__('client.profile')`, `__('client.key')`, `__('client.value')`, `__('client.type')`, `__('client.created_at')`) or domain-specific keys (`__('admin.security_rule_stage')`, `__('admin.security_source_ip')`, `__('admin.certificates_name_domain')`, `__('admin.certificates_san_domains')`, `__('admin.certificates_expires_in')`, `__('admin.certificates_assigned_services')`).
+  - Added full translation parity for all new table header keys across English, Spanish, and French in `lang/{en,es,fr}/client.php`, `app-modules/security/lang/{en,es,fr}/admin.php`, and `app-modules/certificates/lang/{en,es,fr}/admin.php`.
+  - Extended `TranslationParityTest` to enforce 100% key parity across `lang/{locale}/client.php` in addition to `admin.php`.
+  - Created architecture test `TableHeadersLocalizationArchitectureTest` scanning all Blade views across `app-modules/` and `resources/views/` to assert zero unlocalized `<th>` cells.
+- **Verification**: Verified via `TableHeadersLocalizationArchitectureTest` (200+ headers scanned, 0 violations), `TranslationParityTest` (6 tests, 698 assertions), targeted module tests (file-stores, certificates, gateways, call-center-active, active-conferences: 168 tests, 614 assertions), and Pint code style linting.
 
 ### Task 2.4: Normalize Arbitrary Font Sizes (UI Audit L2)
 - **Problem**: 30 occurrences of arbitrary one-off font sizes (`text-[10px]` and `text-[11px]`) concentrated in the security module and display-settings drawer violate the design token convention *(re-measured 2026-10-16; the original audit catalogued 21)*.
@@ -324,6 +327,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-18** | `4734ba20` | **UI / Localization** | **Localize Hardcoded Table Header (`<th>`) Contents**: Localized all 39 previously hardcoded English `<th>` cells across 7 views (`file-stores-list`, `observe-activity`, `certificate-manager`, `settings-edit`, `call-center-active-list`, `gateways-list`, and `active-conferences-list`) using root `client` keys and module domain keys with 100% parity across English, Spanish, and French. Extended `TranslationParityTest` to enforce 100% parity across `client.php`, and added architecture test `TableHeadersLocalizationArchitectureTest` ensuring zero unlocalized table headers across all views. *(Resolves Task 2.3 / UI Audit L1)* |
 | **2026-10-17** | `e972ff44` | **UI / Typography** | **Page-Title Typography Normalization**: Normalized 125 module and panel page-title headings (`<h1>` / `<h2>` with `text-2xl`) across `app-modules/` and `resources/views/` to strictly match the established design standard in `AGENTS.md` (`text-2xl font-bold tracking-tight text-base-content`), eliminating non-standard `font-semibold` and untightened variants while preserving layout spacing utilities (`mb-6`, `mb-4`, etc.). Added architecture test `PageTitleTypographyArchitectureTest` enforcing 100% compliance across all views. *(Resolves Task 2.2)* |
 | **2026-10-17** | `f50c2347` | **UI / Components** | **Standardized Form Submission Loading Feedback (`<x-form-submit-button>`)**: Created `<x-form-submit-button>` Blade component with built-in DaisyUI loading spinner, disabled state lock, standard `btn-sm` sizing, and dynamic present-continuous busy text. Batch-migrated all 47 edit/create views (plus fax send and dialplan tester) to `<x-form-submit-button>`, normalized cancel links to `btn btn-ghost btn-sm` with `wire:navigate`, and added unit and architecture tests. *(Resolves Task 2.1)* |
 | **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Firewall Rules Unified Table Architecture**: Evaluated `firewall-rules.blade.php` against logical boundary principles; retained the single cohesive HTML table and unified Alpine scroller rather than fragmenting into headless `<tr>` partials. *(Resolves Task 1.3.3; Stream 1 100% complete)* |

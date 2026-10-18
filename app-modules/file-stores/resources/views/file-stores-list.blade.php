@@ -73,11 +73,11 @@
                 <table class="table table-zebra">
                     <thead>
                         <tr>
-                            <th>File</th>
-                            <th>Destination</th>
-                            <th>Status</th>
-                            <th>Attempts</th>
-                            <th>Actions</th>
+                            <th>{{ __('client.file') }}</th>
+                            <th>{{ __('client.destination') }}</th>
+                            <th>{{ __('client.status') }}</th>
+                            <th>{{ __('client.attempts') }}</th>
+                            <th>{{ __('client.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -112,10 +112,10 @@
             <table class="table table-zebra">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Provider</th>
-                        <th>Connection</th>
-                        <th>Actions</th>
+                        <th>{{ __('client.name') }}</th>
+                        <th>{{ __('client.provider') }}</th>
+                        <th>{{ __('client.connection') }}</th>
+                        <th>{{ __('client.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>

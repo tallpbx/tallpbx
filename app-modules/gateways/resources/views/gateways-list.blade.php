@@ -17,7 +17,7 @@
                 <thead>
                     <tr>
                         <th><x-tooltip :tip="__('admin.gateway_name_tooltip')" position="bottom">{{ __('admin.gateway_name') }}</x-tooltip></th>
-                        <th>Profile</th>
+                        <th>{{ __('client.profile') }}</th>
                         <th><x-tooltip :tip="__('admin.gateway_host_tooltip')" position="bottom">{{ __('admin.gateway_host') }}</x-tooltip></th>
                         <th><x-tooltip :tip="__('admin.gateway_register_tooltip')" position="bottom">{{ __('admin.gateway_register') }}</x-tooltip></th>
                         <th>{{ __('client.status') }}</th>

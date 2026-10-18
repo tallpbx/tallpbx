@@ -157,6 +157,7 @@ return [
     'security_observe_drawer_bytes' => 'Total Bytes Recorded',
     'security_observe_drawer_stage_summary' => 'Observed Hits by Firewall Stage',
     'security_observe_drawer_recent_events' => 'Recent Observed Packets',
+    'security_rule_stage' => 'Rule Stage',
     'security_observe_drawer_no_events' => 'No observed drop events recorded yet in the kernel journal.',
     'security_observe_drawer_cli_tip' => 'Stream live observe events in your terminal:',
     'security_observe_drawer_refresh' => 'Refresh',

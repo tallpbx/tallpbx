@@ -157,6 +157,7 @@ return [
     'security_observe_drawer_bytes' => 'Total des octets enregistrés',
     'security_observe_drawer_stage_summary' => 'Impacts observés par étape du pare-feu',
     'security_observe_drawer_recent_events' => 'Paquets observés récents',
+    'security_rule_stage' => 'Étape de règle',
     'security_observe_drawer_no_events' => 'Aucun événement de rejet enregistré pour le moment dans le journal du noyau.',
     'security_observe_drawer_cli_tip' => 'Diffuser les événements d\'observation en direct dans le terminal :',
     'security_observe_drawer_refresh' => 'Actualiser',

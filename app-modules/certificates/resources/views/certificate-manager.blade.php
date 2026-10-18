@@ -180,12 +180,12 @@
                     <table class="table table-zebra table-sm w-full">
                         <thead>
                             <tr>
-                                <th>Name / Domain</th>
-                                <th>Type</th>
-                                <th>SAN Domains</th>
-                                <th>Expires In</th>
-                                <th>Assigned Services</th>
-                                <th class="text-right">Actions</th>
+                                <th>{{ __('admin.certificates_name_domain') }}</th>
+                                <th>{{ __('client.type') }}</th>
+                                <th>{{ __('admin.certificates_san_domains') }}</th>
+                                <th>{{ __('admin.certificates_expires_in') }}</th>
+                                <th>{{ __('admin.certificates_assigned_services') }}</th>
+                                <th class="text-right">{{ __('client.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -571,10 +571,10 @@
                         <table class="table table-zebra table-sm w-full">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Provider</th>
-                                    <th>Created</th>
-                                    <th class="text-right">Actions</th>
+                                    <th>{{ __('client.name') }}</th>
+                                    <th>{{ __('client.provider') }}</th>
+                                    <th>{{ __('client.created_at') }}</th>
+                                    <th class="text-right">{{ __('client.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -652,11 +652,11 @@
                     <table class="table table-zebra table-sm w-full">
                         <thead>
                             <tr>
-                                <th>Timestamp</th>
-                                <th>Action</th>
-                                <th>Status</th>
-                                <th>Administrator</th>
-                                <th>Message</th>
+                                <th>{{ __('client.timestamp') }}</th>
+                                <th>{{ __('client.action') }}</th>
+                                <th>{{ __('client.status') }}</th>
+                                <th>{{ __('client.administrator') }}</th>
+                                <th>{{ __('client.message') }}</th>
                             </tr>
                         </thead>
                         <tbody>

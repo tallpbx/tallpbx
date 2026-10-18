@@ -21,19 +21,21 @@ beforeEach(function () {
 });
 
 it('enforces 100% key parity across root language files in en, es, and fr', function () {
-    $enKeys = array_keys(require base_path('lang/en/admin.php'));
-    $esKeys = array_keys(require base_path('lang/es/admin.php'));
-    $frKeys = array_keys(require base_path('lang/fr/admin.php'));
+    foreach (['admin', 'client'] as $group) {
+        $enKeys = array_keys(require base_path("lang/en/{$group}.php"));
+        $esKeys = array_keys(require base_path("lang/es/{$group}.php"));
+        $frKeys = array_keys(require base_path("lang/fr/{$group}.php"));
 
-    $missingEs = array_diff($enKeys, $esKeys);
-    $missingFr = array_diff($enKeys, $frKeys);
-    $extraEs = array_diff($esKeys, $enKeys);
-    $extraFr = array_diff($frKeys, $enKeys);
+        $missingEs = array_diff($enKeys, $esKeys);
+        $missingFr = array_diff($enKeys, $frKeys);
+        $extraEs = array_diff($esKeys, $enKeys);
+        $extraFr = array_diff($frKeys, $enKeys);
 
-    expect($missingEs)->toBeEmpty('Keys missing in lang/es/admin.php: '.implode(', ', $missingEs))
-        ->and($missingFr)->toBeEmpty('Keys missing in lang/fr/admin.php: '.implode(', ', $missingFr))
-        ->and($extraEs)->toBeEmpty('Extra keys in lang/es/admin.php not in en: '.implode(', ', $extraEs))
-        ->and($extraFr)->toBeEmpty('Extra keys in lang/fr/admin.php not in en: '.implode(', ', $extraFr));
+        expect($missingEs)->toBeEmpty("Keys missing in lang/es/{$group}.php: ".implode(', ', $missingEs))
+            ->and($missingFr)->toBeEmpty("Keys missing in lang/fr/{$group}.php: ".implode(', ', $missingFr))
+            ->and($extraEs)->toBeEmpty("Extra keys in lang/es/{$group}.php not in en: ".implode(', ', $extraEs))
+            ->and($extraFr)->toBeEmpty("Extra keys in lang/fr/{$group}.php not in en: ".implode(', ', $extraFr));
+    }
 });
 
 it('enforces zero key collisions between module language files and root dictionary', function () {
