@@ -32,9 +32,9 @@
 | 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Verified | 2026-10-17 |
 | 1.1.3 | Geo-blocking cache freshness & whitelist fail-closed integrity | Verified | 2026-10-17 |
 | 1.2.1 | Decompose `SecurityConfigGenerator` | Verified | 2026-10-17 |
-| 1.3.1 | Reorganize `src/` into sub-domain namespaces | Pending | 2026-10-16 |
-| 1.3.2 | Realign domain trait boundaries | Pending | 2026-10-16 |
-| 1.3.3 | Decompose oversized tab views into partials | Pending | 2026-10-17 |
+| 1.3.1 | Reorganize `src/Services/` into sub-domain namespaces | Verified | 2026-10-17 |
+| 1.3.2 | Realign domain trait boundaries | Verified | 2026-10-17 |
+| 1.3.3 | Retain unified firewall pipeline table (evaluated & consolidated) | Verified | 2026-10-17 |
 | 2.1 | Standardized form submission loading feedback | Pending | 2026-10-16 |
 | 2.2 | Page-title typography normalization | Pending | 2026-10-16 |
 | 2.3 | Localize hardcoded table headers | Pending | 2026-10-16 |
@@ -144,13 +144,12 @@
   - Moved misplaced methods in `SecurityManager` concern traits to their visual domain match:
     - Moved `$tftpDefenseEnabled`, `setTftpDefense()`, and `tftpDefenseCounters()` from `ManagesAttackProtection` into `ManagesFirewallRules` (where the TFTP workbench is visually rendered). Verified with targeted `SecurityManagerTftpTest` and full 421-test suite.
 
-#### Task 1.3.3: Decompose Oversized Tab Views into Partials
-- **Implementation**:
-  - Decompose `resources/views/tabs/firewall-rules.blade.php` (731 LOC; re-verified 2026-10-17) into readable partials:
-    - `partials/prefilter-pipeline.blade.php`
-    - `partials/rules-table.blade.php`
-    - `partials/system-services.blade.php`
-    - `partials/tftp-defense.blade.php`
+#### Task 1.3.3: Firewall Rules Unified Table Architecture [COMPLETED - RETAINED UNIFIED]
+- **Evaluation & Decision**:
+  - Re-evaluated 2026-10-17 based on the principle of separating by logical boundaries rather than file size.
+  - `resources/views/tabs/firewall-rules.blade.php` (732 LOC) is a single, cohesive HTML `<table>` with 7 shared columns governed by a unified Alpine.js horizontal scroll controller, visually modeling the sequential Linux nftables evaluation pipeline from top to bottom (Pre-filters → PBX Core Services → Custom Rules → Default Policy).
+  - Slicing `firewall-rules.blade.php` into 4 separate files would produce headless sets of `<tr>` tags that cannot stand alone or be reused, damaging readability and maintainability without creating domain abstractions.
+  - **Decision**: Retained unified as a single cohesive template. Stream 1 is now 100% complete.
 
 ---
 
@@ -254,13 +253,10 @@
   - Review and document the single-tenant fallback to ensure explicit tenant boundary checks.
 
 ### Task 4.6: Decompose Large Shared-Kernel Classes (Arch Audit M1 & L7)
-- **Problem**: Several large single-purpose classes mix raw protocol handling with business APIs:
-  - `FreeSwitchService` (714 LOC): Mixes raw ESL socket framing and reconnects with high-level command APIs.
-  - `GitUpdateService` (715 LOC): Mixes Git process execution with status storage and web logging.
-  - `ModuleLifecycleService` (696 LOC; previously recorded as 893 — re-measured 2026-10-16): Mixes dependency resolution with DB lifecycle and rollback.
-- **Implementation**:
-  - Split `FreeSwitchService` into `EslConnection` (protocol framing) + `FreeSwitchApi` (command API).
-  - Split `GitUpdateService` into `GitUpdateRunner`, `UpdateStatusStore`, and `UpdateLogWriter`.
+- **Scope & Architectural Evaluation**:
+  - Re-evaluated 2026-10-17 based on the principle of separating by domain/logical boundaries rather than file size.
+  - `GitUpdateService` (716 LOC) and `ModuleLifecycleService` (696 LOC) are cohesive single-domain orchestrators; decomposing their internal status storage or lifecycle steps into artificial micro-classes adds indirection without reuse value, so they remain unified.
+  - `FreeSwitchService` (714 LOC): Retains the genuine protocol/transport boundary — separating raw TCP socket framing/reconnects (`EslConnection`) from the high-level telephony command API (`FreeSwitchApi`) when socket resiliency requires it.
 
 ### Task 4.7: Environment Variable Documentation Reference (Arch Audit L5)
 - **Implementation**:
@@ -325,6 +321,9 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Firewall Rules Unified Table Architecture**: Evaluated `firewall-rules.blade.php` against logical boundary principles; retained the single cohesive HTML table and unified Alpine scroller rather than fragmenting into headless `<tr>` partials. *(Resolves Task 1.3.3; Stream 1 100% complete)* |
+| **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Realign Domain Trait Boundaries**: Relocated `$tftpDefenseEnabled`, `setTftpDefense()`, and `tftpDefenseCounters()` from `ManagesAttackProtection` into `ManagesFirewallRules`, aligning component concerns with the visual TFTP workbench in the Firewall Rules tab. *(Resolves Task 1.3.2)* |
+| **2026-10-17** | `3e0c3356` | **Security / Services** | **Sub-domain Namespace Realignment**: Reorganized flat `app-modules/security/src/Services/` into cohesive sub-domain folders (`Firewall/`, `Geo/`, `ThreatFeeds/`, `Bans/`, `Detection/`) with zero backward-compatibility fallbacks on `4.x`. *(Resolves Task 1.3.1)* |
 | **2026-10-17** | `ad7e9697` | **Security / Architecture** | **Decompose SecurityConfigGenerator**: Decomposed monolithic 1,045 LOC compiler god-class into four stage-specific compiler domain classes (`BlocklistCompiler`, `GeoPerimeterCompiler`, `PreFilterCompiler`, `ServiceRulesCompiler`) under `Modules\Security\Services\Firewall\Compilers`, retaining `SecurityConfigGenerator` as a lean coordinator (~400 LOC) with 100% bit-for-bit ruleset parity and backward-compatible delegation APIs. *(Resolves Task 1.2.1)* |
 | **2026-10-17** | `ac6ce11d` | **Security / Performance** | **Lazy Computed Properties for Cockpit Tabs**: Converted all cockpit tab records and counts (`rules`, `serviceRules`, `whitelist`, `blacklist`, `bans`, `scannerIncidents`, `threatFeeds`, `threatFeed`, `geoRule`, `bannedCount`, `whitelistCount`, `blacklistCount`, `preFilterRows`) into Livewire 4 `#[Computed]` properties, eliminating up to 14 eager database queries per render in `SecurityManager::render()`. Inactive tabs now execute 0 queries during live updates, and direct `SecurityGeoRule::instance()` calls were purged from Blade views. *(Resolves Task 1.1.2)* |
 | **2026-10-17** | `f674ef98` | **Security / Firewall** | **Extract FirewallApplier Domain Service**: Extracted safety-critical 5-step apply pipeline (lockout preflight, pending configuration generation, `nft -c` syntax check, bounded sudoers helper apply, audit logging, pending counter reset, and Reverb broadcasting) into dedicated domain service `FirewallApplier` implementing `FirewallApplierInterface` with typed `FirewallApplyResult` value objects. Refactored `SecurityManager::autoApplyFirewallRuleset()`, `SecurityApplyCommand`, and `FirewallBanReconciler` to eliminate duplicate pipeline logic. *(Resolves Task 1.1.1)* |
