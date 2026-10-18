@@ -5,7 +5,7 @@
             <p class="text-sm text-base-content/60">Credentials remain write-only after they are saved.</p>
         </div>
 
-        <a href="{{ route('panel.file-stores.index') }}" class="btn btn-ghost" wire:navigate>Cancel</a>
+        <a href="{{ route('panel.file-stores.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
     </div>
 
     <form wire:submit="save" class="space-y-6">
@@ -134,8 +134,8 @@
         </div>
 
         <div class="flex justify-end gap-3">
-            <a href="{{ route('panel.file-stores.index') }}" class="btn btn-ghost" wire:navigate>Cancel</a>
-            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">Save file store</button>
+            <a href="{{ route('panel.file-stores.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
+            <x-form-submit-button>{{ __('admin.save') }}</x-form-submit-button>
         </div>
     </form>
 </div>

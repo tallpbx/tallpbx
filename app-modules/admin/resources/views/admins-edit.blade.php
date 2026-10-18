@@ -77,11 +77,10 @@
         </div>
 
         <div class="flex items-center gap-3">
-            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="save">{{ __('admin.save') }}</span>
-                <span wire:loading wire:target="save" class="loading loading-spinner loading-xs"></span>
-            </button>
-            <a href="{{ route('panel.admins.index') }}" wire:navigate class="btn btn-ghost">
+            <x-form-submit-button>
+                {{ __('admin.save') }}
+            </x-form-submit-button>
+            <a href="{{ route('panel.admins.index') }}" wire:navigate class="btn btn-ghost btn-sm">
                 {{ __('admin.cancel') }}
             </a>
         </div>

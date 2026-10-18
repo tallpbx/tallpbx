@@ -59,11 +59,10 @@
 
             {{-- Actions --}}
             <div class="flex gap-3 mt-6">
-                <button type="submit" class="btn btn-primary">
-                    <x-heroicon-o-check class="w-4 h-4" />
+                <x-form-submit-button icon="heroicon-o-check">
                     {{ $this->isEdit ? 'Update Tenant' : 'Create Tenant' }}
-                </button>
-                <a href="{{ route('panel.tenants.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                </x-form-submit-button>
+                <a href="{{ route('panel.tenants.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
             </div>
         </form>
     </div>

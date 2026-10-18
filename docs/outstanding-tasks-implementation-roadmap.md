@@ -35,7 +35,7 @@
 | 1.3.1 | Reorganize `src/Services/` into sub-domain namespaces | Verified | 2026-10-17 |
 | 1.3.2 | Realign domain trait boundaries | Verified | 2026-10-17 |
 | 1.3.3 | Retain unified firewall pipeline table (evaluated & consolidated) | Verified | 2026-10-17 |
-| 2.1 | Standardized form submission loading feedback | Pending | 2026-10-16 |
+| 2.1 | Standardized form submission loading feedback | Verified | 2026-10-17 |
 | 2.2 | Page-title typography normalization | Pending | 2026-10-16 |
 | 2.3 | Localize hardcoded table headers | Pending | 2026-10-16 |
 | 2.4 | Normalize arbitrary font sizes | Pending | 2026-10-16 |
@@ -157,16 +157,18 @@
 
 *Source: retired `ui-audit-report.md` (untracked working audit, consolidated here). Item IDs (M2, L1, ...) are retained for traceability; all quantitative figures were re-measured against the working tree on 2026-10-16.*
 
-### Task 2.1: Standardized Form Submission Loading Feedback (`<x-form-submit-button>`) (UI Audit M3 & L3)
+### Task 2.1: Standardized Form Submission Loading Feedback (`<x-form-submit-button>`) [COMPLETED] (UI Audit M3 & L3)
 - **Problem**: Of the 47 module edit/create views (`acl-edit`, `dialplans-edit`, `bridges-edit`, `sip-profiles-edit`, `extensions-edit`, `users-edit`, `tenants-edit`, etc.), 42 contain no `wire:loading` directive at all *(re-measured 2026-10-16)*, so their submits have no busy state, spinner, or disabled attribute. When saves trigger FreeSWITCH reload jobs or cache invalidation, the screen freezes with zero feedback. In addition, `sip-profiles-edit` and `extensions-edit` have button sizing drift (`btn` instead of standard `btn-sm`).
 - **Implementation**:
-  - Create `<x-form-submit-button>` Blade component with built-in:
+  - Created `<x-form-submit-button>` Blade component in `resources/views/components/form-submit-button.blade.php` with built-in:
     - `wire:loading.attr="disabled"`
+    - Scoped `wire:target` (defaulting to `'save'`, customizable via prop, omissible via `:target="false"`)
     - DaisyUI loading spinner (`<span class="loading loading-spinner loading-xs" wire:loading></span>`)
-    - Standard `btn btn-primary btn-sm` sizing
-    - Dynamic slot text supporting present-continuous busy labels (e.g., "Saving...").
-  - Batch-migrate all 47 edit/create views to use `<x-form-submit-button>` and normalize cancel links to `btn btn-ghost btn-sm`.
-- **Verification**: Browser smoke tests verifying button locks and spinner appears on save.
+    - Standard `btn btn-primary btn-sm` sizing with class merging support
+    - Dynamic slot text supporting present-continuous busy labels (defaulting to `__('admin.saving')`, localized across en/es/fr).
+  - Batch-migrated all 47 edit/create views (plus `fax-send` and `dialplan-tester`) to `<x-form-submit-button>` and normalized cancel links to `btn btn-ghost btn-sm` with `wire:navigate`.
+  - Added unit test `FormSubmitButtonTest` and architecture test `FormSubmitButtonArchitectureTest` verifying 100% compliance across all edit views.
+- **Verification**: Verified via `FormSubmitButtonTest`, `FormSubmitButtonArchitectureTest`, Playwright browser tests (`PanelRoutingSmokeTest`, `PanelCoreSmokeTest`), and full parallel test suite (2,923 tests, 19,724 assertions).
 
 ### Task 2.2: Page-Title Font Weight & Typography Normalization (UI Audit M2)
 - **Problem**: 83 views use `text-2xl font-semibold` while 43 use a `text-2xl font-bold` variant; only 7 views contain `tracking-tight` at all, so the AGENTS.md page-title standard (`text-2xl font-bold tracking-tight text-base-content`) is currently the minority pattern *(re-measured 2026-10-16; the original audit catalogued 81 vs 27)*.
@@ -321,6 +323,7 @@ All items below have been implemented, verified through automated Pest test suit
 
 | Date | Commit | Component | Description |
 | :--- | :--- | :--- | :--- |
+| **2026-10-17** | `ef743f5c` | **UI / Components** | **Standardized Form Submission Loading Feedback (`<x-form-submit-button>`)**: Created `<x-form-submit-button>` Blade component with built-in DaisyUI loading spinner, disabled state lock, standard `btn-sm` sizing, and dynamic present-continuous busy text. Batch-migrated all 47 edit/create views (plus fax send and dialplan tester) to `<x-form-submit-button>`, normalized cancel links to `btn btn-ghost btn-sm` with `wire:navigate`, and added unit and architecture tests. *(Resolves Task 2.1)* |
 | **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Firewall Rules Unified Table Architecture**: Evaluated `firewall-rules.blade.php` against logical boundary principles; retained the single cohesive HTML table and unified Alpine scroller rather than fragmenting into headless `<tr>` partials. *(Resolves Task 1.3.3; Stream 1 100% complete)* |
 | **2026-10-17** | `ba7b0a5a` | **Security / Livewire** | **Realign Domain Trait Boundaries**: Relocated `$tftpDefenseEnabled`, `setTftpDefense()`, and `tftpDefenseCounters()` from `ManagesAttackProtection` into `ManagesFirewallRules`, aligning component concerns with the visual TFTP workbench in the Firewall Rules tab. *(Resolves Task 1.3.2)* |
 | **2026-10-17** | `3e0c3356` | **Security / Services** | **Sub-domain Namespace Realignment**: Reorganized flat `app-modules/security/src/Services/` into cohesive sub-domain folders (`Firewall/`, `Geo/`, `ThreatFeeds/`, `Bans/`, `Detection/`) with zero backward-compatibility fallbacks on `4.x`. *(Resolves Task 1.3.1)* |

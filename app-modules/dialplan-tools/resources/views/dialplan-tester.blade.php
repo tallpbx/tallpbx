@@ -14,7 +14,7 @@
                 @error('testNumber')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
             </div>
             <div class="flex gap-3">
-                <button type="submit" class="btn btn-primary">{{ __('admin.dialplan_tools_test') }}</button>
+                <x-form-submit-button target="testRegex" busy-text="Testing...">{{ __('admin.dialplan_tools_test') }}</x-form-submit-button>
             </div>
         </form>
 

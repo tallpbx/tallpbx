@@ -38,8 +38,8 @@
                 @error('value')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
             </div>
             <div class="flex gap-3">
-                <button type="submit" class="btn btn-primary">{{ __('client.save') }}</button>
-                <a href="{{ route('panel.extension-settings.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                <x-form-submit-button>{{ __('client.save') }}</x-form-submit-button>
+                <a href="{{ route('panel.extension-settings.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
             </div>
         </form>
     </div>

@@ -205,10 +205,10 @@
                 </div>
 
                 <div class="flex gap-2 pt-4 border-t border-base-300">
-                    <button type="submit" class="btn btn-primary">
-                        {{ $this->isEdit ? 'Update' : 'Create' }}
-                    </button>
-                    <a href="{{ route('panel.extensions.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                    <x-form-submit-button>
+                    {{ $this->isEdit ? 'Update' : 'Create' }}
+                </x-form-submit-button>
+                    <a href="{{ route('panel.extensions.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
                 </div>
             </form>
         </div>

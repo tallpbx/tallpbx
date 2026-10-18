@@ -42,10 +42,10 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <button type="submit" class="btn btn-primary">
+                <x-form-submit-button>
                     {{ __('admin.create_call_broadcast') }}
-                </button>
-                <a href="{{ route('panel.call-broadcast.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                </x-form-submit-button>
+                <a href="{{ route('panel.call-broadcast.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
             </div>
         </form>
     </div>

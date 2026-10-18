@@ -44,8 +44,8 @@
                 </label>
             </div>
             <div class="flex gap-3">
-                <button type="submit" class="btn btn-primary">{{ __('client.save') }}</button>
-                <a href="{{ route('panel.speech.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                <x-form-submit-button>{{ __('client.save') }}</x-form-submit-button>
+                <a href="{{ route('panel.speech.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
             </div>
         </form>
     </div>

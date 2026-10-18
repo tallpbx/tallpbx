@@ -87,8 +87,10 @@
                 </div>
 
                 <div class="flex gap-2 pt-4">
-                    <button type="submit" class="btn btn-primary">{{ $this->isEdit ? __('client.update') : __('client.create') }}</button>
-                    <a href="{{ route('panel.inbound-routes.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                    <x-form-submit-button>
+                    {{ $this->isEdit ? __('client.update') : __('client.create') }}
+                </x-form-submit-button>
+                    <a href="{{ route('panel.inbound-routes.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
                 </div>
             </form>
         </div>

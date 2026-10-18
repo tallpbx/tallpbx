@@ -4,11 +4,10 @@
             <div class="flex items-center justify-between pb-4 mb-4 border-b border-base-300">
                 <h3 class="font-medium">{{ $this->isEdit ? 'Edit Group' : 'Create Group' }}</h3>
                 <div class="flex gap-3">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <x-heroicon-o-check class="w-4 h-4" />
+                    <x-form-submit-button icon="heroicon-o-check">
                         {{ $this->isEdit ? 'Update Group' : 'Create Group' }}
-                    </button>
-                    <a href="{{ route('panel.groups.index') }}" class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
+                    </x-form-submit-button>
+                    <a href="{{ route('panel.groups.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
                 </div>
             </div>
             {{-- Name --}}

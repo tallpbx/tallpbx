@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Standardized Form Submit Button Component (`<x-form-submit-button>`)**: Created reusable Blade component with built-in DaisyUI loading spinner (`loading-spinner loading-xs`), `wire:loading.attr="disabled"` submission lock, standard `btn btn-primary btn-sm` sizing, and dynamic present-continuous busy text (`Saving...` localized across English, Spanish, and French).
+- **Form Submit Button Architecture Enforcement Test**: Added `FormSubmitButtonArchitectureTest` ensuring all module create/edit views use `<x-form-submit-button>` and standard `btn btn-ghost btn-sm` cancel links with `wire:navigate`.
+
+### Changed
+- **Form Submission Loading Feedback & Cancel Link Standardization**: Migrated all 47 module create and edit views (plus fax send and dialplan tester) to `<x-form-submit-button>`, eliminating submission freeze during FreeSWITCH reload jobs or cache invalidation, and normalized all cancel links to `btn btn-ghost btn-sm` with `wire:navigate`.
+
 ## [4.0.3] - 2026-10-17
 
 ### Added

@@ -30,10 +30,9 @@
                 </div>
 
                 <div class="pt-2">
-                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="updateProfile">{{ __('admin.save') }}</span>
-                        <span wire:loading wire:target="updateProfile" class="loading loading-spinner loading-xs"></span>
-                    </button>
+                    <x-form-submit-button target="updateProfile">
+                        {{ __('admin.save') }}
+                    </x-form-submit-button>
                 </div>
             </form>
         </div>
@@ -78,10 +77,9 @@
                 </div>
 
                 <div class="pt-2">
-                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="updatePassword">{{ __('admin.update_password') }}</span>
-                        <span wire:loading wire:target="updatePassword" class="loading loading-spinner loading-xs"></span>
-                    </button>
+                    <x-form-submit-button target="updatePassword">
+                        {{ __('admin.update_password') }}
+                    </x-form-submit-button>
                 </div>
             </form>
         </div>

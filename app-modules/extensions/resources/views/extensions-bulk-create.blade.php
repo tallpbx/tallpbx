@@ -127,11 +127,10 @@
                 <div class="flex gap-2 pt-4 border-t border-base-300">
                     {{-- While the save action is in flight the button disables itself and
                          shows a spinner, so bulk extension creation cannot be double-submitted. --}}
-                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="save">
-                        <span wire:loading wire:target="save" class="loading loading-spinner loading-sm"></span>
+                    <x-form-submit-button>
                         {{ __('admin.create_multiple_extensions') }}
-                    </button>
-                    <a href="{{ route('panel.extensions.index') }}" class="btn btn-ghost">{{ __('client.cancel') }}</a>
+                    </x-form-submit-button>
+                    <a href="{{ route('panel.extensions.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
                 </div>
             </form>
         </div>

@@ -94,12 +94,10 @@
 
                 {{-- Actions --}}
                 <div class="flex gap-2 pt-4 border-t border-base-300">
-                    <button type="submit" class="btn btn-primary">
-                        {{ $this->isEdit ? 'Update' : 'Create' }}
-                    </button>
-                    <a href="{{ route('panel.sip-profiles.index') }}" class="btn btn-ghost">
-                        Cancel
-                    </a>
+                    <x-form-submit-button>
+                    {{ $this->isEdit ? 'Update' : 'Create' }}
+                </x-form-submit-button>
+                    <a href="{{ route('panel.sip-profiles.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('client.cancel') }}</a>
                 </div>
             </form>
         </div>

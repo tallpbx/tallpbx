@@ -310,10 +310,9 @@
 
         {{-- Save button --}}
         <div class="pt-2">
-            <button type="submit" class="btn btn-primary">
-                <x-heroicon-o-check class="w-4 h-4" />
-                {{ __('client.save') }}
-            </button>
+            <x-form-submit-button icon="heroicon-o-check">
+                    {{ __('client.save') }}
+                </x-form-submit-button>
         </div>
     </form>
 

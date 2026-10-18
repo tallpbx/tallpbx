@@ -93,12 +93,12 @@
 
             {{-- Form Actions --}}
             <div class="flex justify-end gap-3 pt-4 border-t border-base-300">
-                <a href="{{ route('panel.hot-desking.index') }}" class="btn btn-ghost">
+                <a href="{{ route('panel.hot-desking.index') }}" wire:navigate class="btn btn-ghost btn-sm">
                     {{ __('admin.cancel') }}
                 </a>
-                <button type="submit" class="btn btn-primary">
+                <x-form-submit-button>
                     {{ __('admin.save') }}
-                </button>
+                </x-form-submit-button>
             </div>
         </form>
     </div>
