@@ -36,7 +36,7 @@ PHP);
         'central_only' => 'kept',
     ]);
 
-    (new DemoConfigProvider(app(), $this->sandbox.'/app-modules/demo-config'))
+    createDemoConfigProvider($this->sandbox.'/app-modules/demo-config')
         ->boot(app(MenuService::class), app(PermissionService::class), app(ModuleState::class));
 
     // Module settings override where present; centralized settings survive.
@@ -48,7 +48,7 @@ PHP);
 it('leaves centralized settings untouched when the module ships no config file', function (): void {
     Config::set('demo-config', ['central_only' => 'kept']);
 
-    (new DemoConfigProvider(app(), $this->sandbox.'/app-modules/demo-config'))
+    createDemoConfigProvider($this->sandbox.'/app-modules/demo-config')
         ->boot(app(MenuService::class), app(PermissionService::class), app(ModuleState::class));
 
     expect(config('demo-config.central_only'))->toBe('kept')
@@ -58,37 +58,40 @@ it('leaves centralized settings untouched when the module ships no config file',
 /**
  * Test-only module provider pointing at the sandbox directory.
  */
-class DemoConfigProvider extends ModuleServiceProvider
+function createDemoConfigProvider(string $sandboxPath): ModuleServiceProvider
 {
-    /**
-     * Bind the provider to an explicit sandbox module directory.
-     */
-    public function __construct(Application $app, private readonly string $sandboxPath)
+    return new class(app(), $sandboxPath) extends ModuleServiceProvider
     {
-        parent::__construct($app);
-    }
+        /**
+         * Bind the provider to an explicit sandbox module directory.
+         */
+        public function __construct(Application $app, private readonly string $sandboxPath)
+        {
+            parent::__construct($app);
+        }
 
-    /**
-     * Return the sandbox module's kebab-case name.
-     */
-    protected function moduleName(): string
-    {
-        return 'demo-config';
-    }
+        /**
+         * Return the sandbox module's kebab-case name.
+         */
+        protected function moduleName(): string
+        {
+            return 'demo-config';
+        }
 
-    /**
-     * Return the sandbox module's PHP namespace.
-     */
-    protected function moduleNamespace(): string
-    {
-        return 'Modules\\DemoConfig';
-    }
+        /**
+         * Return the sandbox module's PHP namespace.
+         */
+        protected function moduleNamespace(): string
+        {
+            return 'Modules\\DemoConfig';
+        }
 
-    /**
-     * Point path resolution at the sandbox instead of a real module.
-     */
-    protected function modulePath(): string
-    {
-        return $this->sandboxPath;
-    }
+        /**
+         * Point path resolution at the sandbox instead of a real module.
+         */
+        protected function modulePath(): string
+        {
+            return $this->sandboxPath;
+        }
+    };
 }
