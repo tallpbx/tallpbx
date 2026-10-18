@@ -49,8 +49,8 @@ Do not skip this step. The application caches compiled views, config, routes, an
 
 ## CRITICAL — Mandatory Pre-Commit Verification Gate
 
-You MUST NOT claim a feature is "fixed" or "done" until ALL of the following pass.
-Run this checklist **once when work is complete, before committing or declaring the task finished** (do NOT run the full verification checklist on intermediate micro-edits during active debugging):
+You MUST NOT claim a feature is "fixed" or "done" until the appropriate verification checklist passes.
+Run this checklist **once when work is complete, before committing or declaring the task finished** (do NOT run full suites on intermediate micro-edits or repeatedly):
 
 ```bash
 # 1. Application boots cleanly (run once after code/template changes)
@@ -59,11 +59,13 @@ php artisan optimize:clear
 # 2. Code style passes Pint (ONLY if PHP files were modified; always scope to dirty/modified files)
 ./vendor/bin/pint --dirty
 
-# 3. Targeted test passes during development; full test suite passes before commit
-php artisan test --compact --parallel
+# 3. Targeted test passes for specific parts changed (STANDARD for routine & localized work)
+./vendor/bin/pest path/to/SpecificTest.php
 
-# 4. Pest browser tests pass (when UI/browser changes are made)
-./vendor/bin/pest tests/Browser
+# 4. Full test suite and full browser tests (MAXIMUM ONCE before commit, and ONLY for significant multi-subsystem changes)
+# DO NOT run these for localized, scoped, or cosmetic work (e.g. typography normalizations, translations, single-component tweaks)
+php artisan test --compact --parallel   # Only for significant architectural changes affecting several parts of the code
+./vendor/bin/pest tests/Browser         # Only when major cross-cutting UI/navigation overhauls are made
 
 # 5. Routes exist (for new routes/features)
 php artisan route:list --name=<feature-name>

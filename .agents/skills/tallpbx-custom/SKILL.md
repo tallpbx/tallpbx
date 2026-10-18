@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 4.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), or live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery)."
+description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 4.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery), or test execution scoping and verification discipline (run targeted tests for specific parts changed; full test suite and full browser tests run a maximum of ONE time before committing, and ONLY when making significant architectural changes affecting several parts of the code; never repeatedly or on scoped/trivial changes)."
 license: MIT
 metadata:
   author: tallpbx
@@ -26,6 +26,20 @@ Laravel Pint runs as the authoritative code linter and formatter (`./vendor/bin/
 - **Scope to changed files**: Always use `./vendor/bin/pint --dirty` or `./vendor/bin/pint <path>` instead of scanning the entire repository.
 - **Timing**: Run Pint once prior to staging/committing, not iteratively after every small edit or between test runs.
 - **Standard Verification**: Run `./vendor/bin/pint --dirty --test` to verify clean syntax and code style on uncommitted PHP changes before committing.
+
+## Test Execution Scoping & Verification Discipline
+
+Running the complete Pest suite (`php artisan test --compact --parallel`, ~3,000 tests) and the full Playwright browser suite (`./vendor/bin/pest tests/Browser`, 54 tests) takes 8+ minutes and must **never** be executed repeatedly during routine development:
+
+- **Normally Test Only Specific Parts Changed**: Under standard development workflows, AI agents must ONLY run targeted test files or filters covering the code and templates actually modified:
+  - Targeted unit/feature test: `./vendor/bin/pest tests/Feature/.../SpecificTest.php` or `app-modules/<module>/tests/...`
+  - Filtered test run: `./vendor/bin/pest --filter="specific test name"`
+  - Targeted browser test: `./vendor/bin/pest tests/Browser/SpecificBrowserTest.php` (only when directly touching the UI workflow it exercises)
+- **Maximum of ONE Full Suite Run Before Commit, and ONLY for Significant Multi-Subsystem Changes**:
+  - Full test suite (`php artisan test --compact --parallel`) and full browser suite (`./vendor/bin/pest tests/Browser`) must run at most **once** prior to committing, and **ONLY** when significant changes are made that impact multiple disparate subsystems across the application (such as framework upgrades, shared kernel abstractions, major security firewall pipeline changes, or core auth refactors).
+- **Never Run Full Suites on Scoped or Localized Tasks**:
+  - Never run full test suites or full browser test runs for localized, scoped, or cosmetic work: e.g. typography/class normalizations, Blade template styling tweaks, table header localization (`<th>`), translation dictionary additions, individual component refactors, single bugfixes, single controller/service changes, or documentation updates.
+  - Rely on targeted architecture tests, scoped Pest feature tests, and Pint code-style checks for these tasks.
 
 ## Installer And Resource Scripts
 
