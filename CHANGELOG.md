@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.4] - 2026-10-18
+
 ### Added
 - **Toggle Switch Architecture Enforcement Test**: Added `ToggleSwitchArchitectureTest` verifying 100% of DaisyUI toggle switches across `app-modules/` and `resources/views/` specify standard size tokens (`toggle-sm` or table `toggle-xs`) and enforce `wire:loading.attr="disabled"` mutation locks.
 - **Arbitrary Font Size Architecture Test**: Added `ArbitraryFontSizesArchitectureTest` scanning all Blade views across `app-modules/` and `resources/views/` to assert zero arbitrary font-size utility classes (`text-[...px]` or `text-[...rem]`) exist.
