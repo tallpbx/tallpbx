@@ -44,8 +44,8 @@
 | 2.5 | Standardize toggle switch sizing & loading locks | Verified | 2026-10-18 |
 | 3.1 | Migrate runtime status views from `wire:poll` to Echo push | Verified | 2026-10-18 |
 | 3.2 | ESL event ingestion overflow & queue buffering | Verified | 2026-10-18 |
-| 3.3 | ESL listener queue channel configuration & worker dependency (Audit M-3) | Pending | 2026-10-18 |
-| 3.4 | Broadcast transport error logging & routes/channels.php strict types (Audit L-1 & L-2) | Pending | 2026-10-18 |
+| 3.3 | ESL listener queue channel configuration & worker dependency (Audit M-3) | Verified | 2026-10-18 |
+| 3.4 | Broadcast transport error logging & routes/channels.php strict types (Audit L-1 & L-2) | Verified | 2026-10-18 |
 | 4.1 | Shared kernel boundary architecture test & listener migration | Verified | 2026-10-18 |
 | 4.2 | Enforce contract seams over cross-module model imports | Verified | 2026-10-18 |
 | 4.3 | Consolidate module route registration | Verified | 2026-10-18 |
@@ -248,19 +248,19 @@
   - Retained synchronous inline dispatch for lightweight real-time state telemetry (`BroadcastDashboardStatsOnFreeSwitchEvent`, `BroadcastTelephonyOnFreeSwitchEvent`).
   - Added unit and feature tests covering socket draining, bounded buffer capacity, overflow drop behavior, and listener queue contracts.
 
-### Task 3.3: ESL Listener Queue Channel Configuration & Worker Dependency (Audit M-3)
+### Task 3.3: ESL Listener Queue Channel Configuration & Worker Dependency (Audit M-3) [COMPLETED]
 - **Problem**: Event listeners responsible for intrusion detection and kernel bans (`LogFailedSipAuthListener` and `LogSipScannerListener`) implement `ShouldQueue`. If background queue workers (`php artisan queue:work`) are stopped or saturated, security incident recording and kernel ban enforcement silently halt. Furthermore, while `config('freeswitch.esl.queue_name')` was introduced and documented in `docs/env-reference.md`, neither listener configures `$this->queue`, defaulting to the generic queue.
 - **Implementation**:
   - Wire `config('freeswitch.esl.queue_name', 'default')` explicitly into `LogFailedSipAuthListener`, `LogSipScannerListener`, and companion telephony listeners.
   - Document the queue worker requirement prominently in `docs/operations.md` and `docs/security-architecture.md`, or evaluate keeping security incident listeners synchronous with bounded DB transactions.
-- **Verification**: Unit tests asserting that queued listeners dispatch onto the configured ESL queue channel.
+- **Verification**: Unit tests asserting that queued listeners dispatch onto the configured ESL queue channel. Recorded in commit `a76617a5`.
 
-### Task 3.4: Broadcast Transport Error Logging & Strict Types (Audit L-1 & L-2)
+### Task 3.4: Broadcast Transport Error Logging & Strict Types (Audit L-1 & L-2) [COMPLETED]
 - **Problem**: In `BroadcastTelephonyOnFreeSwitchEvent` and `BroadcastDashboardStatsOnFreeSwitchEvent`, exceptions caught during `dispatch()` are caught with `catch (\Throwable $e) {}` with zero logging. When WebSockets (Reverb) or transport layers fail, telemetry views become permanently stale with zero diagnostic output (Audit L-1). Additionally, `routes/channels.php` lacks `declare(strict_types=1);` (Audit L-2).
 - **Implementation**:
   - Add structured error logging (`Log::warning('Telephony broadcast dispatch failed: ' . $e->getMessage(), ...);`) inside `catch (\Throwable $e)` in both listeners.
   - Add `declare(strict_types=1);` to `routes/channels.php`.
-- **Verification**: Pest tests verifying that transport exceptions emit warning logs while allowing the ESL loop to continue gracefully.
+- **Verification**: Pest tests verifying that transport exceptions emit warning logs while allowing the ESL loop to continue gracefully. Recorded in commit `a76617a5`.
 
 ---
 
@@ -413,6 +413,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `a76617a5` | **FreeSWITCH / Telemetry** | **ESL Listener Queue Configuration, Broadcast Error Logging & Strict Types**: Wired `config('freeswitch.esl.queue_name', 'default')` to all five queued ESL listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`, `RegisterCompletedCallRecording`, `RegisterCompletedVoicemailMessage`, `MarkBroadcastRecipientOutcome`) via `viaQueue()` and `$queue`, with documented queue worker requirements for kernel ban persistence. Added structured `Log::warning(...)` telemetry in `BroadcastTelephonyOnFreeSwitchEvent` and `BroadcastDashboardStatsOnFreeSwitchEvent` catch blocks to surface broadcast transport failures, and added `declare(strict_types=1);` to `routes/channels.php`. *(Resolves Tasks 3.3 & 3.4 / Re-Audit M-3, L-1 & L-2)* |
 | **2026-10-18** | `d8c2a25f` | **Security / Firewall** | **Root Helper Atomic Flock Promote Protocol for External Blocklists**: Wrapped syntax verification, pending-to-active file promotion (`mv`), permissions assignment, and kernel load in `scripts/resources/tallpbx-security` inside an exclusive flock subshell (`flock -x 200`), eliminating the race condition where concurrent PHP threat-feed or geo-blocking writers could interleave during promotion. Validated with non-interactive shell check and automated unit and inter-process lock concurrency tests. *(Resolves Task 5.8 / Re-Audit M-2)* |
 | **2026-10-18** | `5a45048c` | **Security / Geo** | **Whitelist Dual-Family Completeness & Fatal Error Tracking**: Enforced per-country dual-family completeness in whitelist geo-blocking mode (`GeoBlockingService::sync()`), refusing to arm partial perimeters when either IPv4 or IPv6 is missing or incomplete, preventing silent drops of legitimate whitelisted users at stage 9.5. Replaced post-loop string matching on leaked `$cc` variable with typed `$cacheWriteFailed` flag so cache write failures on any country trigger fatal failure. Added targeted RED-proof unit tests. *(Resolves Task 1.1.4 / Re-Audit H-1 & M-1)* |
 | **2026-10-18** | `54e76ed2` | **Architecture / Documentation** | **Environment Variable Reference Documentation**: Authored comprehensive reference guide `docs/env-reference.md` cataloging 242 environment variables across 15 domain sections (FreeSWITCH, ESL, Sofia, XML handler caching, Redis cluster, Reverb WebSockets, S3 storage, queues, session security, mail transports, phone auto-provisioning, updater, and production sizing presets). Documented types, defaults, configuration mapping, security notes, and operational best practices. *(Resolves Task 4.7 / Arch Audit L5; Stream 4 100% complete)* |
