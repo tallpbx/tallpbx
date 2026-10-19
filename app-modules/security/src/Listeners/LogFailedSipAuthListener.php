@@ -16,10 +16,19 @@ use Modules\Security\Contracts\SecurityIncidentServiceInterface;
  * Listens for Sofia SIP failed_auth events emitted via FreeSWITCH ESL
  * (unauthorized SIP REGISTER and INVITE attempts) and forwards offending
  * client IPs to SecurityIncidentServiceInterface to enforce kernel intrusion bans.
+ *
+ * Note: Since this listener implements ShouldQueue to protect ESL event loop throughput,
+ * active queue workers must be running for the configured queue
+ * (`freeswitch.esl.queue_name`, default 'default') to persist incidents and enforce bans.
  */
 class LogFailedSipAuthListener implements ShouldQueue
 {
     use InteractsWithQueue;
+
+    /**
+     * The name of the queue the job should be sent to.
+     */
+    public ?string $queue = null;
 
     /**
      * Create the event listener.
@@ -28,7 +37,17 @@ class LogFailedSipAuthListener implements ShouldQueue
      */
     public function __construct(
         private readonly SecurityIncidentServiceInterface $incidentService,
-    ) {}
+    ) {
+        $this->queue = (string) config('freeswitch.esl.queue_name', 'default');
+    }
+
+    /**
+     * Get the name of the listener's queue.
+     */
+    public function viaQueue(): string
+    {
+        return (string) config('freeswitch.esl.queue_name', 'default');
+    }
 
     /**
      * Handle incoming FreeSWITCH ESL custom and Sofia failed authentication events.

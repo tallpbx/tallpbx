@@ -6,6 +6,7 @@ namespace App\Listeners;
 
 use App\Events\FreeSwitch\FreeSwitchEvent;
 use App\Events\Telephony\TelephonyUpdated;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Listener that broadcasts a TelephonyUpdated event whenever relevant FreeSWITCH ESL events occur.
@@ -31,7 +32,12 @@ class BroadcastTelephonyOnFreeSwitchEvent
 
             TelephonyUpdated::dispatch($tenantId, $event->eventName, $event->callUuid());
         } catch (\Throwable $e) {
-            // Silently ignore broadcast transport errors so the event loop is never interrupted
+            Log::warning('FreeSWITCH telephony broadcast failed', [
+                'event' => $event->eventName,
+                'call_uuid' => $event->callUuid(),
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
         }
     }
 

@@ -6,6 +6,7 @@ namespace App\Listeners;
 
 use App\Events\Dashboard\DashboardStatsUpdated;
 use App\Events\FreeSwitch\FreeSwitchEvent;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Listener that broadcasts a DashboardStatsUpdated event whenever relevant FreeSWITCH ESL events occur.
@@ -29,7 +30,11 @@ class BroadcastDashboardStatsOnFreeSwitchEvent
         try {
             DashboardStatsUpdated::dispatch($event->eventName);
         } catch (\Throwable $e) {
-            // Silently ignore broadcast transport errors
+            Log::warning('FreeSWITCH dashboard stats broadcast failed', [
+                'event' => $event->eventName,
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
         }
     }
 }

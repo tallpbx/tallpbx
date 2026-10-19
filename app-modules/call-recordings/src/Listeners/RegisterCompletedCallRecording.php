@@ -21,12 +21,27 @@ class RegisterCompletedCallRecording implements ShouldQueue
     use InteractsWithQueue;
 
     /**
+     * The name of the queue the job should be sent to.
+     */
+    public ?string $queue = null;
+
+    /**
      * Create the listener with tenant-context and media lifecycle services.
      */
     public function __construct(
         private readonly CallRecordingService $recordings,
         private readonly DialplanContext $dialplanContext,
-    ) {}
+    ) {
+        $this->queue = (string) config('freeswitch.esl.queue_name', 'default');
+    }
+
+    /**
+     * Get the name of the listener's queue.
+     */
+    public function viaQueue(): string
+    {
+        return (string) config('freeswitch.esl.queue_name', 'default');
+    }
 
     /**
      * Archive a valid completed recording without blocking on remote transfer.

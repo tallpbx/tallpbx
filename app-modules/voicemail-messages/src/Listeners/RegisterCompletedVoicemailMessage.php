@@ -19,12 +19,27 @@ class RegisterCompletedVoicemailMessage implements ShouldQueue
     use InteractsWithQueue;
 
     /**
+     * The name of the queue the job should be sent to.
+     */
+    public ?string $queue = null;
+
+    /**
      * Create the listener with trusted tenant-context resolution.
      */
     public function __construct(
         private readonly VoicemailMessageService $messages,
         private readonly DialplanContext $dialplanContext,
-    ) {}
+    ) {
+        $this->queue = (string) config('freeswitch.esl.queue_name', 'default');
+    }
+
+    /**
+     * Get the name of the listener's queue.
+     */
+    public function viaQueue(): string
+    {
+        return (string) config('freeswitch.esl.queue_name', 'default');
+    }
 
     /** Register only non-empty files from the configured managed voicemail root. */
     public function handle(ChannelExecuteComplete $event): void

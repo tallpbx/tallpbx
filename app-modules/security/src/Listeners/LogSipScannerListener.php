@@ -49,10 +49,19 @@ use Symfony\Component\HttpFoundation\IpUtils;
  * reliably available inside the ESL event loop (querying Sofia would interleave
  * on the shared event socket), so the trusted list is the exemption path —
  * the ban service itself refuses whitelisted addresses as well.
+ *
+ * Note: Since this listener implements ShouldQueue to protect ESL event loop throughput,
+ * active queue workers must be running for the configured queue
+ * (`freeswitch.esl.queue_name`, default 'default') to persist incidents and enforce bans.
  */
 class LogSipScannerListener implements ShouldQueue
 {
     use InteractsWithQueue;
+
+    /**
+     * The name of the queue the job should be sent to.
+     */
+    public ?string $queue = null;
 
     /**
      * Create the event listener.
@@ -61,7 +70,17 @@ class LogSipScannerListener implements ShouldQueue
      */
     public function __construct(
         private readonly SecurityBanServiceInterface $banService,
-    ) {}
+    ) {
+        $this->queue = (string) config('freeswitch.esl.queue_name', 'default');
+    }
+
+    /**
+     * Get the name of the listener's queue.
+     */
+    public function viaQueue(): string
+    {
+        return (string) config('freeswitch.esl.queue_name', 'default');
+    }
 
     /**
      * Handle incoming SIP scanner detection events.

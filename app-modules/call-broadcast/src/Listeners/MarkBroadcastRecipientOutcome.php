@@ -25,6 +25,27 @@ class MarkBroadcastRecipientOutcome implements ShouldQueue
     use InteractsWithQueue;
 
     /**
+     * The name of the queue the job should be sent to.
+     */
+    public ?string $queue = null;
+
+    /**
+     * Create the event listener.
+     */
+    public function __construct()
+    {
+        $this->queue = (string) config('freeswitch.esl.queue_name', 'default');
+    }
+
+    /**
+     * Get the name of the listener's queue.
+     */
+    public function viaQueue(): string
+    {
+        return (string) config('freeswitch.esl.queue_name', 'default');
+    }
+
+    /**
      * Handle a channel hangup event for a broadcast call.
      */
     public function handle(ChannelHangupComplete $event): void
