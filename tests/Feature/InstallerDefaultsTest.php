@@ -754,7 +754,9 @@ it('installs the queue worker and scheduler units so jobs and sweeps run', funct
         ->and($tallScript)->toContain('systemctl enable tallpbx-queue')
         ->and($tallScript)->toContain('systemctl enable tallpbx-scheduler')
         ->and($queueUnit)->toContain('queue:work')
-        ->and($queueUnit)->toContain('--queue=freeswitch-events,default')
+        ->and($queueUnit)->toContain('--queue=${FS_ESL_QUEUE_NAME},default')
+        ->and($queueUnit)->toContain('Environment=FS_ESL_QUEUE_NAME=freeswitch-events')
+        ->and($queueUnit)->toContain('EnvironmentFile=-/var/www/tallpbx/.env')
         ->and($queueUnit)->toContain('/var/lib/tallpbx/backups')
         ->and($queueUnit)->toContain('/var/lib/tallpbx/restore-requests')
         ->and($schedulerUnit)->toContain('schedule:work');

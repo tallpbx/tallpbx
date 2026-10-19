@@ -468,3 +468,62 @@ it('pairs the geo drop counter with its own rule line', function (): void {
         ->call('geoDropCounter')
         ->assertReturned(42);
 });
+
+it('rolls back database and kernel sets when enabling geofence fails firewall apply', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'whitelist';
+    $rule->countries = ['US'];
+    $rule->enabled = false;
+    $rule->save();
+
+    // Firewall apply refuses (e.g. syntax or lockout guard rejection)
+    $this->executor->shouldReceive('apply')->once()->andReturn(false);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('setGeoEnabled', true)
+        ->assertOk()
+        ->assertSet('geoEnabled', false);
+
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->enabled)->toBeFalse();
+
+    // Since the rule was previously disabled, rollback invokes clear() which flushes geo sets
+    $pending = file_get_contents($this->tempDir.'/geo_blocking.nft.pending');
+    expect($pending)->toContain('flush set inet tallpbx_filter geo_allowed_ips')
+        ->and($pending)->not->toContain('add element inet tallpbx_filter geo_allowed_ips');
+});
+
+it('rolls back database when disabling geofence fails firewall apply', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'whitelist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    // Firewall apply refuses when attempting to remove the geo perimeter chain
+    $this->executor->shouldReceive('apply')->once()->andReturn(false);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->call('setGeoEnabled', false)
+        ->assertOk()
+        ->assertSet('geoEnabled', true);
+
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->enabled)->toBeTrue();
+});

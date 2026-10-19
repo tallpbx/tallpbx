@@ -9,7 +9,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/tallpbx
-ExecStart=/usr/bin/php artisan queue:work --queue=freeswitch-events,default --sleep=3 --tries=3
+ExecStart=/usr/bin/php artisan queue:work --queue=${FS_ESL_QUEUE_NAME},default --sleep=3 --tries=3
 
 # Restart policy: always restart on failure, with a 5-second delay
 Restart=always
@@ -37,8 +37,10 @@ ProtectHome=yes
 ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/lib/tallpbx/backups /var/lib/tallpbx/restore-requests /var/www/tallpbx/bootstrap/cache
 ReadOnlyPaths=/var/www/tallpbx
 
-# Environment (adjust APP_ENV as needed)
+# Environment (adjust APP_ENV as needed; EnvironmentFile overrides default variables)
 Environment=APP_ENV=production
+Environment=FS_ESL_QUEUE_NAME=freeswitch-events
+EnvironmentFile=-/var/www/tallpbx/.env
 
 [Install]
 WantedBy=multi-user.target

@@ -273,7 +273,7 @@ Debian defaults to `pm = dynamic`, which starts with 2 workers and allows the se
 TallPBX configures PHP-FPM in `static` mode across all hardware sizes (including 5 static workers on 1 GB servers):
 - **Always Ready**: All worker processes are pre-started and sitting quietly in memory 24/7. When a call arrives, an idle worker is already there to answer FreeSWITCH within milliseconds.
 - **Dedicated Lanes**: Even if someone is using the web panel, there are always spare workers standing by to handle call routing on the hotpath without hesitation.
-- **Comfortable Memory Footprint**: Five static workers take only about 250 MB of memory. Together with the operating system (~150 MB), FreeSWITCH (~200 MB), MariaDB (~180 MB), and Redis (~25 MB), the complete system uses roughly ~825 MB. This leaves plenty of headroom for disk caching and is safely backed by the installer's required 2 GB swap file.
+- **Comfortable Memory Footprint**: Five static workers take only about 250 MB of memory. Together with the operating system (~150 MB), FreeSWITCH (~200 MB), MariaDB (~180 MB), and Redis (~25 MB), the complete system uses roughly ~825 MB. This leaves plenty of headroom for disk caching and is safely backed by the documented 2 GB swap baseline (see Step 3: Configure a Swapfile above).
 
 In `static` mode, all workers remain initialized and ready for call bursts. Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases.
 

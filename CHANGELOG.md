@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Queue Worker Dynamic Channel Configuration**: Updated `scripts/tallpbx-queue.service` to support environment file overrides via `EnvironmentFile=-/var/www/tallpbx/.env` with dynamic `--queue=${FS_ESL_QUEUE_NAME},default` expansion while falling back to `freeswitch-events` when unset.
+- **Installation Documentation Swap Baseline**: Refined `INSTALL.md` memory footprint guidance to accurately cite the documented 2 GB swapfile configuration baseline in Step 3 rather than referring to an automated installer step.
+
+### Fixed
+- **Geo-Blocking UI Failure Rollback Verification**: Added targeted regression tests to `SecurityManagerGeoBlockingTest` validating that `setGeoEnabled()` rolls back both database settings and pending kernel sets when ruleset compilation/apply fails during either enabling or disabling operations.
+
 ## [4.0.6] - 2026-10-18
 
 ### Added

@@ -45,5 +45,6 @@ tests/Browser/Screenshots/
 /docs/architecture-audit-report.md
 /docs/ui-audit-report.md
 /docs/4.x-code-and-implementation-plan-re-audit-3.md
+/docs/4.x-code-and-implementation-plan-re-audit-4.md
 /custom-modules/*
 !/custom-modules/.gitkeep
