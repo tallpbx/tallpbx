@@ -417,7 +417,7 @@
                         </td>
                         <td class="px-2">
                             @if (! empty($geoCountries))
-                                <div class="font-mono text-xs {{ ! $geoActive ? 'text-base-content/50' : 'text-primary font-semibold' }}">
+                                <div class="font-mono text-xs {{ ! $geoActive ? 'text-base-content/50' : 'text-base-content/70' }}">
                                     @if ($geoMode === 'whitelist')
                                         {{ __('admin.security_geo_target_all_except', ['countries' => implode(', ', array_slice($geoCountries, 0, 3)).(count($geoCountries) > 3 ? '...' : '')]) }}
                                     @else
@@ -570,7 +570,7 @@
                                 @if ($service->source_ip === 'any' || $service->source_ip === '0.0.0.0/0' || empty($service->source_ip))
                                     <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                                 @else
-                                    <span class="font-mono text-xs text-primary font-medium">{{ $service->source_ip }}</span>
+                                    <span class="font-mono text-xs text-base-content/70">{{ $service->source_ip }}</span>
                                 @endif
                             </td>
                             <td class="text-center px-1.5">
@@ -647,7 +647,7 @@
                                 @if ($rule->source_ip === 'any' || $rule->source_ip === '0.0.0.0/0')
                                     <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                                 @else
-                                    <span class="font-mono text-xs">{{ $rule->source_ip }}</span>
+                                    <span class="font-mono text-xs text-base-content/70">{{ $rule->source_ip }}</span>
                                 @endif
                             </td>
 

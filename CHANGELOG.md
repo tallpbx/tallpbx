@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Firewall Rules Table Source IP Column Color Harmonization**: Standardized text colors in the Source IP column across all sections (Pre-Filters, Geo-Blocking, System Services, and Custom Rules) to a cohesive, readable neutral grey (`text-base-content/70`), eliminating the distracting "Christmas tree" effect caused by conflicting green, red, and primary purple text while allowing the dedicated Status and Action columns to carry semantic meaning.
 - **Firewall Rules Table Empty Geo-Blocking Scope Parity**: Replaced the cluttered "No countries configured" badge in the Firewall Rules table's Source IP column with clean muted monospace text (`0 countries`), matching the formatting and scannability of adjacent pre-filter rows (`0 IPs`, `0 active bans`).
 - **Documentation & Invariant Pre-Filter Tooltip Parity**: Synchronized pre-filter pipeline tooltips, banners, and help strings across `en`, `es`, and `fr` dictionaries (`security_toggle_prefilter_help`, `security_defensive_prefilters_help`, `security_defensive_prefilters_disabled_note`, `security_prefilter_off_badge`, `security_prefilter_disabled_banner_body`) to accurately reflect all eight built-in pre-filter rules (including Geo-Blocking) in 100% parity with the header's "8 Rules" badge. Updated automated test suite metrics to 2,900+ Pest tests across `README.md`, `docs/parity-comparison.md`, `docs/security-architecture.md`, and `docs/ui-tour.md`.
 
