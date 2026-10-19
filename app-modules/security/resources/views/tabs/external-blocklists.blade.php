@@ -81,11 +81,11 @@
                         <input wire:click="setFeedEnabled({{ $feedEnabled ? 'false' : 'true' }})"
                                wire:loading.attr="disabled"
                                wire:target="setFeedEnabled"
-                               type="checkbox" class="toggle toggle-error toggle-sm" @checked($feedEnabled) />
+                               type="checkbox" class="toggle toggle-success toggle-sm" @checked($feedEnabled) />
                         <span wire:loading.remove wire:target="setFeedEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ $feedEnabled ? __('client.disable') : __('client.enable') }}
+                            {{ $feedEnabled ? __('admin.enabled') : __('admin.disabled') }}
                         </span>
-                        <span wire:loading wire:target="setFeedEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
+                        <span wire:loading wire:target="setFeedEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
                             <span class="loading loading-spinner loading-xs"></span>
                             <span>{{ $feedEnabled ? __('admin.security_threat_feed_disabling') : __('admin.security_threat_feed_enabling') }}</span>
                         </span>

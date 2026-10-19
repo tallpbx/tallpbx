@@ -120,14 +120,18 @@ A central requirement of the TallPBX user experience is **predictable consistenc
 - **Holistic Assessment (Never Change One Section in a Vacuum)**: When introducing or altering a capability (such as an enable/disable toggle, inline loading spinner, status indicator dot, dimming opacity, or action progress animation) in one tab or section, agents MUST examine adjacent and structurally similar tabs and workbenches.
 - **Functional Symmetry**: If one feature (e.g. External Blocklists) supports an enable/disable toggle or live state feedback, evaluate whether companion subsystems (e.g. Whitelist, Blacklist, Attack Blocker, or individual pre-filter stages) should have matching controls or visual status parity, and proactively propose or implement those consistent patterns.
 
-### 2. Synchronized State Reflection Across the UI
-- Disabling a subsystem (e.g. External Blocklists or Pre-Filters) in one tab MUST be accurately reflected everywhere that subsystem appears in the UI. For example, if External Blocklists are disabled, its corresponding row in the Firewall Rules master table must be visibly greyed out (`opacity-40`), its status indicator must change from active to neutral/disabled (`bg-base-content/25`), and its badge must reflect its inactive state (`badge-neutral` showing "Disabled")—never leaving the user with the false impression that an inactive rule is actively dropping traffic.
+### 2. Synchronized State & 3-Tier Health Reflection Across the UI
+- Disabling or altering a subsystem (e.g. External Blocklists, Pre-Filters, Geo-Blocking) in one tab MUST be accurately reflected everywhere that subsystem appears in the UI. When reflecting a subsystem's status in master summary tables (such as the Firewall Rules master table), adhere to the **3-Tier Health Model**:
+  1. *Disabled* (`bg-base-content/25` neutral grey dot, `badge-neutral` "Disabled", row dimmed to `opacity-40` or `opacity-50`): Feature is administratively OFF.
+  2. *Active / Enforcing* (Semantic action dot e.g. `bg-error` for DROP or `bg-success` for ALLOW, action badge e.g. `badge-error` "Drop"): Feature is administratively ON and actively enforcing loaded rules/criteria.
+  3. *Enabled but Unconfigured / Idle* (`bg-warning` amber warning dot, `badge-warning` "Idle", warning indicator for empty criteria): Feature is administratively ON, but has 0 configured criteria (e.g. 0 countries or 0 IP entries). Never report an enabled feature as "Disabled" when unconfigured, which causes cognitive dissonance where the administrator's toggle appears ignored.
+  Additionally, master summary tables reflect status via indicator dots, metrics, and action badges; interactive mutation (the enable/disable switch itself) lives exclusively within the subsystem's dedicated tab or workbench.
 
 ### 3. Design System Token Discipline (Strict Parity Across All Pages)
 - **Colors**: Strictly use DaisyUI semantic color tokens (`error`, `warning`, `success`, `primary`, `neutral`, `base-content`). Never introduce ad-hoc Tailwind colors (e.g., `text-red-500`, `bg-blue-600`) that break theme switching:
   - `error`: Destructive, dropped, blocked, banned, critical failure.
-  - `warning`: Bypassed, observe mode, lockout risk, needs attention.
-  - `success`: Allowed, active, healthy, passed.
+  - `warning`: Bypassed, observe mode, lockout risk, needs attention, idle/unconfigured.
+  - `success`: Allowed, active, healthy, passed, enabled protections.
   - `primary`: Interactive triggers, primary submits, active tabs.
   - `neutral` / `ghost`: Disabled, muted, inactive, invariants.
 - **Typography & Sizing**:
@@ -146,11 +150,13 @@ A central requirement of the TallPBX user experience is **predictable consistenc
 - **Badges**:
   - Table cells & inline tags: `badge-xs font-mono`
   - Card headers & status callouts: `badge-sm font-semibold`
+  - Idle / Unconfigured state: `badge-warning badge-sm font-semibold`
   - Inactive / Disabled state: `badge-neutral badge-sm opacity-75`
   - Invariant / System marker: `badge-ghost badge-xs opacity-75 font-mono`
-- **Toggles & Switches**:
-  - Use DaisyUI `toggle toggle-sm` (match theme color to intent: `toggle-primary`, `toggle-warning`, or `toggle-error`).
-  - Always wire with pointer lock (`wire:loading.class="opacity-70 pointer-events-none"`), input disabled state (`wire:loading.attr="disabled"`), and inline DaisyUI spinner with present-continuous status.
+- **Toggles & Switches (State Descriptors vs Action Verbs)**:
+  - Use DaisyUI `toggle toggle-sm`. Interactive feature toggles must use `toggle-success` (green when ON).
+  - **State descriptors, never action verbs**: Toggle switch labels must describe the current state (adjectives: `"Enabled"` / `"Disabled"` via `__('admin.enabled')` / `__('admin.disabled')`), **never** imperative action verbs (`"Enable"` / `"Disable"`). Imperative verbs belong on clickable buttons, not state toggles.
+  - Always wire with pointer lock (`wire:loading.class="opacity-70 pointer-events-none"`), input disabled state (`wire:loading.attr="disabled"`), and inline DaisyUI spinner with present-continuous status copy (`"Enabling..."` / `"Disabling..."` via `__('admin.*_enabling')`).
 
 ## Privileged Host Command Architecture (Bounded Sudoers Pattern)
 

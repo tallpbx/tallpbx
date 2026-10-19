@@ -60,7 +60,7 @@
                                wire:target="setWhitelistEnabled"
                                type="checkbox" class="toggle toggle-success toggle-sm" @checked($whitelistEnabled) />
                         <span wire:loading.remove wire:target="setWhitelistEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ $whitelistEnabled ? __('client.disable') : __('client.enable') }}
+                            {{ $whitelistEnabled ? __('admin.enabled') : __('admin.disabled') }}
                         </span>
                         <span wire:loading wire:target="setWhitelistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
                             <span class="loading loading-spinner loading-xs"></span>
@@ -220,11 +220,11 @@
                         <input wire:click="setBlacklistEnabled({{ $blacklistEnabled ? 'false' : 'true' }})"
                                wire:loading.attr="disabled"
                                wire:target="setBlacklistEnabled"
-                               type="checkbox" class="toggle toggle-error toggle-sm" @checked($blacklistEnabled) />
+                               type="checkbox" class="toggle toggle-success toggle-sm" @checked($blacklistEnabled) />
                         <span wire:loading.remove wire:target="setBlacklistEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ $blacklistEnabled ? __('client.disable') : __('client.enable') }}
+                            {{ $blacklistEnabled ? __('admin.enabled') : __('admin.disabled') }}
                         </span>
-                        <span wire:loading wire:target="setBlacklistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
+                        <span wire:loading wire:target="setBlacklistEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
                             <span class="loading loading-spinner loading-xs"></span>
                             <span>{{ $blacklistEnabled ? __('admin.security_blacklist_disabling') : __('admin.security_blacklist_enabling') }}</span>
                         </span>

@@ -63,11 +63,11 @@
                         <input wire:click="setAttackProtectionEnabled({{ $attackProtectionEnabled ? 'false' : 'true' }})"
                                wire:loading.attr="disabled"
                                wire:target="setAttackProtectionEnabled"
-                               type="checkbox" class="toggle toggle-error toggle-sm" @checked($attackProtectionEnabled) />
+                               type="checkbox" class="toggle toggle-success toggle-sm" @checked($attackProtectionEnabled) />
                         <span wire:loading.remove wire:target="setAttackProtectionEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ $attackProtectionEnabled ? __('client.disable') : __('client.enable') }}
+                            {{ $attackProtectionEnabled ? __('admin.enabled') : __('admin.disabled') }}
                         </span>
-                        <span wire:loading wire:target="setAttackProtectionEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
+                        <span wire:loading wire:target="setAttackProtectionEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
                             <span class="loading loading-spinner loading-xs"></span>
                             <span>{{ $attackProtectionEnabled ? __('admin.security_attack_protection_disabling') : __('admin.security_attack_protection_enabling') }}</span>
                         </span>
@@ -211,11 +211,11 @@
                                 <input wire:click="setSipScannerEnforcement({{ $sipScanner['enforcement'] ? 'false' : 'true' }})"
                                        wire:loading.attr="disabled"
                                        wire:target="setSipScannerEnforcement"
-                                       type="checkbox" class="toggle toggle-error toggle-sm" @checked($sipScanner['enforcement']) />
+                                       type="checkbox" class="toggle toggle-success toggle-sm" @checked($sipScanner['enforcement']) />
                                 <span wire:loading.remove wire:target="setSipScannerEnforcement" class="label-text font-medium">
                                     {{ __('admin.security_scanner_enforcement') }}
                                 </span>
-                                <span wire:loading wire:target="setSipScannerEnforcement" class="inline-flex items-center gap-1.5 label-text font-medium text-error">
+                                <span wire:loading wire:target="setSipScannerEnforcement" class="inline-flex items-center gap-1.5 label-text font-medium text-success">
                                     <span class="loading loading-spinner loading-xs"></span>
                                     <span>{{ $sipScanner['enforcement'] ? __('admin.security_scanner_disabling') : __('admin.security_scanner_enabling') }}</span>
                                 </span>

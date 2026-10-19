@@ -369,23 +369,33 @@
                     {{-- Dedicated Geo-Blocking Row --}}
                     @php
                         $geoRuleModel = $this->geoRule;
-                        $geoActive = $geoRuleModel->enabled && ! empty($geoRuleModel->countries);
+                        $geoEnabled = (bool) $geoRuleModel->enabled;
+                        $hasCountries = ! empty($geoCountries);
+                        $geoActive = $geoEnabled && $hasCountries;
+                        $geoStatus = match (true) {
+                            ! $geoEnabled => 'disabled',
+                            ! $hasCountries => 'idle',
+                            default => 'active',
+                        };
                     @endphp
-                    <tr class="hover transition-opacity duration-200 {{ ! $geoActive ? 'opacity-50 bg-base-200/20' : '' }}"
+                    <tr class="hover transition-opacity duration-200 {{ $geoStatus === 'disabled' ? 'opacity-50 bg-base-200/20' : ($geoStatus === 'idle' ? 'bg-base-200/10' : '') }}"
                         wire:key="geo-blocking-cockpit-row"
                         x-show="showSystemPreFilters" x-cloak>
                         <td class="text-center px-1">
-                            <input wire:click="setGeoEnabled({{ $geoEnabled ? 'false' : 'true' }})"
-                                   wire:loading.attr="disabled"
-                                   wire:target="setGeoEnabled"
-                                   type="checkbox"
-                                   class="toggle toggle-primary toggle-sm"
-                                   @checked($geoEnabled)
-                                   title="{{ $geoEnabled ? __('client.enabled') : __('client.disabled') }}" />
+                            @if ($geoStatus === 'disabled')
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-base-content/25"
+                                      title="{{ __('admin.security_geo_status_disabled') }}"></span>
+                            @elseif ($geoStatus === 'idle')
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-warning"
+                                      title="{{ __('admin.security_geo_no_countries') }}"></span>
+                            @else
+                                <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-error"
+                                      title="{{ __('admin.security_geo_status_active') }}"></span>
+                            @endif
                         </td>
                         <td class="px-3">
                             <div class="flex items-center gap-1.5 font-medium text-base-content">
-                                <span class="{{ ! $geoActive ? 'text-base-content/70' : '' }}">{{ __('admin.security_geo_blocking_title') }}</span>
+                                <span class="{{ $geoStatus === 'disabled' ? 'text-base-content/70' : '' }}">{{ __('admin.security_geo_blocking_title') }}</span>
                                 <x-tooltip :tip="__('admin.security_geo_blocking_tooltip')" align="start" position="right">
                                     <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                                 </x-tooltip>
@@ -422,13 +432,19 @@
                                     @endif
                                 </div>
                                 <span class="badge badge-ghost badge-xs font-mono mt-0.5">{{ __('admin.security_dual_stack_badge') }}</span>
+                            @elseif ($geoEnabled)
+                                <span class="badge badge-warning badge-xs font-medium">{{ __('admin.security_geo_no_countries') }}</span>
                             @else
                                 <span class="badge badge-ghost badge-xs text-base-content/50">{{ __('admin.security_geo_no_countries') }}</span>
                             @endif
                         </td>
                         <td class="text-center px-1.5">
-                            @if (! $geoActive)
-                                <span class="badge badge-neutral badge-sm font-semibold opacity-75">{{ __('client.disabled') }}</span>
+                            @if ($geoStatus === 'disabled')
+                                <span class="badge badge-neutral badge-sm font-semibold opacity-75">{{ __('admin.security_geo_status_disabled') }}</span>
+                            @elseif ($geoStatus === 'idle')
+                                <span class="badge badge-warning badge-sm font-semibold" title="{{ __('admin.security_geo_no_countries') }}">
+                                    {{ __('admin.security_geo_status_idle') }}
+                                </span>
                             @else
                                 <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
                             @endif

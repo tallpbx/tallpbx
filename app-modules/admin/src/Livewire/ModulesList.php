@@ -86,7 +86,7 @@ class ModulesList extends Component
      * Resolve the display label translation key for a category.
      *
      * Seven labels are reused from the root dictionary (zero-collision rule);
-     * Core Administration and Custom Extensions live in this module's
+     * Core Administration and Custom Modules live in this module's
      * dictionary.
      */
     public function categoryLabel(string $category): string

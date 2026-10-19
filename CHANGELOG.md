@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.7] - 2026-10-19
+
 ### Changed
+- **Security Center Tab Switch Consistency & State Descriptor Labeling**: Standardized all security subsystem enable/disable toggles across the workbench tabs (Block/Allow whitelist & blacklist, Attackers intrusion protection, SIP scanner enforcement, External Threat Feeds, and Geo-Blocking) to use consistent DaisyUI `toggle-success` styling with `text-success` present-continuous status copy, aligning with the whitelist switch so all active protections display green when enabled. Replaced imperative action verbs ("Enable"/"Disable") with descriptive state adjectives ("Enabled"/"Disabled" via `__('admin.enabled')` and `__('admin.disabled')`) adhering to Nielsen Norman Group and Apple HIG interaction design standards.
+- **Firewall Rules Table Geo-Blocking Parity & 3-Tier Health State Model**: Replaced the redundant interactive toggle switch in the master Firewall Rules table's Geo-Blocking row with a standard status indicator dot and action badge adhering to a 3-tier health model: *Disabled* (`bg-base-content/25`, `[Disabled]`), *Active / Enforcing* (`bg-error`, `[Drop]`), and *Enabled but Unconfigured* (`bg-warning`, `[Idle]` with warning notice). Interactive toggles reside exclusively in the dedicated tab, bringing it into 100% structural parity with the other pre-filter subsystem rows.
+- **Modules Workbench Custom Category Label**: Renamed the "Custom Extensions" accordion category in `/panel/modules` to "Custom Modules" across English, Spanish, and French translation dictionaries (`modules_category_custom`), matching appliance terminology.
 - **Queue Worker Dynamic Channel Configuration**: Updated `scripts/tallpbx-queue.service` to support environment file overrides via `EnvironmentFile=-/var/www/tallpbx/.env` with dynamic `--queue=${FS_ESL_QUEUE_NAME},default` expansion while falling back to `freeswitch-events` when unset.
 - **Installation Documentation Swap Baseline**: Refined `INSTALL.md` memory footprint guidance to accurately cite the documented 2 GB swapfile configuration baseline in Step 3 rather than referring to an automated installer step.
 

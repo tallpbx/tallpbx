@@ -305,7 +305,7 @@ it('translates every workbench category and workflow string', function () {
     $component = Livewire::actingAs($this->admin, 'admin')->test(ModulesList::class)->instance();
 
     expect($component->categoryLabel('core'))->toBe('Core')
-        ->and($component->categoryLabel('custom'))->toBe('Custom Extensions');
+        ->and($component->categoryLabel('custom'))->toBe('Custom Modules');
 
     foreach (['modules_source', 'modules_builtin', 'modules_custom', 'modules_vendor', 'modules_enabling', 'modules_disabling', 'modules_delete_extension', 'modules_delete_confirm', 'modules_protected_hint'] as $key) {
         expect(__("admin.{$key}"))->not->toBe("admin.{$key}", "Missing translation key admin.{$key}");

@@ -53,11 +53,11 @@
                         <input wire:click="setGeoEnabled({{ $geoEnabled ? 'false' : 'true' }})"
                                wire:loading.attr="disabled"
                                wire:target="setGeoEnabled"
-                               type="checkbox" class="toggle toggle-error toggle-sm" @checked($geoEnabled) />
+                               type="checkbox" class="toggle toggle-success toggle-sm" @checked($geoEnabled) />
                         <span wire:loading.remove wire:target="setGeoEnabled" class="label-text font-medium text-xs sm:text-sm">
-                            {{ $geoEnabled ? __('client.disable') : __('client.enable') }}
+                            {{ $geoEnabled ? __('admin.enabled') : __('admin.disabled') }}
                         </span>
-                        <span wire:loading wire:target="setGeoEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-error">
+                        <span wire:loading wire:target="setGeoEnabled" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
                             <span class="loading loading-spinner loading-xs"></span>
                             <span>{{ $geoEnabled ? __('admin.security_geo_disabling') : __('admin.security_geo_enabling') }}</span>
                         </span>
