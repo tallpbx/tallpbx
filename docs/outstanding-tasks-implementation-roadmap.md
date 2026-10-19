@@ -36,7 +36,7 @@
 | 1.3.1 | Reorganize `src/Services/` into sub-domain namespaces | Verified | 2026-10-17 |
 | 1.3.2 | Realign domain trait boundaries | Verified | 2026-10-17 |
 | 1.3.3 | Retain unified firewall pipeline table (evaluated & consolidated) | Verified | 2026-10-17 |
-| 1.3.4 | Residual security debt cleanup and formal disposition (Audit L6–L8) | Pending | 2026-10-18 |
+| 1.3.4 | Residual security debt cleanup and formal disposition (Audit L6–L8) | Verified | 2026-10-18 |
 | 2.1 | Standardized form submission loading feedback | Verified | 2026-10-17 |
 | 2.2 | Page-title typography normalization | Verified | 2026-10-17 |
 | 2.3 | Localize hardcoded table headers | Verified | 2026-10-18 |
@@ -162,11 +162,12 @@
   - Slicing `firewall-rules.blade.php` into 4 separate files would produce headless sets of `<tr>` tags that cannot stand alone or be reused, damaging readability and maintainability without creating domain abstractions.
   - **Decision**: Retained unified as a single cohesive template.
 
-#### Task 1.3.4: Residual Security Debt Cleanup & Formal Disposition (Audit L6–L8)
+#### Task 1.3.4: Residual Security Debt Cleanup & Formal Disposition (Audit L6–L8) [COMPLETED]
 - **Scope & Disposition**:
-  - **Audit L6**: Clean up misleading rollback comment and pending restore in `ManagesGeoBlocking::setGeoEnabled()`.
-  - **Audit L7**: Re-validate cache lines with `AddressFamily::classify()` before assembling set elements in `GeoBlockingService::compileSetElementFile()`.
-  - **Audit L8**: Remove dead VoIPBL `country_mode` and `countries` fields from UI/schema or formally document as deprecated stubs, and ensure `routes/console.php` declares `strict_types=1`.
+  - **Audit L6**: Fixed rollback in `ManagesGeoBlocking::setGeoEnabled()` to restore `$previousEnabled`, `$previousMode`, and `$previousCountries` on apply failure rather than hardcoding disabled.
+  - **Audit L7**: Added `AddressFamily::classify($entry) === 'ipv4'|'ipv6'` validation when reading cached zone lines in `GeoBlockingService::sync()`.
+  - **Audit L8**: Retained VoIPBL `country_mode` and `countries` table columns on `security_threat_feeds` as harmless schema compatibility attributes, and added `declare(strict_types=1);` to `routes/console.php`.
+- **Verification**: Verified via Pest test suites `GeoBlockingServiceTest` and `GrantModuleManagePermissionMigrationTest`. Recorded in commit `a2d3a24b`.
 
 ---
 
