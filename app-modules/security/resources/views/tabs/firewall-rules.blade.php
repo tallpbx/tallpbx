@@ -244,7 +244,7 @@
                                         </x-tooltip>
                                     </span>
 
-                                    <span class="badge badge-ghost badge-sm text-xs font-normal {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
+                                    <span class="badge badge-ghost badge-sm text-xs font-normal h-auto py-0.5 leading-tight text-center {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
                                         {{ __('admin.security_invariants_rules_count', ['count' => count($this->preFilterRows) + 1]) }}
                                     </span>
                                 </div>
@@ -288,7 +288,7 @@
                                     @endif
                                 </div>
                                 <div class="mt-0.5">
-                                    <span class="badge badge-ghost badge-xs font-mono opacity-75" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight text-center inline-block" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
                                 </div>
                             </td>
                             <td class="text-center text-xs font-mono font-semibold text-base-content/70 px-1.5">
@@ -300,10 +300,10 @@
                             <td class="px-2">
                                 @if ($preFilterRow['source_kind'] === 'static')
                                     <div class="font-mono text-xs text-base-content/70">{{ $preFilterRow['source_static'] }}</div>
-                                    <span class="badge badge-ghost badge-xs font-mono mt-0.5">{{ __('admin.security_dual_stack_badge') }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono mt-0.5 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_dual_stack_badge') }}</span>
                                 @elseif ($preFilterRow['source_kind'] === 'anywhere')
                                     <span class="font-mono text-xs text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
-                                    <span class="badge badge-ghost badge-xs font-mono ml-1">{{ __('admin.security_dual_stack_badge') }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono ml-1 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_dual_stack_badge') }}</span>
                                 @else
                                     <span class="font-mono text-xs {{ ! $rowActive ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
                                         {{ number_format($preFilterRow['count']) }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
@@ -317,11 +317,11 @@
                             </td>
                             <td class="text-center px-1.5">
                                 @if (! $rowActive)
-                                    <span class="badge badge-neutral badge-sm font-semibold opacity-75">{{ __('admin.security_threat_feed_status_disabled') }}</span>
+                                    <span class="badge badge-neutral badge-sm font-semibold opacity-75 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_threat_feed_status_disabled') }}</span>
                                 @elseif ($preFilterRow['action'] === 'allow')
-                                    <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @else
-                                    <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                                    <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                                 @endif
                             </td>
                             <td class="text-right whitespace-nowrap px-2">
@@ -333,7 +333,7 @@
                                                 <x-heroicon-o-lock-closed class="w-3.5 h-3.5" />
                                             </span>
                                         </x-tooltip>
-                                        <span class="badge badge-ghost badge-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                                        <span class="badge badge-ghost badge-xs opacity-75 font-mono h-auto py-0.5 leading-tight text-center inline-block">{{ __('admin.security_kernel_invariant') }}</span>
                                     @else
                                         <span class="flex flex-col">
                                             <button wire:click="movePreFilterUp('{{ $preFilterRow['key'] }}')" type="button"
@@ -348,7 +348,7 @@
                                             </button>
                                         </span>
                                         @if ($preFilterRow['invariant'])
-                                            <span class="badge badge-ghost badge-xs opacity-75 font-mono">{{ __('admin.security_kernel_invariant') }}</span>
+                                            <span class="badge badge-ghost badge-xs opacity-75 font-mono h-auto py-0.5 leading-tight text-center inline-block">{{ __('admin.security_kernel_invariant') }}</span>
                                         @endif
                                         @if ($preFilterRow['manage'])
                                             <x-tooltip :tip="$preFilterRow['manage']['label']" position="left">
@@ -401,10 +401,10 @@
                                 </x-tooltip>
                             </div>
                             <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                <span class="badge badge-ghost badge-xs font-mono opacity-75" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
+                                <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight text-center inline-block" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
                                     {{ $geoMode === 'whitelist' ? '@geo_allowed_ips' : '@geo_blocked_ips' }}
                                 </span>
-                                <span class="badge badge-neutral badge-xs font-mono">
+                                <span class="badge badge-neutral badge-xs font-mono h-auto py-0.5 leading-tight text-center inline-block max-w-full">
                                     {{ $geoMode === 'whitelist' ? __('admin.security_geo_mode_whitelist_badge') : __('admin.security_geo_mode_blacklist_badge') }}
                                 </span>
                             </div>
@@ -431,22 +431,20 @@
                                         {{ implode(', ', array_slice($geoCountries, 0, 4)) }}{{ count($geoCountries) > 4 ? '...' : '' }}
                                     @endif
                                 </div>
-                                <span class="badge badge-ghost badge-xs font-mono mt-0.5">{{ __('admin.security_dual_stack_badge') }}</span>
-                            @elseif ($geoEnabled)
-                                <span class="badge badge-warning badge-xs font-medium">{{ __('admin.security_geo_no_countries') }}</span>
+                                <span class="badge badge-ghost badge-xs font-mono mt-0.5 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_dual_stack_badge') }}</span>
                             @else
-                                <span class="badge badge-ghost badge-xs text-base-content/50">{{ __('admin.security_geo_no_countries') }}</span>
+                                <span class="font-mono text-xs text-base-content/50">0 {{ __('admin.security_geo_country_plural') }}</span>
                             @endif
                         </td>
                         <td class="text-center px-1.5">
                             @if ($geoStatus === 'disabled')
-                                <span class="badge badge-neutral badge-sm font-semibold opacity-75">{{ __('admin.security_geo_status_disabled') }}</span>
+                                <span class="badge badge-neutral badge-sm font-semibold opacity-75 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_geo_status_disabled') }}</span>
                             @elseif ($geoStatus === 'idle')
-                                <span class="badge badge-warning badge-sm font-semibold" title="{{ __('admin.security_geo_no_countries') }}">
+                                <span class="badge badge-warning badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full" title="{{ __('admin.security_geo_no_countries') }}">
                                     {{ __('admin.security_geo_status_idle') }}
                                 </span>
                             @else
-                                <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                                <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                             @endif
                         </td>
                         <td class="text-right whitespace-nowrap px-2">
@@ -502,10 +500,10 @@
                                     <div class="mt-1" x-data="{ tftpCountersOpen: false }">
                                         <div class="flex items-center gap-1.5 flex-wrap">
                                             <button type="button" @click="tftpCountersOpen = ! tftpCountersOpen"
-                                                    class="badge badge-warning badge-xs gap-1 cursor-pointer">
-                                                <x-heroicon-o-shield-check class="w-3 h-3" />
+                                                    class="badge badge-warning badge-xs gap-1 cursor-pointer h-auto py-1 leading-tight text-center max-w-full">
+                                                <x-heroicon-o-shield-check class="w-3 h-3 shrink-0" />
                                                 <span>{{ __('admin.security_tftp_defense_label') }}</span>
-                                                <x-heroicon-s-chevron-down class="w-2.5 h-2.5 transition-transform" x-bind:class="tftpCountersOpen ? 'rotate-180' : ''" />
+                                                <x-heroicon-s-chevron-down class="w-2.5 h-2.5 transition-transform shrink-0" x-bind:class="tftpCountersOpen ? 'rotate-180' : ''" />
                                             </button>
                                             <x-tooltip :tip="__('admin.security_tftp_defense_tooltip')" align="start" position="right">
                                                 <x-heroicon-o-information-circle class="w-3.5 h-3.5 text-base-content/60 cursor-help" />
@@ -570,16 +568,16 @@
                             </td>
                             <td class="px-2">
                                 @if ($service->source_ip === 'any' || $service->source_ip === '0.0.0.0/0' || empty($service->source_ip))
-                                    <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
+                                    <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                                 @else
                                     <span class="font-mono text-xs text-primary font-medium">{{ $service->source_ip }}</span>
                                 @endif
                             </td>
                             <td class="text-center px-1.5">
                                 @if ($service->enabled)
-                                    <span class="badge badge-success badge-sm">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @else
-                                    <span class="badge badge-ghost badge-sm">{{ __('client.disabled') }}</span>
+                                    <span class="badge badge-ghost badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('client.disabled') }}</span>
                                 @endif
                             </td>
                             <td class="text-right whitespace-nowrap px-2">
@@ -647,7 +645,7 @@
                             {{-- Source Network --}}
                             <td class="px-2">
                                 @if ($rule->source_ip === 'any' || $rule->source_ip === '0.0.0.0/0')
-                                    <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
+                                    <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                                 @else
                                     <span class="font-mono text-xs">{{ $rule->source_ip }}</span>
                                 @endif
@@ -656,9 +654,9 @@
                             {{-- Action Badge --}}
                             <td class="text-center px-1.5">
                                 @if ($rule->action === 'accept')
-                                    <span class="badge badge-success badge-sm">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @else
-                                    <span class="badge badge-error badge-sm">{{ __('admin.security_action_block') }}</span>
+                                    <span class="badge badge-error badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_block') }}</span>
                                 @endif
                             </td>
 
@@ -718,19 +716,19 @@
                             <span title="{{ __('admin.security_all_remaining_traffic') }}">{{ __('admin.security_all_ports') }}</span>
                         </td>
                         <td class="px-2">
-                            <span class="badge badge-ghost badge-xs">{{ __('admin.security_source_anywhere') }}</span>
+                            <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                         </td>
                         <td class="text-center px-1.5">
                             <span wire:loading.remove wire:target="saveDefaultPolicy">
                                 @if ($firewallDefaultPolicy === 'drop')
-                                    <span class="badge badge-error badge-sm font-semibold">{{ __('admin.security_action_drop') }}</span>
+                                    <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                                 @else
-                                    <span class="badge badge-success badge-sm font-semibold">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @endif
                             </span>
                             <span wire:loading wire:target="saveDefaultPolicy" class="inline-flex items-center gap-1.5">
                                 <span class="loading loading-spinner loading-xs text-primary"></span>
-                                <span class="badge badge-ghost badge-sm font-semibold text-base-content/60">{{ __('admin.saving') }}</span>
+                                <span class="badge badge-ghost badge-sm font-semibold text-base-content/60 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.saving') }}</span>
                             </span>
                         </td>
                         <td class="text-right whitespace-nowrap px-2">

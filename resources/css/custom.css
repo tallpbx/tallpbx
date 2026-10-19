@@ -91,5 +91,21 @@
   overflow: hidden !important;
 }
 
+/*
+ * Multi-line badge support.
+ * DaisyUI 5 locks .badge height to a fixed `height: var(--size);` (1rem for badge-xs,
+ * 1.25rem for badge-sm), which causes text that word-wraps in constrained table
+ * cells to overflow outside the badge boundaries.
+ * Allowing height: auto with min-height: var(--size) and snug block padding ensures
+ * badges gracefully expand vertically when content wraps, while preserving the exact
+ * standard height for single-line badges.
+ */
+.panel-shell .badge {
+  height: auto;
+  min-height: var(--size, 1.25rem);
+  padding-block: 0.125rem;
+  line-height: 1.25;
+}
+
 
 

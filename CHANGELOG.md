@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Firewall Rules Table Empty Geo-Blocking Scope Parity**: Replaced the cluttered "No countries configured" badge in the Firewall Rules table's Source IP column with clean muted monospace text (`0 countries`), matching the formatting and scannability of adjacent pre-filter rows (`0 IPs`, `0 active bans`).
+
+### Fixed
+- **Multi-Line Badge Overflow & Boundary Containment**: Added universal panel-shell badge styling (`height: auto`, `min-height: var(--size)`, `padding-block: 0.125rem`, and `line-height: 1.25`) in `custom.css` and reinforced table badge wrappers, ensuring that badges with multi-line text (e.g. TFTP defense button, localized filtering modes, and translated action labels) expand vertically to cleanly contain text within pill boundaries rather than bleeding outside.
+
 ## [4.0.7] - 2026-10-19
 
 ### Changed
