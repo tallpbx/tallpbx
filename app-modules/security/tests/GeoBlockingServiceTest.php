@@ -98,7 +98,7 @@ it('only flushes target mode sets during sync to prevent drop window during mode
         ->with('US')
         ->andReturn([
             'v4' => ['1.0.0.0/24'],
-            'v6' => [],
+            'v6' => ['2600::/12'],
         ]);
 
     $this->geoService->sync($rule, force: true);
@@ -366,6 +366,59 @@ it('does not overwrite valid existing cache when a single family fetch returns e
     // The existing valid v6 cache must NOT be wiped or overwritten with empty content
     $v6Content = file_get_contents($this->cacheDir.'/US.v6.zone');
     expect($v6Content)->toContain('2600::/12');
+});
+
+it('fails a whitelist sync when one address family cannot be downloaded and has no valid cache', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'whitelist',
+        'countries' => ['US'],
+    ]);
+
+    // Provider returns valid v4, but empty v6 (e.g. upstream v6 failure or missing v6)
+    // and no existing cache exists for v6.
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => [],
+    ]);
+
+    $this->executor->shouldReceive('updateExternalBlocklist')->never();
+
+    $result = $this->geoService->sync($rule, force: true);
+
+    expect($result['status'])->toBe('failed')
+        ->and($result['error'])->toContain('US');
+});
+
+it('fails a sync when an earlier country in a multi-country list fails to write cache', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'blacklist',
+        'countries' => ['US', 'CA'],
+    ]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')->with('US')->once()->andReturn([
+        'v4' => ['1.0.0.0/24'],
+        'v6' => ['2600::/12'],
+    ]);
+    $this->provider->shouldReceive('fetchCountryRanges')->with('CA')->once()->andReturn([
+        'v4' => ['24.48.0.0/14'],
+        'v6' => ['2607:f8b0::/32'],
+    ]);
+
+    // Make the cache file for US un-writable by creating a directory with that name
+    mkdir($this->cacheDir.'/US.v4.zone');
+
+    $this->executor->shouldReceive('updateExternalBlocklist')->never();
+
+    $result = $this->geoService->sync($rule, force: true);
+
+    expect($result['status'])->toBe('failed')
+        ->and($result['error'])->toContain('Failed to write zone cache for country: US');
+
+    rmdir($this->cacheDir.'/US.v4.zone');
 });
 
 /*

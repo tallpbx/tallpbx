@@ -54,6 +54,7 @@ class GeoBlockingService
         $allV4 = [];
         $allV6 = [];
         $errors = [];
+        $cacheWriteFailed = false;
 
         $ttlSeconds = $rule->syncIntervalSeconds();
         if ($ttlSeconds === PHP_INT_MAX) {
@@ -93,18 +94,21 @@ class GeoBlockingService
                     if ($fetchedV4) {
                         if (@file_put_contents($v4Cache, implode("\n", $ranges['v4'])."\n") === false) {
                             $errors[] = "Failed to write zone cache for country: {$cc}";
+                            $cacheWriteFailed = true;
                         }
                     }
 
                     if ($fetchedV6) {
                         if (@file_put_contents($v6Cache, implode("\n", $ranges['v6'])."\n") === false) {
                             $errors[] = "Failed to write zone cache for country: {$cc}";
+                            $cacheWriteFailed = true;
                         }
                     }
                 }
             }
 
-            $countryHasEntries = false;
+            $countryHasV4 = false;
+            $countryHasV6 = false;
 
             if (is_file($v4Cache)) {
                 $lines = file($v4Cache, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
@@ -112,7 +116,7 @@ class GeoBlockingService
                     $entry = trim($line);
                     if ($entry !== '') {
                         $allV4[] = $entry;
-                        $countryHasEntries = true;
+                        $countryHasV4 = true;
                     }
                 }
             }
@@ -123,12 +127,17 @@ class GeoBlockingService
                     $entry = trim($line);
                     if ($entry !== '') {
                         $allV6[] = $entry;
-                        $countryHasEntries = true;
+                        $countryHasV6 = true;
                     }
                 }
             }
 
-            if (! $countryHasEntries) {
+            if ($rule->mode === 'whitelist') {
+                if (! $countryHasV4 || ! $countryHasV6) {
+                    $missingFamily = ! $countryHasV4 && ! $countryHasV6 ? 'IPv4 and IPv6' : (! $countryHasV4 ? 'IPv4' : 'IPv6');
+                    $errors[] = "Incomplete IP zones for country {$cc} in whitelist mode (missing {$missingFamily})";
+                }
+            } elseif (! $countryHasV4 && ! $countryHasV6) {
                 $errors[] = "Failed to download IP zones for country: {$cc}";
             }
         }
@@ -137,10 +146,10 @@ class GeoBlockingService
         $allV6 = array_values(array_unique($allV6));
 
         // Whitelist mode must never compile a partial allow-set: every
-        // country that yielded an error or no entries would be silently dropped at
+        // country that yielded an error or missing family would silently drop legitimate users at
         // the perimeter while the UI reports success.
         // Also, cache write failures or total download failures must fail the sync in any mode.
-        $hasFatalErrors = ! empty($errors) && ($rule->mode === 'whitelist' || empty($allV4) && empty($allV6) || in_array('Failed to write zone cache for country: '.$cc, $errors, true));
+        $hasFatalErrors = ! empty($errors) && ($rule->mode === 'whitelist' || (empty($allV4) && empty($allV6)) || $cacheWriteFailed);
 
         if ($hasFatalErrors && ! empty($countries)) {
             $rule->last_status = 'failed';
