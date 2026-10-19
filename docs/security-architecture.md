@@ -235,7 +235,7 @@ Pinned directly above the tab strip for immediate visibility:
 ### The Five Security Center Tabs
 
 #### Tab 1: Firewall Rules (`?tab=rules`)
-* **Pre-Filter Pipeline**: Interactive table showing the exact sequence of stages 1–7 with Up/Down reordering chevrons and a "Reset to recommended order" action:
+* **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (stages 1–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the companion Geo-Blocking master cockpit row):
   - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
   - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
 * **Geo-Blocking Master Cockpit Row**: Positioned following External Blocklists, displays the live state of the dedicated geo perimeter rule, mode indicator (`Block Selected` or `Block All Except`), total count of active ranges, and instant link to Tab 5.

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Firewall Rules Table Empty Geo-Blocking Scope Parity**: Replaced the cluttered "No countries configured" badge in the Firewall Rules table's Source IP column with clean muted monospace text (`0 countries`), matching the formatting and scannability of adjacent pre-filter rows (`0 IPs`, `0 active bans`).
+- **Documentation & Invariant Pre-Filter Tooltip Parity**: Synchronized pre-filter pipeline tooltips, banners, and help strings across `en`, `es`, and `fr` dictionaries (`security_toggle_prefilter_help`, `security_defensive_prefilters_help`, `security_defensive_prefilters_disabled_note`, `security_prefilter_off_badge`, `security_prefilter_disabled_banner_body`) to accurately reflect all eight built-in pre-filter rules (including Geo-Blocking) in 100% parity with the header's "8 Rules" badge. Updated automated test suite metrics to 2,900+ Pest tests across `README.md`, `docs/parity-comparison.md`, `docs/security-architecture.md`, and `docs/ui-tour.md`.
 
 ### Fixed
 - **Multi-Line Badge Overflow & Boundary Containment**: Added universal panel-shell badge styling (`height: auto`, `min-height: var(--size)`, `padding-block: 0.125rem`, and `line-height: 1.25`) in `custom.css` and reinforced table badge wrappers, ensuring that badges with multi-line text (e.g. TFTP defense button, localized filtering modes, and translated action labels) expand vertically to cleanly contain text within pill boundaries rather than bleeding outside.

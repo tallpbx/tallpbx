@@ -37,7 +37,7 @@ Built to eliminate the steep learning curve and dated interfaces of legacy PBX p
 | **Multi-Lingual** | **Native English, Spanish, French** (instant switcher) | Partial / community arrays | Partial gettext / PO files |
 | **Firewall & Defense** | **In-Kernel `nftables` + Real-Time Threat Defense** | Fail2ban / iptables scripts | Basic iptables / Fail2ban |
 | **Host Security** | **Hardened Bounded Sudoers** (zero web shells or raw SQL) | Web shell (`app/exec`) & raw SQL | Sudoers entries for Asterisk/Apache |
-| **Automated Tests** | **2,700+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
+| **Automated Tests** | **2,900+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
 See the [Feature and Function Parity Guide](docs/parity-comparison.md) for a domain-by-domain breakdown across all 60 PBX modules, the [Telephony Architecture Guide](docs/telephony-architecture.md) for the Users/Extensions/SIP Accounts/Devices model, and the [Security Architecture & Packet Flow Guide](docs/security-architecture.md) for network defense details.
