@@ -53,7 +53,7 @@
 | 4.5 | Clean up `TenantContext::current()` side effects | Verified | 2026-10-18 |
 | 4.6 | Decompose large shared-kernel classes | Verified | 2026-10-18 |
 | 4.7 | Environment variable documentation reference | Verified | 2026-10-18 |
-| 4.8 | Module management permission upgrade grant & documentation (Audit L-4) | Pending | 2026-10-18 |
+| 4.8 | Module management permission upgrade grant & documentation (Audit L-4) | Verified | 2026-10-18 |
 | 5.1 | Click-to-call ESL command validation | Verified | 2026-10-17 |
 | 5.2 | Open registration feature gate | Verified | 2026-10-17 |
 | 5.3 | XML handler rate limiting & access hardening | Verified | 2026-10-17 |
@@ -342,12 +342,14 @@
   - Documented variable types, defaults, configuration paths (`config/*.php`), descriptions, and highlighted security-critical secrets and live-firewall safety considerations.
 - **Verification**: Verified file structure, completeness across all 19 configuration files, line count (671 lines, 54 KB), and cross-referenced with `.env.example`.
 
-### Task 4.8: Module Management Permission Upgrade Grant & Documentation (Audit L-4)
-- **Problem**: Permission `admin.modules.manage` was introduced to gate destructive module actions (`deleteCustomModule()` and `toggleEnabled()`). On upgrades, existing administrator groups do not have this permission attached until `AdminSeeder` is re-run or permissions are manually assigned, resulting in 403 Forbidden on previously working module administration.
+### Task 4.8: Module Management Permission Upgrade Grant & Residual Debt Resolution (Audit L-4, L6–L8) [COMPLETED]
+- **Problem**: Permission `admin.modules.manage` was introduced to gate destructive module actions (`deleteCustomModule()` and `toggleEnabled()`). On upgrades, existing administrator groups did not have this permission attached until `AdminSeeder` is re-run or permissions are manually assigned, resulting in 403 Forbidden on previously working module administration (Audit L-4). Additionally, residual items L6 (setGeoEnabled rollback to previous state), L7 (AddressFamily::classify cache validation), and L8 (routes/console.php strict types) were untracked.
 - **Implementation**:
-  - Add a database migration or upgrade hook attaching `admin.modules.manage` to existing "Super Administrators" and "Administrators" groups.
-  - Document the permission requirement in release notes and upgrade guides.
-- **Verification**: Migration test verifying that existing groups acquire `admin.modules.manage` without manual seeder invocation.
+  - Authored idempotent database migration `2026_10_18_000002_grant_module_manage_permission_to_super_admins.php` attaching `admin.modules.manage` to existing "Super Administrators" and "Administrators" groups.
+  - In `ManagesGeoBlocking::setGeoEnabled()`, restored previous state (`$previousEnabled`, `$previousMode`, `$previousCountries`) on apply failures (L6).
+  - In `GeoBlockingService::sync()`, added `AddressFamily::classify($entry) === 'ipv4'|'ipv6'` validation on cache lines (L7).
+  - In `routes/console.php`, added `declare(strict_types=1);` (L8).
+- **Verification**: Migration unit test `GrantModuleManagePermissionMigrationTest` verifying idempotent permission grants and rollbacks. Recorded in commit `a2d3a24b`.
 
 ---
 
@@ -413,6 +415,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `a2d3a24b` | **Admin / Permissions** | **Module Management Upgrade Migration & Residual Debt Cleanup**: Added idempotent migration `2026_10_18_000002_grant_module_manage_permission_to_super_admins.php` attaching `admin.modules.manage` to Super Administrators and Administrators groups for seamless 4.x upgrades. Fixed `setGeoEnabled` rollback to preserve previous state on apply failures (L6), validated cached zone lines with `AddressFamily::classify()` (L7), and added `declare(strict_types=1);` to `routes/console.php` (L8). *(Resolves Task 4.8 / Re-Audit L-4, L6–L8; Stream 4 100% complete)* |
 | **2026-10-18** | `a76617a5` | **FreeSWITCH / Telemetry** | **ESL Listener Queue Configuration, Broadcast Error Logging & Strict Types**: Wired `config('freeswitch.esl.queue_name', 'default')` to all five queued ESL listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`, `RegisterCompletedCallRecording`, `RegisterCompletedVoicemailMessage`, `MarkBroadcastRecipientOutcome`) via `viaQueue()` and `$queue`, with documented queue worker requirements for kernel ban persistence. Added structured `Log::warning(...)` telemetry in `BroadcastTelephonyOnFreeSwitchEvent` and `BroadcastDashboardStatsOnFreeSwitchEvent` catch blocks to surface broadcast transport failures, and added `declare(strict_types=1);` to `routes/channels.php`. *(Resolves Tasks 3.3 & 3.4 / Re-Audit M-3, L-1 & L-2)* |
 | **2026-10-18** | `d8c2a25f` | **Security / Firewall** | **Root Helper Atomic Flock Promote Protocol for External Blocklists**: Wrapped syntax verification, pending-to-active file promotion (`mv`), permissions assignment, and kernel load in `scripts/resources/tallpbx-security` inside an exclusive flock subshell (`flock -x 200`), eliminating the race condition where concurrent PHP threat-feed or geo-blocking writers could interleave during promotion. Validated with non-interactive shell check and automated unit and inter-process lock concurrency tests. *(Resolves Task 5.8 / Re-Audit M-2)* |
 | **2026-10-18** | `5a45048c` | **Security / Geo** | **Whitelist Dual-Family Completeness & Fatal Error Tracking**: Enforced per-country dual-family completeness in whitelist geo-blocking mode (`GeoBlockingService::sync()`), refusing to arm partial perimeters when either IPv4 or IPv6 is missing or incomplete, preventing silent drops of legitimate whitelisted users at stage 9.5. Replaced post-loop string matching on leaked `$cc` variable with typed `$cacheWriteFailed` flag so cache write failures on any country trigger fatal failure. Added targeted RED-proof unit tests. *(Resolves Task 1.1.4 / Re-Audit H-1 & M-1)* |
