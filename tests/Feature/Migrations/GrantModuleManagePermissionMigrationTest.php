@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Migrations;
+
+use App\Models\Group;
+use App\Models\Permission;
+
+test('grant module manage permission migration idempotently attaches permission to admin groups', function (): void {
+    $superAdminGroup = Group::firstOrCreate(
+        ['name' => 'Super Administrators', 'tenant_id' => null],
+        ['description' => 'Full system access.']
+    );
+
+    $adminGroup = Group::firstOrCreate(
+        ['name' => 'Administrators', 'tenant_id' => null],
+        ['description' => 'Admin access.']
+    );
+
+    $migration = require database_path('migrations/2026_10_18_000002_grant_module_manage_permission_to_super_admins.php');
+
+    // Run migration
+    $migration->up();
+
+    $permission = Permission::where('name', 'admin.modules.manage')->first();
+    expect($permission)->not->toBeNull()
+        ->and($permission->module)->toBe('admin');
+
+    expect($superAdminGroup->fresh()->permissions->contains('id', $permission->id))->toBeTrue()
+        ->and($adminGroup->fresh()->permissions->contains('id', $permission->id))->toBeTrue();
+
+    // Idempotency: second run does not duplicate or fail
+    $migration->up();
+
+    expect($superAdminGroup->fresh()->permissions()->where('permissions.id', $permission->id)->count())->toBe(1);
+
+    // Rollback detaches permission
+    $migration->down();
+    expect($superAdminGroup->fresh()->permissions->contains('id', $permission->id))->toBeFalse()
+        ->and($adminGroup->fresh()->permissions->contains('id', $permission->id))->toBeFalse();
+});

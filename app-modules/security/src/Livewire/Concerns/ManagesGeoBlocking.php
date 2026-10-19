@@ -149,11 +149,13 @@ trait ManagesGeoBlocking
         $this->geoEnabled = true;
 
         if (! $this->regenerateAndApplyFirewall()) {
-            // Roll back so the panel never claims an enabled state the
+            // Roll back to previous state so the panel never claims an enabled state the
             // kernel is not actually running.
-            $rule->enabled = false;
+            $rule->enabled = $previousEnabled;
+            $rule->mode = $previousMode ?? 'blacklist';
+            $rule->countries = is_array($previousCountries) ? $previousCountries : [];
             $rule->save();
-            $this->geoEnabled = false;
+            $this->geoEnabled = $previousEnabled;
             $this->loadGeoState();
 
             return;

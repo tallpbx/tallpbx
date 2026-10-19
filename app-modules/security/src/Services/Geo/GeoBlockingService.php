@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\Security\Contracts\GeoBlockingProviderInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Models\SecurityGeoRule;
+use Modules\Security\Support\AddressFamily;
 
 /**
  * Service managing Geo-Blocking rules, country zone caching,
@@ -114,7 +115,7 @@ class GeoBlockingService
                 $lines = file($v4Cache, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
                 foreach ($lines as $line) {
                     $entry = trim($line);
-                    if ($entry !== '') {
+                    if ($entry !== '' && ! str_starts_with($entry, '#') && AddressFamily::classify($entry) === 'ipv4') {
                         $allV4[] = $entry;
                         $countryHasV4 = true;
                     }
@@ -125,7 +126,7 @@ class GeoBlockingService
                 $lines = file($v6Cache, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
                 foreach ($lines as $line) {
                     $entry = trim($line);
-                    if ($entry !== '') {
+                    if ($entry !== '' && ! str_starts_with($entry, '#') && AddressFamily::classify($entry) === 'ipv6') {
                         $allV6[] = $entry;
                         $countryHasV6 = true;
                     }
