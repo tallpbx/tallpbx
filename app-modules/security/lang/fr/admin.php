@@ -73,6 +73,7 @@ return [
     'security_banned_attackers' => 'Attaquants Bloqués',
     'security_banned_attackers_desc' => 'Bannissements dynamiques au niveau du noyau déclenchés par la détection automatique d\'intrusion (auth SIP, auth Web, force brute SSH ou scanners SIP). Les adresses IP bannies sont placées directement dans les ensembles dynamiques (@banned_ips et @banned_ips6) du pare-feu du noyau Linux (table inet tallpbx_filter, chaîne input). Les paquets entrants sont rejetés à la vitesse du câble avant d\'atteindre les règles de ports ou les services PBX.',
     'security_banned_attackers_cli_hint' => 'Pour inspecter les bannissements actifs du noyau depuis la ligne de commande Linux :',
+    'security_showing_recent_bans' => 'Affichage des :limit bannissements les plus récents sur un total de :total bannissements actifs.',
     'security_manual_ban_desc' => 'Ajoute une adresse IP directement à l\'ensemble dynamique du pare-feu du noyau (@banned_ips dans la table inet tallpbx_filter). Tout le trafic entrant depuis cette adresse sera rejeté immédiatement.',
     'security_no_attackers_help' => 'L\'ensemble @banned_ips du noyau est actuellement vide. Les intrusions automatisées et blocages de scanners apparaîtront ici et rejetteront le trafic en temps réel.',
     'security_block_manually' => 'Bloquer IP Manuellement',

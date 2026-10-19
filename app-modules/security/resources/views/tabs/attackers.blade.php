@@ -36,11 +36,11 @@
                             {{ $attackProtectionEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
                         </span>
                         @if ($attackProtectionEnabled)
-                            <span class="badge badge-neutral badge-sm font-mono">{{ $this->bans->count() }}</span>
+                            <span class="badge badge-neutral badge-sm font-mono">{{ $this->totalActiveBans }}</span>
                         @else
                             <span class="badge badge-neutral badge-sm font-mono">0</span>
-                            @if ($this->bans->count() > 0)
-                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $this->bans->count()]) }})</span>
+                            @if ($this->totalActiveBans > 0)
+                                <span class="text-xs text-base-content/60">({{ __('admin.security_in_list_note', ['count' => $this->totalActiveBans]) }})</span>
                             @endif
                         @endif
                         <span class="badge badge-ghost badge-sm font-mono opacity-75" title="@banned_ips">@banned_ips</span>
@@ -175,6 +175,12 @@
                     </tbody>
                 </table>
             </div>
+            @if ($this->totalActiveBans > 100)
+                <div class="p-2.5 rounded-box bg-base-200/50 border border-base-200 text-xs text-base-content/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                    <span>{{ __('admin.security_showing_recent_bans', ['limit' => 100, 'total' => number_format($this->totalActiveBans)]) }}</span>
+                    <span class="font-mono text-xs opacity-75">sudo nft list set inet tallpbx_filter banned_ips</span>
+                </div>
+            @endif
         </div>
     </div>
 

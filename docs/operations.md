@@ -224,7 +224,7 @@ journalctl -u php8.5-fpm --no-pager -n 50
 tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
 ```
 
-If you see `server reached pm.max_children setting`, the pool was saturated by concurrent HTTP XML handler requests. The installer auto-configures `pm = static` with `12` workers on 4GB systems (`6` on 2GB systems). If needed on high-traffic PBX servers, increase `pm.max_children` in `/etc/php/8.5/fpm/pool.d/www.conf` and restart PHP-FPM.
+If you see `server reached pm.max_children setting`, the pool was saturated by concurrent HTTP XML handler requests. The installer auto-configures `pm = static` with `12` workers on 4GB systems (`6` on 2GB systems, `5` on 1GB systems). If needed on high-traffic PBX servers, increase `pm.max_children` in `/etc/php/8.5/fpm/pool.d/www.conf` and restart PHP-FPM.
 
 ### "Permission denied" Errors in the Panel or Logs
 

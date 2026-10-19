@@ -259,15 +259,21 @@ class SecurityBanService implements SecurityBanServiceInterface
     }
 
     /**
-     * Get all currently active, non-expired bans.
+     * Get all currently active, non-expired bans (optionally limited).
      *
+     * @param  int|null  $limit  Optional maximum number of bans to retrieve
      * @return Collection<int, SecurityBan>
      */
-    public function getActiveBans(): Collection
+    public function getActiveBans(?int $limit = null): Collection
     {
-        return SecurityBan::active()
-            ->orderByDesc('banned_at')
-            ->get();
+        $query = SecurityBan::active()
+            ->orderByDesc('banned_at');
+
+        if ($limit !== null && $limit > 0) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
     }
 
     /**

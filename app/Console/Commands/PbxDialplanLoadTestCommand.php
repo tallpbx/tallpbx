@@ -13,6 +13,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use Modules\Extensions\Models\Extension;
 
@@ -111,20 +112,29 @@ class PbxDialplanLoadTestCommand extends Command
         );
         $this->writeReport($reportPath, $report);
 
+        $tableRows = [
+            ['Total requests', (string) $report['total_requests']],
+            ['Successful responses', (string) $report['successful_responses']],
+            ['Failed responses', (string) $report['failed_responses']],
+            ['Elapsed seconds', (string) $report['elapsed_seconds']],
+            ['Requests/sec', (string) $report['requests_per_second']],
+            ['Average ms', (string) $report['latency_ms']['average']],
+            ['Fastest ms', (string) $report['latency_ms']['min']],
+            ['Slowest ms', (string) $report['latency_ms']['max']],
+            ['Passed thresholds', $report['passed'] ? 'yes' : 'no'],
+            ['Report', $this->resolveReportPath($reportPath)],
+        ];
+
+        if (isset($report['environment']['redis']['used_memory_human'])) {
+            $redisInfo = $report['environment']['redis'];
+            $maxMem = $redisInfo['maxmemory_human'] ?? 'uncapped';
+            $evicted = $redisInfo['evicted_keys'] ?? 0;
+            $tableRows[] = ['Redis memory', "{$redisInfo['used_memory_human']} / {$maxMem} (evicted: {$evicted})"];
+        }
+
         $this->table(
             ['Metric', 'Value'],
-            [
-                ['Total requests', (string) $report['total_requests']],
-                ['Successful responses', (string) $report['successful_responses']],
-                ['Failed responses', (string) $report['failed_responses']],
-                ['Elapsed seconds', (string) $report['elapsed_seconds']],
-                ['Requests/sec', (string) $report['requests_per_second']],
-                ['Average ms', (string) $report['latency_ms']['average']],
-                ['Fastest ms', (string) $report['latency_ms']['min']],
-                ['Slowest ms', (string) $report['latency_ms']['max']],
-                ['Passed thresholds', $report['passed'] ? 'yes' : 'no'],
-                ['Report', $this->resolveReportPath($reportPath)],
-            ],
+            $tableRows,
         );
 
         return $report['passed'] ? self::SUCCESS : self::FAILURE;
@@ -404,7 +414,33 @@ class PbxDialplanLoadTestCommand extends Command
             'cpu_cores' => $this->cpuCoreCount(),
             'available_ram_mb' => $this->availableRamMb(),
             'swap_used_mb' => $this->swapUsedMb(),
+            'redis' => $this->redisTelemetry(),
         ];
+    }
+
+    /**
+     * Resolve Redis memory metrics and eviction stats if Redis is connected.
+     *
+     * @return array<string, int|string|null>|null
+     */
+    private function redisTelemetry(): ?array
+    {
+        try {
+            $info = Redis::info();
+            $memoryInfo = $info['Memory'] ?? $info['memory'] ?? $info;
+            $statsInfo = $info['Stats'] ?? $info['stats'] ?? $info;
+
+            return [
+                'used_memory_human' => $memoryInfo['used_memory_human'] ?? null,
+                'used_memory_bytes' => isset($memoryInfo['used_memory']) ? (int) $memoryInfo['used_memory'] : null,
+                'used_memory_peak_human' => $memoryInfo['used_memory_peak_human'] ?? null,
+                'maxmemory_human' => $memoryInfo['maxmemory_human'] ?? null,
+                'maxmemory_policy' => $memoryInfo['maxmemory_policy'] ?? null,
+                'evicted_keys' => isset($statsInfo['evicted_keys']) ? (int) $statsInfo['evicted_keys'] : null,
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

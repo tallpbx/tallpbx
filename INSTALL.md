@@ -227,7 +227,7 @@ the old program first; that does not touch your database or recordings.
 
 ### Redis Cache & Session Storage
 
-Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=5`), protecting MariaDB during call bursts. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `.env`, run `php artisan optimize:clear && php artisan optimize`.
+Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=5`), protecting MariaDB during call bursts. The installer also enforces a safe universal memory ceiling (`maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`), ensuring short-lived intrusion counters and dialplan cache keys expire naturally and can be safely evicted under attack floods without risking system out-of-memory errors. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `.env`, run `php artisan optimize:clear && php artisan optimize`.
 
 ### FreeSWITCH Session Rate
 
@@ -239,12 +239,41 @@ PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer det
 
 | Server Size | Process Mode (`pm`) | Workers (`pm.max_children`) | Notes |
 | :--- | :--- | :---: | :--- |
-| **1 GB RAM** | `dynamic` | `5` | Conserves memory on minimal servers. |
+| **1 GB RAM** | `static` | `5` | Pre-forked baseline (eliminates fork latency during bursts; requires ≥ 2GB swap). |
 | **2 GB RAM** | `static` | `6` | Balanced for small office bursts. |
 | **4 GB RAM** | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
 | **8 GB+ RAM** | `static` | `24` | For higher-concurrency call centers. |
 
-In `dynamic` mode, workers are created on demand and shut down when idle to preserve memory on smaller servers. The trade-off is that constantly spawning and terminating workers adds CPU overhead and minor latency during traffic spikes.
+#### Why Spare Workers and Static Mode Matter for a Phone System
+
+On a standard website (such as a blog or storefront), PHP only works when a person clicks a page in their web browser. If nobody is visiting, the server can let its workers go to sleep. If a new visitor arrives and the server takes an extra half-second to start a new worker process, the person barely notices.
+
+A phone system (PBX) is completely different. In TallPBX, PHP does two jobs:
+1. It shows the web control panel when you log in.
+2. It answers questions for the phone engine (FreeSWITCH) every time a phone rings, dials, or registers.
+
+Whenever an extension dials a number, an outside caller rings in, or someone checks their voicemail, FreeSWITCH pauses and asks PHP: *"Who is this caller, what are their permissions, and where should this call go?"* PHP looks up the answer in the database and replies with call instructions (formatted as XML).
+
+##### What is a "Hotpath"?
+In computing, a **hotpath** is the main highway of a software program — the specific stretch of code that runs over and over again for everyday essential tasks. 
+
+In TallPBX, the communication line between FreeSWITCH and PHP is the ultimate hotpath. Almost every action on your phone system must travel across this highway before anything else can happen:
+- A desk phone cannot ring until FreeSWITCH gets the routing instructions from PHP.
+- A user cannot authenticate or make a call until PHP verifies their SIP credentials.
+- A caller cannot reach a ring group or menu until PHP confirms the schedule and extension setup.
+
+Because this is a real-time hotpath, **instant responsiveness is crucial**. If a website takes two seconds to load, it is a minor annoyance. But if a phone system takes two seconds to look up a call route, the caller hears dead silence, desk phones report "Call Failed", and FreeSWITCH will give up and drop the call after a brief timeout.
+
+##### Why Debian's Default "Dynamic" Setting Falls Short
+Debian defaults to `pm = dynamic`, which starts with 2 workers and allows the server to scale down to just 1 worker when the system is quiet. While this saves a small amount of memory on an idle server, it creates serious problems for a PBX:
+- **Starting from a Dead Stop**: When an idle server suddenly receives a burst of phone calls (such as several calls arriving at the start of a business day), it has to create new worker processes on the fly. Spawning new workers takes 200–500 milliseconds of heavy processor work. This delay stalls the hotpath right when the server is busiest.
+- **Worker Starvation**: If an administrator is clicking around or saving settings in the web panel, the single active worker is tied up. Incoming phone calls are forced to sit in a waiting line, leading to delayed audio, timeouts, and dropped calls.
+
+##### The Advantage of Pre-Warmed Static Workers
+TallPBX configures PHP-FPM in `static` mode across all hardware sizes (including 5 static workers on 1 GB servers):
+- **Always Ready**: All worker processes are pre-started and sitting quietly in memory 24/7. When a call arrives, an idle worker is already there to answer FreeSWITCH within milliseconds.
+- **Dedicated Lanes**: Even if someone is using the web panel, there are always spare workers standing by to handle call routing on the hotpath without hesitation.
+- **Comfortable Memory Footprint**: Five static workers take only about 250 MB of memory. Together with the operating system (~150 MB), FreeSWITCH (~200 MB), MariaDB (~180 MB), and Redis (~25 MB), the complete system uses roughly ~825 MB. This leaves plenty of headroom for disk caching and is safely backed by the installer's required 2 GB swap file.
 
 In `static` mode, all workers remain initialized and ready for call bursts. Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases.
 

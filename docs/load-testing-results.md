@@ -72,7 +72,7 @@ Use this authoritative reference when selecting server specifications, tuning PH
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | :--- | :--- | :--- | :--- | :--- | :--- | ---: | --- |
-| **Micro / Edge** | 1 vCPU, 1–2 GiB RAM | `pm = dynamic`<br>`pm.max_children = 5` | 5 seconds | 13–19 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
+| **Micro / Edge** | 1 vCPU, 1–2 GiB RAM | `pm = static`<br>`pm.max_children = 5` | 5 seconds | 13–19 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
 | **Standard SMB** | 2–4 vCPU, 4 GiB RAM | `pm = static`<br>`pm.max_children = 12` | 5 seconds | 19–28 req/sec | 5–8 calls/sec | 50–100 concurrent | Small-to-medium business (10–75 phones) |
 | **Mid-Market** | 4–8 vCPU, 8–16 GiB RAM | `pm = static`<br>`pm.max_children = 24` | 5–15 seconds | 65–72 req/sec | 15–20 calls/sec | 200–400 concurrent | Multi-department office (75–250 phones) |
 | **Call Center** | 8+ vCPU, 16 GiB RAM | `pm = static`<br>`pm.max_children = 32–48` | 15–30 seconds | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
@@ -102,13 +102,13 @@ TallPBX caches compiled dialplan XML responses, individual contributor fragments
 
 ### 2. PHP-FPM Worker Pool Tuning (`/etc/php/8.5/fpm/pool.d/www.conf`)
 
-FreeSWITCH initiates concurrent HTTP requests to PHP-FPM whenever calls arrive. PBX call setup cannot tolerate worker wait states:
+Unlike a standard website where PHP only serves human page clicks in a browser, a PBX uses PHP-FPM to serve real-time XML call routing to FreeSWITCH. This communication line is the system's **hotpath** — the critical highway of code that must run for every phone registration, extension lookup, and inbound/outbound call. If PHP workers are asleep or busy when a call arrives, callers hear silence and FreeSWITCH drops the call.
 
-- **Always Use Static Mode (`pm = static`) on ≥ 2 GiB RAM**: Dynamic mode spawns workers on demand, introducing process-fork latency during call bursts. In benchmarks, dynamic mode with 5 workers saturated at concurrency 25, creating worker starvation warnings and 502 timeouts. Static mode keeps all workers pre-forked in memory.
+- **Always Use Static Mode (`pm = static`) Across All Tiers**: Dynamic mode spawns workers on demand, introducing 200–500 ms process-fork latency during call bursts. In benchmarks, dynamic mode with 5 workers saturated at concurrency 25, creating worker starvation warnings and 502 timeouts. Static mode keeps all workers pre-forked in memory so spare workers are always ready to answer the hotpath instantly, even while users navigate the web panel.
 - **Installer Auto-Tuning**: Fresh installations detect system RAM via `free -m` and configure optimal worker pools:
   - **≥ 3,500 MB RAM (4GB+ standard)**: `pm = static`, `pm.max_children = 12` (+15% throughput, zero timeouts, >2.5 GiB free RAM).
   - **≥ 1,800 MB RAM (2GB small)**: `pm = static`, `pm.max_children = 6`.
-  - **< 1,800 MB RAM (1GB minimal)**: `pm = dynamic`, `pm.max_children = 5` to conserve memory.
+  - **< 1,800 MB RAM (1GB minimal)**: `pm = static`, `pm.max_children = 5` (pre-forked baseline to eliminate fork latency during bursts; paired with mandatory ≥ 2GB swap).
 - **Check for Pool Saturation**:
   ```bash
   tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"

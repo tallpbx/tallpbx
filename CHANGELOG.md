@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Redis Memory Cap & Volatile LRU Eviction**: Added idempotent configuration in `scripts/resources/php.sh` enforcing `maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`. Binds Redis to a predictable 256MB ceiling across all server sizes, ensuring that volatile cache and intrusion sliding-window keys are safely evicted under high-volume brute-force attacks without dropping writes or threatening system memory.
+- **Dialplan Load Test Redis Telemetry**: Added Redis memory metrics (`used_memory_human`, `maxmemory_human`, `maxmemory_policy`, `evicted_keys`) to the console summary table and JSON export of `php artisan pbx:load-test:dialplan`, giving administrators real-time visibility into cache saturation and eviction activity during benchmark runs.
+- **Total Active Bans Counter & UI Pagination Boundary**: Added `totalActiveBans()` computed property and a recent ban notice to the Security Center Attackers tab (`/panel/security?tab=attackers`), bounding rendered active ban collections to the 100 most recent items while reflecting accurate total active bans in the header badge.
+
+### Changed
+- **PHP-FPM Static Worker Pool Sizing Baseline**: Configured PHP-FPM to use `pm = static` with `5` pre-forked workers for minimal 1GB systems (replacing Debian's default dynamic mode with 2 start / 1 min workers) backed by the installer's mandatory 2GB swap file. Eliminates 200–500ms process-fork latency during burst call arrivals on the critical FreeSWITCH `mod_xml_curl` routing hotpath, preventing call setup stalls and SIP 503 errors while maintaining a lean ~250MB memory footprint.
+
+### Security
+- **Asynchronous Intrusion Incident Broadcasting**: Migrated `SecurityIncidentLogged` from synchronous `ShouldBroadcastNow` to asynchronous queued `ShouldBroadcast`, ensuring that real-time intrusion events generated during high-concurrency attack floods are queued over Redis without monopolizing or blocking PHP-FPM web workers with WebSocket socket handshakes.
+- **Security Ban Query Bounds**: Updated `SecurityBanServiceInterface::getActiveBans(?int $limit = null)` and `SecurityBanService` with optional limit parameter, safeguarding web worker memory from unbounded queries when tens of thousands of active IP bans exist.
+
 ## [4.0.5] - 2026-10-18
 
 ### Added

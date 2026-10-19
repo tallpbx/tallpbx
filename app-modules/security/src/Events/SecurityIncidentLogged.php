@@ -6,17 +6,18 @@ namespace Modules\Security\Events;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
  * Event broadcast when an authentication failure or access incident is detected.
  *
- * Broadcasts immediately over Laravel Reverb WebSockets to notify active Security
- * Command Center dashboards in real time.
+ * Broadcasts over Laravel Reverb WebSockets to notify active Security
+ * Command Center dashboards in real time. Implements ShouldBroadcast (queued)
+ * to avoid blocking web workers or FreeSWITCH listeners under attack floods.
  */
-class SecurityIncidentLogged implements ShouldBroadcastNow
+class SecurityIncidentLogged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

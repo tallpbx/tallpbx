@@ -73,6 +73,7 @@ return [
     'security_banned_attackers' => 'Atacantes Bloqueados',
     'security_banned_attackers_desc' => 'Bloqueos dinámicos del kernel activados por detección automática de intrusiones (autenticación SIP, Web, fuerza bruta SSH o escáneres SIP). Las IP bloqueadas se colocan directamente en los conjuntos dinámicos (@banned_ips y @banned_ips6) del cortafuegos del kernel Linux (tabla inet tallpbx_filter, cadena input). Los paquetes entrantes se descartan a velocidad de cable antes de alcanzar las reglas de puertos o los servicios PBX.',
     'security_banned_attackers_cli_hint' => 'Para inspeccionar los bloqueos activos del kernel desde la línea de comandos de Linux:',
+    'security_showing_recent_bans' => 'Mostrando los :limit bloqueos más recientes de :total bloqueos activos en total.',
     'security_manual_ban_desc' => 'Añade una dirección IP directamente al conjunto dinámico del cortafuegos del kernel (@banned_ips en tabla inet tallpbx_filter). Todo el tráfico entrante de esta dirección se descartará de inmediato.',
     'security_no_attackers_help' => 'El conjunto @banned_ips del kernel está vacío actualmente. Las intrusiones automatizadas y bloqueos de escáneres aparecerán aquí y descartarán tráfico en tiempo real.',
     'security_block_manually' => 'Bloquear IP Manualmente',

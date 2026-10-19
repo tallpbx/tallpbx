@@ -492,14 +492,23 @@ class SecurityManager extends Component
     }
 
     /**
-     * Active security bans across all protection vectors.
+     * Active security bans across all protection vectors (bounded to most recent 100).
      *
      * @return Collection<int, SecurityBan>
      */
     #[Computed]
     public function bans(): Collection
     {
-        return app(SecurityBanServiceInterface::class)->getActiveBans();
+        return app(SecurityBanServiceInterface::class)->getActiveBans(limit: 100);
+    }
+
+    /**
+     * Total count of all active, non-expired bans in the database.
+     */
+    #[Computed]
+    public function totalActiveBans(): int
+    {
+        return SecurityBan::active()->count();
     }
 
     /**

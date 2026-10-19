@@ -53,7 +53,7 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 5. **Use FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${destination}/${context}` rather than raw extension strings to avoid `CHAN_NOT_IMPLEMENTED` failures.
 6. **Terminate Background UAS Listeners Between Runs**: In multi-scenario scripts, clean up background UAS processes before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` socket binding collisions.
 7. **Allocate Dedicated Client Ports on Shared Hosts**: When the load generator host also runs FreeSWITCH, SIPp UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). Use local ports 5100+ (`EXTENDED_UAC_LOCAL_PORT=5100`).
-8. **Tune PHP-FPM Worker Pools**: Debian's default dynamic pool (`pm.max_children = 5`) saturates at concurrency 25, creating worker starvation and latency spikes. On ≥ 2 GB RAM, configure `/etc/php/8.5/fpm/pool.d/www.conf` to `pm = static` with `pm.max_children = 6` (or `12` on 4GB+ systems).
+8. **Tune PHP-FPM Worker Pools**: Debian's default dynamic pool (`pm.max_children = 5`) saturates at concurrency 25, creating worker starvation and latency spikes. TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` to `pm = static` across all profiles (`pm.max_children = 5` for 1GB VPS, `6` for 2GB, `12` for 4GB, `24` for 8GB+), eliminating dynamic process-fork latency during burst call arrivals.
 9. **Set Long Registration Leases**: The SIP registration scenario (`tools/sipp/register.xml`) must use a 1-hour lease (`Expires: 3600`) so registrations do not expire mid-test.
 
 ---
@@ -262,6 +262,14 @@ php artisan pbx:load-test:dialplan \
 - `inbound`: Inbound public DID routing lookups only.
 - `outbound`: Outbound prefix/gateway routing lookups only.
 - `cache-hit`: Repeats one exact destination lookup to isolate pure Redis memory hit performance (0 database queries).
+
+### Telemetry & Output Reports
+
+The dialplan test command streams live progress, prints a summary table to the console, and (when `--report` is specified) writes a comprehensive JSON benchmark report:
+- **Throughput & Latency**: Measures requests per second, mean, min, max, median (`p50`), 95th percentile (`p95`), and 99th percentile (`p99`) response latencies.
+- **HTTP Status Codes**: Tracks total counts of `200 OK`, `4xx` client errors, and `5xx` server/gateway errors.
+- **System Environment**: Records PHP version, OPcache status, CPU core count, and system load averages (`1m`, `5m`, `15m`).
+- **Redis Memory Telemetry**: Captures active `used_memory_human`, configured `maxmemory_human` (e.g. 256M cap), `maxmemory_policy` (`volatile-lru`), and `evicted_keys`. This verifies that Redis memory stays within configured bounds during sustained high-concurrency bursts and confirms whether key eviction occurred under load.
 
 ### Relevant .env Configuration
 

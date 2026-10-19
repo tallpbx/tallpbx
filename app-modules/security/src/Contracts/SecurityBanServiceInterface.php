@@ -51,11 +51,12 @@ interface SecurityBanServiceInterface
     public function isBanned(string $ip): bool;
 
     /**
-     * Get all currently active, non-expired bans.
+     * Get all currently active, non-expired bans (optionally limited).
      *
+     * @param  int|null  $limit  Optional maximum number of bans to retrieve
      * @return Collection<int, SecurityBan>
      */
-    public function getActiveBans(): Collection;
+    public function getActiveBans(?int $limit = null): Collection;
 
     /**
      * Mark expired bans as inactive in the database.

@@ -73,6 +73,7 @@ return [
     'security_banned_attackers' => 'Blocked Attackers',
     'security_banned_attackers_desc' => 'Dynamic kernel bans triggered by automated intrusion detection (SIP auth, Web auth, SSH brute force, or SIP scanners). Banned IPs are placed directly into the Linux kernel firewall (table inet tallpbx_filter, input chain) dynamic sets (@banned_ips and @banned_ips6). Inbound packets are dropped at wire speed before reaching any open port rules or PBX services.',
     'security_banned_attackers_cli_hint' => 'To inspect active kernel bans from the Linux command line:',
+    'security_showing_recent_bans' => 'Showing the :limit most recent bans of :total total active bans.',
     'security_manual_ban_desc' => 'Adds an IP address directly to the kernel firewall dynamic set (@banned_ips in table inet tallpbx_filter). All incoming traffic from this address will be dropped immediately.',
     'security_no_attackers_help' => 'The kernel @banned_ips set is currently empty. Automated intrusion bans and scanner blocks will appear here and drop traffic in real time.',
     'security_block_manually' => 'Block IP Manually',
