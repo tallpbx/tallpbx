@@ -272,7 +272,7 @@ Pinned directly above the tab strip for immediate visibility:
   - **Block Selected Countries (`blacklist`)**: Selectively drops traffic originating from specific high-risk jurisdictions.
   - **Block All Except Selected (`whitelist`)**: Strict allow-list perimeter dropping all traffic outside your operating countries. Protected by fail-closed completeness guards requiring valid IPv4 and IPv6 zone data for every selected country; if an upstream country has zero published IPv6 ranges or fails to download, the whitelist refuses to arm to prevent perimeter bypass or unintended lockout.
 * **Automatic Scheduled Synchronization**: Pre-aggregated country zone files are cached locally in `/etc/tallpbx/geoip/` and automatically refreshed weekly via the scheduler (`php artisan security:sync-geoip`), or on demand via `php artisan security:sync-geoip --force`.
-* **Zero-Lockout Concurrency**: Set compilations merge atomically into the shared kernel set-element pipeline under exclusive file locks (`flock(LOCK_EX)`), preventing race conditions with concurrent threat-feed syncs.
+* **Zero-Lockout Concurrency**: Set compilations merge atomically into the shared kernel set-element pipeline under an exclusive `flock(LOCK_EX)` taken on the never-renamed shared lock file (`/etc/tallpbx/external_blocklist.lock`) — the same lock the root helper takes before promoting the pending file — so no concurrent threat-feed sync, geo merge, or helper promotion can interleave or race the promote's rename (the pending file itself is never used as the lock target).
 * **Operational Telemetry & CLI Inspection**: Live packet drop counter anchored to kernel rule counters, and a 1-click CLI hint for terminal inspection (`sudo nft list set inet tallpbx_filter geo_blocked_ips`).
 
 ---

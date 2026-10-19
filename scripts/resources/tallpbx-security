@@ -58,6 +58,10 @@ FIREWALL_ACTIVE="${FIREWALL_CONF_DIR}/firewall.nft"
 # active file after every firewall rebuild (apply).
 EXTERNAL_BLOCKLIST_PENDING="${FIREWALL_CONF_DIR}/external_blocklist.nft.pending"
 EXTERNAL_BLOCKLIST_ACTIVE="${FIREWALL_CONF_DIR}/external_blocklist.nft"
+# Never-renamed shared lock file: the PHP writers (GeoBlockingService,
+# ThreatFeedIngestionService) and this helper's promote step all serialize
+# on it, because the pending file above is renamed away during promotion.
+EXTERNAL_BLOCKLIST_LOCK="${FIREWALL_CONF_DIR}/external_blocklist.lock"
 
 # Legacy threat feed files (retained for backward compatibility)
 THREAT_FEED_PENDING="${FIREWALL_CONF_DIR}/threat_feed.nft.pending"
@@ -356,9 +360,16 @@ case "$ACTION" in
 
         # Preflight the set-element statements before promoting anything, so
         # a malformed compile never replaces the last good feed file.
-        # Acquire an exclusive flock on the pending feed file during preflight
-        # check, promotion, and load so a concurrent PHP writer cannot interleave
+        # Acquire an exclusive flock on the never-renamed shared lock file
+        # (external_blocklist.lock) during preflight check, promotion, and
+        # load: the pending file itself is renamed by the promote step below,
+        # so locking it would race the rename and leave a concurrent PHP
+        # writer holding a lock on a dead inode. With every writer and this
+        # helper serializing on the lock file, no writer can interleave
         # mid-rewrite.
+        touch "$EXTERNAL_BLOCKLIST_LOCK" 2>/dev/null || true
+        chown root:www-data "$EXTERNAL_BLOCKLIST_LOCK" 2>/dev/null || true
+        chmod 0660 "$EXTERNAL_BLOCKLIST_LOCK" 2>/dev/null || true
         if [ -x "$FLOCK_BIN" ]; then
             (
                 "$FLOCK_BIN" -x 200
@@ -367,7 +378,7 @@ case "$ACTION" in
                 chown root:www-data "$ACTIVE_FEED_FILE" 2>/dev/null || true
                 chmod 0640 "$ACTIVE_FEED_FILE" 2>/dev/null || true
                 "$NFT_BIN" -f "$ACTIVE_FEED_FILE"
-            ) 200<"$PENDING_FEED_FILE"
+            ) 200<"$EXTERNAL_BLOCKLIST_LOCK"
         else
             "$NFT_BIN" -c -f "$PENDING_FEED_FILE"
             mv "$PENDING_FEED_FILE" "$ACTIVE_FEED_FILE"

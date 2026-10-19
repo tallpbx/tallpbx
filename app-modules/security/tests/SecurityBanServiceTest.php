@@ -28,20 +28,11 @@ beforeEach(function (): void {
     $this->seed(SecurityServiceSeeder::class);
     SecurityBan::query()->delete();
 
-    // Flush test redis keys if available
-    try {
-        $prefix = (string) config('database.redis.options.prefix', '');
-        $keys = Redis::keys('tallpbx:security:attempts:*');
-        if (! empty($keys)) {
-            $unprefixed = array_map(
-                fn (string $k): string => str_starts_with($k, $prefix) ? substr($k, strlen($prefix)) : $k,
-                $keys
-            );
-            Redis::del($unprefixed);
-        }
-    } catch (\Throwable) {
-        // Ignore in environments without live Redis
-    }
+    // NOTE: deliberately NO global Redis wipe here. Parallel Pest workers and
+    // consecutive runs share one live Redis, so `keys('tallpbx:security:attempts:*')`
+    // deletes concurrently running tests' in-flight sliding-window counters and
+    // silently suppresses their threshold bans. Counter-dependent tests instead
+    // use per-run-unique IPs; leftover keys expire via their find_time TTLs.
 });
 
 it('resolves SecurityBanServiceInterface from service container', function (): void {
@@ -340,6 +331,11 @@ it('prunes expired bans by marking them inactive in the database', function (): 
 });
 
 it('integrates SecurityIncidentService with SecurityBanService end-to-end', function (): void {
+    // Unique IP per run: parallel workers and consecutive runs share one live
+    // Redis, so a fixed address lets another test's cleanup (or leftovers from
+    // a previous run) reset this counter mid-threshold.
+    $ip = '198.51.'.random_int(0, 254).'.'.random_int(2, 254);
+
     SecuritySetting::set('max_retry', 3);
     SecuritySetting::set('find_time', 300);
     SecuritySetting::set('ban_time', 7200);
@@ -347,31 +343,36 @@ it('integrates SecurityIncidentService with SecurityBanService end-to-end', func
     $banService = new SecurityBanService;
     $incidentService = new SecurityIncidentService($banService);
 
-    expect($banService->isBanned('198.51.100.99'))->toBeFalse();
+    expect($banService->isBanned($ip))->toBeFalse();
 
     // First two failures do not ban
-    $incidentService->recordFailure('198.51.100.99', 'web_auth', 'Failed login attempt 1');
-    $incidentService->recordFailure('198.51.100.99', 'web_auth', 'Failed login attempt 2');
-    expect($banService->isBanned('198.51.100.99'))->toBeFalse();
+    $incidentService->recordFailure($ip, 'web_auth', 'Failed login attempt 1');
+    $incidentService->recordFailure($ip, 'web_auth', 'Failed login attempt 2');
+    expect($banService->isBanned($ip))->toBeFalse();
 
     // Third failure reaches max_retry and triggers automatic ban
-    $incidentService->recordFailure('198.51.100.99', 'web_auth', 'Failed login attempt 3');
+    $incidentService->recordFailure($ip, 'web_auth', 'Failed login attempt 3');
 
-    expect($banService->isBanned('198.51.100.99'))->toBeTrue();
+    expect($banService->isBanned($ip))->toBeTrue();
 
     $this->assertDatabaseHas('security_bans', [
-        'ip_address' => '198.51.100.99',
+        'ip_address' => $ip,
         'vector' => 'web_auth',
         'is_active' => true,
     ]);
 
     $this->assertDatabaseHas('security_audit_logs', [
         'action' => 'ban_created',
-        'ip_address' => '198.51.100.99',
+        'ip_address' => $ip,
     ]);
 });
 
 it('handles a flood of failed attempts across hundreds of distinct IPs without leakage', function (): void {
+    // Unique subnet per run: parallel workers and consecutive runs share one
+    // live Redis, so a fixed range lets leftover sliding-window counters (or a
+    // concurrently running test) reset this flood mid-threshold.
+    $subnet = random_int(1, 254);
+
     SecuritySetting::set('max_retry', 3);
     SecuritySetting::set('find_time', 300);
     SecuritySetting::set('ban_time', 3600);
@@ -381,7 +382,7 @@ it('handles a flood of failed attempts across hundreds of distinct IPs without l
 
     // Simulate 100 distinct attacking IPs each with 2 failures (under threshold: counter stays in Redis)
     for ($i = 1; $i <= 100; $i++) {
-        $ip = "192.0.200.{$i}";
+        $ip = "192.0.{$subnet}.{$i}";
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 1');
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 2');
         expect($banService->isBanned($ip))->toBeFalse();
@@ -389,7 +390,7 @@ it('handles a flood of failed attempts across hundreds of distinct IPs without l
 
     // Simulate 20 distinct IPs that reach threshold and get banned (purged from Redis, stored in DB)
     for ($i = 101; $i <= 120; $i++) {
-        $ip = "192.0.200.{$i}";
+        $ip = "192.0.{$subnet}.{$i}";
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 1');
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 2');
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 3');
@@ -409,7 +410,7 @@ it('handles a flood of failed attempts across hundreds of distinct IPs without l
 
     if ($redisAvailable) {
         for ($i = 101; $i <= 120; $i++) {
-            $key = "tallpbx:security:attempts:sip_auth:192.0.200.{$i}";
+            $key = "tallpbx:security:attempts:sip_auth:192.0.{$subnet}.{$i}";
             expect(Redis::get($key))->toBeNull();
         }
     }

@@ -72,6 +72,32 @@ it('syncs country ranges, writes cache zones and compiles set element statements
         ->and($content)->toContain('add element inet tallpbx_filter geo_blocked_ips6 { 2600::/12 }');
 });
 
+it('creates the shared external blocklist lock file when merging pending elements', function (): void {
+    $rule = SecurityGeoRule::instance();
+    $rule->update([
+        'enabled' => true,
+        'mode' => 'blacklist',
+        'port_scope' => 'all_traffic',
+        'countries' => ['US'],
+    ]);
+
+    $this->provider->shouldReceive('fetchCountryRanges')
+        ->with('US')
+        ->once()
+        ->andReturn([
+            'v4' => ['1.0.0.0/24'],
+            'v6' => ['2600::/12'],
+        ]);
+
+    $result = $this->geoService->sync($rule, force: true);
+
+    // Every pending-set writer (and the root helper promote step) serializes
+    // on the never-renamed shared lock file, so a successful merge must leave
+    // that file behind for the next writer to open.
+    expect($result['status'])->toBe('success')
+        ->and(file_exists($this->tempDir.'/external_blocklist.lock'))->toBeTrue();
+});
+
 it('clears kernel geo sets when clear is called', function (): void {
     $rule = SecurityGeoRule::instance();
     $rule->update(['enabled' => false, 'countries' => ['US']]);

@@ -194,6 +194,24 @@ it('fails the sync when the pending set-element file cannot be written', functio
     rmdir($this->firewallDir.'/external_blocklist.nft.pending');
 });
 
+it('creates the shared external blocklist lock file when compiling the pending set element file', function (): void {
+    Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.10/32\n203.0.113.20/32\n203.0.113.30/32", 200)]);
+
+    $feed = SecurityThreatFeed::factory()->create([
+        'provider' => 'voipbl',
+        'enabled' => true,
+        'sync_interval' => 'hourly',
+        'last_sync_at' => now()->subHours(2),
+    ]);
+
+    $result = $this->ingestion->ingest($feed, 'https://www.voipbl.org/api/voipbl', force: true);
+
+    // The compile step serializes on the never-renamed shared lock file, so a
+    // successful pending write must leave that file behind for the next writer.
+    expect($result->status)->toBe('success')
+        ->and(file_exists($this->firewallDir.'/external_blocklist.lock'))->toBeTrue();
+});
+
 it('atomically snapshots and preserves pending geo elements under shared lock protocol', function (): void {
     Http::fake(['www.voipbl.org/*' => Http::response("203.0.113.10/32\n203.0.113.20/32\n203.0.113.30/32", 200)]);
 
@@ -207,8 +225,9 @@ it('atomically snapshots and preserves pending geo elements under shared lock pr
     $pendingFile = $this->firewallDir.'/external_blocklist.nft.pending';
     $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
 
-    // Simulate an interleaved geo sync: lock external_blocklist.nft.pending exclusively
-    $lockHandle = fopen($pendingFile, 'c+');
+    // Simulate an interleaved geo sync: hold the exclusive shared lock file
+    // the way GeoBlockingService does, then publish new geo elements.
+    $lockHandle = fopen($this->firewallDir.'/external_blocklist.lock', 'c+');
     expect($lockHandle)->not->toBeFalse();
     flock($lockHandle, LOCK_EX);
 

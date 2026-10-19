@@ -317,7 +317,7 @@ it('update-external-blocklist ignores any path argument and only reads the canon
     }
 });
 
-it('locks the pending external blocklist file exclusively with flock during promote', function (): void {
+it('locks the dedicated shared external blocklist lock file exclusively with flock during promote', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
     $stubDir = sys_get_temp_dir().'/tallpbx_flock_stub_'.uniqid();
@@ -327,7 +327,10 @@ it('locks the pending external blocklist file exclusively with flock during prom
     chmod($nftStub, 0755);
 
     $flockStub = $stubDir.'/flock';
-    file_put_contents($flockStub, "#!/bin/bash\necho \"FLOCK: \$*\"\nexit 0\n");
+    // The stub reports which file descriptor 200 is bound to, so the test can
+    // prove the helper flocks the never-renamed shared lock file (and not the
+    // pending file that the promote step renames away).
+    file_put_contents($flockStub, "#!/bin/bash\necho \"FLOCK: \$* TARGET=\$(readlink /proc/self/fd/200)\"\nexit 0\n");
     chmod($flockStub, 0755);
 
     $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_flock_test_'.uniqid();
@@ -348,6 +351,7 @@ it('locks the pending external blocklist file exclusively with flock during prom
 
         expect($process->getExitCode())->toBe(0)
             ->and($process->getOutput())->toContain('FLOCK: -x 200')
+            ->and($process->getOutput())->toContain("TARGET={$isolatedDir}/external_blocklist.lock")
             ->and($process->getOutput())->toContain("NFT: -c -f {$isolatedDir}/external_blocklist.nft.pending")
             ->and($process->getOutput())->toContain("NFT: -f {$isolatedDir}/external_blocklist.nft")
             ->and(file_exists($isolatedDir.'/external_blocklist.nft'))->toBeTrue()
@@ -355,6 +359,7 @@ it('locks the pending external blocklist file exclusively with flock during prom
     } finally {
         @unlink($isolatedDir.'/external_blocklist.nft');
         @unlink($isolatedDir.'/external_blocklist.nft.pending');
+        @unlink($isolatedDir.'/external_blocklist.lock');
         @rmdir($isolatedDir);
         @unlink($flockStub);
         @unlink($nftStub);
@@ -362,7 +367,7 @@ it('locks the pending external blocklist file exclusively with flock during prom
     }
 });
 
-it('blocks update-external-blocklist helper while PHP holds exclusive lock on pending file', function (): void {
+it('blocks update-external-blocklist helper while PHP holds exclusive lock on the shared lock file', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
     $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
@@ -376,8 +381,10 @@ it('blocks update-external-blocklist helper while PHP holds exclusive lock on pe
     $pendingFile = $isolatedDir.'/external_blocklist.nft.pending';
     file_put_contents($pendingFile, "# initial content\n");
 
-    // Acquire LOCK_EX in PHP process
-    $handle = fopen($pendingFile, 'c+');
+    // Acquire LOCK_EX on the never-renamed shared lock file in the PHP
+    // process: the helper must block on the same lock before promoting.
+    $lockFile = $isolatedDir.'/external_blocklist.lock';
+    $handle = fopen($lockFile, 'c+');
     expect($handle)->not->toBeFalse();
     flock($handle, LOCK_EX);
 
@@ -419,6 +426,45 @@ it('blocks update-external-blocklist helper while PHP holds exclusive lock on pe
         }
         @unlink($isolatedDir.'/external_blocklist.nft');
         @unlink($pendingFile);
+        @unlink($lockFile);
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
+it('creates the shared lock file during promote when it is absent', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_lockfile_create_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/external_blocklist.nft.pending', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'update-external-blocklist'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $nftStub,
+            ],
+        );
+        $process->run();
+
+        // The helper must leave the shared lock file behind so the PHP
+        // writers can always open it on the next merge.
+        expect($process->getExitCode())->toBe(0)
+            ->and(file_exists($isolatedDir.'/external_blocklist.lock'))->toBeTrue();
+    } finally {
+        @unlink($isolatedDir.'/external_blocklist.nft');
+        @unlink($isolatedDir.'/external_blocklist.nft.pending');
+        @unlink($isolatedDir.'/external_blocklist.lock');
         @rmdir($isolatedDir);
         @unlink($nftStub);
         @rmdir($stubDir);

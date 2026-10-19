@@ -64,24 +64,41 @@ class SecurityIncidentService implements SecurityIncidentServiceInterface
             if ($attempts === 1) {
                 Redis::expire($redisKey, $findTime);
             }
-
-            // Broadcast real-time incident alert to connected security command centers
-            SecurityIncidentLogged::dispatch($ip, $vector, $attempts);
-
-            if ($attempts >= $maxRetry) {
-                Redis::del($redisKey);
-
-                if ($this->banService !== null) {
-                    $this->banService->ban(
-                        ip: $ip,
-                        vector: $vector,
-                        reason: "Exceeded {$maxRetry} failed attempts within {$findTime}s: {$details}",
-                        durationSeconds: $banTime > 0 ? $banTime : null,
-                    );
-                }
-            }
         } catch (\Throwable $e) {
             Log::error('Security incident tracking error in Redis', [
+                'ip' => $ip,
+                'vector' => $vector,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        // Enforcement runs BEFORE the real-time alert: a broken alert
+        // pipeline must never be able to suppress the threshold ban.
+        if ($attempts >= $maxRetry) {
+            try {
+                Redis::del($redisKey);
+            } catch (\Throwable) {
+                // Counter cleanup is best-effort; the ban below is what matters.
+            }
+
+            if ($this->banService !== null) {
+                $this->banService->ban(
+                    ip: $ip,
+                    vector: $vector,
+                    reason: "Exceeded {$maxRetry} failed attempts within {$findTime}s: {$details}",
+                    durationSeconds: $banTime > 0 ? $banTime : null,
+                );
+            }
+        }
+
+        // Broadcast real-time incident alert to connected security command
+        // centers (best-effort: failures are logged and never affect enforcement).
+        try {
+            SecurityIncidentLogged::dispatch($ip, $vector, $attempts);
+        } catch (\Throwable $e) {
+            Log::warning('Security incident alert dispatch failed', [
                 'ip' => $ip,
                 'vector' => $vector,
                 'error' => $e->getMessage(),

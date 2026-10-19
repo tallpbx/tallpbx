@@ -12,15 +12,18 @@ use App\Models\Admin;
 use App\Services\FreeSwitchServiceInterface;
 use Database\Seeders\SecurityServiceSeeder;
 use Illuminate\Auth\Events\Failed;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Redis;
 use Mockery;
 use Modules\Security\Contracts\SecurityBanServiceInterface;
 use Modules\Security\Contracts\SecurityIncidentServiceInterface;
+use Modules\Security\Events\SecurityIncidentLogged;
 use Modules\Security\Models\SecurityAuditLog;
 use Modules\Security\Models\SecurityBan;
 use Modules\Security\Models\SecurityIpList;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\Bans\SecurityIncidentService;
+use RuntimeException;
 
 /**
  * Feature tests for Security Event Listeners (XML Handler Auth, Web Login, SIP Auth, SIP Scanner).
@@ -37,10 +40,14 @@ beforeEach(function (): void {
     $this->banService = Mockery::mock(SecurityBanServiceInterface::class);
     $this->app->instance(SecurityBanServiceInterface::class, $this->banService);
 
-    // Clear test redis keys if any
+    // Clear test redis keys if any. Attempt counters are deliberately NOT
+    // wiped: parallel workers and consecutive runs share one live Redis, and a
+    // global `attempts:*` delete erases concurrently running tests' in-flight
+    // sliding-window counters (silently suppressing their threshold bans).
+    // Counter-dependent tests use per-run-unique IPs and TTL self-cleanup.
     try {
         $prefix = (string) config('database.redis.options.prefix', '');
-        foreach (['tallpbx:security:attempts:*', 'tallpbx:security:sip_scanner_low:*', 'tallpbx:security:sip_scanner_audited:*'] as $pattern) {
+        foreach (['tallpbx:security:sip_scanner_low:*', 'tallpbx:security:sip_scanner_audited:*'] as $pattern) {
             $keys = Redis::keys($pattern);
             if (! empty($keys)) {
                 $unprefixed = array_map(
@@ -58,7 +65,9 @@ beforeEach(function (): void {
 afterEach(function (): void {
     try {
         $prefix = (string) config('database.redis.options.prefix', '');
-        foreach (['tallpbx:security:attempts:*', 'tallpbx:security:sip_scanner_low:*', 'tallpbx:security:sip_scanner_audited:*'] as $pattern) {
+        // Attempt counters stay untouched (shared-Redis parallel safety — see
+        // the beforeEach note); only scanner dedupe keys are cleared here.
+        foreach (['tallpbx:security:sip_scanner_low:*', 'tallpbx:security:sip_scanner_audited:*'] as $pattern) {
             $keys = Redis::keys($pattern);
             if (! empty($keys)) {
                 $unprefixed = array_map(
@@ -213,6 +222,11 @@ it('exempts whitelisted CIDR subnets from failure tracking', function (): void {
 });
 
 it('triggers ban when failures exceed max_retry threshold', function (): void {
+    // Unique IP per run: parallel workers and consecutive runs share one live
+    // Redis, so fixed addresses let concurrent tests purge each other's
+    // sliding-window attempt counters mid-threshold.
+    $ip = '198.51.'.random_int(0, 254).'.'.random_int(2, 254);
+
     SecuritySetting::set('max_retry', 3);
     SecuritySetting::set('find_time', 300);
     SecuritySetting::set('ban_time', 1800);
@@ -221,7 +235,7 @@ it('triggers ban when failures exceed max_retry threshold', function (): void {
     $banService->shouldReceive('ban')
         ->once()
         ->with(
-            '198.51.100.99',
+            $ip,
             'web_auth',
             Mockery::type('string'),
             1800
@@ -229,9 +243,40 @@ it('triggers ban when failures exceed max_retry threshold', function (): void {
 
     $incidentService = new SecurityIncidentService($banService);
 
-    $incidentService->recordFailure('198.51.100.99', 'web_auth', 'Attempt 1');
-    $incidentService->recordFailure('198.51.100.99', 'web_auth', 'Attempt 2');
-    $incidentService->recordFailure('198.51.100.99', 'web_auth', 'Attempt 3');
+    $incidentService->recordFailure($ip, 'web_auth', 'Attempt 1');
+    $incidentService->recordFailure($ip, 'web_auth', 'Attempt 2');
+    $incidentService->recordFailure($ip, 'web_auth', 'Attempt 3');
+});
+
+it('still bans at the threshold when a real-time incident alert listener throws', function (): void {
+    // Unique IP per run (same shared-Redis rationale as the threshold test).
+    $ip = '198.51.'.random_int(0, 254).'.'.random_int(2, 254);
+
+    SecuritySetting::set('max_retry', 3);
+    SecuritySetting::set('find_time', 300);
+    SecuritySetting::set('ban_time', 1800);
+
+    $banService = Mockery::mock(SecurityBanServiceInterface::class);
+    $banService->shouldReceive('ban')
+        ->once()
+        ->with(
+            $ip,
+            'web_auth',
+            Mockery::type('string'),
+            1800
+        );
+
+    // A broken real-time alert subscriber must never block enforcement:
+    // the threshold ban has to fire even when the alert pipeline throws.
+    Event::listen(SecurityIncidentLogged::class, function (): void {
+        throw new RuntimeException('security alert subscriber down');
+    });
+
+    $incidentService = new SecurityIncidentService($banService);
+
+    $incidentService->recordFailure($ip, 'web_auth', 'Attempt 1');
+    $incidentService->recordFailure($ip, 'web_auth', 'Attempt 2');
+    $incidentService->recordFailure($ip, 'web_auth', 'Attempt 3');
 });
 
 it('respects protect_web setting to disable web login tracking', function (): void {

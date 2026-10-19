@@ -527,3 +527,42 @@ it('rolls back database when disabling geofence fails firewall apply', function 
     $fresh = SecurityGeoRule::instance();
     expect($fresh->enabled)->toBeTrue();
 });
+
+it('re-promotes previous kernel geo sets when re-arming geofence fails firewall apply', function (): void {
+    SecurityIpList::create([
+        'ip_address' => '198.51.100.50',
+        'type' => 'whitelist',
+    ]);
+
+    // Previously armed blacklist perimeter: the rollback path must restore
+    // these exact kernel sets when the re-arm is refused by the firewall
+    // apply, because the aborted sync already overwrote them.
+    $rule = SecurityGeoRule::instance();
+    $rule->mode = 'blacklist';
+    $rule->countries = ['US'];
+    $rule->enabled = true;
+    $rule->save();
+
+    // Firewall apply refuses after the new mode's sets were already synced
+    $this->executor->shouldReceive('apply')->once()->andReturn(false);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->set('adminIp', '198.51.100.50')
+        ->set('geoMode', 'whitelist')
+        ->set('geoCountries', ['US'])
+        ->call('setGeoEnabled', true)
+        ->assertOk()
+        ->assertSet('geoEnabled', true);
+
+    // Database restored to the previously armed blacklist state
+    $fresh = SecurityGeoRule::instance();
+    expect($fresh->enabled)->toBeTrue()
+        ->and($fresh->mode)->toBe('blacklist');
+
+    // Kernel geo sets re-promoted to match the restored state: the aborted
+    // whitelist content must not survive in the pending file.
+    $pending = file_get_contents($this->tempDir.'/geo_blocking.nft.pending');
+    expect($pending)->toContain('add element inet tallpbx_filter geo_blocked_ips')
+        ->and($pending)->not->toContain('add element inet tallpbx_filter geo_allowed_ips');
+});

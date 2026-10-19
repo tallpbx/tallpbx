@@ -37,6 +37,7 @@
 | 1.3.2 | Realign domain trait boundaries | Verified | 2026-10-17 |
 | 1.3.3 | Retain unified firewall pipeline table (evaluated & consolidated) | Verified | 2026-10-17 |
 | 1.3.4 | Residual security debt cleanup and formal disposition (Audit L6–L8) | Verified | 2026-10-18 |
+| 1.3.5 | Geo rollback re-promote failure-injection coverage (Re-Audit #5 S2) | In Progress | 2026-10-18 |
 | 2.1 | Standardized form submission loading feedback | Verified | 2026-10-17 |
 | 2.2 | Page-title typography normalization | Verified | 2026-10-17 |
 | 2.3 | Localize hardcoded table headers | Verified | 2026-10-18 |
@@ -62,6 +63,8 @@
 | 5.6 | Module management and custom extension lifecycle authorization | Verified | 2026-10-17 |
 | 5.7 | Atomic inter-process lock protocol for PHP pending firewall sets | Verified | 2026-10-17 |
 | 5.8 | Root helper atomic flock promote protocol for external blocklists (Audit M-2) | Verified | 2026-10-18 |
+| 5.9 | Dedicated shared lock file for pending set promotions (Re-Audit #5 F6) | In Progress | 2026-10-18 |
+| 5.10 | Enforcement-first incident pipeline & parallel-suite Redis isolation | In Progress | 2026-10-18 |
 
 ---
 
@@ -167,7 +170,14 @@
   - **Audit L6**: Fixed rollback in `ManagesGeoBlocking::setGeoEnabled()` to restore `$previousEnabled`, `$previousMode`, and `$previousCountries` on apply failure, and re-sync or clear kernel sets via `app(GeoBlockingService::class)` matching the restored state.
   - **Audit L7**: Added `AddressFamily::classify($entry) === 'ipv4'|'ipv6'` validation when reading cached zone lines in `GeoBlockingService::sync()`.
   - **Audit L8**: Retained VoIPBL `country_mode` and `countries` table columns on `security_threat_feeds` as harmless schema compatibility attributes, and added `declare(strict_types=1);` to `routes/console.php`.
-- **Verification**: Verified via `GeoBlockingServiceTest`, Livewire geo-blocking state validation, and Pint syntax checks. Recorded in commit `a2d3a24b`.
+- **Verification**: Verified via `GeoBlockingServiceTest`, Livewire geo-blocking state validation, and Pint syntax checks. Recorded in commits `a2d3a24b` (database-state restore) and `78ac2039` (kernel-set clear/re-promote on rollback). The re-promote branch's failure-injection coverage is tracked as Task 1.3.5.
+
+#### Task 1.3.5: Geo Rollback Re-Promote Failure-Injection Coverage (Re-Audit #5 S2) [IN PROGRESS]
+- **Problem**: The kernel-set restore half of Task 1.3.4 (`setGeoEnabled()` re-promoting the previous sets via `GeoBlockingService::sync()` when the firewall apply is refused) had no failure-injection test; only the `clear()` half and the analogous `saveGeoSettings` path were covered, leaving the re-promote branch unproven.
+- **Implementation**:
+  - Add a failure-injection test to `SecurityManagerGeoBlockingTest` that arms a blacklist perimeter, attempts a whitelist re-arm with `apply()` refused, and asserts the database is restored AND the pending kernel sets are re-promoted to the previous state (the aborted whitelist content must not survive in the pending file).
+  - Prove RED-ness by running the test against the pre-`78ac2039` rollback code (it fails exactly at the kernel-set assertions).
+- **Verification**: `SecurityManagerGeoBlockingTest` green (19 tests); transient pre-fix substitution confirmed the new test fails at the kernel-set assertions without the rollback branch. Awaiting close-out commit.
 
 ---
 
@@ -408,7 +418,22 @@
 - **Implementation**:
   - Wrap the `mv` and `nft -f` promotion inside `flock -x` targeting the shared lock descriptor (or lock file synchronized with PHP writers).
   - Validate non-interactive shell script syntax with `bash -n scripts/resources/tallpbx-security`.
-- **Verification**: Concurrency test asserting that pending-to-active promotion in `tallpbx-security` narrows the race window against concurrent PHP writers. Recorded in commit `d8c2a25f`.
+- **Verification**: Concurrency test asserting that pending-to-active promotion in `tallpbx-security` narrows the race window against concurrent PHP writers. Recorded in commit `d8c2a25f`. The residual rename race is eliminated by Task 5.9.
+
+### Task 5.9: Dedicated Shared Lock File for Pending Set Promotions (Re-Audit #5 F6) [IN PROGRESS]
+- **Problem**: The exclusive `flock` protecting `external_blocklist.nft.pending` was taken on the pending file itself, but the root helper's promote step renames that file (`mv` pending → active). A concurrent PHP writer could open the pending inode before the rename and then hold its lock on a dead inode while the helper promoted — the race was narrowed by Task 5.8 but never eliminated.
+- **Implementation**:
+  - Introduce a never-renamed shared lock file `external_blocklist.lock` in the firewall conf dir as the single serialization point for all pending-set writers and the helper promote step.
+  - `GeoBlockingService::mergeWithExternalBlocklistPending()` and `ThreatFeedIngestionService::compileSetElementFile()` acquire `LOCK_EX` on the lock file (fail closed when it cannot be opened) around their read-modify-write of the pending file.
+  - The `tallpbx-security` helper creates the lock file (`touch`, `root:www-data`, mode `0660`) and takes `flock -x 200` on it around preflight, promotion, and kernel load. *Operational note: deploy the updated helper to `/usr/local/sbin/tallpbx-security` (then `sudo php artisan permissions:repair --scope=full`).*
+- **Verification**: RED-proof Pest coverage — helper stub test asserting fd 200 binds the lock file, a real cross-process blocking test (PHP holds the lock → helper blocks until release), lock-file creation tests for both PHP writers and the helper, plus `bash -n` script validation. Awaiting close-out commit.
+
+### Task 5.10: Enforcement-First Incident Pipeline & Parallel-Suite Redis Isolation [IN PROGRESS]
+- **Problem**: Two coupled defects made intrusion enforcement unreliable and `php artisan test --parallel` non-deterministic. (1) `SecurityIncidentService::recordFailure()` dispatched the real-time `SecurityIncidentLogged` alert *before* the threshold ban inside one catch-all `try`, so any alert-pipeline exception silently suppressed the ban. (2) `SecurityBanServiceTest` and `SecurityEventListenersTest` wiped `tallpbx:security:attempts:*` globally in `beforeEach`/`afterEach`; parallel Pest workers share one live Redis, so those wipes deleted concurrently running tests' in-flight sliding-window counters mid-threshold, producing flaky "ban never fired" failures under full-suite `--parallel` load.
+- **Implementation**:
+  - Reorder `recordFailure()`: increment the counter, enforce the threshold ban, and only then dispatch the alert — alert dispatch failures are logged (`Log::warning`) and never affect enforcement; Redis counter cleanup at threshold is best-effort.
+  - Remove the global `attempts:*` Redis wipes from both test files (scanner-dedupe cleanup retained) and give every counter-dependent test per-run-unique IP addresses (random subnet for the flood test), so no test can collide with another worker or a previous run; leftover keys self-expire via `find_time` TTLs.
+- **Verification**: Deterministic RED test (a throwing `SecurityIncidentLogged` subscriber must not prevent the threshold ban) reproduced the exact flake signature before the fix; full security module suite (433 tests / 7,953 assertions) passes under `--parallel` after it. Awaiting close-out commit.
 
 ---
 

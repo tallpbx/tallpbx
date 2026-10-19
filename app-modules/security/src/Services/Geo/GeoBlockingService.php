@@ -317,10 +317,14 @@ class GeoBlockingService
     /**
      * Merges geo lines into external_blocklist.nft.pending so updateExternalBlocklist applies both atomically.
      *
-     * The merge runs under an exclusive flock: the hourly (root, scheduler)
-     * threat-feed sync rewrites this same file through
-     * ThreatFeedIngestionService, and neither writer may lose the other's
-     * elements through an interleaved read-modify-write.
+     * The merge runs under an exclusive flock taken on the never-renamed
+     * shared lock file (external_blocklist.lock): the hourly (root,
+     * scheduler) threat-feed sync rewrites this same pending file through
+     * ThreatFeedIngestionService, and the root helper's promote step renames
+     * the pending file away. Locking the pending file itself would race that
+     * rename and leave a writer holding a lock on a dead inode, so every
+     * writer and the helper serialize on the lock file instead — none may
+     * lose another's elements through an interleaved read-modify-write.
      *
      * @return bool Whether the merged content was written successfully
      */
@@ -331,90 +335,103 @@ class GeoBlockingService
 
         $geoContent = file_get_contents($geoPendingFile) ?: '';
 
-        // Write the merged result back under the exclusive lock protocol
-        // shared with ThreatFeedIngestionService (fopen 'c+' + LOCK_EX +
-        // stream_get_contents + filter + ftruncate/rewrite), falling back
-        // to a plain write only when the file cannot be opened at all.
+        // Fail closed when the shared lock file cannot be opened: writing
+        // without the lock could silently drop a concurrent writer's elements.
         // The @ suppresses the stream warning for unwritable paths (such
-        // as a directory) so the fallback branch handles the failure.
-        $handle = @fopen($externalPending, 'c+');
-        if ($handle === false) {
-            $existingContent = file_exists($externalActive) ? (file_get_contents($externalActive) ?: '') : '';
-            $filteredLines = [];
-            foreach (explode("\n", $existingContent) as $line) {
-                if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
-                    break;
-                }
-                $filteredLines[] = $line;
-            }
-            if (trim(implode('', $filteredLines)) === '') {
-                $filteredLines = [
-                    'flush set inet tallpbx_filter external_blocklist_ips',
-                    'flush set inet tallpbx_filter external_blocklist_ips6',
-                ];
-            }
-            $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
+        // as a directory) so callers receive a clean error result instead
+        // of a PHP warning.
+        $lockHandle = @fopen($this->firewallDir.'/external_blocklist.lock', 'c+');
+        if ($lockHandle === false) {
+            Log::error('Geo set merge failed: the shared external blocklist lock file could not be opened.');
 
-            // The plain-write fallback is checked too: a silent failure here
-            // would leave the old elements in place while callers report success.
-            if (@file_put_contents($externalPending, $combined) === false) {
-                Log::error('Geo set merge failed: the shared pending file is not writable.');
-
-                return false;
-            }
-
-            return true;
+            return false;
         }
 
         try {
-            flock($handle, LOCK_EX);
+            flock($lockHandle, LOCK_EX);
 
-            $existingContent = stream_get_contents($handle);
-            if ($existingContent === false || trim($existingContent) === '') {
-                // If pending is freshly created or empty, seed from active external_blocklist.nft if present
-                if (file_exists($externalActive)) {
-                    $existingContent = file_get_contents($externalActive) ?: '';
-                } else {
-                    $existingContent = '';
+            // Write the merged result back under the exclusive lock,
+            // falling back to a plain write only when the pending file
+            // cannot be opened at all.
+            $handle = @fopen($externalPending, 'c+');
+            if ($handle === false) {
+                $existingContent = file_exists($externalActive) ? (file_get_contents($externalActive) ?: '') : '';
+                $filteredLines = [];
+                foreach (explode("\n", $existingContent) as $line) {
+                    if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
+                        break;
+                    }
+                    $filteredLines[] = $line;
                 }
-            }
-
-            // Cut everything from the geo header marker onward: the geo block
-            // is always the trailing section, so this removes any previously
-            // merged geo content together with its header line in one stroke.
-            // (Filtering by set names alone let stale header comments survive
-            // every re-merge and accumulate into this root-executed file.)
-            $filteredLines = [];
-            foreach (explode("\n", $existingContent) as $line) {
-                if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
-                    break;
+                if (trim(implode('', $filteredLines)) === '') {
+                    $filteredLines = [
+                        'flush set inet tallpbx_filter external_blocklist_ips',
+                        'flush set inet tallpbx_filter external_blocklist_ips6',
+                    ];
                 }
-                $filteredLines[] = $line;
+                $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
+
+                // The plain-write fallback is checked too: a silent failure here
+                // would leave the old elements in place while callers report success.
+                if (@file_put_contents($externalPending, $combined) === false) {
+                    Log::error('Geo set merge failed: the shared pending file is not writable.');
+
+                    return false;
+                }
+
+                return true;
             }
 
-            if (trim(implode('', $filteredLines)) === '') {
-                $filteredLines = [
-                    'flush set inet tallpbx_filter external_blocklist_ips',
-                    'flush set inet tallpbx_filter external_blocklist_ips6',
-                ];
+            try {
+                $existingContent = stream_get_contents($handle);
+                if ($existingContent === false || trim($existingContent) === '') {
+                    // If pending is freshly created or empty, seed from active external_blocklist.nft if present
+                    if (file_exists($externalActive)) {
+                        $existingContent = file_get_contents($externalActive) ?: '';
+                    } else {
+                        $existingContent = '';
+                    }
+                }
+
+                // Cut everything from the geo header marker onward: the geo block
+                // is always the trailing section, so this removes any previously
+                // merged geo content together with its header line in one stroke.
+                // (Filtering by set names alone let stale header comments survive
+                // every re-merge and accumulate into this root-executed file.)
+                $filteredLines = [];
+                foreach (explode("\n", $existingContent) as $line) {
+                    if (str_starts_with($line, '# TallPBX Geo-Blocking kernel elements')) {
+                        break;
+                    }
+                    $filteredLines[] = $line;
+                }
+
+                if (trim(implode('', $filteredLines)) === '') {
+                    $filteredLines = [
+                        'flush set inet tallpbx_filter external_blocklist_ips',
+                        'flush set inet tallpbx_filter external_blocklist_ips6',
+                    ];
+                }
+
+                $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
+
+                ftruncate($handle, 0);
+                rewind($handle);
+                $written = fwrite($handle, $combined);
+                $flushed = fflush($handle);
+
+                if ($written === false || $flushed === false) {
+                    Log::error('Geo set merge failed: the shared pending file write failed.');
+
+                    return false;
+                }
+
+                return true;
+            } finally {
+                fclose($handle);
             }
-
-            $combined = implode("\n", array_filter($filteredLines))."\n".$geoContent;
-
-            ftruncate($handle, 0);
-            rewind($handle);
-            $written = fwrite($handle, $combined);
-            $flushed = fflush($handle);
-
-            if ($written === false || $flushed === false) {
-                Log::error('Geo set merge failed: the shared pending file write failed.');
-
-                return false;
-            }
-
-            return true;
         } finally {
-            fclose($handle); // closing the handle releases the lock
+            fclose($lockHandle); // closing the lock handle releases the shared lock
         }
     }
 

@@ -207,6 +207,12 @@ class ThreatFeedIngestionService
      * file, which the helper loads as a single nft transaction, so the sets
      * are never observable in a half-updated state.
      *
+     * The write runs under the exclusive shared lock file
+     * (external_blocklist.lock) — the same never-renamed lock GeoBlockingService
+     * merges under and the root helper promotes under — so no interleaved
+     * read-modify-write can lose another writer's elements and the helper's
+     * rename of the pending file can never race a writer mid-rewrite.
+     *
      * @param  array<int, string>  $v4  Validated IPv4 addresses and ranges
      * @param  array<int, string>  $v6  Validated IPv6 addresses and ranges
      * @return bool Whether the pending file was written successfully
@@ -234,76 +240,88 @@ class ThreatFeedIngestionService
         $pendingFile = $this->firewallDir.'/external_blocklist.nft.pending';
         $geoPending = $this->firewallDir.'/geo_blocking.nft.pending';
 
-        // Write under the exclusive lock protocol shared with
-        // GeoBlockingService (fopen 'c+' + LOCK_EX + snapshot geo + ftruncate/rewrite):
-        // web-context geo toggles merge into this same file, and neither
-        // writer may lose the other's elements through an interleaved
-        // read-modify-write.
-        $handle = @fopen($pendingFile, 'c+');
-        if ($handle === false) {
-            $geoContent = '';
-            if (is_file($geoPending)) {
-                $geoContent = @file_get_contents($geoPending) ?: '';
-            } elseif (is_file($pendingFile)) {
-                $existing = @file_get_contents($pendingFile) ?: '';
-                if (($pos = strpos($existing, '# TallPBX Geo-Blocking kernel elements')) !== false) {
-                    $geoContent = substr($existing, $pos);
-                }
-            }
+        // Fail closed when the shared lock file cannot be opened: writing
+        // without the lock could silently drop a concurrent writer's elements.
+        // The @ suppresses the stream warning for unwritable paths so callers
+        // receive a clean error result instead of a PHP warning.
+        $lockHandle = @fopen($this->firewallDir.'/external_blocklist.lock', 'c+');
+        if ($lockHandle === false) {
+            Log::error('Threat feed compile failed: the shared external blocklist lock file could not be opened.');
 
-            $lines = $feedLines;
-            if (trim($geoContent) !== '') {
-                $lines[] = trim($geoContent);
-            }
-            $content = implode("\n", $lines)."\n";
-
-            // The plain-write fallback is checked too: a silent failure here
-            // would leave the old elements in place while callers report success.
-            if (@file_put_contents($pendingFile, $content) === false) {
-                Log::error('Threat feed compile failed: the pending blocklist file is not writable.');
-
-                return false;
-            }
-
-            return true;
+            return false;
         }
 
         try {
-            flock($handle, LOCK_EX);
+            flock($lockHandle, LOCK_EX);
 
-            // Snapshot any pending geo elements under the exclusive lock.
-            // If geo_blocking.nft.pending exists, use its atomic snapshot;
-            // otherwise, preserve any geo elements already merged in the stream.
-            $geoContent = '';
-            if (is_file($geoPending)) {
-                $geoContent = @file_get_contents($geoPending) ?: '';
-            } else {
-                $existing = stream_get_contents($handle);
-                if ($existing !== false && ($pos = strpos($existing, '# TallPBX Geo-Blocking kernel elements')) !== false) {
-                    $geoContent = substr($existing, $pos);
+            // Write under the exclusive lock, falling back to a plain write
+            // only when the pending file cannot be opened at all.
+            $handle = @fopen($pendingFile, 'c+');
+            if ($handle === false) {
+                $geoContent = '';
+                if (is_file($geoPending)) {
+                    $geoContent = @file_get_contents($geoPending) ?: '';
+                } elseif (is_file($pendingFile)) {
+                    $existing = @file_get_contents($pendingFile) ?: '';
+                    if (($pos = strpos($existing, '# TallPBX Geo-Blocking kernel elements')) !== false) {
+                        $geoContent = substr($existing, $pos);
+                    }
                 }
+
+                $lines = $feedLines;
+                if (trim($geoContent) !== '') {
+                    $lines[] = trim($geoContent);
+                }
+                $content = implode("\n", $lines)."\n";
+
+                // The plain-write fallback is checked too: a silent failure here
+                // would leave the old elements in place while callers report success.
+                if (@file_put_contents($pendingFile, $content) === false) {
+                    Log::error('Threat feed compile failed: the pending blocklist file is not writable.');
+
+                    return false;
+                }
+
+                return true;
             }
 
-            $lines = $feedLines;
-            if (trim($geoContent) !== '') {
-                $lines[] = trim($geoContent);
+            try {
+                // Snapshot any pending geo elements under the exclusive lock.
+                // If geo_blocking.nft.pending exists, use its atomic snapshot;
+                // otherwise, preserve any geo elements already merged in the stream.
+                $geoContent = '';
+                if (is_file($geoPending)) {
+                    $geoContent = @file_get_contents($geoPending) ?: '';
+                } else {
+                    $existing = stream_get_contents($handle);
+                    if ($existing !== false && ($pos = strpos($existing, '# TallPBX Geo-Blocking kernel elements')) !== false) {
+                        $geoContent = substr($existing, $pos);
+                    }
+                }
+
+                $lines = $feedLines;
+                if (trim($geoContent) !== '') {
+                    $lines[] = trim($geoContent);
+                }
+                $content = implode("\n", $lines)."\n";
+
+                ftruncate($handle, 0);
+                rewind($handle);
+                $written = fwrite($handle, $content);
+                $flushed = fflush($handle);
+
+                if ($written === false || $flushed === false) {
+                    Log::error('Threat feed compile failed: the pending blocklist file write failed.');
+
+                    return false;
+                }
+
+                return true;
+            } finally {
+                fclose($handle);
             }
-            $content = implode("\n", $lines)."\n";
-
-            ftruncate($handle, 0);
-            rewind($handle);
-            $written = fwrite($handle, $content);
-            $flushed = fflush($handle);
-
-            if ($written === false || $flushed === false) {
-                Log::error('Threat feed compile failed: the pending blocklist file write failed.');
-
-                return false;
-            }
-
-            return true;
         } finally {
-            fclose($handle); // closing the handle releases the lock
+            fclose($lockHandle); // closing the lock handle releases the shared lock
         }
     }
 
