@@ -31,7 +31,7 @@
 | 1.1.1 | Extract `FirewallApplier` domain service | Verified | 2026-10-17 |
 | 1.1.2 | Lazy `#[Computed]` properties for cockpit tabs | Verified | 2026-10-17 |
 | 1.1.3 | Geo-blocking cache freshness TTL & interval scheduling | Verified | 2026-10-17 |
-| 1.1.4 | Whitelist dual-family completeness & fatal error tracking (Audit H-1 & M-1) | Pending | 2026-10-18 |
+| 1.1.4 | Whitelist dual-family completeness & fatal error tracking (Audit H-1 & M-1) | Verified | 2026-10-18 |
 | 1.2.1 | Decompose `SecurityConfigGenerator` | Verified | 2026-10-17 |
 | 1.3.1 | Reorganize `src/Services/` into sub-domain namespaces | Verified | 2026-10-17 |
 | 1.3.2 | Realign domain trait boundaries | Verified | 2026-10-17 |
@@ -114,12 +114,12 @@
   - Implemented atomic per-family zone file writes, rejecting zero-byte or whitespace-only caches.
 - **Verification**: Verified via unit and feature tests in `e97c397f` asserting freshness TTL evaluation, `--force` overrides, and interval scheduling compliance.
 
-#### Task 1.1.4: Whitelist Dual-Family Completeness & Fatal Error Tracking (Audit H-1 & M-1)
+#### Task 1.1.4: Whitelist Dual-Family Completeness & Fatal Error Tracking (Audit H-1 & M-1) [COMPLETED]
 - **Problem**: In `GeoBlockingService::sync()`, if one address family (e.g. IPv6) fails to download while IPv4 succeeds, `$countryHasEntries` is set to `true` by the IPv4 zone file, so no error is collected in `$errors`. When in `whitelist` mode, `$hasFatalErrors` evaluates to `false` and the sync reports `success` while stage 9.5 compiles an incomplete IPv6 perimeter (`geo_allowed_ips6`), silently dropping legitimate users (Audit H-1). Furthermore, `$hasFatalErrors` tests `in_array('Failed to write zone cache for country: '.$cc, $errors, true)` where `$cc` is the loop variable from `foreach ($countries as $countryCode)`; after the loop ends, `$cc` retains only the *last* country in the array, meaning cache-write failures on earlier countries report `success` with missing zones (Audit M-1).
 - **Implementation**:
   - In `GeoBlockingService::sync()`, enforce per-country dual-family completeness in `whitelist` mode: any country missing valid entries for either required family must push a descriptive error and trigger `$hasFatalErrors`.
   - Replace loop-variable string matching (`$cc`) with a typed failure flag (e.g. `$cacheWriteFailed`) or per-country failure map ensuring write failures on *any* country are fatal.
-- **Verification**: Pest unit tests asserting fail-closed refusal when a whitelist country has one missing family (e.g. IPv6 missing while IPv4 succeeds) and asserting fatal failure when the first of multiple countries fails a cache write.
+- **Verification**: Pest unit tests asserting fail-closed refusal when a whitelist country has one missing family (e.g. IPv6 missing while IPv4 succeeds) and asserting fatal failure when the first of multiple countries fails a cache write. Recorded in commit `5a45048c`.
 
 ---
 
@@ -413,6 +413,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `5a45048c` | **Security / Geo** | **Whitelist Dual-Family Completeness & Fatal Error Tracking**: Enforced per-country dual-family completeness in whitelist geo-blocking mode (`GeoBlockingService::sync()`), refusing to arm partial perimeters when either IPv4 or IPv6 is missing or incomplete, preventing silent drops of legitimate whitelisted users at stage 9.5. Replaced post-loop string matching on leaked `$cc` variable with typed `$cacheWriteFailed` flag so cache write failures on any country trigger fatal failure. Added targeted RED-proof unit tests. *(Resolves Task 1.1.4 / Re-Audit H-1 & M-1)* |
 | **2026-10-18** | `54e76ed2` | **Architecture / Documentation** | **Environment Variable Reference Documentation**: Authored comprehensive reference guide `docs/env-reference.md` cataloging 242 environment variables across 15 domain sections (FreeSWITCH, ESL, Sofia, XML handler caching, Redis cluster, Reverb WebSockets, S3 storage, queues, session security, mail transports, phone auto-provisioning, updater, and production sizing presets). Documented types, defaults, configuration mapping, security notes, and operational best practices. *(Resolves Task 4.7 / Arch Audit L5; Stream 4 100% complete)* |
 | **2026-10-18** | `abd04917` | **Architecture / Modular** | **Large Shared-Kernel Classes Architectural Evaluation**: Re-evaluated `GitUpdateService`, `ModuleLifecycleService`, and `FreeSwitchService` against domain and logical boundary principles. Retained cohesive single-domain orchestrators unified rather than introducing artificial micro-class indirection without reuse value, validated by comprehensive test suites (77 tests, 239 assertions). *(Resolves Task 4.6 / Arch Audit M1 & L7)* |
 | **2026-10-18** | `6e924a47` | **Architecture / Modular** | **Decouple `TenantContext` Read Queries from Mutation Side Effects**: Refactored `TenantContext` into pure read query `resolve(?User $user = null): ?Tenant` and explicit state mutation `apply(?Tenant $tenant): void`. Decoupled `current()` to read without global mutations, and updated `ScopeTenant` and `EnforcePanelLivewireActionPermissions` middleware to resolve and verify access before applying scope. *(Resolves Task 4.5 / Arch Audit L3)* |
