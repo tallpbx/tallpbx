@@ -74,6 +74,11 @@ NFT_BIN="${TALLPBX_NFT_BIN:-/usr/sbin/nft}"
 # env_reset prevents this variable from affecting production invocations.
 CONNTRACK_BIN="${TALLPBX_CONNTRACK_BIN:-/usr/sbin/conntrack}"
 
+# Path to the flock binary. Defaults to system binary. Automated tests point
+# TALLPBX_FLOCK_BIN at a stub binary in a temporary directory; sudo's
+# env_reset prevents this variable from affecting production invocations.
+FLOCK_BIN="${TALLPBX_FLOCK_BIN:-/usr/bin/flock}"
+
 # Helper function to validate IP addresses
 validate_ip() {
     local ip="$1"
@@ -351,14 +356,25 @@ case "$ACTION" in
 
         # Preflight the set-element statements before promoting anything, so
         # a malformed compile never replaces the last good feed file.
-        "$NFT_BIN" -c -f "$PENDING_FEED_FILE"
-
-        # Promote atomically, then load. The flush and add-element statements
-        # travel in one file, so the kernel sees one transaction.
-        mv "$PENDING_FEED_FILE" "$ACTIVE_FEED_FILE"
-        chown root:www-data "$ACTIVE_FEED_FILE" 2>/dev/null || true
-        chmod 0640 "$ACTIVE_FEED_FILE" 2>/dev/null || true
-        "$NFT_BIN" -f "$ACTIVE_FEED_FILE"
+        # Acquire an exclusive flock on the pending feed file during preflight
+        # check, promotion, and load so a concurrent PHP writer cannot interleave
+        # mid-rewrite.
+        if [ -x "$FLOCK_BIN" ]; then
+            (
+                "$FLOCK_BIN" -x 200
+                "$NFT_BIN" -c -f "$PENDING_FEED_FILE"
+                mv "$PENDING_FEED_FILE" "$ACTIVE_FEED_FILE"
+                chown root:www-data "$ACTIVE_FEED_FILE" 2>/dev/null || true
+                chmod 0640 "$ACTIVE_FEED_FILE" 2>/dev/null || true
+                "$NFT_BIN" -f "$ACTIVE_FEED_FILE"
+            ) 200<"$PENDING_FEED_FILE"
+        else
+            "$NFT_BIN" -c -f "$PENDING_FEED_FILE"
+            mv "$PENDING_FEED_FILE" "$ACTIVE_FEED_FILE"
+            chown root:www-data "$ACTIVE_FEED_FILE" 2>/dev/null || true
+            chmod 0640 "$ACTIVE_FEED_FILE" 2>/dev/null || true
+            "$NFT_BIN" -f "$ACTIVE_FEED_FILE"
+        fi
         echo "SUCCESS: External blocklist elements loaded"
         ;;
 

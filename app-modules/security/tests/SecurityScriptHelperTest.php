@@ -317,6 +317,114 @@ it('update-external-blocklist ignores any path argument and only reads the canon
     }
 });
 
+it('locks the pending external blocklist file exclusively with flock during promote', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_flock_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $flockStub = $stubDir.'/flock';
+    file_put_contents($flockStub, "#!/bin/bash\necho \"FLOCK: \$*\"\nexit 0\n");
+    chmod($flockStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_flock_test_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    file_put_contents($isolatedDir.'/external_blocklist.nft.pending', "# feed elements\n");
+
+    try {
+        $process = new Process(
+            ['bash', $scriptPath, 'update-external-blocklist'],
+            null,
+            [
+                'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+                'TALLPBX_NFT_BIN' => $nftStub,
+                'TALLPBX_FLOCK_BIN' => $flockStub,
+            ],
+        );
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toContain('FLOCK: -x 200')
+            ->and($process->getOutput())->toContain("NFT: -c -f {$isolatedDir}/external_blocklist.nft.pending")
+            ->and($process->getOutput())->toContain("NFT: -f {$isolatedDir}/external_blocklist.nft")
+            ->and(file_exists($isolatedDir.'/external_blocklist.nft'))->toBeTrue()
+            ->and(file_exists($isolatedDir.'/external_blocklist.nft.pending'))->toBeFalse();
+    } finally {
+        @unlink($isolatedDir.'/external_blocklist.nft');
+        @unlink($isolatedDir.'/external_blocklist.nft.pending');
+        @rmdir($isolatedDir);
+        @unlink($flockStub);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
+it('blocks update-external-blocklist helper while PHP holds exclusive lock on pending file', function (): void {
+    $scriptPath = base_path('scripts/resources/tallpbx-security');
+
+    $stubDir = sys_get_temp_dir().'/tallpbx_nft_stub_'.uniqid();
+    mkdir($stubDir, 0700, true);
+    $nftStub = $stubDir.'/nft';
+    file_put_contents($nftStub, "#!/bin/bash\necho \"NFT: \$*\"\nexit 0\n");
+    chmod($nftStub, 0755);
+
+    $isolatedDir = sys_get_temp_dir().'/tallpbx_feed_lock_concurrency_'.uniqid();
+    mkdir($isolatedDir, 0700, true);
+    $pendingFile = $isolatedDir.'/external_blocklist.nft.pending';
+    file_put_contents($pendingFile, "# initial content\n");
+
+    // Acquire LOCK_EX in PHP process
+    $handle = fopen($pendingFile, 'c+');
+    expect($handle)->not->toBeFalse();
+    flock($handle, LOCK_EX);
+
+    $process = new Process(
+        ['bash', $scriptPath, 'update-external-blocklist'],
+        null,
+        [
+            'TALLPBX_FIREWALL_CONF_DIR' => $isolatedDir,
+            'TALLPBX_NFT_BIN' => $nftStub,
+        ],
+    );
+
+    try {
+        $process->start();
+
+        // Give helper process time to attempt running and block on flock
+        usleep(100000); // 100ms
+        expect($process->isRunning())->toBeTrue();
+        expect(file_exists($pendingFile))->toBeTrue();
+        expect(file_exists($isolatedDir.'/external_blocklist.nft'))->toBeFalse();
+
+        // Release the lock in PHP
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        $handle = null;
+
+        // Process should now complete promotion
+        $process->wait();
+        expect($process->getExitCode())->toBe(0)
+            ->and(file_exists($isolatedDir.'/external_blocklist.nft'))->toBeTrue()
+            ->and(file_exists($pendingFile))->toBeFalse();
+    } finally {
+        if (is_resource($handle)) {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+        if ($process->isRunning()) {
+            $process->stop();
+        }
+        @unlink($isolatedDir.'/external_blocklist.nft');
+        @unlink($pendingFile);
+        @rmdir($isolatedDir);
+        @unlink($nftStub);
+        @rmdir($stubDir);
+    }
+});
+
 it('reloads the last good external blocklist file after successful apply when referenced', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 
