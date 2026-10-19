@@ -26,12 +26,18 @@ use Modules\Security\Services\Bans\SecurityIncidentService;
  */
 beforeEach(function (): void {
     $this->seed(SecurityServiceSeeder::class);
+    SecurityBan::query()->delete();
 
     // Flush test redis keys if available
     try {
+        $prefix = (string) config('database.redis.options.prefix', '');
         $keys = Redis::keys('tallpbx:security:attempts:*');
         if (! empty($keys)) {
-            Redis::del($keys);
+            $unprefixed = array_map(
+                fn (string $k): string => str_starts_with($k, $prefix) ? substr($k, strlen($prefix)) : $k,
+                $keys
+            );
+            Redis::del($unprefixed);
         }
     } catch (\Throwable) {
         // Ignore in environments without live Redis
@@ -375,7 +381,7 @@ it('handles a flood of failed attempts across hundreds of distinct IPs without l
 
     // Simulate 100 distinct attacking IPs each with 2 failures (under threshold: counter stays in Redis)
     for ($i = 1; $i <= 100; $i++) {
-        $ip = "192.0.2.{$i}";
+        $ip = "192.0.200.{$i}";
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 1');
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 2');
         expect($banService->isBanned($ip))->toBeFalse();
@@ -383,7 +389,7 @@ it('handles a flood of failed attempts across hundreds of distinct IPs without l
 
     // Simulate 20 distinct IPs that reach threshold and get banned (purged from Redis, stored in DB)
     for ($i = 101; $i <= 120; $i++) {
-        $ip = "192.0.2.{$i}";
+        $ip = "192.0.200.{$i}";
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 1');
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 2');
         $incidentService->recordFailure($ip, 'sip_auth', 'Failed attempt 3');
@@ -394,12 +400,17 @@ it('handles a flood of failed attempts across hundreds of distinct IPs without l
     expect(SecurityBan::active()->where('vector', 'sip_auth')->count())->toBe(20);
 
     // Ensure banned IPs had their Redis attempt keys purged
-    for ($i = 101; $i <= 120; $i++) {
-        $key = "tallpbx:security:attempts:sip_auth:192.0.2.{$i}";
-        try {
+    $redisAvailable = true;
+    try {
+        Redis::ping();
+    } catch (\Throwable) {
+        $redisAvailable = false;
+    }
+
+    if ($redisAvailable) {
+        for ($i = 101; $i <= 120; $i++) {
+            $key = "tallpbx:security:attempts:sip_auth:192.0.200.{$i}";
             expect(Redis::get($key))->toBeNull();
-        } catch (\Throwable) {
-            // Live Redis not present in mock test env
         }
     }
 });

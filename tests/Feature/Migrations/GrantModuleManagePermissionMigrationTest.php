@@ -6,6 +6,7 @@ namespace Tests\Feature\Migrations;
 
 use App\Models\Group;
 use App\Models\Permission;
+use App\Models\Tenant;
 
 test('grant module manage permission migration idempotently attaches permission to admin groups', function (): void {
     $superAdminGroup = Group::firstOrCreate(
@@ -18,6 +19,13 @@ test('grant module manage permission migration idempotently attaches permission 
         ['description' => 'Admin access.']
     );
 
+    $tenant = Tenant::factory()->create();
+    $tenantGroup = Group::create([
+        'name' => 'Administrators',
+        'tenant_id' => $tenant->id,
+        'description' => 'Tenant-scoped admin group.',
+    ]);
+
     $migration = require database_path('migrations/2026_10_18_000002_grant_module_manage_permission_to_super_admins.php');
 
     // Run migration
@@ -28,7 +36,8 @@ test('grant module manage permission migration idempotently attaches permission 
         ->and($permission->module)->toBe('admin');
 
     expect($superAdminGroup->fresh()->permissions->contains('id', $permission->id))->toBeTrue()
-        ->and($adminGroup->fresh()->permissions->contains('id', $permission->id))->toBeTrue();
+        ->and($adminGroup->fresh()->permissions->contains('id', $permission->id))->toBeTrue()
+        ->and($tenantGroup->fresh()->permissions->contains('id', $permission->id))->toBeFalse();
 
     // Idempotency: second run does not duplicate or fail
     $migration->up();

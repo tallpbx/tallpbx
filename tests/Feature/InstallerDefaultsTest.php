@@ -754,6 +754,7 @@ it('installs the queue worker and scheduler units so jobs and sweeps run', funct
         ->and($tallScript)->toContain('systemctl enable tallpbx-queue')
         ->and($tallScript)->toContain('systemctl enable tallpbx-scheduler')
         ->and($queueUnit)->toContain('queue:work')
+        ->and($queueUnit)->toContain('--queue=freeswitch-events,default')
         ->and($queueUnit)->toContain('/var/lib/tallpbx/backups')
         ->and($queueUnit)->toContain('/var/lib/tallpbx/restore-requests')
         ->and($schedulerUnit)->toContain('schedule:work');
@@ -1026,7 +1027,7 @@ it('auto-configures PHP-FPM static worker pools based on host memory', function 
         ->and($phpScript)->toContain('target_pm="static"')
         ->and($phpScript)->toContain('target_max_children=12')
         ->and($phpScript)->toContain('target_max_children=6')
-        ->and($phpScript)->toContain('target_pm="dynamic"')
+        ->and($phpScript)->toContain('target_max_children=5')
         ->and($phpScript)->toContain('pm = $target_pm')
         ->and($phpScript)->toContain('pm.max_children = $target_max_children');
 });

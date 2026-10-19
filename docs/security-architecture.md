@@ -259,6 +259,7 @@ Pinned directly above the tab strip for immediate visibility:
   - **Custom Signatures**: Add custom user-agent string matches.
 * **Detected Attack Probes (Unblocked)**: Review unblocked or monitored probes without disrupting active calls, with 1-click manual IP banning.
 * **Incident History & Audit Trail**: Real-time log of security events and threshold triggers.
+* **Queue Worker Requirement**: Security incident listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`) run asynchronously via Laravel queued events (`ShouldQueue`) routed to `FS_ESL_QUEUE_NAME`. The host background worker (`tallpbx-queue`) must remain running (`systemctl status tallpbx-queue`) with active listeners on `--queue=freeswitch-events,default` to guarantee that detected attack thresholds trigger automated kernel bans (`@banned_ips` and `@banned_ips6`).
 
 #### Tab 4: External Blocklists (`?tab=blocklists` or `?tab=feeds`)
 * **Public Threat Feeds (VoIPBL)**: Automated ingestion of public blocklists identifying active VoIP fraud and brute-force scanning networks.
@@ -269,7 +270,7 @@ Pinned directly above the tab strip for immediate visibility:
 * **Dedicated Geo-Filter Workbench**: Country-level perimeter defense covering the complete catalog of 249 ISO 3166-1 alpha-2 countries and territories, backed by pre-aggregated IPv4 and IPv6 zone data from IPdeny (with automatic fallback to the community GitHub RIR mirror).
 * **Dual Filtering Modes**:
   - **Block Selected Countries (`blacklist`)**: Selectively drops traffic originating from specific high-risk jurisdictions.
-  - **Block All Except Selected (`whitelist`)**: Strict allow-list perimeter dropping all traffic outside your operating countries. Protected by fail-closed guards that prevent arming an empty allow-set if zone downloads fail.
+  - **Block All Except Selected (`whitelist`)**: Strict allow-list perimeter dropping all traffic outside your operating countries. Protected by fail-closed completeness guards requiring valid IPv4 and IPv6 zone data for every selected country; if an upstream country has zero published IPv6 ranges or fails to download, the whitelist refuses to arm to prevent perimeter bypass or unintended lockout.
 * **Automatic Scheduled Synchronization**: Pre-aggregated country zone files are cached locally in `/etc/tallpbx/geoip/` and automatically refreshed weekly via the scheduler (`php artisan security:sync-geoip`), or on demand via `php artisan security:sync-geoip --force`.
 * **Zero-Lockout Concurrency**: Set compilations merge atomically into the shared kernel set-element pipeline under exclusive file locks (`flock(LOCK_EX)`), preventing race conditions with concurrent threat-feed syncs.
 * **Operational Telemetry & CLI Inspection**: Live packet drop counter anchored to kernel rule counters, and a 1-click CLI hint for terminal inspection (`sudo nft list set inet tallpbx_filter geo_blocked_ips`).

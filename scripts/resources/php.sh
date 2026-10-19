@@ -113,7 +113,7 @@ systemctl restart redis-server
 # dynamic worker creation introduces 200–500ms of fork latency when burst calls arrive,
 # causing call setup delays and potential FreeSWITCH mod_xml_curl timeouts. Furthermore,
 # background XML routing queries can starve web administration requests.
-# With at least 2GB swap guaranteed as a safety buffer, 5 static workers consume only
+# With the documented 2GB swap baseline configured as a safety buffer, 5 static workers consume only
 # ~250MB total RAM, fitting comfortably within 1GB physical RAM (~825MB total system footprint)
 # while guaranteeing instant, sub-millisecond response times.
 configure_php_fpm_pool() {

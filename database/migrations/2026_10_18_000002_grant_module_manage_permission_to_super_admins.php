@@ -26,7 +26,9 @@ return new class extends Migration
             ]
         );
 
-        $groups = Group::whereIn('name', ['Super Administrators', 'Administrators'])->get();
+        $groups = Group::whereIn('name', ['Super Administrators', 'Administrators'])
+            ->whereNull('tenant_id')
+            ->get();
 
         foreach ($groups as $group) {
             if (! $group->permissions()->where('permissions.id', $permission->id)->exists()) {

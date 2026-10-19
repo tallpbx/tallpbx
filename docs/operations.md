@@ -292,6 +292,13 @@ cd /var/www/tallpbx
 php artisan optimize:clear && php artisan optimize
 ```
 
+### Redis Memory Limit & Eviction Policy
+
+Redis is configured with a universal 256MB memory cap (`maxmemory 256mb`) and volatile-LRU eviction policy (`maxmemory-policy volatile-lru`) in `/etc/redis/redis.conf`. This ceiling accommodates caching, session storage, and security sliding-window counters with automatic eviction of expired keys when memory is constrained.
+
+> [!NOTE]
+> Because `volatile-lru` only evicts keys with an explicit TTL, all application cache keys, rate-limiter entries, and session records have bounded expirations. If `QUEUE_CONNECTION` is switched to `redis`, queue job lists do not carry a TTL and are protected from eviction, but operators should ensure worker throughput keeps queue depth within available Redis memory.
+
 ## Outgoing Mail & Notifications (Email Connector)
 
 TallPBX delivers all transactional emails (password resets, voicemail-to-email
@@ -311,19 +318,23 @@ Use the in-panel **Send Test Email** button after saving credentials to verify
 connectivity.
 
 ### 2. Queue Worker Service
-Outgoing emails are dispatched to the `tallpbx-queue` systemd service so web
-requests remain fast. Ensure the service is active:
+Outgoing emails, asynchronous telephony event recording, and security incident listeners (such as failed SIP authentication and scanner auto-bans) are dispatched to the `tallpbx-queue` systemd service so web requests and Event Socket loops remain non-blocking.
+
+Ensure the service is active:
 
 ```bash
 systemctl status tallpbx-queue
 ```
 
-If emails fail to send or queue up, inspect failed jobs with Artisan:
+> [!IMPORTANT]
+> The `tallpbx-queue` service listens on `--queue=freeswitch-events,default`. Intrusion detection event listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`) and media persistence listeners depend on an active worker to enact kernel firewall bans and database settlements. If the worker is stopped, security bans will not be applied to `nftables`.
+
+If jobs fail or queue up, inspect failed jobs with Artisan:
 
 ```bash
 cd /var/www/tallpbx
-php artisan queue:failed            # view failed mail jobs and error traces
-php artisan queue:retry all         # retry failed jobs after fixing credentials
+php artisan queue:failed            # view failed jobs and error traces
+php artisan queue:retry all         # retry failed jobs after fixing underlying issues
 ```
 
 ---

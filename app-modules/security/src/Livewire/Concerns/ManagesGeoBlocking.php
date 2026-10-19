@@ -156,6 +156,13 @@ trait ManagesGeoBlocking
             $rule->countries = is_array($previousCountries) ? $previousCountries : [];
             $rule->save();
             $this->geoEnabled = $previousEnabled;
+
+            if ($previousEnabled) {
+                app(GeoBlockingService::class)->sync($rule);
+            } else {
+                app(GeoBlockingService::class)->clear();
+            }
+
             $this->loadGeoState();
 
             return;

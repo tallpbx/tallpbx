@@ -19,7 +19,7 @@ beforeEach(function () {
     $permissionService = app(PermissionService::class);
     foreach ($permissionService->all() as $name) {
         $module = explode('.', $name)[0] ?? 'admin';
-        $perm = Permission::factory()->create(['name' => $name, 'module' => $module]);
+        $perm = Permission::firstOrCreate(['name' => $name], ['module' => $module]);
         $group->permissions()->attach($perm);
     }
     $this->admin->groups()->syncWithoutDetaching([$group->id]);

@@ -7,13 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.6] - 2026-10-18
+
 ### Added
 - **Redis Memory Cap & Volatile LRU Eviction**: Added idempotent configuration in `scripts/resources/php.sh` enforcing `maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`. Binds Redis to a predictable 256MB ceiling across all server sizes, ensuring that volatile cache and intrusion sliding-window keys are safely evicted under high-volume brute-force attacks without dropping writes or threatening system memory.
 - **Dialplan Load Test Redis Telemetry**: Added Redis memory metrics (`used_memory_human`, `maxmemory_human`, `maxmemory_policy`, `evicted_keys`) to the console summary table and JSON export of `php artisan pbx:load-test:dialplan`, giving administrators real-time visibility into cache saturation and eviction activity during benchmark runs.
 - **Total Active Bans Counter & UI Pagination Boundary**: Added `totalActiveBans()` computed property and a recent ban notice to the Security Center Attackers tab (`/panel/security?tab=attackers`), bounding rendered active ban collections to the 100 most recent items while reflecting accurate total active bans in the header badge.
 
 ### Changed
-- **PHP-FPM Static Worker Pool Sizing Baseline**: Configured PHP-FPM to use `pm = static` with `5` pre-forked workers for minimal 1GB systems (replacing Debian's default dynamic mode with 2 start / 1 min workers) backed by the installer's mandatory 2GB swap file. Eliminates 200–500ms process-fork latency during burst call arrivals on the critical FreeSWITCH `mod_xml_curl` routing hotpath, preventing call setup stalls and SIP 503 errors while maintaining a lean ~250MB memory footprint.
+- **PHP-FPM Static Worker Pool Sizing Baseline**: Configured PHP-FPM to use `pm = static` with `5` pre-forked workers for minimal 1GB systems (replacing Debian's default dynamic mode with 2 start / 1 min workers) backed by the documented 2GB swap baseline requirement (see `INSTALL.md`). Eliminates 200–500ms process-fork latency during burst call arrivals on the critical FreeSWITCH `mod_xml_curl` routing hotpath, preventing call setup stalls and SIP 503 errors while maintaining a lean ~250MB memory footprint.
+- **Queue Worker FreeSWITCH Events Channel**: Configured `scripts/tallpbx-queue.service` to process `--queue=freeswitch-events,default`, guaranteeing that background telephony and intrusion event listeners are processed concurrently with the default application queue.
+
+### Fixed
+- **Module Management Permission Scoping & Upgrade Migration**: Scoped `2026_10_18_000002_grant_module_manage_permission_to_super_admins.php` with `whereNull('tenant_id')` to safeguard multi-tenant isolation, and switched test permission seeding to `firstOrCreate` to avoid duplicate constraint errors.
+- **Geo-Blocking Failure State Rollback**: Updated `ManagesGeoBlocking::setGeoEnabled()` to restore previous kernel set state via `GeoBlockingService` when firewall rule compilation fails.
+- **Redis Inter-Test Key Flushing**: Stripped database connection prefixes before calling `Redis::del()` during test setup and isolated test subnets in `SecurityBanServiceTest`.
 
 ### Security
 - **Asynchronous Intrusion Incident Broadcasting**: Migrated `SecurityIncidentLogged` from synchronous `ShouldBroadcastNow` to asynchronous queued `ShouldBroadcast`, ensuring that real-time intrusion events generated during high-concurrency attack floods are queued over Redis without monopolizing or blocking PHP-FPM web workers with WebSocket socket handshakes.

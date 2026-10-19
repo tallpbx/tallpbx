@@ -9,7 +9,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/tallpbx
-ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3
+ExecStart=/usr/bin/php artisan queue:work --queue=freeswitch-events,default --sleep=3 --tries=3
 
 # Restart policy: always restart on failure, with a 5-second delay
 Restart=always

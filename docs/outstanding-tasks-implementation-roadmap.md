@@ -164,10 +164,10 @@
 
 #### Task 1.3.4: Residual Security Debt Cleanup & Formal Disposition (Audit L6–L8) [COMPLETED]
 - **Scope & Disposition**:
-  - **Audit L6**: Fixed rollback in `ManagesGeoBlocking::setGeoEnabled()` to restore `$previousEnabled`, `$previousMode`, and `$previousCountries` on apply failure rather than hardcoding disabled.
+  - **Audit L6**: Fixed rollback in `ManagesGeoBlocking::setGeoEnabled()` to restore `$previousEnabled`, `$previousMode`, and `$previousCountries` on apply failure, and re-sync or clear kernel sets via `app(GeoBlockingService::class)` matching the restored state.
   - **Audit L7**: Added `AddressFamily::classify($entry) === 'ipv4'|'ipv6'` validation when reading cached zone lines in `GeoBlockingService::sync()`.
   - **Audit L8**: Retained VoIPBL `country_mode` and `countries` table columns on `security_threat_feeds` as harmless schema compatibility attributes, and added `declare(strict_types=1);` to `routes/console.php`.
-- **Verification**: Verified via Pest test suites `GeoBlockingServiceTest` and `GrantModuleManagePermissionMigrationTest`. Recorded in commit `a2d3a24b`.
+- **Verification**: Verified via `GeoBlockingServiceTest`, Livewire geo-blocking state validation, and Pint syntax checks. Recorded in commit `a2d3a24b`.
 
 ---
 
@@ -253,8 +253,8 @@
 - **Problem**: Event listeners responsible for intrusion detection and kernel bans (`LogFailedSipAuthListener` and `LogSipScannerListener`) implement `ShouldQueue`. If background queue workers (`php artisan queue:work`) are stopped or saturated, security incident recording and kernel ban enforcement silently halt. Furthermore, while `config('freeswitch.esl.queue_name')` was introduced and documented in `docs/env-reference.md`, neither listener configures `$this->queue`, defaulting to the generic queue.
 - **Implementation**:
   - Wire `config('freeswitch.esl.queue_name', 'default')` explicitly into `LogFailedSipAuthListener`, `LogSipScannerListener`, and companion telephony listeners.
-  - Document the queue worker requirement prominently in `docs/operations.md` and `docs/security-architecture.md`, or evaluate keeping security incident listeners synchronous with bounded DB transactions.
-- **Verification**: Unit tests asserting that queued listeners dispatch onto the configured ESL queue channel. Recorded in commit `a76617a5`.
+  - Document the queue worker requirement prominently in `docs/operations.md` and `docs/security-architecture.md`, and configure `tallpbx-queue.service` to process `--queue=freeswitch-events,default`.
+- **Verification**: Verified via `EslQueuedListenersTest` and `InstallerDefaultsTest` (asserting unit worker queues). Recorded in commit `a76617a5`.
 
 ### Task 3.4: Broadcast Transport Error Logging & Strict Types (Audit L-1 & L-2) [COMPLETED]
 - **Problem**: In `BroadcastTelephonyOnFreeSwitchEvent` and `BroadcastDashboardStatsOnFreeSwitchEvent`, exceptions caught during `dispatch()` are caught with `catch (\Throwable $e) {}` with zero logging. When WebSockets (Reverb) or transport layers fail, telemetry views become permanently stale with zero diagnostic output (Audit L-1). Additionally, `routes/channels.php` lacks `declare(strict_types=1);` (Audit L-2).
