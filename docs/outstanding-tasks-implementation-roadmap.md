@@ -61,7 +61,7 @@
 | 5.5 | Reverse lockout protection for armed whitelist geo-perimeter | Verified | 2026-10-17 |
 | 5.6 | Module management and custom extension lifecycle authorization | Verified | 2026-10-17 |
 | 5.7 | Atomic inter-process lock protocol for PHP pending firewall sets | Verified | 2026-10-17 |
-| 5.8 | Root helper atomic flock promote protocol for external blocklists (Audit M-2) | Pending | 2026-10-18 |
+| 5.8 | Root helper atomic flock promote protocol for external blocklists (Audit M-2) | Verified | 2026-10-18 |
 
 ---
 
@@ -400,12 +400,12 @@
   - Removed dead fallback branches for obsolete separate `.nft` files.
 - **Verification**: Verified via concurrency test in `abc9e8f9` verifying that pending geo elements are preserved when threat feeds compile under simulated interleaved writes.
 
-### Task 5.8: Root Helper Atomic Flock Promote Protocol for External Blocklists (Audit M-2)
+### Task 5.8: Root Helper Atomic Flock Promote Protocol for External Blocklists (Audit M-2) [COMPLETED]
 - **Problem**: The root helper `/usr/local/sbin/tallpbx-security` (`update-external-blocklist`) executes `"$NFT_BIN" -c -f "$PENDING_FEED_FILE"`, `mv "$PENDING_FEED_FILE" "$ACTIVE_FEED_FILE"`, and `"$NFT_BIN" -f "$ACTIVE_FEED_FILE"` without taking an exclusive file lock (`flock`). A concurrent PHP writer updating threat feeds or geo sets can interleave between preflight syntax verification and promotion, creating an inter-process race condition where incomplete files are moved or parsed.
 - **Implementation**:
   - Wrap the `mv` and `nft -f` promotion inside `flock -x` targeting the shared lock descriptor (or lock file synchronized with PHP writers).
   - Validate non-interactive shell script syntax with `bash -n scripts/resources/tallpbx-security`.
-- **Verification**: Concurrency test asserting that pending-to-active promotion in `tallpbx-security` cannot interleave with active PHP writers.
+- **Verification**: Concurrency test asserting that pending-to-active promotion in `tallpbx-security` cannot interleave with active PHP writers. Recorded in commit `d8c2a25f`.
 
 ---
 
@@ -413,6 +413,7 @@
 
 All items below have been implemented, verified through automated Pest test suites, and committed to branch `4.x`. Rows are appended in the same commit that closes a task (see the close-out rule in the Task Status Index):
 
+| **2026-10-18** | `d8c2a25f` | **Security / Firewall** | **Root Helper Atomic Flock Promote Protocol for External Blocklists**: Wrapped syntax verification, pending-to-active file promotion (`mv`), permissions assignment, and kernel load in `scripts/resources/tallpbx-security` inside an exclusive flock subshell (`flock -x 200`), eliminating the race condition where concurrent PHP threat-feed or geo-blocking writers could interleave during promotion. Validated with non-interactive shell check and automated unit and inter-process lock concurrency tests. *(Resolves Task 5.8 / Re-Audit M-2)* |
 | **2026-10-18** | `5a45048c` | **Security / Geo** | **Whitelist Dual-Family Completeness & Fatal Error Tracking**: Enforced per-country dual-family completeness in whitelist geo-blocking mode (`GeoBlockingService::sync()`), refusing to arm partial perimeters when either IPv4 or IPv6 is missing or incomplete, preventing silent drops of legitimate whitelisted users at stage 9.5. Replaced post-loop string matching on leaked `$cc` variable with typed `$cacheWriteFailed` flag so cache write failures on any country trigger fatal failure. Added targeted RED-proof unit tests. *(Resolves Task 1.1.4 / Re-Audit H-1 & M-1)* |
 | **2026-10-18** | `54e76ed2` | **Architecture / Documentation** | **Environment Variable Reference Documentation**: Authored comprehensive reference guide `docs/env-reference.md` cataloging 242 environment variables across 15 domain sections (FreeSWITCH, ESL, Sofia, XML handler caching, Redis cluster, Reverb WebSockets, S3 storage, queues, session security, mail transports, phone auto-provisioning, updater, and production sizing presets). Documented types, defaults, configuration mapping, security notes, and operational best practices. *(Resolves Task 4.7 / Arch Audit L5; Stream 4 100% complete)* |
 | **2026-10-18** | `abd04917` | **Architecture / Modular** | **Large Shared-Kernel Classes Architectural Evaluation**: Re-evaluated `GitUpdateService`, `ModuleLifecycleService`, and `FreeSwitchService` against domain and logical boundary principles. Retained cohesive single-domain orchestrators unified rather than introducing artificial micro-class indirection without reuse value, validated by comprehensive test suites (77 tests, 239 assertions). *(Resolves Task 4.6 / Arch Audit M1 & L7)* |
