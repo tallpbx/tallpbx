@@ -134,8 +134,8 @@ Configuring a desk phone or softphone adapts to your deployment model:
 | Deployment Mode | Server Address on Phone | Extension on Phone | Login (Auth Username) | How Separation Works |
 | :--- | :--- | :--- | :--- | :--- |
 | **1. Single Company (Default Tenant)** | `x.x.x.x` (or domain) | `101` | `101` | **No separation needed.** All phones register in the Default tenant with clean internal extensions. |
-| **2. Multi-Tenant by Domain** | `acme.yourpbx.com` (or `acmepbx.com`) | `101` | `101` | **Separated by Domain.** Each tenant has its own domain or subdomain, allowing duplicate extension numbers across companies. |
-| **3. Multi-Tenant on Shared IP or Domain** | `x.x.x.x` (or `pbx.example.com`) | `101` | `acme_101` | **Separated by Username.** A tenant prefix on the login ID ensures unique authentication while the phone displays `101`. |
+| **2. Multi-Tenant by Domain** | `subdomain.yourpbx.com` (or `someuniquedomain.com`) | `101` | `101` | **Separated by Domain.** Each tenant has its own domain or subdomain, allowing duplicate extension numbers across companies. |
+| **3. Multi-Tenant on Shared IP or Domain** | `x.x.x.x` (or domain) | `101` | `acme_101` | **Separated by Username.** A tenant prefix on the login ID ensures unique authentication while the phone displays `101`. |
 
 Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails within each tenant's private dialplan context (`tenant_{id}_internal`).
 
@@ -143,7 +143,7 @@ Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails w
 
 TallPBX includes a first-party Security module (`app-modules/security`) providing defense across telephony, web, and network layers:
 
-- **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@blacklist_ips`, `@banned_ips`, `@external_blocklist_ips`, `@geo_blocked_ips`, `@geo_blocked_ips6`, `@geo_allowed_ips`, `@geo_allowed_ips6`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
+- **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@whitelist_ips6`, `@blacklist_ips`, `@blacklist_ips6`, `@banned_ips`, `@banned_ips6`, `@external_blocklist_ips`, `@external_blocklist_ips6`, `@geo_blocked_ips`, `@geo_blocked_ips6`, `@geo_allowed_ips`, `@geo_allowed_ips6`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
 - **Dedicated Geo-Blocking (IPdeny Aggregated Zones)**: Pure-drop kernel perimeter (`geo_perimeter`) covering all 249 ISO 3166-1 alpha-2 countries and territories with IPv4 and IPv6 support, dual *Block Selected Countries* and *Block All Except Selected* modes, fail-closed allow-set protection, and automated weekly synchronization.
 - **Real-Time Intrusion Defense**: Scans FreeSWITCH SIP authentication failures in real time via the Event Socket Layer (ESL), intercepts web login and SSH brute-force attempts, and enforces temporary rate-based bans in Redis.
 - **Zero-Lockout Safety Guard**: Prevents administrators from locking themselves out by verifying remote IP, active sessions, and local loopback services (database and Redis connections) before restrictive policies apply.
