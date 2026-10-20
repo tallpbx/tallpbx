@@ -75,8 +75,8 @@ Because FreeSWITCH normally runs on the PBX host itself, the entire PBX shares o
 bucket:
 
 - **Default ceiling**: `FS_XML_HANDLER_THROTTLE_LIMIT=6000` requests per
-  `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES=1` minute ≈ 100 lookups/second — comfortably
-  above ~30 concurrent call setups/second (each setup costs 3–5 XML lookups).
+  `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES=1` minute ≈ 100 lookups/second — enough for
+  roughly 20–30 concurrent call setups/second (3–5 XML lookups each).
 - **Failure mode**: when the ceiling is exceeded the limiter returns HTTP 429 and the
   corresponding XML lookup fails — a failed dialplan lookup means a failed call setup.
 - **Tuning**: raise `FS_XML_HANDLER_THROTTLE_LIMIT` for heavy call-center volume, or set
