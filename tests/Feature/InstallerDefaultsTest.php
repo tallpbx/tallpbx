@@ -1054,3 +1054,25 @@ it('loads the external blocklist elements file at boot alongside the main rulese
         // is written (the application fills it on the first feed sync).
         ->and($securityScript)->toContain('install -m 0640 -o root -g www-data /dev/null /etc/tallpbx/external_blocklist.nft');
 });
+
+it('ships every documented FreeSWITCH tuning knob in the environment template', function () {
+    $example = (string) file_get_contents(base_path('.env.example'));
+
+    expect($example)
+        ->toContain('FS_ESL_BUFFER_SIZE=1000')
+        ->toContain('FS_ESL_QUEUE_NAME=default')
+        ->toContain('FS_XML_HANDLER_THROTTLE_ENABLED=true')
+        ->toContain('FS_XML_HANDLER_THROTTLE_DECAY_MINUTES=1');
+});
+
+it('documents xml-handler throttle config keys exactly as config reads them', function () {
+    $reference = (string) file_get_contents(base_path('docs/env-reference.md'));
+
+    expect($reference)
+        ->toContain('freeswitch.xml_handler.throttle_enabled')
+        ->toContain('freeswitch.xml_handler.throttle_limit')
+        ->toContain('freeswitch.xml_handler.throttle_decay_minutes')
+        ->not->toContain('freeswitch.xml_handler.throttle.enabled')
+        ->not->toContain('freeswitch.xml_handler.throttle.limit')
+        ->not->toContain('freeswitch.xml_handler.throttle.decay_minutes');
+});

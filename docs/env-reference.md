@@ -125,9 +125,9 @@ TallPBX serves dynamic directory, dialplan, and configuration XML to FreeSWITCH 
 | `FS_XML_HANDLER_ACL_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.cache.acl.store` | Specific cache store override for IP Access Control List (ACL) configurations. |
 | `FS_XML_HANDLER_ACL_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.cache.acl.ttl` | Specific TTL in seconds for ACL configurations. |
 | `FS_XML_HANDLER_ROUTING_VERSION_STORE`| `string` | `redis` | `freeswitch.xml_handler.cache.routing_version_store` | Fast key-value store used to hold global routing invalidation version tags. |
-| `FS_XML_HANDLER_THROTTLE_ENABLED` | `boolean` | `true` | `freeswitch.xml_handler.throttle.enabled` | Enables rate limiting on `/api/v1/xml-handler` to protect against token brute forcing and denial of service. |
-| `FS_XML_HANDLER_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.xml_handler.throttle.limit` | Maximum allowed XML curl requests per minute per IP address. |
-| `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle.decay_minutes` | Decay window in minutes for XML handler rate limiting. |
+| `FS_XML_HANDLER_THROTTLE_ENABLED` | `boolean` | `true` | `freeswitch.xml_handler.throttle_enabled` | Enables rate limiting on `/api/v1/xml-handler` to protect against token brute forcing and denial of service. |
+| `FS_XML_HANDLER_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.xml_handler.throttle_limit` | Maximum allowed XML curl requests per minute per IP address. |
+| `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle_decay_minutes` | Decay window in minutes for XML handler rate limiting. |
 
 ---
 
