@@ -62,6 +62,31 @@ it('keeps every built-in module menu item under the nav parent matching its mani
     expect($mismatches)->toBe([]);
 });
 
+it('gives every navigable built-in module at least one sidebar entry', function () {
+    $missing = [];
+
+    foreach (File::glob(base_path('app-modules/*/module.json')) as $manifestPath) {
+        $manifest = json_decode((string) file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
+        $category = $manifest['category'] ?? null;
+
+        if (! isset(CATEGORY_NAV_PARENTS[$category])) {
+            continue;
+        }
+
+        $itemCount = 0;
+        foreach ($manifest['providers'] as $providerClass) {
+            $provider = new $providerClass(app());
+            $itemCount += count((new ReflectionMethod($provider, 'menuItems'))->invoke($provider));
+        }
+
+        if ($itemCount === 0) {
+            $missing[] = $manifest['name'];
+        }
+    }
+
+    expect($missing)->toBe([]);
+});
+
 afterEach(function (): void {
     // Tests in this file purge or rebuild the shared generated module cache
     // and may scaffold a probe module; always clean up the scaffold and leave

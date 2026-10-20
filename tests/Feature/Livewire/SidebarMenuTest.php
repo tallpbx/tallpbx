@@ -76,8 +76,8 @@ it('renders admin PBX sub-items', function (): void {
         ->assertSee('Destinations')
         ->assertDontSee('Call Control')
         ->assertDontSee('Communications')
-        ->assertDontSee('SIP Accounts')
-        ->assertDontSee('Extension Settings');
+        ->assertSee('SIP Accounts')
+        ->assertSee('Extension Settings');
 });
 
 it('matches the FusionPBX-style Accounts section without moving Users into PBX', function (): void {
@@ -89,10 +89,21 @@ it('matches the FusionPBX-style Accounts section without moving Users into PBX',
     $accountKeys = collect($accounts['children'] ?? [])->pluck('key')->all();
 
     expect($accountKeys)
-        ->toBe(['devices', 'extensions', 'gateways'])
-        ->not->toContain('users')
-        ->not->toContain('sip-accounts')
-        ->not->toContain('extension-settings');
+        ->toBe(['devices', 'extensions', 'sip-accounts', 'gateways', 'extension-settings'])
+        ->not->toContain('users');
+});
+
+it('hides module sidebar entries the admin has no permission to view', function (): void {
+    // A limited admin keeps only page access plus one module permission:
+    // unpermitted module entries must not render in the sidebar at all.
+    $limited = grantAdminPermissions(permissions: ['admin.dashboard.view', 'extensions.view']);
+
+    actingAs($limited, 'admin')
+        ->get(route('panel.dashboard'))
+        ->assertOk()
+        ->assertSee('Extensions')
+        ->assertDontSee('SIP Accounts')
+        ->assertDontSee('Extension Settings');
 });
 
 it('keeps PBX groups flat and places common PBX features under Features', function (): void {

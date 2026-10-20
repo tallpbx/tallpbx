@@ -52,7 +52,19 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      */
     protected function menuItems(): array
     {
-        return [];
+        return [
+            // Unified panel sidebar — SIP authentication accounts sit beside the
+            // extensions they authenticate; parent mirrors manifest category "accounts".
+            [
+                'key' => 'sip-accounts',
+                'label' => 'admin.sip_accounts',
+                'route' => 'panel.sip-accounts.index',
+                'permission' => 'sip-accounts.view',
+                'icon' => 'heroicon-o-identification',
+                'parent' => 'pbx.accounts',
+                'order' => 25,
+            ],
+        ];
     }
 
     /**

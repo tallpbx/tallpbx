@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SIP Accounts & Extension Settings Navigation Entries**: SIP Accounts and Extension Settings are now reachable from the sidebar (PBX → Accounts) alongside Extensions, Devices, and Gateways, closing the module-manual/navigation parity gap where these modules were only reachable by direct URL or workbench link. Sidebar entries respect each admin's module permissions.
+
 ### Changed
 - **Firewall Rules Table Source IP Column Color Harmonization**: Standardized text colors in the Source IP column across all sections (Pre-Filters, Geo-Blocking, System Services, and Custom Rules) to a cohesive, readable neutral grey (`text-base-content/70`), eliminating the distracting "Christmas tree" effect caused by conflicting green, red, and primary purple text while allowing the dedicated Status and Action columns to carry semantic meaning.
 - **Firewall Rules Table Empty Geo-Blocking Scope Parity**: Replaced the cluttered "No countries configured" badge in the Firewall Rules table's Source IP column with clean muted monospace text (`0 countries`), matching the formatting and scannability of adjacent pre-filter rows (`0 IPs`, `0 active bans`).

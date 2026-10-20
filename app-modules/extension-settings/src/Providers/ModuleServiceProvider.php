@@ -44,7 +44,19 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      */
     protected function menuItems(): array
     {
-        return [];
+        return [
+            // Unified panel sidebar — extension-level settings are reachable from
+            // nav now (previously workbench-only); parent mirrors category "accounts".
+            [
+                'key' => 'extension-settings',
+                'label' => 'admin.extension_settings',
+                'route' => 'panel.extension-settings.index',
+                'permission' => 'extension-settings.view',
+                'icon' => 'heroicon-o-adjustments-horizontal',
+                'parent' => 'pbx.accounts',
+                'order' => 35,
+            ],
+        ];
     }
 
     /**
