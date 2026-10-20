@@ -332,113 +332,11 @@ firewall-adjacent restore safety rules.
 
 # Part II: Security Architecture & Linux Kernel Packet Filtering
 
-## 8. Visual Packet Flow: Inbound Traffic
+## 8. Packet Flow: Inbound Traffic
 
 When an internet packet reaches the server's network interface, it is evaluated by the Linux kernel **before** any application software (like FreeSWITCH or the web server) ever sees it.
 
 TallPBX compiles an optimized, multi-stage Linux kernel firewall ruleset using native `nftables` (`table inet tallpbx_filter`, hook `input`, priority `-10`).
-
-The diagram below illustrates this path from input to processing:
-
-```mermaid
-flowchart TD
-    %% Styling Classes
-    classDef drop fill:#fde8e8,stroke:#e05252,stroke-width:2px,color:#7a1010
-    classDef allow fill:#e8f5ec,stroke:#3fb950,stroke-width:2px,color:#1a6b32
-    classDef spine fill:#eef0f3,stroke:#5b8fd9,stroke-width:2px,color:#1c2a40
-    classDef svc fill:#fef9ec,stroke:#d29922,stroke-width:2px,color:#5a3e08
-    classDef prefilter fill:#e8eef8,stroke:#4a77b4,stroke-width:2px,color:#15325b
-
-    %% Root Ingress Trunk (Centered)
-    A["🌐 Incoming Network Packet<br/>(Internet / LAN)"]:::spine --> B["🔌 Physical Network Card<br/>(eth0 / ens3 / lo)"]:::spine
-    B --> C["🛡️ Linux Kernel Firewall<br/>(nftables inet tallpbx_filter input)"]:::spine
-
-    %% Global Mode Checks
-    C --> FW_CHECK{"Firewall Enabled?"}:::spine
-    FW_CHECK -->|NO: Disabled| PASS_ALL["✅ ALLOW ALL TRAFFIC<br/>(Only lo & established active)"]:::allow
-    FW_CHECK -->|YES: Enabled| OBS_CHECK{"Observe Mode Active?"}:::spine
-
-    OBS_CHECK -->|YES: Observe Mode| OBS_NOTE["👁️ GLOBAL OBSERVE MODE<br/>(Log & count drops, never block)"]:::svc
-    OBS_CHECK -->|NO: Enforcing| PREFILTER_CHECK{"Pre-Filter Pipeline Enabled?"}:::spine
-    OBS_NOTE --> PREFILTER_CHECK
-
-    %% Subgraph: Reorderable Pre-Filter Pipeline (Stages 1-7)
-    subgraph PREFILTER ["Built-in Pre-Filter Pipeline (Stages 1–7: Reorderable)"]
-        direction TB
-        PREFILTER_CHECK -->|YES: Default Order| D{"Stage 1: Loopback Interface?<br/>(iif 'lo')"}:::prefilter
-        D -->|YES: Localhost| PASS_LO["✅ ALLOW UNCONDITIONALLY<br/>(Localhost MariaDB, Redis, IPC)"]:::allow
-        D -->|NO: External| S2{"Stage 2: Trusted Whitelist?<br/>(@whitelist_ips / @whitelist_ips6)"}:::prefilter
-
-        S2 -->|YES: Admin / Office| PASS_WL["✅ ALLOW UNCONDITIONALLY<br/>(Bypass Port Checks)"]:::allow
-        S2 -->|NO: Untrusted| S3{"Stage 3: Invalid Packet State?<br/>(ct state invalid)"}:::prefilter
-
-        S3 -->|YES: Malformed| DROP_INV["❌ DROP IMMEDIATELY<br/>(Out-of-Window / Bad Flags)"]:::drop
-        S3 -->|NO: Valid| S4{"Stage 4: Established or Related?<br/>(ct state established,related)"}:::prefilter
-
-        S4 -->|YES: Active Session| PASS_FAST["✅ ALLOW DIRECTLY<br/>(Fast-path Conntrack Bypass)"]:::allow
-        S4 -->|NO: New Connection| S5{"Stage 5: Permanent Blacklist?<br/>(@blacklist_ips / @blacklist_ips6)"}:::prefilter
-
-        S5 -->|YES: Blacklisted| DROP_BL["❌ DROP IMMEDIATELY<br/>(Kernel Interval Tree Discard)"]:::drop
-        S5 -->|NO: Safe| S6{"Stage 6: Active Intruder Ban?<br/>(@banned_ips / @banned_ips6)"}:::prefilter
-
-        S6 -->|YES: Banned| DROP_BAN["❌ DROP IMMEDIATELY<br/>(Dynamic Kernel Auto-Timeout)"]:::drop
-        S6 -->|NO: Safe| S7{"Stage 7: External Blocklists?<br/>(@external_blocklist_ips / @external_blocklist_ips6)"}:::prefilter
-
-        S7 -->|YES: VoIPBL Hit| DROP_FEED["❌ DROP IMMEDIATELY<br/>(Public Fraud / Scanner Network)"]:::drop
-    end
-
-    PREFILTER_CHECK -->|NO: Disabled| S8
-    S7 -->|NO: Safe| S8{"Stage 8: Diagnostic Ping?<br/>(ICMP / ICMPv6 echo-request)"}:::spine
-
-    %% Stages 8-12: Core Services & Policies
-    S8 -->|Echo > Limit / Stealth| DROP_ICMP["❌ DROP / STEALTH<br/>(Rate Limited or Blocked)"]:::drop
-    S8 -->|Echo <= Limit or IPv6 ND/RA| PASS_ICMP["✅ ALLOW REACHABILITY<br/>(Controlled Diagnostics & IPv6)"]:::allow
-    S8 -->|Non-ICMP Traffic| S9{"Stage 9: Port UDP 69?<br/>(TFTP Provisioning Defense)"}:::spine
-
-    subgraph TFTP_PROFILE ["Hardened TFTP Defense Profile (Stage 9)"]
-        direction TB
-        S9 -->|Opcode 2: WRQ Write| DROP_TFTP_WRQ["❌ DROP UPLOAD<br/>(Provisioning is Read-Only)"]:::drop
-        S9 -->|Traversal '../' or '/x'| DROP_TFTP_PROBE["❌ DROP SCAN PROBE<br/>(Directory Traversal Filter)"]:::drop
-        S9 -->|Rate > Flood Meter| DROP_TFTP_FLOOD["❌ DROP FLOOD<br/>(Bounded Kernel Meter)"]:::drop
-        S9 -->|Valid RRQ Read| PASS_TFTP["✅ ALLOW TFTP PROVISIONING<br/>(Legitimate Phone Boot)"]:::allow
-    end
-
-    S9 -->|Other Ports| S9_5{"Stage 9.5: Geo-Blocking Rule Active?<br/>(jump geo_perimeter)"}:::spine
-
-    subgraph GEO_PERIMETER ["Dedicated Geo-Blocking Perimeter Chain (Stage 9.5)"]
-        direction TB
-        S9_5 -->|Mode: Block Selected & Country Match| DROP_GEO_BL["❌ DROP UNWANTED ORIGIN<br/>(@geo_blocked_ips / @geo_blocked_ips6)"]:::drop
-        S9_5 -->|Mode: Block Except Selected & Non-Match| DROP_GEO_WL["❌ DROP UNAPPROVED ORIGIN<br/>(!= @geo_allowed_ips / @geo_allowed_ips6)"]:::drop
-        S9_5 -->|Country Permitted / Geo Disabled| S10
-    end
-
-    S10{"Stage 10 & 11: Core PBX Port or Custom Rule?"}:::spine
-
-    %% Subgraph: Application & Services
-    subgraph SERVICES ["PBX Services & Application Routing (Stages 10–12)"]
-        direction TB
-        S10 -->|SIP 5060/5061/5080| K["📞 FreeSWITCH Telephony"]:::svc
-        S10 -->|RTP 16384-32768| L["🔊 Audio Stream (RTP)"]:::svc
-        S10 -->|Web 80/443| M["🌐 Nginx & Web Admin"]:::svc
-        S10 -->|SSH 22| N["🔒 Secure Shell (SSH)"]:::svc
-        S10 -->|No Rule Matched| S12{"Stage 12: Default Inbound Policy?"}:::spine
-
-        S12 -->|Policy = DROP| DROP_DEF["❌ DROP PACKET<br/>(Blocked by Default)"]:::drop
-        S12 -->|Policy = ACCEPT / Observe| PASS_DEF["✅ ACCEPT PACKET"]:::allow
-
-        %% Telephony Application Layer
-        K --> BOT_CHECK{"FreeSWITCH SIP Scanner Filter<br/>(Public Call Context)"}:::svc
-        BOT_CHECK -->|Known Bot: sipvicious, sipcli, etc.| DROP_BOT["🚨 403 HANGUP & AUTO-BAN<br/>(Flush Conntrack Live Sessions)"]:::drop
-        BOT_CHECK -->|Valid SIP Peer| SIP_AUTH{"SIP Password & ACL Auth"}:::svc
-        SIP_AUTH -->|Failed Auth Streak| DROP_AUTH["🚨 401/403 Failure Streak<br/>(Trigger Dynamic Kernel Ban)"]:::drop
-        SIP_AUTH -->|Authorized Extension / Trunk| CALL_OK["📱 Call Connected & Audio Rings"]:::allow
-
-        %% Web Application Layer
-        M --> WEB_AUTH{"Web Auth Guard"}:::svc
-        WEB_AUTH -->|Failed Password Streak| DROP_WEB["🚨 Trigger Dynamic Kernel Ban"]:::drop
-        WEB_AUTH -->|Valid Admin / User| WEB_OK["🖥️ Access Control Panel"]:::allow
-    end
-```
 
 ---
 
@@ -473,18 +371,15 @@ When packets reach FreeSWITCH on port 5060/5080:
 
 ---
 
-## 10. Visual Packet Flow: Outbound Traffic
+## 10. Packet Flow: Outbound Traffic
 
 Outbound traffic generated by the server (such as FreeSWITCH connecting to a SIP provider trunk, outbound phone calls, or administrative web notifications) follows a streamlined outbound chain:
 
-```mermaid
-flowchart TD
-    A["📞 Outbound Action Triggered<br/>(e.g., Outbound Call via SIP Trunk, Web Hook, DNS Lookup)"] --> B["⚙️ Application Layer<br/>(FreeSWITCH, PHP-FPM, or System Process)"]
-    B --> C["🔀 Linux Kernel Routing Table"]
-    C --> D["🛡️ nftables Output Chain<br/>(Priority: filter, Policy: ACCEPT)"]
-    D --> E["🔌 Network Card (Output)"]
-    E --> F["🌐 Public Internet / SIP Trunk Carrier"]
-```
+1. **Outbound Action Triggered**: An outbound call via SIP trunk, webhook, DNS lookup, or another application event starts the flow.
+2. **Application Layer**: FreeSWITCH, PHP-FPM, or a system process generates the outbound packet.
+3. **Linux Kernel Routing Table**: The kernel selects the egress interface and route for the destination.
+4. **`nftables` Output Chain**: The packet is evaluated by the output chain (priority `filter`, default policy `ACCEPT`).
+5. **Network Card (Output)**: The network interface transmits the packet to the public internet or SIP trunk carrier.
 
 *Note: By default, the output chain policy is set to `ACCEPT`. The stateful connection tracker (`ct state established,related accept`) automatically correlates response packets from the outside world back to the originating outbound connection.*
 
