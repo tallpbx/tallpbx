@@ -345,7 +345,7 @@ TallPBX compiles an optimized, multi-stage Linux kernel firewall ruleset using n
 The Linux kernel evaluates rules strictly in order across **13 deterministic stages**:
 
 ### 1. Pre-Filter Pipeline (Stages 1–8)
-Toggled and reordered as an administrative unit in the **Firewall Rules** tab. The first seven rules are reorderable; the Geo-Blocking row is the fixed 8th pre-filter rule and is evaluated later as kernel stage 9.5:
+Toggled and reordered as an administrative unit in the **Firewall Rules** tab. The first seven rules are reorderable; the Geo-Blocking row is the fixed 8th pre-filter rule:
 1. **Loopback Interface (`iif "lo" accept`)**: Unconditional access for server processes (PHP-FPM to MariaDB, Redis, and FreeSWITCH ESL).
 2. **Trusted Whitelist (`@whitelist_ips accept`)**: Admin IPs, office subnets, and SIP carrier interconnects bypass all lower drop checks.
 3. **Invalid Packet State (`ct state invalid drop`)**: Corrupted headers and illegal TCP flag combinations are discarded immediately.
@@ -353,17 +353,16 @@ Toggled and reordered as an administrative unit in the **Firewall Rules** tab. T
 5. **Permanent Blacklist (`@blacklist_ips drop`)**: Explicitly forbidden IPs/CIDRs dropped at line rate via kernel interval trees.
 6. **Active Intrusion Bans (`@banned_ips drop`)**: Dynamic hardware-timed bans triggered by authentication failures or scanner probes.
 7. **External Blocklists (`@external_blocklist_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL) dropped at the perimeter.
-8. **Geo-Blocking Perimeter (`jump geo_perimeter`)**: Pure drop filter that traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through; it never issues an unconditional accept. Evaluated as kernel stage 9.5, immediately before the PBX application ports.
+8. **Geo-Blocking Perimeter (`jump geo_perimeter`)**: Pure drop filter that traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through; it never issues an unconditional accept.
 
-### 2. Diagnostics, Protocol Defense & Perimeter Filtering (Kernel Stages 8–9.5)
-8. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
-9. **Hardened TFTP Defense Profile (UDP 69)**: Protects phone provisioning by dropping upload requests (WRQ opcode 2), directory traversal probes (`../`, `/x`), and flood requests.
-9.5. **Geo-Blocking Perimeter Chain**: Applies the 8th pre-filter rule here, immediately before the PBX service catalog. See the pre-filter list above for the mode and set details.
+### 2. Diagnostics, Protocol Defense & Perimeter Filtering (Kernel Stages 9–10)
+9. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
+10. **Hardened TFTP Defense Profile (UDP 69)**: Protects phone provisioning by dropping upload requests (WRQ opcode 2), directory traversal probes (`../`, `/x`), and flood requests.
 
-### 3. Service Catalog & Fallback (Kernel Stages 10–12)
-10. **Core PBX Port Catalog**: Explicit allow rules for SIP (5060/5061/5080), RTP Audio (16384–32768), Web Admin (80/443), and SSH (22).
-11. **Custom Sequential Rules**: User-defined rules evaluated in assigned priority order (first match wins).
-12. **Default Inbound Policy**: Final fallback verdict (`Drop` or `Accept`; forced to `Accept` in Global Observe Mode).
+### 3. Service Catalog & Fallback (Kernel Stages 11–13)
+11. **Core PBX Port Catalog**: Explicit allow rules for SIP (5060/5061/5080), RTP Audio (16384–32768), Web Admin (80/443), and SSH (22).
+12. **Custom Sequential Rules**: User-defined rules evaluated in assigned priority order (first match wins).
+13. **Default Inbound Policy**: Final fallback verdict (`Drop` or `Accept`; forced to `Accept` in Global Observe Mode).
 
 ### 4. Application Layer Defense (FreeSWITCH Dialplan)
 When packets reach FreeSWITCH on port 5060/5080:
@@ -459,7 +458,7 @@ Pinned directly above the tab strip for immediate visibility:
 ### The Five Security Center Tabs
 
 #### Tab 1: Firewall Rules (`?tab=rules`)
-* **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (stages 1–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the fixed Geo-Blocking rule 8 companion row):
+* **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (rules 1–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the fixed Geo-Blocking rule 8 companion row):
   - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
   - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
 * **Geo-Blocking Master Cockpit Row**: Positioned following External Blocklists, displays the live state of the dedicated geo perimeter rule, mode indicator (`Block Selected` or `Block All Except`), total count of active ranges, and instant link to Tab 5.
