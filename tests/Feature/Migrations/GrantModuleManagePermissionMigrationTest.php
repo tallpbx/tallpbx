@@ -49,3 +49,16 @@ test('grant module manage permission migration idempotently attaches permission 
     expect($superAdminGroup->fresh()->permissions->contains('id', $permission->id))->toBeFalse()
         ->and($adminGroup->fresh()->permissions->contains('id', $permission->id))->toBeFalse();
 });
+
+test('grant module manage permission migration rollback deletes the permission row it created', function (): void {
+    // Control row: must survive the rollback untouched.
+    $control = Permission::firstOrCreate(['name' => 'admin.users.view', 'module' => 'admin']);
+
+    $migration = require database_path('migrations/2026_10_18_000002_grant_module_manage_permission_to_super_admins.php');
+    $migration->up();
+    $migration->down();
+
+    // Rollback symmetry: the row this migration created goes away with it.
+    expect(Permission::where('name', 'admin.modules.manage')->exists())->toBeFalse()
+        ->and($control->fresh()?->id)->toBe($control->id);
+});

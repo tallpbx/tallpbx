@@ -49,7 +49,10 @@ return new class extends Migration
         $permission = Permission::where('name', 'admin.modules.manage')->first();
 
         if ($permission !== null) {
+            // Rollback symmetry: detach the grant, then remove the permission row
+            // this migration created. Unrelated permissions are never touched.
             $permission->groups()->detach();
+            $permission->delete();
         }
     }
 };
