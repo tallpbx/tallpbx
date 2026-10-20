@@ -219,7 +219,13 @@ it('syncs the correct number of core modules', function () {
 
 // ─── Module Schema & Migration ──────────────────────────────────
 
-it('drops the obsolete source_ref column and maintains composer_package on module registry rows', function (): void {
+// The obsolete `source_ref` column is intentionally absent from the baseline
+// schema and is NEVER cleaned up by a drop migration: MigrationSafetyGuard
+// blocks dropColumn in up() on the protected database, and the inert-column
+// ruling (source_ref never existed on the live database and is unfilled by the
+// model) deleted 2026_10_14_000001_drop_source_ref_from_modules_table.php.
+// This case pins the schema shape for fresh installs.
+it('keeps the modules schema free of the obsolete source_ref column while maintaining composer_package', function (): void {
     expect(Schema::hasColumn('modules', 'source_ref'))->toBeFalse()
         ->and(Schema::hasColumn('modules', 'composer_package'))->toBeTrue();
 

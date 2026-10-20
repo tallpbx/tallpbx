@@ -16,6 +16,12 @@ return new class extends Migration
         Schema::create('modules', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('name')->unique();
+            // Note: the former `source_ref` column is deliberately absent from this
+            // baseline. Databases upgraded from versions that created it keep a
+            // harmless inert nullable column, and no cleanup migration will ever
+            // drop it: MigrationSafetyGuard blocks dropColumn in up() on the
+            // protected database, and the inert-column ruling established the
+            // column is unfilled and never existed on live installs.
             // Composer package the module was installed from, kept so module:restore
             // can reinstall vendor modules after an uninstall.
             $table->string('composer_package')->nullable();
