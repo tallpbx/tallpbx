@@ -93,15 +93,15 @@ TallPBX is built as a **Domain-Driven Modular Monolith** — an architectural te
 - **Organized by Business Feature, Not Technical Type**: In traditional apps, code is scattered across generic folders (all models together, all controllers together). In TallPBX, each distinct telephony feature (like Extensions, Voicemail, Gateways, or Security) keeps everything it needs — database tables, business rules, web screens, and translations — packaged together in its own self-contained module folder (`app-modules/`).
 - **One Unified System (Monolith)**: Everything runs together as a single, rock-solid application. You don't have to manage dozens of separate microservices, network connections between containers, or fragile external packages. When you update TallPBX, the entire system updates together cleanly and reliably.
 - **Easy to Turn Features On or Off**: If your organization does not need certain telephony features (like Call Center Queues or Ring Groups), administrators can toggle them off with one click in the panel without touching server files or risking system stability.
-- **Clean Foundation for Custom Extensions**: Community plugins and third-party integrations plug in smoothly without altering core application files.
+- **Safe Custom Modules**: Developers can add third-party integrations or custom business tools in a dedicated folder (`custom-modules/`) or install them as standard Composer packages (`composer require`) without modifying core system files or risking future updates.
 
 ### Key Highlights
 - **Built-in Core Modules (`app-modules/`)**: All 60 built-in telephony and administration domains reside in `app-modules/<domain-name>/`. They autoload directly via standard PHP autoloading, update atomically via Git, and are protected against accidental file deletion.
-- **Third-Party Extensions (`custom-modules/`)**: Community add-ons and integrations live in the untracked, git-ignored `custom-modules/<name>/` directory, allowing you to add custom features that never interfere with core system updates.
+- **Third-Party & Custom Modules (`custom-modules/` & Composer Packages)**: Community add-ons and integrations can live in the untracked `custom-modules/<name>/` directory or install via Composer (`vendor/`), allowing you to add custom capabilities that never interfere with core system updates.
 - **Pre-Flight Collision Guards**: External modules are automatically verified so they cannot conflict with core routes, database tables, module names, or permissions.
 - **Detailed Technical Specification**: For developers and system architects interested in bounded contexts and service provider internals, see the [System Architecture & Developer Guide →](docs/architecture.md).
 
-Scaffold a new custom third-party extension in `custom-modules/`:
+Scaffold a new custom module in `custom-modules/`:
 
 ```bash
 php artisan make:module my-crm-connector \
