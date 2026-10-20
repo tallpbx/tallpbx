@@ -62,7 +62,7 @@ The single unified panel (`/panel/`) adapts to administrator preference with ins
 
 ## Quick Start
 
-1. Prepare a Debian 13 server with at least 1 GB RAM, 2 GiB swap, 1 CPU core, and 25 GB disk space.
+1. Prepare a Debian 13 server with at least 1 GB RAM, 2 GB swap, 1 CPU core, and 25 GB disk space.
 2. Follow the [installation guide](INSTALL.md). It walks through server setup, the installer, and the first login.
 3. Open the server's IP address in a browser and sign in with the administrator email and password chosen during installation.
 4. Follow the [PBX "Hello World" Guide](docs/pbx-hello-world.md) to create your first extension, register a softphone (MicroSIP, Linphone, or desk phone), and place an audio loopback echo test call (`*9196`).

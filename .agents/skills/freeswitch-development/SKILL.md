@@ -214,7 +214,7 @@ Use representative hardware for capacity claims, and preserve the distinction be
 
 Project observations from July 2026 representative VPS testing:
 
-- On 1 vCPU/1 GB, Debian's default PHP-FPM dynamic pool was acceptable for light or moderate use. Static 6 was a reasonable optional high-load profile with about 440 MiB available after testing and no swap growth.
+- On 1 vCPU/1 GB, Debian's default PHP-FPM dynamic pool was acceptable for light or moderate use. Static 6 was a reasonable optional high-load profile with about 440 MB available after testing and no swap growth.
 - On 1 vCPU/2 GB, added memory improved headroom but not throughput; the single shared CPU remained the limiter and provider scheduling noise was plausible.
 - On 2 vCPU/2 GB, static 6 produced the strongest remote XML-handler results and substantial memory headroom.
 - A 2 vCPU/2 GB sweep of static 8, 10, and 12 workers did not improve throughput meaningfully and introduced worse p99/max tail spikes. Keep `pm.max_children = 6` as the recommended 2 GB profile unless future measurements prove otherwise.
