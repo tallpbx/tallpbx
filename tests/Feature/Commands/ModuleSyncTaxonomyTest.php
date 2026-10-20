@@ -17,6 +17,51 @@ use Symfony\Component\Console\Output\NullOutput;
  */
 const CANONICAL_CATEGORIES = ['core', 'accounts', 'connectivity', 'routing', 'features', 'media', 'advanced', 'monitoring', 'custom'];
 
+/*
+ * Manifest category ↔ sidebar navigation parent parity (AGENTS.md invariant).
+ * 'core' modules are infrastructure (top-level or menu-less by design) and
+ * 'custom' modules define their own layout; both are exempt.
+ */
+const CATEGORY_NAV_PARENTS = [
+    'accounts' => 'pbx.accounts',
+    'connectivity' => 'pbx.connectivity',
+    'routing' => 'pbx.routing',
+    'features' => 'pbx.features',
+    'media' => 'pbx.media',
+    'advanced' => 'pbx.advanced',
+    'monitoring' => 'pbx.monitoring',
+];
+
+it('keeps every built-in module menu item under the nav parent matching its manifest category', function () {
+    $mismatches = [];
+
+    foreach (File::glob(base_path('app-modules/*/module.json')) as $manifestPath) {
+        $manifest = json_decode((string) file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
+        $category = $manifest['category'] ?? null;
+
+        if (! isset(CATEGORY_NAV_PARENTS[$category])) {
+            continue;
+        }
+
+        $expectedParent = CATEGORY_NAV_PARENTS[$category];
+
+        foreach ($manifest['providers'] as $providerClass) {
+            $provider = new $providerClass(app());
+            // menuItems() is protected; reflection can invoke it since PHP 8.1.
+            $items = (new ReflectionMethod($provider, 'menuItems'))->invoke($provider);
+
+            foreach ($items as $item) {
+                if (($item['parent'] ?? null) !== $expectedParent) {
+                    $mismatches[] = "{$manifest['name']}: {$item['key']} parent=".
+                        var_export($item['parent'] ?? null, true)." expected {$expectedParent}";
+                }
+            }
+        }
+    }
+
+    expect($mismatches)->toBe([]);
+});
+
 afterEach(function (): void {
     // Tests in this file purge or rebuild the shared generated module cache
     // and may scaffold a probe module; always clean up the scaffold and leave
