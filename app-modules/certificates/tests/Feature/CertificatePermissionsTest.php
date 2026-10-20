@@ -63,22 +63,23 @@ it('registers certificates menu item beside security at order 39.5 on main panel
         ->and($item['order'])->toBe(39.5);
 });
 
-it('places certificates nav link between security and pbx in menu tree', function (): void {
+it('places certificates nav link after security inside the PBX advanced group', function (): void {
     $this->actingAs($this->admin, 'admin');
 
     $menuService = app(MenuService::class);
     $tree = $menuService->getTree();
-    $keys = collect($tree)->pluck('key')->all();
+    $pbx = collect($tree)->firstWhere('key', 'pbx');
+    $advanced = collect($pbx['children'] ?? [])->firstWhere('key', 'pbx.advanced');
+    $advancedKeys = collect($advanced['children'] ?? [])->pluck('key')->all();
 
-    $securityIndex = array_search('security', $keys, true);
-    $certificatesIndex = array_search('certificates', $keys, true);
-    $pbxIndex = array_search('pbx', $keys, true);
+    // Nav parity: certificates renders under PBX → Advanced (manifest
+    // category "advanced"), keeping its order after security within the group.
+    $securityIndex = array_search('security', $advancedKeys, true);
+    $certificatesIndex = array_search('certificates', $advancedKeys, true);
 
     expect($securityIndex)->not->toBeFalse()
         ->and($certificatesIndex)->not->toBeFalse()
-        ->and($pbxIndex)->not->toBeFalse()
-        ->and($securityIndex)->toBeLessThan($certificatesIndex)
-        ->and($certificatesIndex)->toBeLessThan($pbxIndex);
+        ->and($securityIndex)->toBeLessThan($certificatesIndex);
 });
 
 it('protects panel.certificates.index with authentication and permission middleware', function (): void {
