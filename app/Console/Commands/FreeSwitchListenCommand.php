@@ -307,10 +307,16 @@ class FreeSwitchListenCommand extends Command
 
         event($laravelEvent);
 
-        // Log at debug level to avoid flooding production logs
-        Log::debug('FreeSWITCH event dispatched.', [
-            'event' => $eventName,
-            'call_uuid' => $laravelEvent->callUuid(),
-        ]);
+        // Heartbeats arrive every ~20 s purely as keepalives; logging each dispatch
+        // floods production logs (~4,300 lines/day) with no diagnostic value. The
+        // event is still dispatched and broadcast — the heartbeat drives the
+        // wire:poll-free telephony views' periodic refresh.
+        if ($eventName !== 'HEARTBEAT' && $eventName !== 'SESSION_HEARTBEAT') {
+            // Log at debug level to avoid flooding production logs
+            Log::debug('FreeSWITCH event dispatched.', [
+                'event' => $eventName,
+                'call_uuid' => $laravelEvent->callUuid(),
+            ]);
+        }
     }
 }

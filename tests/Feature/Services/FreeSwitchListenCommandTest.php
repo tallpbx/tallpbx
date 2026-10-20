@@ -14,6 +14,7 @@ use App\Services\FreeSwitchService;
 use App\Services\FreeSwitchServiceInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Modules\CallBroadcast\Listeners\MarkBroadcastRecipientOutcome;
 use Modules\CallRecordings\Listeners\RegisterCompletedCallRecording;
 use Modules\Security\Listeners\LogFailedSipAuthListener;
@@ -133,6 +134,51 @@ it('dispatches heartbeat events', function () {
     Event::assertDispatched(Heartbeat::class, function (Heartbeat $e): bool {
         return $e->header('Event-Info') === 'System is alive';
     });
+});
+
+it('does not debug-log dispatched heartbeat events', function () {
+    Log::spy();
+
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('connect')->once()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->once();
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')->once()->andReturn([
+        'event_name' => 'HEARTBEAT',
+        'headers' => ['Event-Name' => 'HEARTBEAT', 'Event-Info' => 'System is alive'],
+        'body' => '',
+    ]);
+    $mock->shouldReceive('disconnect')->once();
+
+    app()->instance(FreeSwitchServiceInterface::class, $mock);
+
+    $this->artisan('freeswitch:listen', ['--once' => true])->assertSuccessful();
+
+    // Heartbeat keepalives are dispatched and broadcast but never debug-logged.
+    Log::shouldNotHaveReceived('debug');
+});
+
+it('still debug-logs dispatched non-heartbeat events', function () {
+    Log::spy();
+
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('connect')->once()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->once();
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')->once()->andReturn([
+        'event_name' => 'CHANNEL_CREATE',
+        'headers' => ['Unique-ID' => 'test-uuid-log-001', 'Event-Name' => 'CHANNEL_CREATE'],
+        'body' => '',
+    ]);
+    $mock->shouldReceive('disconnect')->once();
+
+    app()->instance(FreeSwitchServiceInterface::class, $mock);
+
+    $this->artisan('freeswitch:listen', ['--once' => true])->assertSuccessful();
+
+    Log::shouldHaveReceived('debug')
+        ->withArgs(fn (string $message): bool => $message === 'FreeSWITCH event dispatched.')
+        ->once();
 });
 
 it('dispatches record stop events for completed recording ingestion', function () {
