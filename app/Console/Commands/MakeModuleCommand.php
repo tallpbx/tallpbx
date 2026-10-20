@@ -75,7 +75,7 @@ class MakeModuleCommand extends Command
         $this->createModuleJson($moduleDir, $name, $namespace, $displayName, $category);
         $this->createServiceProvider($moduleDir, $namespace, $name);
         $this->createStubView($moduleDir, $name);
-        $this->createLanguageFiles($moduleDir, $name, $displayName);
+        $this->createLanguageFiles($moduleDir);
 
         // Rebuild the module manifest cache in the same step so the scaffolded
         // module is discoverable immediately and the cache never serves a
@@ -92,7 +92,7 @@ class MakeModuleCommand extends Command
             'resources/views/   — Livewire view directory',
             'tests/             — Pest tests discovered by the host suite',
             'database/migrations/ — module migrations',
-            'lang/{en,es,fr}/   — translation files with collision prevention header',
+            'lang/{en,es,fr}/   — translation files (es/fr optional)',
             'config/            — module config merged over centralized defaults',
         ]);
 
@@ -219,33 +219,12 @@ HTML;
     }
 
     /**
-     * Create stub translation files for en, es, and fr with collision prevention docblock.
+     * Create stub translation files for en, es, and fr.
      */
-    private function createLanguageFiles(string $moduleDir, string $name, string $displayName): void
+    private function createLanguageFiles(string $moduleDir): void
     {
-        $entityPrefix = str_replace('-', '_', $name);
-        $content = <<<PHP
+        $content = <<<'PHP'
 <?php
-
-/**
- * --------------------------------------------------------------------------
- * Module Language Lines: {$displayName} ({$name})
- * --------------------------------------------------------------------------
- *
- * COLLISION PREVENTION & KEY NAMING RULES:
- * Under TallPBX's multi-path cascading translation architecture, module
- * language files merge directly into the global group dictionary (e.g. 'admin')
- * at runtime.
- *
- * To prevent collisions across modules or with the root dictionary:
- * 1. Every key defined in this file MUST include the module/entity name
- *    (e.g. '{$entityPrefix}_*', 'create_{$entityPrefix}', 'no_{$entityPrefix}_found').
- * 2. Generic keys (e.g. 'save', 'cancel', 'delete', 'edit', 'enabled', 'disabled',
- *    'status', 'actions') belong strictly in root lang/{locale}/admin.php and
- *    must NEVER be defined in module language files.
- * 3. Module language files will be rejected at runtime by ModuleServiceProvider
- *    if any collision with root language keys is detected.
- */
 
 return [
     //

@@ -597,7 +597,7 @@ Used for actions triggered directly from table rows (e.g. deleting an entry, pro
    - Render the active content inside `<span wire:loading wire:target="<method>">` with `inline-flex items-center gap-1.5` for balanced alignment.
 5. **Plain-Language Present Continuous Copy**:
    - Switch button copy from imperative ("Save", "Protect My IP", "Apply Rules", "Add to Whitelist") to present continuous ("Saving...", "Protecting IP...", "Applying Rules...", "Adding to Whitelist...").
-   - Maintain translation keys across all supported locales (`lang/en/admin.php`, `lang/es/admin.php`, `lang/fr/admin.php`).
+   - For built-in `app-modules/`, maintain all supported locales (`lang/en/admin.php`, `lang/es/admin.php`, `lang/fr/admin.php`); custom modules may support any subset.
 
 ## DaisyUI 5 CSS Compilation Behavior
 
@@ -926,7 +926,7 @@ TallPBX is architected as a **Domain-Driven Modular Monolith**. Telephony, admin
 - **Factories**: `src/Database/Factories/`, namespace `Modules\{Studly}\Database\Factories`, resolved by standard `HasFactory` — never root `database/factories/`, never a `newFactory()` override.
 - **Tests**: Pest tests inside `app-modules/{name}/tests/` (`*Test.php`), discovered by the `phpunit.xml` glob. Cross-module integration tests stay in the root `tests/` tree.
 - **Config**: Ship `config/{name}.php` to override centralized app-level defaults; it merges under the module's key (module values win on conflicts, all other keys survive).
-- **Translations**: Ship `lang/{en,es,fr}/admin.php` for admin translations (and `client.php` if client UI exists). Must include the mandatory collision warning docblock. Module keys MUST contain the module/entity domain (e.g. `gateway_host`, `create_gateway`). Generic action keys (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`) belong strictly in root `lang/{locale}/admin.php`. `ModuleServiceProvider` actively refuses to load files with root collisions at runtime. Views continue using `__('admin.*')`.
+- **Translations**: For built-in `app-modules/`, ship `lang/{en,es,fr}/admin.php` with 100% locale parity, include the module/entity domain in every key, and start each file with the standardized collision-warning header. Custom modules may support any locale subset; the header is optional and entity/domain naming is recommended rather than mandatory. `client.php` is needed only when client UI exists. Generic action keys (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`) belong strictly in root `lang/{locale}/admin.php`. `ModuleServiceProvider` actively refuses to load files with root collisions at runtime. Views continue using `__('admin.*')`.
 - **Dependencies & Decoupling**: High cohesion within a domain, loose coupling across domains. Cross-domain interactions must flow through events, service contracts, or published interfaces—never through deep coupling to another module's internal schema. Declare every cross-module class reference in `module.json` → `requirements.modules`.
 - **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in the database registry, suppressing route and provider registration). Attempting to uninstall a core module will throw a validation error. Never dirty the Git worktree with file deletions.
 - **Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community modules reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External modules never dirty Git and are protected by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
@@ -939,10 +939,10 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular trans
 - **Zero UI Presentation Changes**: All buttons, labels, and copy in English, Spanish, and French remain 100% frozen.
 - **Zero Template Churn**: Never rewrite Blade templates or Livewire components to package namespaces (`module::admin.*`). Views call `__('admin.*')` and resolve seamlessly via path cascading.
 - **Root Dictionary Sanctity**: Root `lang/{locale}/admin.php` exclusively owns generic action keys (`save`, `delete`, `cancel`, `edit`, `filter`, `actions`, `enabled`, `disabled`, `status`, `confirm`, `back`) and global navigation menu labels (`admin.gateways`, `admin.extensions`).
-- **Module Key Domain Relevance**: Every key in `app-modules/{module}/lang/{locale}/admin.php` must include the entity name. Never define generic keys in module files.
-- **Mandatory File Header Comment**: All module translation files (`lang/{en,es,fr}/admin.php`) and scaffolded files from `make:module` must start with the standardized collision warning docblock.
+- **Module Key Domain Requirement (Built-in Modules)**: Every key in `app-modules/{module}/lang/{locale}/admin.php` must include the entity name. For custom modules this is recommended, not mandatory. Never define generic root keys in module files.
+- **Module Language File Header Requirement (Built-in Modules)**: Every built-in `app-modules/{module}/lang/{en,es,fr}/admin.php` file must start with the standardized collision-warning docblock. Custom modules and `make:module` scaffolds do not need to include it.
 - **Runtime Collision Guard**: `ModuleServiceProvider` inspects keys on boot and throws `LogicException` in local/testing (or logs critical error and refuses path in production) if any collision with root keys is detected.
-- **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` checks root non-collision, peer non-collision, entity naming, and 100% key parity across `en`, `es`, `fr`.
+- **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` checks root non-collision, peer non-collision, 100% locale parity and headers for built-in `app-modules/`, root dictionary parity across `en`, `es`, `fr`, and the runtime collision guard.
 - Complete architectural reference: [`docs/architecture.md`](docs/architecture.md).
 
 ## Module Manifest Taxonomy & Navigation Parity

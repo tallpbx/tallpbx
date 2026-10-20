@@ -303,10 +303,7 @@ describe('native module commands', function (): void {
         foreach (['en', 'es', 'fr'] as $locale) {
             $langFile = $modulePath."/lang/{$locale}/admin.php";
             expect($langFile)->toBeFile();
-            $langContent = (string) file_get_contents($langFile);
-            expect($langContent)->toContain('COLLISION PREVENTION & KEY NAMING RULES:')
-                ->and($langContent)->toContain('native_command_test')
-                ->and($langContent)->toContain('Module language files will be rejected at runtime by ModuleServiceProvider');
+            expect((string) file_get_contents($langFile))->not->toContain('COLLISION PREVENTION');
         }
 
         File::deleteDirectory($modulePath);

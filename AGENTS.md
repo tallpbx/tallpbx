@@ -161,7 +161,8 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 **For new modules specifically**, also verify:
 - `module.json` exists and `php artisan module:sync --only-local` succeeds
 - Permissions are in the database: check with `php artisan tinker --execute 'echo Permission::where("name","your.permission")->exists() ? "YES" : "NO";'`
-- Translation keys exist in module dictionaries (`app-modules/<module>/lang/en/admin.php`) or root (`lang/en/admin.php`) with zero root collisions and 100% parity across `en`, `es`, `fr`
+- Translation keys exist in module dictionaries (`app-modules/<module>/lang/en/admin.php`) or root (`lang/en/admin.php`) with zero root collisions and 100% parity across `en`, `es`, and `fr` for built-in modules; custom modules may support any locale subset
+- Root dictionaries remain parity-complete across `en`, `es`, and `fr`
 - View namespace is registered (test by visiting the page in a browser test)
 - Route middleware includes `web` (sessions), `auth.panel` (auth), and `throttle` (rate limit)
 - Super Admin group has the new permissions: `php artisan db:seed --class=AdminSeeder`
@@ -335,10 +336,10 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) to support modula
 
 - **Native Multi-Path Cascading**: `ModuleServiceProvider` registers the module's `lang/` path via `app('translation.loader')->addPath($path)`. Under Laravel 13, translation paths cascade into the global group dictionary (`admin`), resolving `__('admin.gateway_host')` without changing Blade views or component call sites.
 - **Root Dictionary Sanctity**: Root `lang/{locale}/admin.php` is reserved strictly for generic actions (`save`, `delete`, `cancel`, `edit`, `filter`, `actions`, `enabled`, `disabled`, `status`, `confirm`, `back`) and global navigation menu labels (`admin.gateways`, `admin.extensions`). Generic action keys must **NEVER** be defined in module language files.
-- **Module Key Domain Relevance**: Every key defined in a module language file **must** include the module or entity domain identifier (e.g., `gateway_host`, `create_gateway`, `modal_delete_gateway_title`, `no_gateways_found`).
-- **Mandatory File Header Comment**: Every module language file (`lang/{en,es,fr}/admin.php`) and scaffolded file from `make:module` MUST begin with the standardized collision warning docblock explaining the cascading merging rule and prohibition on generic keys.
+- **Module Key Domain Requirement (Built-in Modules)**: Every key in `app-modules/{module}/lang/{locale}/admin.php` must include the module or entity domain identifier (e.g., `gateway_host`, `create_gateway`, `modal_delete_gateway_title`, `no_gateways_found`). For custom modules, this is a recommendation, not a requirement.
+- **Module Language File Header Requirement (Built-in Modules)**: Every `app-modules/{module}/lang/{en,es,fr}/admin.php` file must begin with the standardized collision-warning docblock explaining the cascading merging rule and prohibition on generic keys. Custom modules and `make:module` scaffolds are not required to include it.
 - **Runtime Collision Refusal Guard**: During boot, `ModuleServiceProvider` inspects module keys against the root dictionary. If any key collision is detected, the provider throws a `LogicException` in local/testing environments and logs a critical error while refusing to load the path in production, preventing global dictionary corruption.
-- **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` continuously enforces zero root collisions, zero cross-module collisions, domain name presence in keys, and 100% key parity across `en`, `es`, and `fr`.
+- **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` continuously enforces zero root collisions, zero cross-module collisions, 100% locale parity and collision-warning headers for built-in `app-modules/`, root dictionary parity across `en`, `es`, and `fr`, and the runtime collision guard.
 - Detailed architectural specification: [`docs/architecture.md`](docs/architecture.md).
 
 ### Custom Module Scaffolding (`make:module`)

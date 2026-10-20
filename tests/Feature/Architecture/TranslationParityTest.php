@@ -98,7 +98,7 @@ it('enforces zero cross-module key collisions across all modules', function () {
     );
 });
 
-it('enforces 100% locale parity across all module language files', function () {
+it('enforces 100% locale parity across all built-in module language files', function () {
     $moduleDirs = glob(base_path('app-modules/*'), GLOB_ONLYDIR) ?: [];
     expect($moduleDirs)->not->toBeEmpty();
 
@@ -131,15 +131,12 @@ it('enforces 100% locale parity across all module language files', function () {
     }
 });
 
-it('enforces the collision warning docblock on every module language file', function () {
+it('enforces the collision warning docblock on every built-in module language file', function () {
     $moduleLangFiles = glob(base_path('app-modules/*/lang/*/*.php')) ?: [];
     expect($moduleLangFiles)->toBeArray();
 
     foreach ($moduleLangFiles as $file) {
         $content = (string) file_get_contents($file);
-        $moduleName = basename(dirname($file, 3));
-        $locale = basename(dirname($file));
-        $group = basename($file);
 
         expect($content)->toContain('COLLISION PREVENTION & KEY NAMING RULES:')
             ->and($content)->toContain('Module language files will be rejected at runtime by ModuleServiceProvider');

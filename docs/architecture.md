@@ -126,11 +126,11 @@ To keep translations reliable and safe:
    - Universal action labels (`Save`, `Cancel`, `Delete`, `Edit`, `Filter`, `Actions`, `Enabled`, `Disabled`, `Status`, `Back`) belong exclusively in the main root dictionary.
    - Main navigation menu names (`Gateways`, `Extensions`, `SIP Profiles`) live in root so menus always display correctly even if a module is temporarily stopped.
 2. **Module Keys Use Descriptive Names**:
-   - Every translation key in a module file must include the feature or entity name (for example: `gateway_host`, `gateway_name_tooltip`, `create_gateway`, `no_gateways_found`).
+   - Including the feature or entity name in a module key is recommended to reduce collision risk (for example: `gateway_host`, `gateway_name_tooltip`, `create_gateway`, `no_gateways_found`). It is not mandatory.
    - Module files must never define generic words like `save` or `delete`.
 
-### 4.3 Mandatory Module Language File Header Comment
-Every module language file (`app-modules/{module}/lang/{en,es,fr}/admin.php`) must begin with the standardized collision warning docblock:
+### 4.3 Suggested Module Language File Header Comment
+Custom and third-party modules may optionally include the following collision-warning docblock. It is not required.
 
 ```php
 <?php
@@ -146,7 +146,7 @@ Every module language file (`app-modules/{module}/lang/{en,es,fr}/admin.php`) mu
  * at runtime.
  *
  * To prevent collisions across modules or with the root dictionary:
- * 1. Every key defined in this file MUST include the module/entity name
+ * 1. Including the module/entity name in keys is recommended
  *    (e.g. '{entity}_host', 'create_{entity}', 'no_{entities}_found').
  * 2. Generic keys (e.g. 'save', 'cancel', 'delete', 'edit', 'enabled', 'disabled',
  *    'status', 'actions') belong strictly in root lang/{locale}/admin.php and
@@ -175,8 +175,7 @@ During module boot, `App\Support\ModuleServiceProvider` validates that module la
 The test suite at `tests/Feature/Architecture/TranslationParityTest.php` runs on every CI run and local test cycle:
 - **Zero Root Collisions**: Asserts that no module language file defines any key that exists in root `lang/{locale}/admin.php`.
 - **Zero Cross-Module Collisions**: Asserts that no two modules define the same translation key.
-- **Entity Domain Relevance**: Asserts that keys defined in a module include the module or entity domain identifier.
-- **100% Locale Parity**: Asserts that every key defined in `en` exists with identical keys in `es` (Spanish) and `fr` (French).
+- **Root Locale Parity**: Asserts that root dictionaries have identical keys across `en`, `es`, and `fr`. Module translations may cover any subset of locales.
 
 ---
 
@@ -261,11 +260,11 @@ While developing locally in `custom-modules/` provides instant zero-build feedba
 ## 6. Translation Authoring Guidelines
 
 When creating translation keys for a module:
-1. **Module Domain Prefixing**: Every key defined in `app-modules/{module}/lang/{en,es,fr}/admin.php` must include the entity or domain name (e.g. `gateway_*`, `create_gateway`, `modal_delete_gateway_title`).
+1. **Descriptive Module Keys (Recommended)**: Including the entity or domain name (e.g. `gateway_*`, `create_gateway`, `modal_delete_gateway_title`) is recommended to reduce collision risk, but it is not mandatory.
 2. **Root Action Keys**: Generic action labels (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`, `status`, `actions`) belong strictly in root `lang/{locale}/admin.php` and must never be defined in module dictionaries.
-3. **Locale Parity**: All module keys must be populated across all supported languages (`en`, `es`, `fr`).
-4. **Header Docblock**: All module translation files must begin with the collision prevention docblock.
-5. **Verification**: Verify that keys follow all collision and parity rules:
+3. **Optional Locale Coverage**: Modules may provide translations for any subset of the supported languages; missing translations fall back to the fallback locale. Root dictionaries should remain complete across `en`, `es`, and `fr`.
+4. **Header Docblock (Suggested)**: A collision-warning header is suggested for custom and third-party modules to document the cascading merge behavior; it is optional.
+5. **Verification**: Verify that keys follow the runtime collision rule:
    ```bash
    php artisan optimize:clear
    ./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php
