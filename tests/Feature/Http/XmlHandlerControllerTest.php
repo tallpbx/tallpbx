@@ -9,9 +9,11 @@ use App\Services\DialplanContext;
 use App\Services\DialplanXmlCollector;
 use App\Services\TenantDefaultsService;
 use App\Services\TenantManager;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Modules\Acl\Models\AccessControl;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
@@ -1585,4 +1587,19 @@ it('exports caller id variables directly from extension model in directory xml',
         ->assertSee('<variable name="effective_caller_id_number" value="1001"/>', false)
         ->assertSee('<variable name="outbound_caller_id_name" value="Acme Corp"/>', false)
         ->assertSee('<variable name="outbound_caller_id_number" value="15551234567"/>', false);
+});
+
+it('rate-limits xml-handler requests per IP at the documented default ceiling', function () {
+    $limit = RateLimiter::limiter('xml-handler')(Request::create('/api/v1/xml-handler', 'POST'));
+
+    expect($limit->maxAttempts)->toBe(6000)
+        ->and($limit->key)->toBe('127.0.0.1');
+});
+
+it('disables xml-handler rate limiting only when explicitly opted out', function () {
+    config(['freeswitch.xml_handler.throttle_enabled' => false]);
+
+    $limit = RateLimiter::limiter('xml-handler')(Request::create('/api/v1/xml-handler', 'POST'));
+
+    expect($limit->maxAttempts)->toBe(PHP_INT_MAX); // Limit::none() sentinel = unlimited
 });

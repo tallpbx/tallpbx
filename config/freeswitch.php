@@ -324,7 +324,7 @@ return [
         |
         */
         'throttle_enabled' => filter_var(env('FS_XML_HANDLER_THROTTLE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
-        'throttle_limit' => (int) env('FS_XML_HANDLER_THROTTLE_LIMIT', 600),
+        'throttle_limit' => (int) env('FS_XML_HANDLER_THROTTLE_LIMIT', 6000),
         'throttle_decay_minutes' => (int) env('FS_XML_HANDLER_THROTTLE_DECAY_MINUTES', 1),
 
         /*

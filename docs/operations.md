@@ -67,6 +67,22 @@ To monitor telephony lookup latency and verify PHP-FPM workers under call bursts
 
 For comprehensive load testing runbooks, SIPp feature scenarios, and empirical hardware sizing, see [docs/load-testing-guide.md](load-testing-guide.md) and [docs/load-testing-results.md](load-testing-results.md).
 
+#### XML Handler Rate Limiting & Call-Volume Ceiling
+
+All `mod_xml_curl` lookups (directory, dialplan, and configuration bindings) hit
+`/api/v1/xml-handler`, and the built-in rate limiter buckets them **per source IP**.
+Because FreeSWITCH normally runs on the PBX host itself, the entire PBX shares one
+bucket:
+
+- **Default ceiling**: `FS_XML_HANDLER_THROTTLE_LIMIT=6000` requests per
+  `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES=1` minute ≈ 100 lookups/second — comfortably
+  above ~30 concurrent call setups/second (each setup costs 3–5 XML lookups).
+- **Failure mode**: when the ceiling is exceeded the limiter returns HTTP 429 and the
+  corresponding XML lookup fails — a failed dialplan lookup means a failed call setup.
+- **Tuning**: raise `FS_XML_HANDLER_THROTTLE_LIMIT` for heavy call-center volume, or set
+  `FS_XML_HANDLER_THROTTLE_ENABLED=false` for trusted same-host deployments where the
+  endpoint is only reachable from FreeSWITCH and the shared token is enforced.
+
 ## How the Firewall Decides
 
 The host firewall evaluates incoming connections sequentially through a 12-stage pipeline:
