@@ -416,7 +416,7 @@ sequenceDiagram
     Reverb-->>UI: Push WebSocket message to channel 'security.alerts'
     Note over UI: Livewire component reactively re-renders table without page reload
     
-    Note over Attacker,Kernel: BANNED: 198.51.100.22<br/>Subsequent packets are dropped by the kernel (zero CPU, FreeSWITCH never touched)
+    Note over Attacker,Kernel: BANNED: 198.51.100.22<br/>Kernel drops subsequent packets<br/>(zero CPU, FreeSWITCH untouched)
 ```
 
 ### 11.1 Redis Decoupling & Graceful Degradation
