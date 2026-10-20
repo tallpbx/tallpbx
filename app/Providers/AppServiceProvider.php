@@ -244,7 +244,7 @@ class AppServiceProvider extends ServiceProvider
                 return Limit::none();
             }
 
-            $limit = (int) config('freeswitch.xml_handler.throttle_limit', 600);
+            $limit = (int) config('freeswitch.xml_handler.throttle_limit', 6000);
             $decayMinutes = (int) config('freeswitch.xml_handler.throttle_decay_minutes', 1);
 
             return Limit::perMinutes($decayMinutes, $limit)->by($request->ip() ?? '127.0.0.1');

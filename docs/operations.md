@@ -82,6 +82,9 @@ bucket:
 - **Tuning**: raise `FS_XML_HANDLER_THROTTLE_LIMIT` for heavy call-center volume, or set
   `FS_XML_HANDLER_THROTTLE_ENABLED=false` for trusted same-host deployments where the
   endpoint is only reachable from FreeSWITCH and the shared token is enforced.
+- **Upgrading**: if your `.env` explicitly sets `FS_XML_HANDLER_THROTTLE_LIMIT` (copied
+  from an older `.env.example`), that value overrides the raised default — update it to
+  `6000` or remove the line to adopt the new ceiling.
 
 ## How the Firewall Decides
 
