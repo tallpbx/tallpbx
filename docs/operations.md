@@ -86,30 +86,24 @@ bucket:
   from an older `.env.example`), that value overrides the raised default — update it to
   `6000` or remove the line to adopt the new ceiling.
 
-## How the Firewall Decides
+## How the Firewall Evaluates Traffic
 
-The host firewall evaluates incoming connections sequentially through a 12-stage pipeline:
+TallPBX protects the server using an in-kernel Linux firewall (`nftables`). Incoming network connections are checked in a fast, sequential order:
 
-1. **Loopback (`iif "lo" accept`)**: Server internal communications (PHP-FPM, MariaDB, Redis) pass unconditionally.
-2. **Trusted Whitelist**: Whitelisted administrator IPs, office networks, and VPNs bypass lower drop rules.
-3. **Invalid Packet State**: Corrupted or malformed packets are discarded immediately.
-4. **Established / Related**: Active phone calls and existing sessions pass via fast-path connection tracking.
-5. **Permanent Blacklist**: Forbidden IPs and CIDR blocks are dropped at line rate.
-6. **Active Intruder Bans**: Attackers banned for failed authentication attempts across SIP, Web, or SSH are dropped with auto-expiring timeouts.
-7. **Public Threat Feeds**: Known scanner networks and VoIP fraud IPs (VoIPBL) are blocked.
-8. **Diagnostic Ping & IPv6**: Rate-limited ICMP ping and IPv6 neighbor discovery traffic.
-9. **TFTP Defense (UDP 69)**: Hardened profile blocking upload attempts (WRQ) and directory traversal probes.
-10. **PBX Port Catalog**: Legitimate traffic accepted for SIP (5060/5061/5080), RTP Audio, Web UI (80/443), and SSH (22).
-11. **Custom Sequential Rules**: User-defined firewall rules evaluated in assigned priority order.
-12. **Default Inbound Policy**: Fallback verdict (typically `drop`).
+1. **Loopback Traffic**: Connections between local server components (FreeSWITCH, MariaDB, Redis) pass unconditionally.
+2. **Trusted Whitelist**: Administrator IP addresses, office networks, and VPNs bypass all blocklists.
+3. **Established Connections**: Active phone calls and existing web sessions pass immediately.
+4. **Permanent Blacklist & Active Bans**: Known abusive IPs, country geo-blocks, threat feeds, and brute-force attackers are dropped at line rate.
+5. **Legitimate PBX Services**: Approved traffic is accepted for SIP signaling (ports 5060/5061/5080), voice audio (RTP ports 16384-32768), web admin (ports 80/443), and SSH (port 22).
+6. **Custom Rules & Default Drop**: Any administrator-defined custom rules run next, and unrecognized traffic falls through to the default drop policy.
+
+For complete low-level packet flow diagrams and kernel-level specifications, see the [System Architecture & Security Guide](architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering).
 
 ### Master Control Switches
-Three master operational switches pinned at the top of the Security Center control global behavior:
-- **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules. In the web interface, the Zone 1 overview telemetry dashboard is greyed out and all tab navigation and panels are hidden until re-enabled.
-- **Built-in Pre-Filters Switch**: Located directly in the Pre-Filters section header of the Firewall Rules tab, enables or disables stages 1–7 as a single unit. When disabled, an unmissable warning banner appears across all tabs and entries are marked as bypassed. Guarded against accidental lockout; the panel refuses changes that would sever loopback database and cache services.
-- **Global Observe Mode**: Keeps all rules active and counting, but changes drop verdicts to log-only so you can test policies safely before enforcing them.
-
-For complete packet flow diagrams and kernel-level specifications, see [docs/security-architecture.md](security-architecture.md).
+Three master switches at the top of the **Security Center** control global firewall behavior:
+- **Firewall Master Switch**: Toggles the entire host firewall on or off. When turned off, all incoming traffic is allowed while preserving essential local server connections.
+- **Pre-Filters Switch**: Enables or disables built-in protection stages (whitelist, blacklist, active bans, and threat feeds) with a single click. Guarded against accidental lockout; the system prevents disabling rules that would break local database or cache connections.
+- **Global Observe Mode**: Keeps all rules active and counting, but changes drop actions to log-only so you can test policies safely before enforcing them.
 
 ### Testing Firewall Policies with Observe Mode
 
@@ -225,7 +219,7 @@ apply regenerates the ruleset from the saved configuration and replaces the reco
 added above.
 
 For the complete kernel-level command reference, see
-[security-architecture.md](security-architecture.md#93-method-3-direct-linux-nftables-commands).
+[architecture.md](architecture.md#163-method-3-direct-linux-nftables-commands).
 
 ### Web Panel Shows 502 or 504 Error
 

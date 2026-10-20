@@ -133,7 +133,7 @@ command demonstration. Two production outages were caused this way:
   the next apply. Always reconcile through the application.
 
 **Recovery reference** (use only during an actual lockout; full runbooks for humans:
-`docs/operations.md` → Recovering from a Firewall Lockout, `docs/security-architecture.md` → 9.3):
+`docs/operations.md` → Recovering from a Firewall Lockout, `docs/architecture.md` → §16.3):
 - Restore loopback instantly, keeping every other rule: `nft insert rule inet tallpbx_filter input iif "lo" accept`
 - Restore one administrator address: `nft insert rule inet tallpbx_filter input ip saddr <admin-ip> accept`
 - Flip the chain's policy in place without flushing its rules: `nft 'chain inet tallpbx_filter input { policy accept; }'`
@@ -339,7 +339,7 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) to support modula
 - **Mandatory File Header Comment**: Every module language file (`lang/{en,es,fr}/admin.php`) and scaffolded file from `make:module` MUST begin with the standardized collision warning docblock explaining the cascading merging rule and prohibition on generic keys.
 - **Runtime Collision Refusal Guard**: During boot, `ModuleServiceProvider` inspects module keys against the root dictionary. If any key collision is detected, the provider throws a `LogicException` in local/testing environments and logs a critical error while refusing to load the path in production, preventing global dictionary corruption.
 - **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` continuously enforces zero root collisions, zero cross-module collisions, domain name presence in keys, and 100% key parity across `en`, `es`, and `fr`.
-- Detailed architectural specification: [`docs/modular-architecture.md`](docs/modular-architecture.md).
+- Detailed architectural specification: [`docs/architecture.md`](docs/architecture.md).
 
 ### Custom Module Scaffolding (`make:module`)
 
@@ -706,9 +706,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
 
-## Documentation Files
+## Documentation Files & Plain-Language Standards
 
 - You must only create documentation files if explicitly requested by the user.
+- **Architectural Terms in Documentation (Plain-Language Rule)**: Jargon like "Domain-Driven Modular Monolith" is reserved for technical architecture specifications (e.g. `docs/architecture.md`, `AGENTS.md`). In general, administrator-facing, or end-user documentation (such as `README.md` or user guides), always prioritize simple, intuitive concepts (e.g. "modular architecture with self-contained feature modules in a unified application") or explicitly define the term in plain English immediately upon introduction. Avoid confusing non-technical users with abstract design pattern jargon.
 
 ## Replies
 

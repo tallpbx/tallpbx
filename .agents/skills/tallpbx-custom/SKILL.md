@@ -158,6 +158,7 @@ A central requirement of the TallPBX user experience is **predictable consistenc
   - **State descriptors, never action verbs**: Toggle switch labels must describe the current state (adjectives: `"Enabled"` / `"Disabled"` via `__('admin.enabled')` / `__('admin.disabled')`), **never** imperative action verbs (`"Enable"` / `"Disable"`). Imperative verbs belong on clickable buttons, not state toggles.
   - Always wire with pointer lock (`wire:loading.class="opacity-70 pointer-events-none"`), input disabled state (`wire:loading.attr="disabled"`), and inline DaisyUI spinner with present-continuous status copy (`"Enabling..."` / `"Disabling..."` via `__('admin.*_enabling')`).
 - **Unit Standardization in Documentation & Specs**: Always use standard, accessible decimal storage and memory units (**GB**, **MB**, **KB**) across all documentation, guides, hardware specifications, and agent instructions (e.g. `2 GB swap`, `4 GB RAM`, `25 GB disk`), rather than binary IEC prefixes (**GiB**, **MiB**). Binary units (`GiB`, `MiB`) are reserved strictly for quoting literal, unformatted command output (e.g. raw `free -m` or `free -h` dumps).
+- **Plain-Language Architectural Terms**: Reserve academic jargon like "Domain-Driven Modular Monolith" for technical architecture specs (`docs/architecture.md`, `AGENTS.md`). In general administrator-facing or end-user documents (e.g. `README.md`, setup guides), use simple, accessible descriptions (e.g. "modular architecture with self-contained feature modules in a unified application") or explicitly define the term in plain, intuitive English immediately upon introduction.
 
 ## Privileged Host Command Architecture (Bounded Sudoers Pattern)
 
@@ -942,7 +943,7 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular trans
 - **Mandatory File Header Comment**: All module translation files (`lang/{en,es,fr}/admin.php`) and scaffolded files from `make:module` must start with the standardized collision warning docblock.
 - **Runtime Collision Guard**: `ModuleServiceProvider` inspects keys on boot and throws `LogicException` in local/testing (or logs critical error and refuses path in production) if any collision with root keys is detected.
 - **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` checks root non-collision, peer non-collision, entity naming, and 100% key parity across `en`, `es`, `fr`.
-- Complete architectural reference: [`docs/modular-architecture.md`](docs/modular-architecture.md).
+- Complete architectural reference: [`docs/architecture.md`](docs/architecture.md).
 
 ## Module Manifest Taxonomy & Navigation Parity
 

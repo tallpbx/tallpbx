@@ -12,7 +12,7 @@ TallPBX is a self-hosted business phone system named after its foundation on the
 - Deliver voicemail notifications, password resets, and system alerts via standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft 365, or custom providers).
 - Operate one or more customer or business tenants from the same system.
 - Keep backups and restore approved backup operations.
-- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP, Web, and SSH vectors, automatic ban management, and zero-lockout protection ([Security Architecture & Flow Guide →](docs/security-architecture.md)).
+- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP, Web, and SSH vectors, automatic ban management, and zero-lockout protection ([System Architecture & Packet Flow Guide →](docs/architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering)).
 
 TallPBX is the phone-system software, not a telephone carrier. You need a SIP
 trunk or gateway from a provider if you want to place or receive public phone
@@ -40,11 +40,11 @@ Built to eliminate the steep learning curve and dated interfaces of legacy PBX p
 | **Automated Tests** | **2,900+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
 | **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
 
-See the [Feature and Function Parity Guide](docs/parity-comparison.md) for a domain-by-domain breakdown across all 60 PBX modules, the [Telephony Architecture Guide](docs/telephony-architecture.md) for the Users/Extensions/SIP Accounts/Devices model, and the [Security Architecture & Packet Flow Guide](docs/security-architecture.md) for network defense details.
+See the [Feature and Function Parity Guide](docs/parity-comparison.md) for a domain-by-domain breakdown across all 60 PBX modules, the [PBX Concepts & Fundamentals Guide](docs/pbx-concepts.md) for the Users/Extensions/SIP Accounts/Devices model, and the [System Architecture Guide](docs/architecture.md) for technical modular and security details.
 
-## User Interface & Visual Tour
+## User Interface & Switchable Themes
 
-TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, Laravel 13) with DaisyUI components, offering a modern responsive control panel with light and dark themes and three switchable navigation layouts:
+TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, Laravel 13) with DaisyUI components, offering a modern responsive control panel with light, dark, and system themes, three switchable navigation layouts, and mobile-friendly responsive drawers:
 
 | Public Landing (Light Theme) | Public Landing (Dark Theme) |
 | :---: | :---: |
@@ -53,6 +53,11 @@ TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, 
 ### Unified Panel & Flexible Navigation Layouts
 
 The single unified panel (`/panel/`) adapts to administrator preference with instant theme and layout toggles:
+- **Switchable Themes (Light, Dark, System)**: Instant toggle saved per-user with zero-flicker loading.
+- **Collapsible Sidebar (Mini Rail)**: Collapse navigation down to a compact 64px icon rail to maximize screen space for wide PBX data tables (CDRs, call routing, extensions).
+- **Horizontal Topbar**: Optional top dropdown layout for administrators accustomed to classic PBX interfaces.
+- **Mobile Responsive Drawer**: Compact slide-over menu on mobile screens and tablets.
+- **Scroll Preservation**: Keeps your exact scroll position across page transitions.
 
 | Full Sidebar (`w-64`) | Mini Icon Rail (`w-16`) | Horizontal Topbar |
 | :---: | :---: | :---: |
@@ -60,41 +65,41 @@ The single unified panel (`/panel/`) adapts to administrator preference with ins
 
 👉 **[Explore the Complete Visual Tour (Tenants, Extensions, Devices, Impersonation, Multi-Language & Layouts) →](docs/ui-tour.md)**
 
-## Quick Start
-
-1. Prepare a Debian 13 server with at least 1 GB RAM, 2 GB swap, 1 CPU core, and 25 GB disk space.
-2. Follow the [installation guide](INSTALL.md). It walks through server setup, the installer, and the first login.
-3. Open the server's IP address in a browser and sign in with the administrator email and password chosen during installation.
-4. Follow the [PBX "Hello World" Guide](docs/pbx-hello-world.md) to create your first extension, register a softphone (MicroSIP, Linphone, or desk phone), and place an audio loopback echo test call (`*9196`).
-5. Consult the [Operations Guide](docs/operations.md) for production configuration, including sound prompt languages, email notifications, capacity tuning, and backups.
-
-The installer configures TallPBX, FreeSWITCH, Nginx, MariaDB, and Redis. It is safe to re-run at any time without touching existing data. [Full installation guide →](INSTALL.md)
-
-## Prerequisites & Hardware Requirements
+## System Requirements
 
 - **Operating System**: Debian 13 server (64-bit)
-- **Access**: Root / sudo access
-- **Network**: Internet connectivity with static IP or bridged network adapter
-- **Minimum Hardware (Production)**:
-  - **CPU**: 1 vCPU (2+ vCPUs recommended for active PBX workloads)
-  - **Storage**: 25 GB disk space (40 GB+ recommended for call recordings and voicemail)
-  - **RAM**: 1 GB RAM
-  - **Swap**: 2 GB swap
-- **Recommended Hardware (Development / High-Volume)**:
-  - **CPU**: 4 vCPUs
-  - **Storage**: 40 GB storage
-  - **RAM**: 4 GB RAM
-  - **Swap**: 2 GB swap
+- **Access**: Root / sudo access with internet connectivity
+- **Hardware Tiers**:
+  - **Production (Minimum)**: 1 vCPU (2+ recommended), 1 GB RAM, 2 GB swap, 25 GB disk (40 GB+ for recordings/voicemail).
+  - **Development / High-Volume**: 4 vCPUs, 4 GB RAM, 2 GB swap, 40 GB disk.
+
+## Quick Start
+
+1. Set up a Debian 13 server matching the requirements above.
+2. Follow the [Installation Guide](INSTALL.md) to install TallPBX, FreeSWITCH, Nginx, MariaDB, and Redis with a single command.
+3. Open the server's IP address in your browser and log in with your administrator credentials.
+4. Follow the [PBX "Hello World" Guide](docs/pbx-hello-world.md) to create your first extension, register a phone (MicroSIP, Linphone, or desk phone), and place a test echo call (`*9196`).
+5. Consult the [Operations Guide](docs/operations.md) for production settings, including sound prompt languages, email notifications, capacity tuning, and backups.
+
+The installer is safe to re-run at any time without touching your existing data. [Full installation guide →](INSTALL.md)
 
 ## Modular Architecture (Domain-Driven Modular Monolith)
 
-TallPBX organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**:
+TallPBX is built as a **Domain-Driven Modular Monolith** — an architectural term that simply means:
 
-- **Built-in Core Modules (`app-modules/`)**: All 60 built-in telephony and administration domains reside in `app-modules/<domain-name>/`. They autoload directly via root `composer.json` PSR-4 (`Modules\<Domain>\`), eliminating fragile path repositories and pseudo-packages. Core modules update atomically via Git and are never deleted from disk.
-- **Third-Party Extensions (`custom-modules/`)**: Community add-ons and integrations live in the untracked, git-ignored `custom-modules/<name>/` directory. They are dynamically autoloaded at runtime via `CustomModuleAutoloader` under `CustomModules\<Name>\` with zero modifications to root `composer.json`.
-- **Standard Service Providers**: All modules register views, migrations, Livewire components, routes, menus, and permissions via `App\Support\ModuleServiceProvider`.
-- **Pre-Flight Collision Guards**: External modules are validated against core route prefixes, database tables, module names, permissions, and language keys.
-- **Detailed Specification**: See the [Modular Architecture & Translation Guide →](docs/modular-architecture.md).
+> **All features are organized into dedicated, self-contained building blocks (domains) inside one unified, reliable application (monolith).**
+
+### What This Means in Plain English
+- **Organized by Business Feature, Not Technical Type**: In traditional apps, code is scattered across generic folders (all models together, all controllers together). In TallPBX, each distinct telephony feature (like Extensions, Voicemail, Gateways, or Security) keeps everything it needs — database tables, business rules, web screens, and translations — packaged together in its own self-contained module folder (`app-modules/`).
+- **One Unified System (Monolith)**: Everything runs together as a single, rock-solid application. You don't have to manage dozens of separate microservices, network connections between containers, or fragile external packages. When you update TallPBX, the entire system updates together cleanly and reliably.
+- **Easy to Turn Features On or Off**: If your organization does not need certain telephony features (like Call Center Queues or Ring Groups), administrators can toggle them off with one click in the panel without touching server files or risking system stability.
+- **Clean Foundation for Custom Extensions**: Community plugins and third-party integrations plug in smoothly without altering core application files.
+
+### Key Highlights
+- **Built-in Core Modules (`app-modules/`)**: All 60 built-in telephony and administration domains reside in `app-modules/<domain-name>/`. They autoload directly via standard PHP autoloading, update atomically via Git, and are protected against accidental file deletion.
+- **Third-Party Extensions (`custom-modules/`)**: Community add-ons and integrations live in the untracked, git-ignored `custom-modules/<name>/` directory, allowing you to add custom features that never interfere with core system updates.
+- **Pre-Flight Collision Guards**: External modules are automatically verified so they cannot conflict with core routes, database tables, module names, or permissions.
+- **Detailed Technical Specification**: For developers and system architects interested in bounded contexts and service provider internals, see the [System Architecture & Developer Guide →](docs/architecture.md).
 
 Scaffold a new custom third-party extension in `custom-modules/`:
 
@@ -154,7 +159,7 @@ php artisan security:sync-geoip          # Synchronize IPdeny country zones for 
 php artisan security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
 ```
 
-For packet flow diagrams and architecture details, see [docs/security-architecture.md](docs/security-architecture.md).
+For packet flow diagrams and architecture details, see [docs/architecture.md](docs/architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering).
 
 ## Running the Application
 
@@ -171,16 +176,6 @@ In production, Nginx serves the application automatically. After making code cha
 ```bash
 php artisan optimize:clear
 ```
-
-### Panel Navigation & Switchable Themes
-
-The unified control panel provides flexible ergonomics designed for wide PBX data tables (CDRs, routing rules, extensions):
-
-- **Switchable Themes (Light, Dark, System)**: Instant toggle between Light, Dark, or System preference, saved per-user.
-- **Collapsible Sidebar (Mini Rail)**: Collapse the vertical navigation down to a compact 64px icon rail to maximize table viewing space.
-- **Horizontal Header Navigation**: Optional topbar dropdown layout for administrators accustomed to traditional PBX interfaces.
-- **Mobile Responsive Drawer**: Viewports below 1024px automatically switch to an accessible slide-over mobile drawer.
-- **Scroll Preservation**: Navigation preserves exact scroll positions across page transitions.
 
 ## Running Tests
 
@@ -204,11 +199,11 @@ All automated tests execute inside an isolated in-memory SQLite database and tem
 
 ## Performance & Load Testing
 
-TallPBX is capable of handling high-concurrency telephony workloads. When calls or registrations occur, FreeSWITCH requests user extension accounts (directory) and call routing rules (dialplans) dynamically over HTTP via `mod_xml_curl`. After the initial database query, Redis caches the result in memory. Because simultaneous calls and in-call transfers frequently re-query the same extension and routing data, serving repeated lookups directly from memory avoids querying MariaDB again, delivering sub-millisecond response times.
+TallPBX is built to handle busy phone systems smoothly. When phones register or place calls, FreeSWITCH asks TallPBX for user account and routing rules. TallPBX keeps frequently used rules in high-speed memory (Redis), allowing calls to connect almost instantly (sub-millisecond lookups) without straining the database even during heavy call bursts.
 
-- **Dialplan Benchmarks**: Built-in test tooling (`php artisan pbx:load-test:dialplan`) measures XML handler throughput, concurrency, and latency across synthetic workloads.
-- **End-to-End SIP Validation**: The test harness (`scripts/pbx-sipp-validate.sh`) verifies SIP registrations, outbound routing, RTP media echo, call forwarding, ring groups, and voicemail.
-- **Hardware Sizing**: Tested to sustain 25+ calls/sec and 250+ concurrent channels on standard 4 GB instances.
+- **Built-in Benchmarking**: Test tooling (`php artisan pbx:load-test:dialplan`) measures call routing speed and capacity.
+- **End-to-End SIP Validation**: The test harness (`scripts/pbx-sipp-validate.sh`) verifies phone registrations, outbound calls, audio echo, call forwarding, ring groups, and voicemail.
+- **Hardware Capacity**: Tested to sustain 25+ calls/sec and 250+ concurrent channels on standard 4 GB instances.
 
 For complete benchmarking instructions, PHP-FPM pool sizing, and empirical performance metrics across hardware tiers:
 - 👉 **[Load Testing Guide (docs/load-testing-guide.md)](docs/load-testing-guide.md)** — Operational runbook for running dialplan and SIPp tests.
@@ -220,7 +215,7 @@ TallPBX follows the **[Laravel framework versioning model](https://laravel.com/d
 
 - **Versioned Series Branches**: Following the pattern used by Laravel, the repository does not maintain a perpetual `main` or `master` branch. Instead, active development takes place directly on versioned series branches representing release lines (e.g. `1.1`, `2.0`, `3.x`, `4.x`).
 - **Release Strategy**:
-  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `4.x` series introduces the Domain-Driven Modular Monolith modernization and requires a fresh install rather than an in-place upgrade from earlier major lines (`3.x`, `2.0`, `1.x`).
+  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `4.x` series modernizes the entire codebase into a clean modular architecture and requires a fresh install rather than an in-place upgrade from earlier major lines (`3.x`, `2.0`, `1.x`).
   - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
   - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
 - **Active Release Branches**:

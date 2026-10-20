@@ -113,5 +113,5 @@ To see how straightforward this is in practice, here is what happens when a comp
 ## Related Documentation
 
 - [PBX "Hello World" Quickstart](pbx-hello-world.md) — Create an extension and test your first call with an audio echo test (`*9196`).
-- [Modular Architecture Guide](modular-architecture.md) — Technical details of how modules are structured in `app-modules/`.
-- [Security Architecture & Firewall Guide](security-architecture.md) — How TallPBX defends phone traffic with kernel-level packet filtering.
+- [System Architecture & Developer Guide](architecture.md) — Comprehensive technical reference for modular design, bounded contexts, and Linux kernel firewall defense.
+- [User Interface Tour](ui-tour.md) — Visual walkthrough of TallPBX workspaces, themes, and layouts.

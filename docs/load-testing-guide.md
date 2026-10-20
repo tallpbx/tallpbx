@@ -454,5 +454,5 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 
 - [PBX SIP Load Testing & Benchmark Results](load-testing-results.md) — Authoritative capacity measurements, latency percentiles, and hardware sizing matrices.
 - [Operations & Maintenance Guide](operations.md) — Day-to-day service commands and session rate tuning.
-- [Security Architecture & Flow Guide](security-architecture.md) — Kernel firewall rules and whitelist management.
+- [System Architecture & Developer Guide](architecture.md) — Kernel firewall rules, modular structure, and whitelist management.
 - [SIPp Documentation](https://sipp.readthedocs.io/) — Official SIPp scenario syntax and command-line options.
