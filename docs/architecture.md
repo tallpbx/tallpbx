@@ -21,7 +21,7 @@ Rather than maintaining all models, controllers, Livewire components, routes, mi
 1. **Single Deployable Monolith**: All built-in modules belong to the unified core codebase and update atomically via Git. They are NOT independent microservices or separate Composer packages.
 2. **Direct Root PSR-4 Autoloading**: All built-in modules are mapped directly in root `composer.json` via standard PSR-4 (`Modules\{Domain}\` => `app-modules/{domain}/src/`). Root `composer.json` contains 0 path repositories and 0 `tallpbx/module-*` package requirements.
 3. **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are permanent parts of the system and are never deleted from disk. Disabling a module is strictly logical (`enabled = false` in the database registry, suppressing route, view, and provider registration).
-4. **Clean Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community extensions reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External extensions are guarded by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
+4. **Clean Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community modules reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External modules are guarded by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
 5. **Standardized Base Service Provider**: All modules boot via a child class extending `App\Support\ModuleServiceProvider`, eliminating repetitive boilerplate for views, migrations, routes, Livewire components, permissions, and translations.
 6. **Decoupled Cross-Domain Communication**: High cohesion within domains, low coupling between domains. Modules communicate through Laravel events, service contracts, or published interfaces rather than deep cross-domain database coupling.
 7. **Zero-Friction Scaffolding**: The Artisan command `php artisan make:module <name>` scaffolds production-ready modules conforming strictly to project conventions.
@@ -180,9 +180,9 @@ The test suite at `tests/Feature/Architecture/TranslationParityTest.php` runs on
 
 ---
 
-## 5. Scaffolding Custom Extensions with Artisan (`make:module`)
+## 5. Scaffolding Custom Modules with Artisan (`make:module`)
 
-In the Domain-Driven Modular Monolith, built-in modules (`app-modules/`) are part of the permanent appliance monorepo maintained directly in version control. To keep the developer experience clean and avoid fragile runtime mutations of root `composer.json`, the scaffolding command `php artisan make:module` is dedicated exclusively to generating **third-party community extensions and plugins** in `custom-modules/`:
+In the Domain-Driven Modular Monolith, built-in modules (`app-modules/`) are part of the permanent appliance monorepo maintained directly in version control. To keep the developer experience clean and avoid fragile runtime mutations of root `composer.json`, the scaffolding command `php artisan make:module` is dedicated exclusively to generating **third-party community modules** in `custom-modules/`:
 
 ```bash
 php artisan make:module my-crm-connector \
@@ -202,7 +202,7 @@ php artisan make:module my-crm-connector \
 
 ### 5.1 Distributing Custom Modules as Composer Packages (`vendor/`)
 
-While developing locally in `custom-modules/` provides instant zero-build feedback, custom modules can also be packaged and installed as **Composer packages in `vendor/`** (`source: "vendor"`). This allows teams and community authors to distribute modular extensions via private Git repositories, Packagist, or Satis.
+While developing locally in `custom-modules/` provides instant zero-build feedback, custom modules can also be packaged and installed as **Composer packages in `vendor/`** (`source: "vendor"`). This allows teams and community authors to distribute custom modules via private Git repositories, Packagist, or Satis.
 
 #### Step-by-Step Workflow:
 
@@ -250,7 +250,7 @@ While developing locally in `custom-modules/` provides instant zero-build feedba
    ```
 
 5. **Discovery & Activation**:
-   TallPBX's discovery scanner inspects `vendor/*/*/module.json` on boot and caches the discovered manifest (`bootstrap/cache/modules.php`). Synchronize and activate the extension:
+   TallPBX's discovery scanner inspects `vendor/*/*/module.json` on boot and caches the discovered manifest (`bootstrap/cache/modules.php`). Synchronize and activate the module:
    ```bash
    php artisan module:sync
    ```
@@ -273,7 +273,7 @@ When creating translation keys for a module:
 
 ---
 
-## 7. Multi-Source Discovery, Boot Guards & Custom Extension Lifecycle
+## 7. Multi-Source Discovery, Boot Guards & Custom Module Lifecycle
 
 ### 7.1 Why Path Repositories Were Replaced With Direct PSR-4
 
@@ -286,7 +286,7 @@ TallPBX 3.x registered each of its 60 built-in modules as a Composer **path repo
 2. **Fragile boot coupling**: modules registered their providers through
    `extra.laravel.providers` inside per-module `composer.json` files; deleting a module directory
    without a perfect Composer dance left the installation un-bootable.
-3. **Extension blur**: first-party code was packaged as if it were third-party, so the Git
+3. **Module blur**: first-party code was packaged as if it were third-party, so the Git
    updater and module lifecycle constantly negotiated with Composer state.
 
 TallPBX 4.x replaces all of it with **direct root PSR-4 autoloading**
@@ -310,7 +310,7 @@ the same boot guards, so behavior never depends on cache state.
 
 ### 7.3 Pre-Flight & Runtime Collision Guards (`App\Services\ModuleCollisionGuard`)
 
-Third-party extensions are untrusted code. Before and during registration the appliance enforces:
+Third-party modules are untrusted code. Before and during registration the appliance enforces:
 
 | Guard | Rule | Enforcement point |
 | :--- | :--- | :--- |
@@ -321,7 +321,7 @@ Third-party extensions are untrusted code. Before and during registration the ap
 | Permissions | Custom modules cannot claim permissions already owned by another module | `PermissionService` ownership guard |
 | Dependencies | Unmet `requirements.modules` or `requirements.packages` disable the module (manifest + registry + provider skip) with a critical log instead of crashing the appliance — on both boot paths | Discovery fail-soft check |
 
-### 7.4 Custom Extension Lifecycle
+### 7.4 Custom Module Lifecycle
 
 | Action | Core (`app-modules/`) | Custom (`custom-modules/`) | Vendor (`vendor/`) |
 | :--- | :--- | :--- | :--- |
@@ -330,9 +330,9 @@ Third-party extensions are untrusted code. Before and during registration the ap
 | Restore | N/A (never uninstalled) | N/A (untracked — nothing to restore from) | `module:restore` — Composer re-require from the recorded package |
 
 `module:sync` prunes ghost core registry rows (a `source = 'core'` row whose directory is gone is
-always dead) while preserving custom/vendor rows so unplugged extensions keep their state.
+always dead) while preserving custom/vendor rows so unplugged modules keep their state.
 
-Scaffold new extensions with `php artisan make:module <name>` — it writes to
+Scaffold new modules with `php artisan make:module <name>` — it writes to
 `custom-modules/{name}/` only, tags the manifest `source: custom`, and refreshes the manifest
 cache. Route auto-registration (Livewire `List`/`Edit` component conventions) and dialplan XML
 hooks (`DialplanXmlContributor`) work identically for custom modules and core modules.
@@ -340,9 +340,9 @@ hooks (`DialplanXmlContributor`) work identically for custom modules and core mo
 ### 7.5 Backups: System Superadmin Disaster Recovery
 
 The Backups module is a required Core Administration utility (`required: true` — it cannot be
-disabled) that owns its own routes, menu entry, and permissions. Third-party extensions ride with
+disabled) that owns its own routes, menu entry, and permissions. Third-party modules ride with
 the "Application files" backup scope: `custom-modules/` is captured into every backup that includes
-that scope, included in pre-restore rollback snapshots, and restored module-by-module — extensions
+that scope, included in pre-restore rollback snapshots, and restored module-by-module — modules
 installed after a backup are left untouched. See the Security Center documentation for
 firewall-adjacent restore safety rules.
 

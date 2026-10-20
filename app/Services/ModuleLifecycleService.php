@@ -23,7 +23,7 @@ use Symfony\Component\Process\Process;
  *
  * First-party core modules (app-modules/) are permanent monorepo code and can
  * never be uninstalled — administrators disable them instead. Third-party
- * custom modules (custom-modules/) are untracked extensions that can be
+ * custom modules (custom-modules/) are untracked modules that can be
  * deleted with typed confirmation; their registry row is removed because
  * nothing on disk or in git can bring them back. Vendor modules are removed
  * and restored through Composer, keeping a registry marker with the package
@@ -69,7 +69,7 @@ class ModuleLifecycleService
         }
 
         // Discover which lifecycle class the module belongs to: permanent
-        // core code, an untracked custom extension, or a vendor package.
+        // core code, an untracked custom module, or a vendor package.
         $coreDir = $this->coreDir($name);
         $customDir = $coreDir === null ? $this->customDir($name) : null;
         $vendor = ($coreDir === null && $customDir === null) ? $this->vendorModuleInfo($name) : null;
@@ -79,7 +79,7 @@ class ModuleLifecycleService
         }
 
         if ($customDir === null && $vendor === null) {
-            return $this->refusal("Module [{$name}] is not an installed custom extension or vendor package.");
+            return $this->refusal("Module [{$name}] is not an installed custom module or vendor package.");
         }
 
         $source = $customDir !== null ? 'custom' : 'vendor';
@@ -129,7 +129,7 @@ class ModuleLifecycleService
 
         if ($source === 'custom') {
             // Custom modules are untracked, so nothing can bring them back.
-            $warnings[] = 'This custom extension cannot be restored after deletion — no copy exists in git or Composer.';
+            $warnings[] = 'This custom module cannot be restored after deletion — no copy exists in git or Composer.';
         }
 
         return [
@@ -204,7 +204,7 @@ class ModuleLifecycleService
         $moduleDirDeleted = false;
 
         if (! $isVendor) {
-            // Custom extensions own their untracked directory; nothing else
+            // Custom modules own their untracked directory; nothing else
             // in the installation tree belongs to them.
             $moduleDirDeleted = $this->files->deleteDirectory((string) $preview['module_dir']);
         }
@@ -225,7 +225,7 @@ class ModuleLifecycleService
             // Custom modules have no origin to restore from, so their registry
             // row is deleted along with their files. When the directory
             // deletion failed, keep the row: deleting it would re-register a
-            // default-enabled, panel-visible extension on the next boot.
+            // default-enabled, panel-visible module on the next boot.
             Module::where('name', $name)->delete();
         }
 
@@ -298,7 +298,7 @@ class ModuleLifecycleService
 
         if ($registryRow === null || $registryRow->composer_package === null || $registryRow->composer_package === '') {
             return array_merge($empty, [
-                'reason' => "Module [{$name}] has no recorded Composer package to restore from. Custom extensions are untracked and cannot be restored.",
+                'reason' => "Module [{$name}] has no recorded Composer package to restore from. Custom modules are untracked and cannot be restored.",
                 'registry_row' => $registryRow !== null,
             ]);
         }
@@ -409,7 +409,7 @@ class ModuleLifecycleService
     }
 
     /**
-     * Resolve the untracked custom extension directory for a module name.
+     * Resolve the untracked custom module directory for a module name.
      */
     private function customDir(string $name): ?string
     {

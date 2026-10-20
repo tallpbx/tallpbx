@@ -46,7 +46,7 @@ return [
     'no_admins_found' => 'Aucun administrateur trouvé.',
 
     // Modules workbench (Task 7): category headers, source badges, and
-    // the custom-extension deletion flow. No root-dictionary collisions.
+    // the custom-module deletion flow. No root-dictionary collisions.
     'modules_category_core' => 'Core',
     'modules_category_custom' => 'Modules personnalisés',
     'modules_source' => 'Source',
@@ -55,9 +55,9 @@ return [
     'modules_vendor' => 'Fournisseur',
     'modules_enabling' => 'Activation…',
     'modules_disabling' => 'Désactivation…',
-    'modules_delete_extension' => 'Supprimer l\'extension',
-    'modules_delete_confirm' => 'Supprimer définitivement l\'extension personnalisée « :name » ? Cette action est irréversible : les extensions personnalisées ne peuvent pas être restaurées.',
+    'modules_delete_extension' => 'Supprimer le module',
+    'modules_delete_confirm' => 'Supprimer définitivement le module personnalisé « :name » ? Cette action est irréversible : les modules personnalisés ne peuvent pas être restaurés.',
     'modules_protected_hint' => 'Les modules protégés ne peuvent pas être désinstallés.',
-    'modules_delete_not_custom' => 'Seules les extensions personnalisées peuvent être supprimées depuis le panneau des modules.',
-    'modules_delete_failed' => 'L\'extension n\'a pas pu être supprimée.',
+    'modules_delete_not_custom' => 'Seuls les modules personnalisés peuvent être supprimés depuis le panneau des modules.',
+    'modules_delete_failed' => 'Le module n\'a pas pu être supprimé.',
 ];

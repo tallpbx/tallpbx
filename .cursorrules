@@ -24,7 +24,7 @@ Laravel Boost is active as an MCP server (`.cursor/mcp.json` runs `php artisan b
 - **Atomic Deployment**: All 60 built-in modules are part of the core repository and deploy/update together via Git. They are NOT independent microservices or separate Composer packages.
 - **Direct PSR-4 Autoloading**: All built-in modules are autoloaded via direct PSR-4 in root `composer.json` (`Modules\{Domain}\` => `app-modules/{domain}/src/`). Root `composer.json` contains 0 path repositories.
 - **No Core File Deletion**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in registry, suppressing route and provider registration).
-- **Extensibility Boundary (`custom-modules/`)**: 3rd-party community extensions reside in the untracked, git-ignored `custom-modules/` directory or in standard Composer packages under `vendor/`, protected by strict Pre-flight Collision Guards.
+- **Extensibility Boundary (`custom-modules/`)**: 3rd-party community modules reside in the untracked, git-ignored `custom-modules/` directory or in standard Composer packages under `vendor/`, protected by strict Pre-flight Collision Guards.
 - **Domain Boundaries & Decoupling**: All future AI design decisions and code changes must respect domain boundaries. Keep high cohesion within domains, low coupling between domains, and communicate across domains using Laravel events, service contracts, or published interfaces—never deep coupling to another module's internal schema.
 - **Autonomous Utilities**: System administration utilities like Backups are self-contained modules under Core Administration (Superadmin-centric).
 

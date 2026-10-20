@@ -45,7 +45,7 @@ class BackupService implements BackupServiceInterface
     {
         return [
             'database' => 'Database (full SQL dump)',
-            'app_files' => 'Application files (Laravel storage excluding media, plus third-party custom extensions)',
+            'app_files' => 'Application files (Laravel storage excluding media, plus third-party custom modules)',
             'media' => 'Media files (recordings, voicemail, fax)',
             'configuration' => 'Configuration (.env, config files, FreeSWITCH conf)',
         ];
@@ -188,7 +188,7 @@ class BackupService implements BackupServiceInterface
                 $this->archiveAppFiles($tempDir);
 
                 // Third-party custom modules ride with the app-files scope so
-                // a disaster-recovery restore brings user extensions back.
+                // a disaster-recovery restore brings user modules back.
                 $this->archiveCustomModules($tempDir);
             }
 
@@ -326,11 +326,11 @@ class BackupService implements BackupServiceInterface
     }
 
     /**
-     * Archive third-party custom modules so user extensions survive restore.
+     * Archive third-party custom modules so user modules survive restore.
      *
      * Captured alongside the app-files scope (plan §1.2 / F10): a
      * disaster-recovery restore of application files brings the installed
-     * extensions back with it instead of silently dropping them.
+     * modules back with it instead of silently dropping them.
      */
     private function archiveCustomModules(string $tempDir): void
     {

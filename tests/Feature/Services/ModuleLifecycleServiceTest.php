@@ -27,7 +27,7 @@ beforeEach(function () {
         'protected' => false,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-    // A custom extension: untracked, deletable with typed confirmation.
+    // A custom module: untracked, deletable with typed confirmation.
     File::makeDirectory($this->sandbox.'/custom-modules/rogue-tool', 0755, true);
     File::put($this->sandbox.'/custom-modules/rogue-tool/module.json', json_encode([
         'name' => 'rogue-tool',
@@ -79,7 +79,7 @@ it('refuses invalid module names', function (): void {
         ->toThrow(ValidationException::class);
 });
 
-it('refuses required or protected custom extensions', function (): void {
+it('refuses required or protected custom modules', function (): void {
     File::put($this->sandbox.'/custom-modules/rogue-tool/module.json', json_encode([
         'name' => 'rogue-tool', 'version' => '1.0.0',
         'namespace' => 'CustomModules\\RogueTool', 'display_name' => 'Rogue Tool',
@@ -99,7 +99,7 @@ it('refuses a mismatched confirmation phrase', function (): void {
     expect(File::exists($this->sandbox.'/custom-modules/rogue-tool'))->toBeTrue();
 });
 
-it('uninstalls a custom extension and deletes its directory and registry record', function (): void {
+it('uninstalls a custom module and deletes its directory and registry record', function (): void {
     Module::create(['name' => 'rogue-tool', 'display_name' => 'Rogue Tool', 'version' => '1.0.0']);
     Permission::create(['name' => 'rogue-tool.view', 'module' => 'rogue-tool']);
 
@@ -109,15 +109,15 @@ it('uninstalls a custom extension and deletes its directory and registry record'
         ->and($report['module_dir_deleted'])->toBeTrue()
         ->and($report['permissions_deleted'])->toBe(1)
         ->and($report['uninstall_ran'])->toBeFalse()
-        // Custom extensions are irreversible: no restore hint exists.
+        // Custom modules are irreversible: no restore hint exists.
         ->and($report['restore_hint'])->toBe('')
-        // No Composer manipulation of any kind for a custom extension.
+        // No Composer manipulation of any kind for a custom module.
         ->and($this->composerCalls)->toBe([])
         ->and(File::exists($this->sandbox.'/custom-modules/rogue-tool'))->toBeFalse()
         ->and(Permission::where('module', 'rogue-tool')->exists())->toBeFalse();
 
-    // The registry record is deleted with the extension: nothing on disk or
-    // in git can bring a custom extension back, so there is no marker to keep.
+    // The registry record is deleted with the module: nothing on disk or
+    // in git can bring a custom module back, so there is no marker to keep.
     $this->assertDatabaseMissing('modules', ['name' => 'rogue-tool']);
 
     // The root composer.json is never touched by a custom uninstall.
@@ -126,7 +126,7 @@ it('uninstalls a custom extension and deletes its directory and registry record'
     expect($composer)->toBe(['require' => []]);
 });
 
-it('keeps a custom extension intact when its directory cannot be deleted', function (): void {
+it('keeps a custom module intact when its directory cannot be deleted', function (): void {
     $stubbornFiles = new class extends Filesystem
     {
         /**
@@ -263,7 +263,7 @@ it('scans only module code and central tests for cross-module references, skippi
         ->and($warnings)->not->toContain('.git');
 });
 
-it('detects cross-module test references using CustomModules namespace for custom extensions', function (): void {
+it('detects cross-module test references using CustomModules namespace for custom modules', function (): void {
     File::makeDirectory($this->sandbox.'/tests/Feature', 0755, true);
     File::put($this->sandbox.'/tests/Feature/CustomToolTest.php', "<?php\n\nuse CustomModules\\RogueTool\\Something;\n");
 

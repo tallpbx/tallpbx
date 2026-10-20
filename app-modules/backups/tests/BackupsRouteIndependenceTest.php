@@ -138,8 +138,8 @@ it('restores the custom-modules directory when the app files scope is selected',
     // the backup" — the latter must survive a per-module restore.
     File::ensureDirectoryExists($target.'/'.$token, 0755, true);
     file_put_contents($target.'/'.$token.'/stale.txt', 'to be replaced');
-    File::ensureDirectoryExists($target.'/post-backup-extension', 0755, true);
-    file_put_contents($target.'/post-backup-extension/keep.txt', 'installed after the backup');
+    File::ensureDirectoryExists($target.'/post-backup-module', 0755, true);
+    file_put_contents($target.'/post-backup-module/keep.txt', 'installed after the backup');
 
     $originalBasePath = base_path();
 
@@ -162,8 +162,8 @@ it('restores the custom-modules directory when the app files scope is selected',
             ->toBeTrue('Selecting the app files scope must restore the custom-modules directory.')
             ->and(is_file($target.'/'.$token.'/stale.txt'))
             ->toBeFalse('The restore must replace the module tree from the archive.')
-            ->and(is_file($target.'/post-backup-extension/keep.txt'))
-            ->toBeTrue('Extensions installed after the backup must survive a restore.')
+            ->and(is_file($target.'/post-backup-module/keep.txt'))
+            ->toBeTrue('Modules installed after the backup must survive a restore.')
             ->and(is_file($target.'/.gitkeep'))
             ->toBeTrue('Root dotfiles from the archive must be restored.');
     } finally {

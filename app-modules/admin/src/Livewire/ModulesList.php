@@ -19,8 +19,8 @@ use Livewire\Component;
  *
  * Admin-only access. Modules are grouped into the nine navigation
  * categories (plan §1.6) rendered as DaisyUI accordions, each row carries
- * an enable/disable toggle, and untracked custom extensions offer a
- * typed-confirmation "Delete Extension" action. Built-in core modules are
+ * an enable/disable toggle, and untracked custom modules offer a
+ * typed-confirmation "Delete Module" action. Built-in core modules are
  * permanent monorepo code: they can only be toggled, never uninstalled.
  */
 #[Layout('layouts.app')]
@@ -37,7 +37,7 @@ class ModulesList extends Component
     /** @var Collection<int, Module> */
     public Collection $modules;
 
-    /** The custom extension pending deletion (modal is open when set). */
+    /** The custom module pending deletion (modal is open when set). */
     public ?string $pendingDeletionId = null;
 
     /** Display name of the pending deletion, shown in the modal. */
@@ -106,7 +106,7 @@ class ModulesList extends Component
     }
 
     /**
-     * Open the delete confirmation dialog for a custom extension.
+     * Open the delete confirmation dialog for a custom module.
      */
     public function confirmDeleteCustom(string $moduleId): void
     {
@@ -138,7 +138,7 @@ class ModulesList extends Component
     }
 
     /**
-     * Permanently delete a custom extension through the lifecycle service.
+     * Permanently delete a custom module through the lifecycle service.
      *
      * The typed confirmation phrase must match the exact UNINSTALL {name}
      * contract the lifecycle service enforces.
@@ -149,7 +149,7 @@ class ModulesList extends Component
 
         $module = Module::findOrFail($moduleId);
 
-        // Only untracked custom extensions are deletable here; core modules
+        // Only untracked custom modules are deletable here; core modules
         // are permanent and vendor modules are removed via Composer.
         if ($module->source !== 'custom') {
             $this->deleteError = (string) __('admin.modules_delete_not_custom');

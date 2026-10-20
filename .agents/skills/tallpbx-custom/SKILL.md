@@ -929,7 +929,7 @@ TallPBX is architected as a **Domain-Driven Modular Monolith**. Telephony, admin
 - **Translations**: Ship `lang/{en,es,fr}/admin.php` for admin translations (and `client.php` if client UI exists). Must include the mandatory collision warning docblock. Module keys MUST contain the module/entity domain (e.g. `gateway_host`, `create_gateway`). Generic action keys (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`) belong strictly in root `lang/{locale}/admin.php`. `ModuleServiceProvider` actively refuses to load files with root collisions at runtime. Views continue using `__('admin.*')`.
 - **Dependencies & Decoupling**: High cohesion within a domain, loose coupling across domains. Cross-domain interactions must flow through events, service contracts, or published interfaces—never through deep coupling to another module's internal schema. Declare every cross-module class reference in `module.json` → `requirements.modules`.
 - **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in the database registry, suppressing route and provider registration). Attempting to uninstall a core module will throw a validation error. Never dirty the Git worktree with file deletions.
-- **Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community extensions reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External extensions never dirty Git and are protected by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
+- **Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community modules reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External modules never dirty Git and are protected by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
 - **Autonomous System Utilities**: System administration utilities such as Backups are self-contained modules under Core Administration (Superadmin-centric), responsible for full appliance backup and restore.
 - **Custom Module Scaffolding**: `php artisan make:module <name>` scaffolds exclusively into `custom-modules/{name}/` (no `--custom` flag, no root `composer.json` edits). Core modules in `app-modules/` are created and maintained directly in code by AI agents and developers.
 
@@ -956,7 +956,7 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular trans
   - `media` <=> `pbx.media`
   - `advanced` <=> `pbx.advanced`
   - `monitoring` <=> `pbx.monitoring`
-  - `custom` <=> Third-party community extensions
+  - `custom` <=> Third-party community modules
 - **FreeSWITCH v1.11 Core Correlation**: The required PBX modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) strictly correlate to FreeSWITCH v1.11's three mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`). All other telephony modules represent optional FreeSWITCH feature modules (`mod_voicemail`, `mod_conference`, `mod_callcenter`, `mod_local_stream`, `mod_xml_cdr`, etc.) and must remain toggleable.
 
 

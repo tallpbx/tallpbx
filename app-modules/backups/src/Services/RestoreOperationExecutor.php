@@ -180,7 +180,7 @@ class RestoreOperationExecutor
 
         // Mirror the backup: a selected app-files restore also brings back
         // third-party custom modules. Only directories present in the archive
-        // are replaced, so extensions installed after the backup was taken
+        // are replaced, so modules installed after the backup was taken
         // survive the restore; older archives without the member are skipped
         // by the is_dir guard.
         if (in_array('app_files', $scopes, true) && is_dir($archiveRoot.'/custom_modules')) {

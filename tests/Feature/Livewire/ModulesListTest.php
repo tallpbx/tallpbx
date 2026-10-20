@@ -57,7 +57,7 @@ it('toggles module enabled status', function () {
     ]);
 });
 
-it('refuses to delete protected custom extensions through the dialog', function () {
+it('refuses to delete protected custom modules through the dialog', function () {
     // protected forbids uninstall (service-level refusal), not disabling:
     // the two flags must not be conflated (plan §7 Step 1.3).
     $fixtureDir = base_path('custom-modules/protected-rogue');
@@ -242,7 +242,7 @@ it('invalidates caches when toggling a module', function () {
     expect($module->fresh()->enabled)->toBeFalse();
 });
 
-it('deletes a custom extension through the typed-confirmation dialog', function () {
+it('deletes a custom module through the typed-confirmation dialog', function () {
     $fixtureDir = base_path('custom-modules/delete-me');
     File::makeDirectory($fixtureDir, 0755, true);
     File::put($fixtureDir.'/module.json', json_encode([

@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
  * Restore a previously uninstalled vendor module through Composer.
  *
  * Built-in core modules are permanent monorepo code and can never be
- * uninstalled, and custom extensions are untracked with nothing to restore
+ * uninstalled, and custom modules are untracked with nothing to restore
  * from — so restore applies exclusively to vendor packages. Migrations
  * re-run into empty tables and permissions are re-seeded. Database data is
  * not restored.

@@ -46,7 +46,7 @@ return [
     'no_admins_found' => 'No administrators found.',
 
     // Modules workbench (Task 7): category headers, source badges, and
-    // the custom-extension deletion flow. No root-dictionary collisions.
+    // the custom-module deletion flow. No root-dictionary collisions.
     'modules_category_core' => 'Core',
     'modules_category_custom' => 'Custom Modules',
     'modules_source' => 'Source',
@@ -55,9 +55,9 @@ return [
     'modules_vendor' => 'Vendor',
     'modules_enabling' => 'Enabling…',
     'modules_disabling' => 'Disabling…',
-    'modules_delete_extension' => 'Delete Extension',
-    'modules_delete_confirm' => 'Permanently delete the custom extension ":name"? This action cannot be undone — custom extensions cannot be restored.',
+    'modules_delete_extension' => 'Delete Module',
+    'modules_delete_confirm' => 'Permanently delete the custom module ":name"? This action cannot be undone — custom modules cannot be restored.',
     'modules_protected_hint' => 'Protected modules cannot be uninstalled.',
-    'modules_delete_not_custom' => 'Only custom extensions can be deleted from the workbench.',
-    'modules_delete_failed' => 'The extension could not be deleted.',
+    'modules_delete_not_custom' => 'Only custom modules can be deleted from the workbench.',
+    'modules_delete_failed' => 'The module could not be deleted.',
 ];

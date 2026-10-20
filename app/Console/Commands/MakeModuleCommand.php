@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
  * Scaffold a new custom module directory with module.json and src/.
  *
  * Creates the standard module directory structure under custom-modules/
- * for 3rd-party and community extensions, without modifying root composer.json.
+ * for 3rd-party and community modules, without modifying root composer.json.
  */
 class MakeModuleCommand extends Command
 {
@@ -78,7 +78,7 @@ class MakeModuleCommand extends Command
         $this->createLanguageFiles($moduleDir, $name, $displayName);
 
         // Rebuild the module manifest cache in the same step so the scaffolded
-        // extension is discoverable immediately and the cache never serves a
+        // module is discoverable immediately and the cache never serves a
         // pre-scaffold snapshot.
         Artisan::call('module:cache');
 

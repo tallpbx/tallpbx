@@ -27,7 +27,7 @@
         "namespace": {
             "type": "string",
             "pattern": "^(Modules|CustomModules)\\\\[A-Z][a-zA-Z0-9_]*$",
-            "description": "PHP namespace (e.g., Modules\\CallForwarding for built-in modules or CustomModules\\MyPlugin for extensions)."
+            "description": "PHP namespace (e.g., Modules\\CallForwarding for built-in modules or CustomModules\\MyPlugin for custom modules)."
         },
         "display_name": {
             "type": "string",
@@ -40,13 +40,13 @@
         "source": {
             "type": "string",
             "enum": ["core", "custom", "vendor"],
-            "description": "Where the module lives: core app-modules/ monorepo code (default, tagged by discovery), untracked custom-modules/ extension, or vendor package. Not declared in built-in manifests; discovery tags it.",
+            "description": "Where the module lives: core app-modules/ monorepo code (default, tagged by discovery), untracked custom-modules/ module, or vendor package. Not declared in built-in manifests; discovery tags it.",
             "default": "core"
         },
         "category": {
             "type": "string",
             "enum": ["core", "accounts", "connectivity", "routing", "features", "media", "advanced", "monitoring", "custom"],
-            "description": "Canonical UI navigation group (plan §1.6) rendered by the /panel/modules workbench. The 'custom' value is assigned to third-party extensions only.",
+            "description": "Canonical UI navigation group (plan §1.6) rendered by the /panel/modules workbench. The 'custom' value is assigned to third-party modules only.",
             "default": "core"
         },
         "required": {

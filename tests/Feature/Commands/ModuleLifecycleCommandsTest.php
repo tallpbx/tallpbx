@@ -19,7 +19,7 @@ describe('module restore command', function (): void {
     beforeEach(function (): void {
         $this->sandbox = sys_get_temp_dir().'/pbx-restore-cmd-'.bin2hex(random_bytes(8));
 
-        // A custom extension: uninstallable, but irreversible (no restore).
+        // A custom module: uninstallable, but irreversible (no restore).
         File::makeDirectory($this->sandbox.'/custom-modules/rogue-tool', 0755, true);
         File::put($this->sandbox.'/custom-modules/rogue-tool/module.json', json_encode([
             'name' => 'rogue-tool', 'version' => '1.0.0',
@@ -81,7 +81,7 @@ describe('module restore command', function (): void {
             ->assertSuccessful();
     });
 
-    it('refuses to restore a custom extension', function (): void {
+    it('refuses to restore a custom module', function (): void {
         $this->artisan('module:restore rogue-tool')->assertFailed();
     });
 });
@@ -104,7 +104,7 @@ describe('module uninstall command', function (): void {
             'source' => 'core',
         ]));
 
-        // A custom extension: deletable with typed confirmation.
+        // A custom module: deletable with typed confirmation.
         File::makeDirectory($this->sandbox.'/custom-modules/rogue-tool', 0755, true);
         File::put($this->sandbox.'/custom-modules/rogue-tool/module.json', json_encode([
             'name' => 'rogue-tool', 'version' => '1.0.0',
@@ -135,7 +135,7 @@ describe('module uninstall command', function (): void {
             ->and($this->composerCalls)->toBe([]);
     });
 
-    it('uninstalls a custom extension with the exact confirmation phrase', function (): void {
+    it('uninstalls a custom module with the exact confirmation phrase', function (): void {
         $this->artisan('module:uninstall rogue-tool --confirm="UNINSTALL rogue-tool"')
             ->expectsOutputToContain('Uninstalled module [rogue-tool]')
             ->assertSuccessful();

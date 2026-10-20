@@ -211,7 +211,7 @@ it('scaffolds custom modules with the canonical custom category', function () {
     $manifest = json_decode((string) file_get_contents(base_path('custom-modules/taxonomy-cache-probe/module.json')), true);
 
     expect($manifest['category'])
-        ->toBe('custom', 'Scaffolds must use the canonical custom category so they group under Custom Extensions and satisfy the manifest schema enum.');
+        ->toBe('custom', 'Scaffolds must use the canonical custom category so they group under Custom Modules and satisfy the manifest schema enum.');
 });
 
 it('rejects non-canonical --category values when scaffolding', function () {
@@ -262,5 +262,5 @@ it('prunes ghost core registry rows whose module directory no longer exists', fu
     expect(Module::query()->whereKey($ghost->getKey())->exists())
         ->toBeFalse('Ghost core rows must be pruned by module:sync.')
         ->and(Module::query()->whereKey($unplugged->getKey())->exists())
-        ->toBeTrue('Custom extension rows must never be pruned.');
+        ->toBeTrue('Custom module rows must never be pruned.');
 });

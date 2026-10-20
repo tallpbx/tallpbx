@@ -9,10 +9,10 @@ use Illuminate\Console\Command;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Permanently uninstall a custom extension or vendor module.
+ * Permanently uninstall a custom module or vendor module.
  *
  * Built-in core modules are refused — they are permanent monorepo code and
- * are disabled with the panel toggle instead. Custom extensions are deleted
+ * are disabled with the panel toggle instead. Custom modules are deleted
  * from custom-modules/ (irreversible; nothing can restore them), and vendor
  * modules are removed through Composer, keeping a registry marker so
  * module:restore can re-require them later.
@@ -20,10 +20,10 @@ use Illuminate\Validation\ValidationException;
 class ModuleUninstallCommand extends Command
 {
     protected $signature = 'module:uninstall
-        {name : Module name in kebab-case (e.g., "my-extension")}
+        {name : Module name in kebab-case (e.g., "my-module")}
         {--confirm= : Exact confirmation phrase (skips the interactive prompt)}';
 
-    protected $description = 'Permanently uninstall a custom extension or vendor module';
+    protected $description = 'Permanently uninstall a custom module or vendor module';
 
     /**
      * Execute the console command.
@@ -94,10 +94,10 @@ class ModuleUninstallCommand extends Command
         $this->components->bulletList([
             $isVendor
                 ? "Vendor package: {$preview['vendor_package']} (removed via Composer)"
-                : "Custom extension directory: {$preview['module_dir']} (irreversible — custom extensions cannot be restored)",
+                : "Custom module directory: {$preview['module_dir']} (irreversible — custom modules cannot be restored)",
             "Permissions: {$preview['permission_count']}",
             $preview['registry_row']
-                ? ($isVendor ? 'Module registry row (kept as a restore marker)' : 'Module registry row (deleted with the extension)')
+                ? ($isVendor ? 'Module registry row (kept as a restore marker)' : 'Module registry row (deleted with the module)')
                 : 'Module registry row: none',
         ]);
 
