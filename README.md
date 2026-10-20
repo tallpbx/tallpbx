@@ -134,8 +134,8 @@ Configuring a desk phone or softphone adapts to your deployment model:
 | Deployment Mode | Server Address on Phone | Extension on Phone | Login (Auth Username) | How Separation Works |
 | :--- | :--- | :--- | :--- | :--- |
 | **1. Single Company (Default Tenant)** | `x.x.x.x` (or domain) | `101` | `101` | **No separation needed.** All phones register in the Default tenant with clean internal extensions. |
-| **2. Multi-Tenant by Domain** | `acme.yourpbx.com` | `101` | `101` | **Separated by Domain.** Each tenant has its own subdomain, allowing duplicate extension numbers across companies. |
-| **3. Multi-Tenant on Shared IP** | `x.x.x.x` (shared IP) | `101` | `acme_101` | **Separated by Username.** A tenant prefix on the login ID ensures unique authentication while the phone displays `101`. |
+| **2. Multi-Tenant by Domain** | `acme.yourpbx.com` (or `acmepbx.com`) | `101` | `101` | **Separated by Domain.** Each tenant has its own domain or subdomain, allowing duplicate extension numbers across companies. |
+| **3. Multi-Tenant on Shared IP or Domain** | `x.x.x.x` (or `pbx.example.com`) | `101` | `acme_101` | **Separated by Username.** A tenant prefix on the login ID ensures unique authentication while the phone displays `101`. |
 
 Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails within each tenant's private dialplan context (`tenant_{id}_internal`).
 
