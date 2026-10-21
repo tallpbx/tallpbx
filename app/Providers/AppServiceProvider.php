@@ -131,6 +131,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Fail fast during provider registration too so later providers'
+        // register() hooks (e.g. ModuleServiceProvider dependency checks) can
+        // never reach a cached production database before boot() runs.
+        TestDatabaseSafety::enforce();
+
         $this->app->singleton(TenantManager::class, function (): TenantManager {
             return new TenantManager;
         });

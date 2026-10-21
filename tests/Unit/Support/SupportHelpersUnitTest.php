@@ -145,18 +145,24 @@ describe('application file permissions service', function (): void {
 
     it('repairs only generated paths in generated scope', function (): void {
         $cacheDirectory = $this->permissionsTestRoot.'/bootstrap/cache';
+        $testingViewsDirectory = $this->permissionsTestRoot.'/storage/framework/testing-views';
         $sourceFile = $this->permissionsTestRoot.'/app/Example.php';
         ensurePermDirectory($cacheDirectory);
+        ensurePermDirectory($testingViewsDirectory);
         ensurePermDirectory(dirname($sourceFile));
         file_put_contents($cacheDirectory.'/services.php', '<?php return [];');
+        file_put_contents($testingViewsDirectory.'/compiled.php', '<?php');
         file_put_contents($sourceFile, '<?php');
         chmod($cacheDirectory.'/services.php', 0600);
+        chmod($testingViewsDirectory.'/compiled.php', 0600);
         chmod($sourceFile, 0600);
 
         (new ApplicationFilePermissions($this->permissionsTestRoot))->repair(PermissionRepairScope::Generated);
 
         expect(unitFileMode($cacheDirectory.'/services.php'))->toBe(0664)
             ->and(unitFileMode($cacheDirectory))->toBe(02775)
+            ->and(unitFileMode($testingViewsDirectory.'/compiled.php'))->toBe(0664)
+            ->and(unitFileMode($testingViewsDirectory))->toBe(02775)
             ->and(unitFileMode($sourceFile))->toBe(0600);
     });
 

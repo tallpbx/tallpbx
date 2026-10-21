@@ -37,6 +37,23 @@ abstract class TestCase extends BaseTestCase
 
         $app['config']->set('view.compiled', $compiledViews);
 
+        // parent::createApplication() already booted service providers and
+        // resolved the Blade compiler with the default view.compiled path. In
+        // non-parallel runs ParallelTesting::setUpTestCase never fires, so patch
+        // the already-resolved compilers here just as Laravel's TestViews and
+        // Livewire's SupportTesting do for parallel workers.
+        if ($app->resolved('blade.compiler')) {
+            $compiler = $app['blade.compiler'];
+
+            (function () use ($compiledViews): void {
+                $this->cachePath = $compiledViews;
+            })->bindTo($compiler, $compiler)();
+        }
+
+        if ($app->resolved('livewire.compiler')) {
+            $app['livewire.compiler']->cacheManager->cacheDirectory = $compiledViews.'/livewire';
+        }
+
         return $app;
     }
 }

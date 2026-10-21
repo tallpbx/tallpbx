@@ -390,6 +390,36 @@ it('blocks conference subcommands outside the read-only inspection set', functio
     }
 });
 
+it('blocks prefix-matched mutations even when internal whitespace is repeated or tabbed', function () {
+    // Multi-word prefixes ("sofia profile", "sofia gateway", "sofia global",
+    // "sofia recover") must not be bypassed by repeated spaces or tabs.
+    $commands = ['sofia  profile internal restart', "sofia\tgateway 1001 kill"];
+
+    Log::spy();
+
+    foreach ($commands as $command) {
+        expect($this->service->api($command))->toBe('');
+    }
+
+    foreach ($commands as $command) {
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+                && ($context['command'] ?? null) === $command);
+    }
+});
+
+it('blocks sendEvent against the live switch during a test run', function () {
+    // sendEvent writes a custom ESL frame directly to the socket; against the
+    // configured live switch endpoint it must be blocked during test runs.
+    Log::spy();
+
+    $this->service->sendEvent('NOTIFY', ['profile' => 'internal']);
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'sendevent NOTIFY');
+});
+
 it('rejects commands containing newline characters in api()', function () {
     Log::spy();
 

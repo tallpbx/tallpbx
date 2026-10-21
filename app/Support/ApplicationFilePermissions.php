@@ -49,6 +49,7 @@ class ApplicationFilePermissions
         foreach ([
             $this->path('bootstrap/cache'),
             $this->path('storage/framework/views'),
+            $this->path('storage/framework/testing-views'),
             $this->path('public/build'),
         ] as $path) {
             $this->repairRuntimeTree($path);

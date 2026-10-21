@@ -420,6 +420,7 @@ class FreeSwitchService implements FreeSwitchServiceInterface
     {
         $normalized = strtolower(trim($command));
         $tokens = preg_split('/\s+/', $normalized) ?: [];
+        $normalized = implode(' ', $tokens);
         $head = $tokens[0] ?? '';
 
         // First-word matches are mutations whatever their arguments are.
@@ -515,6 +516,14 @@ class FreeSwitchService implements FreeSwitchServiceInterface
      */
     public function sendEvent(string $eventName, array $headers = [], string $body = ''): void
     {
+        if ($this->isTestRun() && $this->targetsConfiguredEslEndpoint()) {
+            $this->logMessage('warning', 'Blocked FreeSWITCH ESL mutation during a test run', [
+                'command' => "sendevent {$eventName}",
+            ]);
+
+            return;
+        }
+
         $headerLines = implode("\n", array_map(
             fn (string $key, string $value): string => "{$key}: {$value}",
             array_keys($headers),

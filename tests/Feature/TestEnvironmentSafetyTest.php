@@ -1,5 +1,6 @@
 <?php
 
+use App\Providers\AppServiceProvider;
 use App\Support\TestDatabaseSafety;
 use Symfony\Component\Process\Process;
 
@@ -118,6 +119,7 @@ it('still blocks APP_ENV=testing processes from a real database outside test run
             'APP_CONFIG_CACHE' => sys_get_temp_dir().'/tallpbx-no-cache-'.bin2hex(random_bytes(8)).'.php',
             'DB_CONNECTION' => 'mysql',
             'DB_DATABASE' => 'tallpbx',
+            'LOG_CHANNEL' => 'null',
         ],
     );
 
@@ -189,6 +191,7 @@ it('fails fast at boot when a test runner meets a cached configuration', functio
                 'APP_ENV' => 'local',
                 'DB_CONNECTION' => 'sqlite',
                 'DB_DATABASE' => $scratchDatabase,
+                'LOG_CHANNEL' => 'null',
             ],
         );
         $generate->run();
@@ -202,7 +205,10 @@ it('fails fast at boot when a test runner meets a cached configuration', functio
         $probe = new Process(
             [PHP_BINARY, base_path('vendor/bin/pest'), '--compact', 'tests/Feature/TestCommandEnvironmentProbeTest.php'],
             base_path(),
-            ['APP_CONFIG_CACHE' => $cachePath],
+            [
+                'APP_CONFIG_CACHE' => $cachePath,
+                'LOG_CHANNEL' => 'null',
+            ],
         );
         $probe->run();
 
@@ -236,6 +242,7 @@ it('rejects a non-sqlite database in a test run even when APP_ENV is not testing
                 'APP_ENV' => 'local',
                 'DB_CONNECTION' => 'sqlite',
                 'DB_DATABASE' => $scratchDatabase,
+                'LOG_CHANNEL' => 'null',
             ],
         );
         $probe->run();
@@ -372,12 +379,33 @@ it('runs tests against the dedicated Redis test workspaces', function (): void {
 it('compiles rendered views into a test-only folder away from the live panel', function (): void {
     // Root-run tests used to poison the live panel's compiled-view folder
     // (storage/framework/views) with root-owned files, breaking the panel
-    // with "touch(): Utime failed". Tests must compile into their own folder.
+    // with "touch(): Utime failed". Both config('view.compiled') and the
+    // already-resolved BladeCompiler singleton must point at the test-only
+    // folder so sequential/targeted test runs do not leak into the live path.
     $compiled = (string) config('view.compiled');
+    $liveViews = (string) realpath(storage_path('framework/views'));
+    $compilerCompiledPath = (string) app('blade.compiler')->getCompiledPath('welcome.blade.php');
 
-    expect($compiled)->not->toBe((string) realpath(storage_path('framework/views')))
+    expect($compiled)->not->toBe($liveViews)
         ->and($compiled)->toContain('testing-views')
-        ->and(is_dir($compiled))->toBeTrue();
+        ->and(is_dir($compiled))->toBeTrue()
+        ->and($compilerCompiledPath)->toStartWith($compiled)
+        ->and($compilerCompiledPath)->not->toStartWith($liveViews);
+
+    if (app()->bound('livewire.compiler')) {
+        expect((string) app('livewire.compiler')->cacheManager->cacheDirectory)
+            ->toStartWith($compiled);
+    }
+});
+
+it('enforces database safety during service provider registration before later providers run', function (): void {
+    // ModuleServiceProvider::register() runs before any boot() hook and can
+    // write to the modules table when a module has unmet requirements, so
+    // AppServiceProvider::register() must enforce database safety first.
+    $this->app->instance('config_loaded_from_cache', true);
+
+    expect(fn () => (new AppServiceProvider($this->app))->register())
+        ->toThrow(LogicException::class, 'Cached configuration detected during a test run. Run "php artisan config:clear" before running tests.');
 });
 
 it('keeps the test-only compiled view folder out of git', function (): void {
