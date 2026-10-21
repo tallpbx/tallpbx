@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Tests always use SQLite in memory. The forced settings prevent an
-    application's MariaDB configuration from being used by accident.
+    Tests always use SQLite in memory and their own Redis databases. The
+    forced settings prevent an application's MariaDB or Redis configuration
+    from being used by accident.
 -->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
@@ -33,6 +34,12 @@
         <env name="DB_CONNECTION" value="sqlite" force="true"/>
         <env name="DB_DATABASE" value=":memory:" force="true"/>
         <env name="DB_URL" value="" force="true"/>
+        <!-- Redis isolation: production security state (ban counters, scanner
+             dedupe) lives in DB 0/1 under the production prefix; tests get
+             their own databases and key prefix so they cannot touch it. -->
+        <env name="REDIS_DB" value="15" force="true"/>
+        <env name="REDIS_CACHE_DB" value="14" force="true"/>
+        <env name="REDIS_PREFIX" value="tallpbx-test-" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>

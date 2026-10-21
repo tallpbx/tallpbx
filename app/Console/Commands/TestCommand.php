@@ -17,6 +17,10 @@ use Symfony\Component\Process\Process;
  *   php artisan app:test --sequential Run without --parallel
  *   php artisan app:test --clear-cache Clear Laravel caches before testing
  *
+ * A stale cached configuration (bootstrap/cache/config.php) is always
+ * cleared before tests run, in every mode, so test runs can never inherit
+ * the server's production database settings.
+ *
  * The default mode runs all Pest feature tests in parallel
  * with compact output (a few minutes for the full feature
  * suite). This is the recommended mode for day-to-day
@@ -45,6 +49,12 @@ class TestCommand extends Command
      */
     public function handle(): int
     {
+        // A stale cached configuration would silently re-point the spawned
+        // test processes at the server's real database (the boot-time
+        // fail-fast would stop them), so it is always removed first —
+        // independent of the optional --clear-cache sweep below.
+        $this->callSilent('config:clear');
+
         if ($this->option('clear-cache')) {
             $this->callSilent('optimize:clear');
         }
@@ -242,7 +252,7 @@ class TestCommand extends Command
      * The browser tests run against an in-process HTTP server backed by the
      * same in-memory SQLite database as the feature suite, so no dedicated
      * database, .env swap, or ChromeDriver daemon is required. By default the
-     * suite runs in parallel with the worker count capped at four: each worker
+     * suite runs in parallel with the worker count capped at two: each worker
      * keeps its own Chromium instance alive, so an unbounded worker count can
      * starve memory on smaller servers (the feature suite auto-detects the
      * core count because its workers are far lighter). Passing --sequential

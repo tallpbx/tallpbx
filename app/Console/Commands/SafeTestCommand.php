@@ -15,6 +15,20 @@ use NunoMaduro\Collision\Adapters\Laravel\Commands\TestCommand as CollisionTestC
 class SafeTestCommand extends CollisionTestCommand
 {
     /**
+     * Clear stale cached configuration before any test process starts.
+     *
+     * A cached configuration would silently re-point the spawned test
+     * processes at the server's real database (the boot-time fail-fast would
+     * stop them), so the cache is removed first. Harmless when none exists.
+     */
+    public function handle()
+    {
+        $this->callSilent('config:clear');
+
+        return parent::handle();
+    }
+
+    /**
      * Supply safe test settings to a normal Pest or PHPUnit process.
      *
      * @return array<string, string|false>
@@ -58,6 +72,11 @@ class SafeTestCommand extends CollisionTestCommand
             'DB_CONNECTION' => 'sqlite',
             'DB_DATABASE' => ':memory:',
             'DB_URL' => false,
+            // Redis isolation: keep tests off the production security-state
+            // databases (0/1) and the production key prefix.
+            'REDIS_DB' => '15',
+            'REDIS_CACHE_DB' => '14',
+            'REDIS_PREFIX' => 'tallpbx-test-',
             'MAIL_MAILER' => 'array',
             'QUEUE_CONNECTION' => 'sync',
             'SESSION_DRIVER' => 'array',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\TestDatabaseSafety;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -343,31 +344,133 @@ class FreeSwitchService implements FreeSwitchServiceInterface
     }
 
     /**
+     * Commands that always mutate the live switch or its host when executed:
+     * call creation/teardown, module state, host processes and host files.
+     */
+    private const LIVE_MUTATION_COMMANDS = [
+        'reloadxml',
+        'reloadacl',
+        'load',
+        'unload',
+        'reload',
+        'originate',
+        'hupall',
+        'fsctl',
+        'system',
+        'bg_system',
+        'eval',
+        'expand',
+        'global_setvar',
+    ];
+
+    /**
+     * Command families blocked wholesale during test runs.
+     *
+     * Every form of these families is treated as a live mutation — including
+     * the few read-only forms — because a test run must never reach a live
+     * switch at all, so the fail-closed choice is the safe one.
+     */
+    private const LIVE_MUTATION_PREFIXES = [
+        'sofia profile',
+        'sofia gateway',
+        'sofia global',
+        'sofia recover',
+        'create_sofia_profile',
+        'callcenter_config',
+        'sched_',
+        'vm_fsdb_',
+        'file_',
+    ];
+
+    /**
+     * uuid_* commands that only inspect channel state and stay available.
+     */
+    private const READ_ONLY_UUID_COMMANDS = [
+        'uuid_exists',
+        'uuid_dump',
+    ];
+
+    /**
+     * Conference subcommands that only inspect a live conference and stay
+     * available; every other subcommand (kick, mute, vmute, dial, record, …)
+     * mutates conference state and is blocked.
+     */
+    private const READ_ONLY_CONFERENCE_SUBCOMMANDS = [
+        'list',
+        'listall',
+        'count',
+        'get',
+        'xml_list',
+    ];
+
+    /**
      * Determine whether an ESL command mutates live FreeSWITCH state.
      *
-     * Reload, rescan, restart, and gateway commands change the running
-     * switch; read-only status commands (sofia status, show channels,
-     * conference list, and so on) are allowed through the test-run guard.
+     * Blocked during test runs: call-control commands (originate, hupall,
+     * uuid_* channel control, conference control, sched_* call scheduling),
+     * queue-state commands (callcenter_config), configuration and module
+     * changes (reloadxml, reloadacl, sofia profile/gateway/global, sofia
+     * recover, create_sofia_profile, load/unload/reload), voicemail and
+     * host-file writes (vm_fsdb_*, file_*), and host process execution
+     * (system, eval, expand). Read-only status commands (sofia status, show
+     * channels, conference list, uuid_dump, and so on) are allowed through so
+     * monitoring keeps working; unlisted conference subcommands fail closed.
      */
     private function isLiveMutationCommand(string $command): bool
     {
         $normalized = strtolower(trim($command));
+        $tokens = preg_split('/\s+/', $normalized) ?: [];
+        $head = $tokens[0] ?? '';
 
-        return in_array($normalized, ['reloadxml', 'reloadacl'], true)
-            || str_starts_with($normalized, 'sofia profile');
+        // First-word matches are mutations whatever their arguments are.
+        if (in_array($head, self::LIVE_MUTATION_COMMANDS, true)) {
+            return true;
+        }
+
+        // The uuid_* family controls live channels; only the read-only
+        // inspection commands stay available.
+        if (str_starts_with($head, 'uuid_') && ! in_array($head, self::READ_ONLY_UUID_COMMANDS, true)) {
+            return true;
+        }
+
+        // Whole-family prefixes: every form mutates live state.
+        foreach (self::LIVE_MUTATION_PREFIXES as $prefix) {
+            if (str_starts_with($normalized, $prefix)) {
+                return true;
+            }
+        }
+
+        // Conference control sits at the subcommand position: room-scoped
+        // forms carry it as the third word ("conference <room> <subcommand>"),
+        // global forms as the second ("conference list"). Everything outside
+        // the read-only inspection set mutates a live conference, so unknown
+        // subcommands fail closed and a room whose name collides with a
+        // subcommand (for example "conference kick list") is not misclassified.
+        if ($head === 'conference') {
+            $subcommand = $tokens[2] ?? $tokens[1] ?? '';
+
+            return ! in_array($subcommand, self::READ_ONLY_CONFERENCE_SUBCOMMANDS, true);
+        }
+
+        return false;
     }
 
     /**
      * Whether the current process is an automated test run.
      *
-     * The framework's Application exposes runningUnitTests(), but the bare
-     * container used by some isolated unit tests does not — the phpunit.xml
-     * APP_ENV=testing value is the reliable signal in that context, so both
-     * are checked. Bare unit tests construct the service with unreachable
-     * sockets, so a false reading there would never be a live risk anyway.
+     * TestDatabaseSafety recognizes real Pest/PHPUnit processes (including
+     * ParaTest workers) and keeps working when a cached configuration has
+     * overridden APP_ENV. The framework checks stay in the union so bare
+     * containers and APP_ENV=testing boots remain covered (fail closed for
+     * live switches). In production none of these signals can fire, so live
+     * ESL operations are unaffected.
      */
     private function isTestRun(): bool
     {
+        if (TestDatabaseSafety::isRunningTests()) {
+            return true;
+        }
+
         $app = app();
 
         if (method_exists($app, 'runningUnitTests') && $app->runningUnitTests()) {

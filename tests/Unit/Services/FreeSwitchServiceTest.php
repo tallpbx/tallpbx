@@ -186,6 +186,210 @@ it('allows read-only ESL commands during a test run', function () {
     Log::shouldNotHaveReceived('warning', fn (string $message) => str_contains($message, 'Blocked FreeSWITCH ESL mutation'));
 });
 
+it('blocks originate call creation against the live switch during a test run', function () {
+    Log::spy();
+
+    $command = 'originate {ignore_early_media=true}sofia/gateway/1001 5551234 XML default';
+    $result = $this->service->api($command);
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === $command);
+});
+
+it('blocks hupall call teardown against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('hupall ALLOFTHEM');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'hupall ALLOFTHEM');
+});
+
+it('blocks hupall through bgapi as well during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->bgapi('hupall');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'hupall');
+});
+
+it('blocks uuid channel-control commands against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('uuid_kill abc123');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'uuid_kill abc123');
+});
+
+it('blocks conference call-control subcommands against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('conference 3001 kick 1001');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'conference 3001 kick 1001');
+});
+
+it('blocks voicemail database mutations against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('vm_fsdb_msg_delete 1001@default 1234');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'vm_fsdb_msg_delete 1001@default 1234');
+});
+
+it('blocks module load, unload and reload against the live switch during a test run', function () {
+    $commands = ['load mod_sofia', 'unload mod_sofia', 'reload'];
+
+    Log::spy();
+
+    foreach ($commands as $command) {
+        expect($this->service->api($command))->toBe('');
+    }
+
+    foreach ($commands as $command) {
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+                && ($context['command'] ?? null) === $command);
+    }
+});
+
+it('blocks host commands against the live switch during a test run', function () {
+    Log::spy();
+
+    $result = $this->service->api('system reboot');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === 'system reboot');
+});
+
+it('allows read-only uuid inspection commands during a test run', function () {
+    // Regression guard for the uuid_* family: inspection stays available so
+    // monitoring can keep working while call-control forms are blocked.
+    Log::spy();
+
+    $result = $this->service->api('uuid_dump abc123');
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'FreeSWITCH ESL: api() called without connection.'
+            && ($context['command'] ?? null) === 'uuid_dump abc123');
+
+    Log::shouldNotHaveReceived('warning', fn (string $message) => str_contains($message, 'Blocked FreeSWITCH ESL mutation'));
+});
+
+it('allows read-only conference listing during a test run', function () {
+    // Regression guard: read-only conference inspection (room-scoped and
+    // global forms) must keep flowing to the normal connection path while
+    // every mutating subcommand is blocked.
+    $commands = ['conference 3001 list', 'conference list', 'conference 3001 count'];
+
+    Log::spy();
+
+    foreach ($commands as $command) {
+        expect($this->service->api($command))->toBe('');
+    }
+
+    Log::shouldNotHaveReceived('warning', fn (string $message) => str_contains($message, 'Blocked FreeSWITCH ESL mutation'));
+});
+
+it('blocks callcenter agent state mutations against the live switch during a test run', function () {
+    // The panel's operator controls pause, unpause and log out queue agents
+    // through callcenter_config, which changes live queue routing for waiting
+    // callers — so the whole family is blocked during test runs.
+    Log::spy();
+
+    $command = "callcenter_config agent set status 1001@default 'Available'";
+    $result = $this->service->api($command);
+
+    expect($result)->toBe('');
+
+    Log::shouldHaveReceived('warning')
+        ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+            && ($context['command'] ?? null) === $command);
+});
+
+it('blocks scheduled call mutations and scheduled api commands during a test run', function () {
+    // sched_hangup tears down live calls, and sched_api schedules an arbitrary
+    // API command for later execution — a complete bypass of every other guard
+    // pattern — so the whole sched_* family is blocked.
+    $commands = ['sched_hangup +60 abc123', 'sched_api +60 reloadxml'];
+
+    Log::spy();
+
+    foreach ($commands as $command) {
+        expect($this->service->api($command))->toBe('');
+    }
+
+    foreach ($commands as $command) {
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+                && ($context['command'] ?? null) === $command);
+    }
+});
+
+it('blocks sofia global, recover and profile-creation commands during a test run', function () {
+    // These mutate switch state above the "sofia profile …" level; a
+    // "sofia global restart" can drop every live call.
+    $commands = ['sofia global restart', 'sofia recover', 'create_sofia_profile default'];
+
+    Log::spy();
+
+    foreach ($commands as $command) {
+        expect($this->service->api($command))->toBe('');
+    }
+
+    foreach ($commands as $command) {
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+                && ($context['command'] ?? null) === $command);
+    }
+});
+
+it('blocks conference subcommands outside the read-only inspection set', function () {
+    // vmute and dial (which creates a call leg) were never in the original
+    // call-control enumeration; the guard inverts to a read-only exemption
+    // list so unlisted subcommands fail closed.
+    $commands = ['conference 3001 vmute 1001', 'conference 3001 dial sofia/gateway/1001 5551234'];
+
+    Log::spy();
+
+    foreach ($commands as $command) {
+        expect($this->service->api($command))->toBe('');
+    }
+
+    foreach ($commands as $command) {
+        Log::shouldHaveReceived('warning')
+            ->withArgs(fn (string $message, array $context) => $message === 'Blocked FreeSWITCH ESL mutation during a test run'
+                && ($context['command'] ?? null) === $command);
+    }
+});
+
 it('rejects commands containing newline characters in api()', function () {
     Log::spy();
 

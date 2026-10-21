@@ -283,9 +283,11 @@ class AppServiceProvider extends ServiceProvider
             Event::listen(FileStoreDeleting::class, BlockFileStoreDeletion::class);
         }
 
-        if ($this->app->environment('testing')) {
-            TestDatabaseSafety::enforce();
-        }
+        // Fail fast inside test runs even when a cached configuration has
+        // overridden APP_ENV (environment('testing') lies in that state).
+        // enforce() decides by real test-runner detection, so ordinary
+        // processes — including "php artisan config:clear" — stay bootable.
+        TestDatabaseSafety::enforce();
 
         Model::preventLazyLoading(! $this->app->isProduction());
 
