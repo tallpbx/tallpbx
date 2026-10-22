@@ -45,32 +45,36 @@ it('registers security permissions and assigns them to super administrators', fu
     expect($this->superAdminGroup->fresh()->permissions->pluck('name'))->toContain('security.view', 'security.edit');
 });
 
-it('registers security menu item under the PBX advanced group in MenuService', function (): void {
+it('registers security menu item as top-level item on main panel menu in MenuService', function (): void {
     $menuService = app(MenuService::class);
     $items = $menuService->getFlat('admin');
 
     $securityItem = collect($items)->firstWhere('key', 'security');
 
-    // Nav parity: the item's parent mirrors the manifest category "advanced"
-    // (AGENTS.md invariant), so it groups under PBX → Advanced.
     expect($securityItem)->not->toBeNull()
         ->and($securityItem['label'])->toBe('admin.security')
         ->and($securityItem['route'])->toBe('panel.security.index')
         ->and($securityItem['permission'])->toBe('security.view')
-        ->and($securityItem['parent'] ?? null)->toBe('pbx.advanced')
+        ->and($securityItem['parent'] ?? null)->toBeNull()
         ->and($securityItem['order'])->toBe(39);
 });
 
-it('places security nav link inside the PBX advanced group in menu tree', function (): void {
+it('places security nav link below monitoring and before pbx in menu tree', function (): void {
     $this->actingAs($this->admin, 'admin');
 
     $menuService = app(MenuService::class);
     $tree = $menuService->getTree();
-    $pbx = collect($tree)->firstWhere('key', 'pbx');
-    $advanced = collect($pbx['children'] ?? [])->firstWhere('key', 'pbx.advanced');
-    $advancedKeys = collect($advanced['children'] ?? [])->pluck('key')->all();
+    $keys = collect($tree)->pluck('key')->all();
 
-    expect($advancedKeys)->toContain('security');
+    $monitoringIndex = array_search('monitoring', $keys, true);
+    $securityIndex = array_search('security', $keys, true);
+    $pbxIndex = array_search('pbx', $keys, true);
+
+    expect($monitoringIndex)->not->toBeFalse()
+        ->and($securityIndex)->not->toBeFalse()
+        ->and($pbxIndex)->not->toBeFalse()
+        ->and($monitoringIndex)->toBeLessThan($securityIndex)
+        ->and($securityIndex)->toBeLessThan($pbxIndex);
 });
 
 it('protects panel.security.index with auth and permission middleware', function (): void {

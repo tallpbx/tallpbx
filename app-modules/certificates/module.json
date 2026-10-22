@@ -4,11 +4,11 @@
     "version": "1.0.0",
     "namespace": "Modules\\Certificates",
     "display_name": "Certificates",
-    "category": "advanced",
+    "category": "core",
     "description": "HTTPS, SIP TLS, and WebRTC WSS certificate management",
     "required": false,
     "protected": false,
-    "priority": 0,
+    "priority": 20,
     "providers": [
         "Modules\\Certificates\\Providers\\ModuleServiceProvider"
     ],

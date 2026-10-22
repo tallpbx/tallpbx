@@ -53,10 +53,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'route' => 'panel.email-connector.edit',
                 'permission' => 'email-connector.view',
                 'icon' => 'heroicon-o-envelope',
-                // Group under PBX → Advanced: nav parent must mirror the
-                // manifest category "advanced" (AGENTS.md nav parity invariant).
-                'parent' => 'pbx.advanced',
-                'order' => 51,
+                'order' => 39.6,
             ],
         ];
     }

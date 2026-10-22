@@ -144,7 +144,7 @@ it('module:sync populates every built-in module with core source and its manifes
 
     // Plan §1.6 spot checks for the assignments the original taxonomy got wrong.
     expect(Module::where('name', 'backups')->value('category'))->toBe('core');
-    expect(Module::where('name', 'email-connector')->value('category'))->toBe('advanced');
+    expect(Module::where('name', 'email-connector')->value('category'))->toBe('core');
     expect(Module::where('name', 'click-to-call')->value('category'))->toBe('features');
     expect(Module::where('name', 'destinations')->value('category'))->toBe('routing');
     expect(Module::where('name', 'extension-settings')->value('category'))->toBe('accounts');

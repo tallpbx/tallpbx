@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Models\Admin;
 use App\Models\Group;
 use App\Models\Permission;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\MenuService;
+use Database\Seeders\AdminSeeder;
 use Database\Seeders\DatabaseSeeder;
 
 use function Pest\Laravel\actingAs;
@@ -290,4 +292,26 @@ it('renders PBX sidebar links for the seeded tenant administrator', function ():
     } finally {
         config(['freeswitch.demo_mode' => $previousDemoMode]);
     }
+});
+
+it('does not leak unrendered translation keys into sidebar navigation for super administrator', function (): void {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->firstOrFail();
+    $superAdmin = Admin::factory()->create(['enabled' => true]);
+    $superAdmin->groups()->attach($superAdminGroup->id);
+
+    $response = actingAs($superAdmin, 'admin')
+        ->get(route('panel.dashboard'))
+        ->assertOk();
+
+    $content = $response->getContent();
+    $navStart = strpos($content, '<nav');
+    $navEnd = strpos($content, '</nav>', $navStart !== false ? $navStart : 0);
+    $navContent = $navStart !== false && $navEnd !== false
+        ? substr($content, $navStart, $navEnd - $navStart)
+        : $content;
+
+    preg_match_all('/>\s*(admin\.[a-z0-9_.-]+)\s*</i', $navContent, $matches);
+    expect($matches[1])->toBeEmpty('Unrendered translation keys found in sidebar navigation: '.implode(', ', $matches[1]));
 });

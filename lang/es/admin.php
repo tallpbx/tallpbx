@@ -507,6 +507,7 @@ return [
     'no_active_conferences' => 'No hay conferencias activas.',
     'registrations' => 'Registros',
     'sip_status' => 'Estado SIP',
+    'logs' => 'Visor de Registros',
     'call_centers' => 'Centros de Llamadas',
     'queue' => 'Cola',
     'create_queue' => 'Crear Cola',

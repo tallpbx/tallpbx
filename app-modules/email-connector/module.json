@@ -6,12 +6,12 @@
         "Modules\\EmailConnector\\Providers\\ModuleServiceProvider"
     ],
     "display_name": "Email Connector",
-    "category": "advanced",
+    "category": "core",
     "description": "Admin Email connector configuration supporting standard username/password authentication and OAuth 2.0 with encrypted credential storage and test-email workflow.",
     "type": "pbx-module",
     "protected": false,
     "required": false,
-    "priority": 51,
+    "priority": 30,
     "requirements": {
         "modules": []
     }

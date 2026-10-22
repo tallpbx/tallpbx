@@ -10,6 +10,7 @@ use App\Services\PermissionService;
 use App\Support\ModuleServiceProvider;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Lang;
 use LogicException;
 
 beforeEach(function () {
@@ -203,4 +204,36 @@ it('throws LogicException at runtime when a module language file collides with r
     } finally {
         File::deleteDirectory($testModuleDir);
     }
+});
+
+it('enforces that all registered menu item translation keys resolve across all locales', function (): void {
+    $menuService = app(MenuService::class);
+    $items = $menuService->getFlat();
+
+    expect($items)->not->toBeEmpty();
+
+    $missingByLocale = [];
+
+    foreach (['en', 'es', 'fr'] as $locale) {
+        $missing = [];
+
+        foreach ($items as $item) {
+            $label = $item['label'] ?? null;
+            if (! is_string($label) || ! str_contains($label, '.')) {
+                continue;
+            }
+
+            if (! Lang::has($label, $locale)) {
+                $missing[$item['key']] = $label;
+            }
+        }
+
+        if (! empty($missing)) {
+            $missingByLocale[$locale] = $missing;
+        }
+    }
+
+    expect($missingByLocale)->toBeEmpty(
+        'Registered menu items reference missing translation keys: '.json_encode($missingByLocale, JSON_PRETTY_PRINT)
+    );
 });

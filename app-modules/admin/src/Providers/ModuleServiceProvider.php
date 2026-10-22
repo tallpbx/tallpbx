@@ -201,20 +201,20 @@ class ModuleServiceProvider extends ServiceProvider
                 'order' => 49,
             ],
             [
-                'key' => 'git-update',
-                'label' => 'admin.git_update',
-                'route' => 'panel.git-update',
-                'permission' => 'admin.git-update.view',
-                'icon' => 'heroicon-o-arrow-down-circle',
-                'order' => 50,
-            ],
-            [
                 'key' => 'settings',
                 'label' => 'admin.settings',
                 'route' => 'panel.settings.index',
                 'permission' => 'admin.settings.view',
                 'icon' => 'heroicon-o-cog-6-tooth',
-                'order' => 51,
+                'order' => 39.8,
+            ],
+            [
+                'key' => 'git-update',
+                'label' => 'admin.git_update',
+                'route' => 'panel.git-update',
+                'permission' => 'admin.git-update.view',
+                'icon' => 'heroicon-o-arrow-down-circle',
+                'order' => 39.9,
             ],
         ]);
     }

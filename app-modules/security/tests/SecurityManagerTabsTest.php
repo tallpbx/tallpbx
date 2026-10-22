@@ -26,7 +26,7 @@ use Modules\Security\Services\Firewall\SecurityConfigGenerator;
  * The Security Center renders four tabs whose order mirrors the kernel
  * evaluation order, binds the active tab to ?tab= deep links, keeps the
  * switch controls and banners pinned above the strip, and renders the
- * reorderable pre-filter rows.
+ * movable pre-filter rows alongside the pinned loopback row.
  */
 beforeEach(function (): void {
     $this->artisan('module:sync --only-local');

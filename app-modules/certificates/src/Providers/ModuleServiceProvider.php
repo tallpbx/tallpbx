@@ -62,10 +62,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'permission' => 'certificates.view',
                 'icon' => 'heroicon-o-key',
                 'guard' => 'admin',
-                // Group under PBX → Advanced: nav parent must mirror the
-                // manifest category "advanced" (AGENTS.md nav parity invariant).
-                'parent' => 'pbx.advanced',
-                'order' => 39.5,
+                'order' => 39.4,
             ],
         ];
     }

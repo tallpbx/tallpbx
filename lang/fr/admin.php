@@ -506,6 +506,7 @@ return [
     'no_active_conferences' => 'Aucune conférence active.',
     'registrations' => 'Enregistrements',
     'sip_status' => 'État SIP',
+    'logs' => 'Visualiseur de Journaux',
     'call_centers' => 'Centres d\'Appels',
     'queue' => 'File d\'Attente',
     'create_queue' => 'Créer une File d\'Attente',

@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Models\Admin;
+use App\Models\Group;
 use App\Services\MenuService;
 use App\Services\PermissionService;
+use Database\Seeders\AdminSeeder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Modules\Backups\Services\BackupServiceInterface;
@@ -52,7 +55,7 @@ it('registers the backups menu item at top level from the backups module', funct
 
     expect($entry)->not->toBeNull('The backups menu entry must be registered by the backups module.')
         ->and($entry['parent'] ?? null)->toBeNull('Backups must be a top-level sidebar entry (parent: null).')
-        ->and($entry['order'] ?? null)->toBe(85)
+        ->and($entry['order'] ?? null)->toBe(39.7)
         ->and($entry['route'] ?? null)->toBe('panel.backups.index');
 
     // The admin module must no longer carry the entry.
@@ -66,7 +69,39 @@ it('registers the backups menu item at top level from the backups module', funct
 
     expect($flat)->not->toBeNull()
         ->and($flat['parent'] ?? null)->toBeNull('The merged sidebar entry must stay top-level.')
-        ->and($flat['order'] ?? null)->toBe(85);
+        ->and($flat['order'] ?? null)->toBe(39.7);
+});
+
+it('places backups nav link between email-connector and settings in menu tree', function (): void {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $admin->groups()->attach($superAdminGroup->id);
+    $this->actingAs($admin, 'admin');
+
+    $menuService = app(MenuService::class);
+    $tree = $menuService->getTree();
+    $keys = collect($tree)->pluck('key')->all();
+
+    $certificatesIndex = array_search('certificates', $keys, true);
+    $emailConnectorIndex = array_search('email-connector', $keys, true);
+    $backupsIndex = array_search('backups', $keys, true);
+    $settingsIndex = array_search('settings', $keys, true);
+    $gitUpdateIndex = array_search('git-update', $keys, true);
+    $pbxIndex = array_search('pbx', $keys, true);
+
+    expect($certificatesIndex)->not->toBeFalse()
+        ->and($emailConnectorIndex)->not->toBeFalse()
+        ->and($backupsIndex)->not->toBeFalse()
+        ->and($settingsIndex)->not->toBeFalse()
+        ->and($gitUpdateIndex)->not->toBeFalse()
+        ->and($pbxIndex)->not->toBeFalse()
+        ->and($certificatesIndex)->toBeLessThan($emailConnectorIndex)
+        ->and($emailConnectorIndex)->toBeLessThan($backupsIndex)
+        ->and($backupsIndex)->toBeLessThan($settingsIndex)
+        ->and($settingsIndex)->toBeLessThan($gitUpdateIndex)
+        ->and($gitUpdateIndex)->toBeLessThan($pbxIndex);
 });
 
 it('registers the backups permissions from the backups module', function (): void {

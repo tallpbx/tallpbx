@@ -515,6 +515,9 @@ return [
     // ─── SIP Status ─────────────────────────────────────────────────────
     'sip_status' => 'SIP Status',
 
+    // ─── Log Viewer ──────────────────────────────────────────────────────
+    'logs' => 'Log Viewer',
+
     // ─── Call Centers ───────────────────────────────────────────────────
     'call_centers' => 'Call Centers',
     'queue' => 'Queue',

@@ -60,7 +60,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'permission' => 'backups.view',
                 'icon' => 'heroicon-o-archive-box-arrow-down',
                 'parent' => null,
-                'order' => 85,
+                'order' => 39.7,
             ],
         ];
     }

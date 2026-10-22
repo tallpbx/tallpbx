@@ -4,11 +4,11 @@
     "version": "1.0.0",
     "namespace": "Modules\\Security",
     "display_name": "Security",
-    "category": "advanced",
+    "category": "core",
     "description": "Host firewall, trusted and blocked IP lists, and automatic attack protection.",
     "required": false,
     "protected": false,
-    "priority": 140,
+    "priority": 10,
     "providers": [
         "Modules\\Security\\Providers\\ModuleServiceProvider"
     ],

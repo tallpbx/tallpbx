@@ -345,8 +345,8 @@ TallPBX compiles an optimized, multi-stage Linux kernel firewall ruleset using n
 The Linux kernel evaluates rules strictly in order across **13 deterministic stages**:
 
 ### 1. Pre-Filter Pipeline (Stages 1–8)
-Toggled and reordered as an administrative unit in the **Firewall Rules** tab. The first seven rules are reorderable; the Geo-Blocking row is the fixed 8th pre-filter rule:
-1. **Loopback Interface (`iif "lo" accept`)**: Unconditional access for server processes (PHP-FPM to MariaDB, Redis, and FreeSWITCH ESL).
+Toggled as an administrative unit in the **Firewall Rules** tab. Rule 1 (Loopback) is pinned first as an immutable kernel invariant; the next six stages (rules 2–7) are reorderable by administrators (with safety guards preventing drop stages from preceding the whitelist), and the Geo-Blocking row is the fixed 8th pre-filter rule:
+1. **Loopback Interface (`iif "lo" accept`)**: Unconditional access for server processes (PHP-FPM to MariaDB, Redis, and FreeSWITCH ESL). Pinned first with a lock icon; cannot be reordered.
 2. **Trusted Whitelist (`@whitelist_ips accept`)**: Admin IPs, office subnets, and SIP carrier interconnects bypass all lower drop checks.
 3. **Invalid Packet State (`ct state invalid drop`)**: Corrupted headers and illegal TCP flag combinations are discarded immediately.
 4. **Stateful Fast Path (`ct state established,related accept`)**: Established call audio (RTP) and active sessions pass with zero CPU lookup overhead.
@@ -455,9 +455,9 @@ Pinned directly above the tab strip for immediate visibility:
 ### The Five Security Center Tabs
 
 #### Tab 1: Firewall Rules (`?tab=rules`)
-* **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (rules 1–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the fixed Geo-Blocking rule 8 companion row):
+* **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (pinned loopback rule 1 with lock icon, rules 2–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the fixed Geo-Blocking rule 8 companion row):
   - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
-  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon, guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
+  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon (cannot be moved or reordered), guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
 * **Geo-Blocking Master Cockpit Row**: Positioned following External Blocklists, displays the live state of the dedicated geo perimeter rule, mode indicator (`Block Selected` or `Block All Except`), total count of active ranges, and instant link to Tab 5.
 * **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
   - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
