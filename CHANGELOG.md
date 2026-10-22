@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Storage Gitignore File Mode Normalization**: Normalized tracked git file modes from `100755` executable to `100644` standard non-executable for `.gitignore` placeholder files under `storage/` (`storage/app/`, `storage/framework/`, and `storage/logs/`). This prevents `ApplicationFilePermissions` runtime permissions repairs (`0664`) from causing git working tree dirty status errors during web UI Git Updater runs.
+
 ## [4.0.9] - 2026-10-21
 
 ### Fixed
