@@ -97,6 +97,20 @@ repair_vendor_tree() {
     find "$path" -type f ! -perm /111 -exec chmod 664 {} +
 }
 
+# Make Node.js packages and cache safely writable by the PHP-FPM user so web
+# updates can run npm ci and npm run build without permission errors.
+repair_node_modules_tree() {
+    local path="$1"
+
+    # Node modules is absent before the first npm install.
+    [ -e "$path" ] || return
+
+    chown -R www-data:www-data "$path"
+    find "$path" -type d -exec chmod 2775 {} +
+    find "$path" -type f -perm /111 -exec chmod 755 {} +
+    find "$path" -type f ! -perm /111 -exec chmod 664 {} +
+}
+
 # Make Laravel's writable folders safely writable by the PHP-FPM user.
 repair_runtime_tree() {
     local path="$1"
@@ -164,9 +178,20 @@ if [ -d "/var/www/.cache" ]; then
     find /var/www/.cache -type f -exec chmod 664 {} +
 fi
 
+# Ensure web user npm cache and log directory is accessible.
+if [ -d "/var/www/.npm" ]; then
+    chown -R www-data:www-data /var/www/.npm
+    find /var/www/.npm -type d -exec chmod 2775 {} +
+    find /var/www/.npm -type f -exec chmod 664 {} +
+fi
+
 # Repair Composer dependencies separately because vendor/bin contains package
 # executables that must retain their executable mode.
 repair_vendor_tree "$ROOT_DIR/vendor"
+
+# Repair Node.js dependencies and cache so web updates can clean and rebuild assets.
+repair_node_modules_tree "$ROOT_DIR/node_modules"
+
 
 # Apply the same read-only source policy to important files at the repository
 # root that are not covered by the source-tree loop above.

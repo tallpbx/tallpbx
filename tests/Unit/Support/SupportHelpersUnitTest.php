@@ -172,18 +172,21 @@ describe('application file permissions service', function (): void {
         $testFile = $this->permissionsTestRoot.'/tests/Feature/ExampleTest.php';
         $vendorFile = $this->permissionsTestRoot.'/vendor/package/Example.php';
         $vendorCommand = $this->permissionsTestRoot.'/vendor/bin/example';
+        $nodeModulesFile = $this->permissionsTestRoot.'/node_modules/package/index.js';
+        $nodeModulesCommand = $this->permissionsTestRoot.'/node_modules/.bin/vite';
         $runtimeFile = $this->permissionsTestRoot.'/storage/logs/tallpbx.log';
         $environmentFile = $this->permissionsTestRoot.'/.env';
         $gitDir = $this->permissionsTestRoot.'/.git';
         $gitConfig = $gitDir.'/config';
         $lockFile = $this->permissionsTestRoot.'/composer.lock';
 
-        foreach ([$sourceFile, $docFile, $testFile, $vendorFile, $vendorCommand, $runtimeFile, $environmentFile, $gitConfig, $lockFile] as $path) {
+        foreach ([$sourceFile, $docFile, $testFile, $vendorFile, $vendorCommand, $nodeModulesFile, $nodeModulesCommand, $runtimeFile, $environmentFile, $gitConfig, $lockFile] as $path) {
             ensurePermDirectory(dirname($path));
             file_put_contents($path, 'contents');
             chmod($path, 0600);
         }
         chmod($vendorCommand, 0700);
+        chmod($nodeModulesCommand, 0700);
         chmod($gitDir, 0700);
 
         (new ApplicationFilePermissions($this->permissionsTestRoot))->repair(PermissionRepairScope::Full);
@@ -196,6 +199,9 @@ describe('application file permissions service', function (): void {
             ->and(unitFileMode($vendorFile))->toBe(0664)
             ->and(unitFileMode(dirname($vendorFile)))->toBe(02775)
             ->and(unitFileMode($vendorCommand))->toBe(0755)
+            ->and(unitFileMode($nodeModulesFile))->toBe(0664)
+            ->and(unitFileMode(dirname($nodeModulesFile)))->toBe(02775)
+            ->and(unitFileMode($nodeModulesCommand))->toBe(0755)
             ->and(unitFileMode($runtimeFile))->toBe(0664)
             ->and(unitFileMode(dirname($runtimeFile)))->toBe(02775)
             ->and(unitFileMode($environmentFile))->toBe(0640)

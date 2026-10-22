@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.9] - 2026-10-21
+
+### Fixed
+- **Application Permissions Node Modules & NPM Cache Repair**: Added `node_modules` and `/var/www/.npm` to `ApplicationFilePermissions` (`repairNodeModulesTree`) and `scripts/repair-application-permissions.sh`, ensuring that Node.js packages and cache retain `www-data:www-data` ownership and `02775` directory modes with preserved binary executables. This prevents `EACCES: permission denied, rmdir` errors when the web UI Git Updater executes `npm ci` under PHP-FPM.
+
 ## [4.0.8] - 2026-10-21
 
 ### Added

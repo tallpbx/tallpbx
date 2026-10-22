@@ -80,6 +80,7 @@ class ApplicationFilePermissions
         }
 
         $this->repairVendorTree($this->path('vendor'));
+        $this->repairNodeModulesTree($this->path('node_modules'));
         $this->repairSourceFiles();
         $this->repairEnvironmentFile();
         $this->repairRuntimePaths();
@@ -102,6 +103,15 @@ class ApplicationFilePermissions
     private function repairVendorTree(string $path): void
     {
         $this->repairTree($path, 'root', 'www-data', 02775, 0664, true);
+    }
+
+    /**
+     * Repair Node.js packages while keeping existing package commands executable
+     * and allowing the web user (www-data) to install, clean, or update packages.
+     */
+    private function repairNodeModulesTree(string $path): void
+    {
+        $this->repairTree($path, 'www-data', 'www-data', 02775, 0664, true);
     }
 
     /**
