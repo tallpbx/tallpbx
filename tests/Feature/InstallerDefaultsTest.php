@@ -34,6 +34,20 @@ it('installs net-tools as a core Debian dependency', function (): void {
     expect($installer)->toMatch('/apt_get_with_lock_wait install -y\\s+\\\\[\\s\\S]*?\\bnet-tools\\b/');
 });
 
+it('installs unattended-upgrades as a core Debian dependency', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+
+    expect($installer)->toMatch('/apt_get_with_lock_wait install -y\\s+\\\\[\\s\\S]*?\\bunattended-upgrades\\b/');
+});
+
+it('enables unattended-upgrades and allows the Sury PHP origin for automatic PHP updates', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+
+    expect($installer)->toContain('APT::Periodic::Update-Package-Lists "1"')
+        ->and($installer)->toContain('APT::Periodic::Unattended-Upgrade "1"')
+        ->and($installer)->toContain('origin=deb.sury.org');
+});
+
 it('explains that Enter generates the database password', function (): void {
     $installer = (string) file_get_contents(base_path('scripts/install.sh'));
 

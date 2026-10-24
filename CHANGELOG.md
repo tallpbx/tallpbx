@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Storage Gitignore File Mode Normalization**: Normalized tracked git file modes from `100755` executable to `100644` standard non-executable for `.gitignore` placeholder files under `storage/` (`storage/app/`, `storage/framework/`, and `storage/logs/`). This prevents `ApplicationFilePermissions` runtime permissions repairs (`0664`) from causing git working tree dirty status errors during web UI Git Updater runs.
 
+### Security
+- **Unattended-Upgrades Enabled by Default on New Installs**: The installer now installs and enables `unattended-upgrades` and allows the Sury PHP repository origin (`origin=deb.sury.org`) in its allowed-origins list, so Debian security updates and PHP security fixes (such as PHP2Shell CVE-2026-109618/109619) apply automatically on new servers. The two configuration files are only created when missing, so installer re-runs preserve operator edits. Existing installations are unchanged; re-running `scripts/install.sh` adopts the same settings.
+
 ## [4.0.9] - 2026-10-21
 
 ### Fixed

@@ -757,7 +757,35 @@ apt_get_with_lock_wait install -y \
     gnupg2 \
     net-tools \
     unzip \
-    sudo
+    sudo \
+    unattended-upgrades
+
+# Debian ships unattended-upgrades disabled. Create the small configuration
+# file that turns on the daily package-list refresh and the automatic upgrade
+# job, so security fixes reach new servers without operator action. The file
+# is only created when missing, so a re-run never overwrites changes an
+# administrator has made.
+if [ ! -f /etc/apt/apt.conf.d/20auto-upgrades ]; then
+    cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+fi
+
+# Keep Debian's standard security origins and also allow the Sury PHP
+# repository, so PHP security fixes (for example php2shell) install
+# automatically together with Debian security updates. The file name sorts
+# after the package's 50unattended-upgrades so this list wins, and it is only
+# created when missing to preserve operator edits on installer re-runs.
+if [ ! -f /etc/apt/apt.conf.d/52tallpbx-unattended-upgrades ]; then
+    cat > /etc/apt/apt.conf.d/52tallpbx-unattended-upgrades <<'EOF'
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}";
+    "${distro_id}:${distro_codename}-security";
+    "origin=deb.sury.org";
+};
+EOF
+fi
 
 # Some VPS providers hand out a global IPv6 address without a default IPv6
 # route. PHP then tries the IPv6 address first when it downloads files (for
