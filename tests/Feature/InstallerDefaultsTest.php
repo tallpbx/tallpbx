@@ -90,7 +90,10 @@ it('ships production-safe debug and session defaults in the environment template
     expect($example)->toContain('APP_ENV=production')
         ->and($example)->toContain('APP_DEBUG=false')
         ->and($example)->toContain('SESSION_ENCRYPT=true')
-        ->and($example)->toContain('SESSION_SECURE_COOKIE=false');
+        ->and($example)->toContain('SESSION_SECURE_COOKIE=false')
+        ->and($example)->toContain('SESSION_CONNECTION=session')
+        ->and($example)->toContain('REDIS_SESSION_DB=2')
+        ->and($example)->not->toContain('SESSION_CONNECTION=cache');
 });
 
 it('encrypts sessions in every install mode and enables secure cookies on HTTPS', function (): void {
@@ -98,7 +101,16 @@ it('encrypts sessions in every install mode and enables secure cookies on HTTPS'
     $tlsScript = (string) file_get_contents(base_path('scripts/resources/letsencrypt.sh'));
 
     expect($tallScript)->toContain('set_env_value .env SESSION_ENCRYPT true')
+        ->and($tallScript)->toContain('SESSION_CONNECTION=session')
+        ->and($tallScript)->not->toContain('SESSION_CONNECTION=cache')
         ->and($tlsScript)->toContain('set_env_value /var/www/tallpbx/.env SESSION_SECURE_COOKIE true');
+});
+
+it('isolates cache sweeps to the dedicated cache database without flushing security state or sessions', function (): void {
+    $sweepScript = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+
+    expect($sweepScript)->toMatch('/redis-cli\s+-n\s+["\']?\$\{REDIS_CACHE_DB:-1\}["\']?\s+flushdb/')
+        ->and($sweepScript)->not->toMatch('/^\s*redis-cli\s+flushdb/m');
 });
 
 it('requires an interactive FreeSWITCH installation method choice and persists it', function (): void {

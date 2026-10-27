@@ -234,8 +234,11 @@ grep -q "^SESSION_DRIVER=" .env 2>/dev/null \
     && sed -i "s/^SESSION_DRIVER=.*/SESSION_DRIVER=redis/" .env \
     || echo "SESSION_DRIVER=redis" >> .env
 grep -q "^SESSION_CONNECTION=" .env 2>/dev/null \
-    && sed -i "s/^SESSION_CONNECTION=.*/SESSION_CONNECTION=cache/" .env \
-    || echo "SESSION_CONNECTION=cache" >> .env
+    && sed -i "s/^SESSION_CONNECTION=.*/SESSION_CONNECTION=session/" .env \
+    || echo "SESSION_CONNECTION=session" >> .env
+grep -q "^REDIS_SESSION_DB=" .env 2>/dev/null \
+    && sed -i "s/^REDIS_SESSION_DB=.*/REDIS_SESSION_DB=2/" .env \
+    || echo "REDIS_SESSION_DB=2" >> .env
 grep -q "^FS_XML_HANDLER_CACHE_STORE=" .env 2>/dev/null \
     && sed -i "s/^FS_XML_HANDLER_CACHE_STORE=.*/FS_XML_HANDLER_CACHE_STORE=redis/" .env \
     || echo "FS_XML_HANDLER_CACHE_STORE=redis" >> .env

@@ -76,10 +76,12 @@ class SafeTestCommand extends CollisionTestCommand
             // databases (0/1) and the production key prefix.
             'REDIS_DB' => '15',
             'REDIS_CACHE_DB' => '14',
+            'REDIS_SESSION_DB' => '13',
             'REDIS_PREFIX' => 'tallpbx-test-',
             'MAIL_MAILER' => 'array',
             'QUEUE_CONNECTION' => 'sync',
             'SESSION_DRIVER' => 'array',
+            'SESSION_CONNECTION' => 'session',
             'PULSE_ENABLED' => 'false',
             'TELESCOPE_ENABLED' => 'false',
             'NIGHTWATCH_ENABLED' => 'false',

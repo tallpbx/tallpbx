@@ -64,7 +64,9 @@ for item in "${RUNS[@]}"; do
   sed -i "s/^#\? \?FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=.*/FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=$c_ttl/" .env
   php artisan optimize:clear > /dev/null 2>&1
   php artisan optimize > /dev/null 2>&1
-  redis-cli flushdb > /dev/null 2>&1
+  # Clear only the FreeSWITCH XML dialplan cache (DB 1).
+  # DB 0 (security sliding windows and mutex locks) and DB 2 (sessions) must never be flushed.
+  redis-cli -n "${REDIS_CACHE_DB:-1}" flushdb > /dev/null 2>&1
 
   # Capture Redis stats before the run
   H_PRE=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')

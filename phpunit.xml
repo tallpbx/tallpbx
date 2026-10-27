@@ -39,10 +39,12 @@
              their own databases and key prefix so they cannot touch it. -->
         <env name="REDIS_DB" value="15" force="true"/>
         <env name="REDIS_CACHE_DB" value="14" force="true"/>
+        <env name="REDIS_SESSION_DB" value="13" force="true"/>
         <env name="REDIS_PREFIX" value="tallpbx-test-" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="SESSION_CONNECTION" value="session" force="true"/>
         <env name="PULSE_ENABLED" value="false" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>

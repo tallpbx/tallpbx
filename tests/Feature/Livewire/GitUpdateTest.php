@@ -205,3 +205,25 @@ it('finalizes state when background update completes', function (): void {
         ->assertSet('terminalOutput', 'TallPBX Update SUCCEEDED')
         ->assertSet('updateSteps', fn (array $steps): bool => count($steps) === 2);
 });
+
+it('renders a warning banner when session storage shares the cache connection', function (): void {
+    config([
+        'session.driver' => 'redis',
+        'session.connection' => 'cache',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(GitUpdate::class)
+        ->assertSee(__('admin.git_session_cache_warning'));
+});
+
+it('does not render the session cache warning banner when session has dedicated connection', function (): void {
+    config([
+        'session.driver' => 'redis',
+        'session.connection' => 'session',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(GitUpdate::class)
+        ->assertDontSee(__('admin.git_session_cache_warning'));
+});

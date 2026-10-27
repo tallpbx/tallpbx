@@ -373,6 +373,8 @@ it('runs tests against the dedicated Redis test workspaces', function (): void {
     // isolation, this fails loudly instead of silently sharing state.
     expect((string) config('database.redis.default.database'))->toBe('15')
         ->and((string) config('database.redis.cache.database'))->toBe('14')
+        ->and((string) config('database.redis.session.database'))->toBe('13')
+        ->and((string) config('session.connection'))->toBe('session')
         ->and((string) config('database.redis.options.prefix'))->toBe('tallpbx-test-');
 });
 

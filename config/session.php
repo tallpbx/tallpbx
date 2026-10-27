@@ -75,7 +75,7 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION', 'cache'),
+    'connection' => env('SESSION_CONNECTION', 'session'),
 
     /*
     |--------------------------------------------------------------------------

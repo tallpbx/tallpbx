@@ -6,6 +6,7 @@ namespace Modules\Admin\Livewire;
 
 use App\Services\GitUpdateService;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -292,6 +293,15 @@ class GitUpdate extends Component
             $this->currentVersion = $this->gitService->currentVersion();
             $this->refreshCommitStatus();
         }
+    }
+
+    /**
+     * Determine whether session storage shares the volatile application cache connection.
+     */
+    #[Computed]
+    public function usesSharedSessionCache(): bool
+    {
+        return config('session.driver') === 'redis' && config('session.connection') === 'cache';
     }
 
     /**

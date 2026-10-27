@@ -12,6 +12,13 @@
         </button>
     </div>
 
+    {{-- Shared Session / Cache Connection Warning --}}
+    @if ($this->usesSharedSessionCache)
+        <x-inline-alert type="warning">
+            {{ __('admin.git_session_cache_warning') }}
+        </x-inline-alert>
+    @endif
+
     {{-- Repo Inaccessible Notice --}}
     @if ($currentBranch === '')
         <div class="alert alert-warning">
