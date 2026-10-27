@@ -29,6 +29,8 @@ trait ManagesGeoBlocking
 
     public string $geoCountrySearch = '';
 
+    public bool $confirmingClearGeoRules = false;
+
     /**
      * Load Geo-Blocking state into Livewire properties.
      */
@@ -321,10 +323,27 @@ trait ManagesGeoBlocking
     }
 
     /**
+     * Open confirmation modal for clearing all geo rules.
+     */
+    public function confirmClearGeoRules(): void
+    {
+        $this->confirmingClearGeoRules = true;
+    }
+
+    /**
+     * Cancel pending clearing of geo rules.
+     */
+    public function cancelClearGeoRules(): void
+    {
+        $this->confirmingClearGeoRules = false;
+    }
+
+    /**
      * Clear all geo rules and kernel elements.
      */
     public function clearGeoRules(): void
     {
+        $this->confirmingClearGeoRules = false;
         $this->ensureGeoManagePermission();
 
         $rule = SecurityGeoRule::instance();

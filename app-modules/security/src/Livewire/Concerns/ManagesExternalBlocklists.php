@@ -20,6 +20,8 @@ trait ManagesExternalBlocklists
 
     public string $feedSyncInterval = 'hourly';
 
+    public bool $confirmingRemoveAllFeedBlocks = false;
+
     /**
      * Load the external blocklist (threat feed) configuration into the form properties.
      */
@@ -137,10 +139,27 @@ trait ManagesExternalBlocklists
     }
 
     /**
+     * Open confirmation modal for removing all feed blocks.
+     */
+    public function confirmRemoveAllFeedBlocks(): void
+    {
+        $this->confirmingRemoveAllFeedBlocks = true;
+    }
+
+    /**
+     * Cancel pending removal of all feed blocks.
+     */
+    public function cancelRemoveAllFeedBlocks(): void
+    {
+        $this->confirmingRemoveAllFeedBlocks = false;
+    }
+
+    /**
      * Flush the feed's kernel elements without disabling the feed.
      */
     public function removeAllFeedBlocks(): void
     {
+        $this->confirmingRemoveAllFeedBlocks = false;
         $this->ensureFeedManagePermission();
 
         app(ThreatFeedIngestionService::class)->clear();

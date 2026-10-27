@@ -250,10 +250,9 @@
                                 </div>
                                 <div class="flex items-center gap-3">
                                     {{-- The reset escape hatch always restores a known-safe evaluation order. --}}
-                                    <button wire:click.stop="resetPreFilterOrder" type="button"
+                                    <button wire:click.stop="confirmResetPreFilterOrder" type="button"
                                             @mouseenter="suppressTitle = true"
                                             @mouseleave="suppressTitle = false"
-                                            wire:confirm="{{ __('admin.security_prefilter_reset_confirm') }}"
                                             @disabled(! $prefilterEnabled)
                                             class="btn btn-ghost btn-xs gap-1 text-base-content/70 normal-case font-medium">
                                         <x-heroicon-o-arrow-path class="w-3.5 h-3.5" />

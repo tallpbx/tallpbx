@@ -93,4 +93,32 @@
     @include('security::modals.custom-rule')
     @include('security::modals.edit-system-service')
     @include('security::drawers.observe-activity')
+
+    {{-- Confirmation Modals --}}
+    <x-confirmation-modal
+        :open="$confirmingClearGeoRules"
+        :title="__('admin.security_geo_clear_rules')"
+        :message="__('admin.security_geo_clear_confirm')"
+        :confirm-label="__('admin.security_geo_clear_rules')"
+        confirm-action="clearGeoRules"
+        cancel-action="cancelClearGeoRules"
+    />
+
+    <x-confirmation-modal
+        :open="$confirmingResetPreFilterOrder"
+        :title="__('admin.security_prefilter_reset')"
+        :message="__('admin.security_prefilter_reset_confirm')"
+        :confirm-label="__('admin.security_prefilter_reset')"
+        confirm-action="resetPreFilterOrder"
+        cancel-action="cancelResetPreFilterOrder"
+    />
+
+    <x-confirmation-modal
+        :open="$confirmingRemoveAllFeedBlocks"
+        :title="__('admin.security_threat_feed_remove_blocks')"
+        :message="__('admin.security_threat_feed_remove_blocks_confirm')"
+        :confirm-label="__('admin.security_threat_feed_remove_blocks')"
+        confirm-action="removeAllFeedBlocks"
+        cancel-action="cancelRemoveAllFeedBlocks"
+    />
 </div>

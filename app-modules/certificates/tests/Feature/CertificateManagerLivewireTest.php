@@ -310,3 +310,45 @@ it('deletes an inactive certificate successfully', function (): void {
 
     expect(Certificate::find($inactive->id))->toBeNull();
 });
+
+it('opens and cancels certificate deletion confirmation modal', function (): void {
+    $inactive = Certificate::create([
+        'name' => 'Modal Inactive Cert',
+        'type' => Certificate::TYPE_SELF_SIGNED,
+        'common_name' => 'modal.local',
+        'valid_to' => now()->addDays(30),
+        'storage_identifier' => 'modal_inactive_cert',
+        'is_default_web' => false,
+        'is_default_telephony' => false,
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(CertificateManager::class)
+        ->assertSet('pendingDeleteCertificateId', null)
+        ->call('confirmDeleteCertificate', $inactive->id)
+        ->assertSet('pendingDeleteCertificateId', $inactive->id)
+        ->assertSet('pendingDeleteCertificateName', 'Modal Inactive Cert')
+        ->assertSee(__('admin.certificates_delete_confirm_title'))
+        ->call('cancelDeleteCertificate')
+        ->assertSet('pendingDeleteCertificateId', null)
+        ->assertSet('pendingDeleteCertificateName', null);
+});
+
+it('opens and cancels DNS credential deletion confirmation modal', function (): void {
+    $cred = CertificateDnsCredential::create([
+        'name' => 'Modal Credential',
+        'provider' => 'cloudflare',
+        'credentials' => ['api_token' => 'dummy-modal-token'],
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(CertificateManager::class)
+        ->assertSet('pendingDeleteCredentialId', null)
+        ->call('confirmDeleteDnsCredential', $cred->id)
+        ->assertSet('pendingDeleteCredentialId', $cred->id)
+        ->assertSet('pendingDeleteCredentialName', 'Modal Credential')
+        ->assertSee(__('admin.certificates_delete_credential_confirm_title'))
+        ->call('cancelDeleteDnsCredential')
+        ->assertSet('pendingDeleteCredentialId', null)
+        ->assertSet('pendingDeleteCredentialName', null);
+});

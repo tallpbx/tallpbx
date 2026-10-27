@@ -574,7 +574,13 @@ return [
     'git_no_stable_branches' => 'No se encontraron ramas de versión estable en el repositorio. Siguiendo la rama de desarrollo.',
     'git_switch_and_update' => 'Cambiar de Rama y Actualizar',
     'git_view_commits' => 'Confirmaciones Recientes',
+    'git_session_cache_warning' => 'El almacenamiento de sesiones comparte actualmente la conexión de caché de la aplicación (SESSION_CONNECTION=cache). Configure SESSION_CONNECTION=session en .env para que las actualizaciones y limpiezas de caché no cierren las sesiones activas de los administradores.',
     'saving' => 'Guardando...',
+
+    // ─── Session Expiration ──────────────────────────────────────────────
+    'session_expired_title' => 'Sesión expirada',
+    'session_expired_message' => 'Su sesión ha expirado. Por favor, actualice la página o inicie sesión nuevamente para continuar.',
+    'session_expired_action' => 'Continuar',
 
     // ─── Security Module ────────────────────────────────────────────────
     'security' => 'Seguridad',

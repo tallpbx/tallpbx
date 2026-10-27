@@ -231,6 +231,8 @@
         </div>
     </div>
 
+    <x-session-expired-modal />
+
     @livewireScripts
 </body>
 </html>

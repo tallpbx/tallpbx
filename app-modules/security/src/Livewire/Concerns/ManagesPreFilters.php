@@ -22,6 +22,8 @@ trait ManagesPreFilters
 
     public bool $showDisablePrefilterModal = false;
 
+    public bool $confirmingResetPreFilterOrder = false;
+
     /**
      * Turn defensive pre-filters on or off.
      */
@@ -282,10 +284,27 @@ trait ManagesPreFilters
     }
 
     /**
+     * Open confirmation modal for resetting pre-filter order.
+     */
+    public function confirmResetPreFilterOrder(): void
+    {
+        $this->confirmingResetPreFilterOrder = true;
+    }
+
+    /**
+     * Cancel pending reset of pre-filter order.
+     */
+    public function cancelResetPreFilterOrder(): void
+    {
+        $this->confirmingResetPreFilterOrder = false;
+    }
+
+    /**
      * Reset the stored pre-filter order to the recommended default.
      */
     public function resetPreFilterOrder(): void
     {
+        $this->confirmingResetPreFilterOrder = false;
         $this->ensureEditPermission();
 
         $order = SecurityConfigGenerator::DEFAULT_PRE_FILTER_ORDER;

@@ -65,6 +65,14 @@ class CertificateManager extends Component
      */
     public ?int $assigningCertificateId = null;
 
+    public ?int $pendingDeleteCertificateId = null;
+
+    public ?string $pendingDeleteCertificateName = null;
+
+    public ?int $pendingDeleteCredentialId = null;
+
+    public ?string $pendingDeleteCredentialName = null;
+
     /**
      * Service assignment checkbox for Web.
      */
@@ -485,11 +493,10 @@ class CertificateManager extends Component
     }
 
     /**
-     * Delete an inactive certificate from the system.
+     * Open confirmation modal for deleting an inactive certificate.
      */
-    public function deleteCertificate(int $id, CertificateExecutorInterface $executor): void
+    public function confirmDeleteCertificate(int $id): void
     {
-        $this->authorizeAction('certificates.delete');
         $cert = Certificate::findOrFail($id);
 
         if ($cert->is_default_web || $cert->is_default_telephony) {
@@ -497,6 +504,41 @@ class CertificateManager extends Component
 
             return;
         }
+
+        $this->pendingDeleteCertificateId = $id;
+        $this->pendingDeleteCertificateName = $cert->name;
+    }
+
+    /**
+     * Cancel pending certificate deletion.
+     */
+    public function cancelDeleteCertificate(): void
+    {
+        $this->pendingDeleteCertificateId = null;
+        $this->pendingDeleteCertificateName = null;
+    }
+
+    /**
+     * Delete an inactive certificate from the system.
+     */
+    public function deleteCertificate(?int $id = null, ?CertificateExecutorInterface $executor = null): void
+    {
+        $targetId = $id ?? $this->pendingDeleteCertificateId;
+        if ($targetId === null) {
+            return;
+        }
+
+        $this->authorizeAction('certificates.delete');
+        $cert = Certificate::findOrFail($targetId);
+
+        if ($cert->is_default_web || $cert->is_default_telephony) {
+            $this->notifyError('Cannot delete an active certificate. Reassign Web and Telephony services first.');
+            $this->cancelDeleteCertificate();
+
+            return;
+        }
+
+        $executor ??= app(CertificateExecutorInterface::class);
 
         try {
             $executor->delete($cert->storage_identifier);
@@ -515,6 +557,8 @@ class CertificateManager extends Component
             $this->notifySuccess("Certificate '{$certName}' was deleted.");
         } catch (Throwable $e) {
             $this->notifyError($e->getMessage());
+        } finally {
+            $this->cancelDeleteCertificate();
         }
     }
 
@@ -744,11 +788,10 @@ class CertificateManager extends Component
     }
 
     /**
-     * Delete an unused DNS credential from the vault.
+     * Open confirmation modal for deleting a DNS credential.
      */
-    public function deleteDnsCredential(int $id): void
+    public function confirmDeleteDnsCredential(int $id): void
     {
-        $this->authorizeAction('certificates.delete');
         $cred = CertificateDnsCredential::findOrFail($id);
 
         if ($cred->certificates()->exists()) {
@@ -757,8 +800,42 @@ class CertificateManager extends Component
             return;
         }
 
+        $this->pendingDeleteCredentialId = $id;
+        $this->pendingDeleteCredentialName = $cred->name;
+    }
+
+    /**
+     * Cancel pending DNS credential deletion.
+     */
+    public function cancelDeleteDnsCredential(): void
+    {
+        $this->pendingDeleteCredentialId = null;
+        $this->pendingDeleteCredentialName = null;
+    }
+
+    /**
+     * Delete an unused DNS credential from the vault.
+     */
+    public function deleteDnsCredential(?int $id = null): void
+    {
+        $targetId = $id ?? $this->pendingDeleteCredentialId;
+        if ($targetId === null) {
+            return;
+        }
+
+        $this->authorizeAction('certificates.delete');
+        $cred = CertificateDnsCredential::findOrFail($targetId);
+
+        if ($cred->certificates()->exists()) {
+            $this->notifyError('Cannot delete DNS credential because it is associated with active certificates.');
+            $this->cancelDeleteDnsCredential();
+
+            return;
+        }
+
         $cred->delete();
         $this->notifySuccess('DNS credential deleted from vault.');
+        $this->cancelDeleteDnsCredential();
     }
 
     /**

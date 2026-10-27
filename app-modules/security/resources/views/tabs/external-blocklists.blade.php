@@ -103,20 +103,11 @@
                             <span>{{ __('admin.security_threat_feed_syncing') }}</span>
                         </span>
                     </button>
-                    <button wire:click="removeAllFeedBlocks"
-                            wire:loading.attr="disabled"
-                            wire:target="removeAllFeedBlocks"
+                    <button wire:click="confirmRemoveAllFeedBlocks"
                             type="button"
-                            wire:confirm="{{ __('admin.security_threat_feed_remove_blocks_confirm') }}"
                             class="btn btn-outline btn-error btn-sm gap-1">
-                        <span wire:loading.remove wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
-                            <x-heroicon-o-trash class="w-4 h-4" />
-                            <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
-                        </span>
-                        <span wire:loading wire:target="removeAllFeedBlocks" class="inline-flex items-center gap-1">
-                            <span class="loading loading-spinner loading-xs"></span>
-                            <span>{{ __('admin.security_threat_feed_removing_blocks') }}</span>
-                        </span>
+                        <x-heroicon-o-trash class="w-4 h-4" />
+                        <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
                     </button>
                 </div>
             </div>

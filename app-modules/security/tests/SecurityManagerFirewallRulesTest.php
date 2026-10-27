@@ -538,3 +538,14 @@ it('queries the kernel status helper at most once when rendering and switching t
         @rmdir($stubDir);
     }
 });
+
+it('opens and cancels pre-filter order reset confirmation modal', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'firewall-rules'])
+        ->assertSet('confirmingResetPreFilterOrder', false)
+        ->call('confirmResetPreFilterOrder')
+        ->assertSet('confirmingResetPreFilterOrder', true)
+        ->assertSee(__('admin.security_prefilter_reset'))
+        ->call('cancelResetPreFilterOrder')
+        ->assertSet('confirmingResetPreFilterOrder', false);
+});

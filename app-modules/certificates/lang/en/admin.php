@@ -37,4 +37,9 @@ return [
     'certificates_san_domains' => 'SAN Domains',
     'certificates_expires_in' => 'Expires In',
     'certificates_assigned_services' => 'Assigned Services',
+    'certificates_delete_action' => 'Delete',
+    'certificates_delete_confirm_title' => 'Delete Certificate?',
+    'certificates_delete_confirm_message' => 'Are you sure you want to delete certificate ":name"? This action cannot be undone.',
+    'certificates_delete_credential_confirm_title' => 'Delete DNS Credential?',
+    'certificates_delete_credential_confirm_message' => 'Are you sure you want to delete DNS credential ":name"?',
 ];

@@ -37,4 +37,9 @@ return [
     'certificates_san_domains' => 'Domaines SAN',
     'certificates_expires_in' => 'Expire dans',
     'certificates_assigned_services' => 'Services Assignés',
+    'certificates_delete_action' => 'Supprimer',
+    'certificates_delete_confirm_title' => 'Supprimer le certificat ?',
+    'certificates_delete_confirm_message' => 'Êtes-vous sûr de vouloir supprimer le certificat « :name » ? Cette action est irréversible.',
+    'certificates_delete_credential_confirm_title' => 'Supprimer l\'identifiant DNS ?',
+    'certificates_delete_credential_confirm_message' => 'Êtes-vous sûr de vouloir supprimer l\'identifiant DNS « :name » ?',
 ];

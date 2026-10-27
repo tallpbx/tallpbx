@@ -573,7 +573,13 @@ return [
     'git_no_stable_branches' => 'Aucune branche de version stable trouvée sur le dépôt. Suivi de la branche de développement.',
     'git_switch_and_update' => 'Changer de Branche et Mettre à Jour',
     'git_view_commits' => 'Commits Récents',
+    'git_session_cache_warning' => 'Le stockage des sessions partage actuellement la connexion de cache de l\'application (SESSION_CONNECTION=cache). Définissez SESSION_CONNECTION=session dans .env afin que les mises à jour et nettoyages du cache ne déconnectent pas les administrateurs actifs.',
     'saving' => 'Enregistrement...',
+
+    // ─── Session Expiration ──────────────────────────────────────────────
+    'session_expired_title' => 'Session expirée',
+    'session_expired_message' => 'Votre session a expiré. Veuillez actualiser la page ou vous reconnecter pour continuer.',
+    'session_expired_action' => 'Continuer',
 
     // ─── Security Module ────────────────────────────────────────────────
     'security' => 'Sécurité',

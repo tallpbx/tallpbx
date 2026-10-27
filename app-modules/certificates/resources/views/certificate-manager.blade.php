@@ -261,8 +261,7 @@
                                                 </button>
                                             @endif
                                             <button type="button"
-                                                    wire:click="deleteCertificate({{ $cert->id }})"
-                                                    wire:confirm="Are you sure you want to delete certificate '{{ $cert->name }}'? This action cannot be undone."
+                                                    wire:click="confirmDeleteCertificate({{ $cert->id }})"
                                                     @if ($cert->is_default_web || $cert->is_default_telephony) disabled @endif
                                                     class="btn btn-ghost btn-xs text-error"
                                                     title="Delete Certificate">
@@ -587,8 +586,7 @@
                                         <td class="text-xs text-base-content/60">{{ $cred->created_at?->diffForHumans() }}</td>
                                         <td class="text-right">
                                             <button type="button"
-                                                    wire:click="deleteDnsCredential({{ $cred->id }})"
-                                                    wire:confirm="Delete DNS credential '{{ $cred->name }}'?"
+                                                    wire:click="confirmDeleteDnsCredential({{ $cred->id }})"
                                                     class="btn btn-ghost btn-xs text-error">
                                                 Delete
                                             </button>
@@ -806,4 +804,24 @@
             </div>
         </div>
     @endif
+
+    {{-- Delete Certificate Confirmation Modal --}}
+    <x-confirmation-modal
+        :open="$pendingDeleteCertificateId !== null"
+        :title="__('admin.certificates_delete_confirm_title')"
+        :message="__('admin.certificates_delete_confirm_message', ['name' => $pendingDeleteCertificateName])"
+        :confirm-label="__('admin.certificates_delete_action')"
+        confirm-action="deleteCertificate({{ $pendingDeleteCertificateId }})"
+        cancel-action="cancelDeleteCertificate"
+    />
+
+    {{-- Delete DNS Credential Confirmation Modal --}}
+    <x-confirmation-modal
+        :open="$pendingDeleteCredentialId !== null"
+        :title="__('admin.certificates_delete_credential_confirm_title')"
+        :message="__('admin.certificates_delete_credential_confirm_message', ['name' => $pendingDeleteCredentialName])"
+        :confirm-label="__('admin.certificates_delete_action')"
+        confirm-action="deleteDnsCredential({{ $pendingDeleteCredentialId }})"
+        cancel-action="cancelDeleteDnsCredential"
+    />
 </div>

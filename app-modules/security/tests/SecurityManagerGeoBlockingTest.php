@@ -566,3 +566,14 @@ it('re-promotes previous kernel geo sets when re-arming geofence fails firewall 
     expect($pending)->toContain('add element inet tallpbx_filter geo_blocked_ips')
         ->and($pending)->not->toContain('add element inet tallpbx_filter geo_allowed_ips');
 });
+
+it('opens and cancels clear geo rules confirmation modal', function (): void {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'geo-blocking'])
+        ->assertSet('confirmingClearGeoRules', false)
+        ->call('confirmClearGeoRules')
+        ->assertSet('confirmingClearGeoRules', true)
+        ->assertSee(__('admin.security_geo_clear_rules'))
+        ->call('cancelClearGeoRules')
+        ->assertSet('confirmingClearGeoRules', false);
+});

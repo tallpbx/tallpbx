@@ -342,3 +342,17 @@ it('renders the feed drop counter from the live kernel status', function (): voi
         ->set('activeTab', 'threat-feeds')
         ->assertSee('12345');
 });
+
+it('opens and cancels remove all feed blocks confirmation modal', function (): void {
+    SecurityThreatFeed::factory()->create(['provider' => 'voipbl', 'enabled' => true]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class)
+        ->set('activeTab', 'threat-feeds')
+        ->assertSet('confirmingRemoveAllFeedBlocks', false)
+        ->call('confirmRemoveAllFeedBlocks')
+        ->assertSet('confirmingRemoveAllFeedBlocks', true)
+        ->assertSee(__('admin.security_threat_feed_remove_blocks'))
+        ->call('cancelRemoveAllFeedBlocks')
+        ->assertSet('confirmingRemoveAllFeedBlocks', false);
+});

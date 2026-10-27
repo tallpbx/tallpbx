@@ -250,6 +250,37 @@ window.addEventListener('load', restoreSidebarScrollPositionsAfterNavigation);
 
 document.addEventListener('livewire:navigated', restoreSidebarScrollPositionsAfterNavigation);
 
+// ─── Livewire Request Interception & Session Expiration ───────────────────────
+let isSessionExpired = false;
+
+document.addEventListener('livewire:init', () => {
+    Livewire.interceptRequest(({ request, onError }) => {
+        if (isSessionExpired) {
+            request.cancel();
+            return;
+        }
+
+        onError(({ response, body, preventDefault }) => {
+            if (response?.status === 419) {
+                preventDefault();
+                isSessionExpired = true;
+                window.dispatchEvent(new CustomEvent('tallpbx:session-expired'));
+                return;
+            }
+
+            // Suppress Livewire's second native confirm() on transient empty 200 responses
+            // (e.g. during asset/cache swaps) without falsely marking the session expired.
+            if (response?.ok && typeof body === 'string' && body.trim() === '') {
+                preventDefault();
+            }
+        });
+    });
+});
+
+document.addEventListener('livewire:navigated', () => {
+    isSessionExpired = false;
+});
+
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
  * for events that are broadcast by Laravel. Echo and event broadcasting

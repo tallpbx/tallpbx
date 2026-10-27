@@ -63,13 +63,9 @@
                         </span>
                     </label>
 
-                    <button wire:click="clearGeoRules"
-                            wire:loading.attr="disabled"
-                            wire:target="clearGeoRules"
-                            wire:confirm="{{ __('admin.security_geo_clear_confirm') }}"
+                    <button wire:click="confirmClearGeoRules"
                             type="button" class="btn btn-ghost btn-sm text-base-content/70 hover:text-error gap-1">
-                        <x-heroicon-o-x-circle class="w-4 h-4" wire:loading.remove wire:target="clearGeoRules" />
-                        <span class="loading loading-spinner loading-xs" wire:loading wire:target="clearGeoRules"></span>
+                        <x-heroicon-o-x-circle class="w-4 h-4" />
                         <span>{{ __('admin.security_geo_clear_rules') }}</span>
                     </button>
                 </div>

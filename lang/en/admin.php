@@ -470,6 +470,7 @@ return [
     'git_no_stable_branches' => 'No stable release branches found on remote. Tracking development branch.',
     'git_switch_and_update' => 'Switch Branch & Update',
     'git_view_commits' => 'Recent Commits',
+    'git_session_cache_warning' => 'Session storage currently shares the application cache connection (SESSION_CONNECTION=cache). Set SESSION_CONNECTION=session in .env so updates and cache clears do not sign out active administrators.',
 
     // ─── Transcribe ───────────────────────────────────────────────────
     'transcribe' => 'Transcriptions',
@@ -664,6 +665,11 @@ return [
     'cancel' => 'Cancel',
     'delete' => 'Delete',
     'actions' => 'Actions',
+
+    // ─── Session Expiration ──────────────────────────────────────────────
+    'session_expired_title' => 'Session Expired',
+    'session_expired_message' => 'Your session has expired. Please refresh the page or sign in again to continue.',
+    'session_expired_action' => 'Continue',
 
     // ─── Security Module ────────────────────────────────────────────────
     'security' => 'Security',
