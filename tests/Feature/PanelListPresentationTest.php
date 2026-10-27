@@ -37,5 +37,5 @@ it('uses the shared compact action presentation on the file stores list', functi
         ->toContain('<x-icon-button icon="heroicon-o-trash"')
         ->toContain('class="text-error"')
         ->toContain('<x-heroicon-o-signal class="w-4 h-4" />')
-        ->toContain('<x-icon-button icon="heroicon-o-pencil-square"');
+        ->toContain('<x-icon-button icon="heroicon-o-pencil"');
 });

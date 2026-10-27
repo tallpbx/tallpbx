@@ -161,7 +161,7 @@ trait ManagesPreFilters
                 'count_choice' => 'admin.security_entries_count',
                 'count_class' => 'text-base-content/70',
                 'count_pulse' => false,
-                'manage' => ['label' => __('admin.security_manage_whitelist'), 'tab' => 'block-allow', 'class' => 'text-success'],
+                'manage' => ['label' => __('admin.security_manage_whitelist'), 'tab' => 'block-allow'],
                 'pinned' => false,
             ],
             'invalid' => [
@@ -213,7 +213,7 @@ trait ManagesPreFilters
                 'count_choice' => 'admin.security_entries_count',
                 'count_class' => 'text-base-content/70',
                 'count_pulse' => false,
-                'manage' => ['label' => __('admin.security_manage_blacklist'), 'tab' => 'block-allow', 'class' => 'text-error'],
+                'manage' => ['label' => __('admin.security_manage_blacklist'), 'tab' => 'block-allow'],
                 'pinned' => false,
             ],
             'banned' => [
@@ -231,7 +231,7 @@ trait ManagesPreFilters
                 'count_choice' => 'admin.security_threats_count',
                 'count_class' => 'text-base-content/70',
                 'count_pulse' => $attackProtectionEnabled && $bannedCount > 0,
-                'manage' => ['label' => __('admin.security_view_threats'), 'tab' => 'attackers', 'class' => 'text-error'],
+                'manage' => ['label' => __('admin.security_view_threats'), 'tab' => 'attackers'],
                 'pinned' => false,
             ],
             'threat_feeds' => [
@@ -249,7 +249,7 @@ trait ManagesPreFilters
                 'count_choice' => 'admin.security_entries_count',
                 'count_class' => 'text-base-content/70',
                 'count_pulse' => false,
-                'manage' => ['label' => __('admin.security_threat_feed_manage'), 'tab' => 'external-blocklists', 'class' => 'text-error'],
+                'manage' => ['label' => __('admin.security_threat_feed_manage'), 'tab' => 'external-blocklists'],
                 'pinned' => false,
             ],
         ];

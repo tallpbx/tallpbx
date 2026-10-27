@@ -72,7 +72,7 @@
             <div class="flex items-center justify-between mb-2">
                 <h4 class="text-sm font-medium text-base-content/60">{{ __('admin.monitoring_queues') }}</h4>
                 @if(auth('admin')->user()?->hasPermission('admin.queue.view'))
-                    <button type="button" wire:click="openQueueModal" class="btn btn-ghost btn-xs gap-1 text-primary hover:underline">
+                    <button type="button" wire:click="openQueueModal" class="btn btn-ghost btn-xs gap-1 text-base-content/70 hover:text-base-content">
                         {{ __('admin.queue_status') }}
                         <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
                     </button>
@@ -202,7 +202,7 @@
                                         </td>
                                         <td class="text-xs whitespace-nowrap text-base-content/60">{{ $job['failed_at'] }}</td>
                                         <td class="text-right">
-                                            <button type="button" wire:click="retry('{{ $job['uuid'] }}')" class="btn btn-ghost btn-xs text-primary">
+                                            <button type="button" wire:click="retry('{{ $job['uuid'] }}')" class="btn btn-ghost btn-xs text-base-content/70 hover:text-base-content">
                                                 {{ __('admin.retry') }}
                                             </button>
                                         </td>

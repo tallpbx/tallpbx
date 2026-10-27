@@ -169,7 +169,7 @@
                                                            :label="__('client.delete').' '.$item->ip_address"
                                                            wire:click="deleteIp({{ $item->id }})"
                                                            loading-target="deleteIp({{ $item->id }})"
-                                                           class="text-error p-1" />
+                                                           class="btn-square text-error hover:text-error/80" />
                                         </td>
                                     </tr>
                                 @empty
@@ -302,7 +302,7 @@
                                                            :label="__('client.delete').' '.$item->ip_address"
                                                            wire:click="deleteIp({{ $item->id }})"
                                                            loading-target="deleteIp({{ $item->id }})"
-                                                           class="text-error p-1" />
+                                                           class="btn-square text-error hover:text-error/80" />
                                         </td>
                                     </tr>
                                 @empty

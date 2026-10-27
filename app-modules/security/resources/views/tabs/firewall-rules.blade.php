@@ -204,7 +204,9 @@
                         <th class="w-24 px-2">{{ __('admin.security_port') }}</th>
                         <th class="w-28 px-2">{{ __('admin.security_source_ip') }}</th>
                         <th class="w-16 text-center px-1">{{ __('admin.security_action') }}</th>
-                        <th class="w-20 text-right px-2">{{ __('admin.actions') }}</th>
+                        {{-- Every section shares this trailing column grid (reorder | primary
+                             action | delete) so each icon lines up in one vertical column. --}}
+                        <th colspan="3" class="text-center px-1">{{ __('admin.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-base-200">
@@ -213,7 +215,7 @@
                         class="bg-base-200/40 text-xs font-semibold text-base-content/80 cursor-pointer hover:bg-base-200/70 transition-colors select-none"
                         @click="showSystemPreFilters = !showSystemPreFilters"
                         :title="suppressTitle ? null : '{{ __('admin.security_toggle_invariants_tooltip') }}'">
-                        <td colspan="7" class="py-2.5 px-3">
+                        <td colspan="9" class="py-2.5 px-3">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2.5">
                                     {{-- Pre-filter switch on the left with no other text --}}
@@ -258,7 +260,7 @@
                                         <x-heroicon-o-arrow-path class="w-3.5 h-3.5" />
                                         <span>{{ __('admin.security_prefilter_reset') }}</span>
                                     </button>
-                                    <div class="flex items-center gap-1.5 text-xs font-medium text-primary">
+                                    <div class="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80">
                                         <span x-text="showSystemPreFilters ? '{{ __('admin.security_hide_rules') }}' : '{{ __('admin.security_show_rules') }}'"></span>
                                         <x-heroicon-s-chevron-down class="w-4 h-4 transition-transform duration-200" ::class="showSystemPreFilters ? 'rotate-180' : ''" />
                                     </div>
@@ -272,11 +274,13 @@
                         @php
                             $rowActive = $prefilterEnabled && ($preFilterRow['enabled'] ?? true);
                         @endphp
-                        <tr class="hover transition-opacity duration-200 {{ ! $rowActive ? 'opacity-40 bg-base-200/20' : ($preFilterRow['invariant'] ? 'bg-base-200/5' : '') }}"
+                        <tr class="hover transition-opacity duration-200 {{ ! $rowActive ? 'opacity-40 bg-base-200/20' : '' }}"
                             x-show="showSystemPreFilters" x-cloak>
                             <td class="text-center px-1">
                                 <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full {{ ! $rowActive ? 'bg-base-content/25' : $preFilterRow['status_class'] }} {{ ($rowActive && $preFilterRow['count_pulse']) ? 'animate-pulse' : '' }}" title="{{ $rowActive ? 'Active' : 'Disabled' }}"></span>
                             </td>
+                            {{-- Name cell is a single line, like every other section, so rows stay
+                                 uniform in height and the columns read as one clean grid. --}}
                             <td class="px-3">
                                 <div class="flex items-center gap-1.5 font-medium text-base-content">
                                     <span class="{{ ! $rowActive ? 'text-base-content/70' : '' }}">{{ $preFilterRow['label'] }}</span>
@@ -285,9 +289,10 @@
                                             <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                                         </x-tooltip>
                                     @endif
-                                </div>
-                                <div class="mt-0.5">
-                                    <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight text-center inline-block" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
+                                    @if ($preFilterRow['invariant'] && ! $preFilterRow['pinned'])
+                                        <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight inline-block">{{ __('admin.security_kernel_invariant') }}</span>
+                                    @endif
+                                    <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight inline-block" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
                                 </div>
                             </td>
                             <td class="text-center text-xs font-mono font-semibold text-base-content/70 px-1.5">
@@ -297,22 +302,20 @@
                                 {{ __('admin.security_all_ports') }}
                             </td>
                             <td class="px-2">
-                                @if ($preFilterRow['source_kind'] === 'static')
-                                    <div class="font-mono text-xs text-base-content/70">{{ $preFilterRow['source_static'] }}</div>
-                                    <span class="badge badge-ghost badge-xs font-mono mt-0.5 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_dual_stack_badge') }}</span>
-                                @elseif ($preFilterRow['source_kind'] === 'anywhere')
-                                    <span class="font-mono text-xs text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
-                                    <span class="badge badge-ghost badge-xs font-mono ml-1 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_dual_stack_badge') }}</span>
-                                @else
-                                    <span class="font-mono text-xs {{ ! $rowActive ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
-                                        {{ number_format($preFilterRow['count']) }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
-                                    </span>
-                                    @if (! $rowActive && ! empty($preFilterRow['downloaded_count']))
-                                        <div class="text-xs text-base-content/50 font-normal">
-                                            ({{ __('admin.security_in_list_note', ['count' => number_format($preFilterRow['downloaded_count'])]) }})
-                                        </div>
+                                <div class="flex items-center gap-1.5">
+                                    @if ($preFilterRow['source_kind'] === 'static')
+                                        <span class="font-mono text-xs text-base-content/70">{{ $preFilterRow['source_static'] }}</span>
+                                    @elseif ($preFilterRow['source_kind'] === 'anywhere')
+                                        <span class="font-mono text-xs text-base-content/70">{{ __('admin.security_source_anywhere') }}</span>
+                                    @else
+                                        <span class="font-mono text-xs {{ ! $rowActive ? 'text-base-content/50' : $preFilterRow['count_class'] }}">
+                                            {{ number_format($preFilterRow['count']) }} {{ trans_choice($preFilterRow['count_choice'], $preFilterRow['count']) }}
+                                        </span>
                                     @endif
-                                @endif
+                                    @if (! $rowActive && ! empty($preFilterRow['downloaded_count']))
+                                        <span class="text-xs text-base-content/50">({{ __('admin.security_in_list_note', ['count' => number_format($preFilterRow['downloaded_count'])]) }})</span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="text-center px-1.5">
                                 @if (! $rowActive)
@@ -323,45 +326,51 @@
                                     <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                                 @endif
                             </td>
-                            <td class="text-right whitespace-nowrap px-2">
-                                <div class="inline-flex items-center gap-1 justify-end">
-                                    @if ($preFilterRow['pinned'])
+                            {{-- Reorder, primary action, and delete each get their own column so
+                                 they line up with every other section of the table. --}}
+                            <td class="text-center px-1 w-10">
+                                <div class="flex flex-col items-center gap-0.5">
+                                    @if (! $preFilterRow['pinned'])
+                                        <button wire:click="movePreFilterUp('{{ $preFilterRow['key'] }}')" type="button"
+                                                @disabled(! $prefilterEnabled)
+                                                class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content disabled:opacity-30">
+                                            <x-heroicon-s-chevron-up class="w-3.5 h-3.5" />
+                                        </button>
+                                        <button wire:click="movePreFilterDown('{{ $preFilterRow['key'] }}')" type="button"
+                                                @disabled(! $prefilterEnabled)
+                                                class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content disabled:opacity-30">
+                                            <x-heroicon-s-chevron-down class="w-3.5 h-3.5" />
+                                        </button>
+                                    @else
                                         {{-- Pinned first: localhost IPC can never be filtered. --}}
                                         <x-tooltip :tip="__('admin.security_prefilter_locked_tooltip')" align="end" position="left">
-                                            <span class="inline-flex items-center text-base-content/40 px-1">
-                                                <x-heroicon-o-lock-closed class="w-3.5 h-3.5" />
+                                            <span class="inline-flex items-center justify-center h-4 text-base-content/40">
+                                                <x-heroicon-o-lock-closed class="w-4 h-4" />
                                             </span>
                                         </x-tooltip>
-                                        <span class="badge badge-ghost badge-xs opacity-75 font-mono h-auto py-0.5 leading-tight text-center inline-block">{{ __('admin.security_kernel_invariant') }}</span>
-                                    @else
-                                        <span class="flex flex-col">
-                                            <button wire:click="movePreFilterUp('{{ $preFilterRow['key'] }}')" type="button"
-                                                    @disabled(! $prefilterEnabled)
-                                                    class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content disabled:opacity-30">
-                                                <x-heroicon-s-chevron-up class="w-3 h-3" />
-                                            </button>
-                                            <button wire:click="movePreFilterDown('{{ $preFilterRow['key'] }}')" type="button"
-                                                    @disabled(! $prefilterEnabled)
-                                                    class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content disabled:opacity-30">
-                                                <x-heroicon-s-chevron-down class="w-3 h-3" />
-                                            </button>
-                                        </span>
-                                        @if ($preFilterRow['invariant'])
-                                            <span class="badge badge-ghost badge-xs opacity-75 font-mono h-auto py-0.5 leading-tight text-center inline-block">{{ __('admin.security_kernel_invariant') }}</span>
-                                        @endif
-                                        @if ($preFilterRow['manage'])
-                                            <x-tooltip :tip="$preFilterRow['manage']['label']" position="left">
-                                                <button wire:click="$set('activeTab', '{{ $preFilterRow['manage']['tab'] }}')" type="button"
-                                                        @disabled(! $prefilterEnabled)
-                                                        aria-label="{{ $preFilterRow['manage']['label'] }}"
-                                                        class="btn btn-ghost btn-xs btn-square {{ ! $prefilterEnabled ? 'opacity-40 pointer-events-none' : $preFilterRow['manage']['class'] }}">
-                                                    <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
-                                                </button>
-                                            </x-tooltip>
-                                        @endif
                                     @endif
                                 </div>
                             </td>
+                            <td class="text-center px-1 w-10">
+                                @if ($preFilterRow['manage'])
+                                    {{-- Row actions stay neutral-themed; the status dot and action
+                                         badge in this row already carry the semantic colour. --}}
+                                    <x-tooltip :tip="$preFilterRow['manage']['label']" position="left">
+                                        <button wire:click="$set('activeTab', '{{ $preFilterRow['manage']['tab'] }}')" type="button"
+                                                @disabled(! $prefilterEnabled)
+                                                aria-label="{{ $preFilterRow['manage']['label'] }}"
+                                                class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content {{ ! $prefilterEnabled ? 'opacity-40 pointer-events-none' : '' }}">
+                                            <x-heroicon-o-arrow-top-right-on-square class="w-4 h-4" />
+                                        </button>
+                                    </x-tooltip>
+                                @else
+                                    {{-- Not all stages open a management tab: keep the lane uniform. --}}
+                                    <span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span>
+                                @endif
+                            </td>
+                            {{-- Built-in pre-filter stages cannot be deleted: reserve the empty
+                                 delete column to keep the shared grid aligned. --}}
+                            <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
                         </tr>
                     @endforeach
 
@@ -430,7 +439,6 @@
                                         {{ implode(', ', array_slice($geoCountries, 0, 4)) }}{{ count($geoCountries) > 4 ? '...' : '' }}
                                     @endif
                                 </div>
-                                <span class="badge badge-ghost badge-xs font-mono mt-0.5 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_dual_stack_badge') }}</span>
                             @else
                                 <span class="font-mono text-xs text-base-content/50">0 {{ __('admin.security_geo_country_plural') }}</span>
                             @endif
@@ -446,20 +454,24 @@
                                 <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                             @endif
                         </td>
-                        <td class="text-right whitespace-nowrap px-2">
+                        {{-- Reorder and delete columns are reserved empty so the manage link
+                             lines up with the other sections in the shared grid. --}}
+                        <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
+                        <td class="text-center px-1 w-10">
                             <x-tooltip :tip="__('admin.security_manage_geo_blocking')" position="left">
                                 <button wire:click="$set('activeTab', 'geo-blocking')" type="button"
                                         aria-label="{{ __('admin.security_manage_geo_blocking') }}"
-                                        class="btn btn-ghost btn-xs btn-square text-primary">
-                                    <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                                        class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
+                                    <x-heroicon-o-arrow-top-right-on-square class="w-4 h-4" />
                                 </button>
                             </x-tooltip>
                         </td>
+                        <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
                     </tr>
 
                     {{-- Standard Services Section Header --}}
                     <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                        <td colspan="7" class="py-2 px-3">
+                        <td colspan="9" class="py-2 px-3">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <span class="uppercase tracking-wider text-xs">{{ __('admin.security_core_services_title') }}</span>
@@ -579,15 +591,19 @@
                                     <span class="badge badge-ghost badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('client.disabled') }}</span>
                                 @endif
                             </td>
-                            <td class="text-right whitespace-nowrap px-2">
-                                <x-icon-button icon="heroicon-o-pencil-square" :label="__('admin.security_edit_service')" wire:click="openEditSystemServiceModal({{ $service->id }})" class="text-primary" />
+                            {{-- Reorder and delete columns reserved empty; edit sits in the shared
+                                 primary-action column so it lines up across all sections. --}}
+                            <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
+                            <td class="text-center px-1 w-10">
+                                <x-icon-button icon="heroicon-o-pencil" :label="__('admin.security_edit_service')" wire:click="openEditSystemServiceModal({{ $service->id }})" class="btn-square text-base-content/70 hover:text-base-content" />
                             </td>
+                            <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
                         </tr>
                     @endforeach
 
                     {{-- Custom Rules Section Header --}}
                     <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                        <td colspan="7" class="py-2 px-3">
+                        <td colspan="9" class="py-2 px-3">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <span class="uppercase tracking-wider text-xs">{{ __('admin.security_custom_rules_title') }}</span>
@@ -659,25 +675,28 @@
                                 @endif
                             </td>
 
-                            {{-- Reorder Arrows & Row Actions --}}
-                            <td class="text-right whitespace-nowrap px-2">
-                                <div class="inline-flex items-center gap-1 justify-end">
-                                    <span class="flex flex-col">
-                                        <button wire:click="moveRuleUp({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
-                                            <x-heroicon-s-chevron-up class="w-3 h-3" />
-                                        </button>
-                                        <button wire:click="moveRuleDown({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs p-0 h-4 min-h-0 text-base-content/60 hover:text-base-content">
-                                            <x-heroicon-s-chevron-down class="w-3 h-3" />
-                                        </button>
-                                    </span>
-                                    <x-icon-button icon="heroicon-o-pencil-square" :label="__('client.edit').' '.$rule->source_ip" wire:click="openCustomRuleModal({{ $rule->id }})" />
-                                    <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$rule->source_ip" wire:click="deleteRule({{ $rule->id }})" class="text-error" />
+                            {{-- Reorder | edit | delete each get their own column so they line up
+                                 with every other section. Delete carries the destructive red tone. --}}
+                            <td class="text-center px-1 w-10">
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <button wire:click="moveRuleUp({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
+                                        <x-heroicon-s-chevron-up class="w-3.5 h-3.5" />
+                                    </button>
+                                    <button wire:click="moveRuleDown({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
+                                        <x-heroicon-s-chevron-down class="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
+                            </td>
+                            <td class="text-center px-1 w-10">
+                                <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit').' '.$rule->source_ip" wire:click="openCustomRuleModal({{ $rule->id }})" class="btn-square text-base-content/70 hover:text-base-content" />
+                            </td>
+                            <td class="text-center px-1 w-10">
+                                <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$rule->source_ip" wire:click="deleteRule({{ $rule->id }})" class="btn-square text-error hover:text-error/80" />
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4 text-base-content/60">
+                            <td colspan="9" class="text-center py-4 text-base-content/60">
                                 <div class="flex items-center justify-center gap-2">
                                     <x-heroicon-o-shield-check class="w-4 h-4 text-success" />
                                     <span class="text-sm text-base-content/70">{{ __('admin.security_no_rules_help') }}</span>
@@ -688,7 +707,7 @@
 
                     {{-- Default Inbound Policy Section Header --}}
                     <tr class="bg-base-200/20 text-xs font-semibold text-base-content/70">
-                        <td colspan="7" class="py-2 px-3">
+                        <td colspan="9" class="py-2 px-3">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2">
                                     <span class="uppercase tracking-wider text-xs">{{ __('admin.security_default_policy') }}</span>
@@ -730,16 +749,21 @@
                                 <span class="badge badge-ghost badge-sm font-semibold text-base-content/60 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.saving') }}</span>
                             </span>
                         </td>
-                        <td class="text-right whitespace-nowrap px-2">
+                        {{-- Reorder and delete reserved empty; configure becomes an icon-only control
+                             so it lines up in the shared primary-action column. --}}
+                        <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
+                        <td class="text-center px-1 w-10">
                             <button wire:click="openDefaultPolicyForm"
                                     wire:loading.attr="disabled"
                                     wire:target="saveDefaultPolicy"
-                                    type="button" class="btn btn-ghost btn-xs gap-1 text-base-content/70">
-                                <x-heroicon-o-cog-6-tooth class="w-3.5 h-3.5" wire:loading.remove wire:target="saveDefaultPolicy" />
+                                    type="button"
+                                    aria-label="{{ __('admin.security_configure') }}"
+                                    class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
+                                <x-heroicon-o-cog-6-tooth class="w-4 h-4" wire:loading.remove wire:target="saveDefaultPolicy" />
                                 <span wire:loading wire:target="saveDefaultPolicy" class="loading loading-spinner loading-xs text-primary"></span>
-                                <span>{{ __('admin.security_configure') }}</span>
                             </button>
                         </td>
+                        <td class="text-center px-1 w-10"><span class="text-base-content/30 font-mono" aria-hidden="true">&ndash;</span></td>
                     </tr>
                 </tbody>
             </table>

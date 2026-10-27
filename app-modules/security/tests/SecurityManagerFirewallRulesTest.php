@@ -549,3 +549,150 @@ it('opens and cancels pre-filter order reset confirmation modal', function (): v
         ->call('cancelResetPreFilterOrder')
         ->assertSet('confirmingResetPreFilterOrder', false);
 });
+
+it('renders every pre-filter row action in the same neutral colour regardless of subsystem or status', function (): void {
+    // The row indicators (status dot, action badge) already carry the semantic
+    // colour, so the cross-tab "manage" buttons must not add a second, rival
+    // colour coding of their own.
+    SecurityIpList::create(['type' => 'whitelist', 'ip_address' => '198.51.100.7', 'description' => 'Office']);
+    SecurityIpList::create(['type' => 'blacklist', 'ip_address' => '203.0.113.9', 'description' => 'Scanner']);
+    SecuritySetting::set('attack_protection_enabled', '1');
+
+    $component = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'firewall-rules']);
+
+    // Every pre-filter stage that offers a cross-tab action must share one
+    // neutral styling, whether the subsystem allows, drops, or is disabled.
+    $managed = collect($component->instance()->preFilterRows)
+        ->filter(fn (array $row): bool => $row['manage'] !== null);
+
+    expect($managed->count())->toBeGreaterThanOrEqual(4)
+        ->and($managed->every(fn (array $row): bool => ($row['manage']['class'] ?? null) === null))->toBeTrue();
+
+    // No row action button may be tinted with a semantic colour token.
+    $component
+        ->assertDontSeeHtml('btn-square text-error')
+        ->assertDontSeeHtml('btn-square text-success')
+        ->assertDontSeeHtml('btn-square text-primary');
+
+    $html = $component->html();
+
+    // All cross-section links are rendered dimmed (softer than plain
+    // base-content), so an undimmed variant must never appear.
+    expect(substr_count($html, 'btn btn-ghost btn-xs btn-square'))->toBeGreaterThanOrEqual(4)
+        ->and(substr_count($html, 'btn btn-ghost btn-xs btn-square text-base-content/70'))
+        ->toBe(substr_count($html, 'btn btn-ghost btn-xs btn-square'));
+});
+
+it('dims every row edit control to the same brightness as the pre-filter row links', function (): void {
+    // Administrators read the whole pipeline as one control surface, so the
+    // pencil links in the standard services and custom rules sections must
+    // carry the same softened tone as the pre-filter cross-section links.
+    SecurityRule::create([
+        'sequence' => 100,
+        'description' => 'Allow office workstation',
+        'source_ip' => '198.51.100.23',
+        'action' => 'accept',
+        'enabled' => true,
+    ]);
+
+    $html = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'firewall-rules'])
+        ->html();
+
+    // Every edit control shares the pre-filter tone, and no edit control is
+    // rendered at full base-content brightness.
+    expect(substr_count($html, 'text-base-content/70 hover:text-base-content'))
+        ->toBeGreaterThanOrEqual(6)
+        ->and(substr_count($html, 'openEditSystemServiceModal'))->toBeGreaterThanOrEqual(1)
+        ->and(substr_count($html, 'openCustomRuleModal('))->toBeGreaterThanOrEqual(1);
+
+    foreach (['openEditSystemServiceModal', 'openCustomRuleModal('] as $editAction) {
+        preg_match_all('/<(button|a)\b[^>]*'.preg_quote($editAction, '/').'[^>]*>/i', $html, $matches);
+
+        expect($matches[0])->not->toBeEmpty()
+            ->and(collect($matches[0])->every(
+                fn (string $tag): bool => str_contains($tag, 'text-base-content/70')
+            ))->toBeTrue("edit control {$editAction} is not dimmed like the pre-filter links");
+    }
+});
+
+it('aligns reorder, edit, and delete controls in one shared column grid in every section', function (): void {
+    // Row controls must read as one grid across every section of the pipeline
+    // table: a reorder column, a primary-action column (edit / manage /
+    // configure), and the destructive delete column, each in its own lane.
+    SecurityIpList::create(['type' => 'whitelist', 'ip_address' => '198.51.100.7', 'description' => 'Office']);
+    SecurityIpList::create(['type' => 'blacklist', 'ip_address' => '203.0.113.9', 'description' => 'Scanner']);
+
+    SecurityRule::create([
+        'sequence' => 10,
+        'description' => 'Block scanner subnet',
+        'source_ip' => '203.0.113.0/24',
+        'custom_protocol' => 'udp',
+        'custom_port' => '5060',
+        'action' => 'drop',
+        'enabled' => true,
+    ]);
+
+    $html = Livewire::actingAs($this->admin, 'admin')
+        ->test(SecurityManager::class, ['activeTab' => 'firewall-rules'])
+        ->html();
+
+    // Every rule row now ends with one shared trailing grid: three equal-width,
+    // centered action columns — reorder | primary action | delete — so the icons
+    // line up vertically across every section. We assert the stable `w-10` column
+    // structure rather than a layout CSS class, which is brittle to restyling.
+    $actionColumns = substr_count($html, '<td class="text-center px-1 w-10">');
+
+    expect($actionColumns)->toBeGreaterThanOrEqual(12)
+        ->and($actionColumns % 3)->toBe(0, 'every rule row must render exactly three action columns');
+
+    // All non-destructive controls (reorder, edit, manage, configure) share one
+    // square icon-button size and the same softened neutral tone in every section.
+    expect(substr_count($html, 'btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content'))
+        ->toBeGreaterThanOrEqual(4);
+
+    // The delete control is the single intentionally destructive affordance and
+    // carries the semantic error colour.
+    expect($html)->toContain('btn btn-ghost btn-xs btn-square text-error hover:text-error/80');
+
+    // Sections without a reorder or delete affordance reserve the empty lane with
+    // a muted en-dash placeholder so the columns stay uniform across the whole table.
+    expect(substr_count($html, 'text-base-content/30 font-mono'))
+        ->toBeGreaterThanOrEqual(4);
+
+    // The redundant always-on IPv4 & IPv6 dual-stack badge was removed from every row.
+    expect($html)->not->toContain(__('admin.security_dual_stack_badge'));
+
+    // Row status may only dim the row (opacity) or use a subtle disabled tint; it
+    // must not band the table with a per-stage background. Assert no literal
+    // `bg-base-200/5` token (negative lookahead keeps the unrelated `bg-base-200/50`
+    // info callout from matching the substring).
+    expect(preg_match('/bg-base-200\/5(?![0-9])/', $html))->toBe(0);
+
+    // Within the action grid the destructive delete column sits furthest right: its
+    // cell must come after the edit cell of the same rule row (scoped to the action
+    // cells so the row-level wire:target, which lists both handlers, cannot skew it).
+    preg_match_all('/<td class="text-center px-1 w-10">.*?<\/td>/s', $html, $actionCells);
+
+    $editIndex = null;
+    $deleteIndex = null;
+    foreach ($actionCells[0] as $index => $cell) {
+        if ($editIndex === null && str_contains($cell, 'openCustomRuleModal(')) {
+            $editIndex = $index;
+        }
+        if (str_contains($cell, 'deleteRule(')) {
+            $deleteIndex = $index;
+        }
+    }
+
+    expect($editIndex)->not->toBeNull()
+        ->and($deleteIndex)->not->toBeNull()
+        ->and($deleteIndex)->toBeGreaterThan((int) $editIndex);
+
+    // Built-in / kernel-invariant copy belongs to the name column, never an action lane.
+    expect($actionCells[0])->not->toBeEmpty()
+        ->and(collect($actionCells[0])->every(
+            fn (string $cell): bool => ! str_contains($cell, __('admin.security_kernel_invariant'))
+        ))->toBeTrue('built-in notes must not sit inside an action column');
+});

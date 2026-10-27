@@ -136,7 +136,7 @@
                                         </button>
                                     </x-tooltip>
                                     <x-tooltip tip="Edit file store">
-                                        <x-icon-button icon="heroicon-o-pencil-square" :label="__('client.edit')" :href="route('panel.file-stores.edit', $fileStore->id)" />
+                                        <x-icon-button icon="heroicon-o-pencil" :label="__('client.edit')" :href="route('panel.file-stores.edit', $fileStore->id)" />
                                     </x-tooltip>
                                     <x-tooltip tip="Delete file store">
                                         <x-icon-button icon="heroicon-o-trash" :label="__('client.delete').' '.$fileStore->name" wire:click="confirmFileStoreDeletion('{{ $fileStore->id }}')" class="text-error" />
