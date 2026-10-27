@@ -290,6 +290,7 @@ TallPBX relies heavily on Redis for high-throughput XML response caching, sessio
 | `REDIS_BACKOFF_CAP` | `integer` | `null` | `database.redis.default.backoff_cap` | Maximum backoff cap duration in milliseconds. |
 | `REDIS_CLUSTER` | `string` | `redis` | `database.redis.options.cluster` | Redis cluster driver name when deploying clustered topologies. |
 | `REDIS_CACHE_DB` | `integer` | `1` | `database.redis.cache.database` | Redis database index isolated specifically for application and XML cache keys. |
+| `REDIS_SESSION_DB` | `integer` | `2` | `database.redis.session.database` | Redis database index isolated specifically for stateful HTTP user and admin sessions. |
 | `REDIS_CACHE_CONNECTION` | `string` | `cache` | `cache.stores.redis.connection` | Named Redis connection configuration mapped to cache operations. |
 | `REDIS_CACHE_LOCK_CONNECTION` | `string` | `default` | `cache.stores.redis.lock_connection` | Redis connection used for atomic distributed mutex locks. |
 
@@ -472,7 +473,7 @@ Governs administrator and tenant user sessions, authentication persistence, and 
 | `SESSION_LIFETIME` | `integer` | `120` | `session.lifetime` | Session idle expiration time in minutes (default 2 hours). |
 | `SESSION_EXPIRE_ON_CLOSE` | `boolean` | `false` | `session.expire_on_close` | Forces browser sessions to invalidate immediately when the user closes their browser window. |
 | `SESSION_ENCRYPT` | `boolean` | `true` | `session.encrypt` | Encrypts all session data at rest using `APP_KEY`. Default `true` protects session payloads from exposure. |
-| `SESSION_CONNECTION` | `string` | `cache` | `session.connection` | Dedicated Redis connection utilized for storing session keys. |
+| `SESSION_CONNECTION` | `string` | `session` | `session.connection` | Dedicated Redis connection utilized for storing session keys. |
 | `SESSION_STORE` | `string` | `null` | `session.store` | Specific cache store mapped when using cache session driver. |
 | `SESSION_TABLE` | `string` | `sessions` | `session.table` | Database table used when storing sessions in SQL database. |
 
@@ -646,6 +647,7 @@ APP_ENV=production
 APP_DEBUG=false
 CACHE_STORE=redis
 SESSION_DRIVER=redis
+SESSION_CONNECTION=session
 SESSION_SECURE_COOKIE=true
 QUEUE_CONNECTION=redis
 BROADCAST_CONNECTION=reverb
@@ -654,6 +656,7 @@ BROADCAST_CONNECTION=reverb
 REDIS_CLIENT=phpredis
 REDIS_PERSISTENT=true
 REDIS_CACHE_DB=1
+REDIS_SESSION_DB=2
 
 # FreeSWITCH Engine Tuning
 FS_LOG_LEVEL=warning

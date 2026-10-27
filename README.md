@@ -195,7 +195,7 @@ php artisan app:test --full
 php artisan test --filter=AdminAuthTest
 ```
 
-All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (14/15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `php artisan config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
+All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (13–15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `php artisan config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
 
 ## Performance & Load Testing
 

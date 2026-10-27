@@ -421,6 +421,11 @@ sequenceDiagram
 
 ### 11.1 Redis Decoupling & Graceful Degradation
 
+- **Standalone Redis 3-Tier Keyspace Isolation**: TallPBX structures its Redis deployment across isolated database indexes:
+  - **DB 0 (Persistent Coordination & Security)**: Default connection used for atomic distributed mutex locks (`tallpbx_database_lock:*`), queue jobs, intrusion detection sliding-window counters, scanner dedup sets, and event broadcasting.
+  - **DB 1 (Disposable Cache)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`REDIS_CACHE_DB=1`). Cleared aggressively during `php artisan optimize:clear` or XML cache sweeps without touching session or security state.
+  - **DB 2 (Stateful HTTP Sessions)**: User and administrator web sessions (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`). Completely decoupled from cache flushes so background sweeps, module syncs, and web Git updates never evict active logins.
+  - **DB 13–15 (Isolated Test Workspaces)**: Confined execution for automated unit, feature, and browser test suites (`tallpbx-test-*`), ensuring tests never mutate or wipe production keyspaces.
 - **Direct Redis Communication**: TallPBX's intrusion detection engine (`SecurityIncidentService`) talks directly to Redis via `Illuminate\Support\Facades\Redis` facade (`Redis::incr()`, `expire()`), bypassing Laravel's general `CACHE_STORE`. Configuring `CACHE_STORE=file` or `database` in `.env` does not alter or disable intrusion tracking.
 - **Zero Database Load**: In-flight failure counters live strictly in Redis memory, preventing MariaDB lock contention during brute-force floods.
 - **Memory Ceiling & LRU Eviction Policy**: Fresh installs configure Redis with `maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`. Each sliding-window attack key has an automatic 10-minute TTL and is deleted immediately once an IP is banned. If a distributed botnet floods millions of attack packets, Redis evicts expired and least-recently-used volatile keys, keeping memory bounded without rejecting commands or risking host OOM events.

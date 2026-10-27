@@ -298,6 +298,8 @@ systemctl restart redis-server
 redis-cli ping    # should respond PONG
 ```
 
+Active sessions reside in isolated Redis DB 2 (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`), while application and XML dialplan caches reside in DB 1 (`REDIS_CACHE_DB=1`). Running `php artisan optimize:clear` or `php artisan cache:clear` clears only DB 1, leaving active administrator and tenant logins intact. Furthermore, standard Debian Redis configurations maintain RDB snapshot persistence (`/var/lib/redis/dump.rdb`), preserving active session keys across graceful Redis service restarts.
+
 After restoring Redis, clear stale cache:
 
 ```bash
@@ -307,10 +309,10 @@ php artisan optimize:clear && php artisan optimize
 
 ### Redis Memory Limit & Eviction Policy
 
-Redis is configured with a universal 256MB memory cap (`maxmemory 256mb`) and volatile-LRU eviction policy (`maxmemory-policy volatile-lru`) in `/etc/redis/redis.conf`. This ceiling accommodates caching, session storage, and security sliding-window counters with automatic eviction of expired keys when memory is constrained.
+Redis is configured with a universal 256MB memory cap (`maxmemory 256mb`) and volatile-LRU eviction policy (`maxmemory-policy volatile-lru`) in `/etc/redis/redis.conf`. This ceiling accommodates caching, session storage, and security sliding-window counters with automatic capacity-based eviction of least-recently-used keys when memory is constrained.
 
 > [!NOTE]
-> Because `volatile-lru` only evicts keys with an explicit TTL, all application cache keys, rate-limiter entries, and session records have bounded expirations. If `QUEUE_CONNECTION` is switched to `redis`, queue job lists do not carry a TTL and are protected from eviction, but operators should ensure worker throughput keeps queue depth within available Redis memory.
+> Because `volatile-lru` only evicts keys with an explicit TTL, all application cache keys (DB 1), rate-limiter entries, and session records (DB 2) have bounded expirations and are safely pruned under high memory pressure without dropping persistent coordination state. If `QUEUE_CONNECTION` is switched to `redis`, queue job lists in DB 0 do not carry a TTL and are protected from eviction, but operators should ensure worker throughput keeps queue depth within available Redis memory.
 
 ## Outgoing Mail & Notifications (Email Connector)
 

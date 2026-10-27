@@ -7,8 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Session Expired Modal Dialog**: Introduced `<x-session-expired-modal />` with cohesive DaisyUI semantic tokens and page reload recovery, mounted globally in `layouts/app.blade.php`.
+- **Livewire Request Interception Hook**: Wired `Livewire.interceptRequest()` in `resources/js/app.js` to intercept HTTP 419 session expirations, silence built-in browser `window.confirm()` popups, dispatch `tallpbx:session-expired`, and cancel queued background requests (`wire:poll`) to prevent post-expiration request storms.
+- **Git Updater Legacy Session Storage Warning**: Added preflight warning banner on `/panel/git-update` warning administrators if legacy `.env` configurations still share `SESSION_CONNECTION=cache`, ensuring updates and cache flushes do not invalidate active logins.
+
+### Changed
+- **Redis Session Database Isolation (DB 2)**: Added dedicated `session` Redis connection mapping to `REDIS_SESSION_DB` (default DB `2`), isolating stateful HTTP user and administrator logins from volatile application and telephony XML caches (`DB 1`) and persistent coordination state (`DB 0`).
+- **Test Runner Redis Safety (DB 13)**: Mirrored `REDIS_SESSION_DB=13` and `SESSION_CONNECTION=session` in `phpunit.xml` and `SafeTestCommand`, isolating test session state away from production databases during parallel and compact test runs.
+- **Cache Sweep Granularity**: Updated `scripts/run-cache-sweep.sh` to flush only `${REDIS_CACHE_DB:-1}` (DB 1), protecting DB 0 (security/mutex locks) and DB 2 (sessions) during benchmarking sweeps.
+- **Native Browser Confirm Eliminated**: Replaced the remaining five `wire:confirm` directives in `CertificateManager` (deleting certificates and DNS credentials) and `SecurityManager` (clearing geo rules, resetting pre-filter order, and removing feed blocks) with cohesive `<x-confirmation-modal>` components. Enforced by an automated architecture test asserting zero `wire:confirm` usages across all Blade templates.
+
 ### Fixed
 - **Storage Gitignore File Mode Normalization**: Normalized tracked git file modes from `100755` executable to `100644` standard non-executable for `.gitignore` placeholder files under `storage/` (`storage/app/`, `storage/framework/`, and `storage/logs/`). This prevents `ApplicationFilePermissions` runtime permissions repairs (`0664`) from causing git working tree dirty status errors during web UI Git Updater runs.
+- **Livewire Transient Empty 200 Browser Popups**: Silenced Livewire's built-in `window.confirm()` on transient empty 200 responses during Livewire polling without falsely marking sessions expired.
+
+### Upgrade Note
+- **Redis Session DB-2 Migration**: Existing installations with `SESSION_CONNECTION=cache` in `.env` should update `.env` to:
+  ```ini
+  SESSION_CONNECTION=session
+  REDIS_SESSION_DB=2
+  ```
+  and verify `SESSION_ENCRYPT=true`, followed by running `php artisan optimize:clear`. Active web sessions will require a one-time sign-in upon cutover; subsequent cache flushes (`cache:clear`, `optimize:clear`) and Git updates will no longer sign out active administrators.
 
 ### Security
 - **Unattended-Upgrades Enabled by Default on New Installs**: The installer now installs and enables `unattended-upgrades` and allows the Sury PHP repository origin (`origin=deb.sury.org`) in its allowed-origins list, so Debian security updates and PHP security fixes (such as PHP2Shell CVE-2026-109618/109619) apply automatically on new servers. The two configuration files are only created when missing, so installer re-runs preserve operator edits. Existing installations are unchanged; re-running `scripts/install.sh` adopts the same settings.
