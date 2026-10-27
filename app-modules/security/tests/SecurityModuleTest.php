@@ -56,7 +56,7 @@ it('registers security menu item as top-level item on main panel menu in MenuSer
         ->and($securityItem['route'])->toBe('panel.security.index')
         ->and($securityItem['permission'])->toBe('security.view')
         ->and($securityItem['parent'] ?? null)->toBeNull()
-        ->and($securityItem['order'])->toBe(39);
+        ->and($securityItem['order'])->toBe(39.2);
 });
 
 it('places security nav link below monitoring and before pbx in menu tree', function (): void {

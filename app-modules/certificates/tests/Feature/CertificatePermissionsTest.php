@@ -48,7 +48,7 @@ it('registers all certificate permissions and assigns them to super administrato
     }
 });
 
-it('registers certificates menu item beside security at order 39.5 on main panel menu', function (): void {
+it('registers certificates menu item beside security at order 39.4 on main panel menu', function (): void {
     $menuService = app(MenuService::class);
     $items = $menuService->getFlat('admin');
 
@@ -61,7 +61,7 @@ it('registers certificates menu item beside security at order 39.5 on main panel
         ->and($item['icon'])->toBe('heroicon-o-key')
         ->and($item['guard'])->toBe('admin')
         ->and($item['parent'] ?? null)->toBeNull()
-        ->and($item['order'])->toBe(39.5);
+        ->and($item['order'])->toBe(39.4);
 });
 
 it('places certificates nav link between security and pbx in menu tree', function (): void {
