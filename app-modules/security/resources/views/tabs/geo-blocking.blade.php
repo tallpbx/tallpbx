@@ -47,7 +47,13 @@
 
                 {{-- Action Buttons & Toggle --}}
                 <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                    <label class="label cursor-pointer justify-start gap-2 p-0 mr-2"
+                    <button wire:click="confirmClearGeoRules"
+                            type="button" class="btn btn-ghost btn-sm text-base-content/70 hover:text-error gap-1">
+                        <x-heroicon-o-x-circle class="w-4 h-4" />
+                        <span>{{ __('admin.security_geo_clear_rules') }}</span>
+                    </button>
+
+                    <label class="label cursor-pointer justify-start gap-2 p-0"
                            wire:loading.class="opacity-70 pointer-events-none"
                            wire:target="setGeoEnabled">
                         <input wire:click="setGeoEnabled({{ $geoEnabled ? 'false' : 'true' }})"
@@ -62,12 +68,6 @@
                             <span>{{ $geoEnabled ? __('admin.security_geo_disabling') : __('admin.security_geo_enabling') }}</span>
                         </span>
                     </label>
-
-                    <button wire:click="confirmClearGeoRules"
-                            type="button" class="btn btn-ghost btn-sm text-base-content/70 hover:text-error gap-1">
-                        <x-heroicon-o-x-circle class="w-4 h-4" />
-                        <span>{{ __('admin.security_geo_clear_rules') }}</span>
-                    </button>
                 </div>
             </div>
 

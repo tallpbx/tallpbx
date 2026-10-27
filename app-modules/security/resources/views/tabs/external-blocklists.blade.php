@@ -74,8 +74,8 @@
                         <code class="px-1.5 py-0.5 rounded bg-base-200 text-xs font-mono select-all text-base-content">sudo nft list set inet tallpbx_filter external_blocklist_ips</code>
                     </p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                    <label class="label cursor-pointer justify-start gap-2 p-0 mr-2"
+                <div class="flex flex-col items-end gap-2 self-start sm:self-auto">
+                    <label class="label cursor-pointer justify-start gap-2 p-0"
                            wire:loading.class="opacity-70 pointer-events-none"
                            wire:target="setFeedEnabled">
                         <input wire:click="setFeedEnabled({{ $feedEnabled ? 'false' : 'true' }})"
@@ -90,25 +90,27 @@
                             <span>{{ $feedEnabled ? __('admin.security_threat_feed_disabling') : __('admin.security_threat_feed_enabling') }}</span>
                         </span>
                     </label>
-                    <button wire:click="syncThreatFeedNow"
-                            wire:loading.attr="disabled"
-                            wire:target="syncThreatFeedNow"
-                            type="button" class="btn btn-outline btn-sm gap-1">
-                        <span wire:loading.remove wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
-                            <x-heroicon-o-arrow-path class="w-4 h-4" />
-                            <span>{{ __('admin.security_threat_feed_sync_now') }}</span>
-                        </span>
-                        <span wire:loading wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
-                            <span class="loading loading-spinner loading-xs"></span>
-                            <span>{{ __('admin.security_threat_feed_syncing') }}</span>
-                        </span>
-                    </button>
-                    <button wire:click="confirmRemoveAllFeedBlocks"
-                            type="button"
-                            class="btn btn-outline btn-error btn-sm gap-1">
-                        <x-heroicon-o-trash class="w-4 h-4" />
-                        <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
-                    </button>
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button wire:click="syncThreatFeedNow"
+                                wire:loading.attr="disabled"
+                                wire:target="syncThreatFeedNow"
+                                type="button" class="btn btn-outline btn-sm gap-1">
+                            <span wire:loading.remove wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
+                                <x-heroicon-o-arrow-path class="w-4 h-4" />
+                                <span>{{ __('admin.security_threat_feed_sync_now') }}</span>
+                            </span>
+                            <span wire:loading wire:target="syncThreatFeedNow" class="inline-flex items-center gap-1">
+                                <span class="loading loading-spinner loading-xs"></span>
+                                <span>{{ __('admin.security_threat_feed_syncing') }}</span>
+                            </span>
+                        </button>
+                        <button wire:click="confirmRemoveAllFeedBlocks"
+                                type="button"
+                                class="btn btn-outline btn-error btn-sm gap-1">
+                            <x-heroicon-o-trash class="w-4 h-4" />
+                            <span>{{ __('admin.security_threat_feed_remove_blocks') }}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

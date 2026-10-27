@@ -32,7 +32,7 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_banned_attackers') }}</h2>
-                        <span class="badge {{ $attackProtectionEnabled ? 'badge-error' : 'badge-neutral' }} badge-sm font-semibold">
+                        <span class="badge {{ $attackProtectionEnabled ? 'badge-success' : 'badge-neutral' }} badge-sm font-semibold">
                             {{ $attackProtectionEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
                         </span>
                         @if ($attackProtectionEnabled)
@@ -56,8 +56,8 @@
                         <code class="px-1.5 py-0.5 rounded bg-base-200 text-xs font-mono select-all text-base-content">sudo nft list set inet tallpbx_filter banned_ips</code>
                     </p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                    <label class="label cursor-pointer justify-start gap-2 p-0 mr-2"
+                <div class="flex flex-col items-end gap-2 self-start sm:self-auto">
+                    <label class="label cursor-pointer justify-start gap-2 p-0"
                            wire:loading.class="opacity-70 pointer-events-none"
                            wire:target="setAttackProtectionEnabled">
                         <input wire:click="setAttackProtectionEnabled({{ $attackProtectionEnabled ? 'false' : 'true' }})"
@@ -72,14 +72,16 @@
                             <span>{{ $attackProtectionEnabled ? __('admin.security_attack_protection_disabling') : __('admin.security_attack_protection_enabling') }}</span>
                         </span>
                     </label>
-                    <button wire:click="openSettingsDrawer" type="button" class="btn btn-outline btn-sm gap-1">
-                        <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
-                        <span>{{ __('admin.security_protection_settings') }}</span>
-                    </button>
-                    <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1">
-                        <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
-                        <span>{{ __('admin.security_block_manually') }}</span>
-                    </button>
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button wire:click="openSettingsDrawer" type="button" class="btn btn-outline btn-sm gap-1">
+                            <x-heroicon-o-cog-6-tooth class="w-4 h-4" />
+                            <span>{{ __('admin.security_protection_settings') }}</span>
+                        </button>
+                        <button wire:click="openManualBanModal" type="button" class="btn btn-outline btn-sm gap-1">
+                            <x-heroicon-o-no-symbol class="w-4 h-4 text-error" />
+                            <span>{{ __('admin.security_block_manually') }}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -101,7 +103,7 @@
                                 wire:key="active-ban-{{ $ban->ip_address }}"
                                 wire:loading.class="opacity-40 pointer-events-none"
                                 wire:target="unban('{{ $ban->ip_address }}'), promoteToWhitelist('{{ $ban->ip_address }}'), promoteToBlacklist('{{ $ban->ip_address }}')">
-                                <td class="font-mono font-medium text-error">
+                                <td class="font-mono font-medium text-base-content/70">
                                     {{ $ban->ip_address }}
                                     {{-- The reason carries the signature that triggered the ban (e.g. sip_scanner · User-Agent: friendly-scanner),
                                          so a false positive is diagnosable before it becomes a support call. --}}
@@ -187,45 +189,41 @@
     {{-- Card: SIP Bot & Scanner Signatures --}}
     <div class="card bg-base-100 shadow-sm border border-base-200 mt-4">
         <div class="card-body p-4 space-y-4">
-            <div class="border-b border-base-200 pb-3">
-                <div class="flex items-center gap-2">
-                    <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_scanner_title') }}</h2>
-                    <span class="badge {{ $sipScanner['enforcement'] ? 'badge-error' : 'badge-neutral' }} badge-sm font-semibold">
-                        {{ $sipScanner['enforcement'] ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
-                    </span>
-                    <x-tooltip :tip="__('admin.security_scanner_desc')" align="start" position="right">
-                        <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                    </x-tooltip>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-base-200 pb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_scanner_title') }}</h2>
+                        <span class="badge {{ $sipScanner['enforcement'] ? 'badge-success' : 'badge-neutral' }} badge-sm font-semibold">
+                            {{ $sipScanner['enforcement'] ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
+                        </span>
+                        <x-tooltip :tip="__('admin.security_scanner_desc')" align="start" position="right">
+                            <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
+                        </x-tooltip>
+                    </div>
+                    <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_scanner_desc') }}</p>
                 </div>
-                <p class="text-xs text-base-content/60 mt-0.5">{{ __('admin.security_scanner_desc') }}</p>
+                <div class="flex items-center gap-2 self-start sm:self-auto">
+                    <label class="label cursor-pointer justify-start gap-2 p-0"
+                           wire:loading.class="opacity-70 pointer-events-none"
+                           wire:target="setSipScannerEnforcement">
+                        <input wire:click="setSipScannerEnforcement({{ $sipScanner['enforcement'] ? 'false' : 'true' }})"
+                               wire:loading.attr="disabled"
+                               wire:target="setSipScannerEnforcement"
+                               type="checkbox" class="toggle toggle-success toggle-sm" @checked($sipScanner['enforcement']) />
+                        <span wire:loading.remove wire:target="setSipScannerEnforcement" class="label-text font-medium text-xs sm:text-sm">
+                            {{ $sipScanner['enforcement'] ? __('admin.enabled') : __('admin.disabled') }}
+                        </span>
+                        <span wire:loading wire:target="setSipScannerEnforcement" class="inline-flex items-center gap-1.5 label-text font-medium text-xs sm:text-sm text-success">
+                            <span class="loading loading-spinner loading-xs"></span>
+                            <span>{{ $sipScanner['enforcement'] ? __('admin.security_scanner_disabling') : __('admin.security_scanner_enabling') }}</span>
+                        </span>
+                    </label>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                {{-- Left: enforcement, duration, custom signatures --}}
+                {{-- Left: duration, custom signatures --}}
                 <div class="space-y-4">
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <label class="label cursor-pointer justify-start gap-2 p-0"
-                                   wire:loading.class="opacity-70 pointer-events-none"
-                                   wire:target="setSipScannerEnforcement">
-                                <input wire:click="setSipScannerEnforcement({{ $sipScanner['enforcement'] ? 'false' : 'true' }})"
-                                       wire:loading.attr="disabled"
-                                       wire:target="setSipScannerEnforcement"
-                                       type="checkbox" class="toggle toggle-success toggle-sm" @checked($sipScanner['enforcement']) />
-                                <span wire:loading.remove wire:target="setSipScannerEnforcement" class="label-text font-medium">
-                                    {{ __('admin.security_scanner_enforcement') }}
-                                </span>
-                                <span wire:loading wire:target="setSipScannerEnforcement" class="inline-flex items-center gap-1.5 label-text font-medium text-success">
-                                    <span class="loading loading-spinner loading-xs"></span>
-                                    <span>{{ $sipScanner['enforcement'] ? __('admin.security_scanner_disabling') : __('admin.security_scanner_enabling') }}</span>
-                                </span>
-                            </label>
-                            <x-tooltip :tip="$sipScanner['enforcement'] ? __('admin.security_scanner_enforcement_help_on') : __('admin.security_scanner_enforcement_help_off')" align="start" position="right">
-                                <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
-                            </x-tooltip>
-                        </div>
-                    </div>
-
                     <div class="form-control">
                         <label class="label justify-start gap-2 pb-1">
                             <span class="label-text font-medium">{{ __('admin.security_scanner_duration') }}</span>
@@ -270,9 +268,9 @@
                 <div class="space-y-3">
                     <div>
                         @if ($sipScanner['enforcement'])
-                            <span class="badge badge-error badge-sm mb-1.5">{{ __('admin.security_scanner_high_group_active') }}</span>
+                            <div class="text-sm font-medium mb-1.5">{{ __('admin.security_scanner_high_group_active') }}</div>
                         @else
-                            <span class="badge badge-neutral badge-sm mb-1.5">{{ __('admin.security_scanner_high_group_monitored') }}</span>
+                            <div class="text-sm font-medium mb-1.5">{{ __('admin.security_scanner_high_group_monitored') }}</div>
                         @endif
                         <div class="flex items-center gap-1.5 flex-wrap">
                             @foreach ($sipScanner['defaults']['high'] as $entry)
@@ -282,7 +280,7 @@
                     </div>
                     <div>
                         <div class="flex items-center gap-1.5 mb-1.5">
-                            <span class="badge {{ $sipScanner['enforcement'] ? 'badge-warning' : 'badge-neutral' }} badge-sm">{{ __('admin.security_scanner_low_group') }}</span>
+                            <span class="text-sm font-medium">{{ __('admin.security_scanner_low_group') }}</span>
                             <x-tooltip :tip="__('admin.security_scanner_incidents_help')" align="start" position="right">
                                 <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                             </x-tooltip>
@@ -300,7 +298,7 @@
             <div class="border-t border-base-200 pt-3">
                 <div class="flex items-center gap-2 mb-2">
                     <span class="text-sm font-medium">{{ __('admin.security_scanner_incidents') }}</span>
-                    <span class="badge badge-warning badge-sm font-mono">{{ $this->scannerIncidents->count() }}</span>
+                    <span class="badge badge-neutral badge-sm font-mono">{{ $this->scannerIncidents->count() }}</span>
                 </div>
                 @if ($this->scannerIncidents->isNotEmpty())
                     <div class="overflow-x-auto max-h-60 overflow-y-auto border border-base-200 rounded-box">

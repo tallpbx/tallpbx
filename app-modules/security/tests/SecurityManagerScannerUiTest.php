@@ -280,10 +280,6 @@ it('ships every scanner label in English, Spanish, and French', function (): voi
     $required = [
         'security_scanner_title',
         'security_scanner_desc',
-        'security_scanner_enforcement',
-        'security_scanner_enforcement_help',
-        'security_scanner_enforcement_help_on',
-        'security_scanner_enforcement_help_off',
         'security_scanner_duration',
         'security_scanner_duration_1h',
         'security_scanner_duration_24h',

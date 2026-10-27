@@ -155,7 +155,7 @@
                             <tbody>
                                 @forelse ($this->whitelist as $item)
                                     <tr class="hover" wire:loading.class="opacity-40 pointer-events-none" wire:target="deleteIp({{ $item->id }})">
-                                        <td class="font-mono font-medium text-success whitespace-nowrap">
+                                        <td class="font-mono font-medium text-base-content/70 whitespace-nowrap">
                                             {{ $item->ip_address }}
                                             @if ($item->ip_address === $adminIp)
                                                 <span class="badge badge-success badge-sm ml-1">You</span>
@@ -194,7 +194,7 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-base-content">{{ __('admin.security_blacklist_ips') }}</h2>
-                        <span class="badge {{ $blacklistEnabled ? 'badge-error' : 'badge-neutral' }} badge-sm font-semibold">
+                        <span class="badge {{ $blacklistEnabled ? 'badge-success' : 'badge-neutral' }} badge-sm font-semibold">
                             {{ $blacklistEnabled ? __('admin.security_threat_feed_status_active') : __('admin.security_threat_feed_status_disabled') }}
                         </span>
                         @if ($blacklistEnabled)
@@ -256,7 +256,7 @@
                             <button type="submit"
                                     wire:loading.attr="disabled"
                                     wire:target="addBlacklistIp"
-                                    class="btn btn-error btn-sm w-full gap-1 shadow-xs">
+                                    class="btn btn-primary btn-sm w-full gap-1 shadow-xs">
                                 <span wire:loading.remove wire:target="addBlacklistIp" class="inline-flex items-center gap-1">
                                     <x-heroicon-o-plus class="w-4 h-4" />
                                     <span>{{ __('admin.security_add_to_blacklist') }}</span>
@@ -291,7 +291,7 @@
                             <tbody>
                                 @forelse ($this->blacklist as $item)
                                     <tr class="hover" wire:loading.class="opacity-40 pointer-events-none" wire:target="deleteIp({{ $item->id }})">
-                                        <td class="font-mono font-medium text-error whitespace-nowrap">
+                                        <td class="font-mono font-medium text-base-content/70 whitespace-nowrap">
                                             {{ $item->ip_address }}
                                         </td>
                                         <td class="text-base-content/70 whitespace-normal break-words max-w-xs text-xs sm:text-sm">
