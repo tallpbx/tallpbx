@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-26
+
 ### Added
 - **Session Expired Modal Dialog**: Introduced `<x-session-expired-modal />` with cohesive DaisyUI semantic tokens and page reload recovery, mounted globally in `layouts/app.blade.php`.
 - **Livewire Request Interception Hook**: Wired `Livewire.interceptRequest()` in `resources/js/app.js` to intercept HTTP 419 session expirations, silence built-in browser `window.confirm()` popups, dispatch `tallpbx:session-expired`, and cancel queued background requests (`wire:poll`) to prevent post-expiration request storms.
