@@ -202,7 +202,6 @@ return [
     'security_threat_feed_enabling' => 'Enabling...',
     'security_threat_feed_disabling' => 'Disabling...',
     'security_threat_feed_syncing' => 'Syncing...',
-    'security_threat_feed_removing_blocks' => 'Removing blocks...',
     'security_threat_feed_enabled_notice' => 'External blocklist enabled.',
     'security_threat_feed_disabled_notice' => 'External blocklist disabled and flushed from the firewall.',
     'security_threat_feed_downloaded_count' => ':count in downloaded feed',

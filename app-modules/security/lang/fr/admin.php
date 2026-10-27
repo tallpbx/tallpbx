@@ -202,7 +202,6 @@ return [
     'security_threat_feed_enabling' => 'Activation...',
     'security_threat_feed_disabling' => 'Désactivation...',
     'security_threat_feed_syncing' => 'Synchronisation...',
-    'security_threat_feed_removing_blocks' => 'Suppression des blocages...',
     'security_threat_feed_enabled_notice' => 'Liste de menaces externe activée.',
     'security_threat_feed_disabled_notice' => 'Liste de menaces externe désactivée et purgée du pare-feu.',
     'security_threat_feed_downloaded_count' => ':count dans la liste téléchargée',

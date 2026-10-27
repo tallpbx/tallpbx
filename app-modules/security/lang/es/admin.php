@@ -202,7 +202,6 @@ return [
     'security_threat_feed_enabling' => 'Activando...',
     'security_threat_feed_disabling' => 'Desactivando...',
     'security_threat_feed_syncing' => 'Sincronizando...',
-    'security_threat_feed_removing_blocks' => 'Eliminando bloqueos...',
     'security_threat_feed_enabled_notice' => 'Lista de amenazas externa activada.',
     'security_threat_feed_disabled_notice' => 'Lista de amenazas externa desactivada y purgada del cortafuegos.',
     'security_threat_feed_downloaded_count' => ':count en la lista descargada',

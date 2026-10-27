@@ -125,7 +125,6 @@ it('ships every threat feed label in English, Spanish, and French', function ():
         'security_threat_feed_enabling',
         'security_threat_feed_disabling',
         'security_threat_feed_syncing',
-        'security_threat_feed_removing_blocks',
         'security_threat_feed_enabled_notice',
         'security_threat_feed_disabled_notice',
         'security_threat_feed_downloaded_count',
