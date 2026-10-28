@@ -6,6 +6,8 @@ In older or simpler phone systems, they often were mashed together. But in a mod
 
 This guide breaks down each piece in plain, non-technical language first, followed by real-world examples and deeper details for technical readers.
 
+> **Where does a *tenant* fit in?** Every user, extension, SIP account, and device below belongs to a **tenant** — the organization or customer on the phone system. To learn what a tenant is and how tenants stay separate, see [Tenants & Multi-Tenancy](multi-tenancy.md).
+
 ---
 
 ## The Quick Analogy: Office Mail & Desks
@@ -115,3 +117,4 @@ To see how straightforward this is in practice, here is what happens when a comp
 - [PBX "Hello World" Quickstart](pbx-hello-world.md) — Create an extension and test your first call with an audio echo test (`*9196`).
 - [System Architecture & Developer Guide](architecture.md) — Comprehensive technical reference for modular design, bounded contexts, and Linux kernel firewall defense.
 - [User Interface Tour](ui-tour.md) — Visual walkthrough of TallPBX workspaces, themes, and layouts.
+- [Tenants & Multi-Tenancy](multi-tenancy.md) — What a tenant is, the customer vs. default types, who can access each, and admin impersonation.

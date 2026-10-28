@@ -80,6 +80,8 @@ For administrators accustomed to classic PBX topbars or horizontal workflow menu
 ### Multi-Tenant Management
 Manage multiple organizations, customer tenants, and internal business units from a single interface. Each tenant maintains isolated SIP credentials, extensions, routes, and call data.
 
+New to multi-tenancy? See [Tenants & Multi-Tenancy](multi-tenancy.md) for what a tenant is and how the customer and default tenant types differ.
+
 ![TallPBX Multi-Tenant Management](images/pbx-tenants.png)
 
 <details>

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Tenants & Multi-Tenancy Concept Guide**: Added `docs/multi-tenancy.md`, a plain-English guide explaining what a tenant is, the customer vs. default tenant types, who can access each, how admin impersonation works (admins impersonate users, not tenants), and what "shared" resources really mean (baseline defaults are copied into each tenant rather than shared between tenants). Cross-linked from the README tenant section, the Telephony Fundamentals guide, the UI Tour, and the Hello World quickstart.
+
 ### Changed
 - **Security Center control consistency**: Unified the row and header controls across the Block/Allow, Attackers, External Blocklists, and Geo-Blocking tabs with the Firewall Rules conventions. IP address values render in one neutral tone, "Active" state badges are green, primary action buttons use the purple primary style, tier/group headings are plain labels instead of coloured pills, count badges use the neutral (dark) style, and the enable/disable switch sits at the upper far right of every tab. Red is now reserved for destructive actions only.
 
