@@ -89,6 +89,9 @@ class CallCenterActiveList extends BaseListComponent
         }
     }
 
+    /**
+     * Resynchronize active queues and agents state after an Echo WebSocket reconnection event.
+     */
     #[On('echo-reconnected')]
     public function resyncAfterReconnect(): void
     {

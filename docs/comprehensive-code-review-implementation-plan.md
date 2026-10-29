@@ -481,28 +481,28 @@ git commit -m "perf(permissions): remove per-request DB upsert from HTTP and mod
   - Uniform `"php": "^8.5"` root constraint and `"php": ">=8.5"` across all 60 built-in module manifests, matching `scripts/resources/config.sh` (`php_version=8.5`), `composer.lock`, and `.github/workflows/tests.yml` (native PHP 8.4/8.5 `array_any()` in `TenantEslScoping::filterConferencesByTenant()` remains valid as written).
   - `SecurityConfigGenerator` without the dead, unguarded `writeActive()` method.
 
-- [ ] **Step 1: Append failing PHP 8.5 floor & firewall guard assertions to `tests/Feature/Architecture/ModuleArchitectureTest.php`**
+- [x] **Step 1: Append failing PHP 8.5 floor & firewall guard assertions to `tests/Feature/Architecture/ModuleArchitectureTest.php`**
 
 1. Assert `composer.json` `require.php` equals `'^8.5'` and every `app-modules/*/module.json` declares `requirements.php === '>=8.5'`.
 2. Assert `! method_exists(SecurityConfigGenerator::class, 'writeActive')`.
 3. Unit-test `TenantEslScoping::filterConferencesByTenant()` matching a conference via `members_list[*]['caller_id']` belonging to the tenant's extension list and rejecting conferences belonging only to another tenant.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/ModuleArchitectureTest.php`
 Expected: FAIL (`composer.json` declares `^8.3`, all 60 `module.json` files declare `>=8.3`, and `SecurityConfigGenerator::writeActive` exists).
 
-- [ ] **Step 3: Bump PHP floor to `8.5` across root & module manifests and delete `SecurityConfigGenerator::writeActive()`**
+- [x] **Step 3: Bump PHP floor to `8.5` across root & module manifests and delete `SecurityConfigGenerator::writeActive()`**
 
 1. Update `"php"` in `composer.json` from `"^8.3"` to `"^8.5"`, update `"requirements": { "php": ">=8.5", ... }` across all 60 `app-modules/*/module.json` manifests (and `resources/schemas/module.json:81`), and run `composer update --lock` (or verify `composer validate --strict` passes cleanly with zero lockfile diff beyond the content-hash).
 2. Delete `SecurityConfigGenerator::writeActive()` from `app-modules/security/src/Services/Firewall/SecurityConfigGenerator.php` so all live ruleset writes must flow through `FirewallApplier`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `composer validate --strict && php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Architecture/ModuleArchitectureTest.php tests/Feature/ModuleManifestTest.php app-modules/security/tests/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add composer.json composer.lock app-modules/*/module.json resources/schemas/module.json app-modules/security/src/Services/Firewall/SecurityConfigGenerator.php tests/Feature/Architecture/ModuleArchitectureTest.php
@@ -1340,19 +1340,19 @@ git commit -m "refactor(ui): introduce shared <x-tabs> component and split Blade
 - Produces: an accurate local `.superpowers/sdd/progress.md` index with zero empty directories, and a defined archive convention so historical ledgers stop asserting an auditable plan that no longer exists.
 - **Data-model correction:** there is no `plan-path` field anywhere in `.superpowers/sdd/`. The pointer is the first line of each ledger directory's `progress.md`, formatted `# SDD ledger — plan: docs/<name>.md`. **Measured: 18 ledgers carry such a line and all 18 resolve to a missing file** — not three, as earlier drafts claimed. The archive convention must therefore cover 18 directories, not a handful.
 
-- [ ] **Step 1: Write the failing hygiene check in `tests/Feature/Architecture/SddLedgerHygieneTest.php`**
+- [x] **Step 1: Write the failing hygiene check in `tests/Feature/Architecture/SddLedgerHygieneTest.php`**
 
 Guard with `if (! is_dir(base_path('.superpowers/sdd'))) { $this->markTestSkipped('No local .superpowers/sdd ledger directory present.'); }`, then assert:
 1. `.superpowers/sdd/` contains no empty subdirectories.
 2. For every `<dir>/progress.md` whose first line matches `/^# SDD ledger — plan: (\S+)/`, the referenced path either exists on disk **or** the ledger is explicitly archived by a line containing `> **Archived:**` in its first 10 lines.
 3. `.superpowers/sdd/progress.md` lists every archived/completed ledger directory whose referenced plan file no longer exists on disk, and contains zero references to non-existent directories (active in-flight SDD workspaces whose plan file exists on disk are exempt so transient SDD runs can be cleaned up without breaking the index).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/SddLedgerHygieneTest.php`
 Expected: FAIL (`one-line-installer-implementation-plan` is empty; 18 ledgers point at deleted `docs/` plans; `progress.md` lists nothing).
 
-- [ ] **Step 3: Clean `.superpowers/sdd/`, update `AGENTS.md` & `CHANGELOG.md`, and run final verification**
+- [x] **Step 3: Clean `.superpowers/sdd/`, update `AGENTS.md` & `CHANGELOG.md`, and run final verification**
 
 1. Remove the empty `one-line-installer-implementation-plan` directory.
 2. Add a standard archive annotation (`> **Archived:** source plan removed from docs/; execution summary retained.`) beneath the H1 of each of the 18 ledgers whose plan document is gone, including `admin-panel-authorization-implementation-plan` — which additionally gets the corrected 20/20 component status, replacing the misleading "Sweep: admin 12…" summary that made the admin panel look authorized while 19 of 20 components were open (C1).
@@ -1360,7 +1360,7 @@ Expected: FAIL (`one-line-installer-implementation-plan` is empty; 18 ledgers po
 4. Document the explicit `DB::transaction()` boundary convention for multi-service orchestration flows in `AGENTS.md`.
 5. Record all user/admin-facing remediations under `## [Unreleased]` (`### Security`, `### Changed`, `### Fixed`) in `CHANGELOG.md`, noting that upgrading requires `php artisan migrate` (admin permission grants + compound index migrations), `php artisan permissions:sync`, and `npm run build` (handled automatically by the web Git Updater). Keep entries under `## [Unreleased]`; `v4.2.0` will be dated and tagged only when the user explicitly authorizes pushing the release.
 
-- [ ] **Step 4: Run final full-branch verification gate**
+- [x] **Step 4: Run final full-branch verification gate**
 
 Run:
 ```bash
@@ -1370,7 +1370,7 @@ php artisan test --compact --parallel
 ```
 Expected: 100% PASS across the entire test suite with zero Pint errors.
 
-- [ ] **Step 5: Commit (local `4.x` only — DO NOT tag or push)**
+- [x] **Step 5: Commit (local `4.x` only — DO NOT tag or push)**
 
 ```bash
 git add AGENTS.md CHANGELOG.md tests/Feature/Architecture/SddLedgerHygieneTest.php

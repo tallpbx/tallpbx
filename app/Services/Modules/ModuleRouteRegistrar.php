@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Route;
  */
 class ModuleRouteRegistrar
 {
+    /**
+     * Create a new module route registrar instance.
+     */
     public function __construct(private readonly ?ModuleCollisionGuard $guard = null) {}
 
     /**

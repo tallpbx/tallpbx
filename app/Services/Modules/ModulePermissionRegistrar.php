@@ -11,6 +11,9 @@ use App\Services\PermissionService;
  */
 class ModulePermissionRegistrar
 {
+    /**
+     * Create a new module permission registrar instance.
+     */
     public function __construct(private readonly ?PermissionService $permissionService = null) {}
 
     /**

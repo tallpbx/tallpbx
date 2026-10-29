@@ -396,6 +396,9 @@ it('does not execute direct SecurityGeoRule instance query inside geo-blocking v
 
 it('does not execute direct SecurityGeoRule instance query inside firewall-rules view template', function (): void {
     $viewContent = file_get_contents(base_path('app-modules/security/resources/views/tabs/firewall-rules.blade.php'));
+    if (file_exists(base_path('app-modules/security/resources/views/tabs/partials/firewall-prefilters.blade.php'))) {
+        $viewContent .= file_get_contents(base_path('app-modules/security/resources/views/tabs/partials/firewall-prefilters.blade.php'));
+    }
 
     expect($viewContent)->not->toContain('SecurityGeoRule::instance()')
         ->and($viewContent)->toContain('$this->geoRule');

@@ -7,14 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Fail-Closed Livewire Component Action Authorization**: Replaced open or unverified administrative component actions across 20 Livewire components in Admin, System Settings, Module Registry, and Telephony modules with fail-closed permission checks (`authorizeAction`) and strict admin guard resolution.
+- **Record Identifier Tampering Protection**: Added `#[Locked]` attributes to primary and foreign key properties (`$id`, `$tenant_id`, `$record_id`, `$setting_id`) across all Livewire form and detail components, preventing client-side parameter tampering, and re-asserted tenant ownership verification inside `save()` and delete operations.
+- **Provisioning Template Path Traversal Hardening**: Enforced strict template filename allowlisting and tenant directory sandboxing on device provisioning endpoints (`/provisioning/{mac}`), preventing directory traversal and cross-tenant template exposure.
+- **Multi-Tenant FreeSWITCH ESL Command Scoping**: Enforced strict tenant-scoped allowlist validation on conference control, call-center agent state mutations, and active call eavesdrop/whisper/hangup commands dispatched over the FreeSWITCH Event Socket Layer (ESL).
+- **System Process Execution Hardening**: Replaced shell string interpolation with strict argument array invocations (`argv` arrays via `Symfony\Component\Process\Process`) across Git updater operations, network diagnostic tools (ping, traceroute), and certificate hooks, eliminating shell injection vectors.
+- **Multi-Tenant Database Query Isolation**: Hardened tenant boundary scopes across all 36 Livewire forms, repositories, and background services, ensuring queries strictly enforce `where('tenant_id', ...)` isolation without relying on unvalidated request parameters.
+- **Uniform PHP 8.5 Baseline & Dead Firewall Helper Removal**: Aligned PHP runtime requirements to `^8.5` and removed deprecated firewall shell invocation helpers, standardizing on atomic `nft -c -f` pre-flight checks and non-interactive absolute binary paths.
+
+### Performance
+- **Telephony XML Handler Caching & Invalidation**: Optimized high-throughput `mod_xml_curl` XML directory and dialplan lookup handlers with configurable cache TTLs (`FS_XML_HANDLER_CACHE_TTL`) and event-driven invalidation hooks on Extension and Setting mutations, cutting redundant database queries during call routing.
+- **High-Volume Telephony List Pagination & Computed Properties**: Migrated memory-heavy in-memory collections to paginated Eloquent queries and cached `#[Computed]` properties across active calls, CDR records, voicemail listings, and extensions.
+- **Compound Database Indexing**: Added forward-compatible compound database indexes on high-frequency tenant queries across call detail records (`tenant_id`, `start_stamp`), voicemail messages (`tenant_id`, `created_at`), extension lookups, and audit trails.
+
 ### Added
-- **Tenants & Multi-Tenancy Concept Guide**: Added `docs/multi-tenancy.md`, a plain-English guide explaining what a tenant is, the customer vs. default tenant types, who can access each, how admin impersonation works (admins impersonate users, not tenants), and what "shared" resources really mean (baseline defaults are copied into each tenant rather than shared between tenants). Cross-linked from the README tenant section, the Telephony Fundamentals guide, the UI Tour, and the Hello World quickstart.
+- **Shared UI Primitives**: Introduced reusable `<x-form-error>` for standardized form validation messages across 362 form fields, `<x-page-header>` for uniform dashboard titles, action bars, and breadcrumbs, and `<x-tabs>` for accessible tabbed navigation with WAI-ARIA `role="tablist"` / `role="tab"` and `aria-selected` attributes.
+- **Push-Compliant Real-Time Reconnection Banner**: Added an unobtrusive connection health indicator for Laravel Echo / WebSocket connections with automatic state resynchronization on reconnection, replacing high-overhead polling.
+- **Tenants & Multi-Tenancy Concept Guide**: Added `docs/multi-tenancy.md`, a plain-English guide explaining what a tenant is, customer vs. default tenant types, how admin impersonation works, and shared baseline defaults.
 
 ### Changed
+- **3-Tier Health State Semantics**: Unified status indicator dots and badges across security, pre-filter, and telephony monitoring tables: *Disabled* (neutral grey), *Active / Enforcing* (green or semantic action badge), and *Enabled but Unconfigured / Idle* (amber warning with diagnostic hint).
+- **Table Row Dimming & Micro-Interactions**: Applied standardized row dimming (`opacity-40 pointer-events-none`) and automatic button loading spinners (`<x-icon-button>`) across table row operations, providing immediate feedback during background mutations.
+- **Accessibility & Contrast**: Converted icon-only buttons to accessible `<x-icon-button>` components with required `aria-label` attributes, ensured all checkbox and toggle inputs associate with explicit labels, and normalized secondary helper text opacity and sizing.
+- **Blade View Decomposition**: Refactored oversized monolithic Blade views (Git Updater, Email Connector, Firewall Rules, Block/Allow, Attackers, and Certificate Manager) into clean, maintainable modular partials, keeping all top-level templates under 300 lines.
 - **Security Center control consistency**: Unified the row and header controls across the Block/Allow, Attackers, External Blocklists, and Geo-Blocking tabs with the Firewall Rules conventions. IP address values render in one neutral tone, "Active" state badges are green, primary action buttons use the purple primary style, tier/group headings are plain labels instead of coloured pills, count badges use the neutral (dark) style, and the enable/disable switch sits at the upper far right of every tab. Red is now reserved for destructive actions only.
+- **Modular Subsystem Decomposition**: Decomposed `ModuleServiceProvider` and `ModuleLifecycleService` into dedicated, single-responsibility collaborators (`ModuleManifestLoader`, `ModuleProtectionPolicy`, `ModuleRouteRegistrar`, `ModulePermissionRegistrar`) and introduced a shared `XmlWriter` utility for telephony XML payloads.
+- **Edit/Create View Localization Sweep**: Replaced remaining hardcoded English strings across edit/create forms with localized translation keys, deduplicated root dictionary collisions with module-specific dictionaries, and maintained 100% translation parity across English, Spanish, and French.
 
 ### Removed
 - **Orphaned scanner translation keys**: Dropped the now-unused `security_scanner_enforcement` label and its help tooltips from the English, Spanish, and French dictionaries after the SIP Bot & Scanner Signatures switch adopted the standard Enabled/Disabled label.
+
+### Upgrade Requirements
+- **Database Migrations & Permissions**: Upgrading requires running `php artisan migrate` to apply new compound database indexes and administrative permission grants, followed by `php artisan permissions:sync`.
+- **Frontend Assets**: Run `npm run build` to compile updated front-end styles and scripts (handled automatically when updating via the web Git Updater).
 
 ## [4.1.0] - 2026-10-26
 

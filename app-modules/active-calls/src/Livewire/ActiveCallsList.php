@@ -90,6 +90,9 @@ class ActiveCallsList extends BaseListComponent
         }
     }
 
+    /**
+     * Resynchronize active calls state after an Echo WebSocket reconnection event.
+     */
     #[On('echo-reconnected')]
     public function resyncAfterReconnect(): void
     {

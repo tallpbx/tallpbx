@@ -75,6 +75,9 @@ class RegistrationsList extends BaseListComponent
         }
     }
 
+    /**
+     * Resynchronize active registrations state after an Echo WebSocket reconnection event.
+     */
     #[On('echo-reconnected')]
     public function resyncAfterReconnect(): void
     {

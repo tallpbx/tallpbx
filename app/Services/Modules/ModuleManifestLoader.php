@@ -18,6 +18,9 @@ class ModuleManifestLoader
 {
     public const CACHE_PATH = 'bootstrap/cache/modules.php';
 
+    /**
+     * Create a new module manifest loader instance.
+     */
     public function __construct(private readonly ?string $basePath = null) {}
 
     /**

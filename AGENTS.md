@@ -261,7 +261,10 @@ TallPBX enforces a strict two-tier policy for executing Linux commands to preven
 - Use strict types (`declare(strict_types=1);`) and native type hints.
 - Keep controllers thin — move business logic to Service classes and use Form Requests for validation.
 - Use Eloquent relationships and eager loading (`with()`) to avoid N+1 queries.
-- Wrap multi-step database operations in `DB::transaction()`.
+- **Explicit `DB::transaction()` Boundaries for Multi-Service Orchestration Flows**:
+  - All multi-step database writes and cross-service orchestration flows (e.g., creating an Extension along with Voicemails, Dialplans, and SIP credentials; tenant provisioning; or module state synchronization) MUST establish an explicit `DB::transaction()` boundary at the outer orchestrator level to guarantee atomicity.
+  - Never rely on isolated, partial micro-transactions inside individual child services that leave parent workflows half-committed upon downstream failure.
+  - Non-transactional external side-effects (such as FreeSWITCH ESL socket commands, filesystem writes, webhook dispatch, or outbound network calls) MUST be deferred to `DB::afterCommit()` callbacks so database rollbacks never leak stale external state or trigger out-of-order background processing.
 
 ## Domain-Driven Modular Monolith Architecture
 

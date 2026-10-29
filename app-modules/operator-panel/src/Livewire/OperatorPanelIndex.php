@@ -90,6 +90,9 @@ class OperatorPanelIndex extends Component
         $this->loadActiveCalls();
     }
 
+    /**
+     * Resynchronize operator panel calls and status after an Echo WebSocket reconnection event.
+     */
     #[On('echo-reconnected')]
     public function resyncAfterReconnect(): void
     {

@@ -88,6 +88,9 @@ class ActiveConferencesList extends BaseListComponent
         }
     }
 
+    /**
+     * Resynchronize active conferences state after an Echo WebSocket reconnection event.
+     */
     #[On('echo-reconnected')]
     public function resyncAfterReconnect(): void
     {
