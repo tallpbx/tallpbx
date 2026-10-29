@@ -1,23 +1,17 @@
 <div>
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-            <div class="flex items-center gap-2">
-                <a href="{{ route('panel.users.index') }}" wire:navigate class="btn btn-ghost btn-xs btn-circle">
-                    <x-heroicon-o-arrow-left class="w-4 h-4" />
-                </a>
-                <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.impersonation_logs_title') }}</h1>
-            </div>
-            <p class="text-xs text-base-content/60 mt-1">
-                {{ __('admin.impersonation_logs_description') }}
-            </p>
-        </div>
-        <div class="flex items-center gap-2">
+    <x-page-header
+        :title="__('admin.impersonation_logs_title')"
+        :subtitle="__('admin.impersonation_logs_description')"
+        :back-href="route('panel.users.index')"
+        :back-label="__('admin.back_to_users')"
+    >
+        <x-slot:actions>
             <a href="{{ route('panel.users.index') }}" wire:navigate class="btn btn-ghost btn-sm gap-1.5">
                 <x-heroicon-o-users class="w-4 h-4" />
                 {{ __('admin.users') }}
             </a>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-page-header>
 
     {{-- Filter bar --}}
     <div class="card bg-base-100 border border-base-300 mb-6">

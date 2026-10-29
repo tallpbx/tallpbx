@@ -1,11 +1,10 @@
 <div>
-    <div class="mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.permissions_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
-        <p class="text-sm text-base-content/50 mt-1">
+    <x-page-header :title="__('admin.permissions_title')" :tooltip="__('admin.page_info_tooltip')">
+        <x-slot:subtitle>
             {{ __('admin.permissions_description') }}
             <a href="{{ route('panel.groups.index') }}" wire:navigate class="link link-primary">{{ __('admin.groups') }}</a> {{ __('admin.permissions_page') }}.
-        </p>
-    </div>
+        </x-slot:subtitle>
+    </x-page-header>
 
     {{-- Single table with Module column for consistent column alignment across sections --}}
     @php $allPermissions = collect($modules)->flatMap(fn ($m) => collect($permissions[$m] ?? [])->map(fn ($p) => ['module' => $m] + $p)); @endphp

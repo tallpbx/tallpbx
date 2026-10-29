@@ -94,7 +94,7 @@ it('enforces standardized x-form-submit-button across all edit and create views'
     expect($violations)->toBeEmpty();
 });
 
-it('enforces standardized page-title typography across all module and panel views', function (): void {
+it('enforces standardized page-title typography and x-page-header usage across all module and panel views', function (): void {
     $projectRoot = base_path();
 
     $files = [];
@@ -111,8 +111,19 @@ it('enforces standardized page-title typography across all module and panel view
 
     expect(count($files))->toBeGreaterThan(100);
 
+    $rawHeadingAllowlist = [
+        'resources/views/components/page-header.blade.php',
+        'app-modules/admin/resources/views/auth/admin-login.blade.php',
+        'app-modules/admin/resources/views/auth/initial-admin-setup.blade.php',
+        'app-modules/tenant/resources/views/auth/tenant-login.blade.php',
+        'app-modules/auth/resources/views/register.blade.php',
+        'app-modules/auth/resources/views/forgot-password.blade.php',
+        'app-modules/auth/resources/views/reset-password.blade.php',
+        'resources/views/errors/500.blade.php',
+        'resources/views/errors/503.blade.php',
+    ];
+
     $violations = [];
-    $matchedHeadings = 0;
     $xPageHeaders = 0;
 
     foreach ($files as $file) {
@@ -129,7 +140,9 @@ it('enforces standardized page-title typography across all module and panel view
                 $classes = $match[1];
 
                 if (str_contains($classes, 'text-2xl')) {
-                    $matchedHeadings++;
+                    if (! in_array($relativePath, $rawHeadingAllowlist, true)) {
+                        $violations[] = "{$relativePath}: raw text-2xl page heading must use <x-page-header> -> {$fullTag}";
+                    }
 
                     if (! str_contains($classes, 'font-bold')) {
                         $violations[] = "{$relativePath}: heading missing 'font-bold' -> {$fullTag}";
@@ -148,9 +161,23 @@ it('enforces standardized page-title typography across all module and panel view
         }
     }
 
-    $totalHeadings = $matchedHeadings + $xPageHeaders;
-    expect($totalHeadings)->toBeGreaterThanOrEqual(125)
-        ->and($violations)->toBeEmpty();
+    expect($violations)->toBeEmpty('Page header violations: '.implode("\n", $violations))
+        ->and($xPageHeaders)->toBeGreaterThanOrEqual(119);
+});
+
+it('renders x-page-header with optional back link and rich subtitle slot', function (): void {
+    $rendered = Blade::render(
+        '<x-page-header title="Audit Logs" back-href="/panel/users" back-label="Back to Users">'
+        .'<x-slot:subtitle>Manage <a href="/panel/groups" class="link link-primary">Groups</a> here.</x-slot:subtitle>'
+        .'</x-page-header>'
+    );
+
+    expect($rendered)
+        ->toContain('Audit Logs')
+        ->toContain('href="/panel/users"')
+        ->toContain('aria-label="Back to Users"')
+        ->toContain('wire:navigate')
+        ->toContain('<a href="/panel/groups" class="link link-primary">Groups</a>');
 });
 
 it('enforces that all table header cells across app-modules and resources/views are localized', function (): void {

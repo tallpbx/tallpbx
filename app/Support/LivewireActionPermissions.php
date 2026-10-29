@@ -16,14 +16,14 @@ use Illuminate\Support\Str;
  * resolver supplies the convention-based ability requirements that the
  * EnforcePanelLivewireActionPermissions middleware checks instead:
  *
- *   - "save" on an Edit component  → the module edit or create permission
- *   - "delete*" actions            → the module delete permission
+ *   - "save*" on Edit/Create/Settings → the module edit, update, create, or manage permission
+ *   - "delete*" actions               → the module delete permission
  *   - anything else (property sync, confirmation dialogs, pagination)
- *                                  → the module view permission
+ *                                     → the module view permission
  *
- * Abilities that a module never declared fall back to view, then to no
- * requirement at all, so a module without matching permissions keeps
- * working exactly as before instead of being locked out.
+ * Abilities that a module never declared fall back to view; if the module
+ * declares no view permission either, resolution fails closed with the
+ * `[['__unmapped_deny__']]` sentinel so unmapped actions are denied (403).
  *
  * A component may override the convention by defining a static
  * livewireActionAbilities() method that maps action names to ability

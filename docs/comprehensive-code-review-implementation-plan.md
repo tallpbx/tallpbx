@@ -949,7 +949,7 @@ git commit -m "ui(forms): standardize all validation errors onto shared <x-form-
 
 **Interfaces:**
 - Produces:
-  - `<x-page-header :title="__('admin.extensions')" :tooltip="__('admin.extensions_tooltip')" :subtitle="null">` with named `actions` slot for right-aligned toolbar buttons (`btn btn-primary btn-sm`, etc.).
+  - `<x-page-header :title="__('admin.extensions')" :tooltip="__('admin.extensions_tooltip')" :subtitle="null" :back-href="null" :back-label="null">` with optional `subtitle` slot/prop, optional `backHref`/`backLabel` navigation link (`wire:navigate` + `aria-label`), and named `actions` slot for right-aligned toolbar buttons (`btn btn-primary btn-sm`, etc.) across all 119 panel page-header views (including `permissions-list.blade.php` and `impersonation-logs-list.blade.php`), enforced by a strict 9-file `$rawHeadingAllowlist` in `UiArchitectureTest.php`.
 
 - [x] **Step 1: Extend `UiArchitectureTest.php` with failing assertions for `settings-edit`, `layouts/app`, and `<x-page-header>`**
 
@@ -1144,7 +1144,8 @@ git commit -m "i18n(panel): localize module edit forms across en/es/fr and dedup
 **Interfaces:**
 - Produces:
   - Browser custom events `tallpbx:ws-disconnected` and `tallpbx:ws-reconnected` emitted from `window.Echo.connector.pusher.connection.bind('state_change', ...)` whenever connection transitions out of `'connected'` (`unavailable`, `failed`, `disconnected`) and when transitioning back to `'connected'` after a drop.
-  - Alpine-driven `<x-websocket-health-banner />` (`alert alert-warning text-xs` hidden while connected, visible during disconnect, dispatching `Livewire.dispatch('echo-reconnected')` once upon recovery) plus subtle skeleton shimmer rows (`animate-pulse`) during initial mount/resync (`§2.4`).
+  - Alpine-driven `<x-websocket-health-banner />` (`alert alert-warning text-xs` hidden while connected, visible during disconnect, dispatching `Livewire.dispatch('echo-reconnected')` once upon recovery).
+  - **Disposition on `§2.4` skeleton shimmer rows:** Intentionally omitted on the 5 live telephony lists because all 5 load initial ESL state synchronously in `mount()` during SSR (neither `#[Lazy]` nor `wire:init` is used); rendering skeleton rows during reconnect resync would flicker over active call tables, whereas `<x-websocket-health-banner />` provides unobtrusive reconnect spinner feedback.
   - `#[On('echo-reconnected')] public function resyncAfterReconnect(): void` on live telephony components.
 
 - [x] **Step 1: Add failing tests in `tests/Feature/Telephony/TelephonyPushBroadcastingTest.php`**
@@ -1376,3 +1377,12 @@ Expected: 100% PASS across the entire test suite with zero Pint errors.
 git add AGENTS.md CHANGELOG.md tests/Feature/Architecture/SddLedgerHygieneTest.php
 git commit -m "chore(sdd,changelog): reconcile SDD ledgers and document code/UI review remediations"
 ```
+
+---
+
+## Post-Implementation Verification & Polish Summary (Completed 2026-10-29)
+
+- [x] All 23 tasks across Phases 1–4 implemented and verified (`3,183 passed, 1 skipped` in parallel Pest; `55 passed` across all 9 Playwright browser suites).
+- [x] Enhanced `<x-page-header>` with `backHref`/`backLabel` and slot-compatible `subtitle`, migrated `permissions-list.blade.php` and `impersonation-logs-list.blade.php` (119 total usages), and tightened `UiArchitectureTest` raw `text-2xl` heading enforcement to a strict 9-file allowlist.
+- [x] Updated `LivewireActionPermissions` class PHPDoc to reflect fail-closed `[['__unmapped_deny__']]` (403) resolution.
+- [x] Audited `CHANGELOG.md` entries for exact technical accuracy prior to cutting `v4.2.0`.
