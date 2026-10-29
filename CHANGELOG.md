@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-10-29
+
 ### Added
 - **Shared UI Primitives**: Introduced reusable `<x-form-error>` for standardized form validation messages across 362 form fields, `<x-page-header>` for uniform panel page titles, tooltips, subtitles, back links, and action toolbars across 119 views, and `<x-tabs>` for accessible tabbed navigation with WAI-ARIA `role="tablist"` / `role="tab"` and `aria-selected` attributes.
 - **Push-Compliant Real-Time Reconnection Banner**: Added an unobtrusive connection health indicator (`<x-websocket-health-banner />`) for Laravel Echo / WebSocket connections across live telephony views with automatic state resynchronization (`resyncAfterReconnect`) upon reconnection, preserving the zero-polling push architecture.
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modular Subsystem & XML Builder Decomposition**: Extracted four single-responsibility module collaborators (`ModuleManifestLoader`, `ModuleProtectionPolicy`, `ModuleRouteRegistrar`, `ModulePermissionRegistrar`) and a shared `XmlWriter` utility across `DialplanXmlBuilder` and `DirectoryXmlBuilder`.
 - **Edit/Create View Localization Sweep**: Replaced remaining hardcoded English strings across edit/create forms with localized translation keys, deduplicated root dictionary keys colliding with module dictionaries, and maintained 100% translation parity across English, Spanish, and French.
 - **Uniform PHP 8.5 Runtime Floor**: Aligned the declared PHP constraint in `composer.json` (`^8.5`) and all 60 built-in `module.json` manifests (`>=8.5`) with the appliance runtime and CI toolchain.
+- **Upgrade Requirements**: Manual CLI upgrades require running `php artisan migrate` (applies the split admin permission grants and `(tenant_id, created_at)` compound indexes), `php artisan permissions:sync`, `npm run build`, and `php artisan optimize:clear` (all handled automatically when updating via the web Git Updater).
 
 ### Fixed
 - **Unified `PanelActor` Impersonation Resolution**: Consolidated actor and permission checks onto `PanelActor`, fixing five impersonation mismatches where an administrator impersonating a tenant user could inherit or leak admin-guard state across middleware, forms, and operational controls.
@@ -32,9 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - **Orphaned scanner translation keys**: Dropped the now-unused `security_scanner_enforcement` label and its help tooltips from the English, Spanish, and French dictionaries after the SIP Bot & Scanner Signatures switch adopted the standard Enabled/Disabled label.
 - **Dead Firewall Write Helper**: Removed the unused, unguarded `SecurityConfigGenerator::writeActive()` method so all firewall ruleset writes flow exclusively through `FirewallApplier`.
-
-### Upgrade Note
-- **Database Migrations, Permissions & Assets**: Manual CLI upgrades require running `php artisan migrate` (applies the split admin permission grants and `(tenant_id, created_at)` compound indexes), `php artisan permissions:sync`, `npm run build`, and `php artisan optimize:clear` (all handled automatically when updating via the web Git Updater).
 
 ### Security
 - **Fail-Closed Livewire Action Authorization**: Removed the blanket `Modules\Admin\*` exemption in `EnforcePanelLivewireActionPermissions` (exempting only unauthenticated `Modules\Auth\*` guest flows), made `LivewireActionPermissions` fail closed when an action has no registered permission mapping, split four privileged admin mutation permissions (`admin.settings.update`, `admin.settings.delete`, `admin.git-update.execute`, `admin.queue.retry`), and wired explicit ability maps across all 20 Admin Livewire components plus non-standard create/settings components.
