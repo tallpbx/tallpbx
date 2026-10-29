@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Admin\Livewire;
 
 use App\Services\SystemHealth;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +49,26 @@ class Monitoring extends Component
     public ?string $retryResult = null;
 
     public ?string $actionError = null;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.monitoring.view']];
+
+        return [
+            '' => $viewGroup,
+            'openQueueModal' => $viewGroup,
+            'closeQueueModal' => $viewGroup,
+            'loadRecentFailures' => $viewGroup,
+            'retry' => [['admin.queue.retry']],
+            'retryAll' => [['admin.queue.retry']],
+            'refresh' => $viewGroup,
+        ];
+    }
 
     /**
      * Collect all health metrics on component mount.
@@ -140,7 +161,7 @@ class Monitoring extends Component
         $this->retryResult = null;
         $this->actionError = null;
 
-        if (! $this->authorizeQueueAction()) {
+        if (! PanelActor::can('admin.queue.retry')) {
             $this->actionError = (string) __('admin.queue_permission_denied');
 
             return;
@@ -174,7 +195,7 @@ class Monitoring extends Component
         $this->retryResult = null;
         $this->actionError = null;
 
-        if (! $this->authorizeQueueAction()) {
+        if (! PanelActor::can('admin.queue.retry')) {
             $this->actionError = (string) __('admin.queue_permission_denied');
 
             return;

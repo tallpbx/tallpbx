@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Tenant;
-use App\Services\ImpersonationServiceInterface;
 use App\Services\TenantManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
@@ -42,8 +40,7 @@ abstract class BaseEditComponent extends Component
      */
     protected function isAdminGuard(): bool
     {
-        return Auth::guard('admin')->check()
-            && ! app(ImpersonationServiceInterface::class)->isImpersonating();
+        return PanelActor::isAdmin();
     }
 
     /**

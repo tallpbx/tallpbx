@@ -19,6 +19,18 @@ use Livewire\Component;
 class Dashboard extends Component
 {
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.dashboard.view']],
+        ];
+    }
+
+    /**
      * Render the dashboard view.
      */
     public function render(): mixed

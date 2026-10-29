@@ -8,6 +8,8 @@ use App\Jobs\ReloadFreeSwitchXml;
 use App\Services\DestinationResolver;
 use App\Support\BaseEditComponent;
 use App\Support\FreeSwitchApplications;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\InboundRoutes\Services\InboundRouteServiceInterface;
 
@@ -27,6 +29,7 @@ class InboundRoutesEdit extends BaseEditComponent
 
     public int $priority = 100;
 
+    #[Locked]
     public ?string $routeId = null;
 
     private InboundRouteServiceInterface $inboundRouteService;
@@ -75,6 +78,11 @@ class InboundRoutesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->routeId === null ? 'inbound-routes.create' : 'inbound-routes.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -88,7 +96,9 @@ class InboundRoutesEdit extends BaseEditComponent
         ];
 
         if ($this->routeId !== null) {
-            $this->inboundRouteService->update(InboundRoute::withoutGlobalScope('tenant')->findOrFail($this->routeId), $data);
+            $route = InboundRoute::withoutGlobalScope('tenant')->findOrFail($this->routeId);
+            $this->assertCanAccessTenantRecord($route);
+            $this->inboundRouteService->update($route, $data);
         } else {
             $this->inboundRouteService->create($data);
         }

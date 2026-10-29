@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Support\PanelActor;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -58,10 +58,6 @@ class AdminAuthorize
      */
     private function panelActor(): ?Authenticatable
     {
-        if (session()->has('impersonation.original_admin_id') && Auth::guard('web')->check()) {
-            return Auth::guard('web')->user();
-        }
-
-        return Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+        return PanelActor::resolve();
     }
 }

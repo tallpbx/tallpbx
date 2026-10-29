@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Models\Module;
 use App\Models\Permission;
+use App\Support\PermissionSyncPolicy;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -40,6 +42,13 @@ class PermissionService
      * Whether the database has been synced.
      */
     private bool $synced = false;
+
+    /**
+     * In-memory memoization cache of all permissions.
+     *
+     * @var list<string>|null
+     */
+    private ?array $memoizedAll = null;
 
     /**
      * Register permissions for a module.
@@ -78,6 +87,7 @@ class PermissionService
             }
         }
 
+        $this->memoizedAll = null;
         $this->permissions[$module] = array_values(array_unique([
             ...($this->permissions[$module] ?? []),
             ...$names,
@@ -139,6 +149,15 @@ class PermissionService
         $this->permissions = [];
         $this->descriptions = [];
         $this->synced = false;
+        $this->memoizedAll = null;
+    }
+
+    /**
+     * Clear the in-memory memoization cache of all permissions.
+     */
+    public function clearMemoization(): void
+    {
+        $this->memoizedAll = null;
     }
 
     /**
@@ -156,17 +175,21 @@ class PermissionService
      */
     public function all(): array
     {
+        if ($this->memoizedAll !== null) {
+            return $this->memoizedAll;
+        }
+
         if ($this->synced) {
-            return Permission::query()->pluck('name')->all();
+            $result = Permission::query()->pluck('name')->all();
+        } else {
+            $result = [];
+
+            foreach ($this->permissions as $perms) {
+                array_push($result, ...$perms);
+            }
         }
 
-        $result = [];
-
-        foreach ($this->permissions as $perms) {
-            array_push($result, ...$perms);
-        }
-
-        return $result;
+        return $this->memoizedAll = $result;
     }
 
     /**
@@ -242,6 +265,62 @@ class PermissionService
         });
 
         $this->synced = true;
+        $this->memoizedAll = null;
+    }
+
+    /**
+     * Generate a deterministic sha1 hash of all declared module permissions and descriptions.
+     *
+     * Computed strictly from in-memory module registrations and canonicalized by
+     * permission name so the hash is 100% deterministic and unaffected by module boot
+     * order or whether permissions have been synchronized to the database.
+     */
+    public function registryHash(): string
+    {
+        $payload = [];
+
+        foreach ($this->permissions as $module => $names) {
+            foreach ($names as $name) {
+                $payload[$name] = [
+                    'module' => $module,
+                    'description' => $this->descriptions[$name] ?? null,
+                ];
+            }
+        }
+
+        ksort($payload);
+
+        return sha1((string) json_encode($payload));
+    }
+
+    /**
+     * Synchronize permissions to database only if stale or un-synced.
+     *
+     * Uses PermissionSyncPolicy to check whether synchronization is required.
+     * Updates the cached hash upon successful synchronization.
+     */
+    public function syncIfStale(?PermissionSyncPolicy $policy = null): bool
+    {
+        $policy ??= new PermissionSyncPolicy;
+        $currentHash = $this->registryHash();
+        $cachedHash = Cache::get('permissions.sync.hash');
+
+        $request = app()->bound('request') ? request() : null;
+        $requestPath = $request?->path();
+        $runningInConsole = app()->runningInConsole();
+
+        if (! $policy->shouldSync($requestPath, $runningInConsole, is_string($cachedHash) ? $cachedHash : null, $currentHash)) {
+            return false;
+        }
+
+        if (! Schema::hasTable('permissions')) {
+            return false;
+        }
+
+        $this->syncToDatabase();
+        Cache::forever('permissions.sync.hash', $currentHash);
+
+        return true;
     }
 
     /**

@@ -13,6 +13,7 @@
     "required": false,
     "priority": 30,
     "requirements": {
+        "php": ">=8.5",
         "modules": []
     }
 }

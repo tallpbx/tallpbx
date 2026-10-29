@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Dialplans\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Services\DialplanServiceInterface;
 
@@ -21,6 +23,7 @@ class DialplansEdit extends BaseEditComponent
 
     public string $order = '100';
 
+    #[Locked]
     public ?string $dialplanId = null;
 
     private DialplanServiceInterface $dialplanService;
@@ -67,6 +70,11 @@ class DialplansEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->dialplanId === null ? 'dialplans.create' : 'dialplans.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -80,6 +88,7 @@ class DialplansEdit extends BaseEditComponent
 
         if ($this->dialplanId !== null) {
             $dialplan = Dialplan::withoutGlobalScope('tenant')->findOrFail($this->dialplanId);
+            $this->assertCanAccessTenantRecord($dialplan);
             $this->dialplanService->update($dialplan, $data);
         } else {
             $this->dialplanService->create($data);

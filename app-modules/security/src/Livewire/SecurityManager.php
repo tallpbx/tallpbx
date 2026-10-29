@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Security\Livewire;
 
 use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -244,7 +245,7 @@ class SecurityManager extends Component
      */
     protected function ensureAnyPermission(string ...$permissions): void
     {
-        $actor = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+        $actor = PanelActor::resolve();
 
         abort_unless($actor !== null, 403);
 

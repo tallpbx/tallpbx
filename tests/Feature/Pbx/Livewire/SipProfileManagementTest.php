@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\SipProfiles\Livewire\SipProfilesEdit;
@@ -10,7 +9,7 @@ use Modules\SipProfiles\Livewire\SipProfilesList;
 use Modules\SipProfiles\Models\SipProfile;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['sip-profiles.view', 'sip-profiles.create', 'sip-profiles.edit', 'sip-profiles.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

@@ -11,7 +11,7 @@ use Modules\HotDesking\Livewire\HotDeskingList;
 use Modules\HotDesking\Models\HotDeskSession;
 
 beforeEach(function (): void {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['hot-desking.view', 'hot-desking.create', 'hot-desking.edit', 'hot-desking.delete']);
     $this->tenant = Tenant::factory()->create();
 
     $this->extUser = Extension::factory()->create([

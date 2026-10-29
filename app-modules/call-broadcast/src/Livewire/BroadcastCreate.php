@@ -30,6 +30,20 @@ class BroadcastCreate extends Component
     private CallBroadcastService $broadcastService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['call-broadcast.view']],
+            'save' => [['call-broadcast.create']],
+            'rules' => [['call-broadcast.view']],
+        ];
+    }
+
+    /**
      * Inject the call broadcast service used by this component.
      */
     public function boot(CallBroadcastService $broadcastService): void

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Recordings\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\FileStores\Enums\MediaCategory;
@@ -27,6 +29,7 @@ class RecordingsEdit extends BaseEditComponent
 
     public ?TemporaryUploadedFile $file = null;
 
+    #[Locked]
     public ?string $recordingId = null;
 
     private RecordingService $recordingService;
@@ -79,6 +82,11 @@ class RecordingsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->recordingId === null ? 'recordings.create' : 'recordings.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $existingRecording = $this->recordingId !== null
@@ -94,6 +102,7 @@ class RecordingsEdit extends BaseEditComponent
         ];
 
         if ($existingRecording !== null) {
+            $this->assertCanAccessTenantRecord($existingRecording);
             $recording = $this->recordingService->update($existingRecording, $data);
         } else {
             $recording = $this->recordingService->create($data);

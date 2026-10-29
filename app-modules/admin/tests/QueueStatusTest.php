@@ -118,7 +118,7 @@ it('denies the queue page and retry actions to tenant users', function (): void 
 });
 
 it('retries a failed job when an authorized admin acts', function (): void {
-    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.queue.view']);
+    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.queue.view', 'admin.queue.retry']);
 
     $uuid = (string) Str::uuid();
     DB::table('failed_jobs')->insert([
@@ -141,7 +141,7 @@ it('retries a failed job when an authorized admin acts', function (): void {
 });
 
 it('rejects a non-numeric retry id without requeueing', function (): void {
-    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.queue.view']);
+    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.queue.view', 'admin.queue.retry']);
 
     DB::table('failed_jobs')->insert([
         'uuid' => (string) Str::uuid(),
@@ -181,7 +181,7 @@ it('exposes the failed job uuid for the retry action', function (): void {
 });
 
 it('reports an error when retrying an unknown job id', function (): void {
-    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.queue.view']);
+    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.queue.view', 'admin.queue.retry']);
 
     Livewire::actingAs($admin, 'admin')
         ->test(QueueStatus::class)

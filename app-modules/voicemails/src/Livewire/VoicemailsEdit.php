@@ -6,6 +6,8 @@ namespace Modules\Voicemails\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\FileStores\Enums\MediaCategory;
@@ -41,6 +43,7 @@ class VoicemailsEdit extends BaseEditComponent
 
     public bool $deleteAfterEmail = false;
 
+    #[Locked]
     public ?string $voicemailUuid = null;
 
     private VoicemailServiceInterface $voicemailService;
@@ -101,6 +104,11 @@ class VoicemailsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->voicemailUuid === null ? 'voicemails.create' : 'voicemails.edit'), 403);
+
+        }
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 

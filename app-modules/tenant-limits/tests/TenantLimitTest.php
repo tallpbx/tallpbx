@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use App\Services\TenantManager;
 use Livewire\Livewire;
@@ -11,7 +10,7 @@ use Modules\TenantLimits\Livewire\TenantLimitsList;
 use Modules\TenantLimits\Models\TenantLimit;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['tenant-limits.view', 'tenant-limits.create', 'tenant-limits.edit', 'tenant-limits.delete']);
     $this->tenant = Tenant::factory()->create();
     app(TenantManager::class)->setTenantId((string) $this->tenant->id);
 });

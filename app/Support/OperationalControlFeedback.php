@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Auth;
-
 /**
  * Shared feedback and authorization state for the operational control modules.
  *
@@ -24,9 +22,7 @@ trait OperationalControlFeedback
      */
     private function authorizeAction(string $permission): bool
     {
-        $user = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
-
-        return $user !== null && $user->hasPermission($permission);
+        return PanelActor::can($permission);
     }
 
     /**

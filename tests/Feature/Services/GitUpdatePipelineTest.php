@@ -53,7 +53,7 @@ it('runs the full pipeline in order on success', function (): void {
 
     $joined = implode("\n", $runner->commands);
     // The artisan path is shell-quoted, so match on the argument part.
-    $order = ['composer validate', 'pull --ff-only', 'composer install', 'migrate --force', 'npm ci', 'npm run build', 'permissions:repair', 'optimize:clear'];
+    $order = ['composer validate', 'pull --ff-only', 'composer install', 'migrate --force', 'permissions:sync', 'npm ci', 'npm run build', 'permissions:repair', 'optimize:clear'];
 
     $positions = array_map(fn (string $needle): int|false => strpos($joined, $needle), $order);
 

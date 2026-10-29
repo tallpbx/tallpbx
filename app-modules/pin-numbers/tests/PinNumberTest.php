@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\PinNumbers\Livewire\PinNumbersEdit;
@@ -10,7 +9,7 @@ use Modules\PinNumbers\Livewire\PinNumbersList;
 use Modules\PinNumbers\Models\PinNumber;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['pin-numbers.view', 'pin-numbers.create', 'pin-numbers.edit', 'pin-numbers.delete']);
 });
 
 it('renders the pin numbers list component', function () {

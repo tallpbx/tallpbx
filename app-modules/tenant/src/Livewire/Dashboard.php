@@ -19,6 +19,18 @@ use Livewire\Component;
 class Dashboard extends Component
 {
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['*']],
+        ];
+    }
+
+    /**
      * Render the tenant dashboard view.
      */
     public function render(): mixed

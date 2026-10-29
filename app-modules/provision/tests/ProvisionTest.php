@@ -3,19 +3,27 @@
 declare(strict_types=1);
 
 use App\Models\Admin;
+use App\Models\Group;
 use App\Models\Tenant;
+use Database\Seeders\AdminSeeder;
 use Livewire\Livewire;
 use Modules\Devices\Models\Device;
 use Modules\Extensions\Models\Extension;
 use Modules\Provision\Livewire\TemplateEdit;
 use Modules\Provision\Livewire\TemplateList;
 use Modules\Provision\Models\ProvisionTemplate;
+use Modules\Provision\Services\ProvisionServiceInterface;
 use Modules\SipAccounts\Models\SipAccount;
 
 use function Pest\Laravel\get;
 
 beforeEach(function () {
+    $this->artisan('module:sync --only-local');
+    $this->seed(AdminSeeder::class);
+    $superAdminGroup = Group::where('name', 'Super Administrators')->first();
     $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin->groups()->attach($superAdminGroup->id);
+
     // The endpoint is disabled by default (FusionPBX parity); these tests
     // exercise the rendering path, so the switch is turned on here.
     config(['provisioning.enabled' => true]);
@@ -270,4 +278,176 @@ it('never renders credentials from a mismatched tenant sip account', function ()
         ->assertOk()
         ->assertDontSee('b-secret')
         ->assertDontSee('b-line');
+});
+
+// ─── Security & Tenant Isolation Tests (C3, M7) ────────────────────
+
+it('rejects path traversal and unauthorized file paths in template form', function (string $maliciousPath) {
+    $tenant = Tenant::factory()->create();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(TemplateEdit::class)
+        ->set('tenantId', $tenant->id)
+        ->set('name', 'Malicious Template')
+        ->set('vendor', 'grandstream')
+        ->set('filePath', $maliciousPath)
+        ->call('save')
+        ->assertHasErrors(['filePath' => 'regex']);
+})->with([
+    '../../.env',
+    '/etc/passwd',
+    'storage/logs/laravel.log',
+]);
+
+it('fails closed when an invalid template path is persisted in database', function (string $maliciousPath) {
+    $tenant = Tenant::factory()->create();
+    Device::factory()->create([
+        'tenant_id' => $tenant->id,
+        'vendor' => 'customvendor',
+        'mac_address' => 'AA:BB:CC:DD:EE:99',
+        'enabled' => true,
+    ]);
+
+    ProvisionTemplate::factory()->create([
+        'tenant_id' => $tenant->id,
+        'vendor' => 'customvendor',
+        'file_path' => $maliciousPath,
+        'enabled' => true,
+    ]);
+
+    $service = app(ProvisionServiceInterface::class);
+    expect(fn () => $service->provision('AA:BB:CC:DD:EE:99'))
+        ->toThrow(InvalidArgumentException::class);
+})->with([
+    '../../.env',
+    '/etc/passwd',
+    'storage/logs/laravel.log',
+]);
+
+it('never discloses arbitrary files or executes code via http endpoint when path is manipulated', function (string $maliciousPath) {
+    config(['app.debug' => false]);
+
+    $tenant = Tenant::factory()->create();
+    Device::factory()->create([
+        'tenant_id' => $tenant->id,
+        'vendor' => 'customvendor',
+        'mac_address' => 'AA:BB:CC:DD:EE:98',
+        'enabled' => true,
+    ]);
+
+    ProvisionTemplate::factory()->create([
+        'tenant_id' => $tenant->id,
+        'vendor' => 'customvendor',
+        'file_path' => $maliciousPath,
+        'enabled' => true,
+    ]);
+
+    $response = get('/provision/AA:BB:CC:DD:EE:98');
+    expect($response->status())->toBeIn([404, 500]);
+    $response->assertDontSee('APP_KEY');
+    $response->assertDontSee('root:');
+})->with([
+    '../../.env',
+    '/etc/passwd',
+    'storage/logs/laravel.log',
+]);
+
+it('accepts valid 2-segment and 3-segment template paths with or without .blade.php suffix in form', function (string $path) {
+    $tenant = Tenant::factory()->create();
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(TemplateEdit::class)
+        ->set('tenantId', $tenant->id)
+        ->set('name', 'Valid Template')
+        ->set('vendor', 'grandstream')
+        ->set('filePath', $path)
+        ->call('save')
+        ->assertHasNoErrors(['filePath'])
+        ->assertRedirect(route('panel.provision.templates.index'));
+})->with([
+    'grandstream/default.blade.php',
+    'grandstream/default',
+    'grandstream/gxp2170/default.blade.php',
+    'grandstream/gxp2170/default',
+]);
+
+it('normalizes template paths with and without .blade.php suffix when rendering', function (string $path) {
+    $tenant = Tenant::factory()->create();
+    Device::factory()->create([
+        'tenant_id' => $tenant->id,
+        'vendor' => 'grandstream',
+        'mac_address' => 'AA:BB:CC:DD:EE:33',
+        'settings' => ['sip_username' => '3001', 'sip_password' => 'pass3001'],
+        'enabled' => true,
+    ]);
+
+    ProvisionTemplate::factory()->create([
+        'tenant_id' => $tenant->id,
+        'vendor' => 'grandstream',
+        'file_path' => $path,
+        'enabled' => true,
+    ]);
+
+    get('/provision/AA:BB:CC:DD:EE:33')
+        ->assertOk()
+        ->assertSee('sip_user_id = 3001')
+        ->assertSee('sip_password = pass3001');
+})->with([
+    'grandstream/default.blade.php',
+    'grandstream/default',
+    'grandstream/gxp2170/default.blade.php',
+    'grandstream/gxp2170/default',
+]);
+
+it('enforces cross-tenant template isolation during resolution and provisioning', function () {
+    $tenantA = Tenant::factory()->create();
+    $tenantB = Tenant::factory()->create();
+
+    // Tenant A creates an enabled ProvisionTemplate for vendor 'polycom' that renders grandstream ini-style config
+    ProvisionTemplate::factory()->create([
+        'tenant_id' => $tenantA->id,
+        'vendor' => 'polycom',
+        'file_path' => 'grandstream/default.blade.php',
+        'enabled' => true,
+    ]);
+
+    $service = app(ProvisionServiceInterface::class);
+
+    // Tenant A resolves their own template
+    expect($service->resolveTemplate('polycom', null, $tenantA->id))
+        ->toBe('grandstream/default.blade.php');
+
+    // Tenant B must NOT match Tenant A's template; falls back to bundled polycom default
+    expect($service->resolveTemplate('polycom', null, $tenantB->id))
+        ->toBe('polycom/default');
+
+    // Tenant B device on public endpoint renders bundled polycom XML, never Tenant A's grandstream config
+    Device::factory()->create([
+        'tenant_id' => $tenantB->id,
+        'vendor' => 'polycom',
+        'mac_address' => 'AA:BB:CC:DD:EE:88',
+        'settings' => ['sip_username' => '8001'],
+        'enabled' => true,
+    ]);
+
+    get('/provision/AA:BB:CC:DD:EE:88')
+        ->assertOk()
+        ->assertSee('<reg.1.address>8001</reg.1.address>', false)
+        ->assertDontSee('sip_user_id');
+
+    // When Tenant B defines their own polycom template, Tenant B resolves and renders Tenant B's template
+    ProvisionTemplate::factory()->create([
+        'tenant_id' => $tenantB->id,
+        'vendor' => 'polycom',
+        'file_path' => 'snom/default.blade.php',
+        'enabled' => true,
+    ]);
+
+    expect($service->resolveTemplate('polycom', null, $tenantB->id))
+        ->toBe('snom/default.blade.php');
+
+    get('/provision/AA:BB:CC:DD:EE:88')
+        ->assertOk()
+        ->assertSee('<sip_user prime="0">8001</sip_user>', false)
+        ->assertDontSee('<reg.1.address>');
 });

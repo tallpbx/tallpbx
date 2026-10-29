@@ -26,6 +26,20 @@ class EventRateLimitsSettings extends Component
     private SettingServiceInterface $settings;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['event-rate-limits.view']],
+            'save' => [['admin.settings.update']],
+            'rules' => [['event-rate-limits.view']],
+        ];
+    }
+
+    /**
      * Inject the settings service used by this component.
      */
     public function boot(SettingServiceInterface $settings): void

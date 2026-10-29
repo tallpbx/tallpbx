@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use App\Services\TenantManager;
 use Livewire\Livewire;
@@ -12,7 +11,7 @@ use Modules\ExtensionSettings\Livewire\ExtensionSettingsList;
 use Modules\ExtensionSettings\Models\ExtensionSetting;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['extension-settings.view', 'extension-settings.create', 'extension-settings.edit', 'extension-settings.delete']);
     $this->tenant = Tenant::factory()->create();
     app(TenantManager::class)->setTenantId((string) $this->tenant->id);
 });

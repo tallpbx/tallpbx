@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\ConferenceCenters\Livewire\ConferenceCentersEdit;
@@ -10,7 +9,7 @@ use Modules\ConferenceCenters\Livewire\ConferenceCentersList;
 use Modules\ConferenceCenters\Models\ConferenceCenter;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['conference-centers.view', 'conference-centers.create', 'conference-centers.edit', 'conference-centers.delete']);
 });
 
 it('renders the conference centers list component', function () {

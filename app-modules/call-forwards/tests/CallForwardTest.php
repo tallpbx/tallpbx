@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\CallForwards\Livewire\CallForwardsEdit;
@@ -12,7 +11,7 @@ use Modules\CallForwards\Services\CallForwardService;
 use Modules\Extensions\Models\Extension;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['call-forwards.view', 'call-forwards.create', 'call-forwards.edit', 'call-forwards.delete']);
 });
 
 it('renders the forward dialplan condition with the extension number', function () {

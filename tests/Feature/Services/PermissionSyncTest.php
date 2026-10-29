@@ -7,6 +7,7 @@ use App\Models\Module;
 use App\Models\Permission;
 use App\Providers\AppServiceProvider;
 use App\Services\PermissionService;
+use Illuminate\Support\Facades\Cache;
 
 beforeEach(function () {
     $this->service = app(PermissionService::class);
@@ -161,4 +162,61 @@ it('does not automatically grant newly synced permissions to existing groups', f
     (new AppServiceProvider(app()))->boot();
 
     expect($group->permissions()->where('name', 'admin.users.view')->exists())->toBeFalse();
+});
+
+it('syncs on syncIfStale when cached hash is missing and skips when warm', function (): void {
+    Cache::forget('permissions.sync.hash');
+
+    $this->service->register('test', ['test.stale.view']);
+
+    expect($this->service->syncIfStale())->toBeTrue();
+    expect(Permission::where('name', 'test.stale.view')->exists())->toBeTrue();
+    expect(Cache::get('permissions.sync.hash'))->toBe($this->service->registryHash());
+
+    // Second call is a no-op
+    expect($this->service->syncIfStale())->toBeFalse();
+});
+
+it('artisan permissions:sync writes current hash to cache', function (): void {
+    Cache::forget('permissions.sync.hash');
+
+    $this->service->register('test', ['test.artisan.view']);
+
+    $this->artisan('permissions:sync')->assertSuccessful();
+
+    expect(Permission::where('name', 'test.artisan.view')->exists())->toBeTrue();
+    expect(Cache::get('permissions.sync.hash'))->toBe($this->service->registryHash());
+});
+
+it('evaluates syncIfStale as false on a fresh unsynced instance when cache is warmed by permissions:sync', function (): void {
+    Cache::forget('permissions.sync.hash');
+
+    $this->service->register('extensions', [
+        'extensions.view' => 'View extensions',
+        'extensions.create' => 'Create extensions',
+    ]);
+    $this->service->register('admin', [
+        'panel.dashboard.view' => 'View panel dashboard',
+    ]);
+
+    // Warm cache via artisan permissions:sync
+    $this->artisan('permissions:sync')->assertSuccessful();
+
+    expect(Cache::has('permissions.sync.hash'))->toBeTrue();
+
+    // Create a fresh PermissionService instance simulating a new HTTP request boot ($synced = false)
+    $freshService = new PermissionService;
+    $freshService->register('extensions', [
+        'extensions.view' => 'View extensions',
+        'extensions.create' => 'Create extensions',
+    ]);
+    $freshService->register('admin', [
+        'panel.dashboard.view' => 'View panel dashboard',
+    ]);
+
+    expect($freshService->isSynced())->toBeFalse();
+
+    // Verify syncIfStale returns false and does not trigger synchronization
+    expect($freshService->syncIfStale())->toBeFalse()
+        ->and($freshService->isSynced())->toBeFalse();
 });

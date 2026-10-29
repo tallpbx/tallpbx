@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\FileStores\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Modules\FileStores\Models\FileStore;
 use Modules\FileStores\Services\FileStoreServiceInterface;
 
@@ -14,6 +16,7 @@ use Modules\FileStores\Services\FileStoreServiceInterface;
  */
 class FileStoresEdit extends BaseEditComponent
 {
+    #[Locked]
     public ?string $fileStoreId = null;
 
     public string $name = '';
@@ -55,6 +58,11 @@ class FileStoresEdit extends BaseEditComponent
      */
     public function save(FileStoreServiceInterface $fileStoreService): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->fileStoreId === null ? 'file-stores.create' : 'file-stores.update'), 403);
+
+        }
         $this->authorizeSystemAdmin();
 
         $data = [
@@ -66,7 +74,9 @@ class FileStoresEdit extends BaseEditComponent
         if ($this->fileStoreId === null) {
             $fileStoreService->create($data);
         } else {
-            $fileStoreService->update(FileStore::findOrFail($this->fileStoreId), $data);
+            $fileStore = FileStore::findOrFail($this->fileStoreId);
+            $this->assertCanAccessTenantRecord($fileStore);
+            $fileStoreService->update($fileStore, $data);
         }
 
         $this->redirectRoute('panel.file-stores.index', navigate: true);

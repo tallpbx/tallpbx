@@ -15,7 +15,7 @@ use function Pest\Laravel\actingAs;
 
 describe('Component Interactions', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['conferences.view', 'conferences.create', 'conferences.edit', 'conferences.delete']);
     });
 
     it('renders the conferences list component', function () {

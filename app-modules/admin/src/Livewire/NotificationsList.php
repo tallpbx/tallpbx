@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Admin\Livewire;
 
 use App\Support\OperationalControlFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\DatabaseNotification;
@@ -27,6 +28,30 @@ class NotificationsList extends Component
     use WithPagination;
 
     public int $unreadCount = 0;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.notifications.view', '@tenant-user']];
+
+        return [
+            '' => $viewGroup,
+            'markAsRead' => $viewGroup,
+            'markAllAsRead' => $viewGroup,
+            'deleteNotification' => [['admin.notifications.delete', '@tenant-user']],
+            'queryStringHandlesPagination' => $viewGroup,
+            'getPage' => $viewGroup,
+            'previousPage' => $viewGroup,
+            'nextPage' => $viewGroup,
+            'gotoPage' => $viewGroup,
+            'resetPage' => $viewGroup,
+            'setPage' => $viewGroup,
+        ];
+    }
 
     /**
      * Refresh the unread notification count when the page opens.
@@ -71,7 +96,7 @@ class NotificationsList extends Component
         $this->actionMessage = null;
         $this->actionError = null;
 
-        if (Auth::guard('admin')->check() && ! $this->authorizeAction('admin.notifications.delete')) {
+        if (PanelActor::isAdmin() && ! $this->authorizeAction('admin.notifications.delete')) {
             $this->actionError = 'You do not have permission to delete notifications.';
 
             return;
@@ -97,7 +122,7 @@ class NotificationsList extends Component
      */
     private function currentActor(): ?Model
     {
-        return Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+        return PanelActor::resolve();
     }
 
     /**

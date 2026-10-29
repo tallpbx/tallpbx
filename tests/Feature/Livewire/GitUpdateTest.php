@@ -9,7 +9,11 @@ use Livewire\Livewire;
 use Modules\Admin\Livewire\GitUpdate;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.git-update.view',
+        'admin.git-update.execute',
+    ]);
 
     $this->gitService = Mockery::mock(GitUpdateService::class);
     $this->gitService->shouldReceive('currentBranch')->andReturn('main')->byDefault();

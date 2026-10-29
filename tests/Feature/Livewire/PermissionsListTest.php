@@ -10,8 +10,14 @@ use Livewire\Livewire;
 use Modules\Admin\Livewire\PermissionsList;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
     app(PermissionService::class)->reset();
+    $permService = app(PermissionService::class);
+    $permService->register('admin', ['admin.permissions.view' => 'View permissions reference']);
+    $permService->syncToDatabase();
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.permissions.view',
+    ]);
 });
 
 it('renders the permissions list as a read-only reference', function () {

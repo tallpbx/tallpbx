@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Speech\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Locked;
 use Modules\Speech\Services\SpeechServiceInterface;
 
 /**
@@ -28,6 +30,7 @@ class SpeechEdit extends BaseEditComponent
 
     public string $rate = '1.00';
 
+    #[Locked]
     public ?string $configId = null;
 
     /** The speech service instance. */
@@ -53,6 +56,7 @@ class SpeechEdit extends BaseEditComponent
         }
 
         $config = $this->service->find($configId);
+        $this->assertCanAccessTenantRecord($config);
         $this->configId = $config->id;
         $this->tenantId = $config->tenant_id;
         $this->engine = $config->engine;
@@ -75,6 +79,11 @@ class SpeechEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->configId === null ? 'speech.create' : 'speech.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -88,6 +97,7 @@ class SpeechEdit extends BaseEditComponent
 
         if ($this->isEdit) {
             $config = $this->service->find($this->configId);
+            $this->assertCanAccessTenantRecord($config);
             $this->service->update($config, $data);
         } else {
             $this->service->create($data);

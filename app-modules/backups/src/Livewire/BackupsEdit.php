@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Backups\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Backups\Models\Backup;
 use Modules\Backups\Services\BackupServiceInterface;
 use Modules\FileStores\Models\FileStore;
@@ -36,6 +38,7 @@ class BackupsEdit extends BaseEditComponent
 
     public ?string $scheduleCron = null;
 
+    #[Locked]
     public ?string $backupId = null;
 
     private BackupServiceInterface $backupService;
@@ -65,6 +68,7 @@ class BackupsEdit extends BaseEditComponent
 
         if ($backupId !== null) {
             $backup = Backup::findOrFail($backupId);
+            $this->assertCanAccessTenantRecord($backup);
             $this->backupId = $backup->id;
             $this->name = $backup->name;
             $this->scope = $backup->scope;
@@ -84,6 +88,11 @@ class BackupsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->backupId === null ? 'backups.create' : 'backups.update'), 403);
+
+        }
         $validated = $this->validate();
         $fileStore = FileStore::query()
             ->whereKey($validated['fileStoreId'])
@@ -94,6 +103,7 @@ class BackupsEdit extends BaseEditComponent
 
         if ($this->backupId !== null) {
             $backup = Backup::findOrFail($this->backupId);
+            $this->assertCanAccessTenantRecord($backup);
             $this->backupService->updateBackup($backup, $validated);
         } else {
             $backup = $this->backupService->createBackup($validated);

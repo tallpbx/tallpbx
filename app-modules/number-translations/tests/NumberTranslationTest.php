@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use App\Services\TenantManager;
 use Livewire\Livewire;
@@ -11,7 +10,7 @@ use Modules\NumberTranslations\Livewire\NumberTranslationsList;
 use Modules\NumberTranslations\Models\NumberTranslation;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['number-translations.view', 'number-translations.create', 'number-translations.edit', 'number-translations.delete']);
     $this->tenant = Tenant::factory()->create();
     app(TenantManager::class)->setTenantId((string) $this->tenant->id);
 });

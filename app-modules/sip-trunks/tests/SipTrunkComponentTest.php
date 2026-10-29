@@ -16,7 +16,7 @@ use function Pest\Laravel\actingAs;
 
 describe('Component Interactions', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['sip-trunks.view', 'sip-trunks.create', 'sip-trunks.edit', 'sip-trunks.delete']);
         $this->tenant = Tenant::factory()->create();
         app(TenantManager::class)->setTenantId((string) $this->tenant->id);
     });

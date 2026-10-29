@@ -13,7 +13,13 @@ use Modules\Admin\Livewire\UsersEdit;
 use Modules\Admin\Livewire\UsersList;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.users.view',
+        'admin.users.create',
+        'admin.users.update',
+        'admin.users.delete',
+    ]);
 });
 
 it('renders the users list component', function () {

@@ -10,6 +10,7 @@ use App\Services\TenantEslScoping;
 use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use App\Support\OperationalControlFeedback;
+use App\Support\PanelActor;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
@@ -73,14 +74,17 @@ class ActiveConferencesList extends BaseListComponent
 
         try {
             $raw = $this->fs->api('conference list');
+            $tenantId = ($this->isAdminGuard() && ! app(TenantManager::class)->hasTenant())
+                ? null
+                : $this->tenantId();
+
             $this->conferences = $this->scoping->filterConferencesByTenant(
                 $this->parseConferences($raw),
-                $this->isAdminGuard() ? null : $this->tenantId()
+                $tenantId
             );
         } catch (\Throwable $e) {
-            Log::warning('Failed to parse conference list output.', ['error' => $e->getMessage()]);
+            Log::error('Failed to parse conference list output.', ['error' => $e->getMessage()]);
             $this->conferences = [];
-            $this->fsConnected = false;
         }
     }
 
@@ -147,6 +151,40 @@ class ActiveConferencesList extends BaseListComponent
     }
 
     /**
+     * Compute allowed conference names server-side from fresh ESL state.
+     *
+     * Returns null for unscoped admin callers without an active tenant filter.
+     *
+     * @return array<int, string>|null
+     */
+    public function allowedConferenceNames(): ?array
+    {
+        $tenantScoped = ! PanelActor::isAdmin() || app(TenantManager::class)->hasTenant();
+
+        if (! $tenantScoped) {
+            return null;
+        }
+
+        if (! $this->fs->isConnected()) {
+            return [];
+        }
+
+        try {
+            $raw = $this->fs->api('conference list');
+            $scoped = $this->scoping->filterConferencesByTenant(
+                $this->parseConferences($raw),
+                $this->tenantId()
+            );
+
+            return array_values(array_filter(array_column($scoped, 'name')));
+        } catch (\Throwable $e) {
+            Log::error('Failed to resolve allowed conferences from ESL.', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
      * Mute a conference member.
      */
     public function muteMember(string $conference, string $memberId): void
@@ -160,7 +198,7 @@ class ActiveConferencesList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->conferenceMute($conference, $memberId, true));
+        $this->applyResult($this->control->conferenceMute($conference, $memberId, true, $this->allowedConferenceNames()));
         $this->refresh();
     }
 
@@ -178,7 +216,7 @@ class ActiveConferencesList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->conferenceMute($conference, $memberId, false));
+        $this->applyResult($this->control->conferenceMute($conference, $memberId, false, $this->allowedConferenceNames()));
         $this->refresh();
     }
 
@@ -196,7 +234,7 @@ class ActiveConferencesList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->conferenceKick($conference, $memberId));
+        $this->applyResult($this->control->conferenceKick($conference, $memberId, $this->allowedConferenceNames()));
         $this->refresh();
     }
 }

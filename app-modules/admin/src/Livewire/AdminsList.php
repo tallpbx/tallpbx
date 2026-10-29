@@ -29,6 +29,22 @@ class AdminsList extends Component
     public ?string $deleteError = null;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.users.view']],
+            'confirmAdminDeletion' => [['admin.users.view']],
+            'cancelAdminDeletion' => [['admin.users.view']],
+            'deleteAdmin' => [['admin.users.delete']],
+            'dismissFeedback' => [['admin.users.view']],
+        ];
+    }
+
+    /**
      * Open confirmation modal for deleting an administrator.
      */
     public function confirmAdminDeletion(int $adminId): void

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use App\Services\TenantContext;
 use App\Support\LivewireActionPermissions;
+use App\Support\PanelActor;
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
@@ -27,10 +30,9 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * The middleware inspects every component in the update payload, resolves
  * its class from the signed snapshot, and checks the abilities required by
- * LivewireActionPermissions for each invoked action. It only gates panel
- * module components (Modules\* except Modules\Admin\): framework, layout,
- * and auth components keep their existing behavior, and the admin module
- * authorizes each action explicitly.
+ * LivewireActionPermissions for each invoked action. It gates all panel
+ * module components (Modules\* except guest Modules\Auth\*): framework, layout,
+ * and auth components keep their existing behavior.
  */
 class EnforcePanelLivewireActionPermissions
 {
@@ -124,10 +126,10 @@ class EnforcePanelLivewireActionPermissions
             return null;
         }
 
-        // Only panel module components are gated here. The admin module
-        // authorizes its actions explicitly, and framework, layout, and
-        // auth components must stay reachable without panel permissions.
-        if (! str_starts_with($class, 'Modules\\') || str_starts_with($class, 'Modules\\Admin\\')) {
+        // Only panel module components are gated here. Framework, layout,
+        // and guest auth components (Modules\Auth\*) must stay reachable
+        // without panel permissions.
+        if (! str_starts_with($class, 'Modules\\') || str_starts_with($class, 'Modules\\Auth\\')) {
             return null;
         }
 
@@ -139,18 +141,14 @@ class EnforcePanelLivewireActionPermissions
     /**
      * Resolve the active panel actor or refuse anonymous access.
      *
-     * Mirrors AdminAuthorize::panelActor(): impersonated sessions act as
+     * Delegates to PanelActor::resolve(): impersonated sessions act as
      * the tenant user, otherwise the admin guard takes precedence.
      *
      * @throws AuthenticationException
      */
     private function authenticate(): Authenticatable
     {
-        if (session()->has('impersonation.original_admin_id') && Auth::guard('web')->check()) {
-            return Auth::guard('web')->user();
-        }
-
-        $actor = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+        $actor = PanelActor::resolve();
 
         if ($actor === null) {
             throw new AuthenticationException('Unauthenticated.', ['admin', 'web']);
@@ -190,19 +188,37 @@ class EnforcePanelLivewireActionPermissions
     }
 
     /**
-     * Abort with 403 unless every ability group is satisfied.
+     * Abort with 403 / AuthorizationException unless every ability group is satisfied.
      *
      * All groups are required; within one group any single ability passing
      * is enough. An empty group list means no requirement applies.
      *
      * @param  array<int, array<int, string>>  $groups
+     *
+     * @throws AuthorizationException
      */
     private function assertAbilities(Authenticatable $actor, array $groups): void
     {
         foreach ($groups as $abilities) {
+            if (in_array('__unmapped_deny__', $abilities, true)) {
+                throw new AuthorizationException('This action is not mapped to a permission.');
+            }
+
             $granted = false;
 
             foreach ($abilities as $ability) {
+                if ($ability === '*') {
+                    $granted = true;
+
+                    break;
+                }
+
+                if ($ability === '@tenant-user' && $actor instanceof User) {
+                    $granted = true;
+
+                    break;
+                }
+
                 if (Gate::forUser($actor)->check($ability)) {
                     $granted = true;
 
@@ -211,7 +227,7 @@ class EnforcePanelLivewireActionPermissions
             }
 
             if (! $granted) {
-                abort(403, 'You do not have permission to perform this action.');
+                throw new AuthorizationException('You do not have permission to perform this action.');
             }
         }
     }

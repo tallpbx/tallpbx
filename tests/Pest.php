@@ -50,6 +50,10 @@ pest()->extend(TestCase::class)
 pest()->extend(TestCase::class)
     ->in('Unit/Services/FreeSwitchServiceTest.php');
 
+pest()->extend(TestCase::class)
+    ->use(LazilyRefreshDatabase::class)
+    ->in('Unit/Services/PermissionServiceTest.php');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations

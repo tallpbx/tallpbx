@@ -117,7 +117,7 @@ Phases 3A/3B/3C each carry their own verification gate and commit series. Phase 
   - `App\Support\PanelActor::isSuperAdmin(): bool` (true only when `isAdmin()` and actor belongs to group `'Super Administrators'` with `tenant_id === null`)
   - `App\Support\PanelActor::can(string $ability): bool`
 
-- [ ] **Step 1: Write the failing unit & impersonation boundary tests in `tests/Unit/Support/PanelActorTest.php`**
+- [x] **Step 1: Write the failing unit & impersonation boundary tests in `tests/Unit/Support/PanelActorTest.php`**
 
 ```php
 it('resolves the impersonated tenant user instead of the underlying admin when impersonation session is active', function () {
@@ -152,23 +152,23 @@ it('resolves the admin actor when not impersonating and detects Super Administra
 
 Also add impersonation regression assertions covering `ScopeTenant` (an impersonating admin with `selected_tenant_id` pointing at a tenant the impersonated `User` does NOT belong to must be denied/reset rather than allowed by `Auth::guard('admin')->check()`), `NotificationsList` (returns the impersonated `User`'s notifications rather than the underlying `Admin`'s), and `ProfileEdit::currentUser()`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Unit/Support/PanelActorTest.php`
 Expected: FAIL with `Class "App\Support\PanelActor" not found`.
 
-- [ ] **Step 3: Implement `App\Support\PanelActor` and consolidate all actor/impersonation resolvers**
+- [x] **Step 3: Implement `App\Support\PanelActor` and consolidate all actor/impersonation resolvers**
 
 Implement `PanelActor` checking `session()->has('impersonation.original_admin_id') && Auth::guard('web')->check()` **first** (returning `Auth::guard('web')->user()`), otherwise `Auth::guard('admin')->user() ?? Auth::guard('web')->user()`.
 1. **Fix the five live impersonation defects:** delegate `OperationalControlFeedback::authorizeAction()`, `ProfileEdit::currentUser()`, `ScopeTenant::verifyTenantAccess()` (`ScopeTenant.php:50-54`), `NotificationsList` (`NotificationsList.php:74,100`), and `SecurityManager` (`SecurityManager.php:247`) to `PanelActor` so impersonated sessions never bypass tenant membership checks, read/delete underlying admin notifications, or evaluate permissions/profile mutations against the underlying `Admin`.
 2. **Behaviour-preserving consolidation:** delegate `AdminAuthorize::panelActor()`, `EnforcePanelLivewireActionPermissions::authenticate()`, and the duplicate `isAdminGuard()` helpers in `BaseEditComponent`, `BaseListComponent`, `TenantMutationGuard`, `CdrDetail`, and `OperatorPanelIndex` to `PanelActor` so one implementation governs the entire panel. Their existing tests must keep passing unmodified.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Unit/Support/PanelActorTest.php tests/Feature/LivewireActionPermissionTest.php tests/Feature/Middleware/ScopeTenantTest.php app-modules/admin/tests/NotificationsListTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Support/PanelActor.php app/Http/Middleware/AdminAuthorize.php app/Http/Middleware/EnforcePanelLivewireActionPermissions.php app/Http/Middleware/ScopeTenant.php app/Support/BaseEditComponent.php app/Support/BaseListComponent.php app/Support/TenantMutationGuard.php app/Support/OperationalControlFeedback.php app-modules/admin/src/Livewire/ProfileEdit.php app-modules/admin/src/Livewire/NotificationsList.php app-modules/security/src/Livewire/SecurityManager.php app-modules/cdr/src/Livewire/CdrDetail.php app-modules/operator-panel/src/Livewire/OperatorPanelIndex.php tests/Unit/Support/PanelActorTest.php
@@ -219,7 +219,7 @@ git commit -m "security(auth): unify PanelActor resolver across middleware, edit
     - Actor token `'@tenant-user'` (satisfied when `$actor instanceof \App\Models\User`) is permitted **strictly** on `Modules\Admin\Livewire\NotificationsList`, which serves both `Admin` (via `admin.notifications.view` / `admin.notifications.delete`) and tenant `User` self-notifications (`User::getPermissionNames()` strips all `admin.%` strings): `''`, `markAsRead`, `markAllAsRead`, and pagination helpers map to `[['admin.notifications.view', '@tenant-user']]`, while `deleteNotification` maps to `[['admin.notifications.delete', '@tenant-user']]`.
   - `LivewireActionPermissions::abilitiesFor(string $componentClass, string $method): array<int, array<int, string>>` — returns the fail-closed sentinel **`[['__unmapped_deny__']]`** (nested, matching the declared return type) whenever a gated `Modules\*` component method is neither an allowlisted UI/read helper nor mapped to at least one registered permission.
 
-- [ ] **Step 1: Write the failing tests in `tests/Feature/LivewireActionPermissionTest.php`**
+- [x] **Step 1: Write the failing tests in `tests/Feature/LivewireActionPermissionTest.php`**
 
 Add tests covering:
 1. Guest unauthenticated `POST /livewire/update` to `Modules\Auth\Livewire\ForgotPassword` is NOT blocked with 401/403 by `EnforcePanelLivewireActionPermissions`.
@@ -230,12 +230,12 @@ Add tests covering:
 6. View-only user calling `BroadcastCreate::save` or `EventRateLimitsSettings::save` → `assertForbidden()`.
 7. Exhaustive reflection test: iterate every Livewire component class under `app-modules/*/src/Livewire/**/*.php` **excluding `Modules\Auth\Livewire\*`** and every public action method (excluding lifecycle hooks `boot`, `mount`, `render`, `hydrate*`, `updating*`, `updated*`), asserting `LivewireActionPermissions::abilitiesFor($class, $method)` is non-empty, never equals `[['__unmapped_deny__']]`, and every returned ability exists in `app(PermissionService::class)->all()` — except `'*'` (allowed strictly on `ProfileEdit` and `Modules\Tenant\Livewire\Dashboard`) and `'@tenant-user'` (allowed strictly on `NotificationsList`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/LivewireActionPermissionTest.php`
 Expected: FAIL (`SettingsEdit::saveSetting`, `GitUpdate::updateApp`, and `BroadcastCreate::save` return 200 instead of 403).
 
-- [ ] **Step 3: Remove the `Modules\Admin\` exemption, fail closed in `LivewireActionPermissions`, add the `4.x` upgrade migration, and wire ability maps + affected tests**
+- [x] **Step 3: Remove the `Modules\Admin\` exemption, fail closed in `LivewireActionPermissions`, add the `4.x` upgrade migration, and wire ability maps + affected tests**
 
 1. In `EnforcePanelLivewireActionPermissions::resolveGatedComponent()`, replace `str_starts_with($class, 'Modules\\Admin\\')` with `str_starts_with($class, 'Modules\\Auth\\')` so guest auth components stay open while all panel `Modules\*` (including `Modules\Admin\*` and `Modules\Tenant\*`) are gated. In `assertAbilities()`, handle `'*'` (any authenticated `PanelActor`), `'@tenant-user'` (`$actor instanceof \App\Models\User`), and throw `AuthorizationException` whenever a group is `['__unmapped_deny__']`.
 2. In `LivewireActionPermissions`, extend edit-verb fallback to check `[$module.'.edit', $module.'.update', $module.'.create', $module.'.manage']` and apply `save*` handling to `*Create` and `*Settings` classes as well as `*Edit`. Replace the empty-array fallback in `viewGroup()` with `[['__unmapped_deny__']]`.
@@ -244,12 +244,12 @@ Expected: FAIL (`SettingsEdit::saveSetting`, `GitUpdate::updateApp`, and `Broadc
 5. Add explicit `livewireActionAbilities()` maps across all 20 `Modules\Admin\Livewire\*` components plus `Modules\Tenant\Livewire\Dashboard`, `BroadcastCreate`, and `EventRateLimitsSettings`. Update `QueueStatus::authorizeRetry()` (`QueueStatus.php:135`) and `Monitoring` retry authorization to `PanelActor::can('admin.queue.retry')`, and add belt-and-braces `abort_unless(PanelActor::can(...), 403)` inside `AdminsEdit::save()`, `UsersEdit::save()`, `SettingsEdit::{saveSetting,deleteSetting}()`, and `GitUpdate::{fetch,updateApp}()`.
 6. Update all 11 existing feature test files listed under `Files` so authorized test setups seed/grant the required `admin.*` permissions and unauthorized Livewire call assertions expect HTTP `403` (`assertForbidden()`).
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/LivewireActionPermissionTest.php tests/Feature/Livewire/ app-modules/admin/tests/ app-modules/auth/tests/ app-modules/tenant/tests/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add database/migrations/2026_10_28_000001_grant_split_admin_mutation_permissions.php app/Http/Middleware/EnforcePanelLivewireActionPermissions.php app/Support/LivewireActionPermissions.php app-modules/admin/ app-modules/tenant/src/Livewire/Dashboard.php database/seeders/AdminSeeder.php app-modules/call-broadcast/src/Livewire/BroadcastCreate.php app-modules/event-rate-limits/src/Livewire/EventRateLimitsSettings.php tests/Feature/LivewireActionPermissionTest.php tests/Feature/Livewire/
@@ -279,7 +279,7 @@ git commit -m "security(livewire): enforce fail-closed action permissions across
   - Every record-identifying public property (`$*Id` / `$*Uuid`) across the 43 record-backed `*Edit` Livewire components carries `#[Locked]`.
   - `AdminsEdit::save()`, `UsersEdit::save()`, `GroupsEdit::save()`, `TenantsEdit::save()`, `TenantDomainsEdit::save()` re-verify exact create-vs-update ability (`*.create` when ID is `null`, `*.update` when ID is non-`null`) and enforce `Super Administrators` escalation guards.
 
-- [ ] **Step 1: Write the failing IDOR, privilege-escalation, and architecture tests**
+- [x] **Step 1: Write the failing IDOR, privilege-escalation, and architecture tests**
 
 In `tests/Feature/Security/EditComponentIdorProtectionTest.php`:
 1. Admin holding ONLY `admin.users.create` renders `/panel/admins/create`, posts `updates: ['adminId' => $superAdmin->id]` + `calls: [['method' => 'save']]` → assert two deterministic invariants: (a) `$superAdmin->fresh()->email` is unchanged, and (b) the `/livewire/update` response is NOT successful. Assert one exact status — run the probe once, then pin `assertStatus(403)` or the 500 that Livewire's `CannotUpdateLockedPropertyException` produces; never accept a status range such as `403|500`, which would also pass for an unrelated crash. The presence of `#[Locked]` itself is proven separately by the attribute reflection test, not by the HTTP status.
@@ -289,24 +289,24 @@ In `tests/Feature/Security/EditComponentIdorProtectionTest.php`:
 In `tests/Feature/Architecture/ModuleArchitectureTest.php`:
 - Reflect over every `*Edit` class in `app-modules/*/src/Livewire/` (exempting only `ProfileEdit` and `EmailConnectorEdit` by FQCN); assert each class declares at least one primary record-identifier property (`$*Id` or `$*Uuid`, including `SettingsEdit::$editingId`, `TenantsEdit::$tenantId`, and `IvrMenusEdit::$menuUuid`, while excluding foreign-key selectors such as `$tenantId` on non-`TenantsEdit` classes or `$extensionId` on `SipAccountsEdit`) carrying `#[Locked]`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `./vendor/bin/pest tests/Feature/Security/EditComponentIdorProtectionTest.php tests/Feature/Architecture/ModuleArchitectureTest.php`
 Expected: FAIL (0 `#[Locked]` attributes currently exist on `*Edit` classes; `AdminsEdit` allows `Super Administrators` group attachment).
 
-- [ ] **Step 3: Add `#[Locked]` across the 43 record-backed edit components and harden `save()` authorization across all 45**
+- [x] **Step 3: Add `#[Locked]` across the 43 record-backed edit components and harden `save()` authorization across all 45**
 
 1. Add `use Livewire\Attributes\Locked;` and `#[Locked]` to the primary record identifier property on all 43 record-backed `*Edit` Livewire components (including `IvrMenusEdit::$menuUuid`, `SettingsEdit::$editingId`, and `TenantsEdit::$tenantId`).
 2. In every `*Edit::save()`, re-assert create vs update permission (`*.create` when primary ID/UUID is `null`, `*.edit` or `*.update` when non-`null`; `email-connector.edit` on `EmailConnectorEdit::save()`) and call `$this->assertCanAccessTenantRecord($record)` before mutating on update branches (including `TemplateEdit`).
 3. In `AdminsEdit::save()` and `GroupsEdit::save()`, forbid non-`PanelActor::isSuperAdmin()` actors from editing the `Super Administrators` group, editing an existing Super Admin, or syncing `Super Administrators` in `selectedGroupIds`. In `UsersEdit::save()`, restrict `selectedTenantIds` for tenant-scoped actors to their accessible tenant.
 4. Update `app-modules/provision/tests/ProvisionTest.php` `beforeEach` to seed `AdminSeeder` and attach `$this->admin` to `Super Administrators`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Security/EditComponentIdorProtectionTest.php tests/Feature/Architecture/ModuleArchitectureTest.php tests/Feature/CrossTenantMutationGuardTest.php app-modules/provision/tests/ProvisionTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app-modules/ tests/Feature/Security/EditComponentIdorProtectionTest.php tests/Feature/Architecture/ModuleArchitectureTest.php
@@ -330,31 +330,31 @@ git commit -m "security(livewire): lock edit record IDs and block Super Admin pr
   - `ProvisionServiceInterface::resolveTemplate(string $vendor, ?string $model = null, ?int $tenantId = null): ?string`
   - View-only rendering via `view('provision::templates.'.$normalizedViewName, [...])->render()` (zero `Blade::render(file_get_contents(...))` calls).
 
-- [ ] **Step 1: Write the failing security and tenant-isolation tests in `app-modules/provision/tests/ProvisionTest.php`**
+- [x] **Step 1: Write the failing security and tenant-isolation tests in `app-modules/provision/tests/ProvisionTest.php`**
 
 Add tests asserting:
 1. `ProvisionTemplate` with `file_path` set to `'../../.env'`, `'/etc/passwd'`, or `'storage/logs/laravel.log'` fails validation in `TemplateEdit::save()` AND fails closed (`InvalidArgumentException` / HTTP `404` or `500`, never disclosing file contents or executing `@php`) if persisted directly in DB *(Review Focus #3)*.
 2. Existing relative paths WITH `.blade.php` suffix (`'grandstream/default.blade.php'`, `'yealink/t46s/default.blade.php'`) and WITHOUT suffix (`'grandstream/default'`) both normalize cleanly and render from `provision::templates.*` *(Review Focus #3)*.
 3. Cross-tenant isolation (`M7`): Tenant A creates an enabled `ProvisionTemplate` for vendor `'polycom'`; Tenant B provisions a `'polycom'` device on the public endpoint → Tenant A's template record is NOT matched unless a global (`tenant_id === null`) or Tenant B (`tenant_id === $device->tenant_id`) template exists.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest app-modules/provision/tests/ProvisionTest.php`
 Expected: FAIL (arbitrary file path is read/rendered by `file_get_contents`, and Tenant A's template resolves for Tenant B).
 
-- [ ] **Step 3: Harden `ProvisionService` and `TemplateEdit`**
+- [x] **Step 3: Harden `ProvisionService` and `TemplateEdit`**
 
 1. In `ProvisionService`, add `public const TEMPLATE_PATH_PATTERN = '/^[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)?(\.blade\.php)?$/';`.
 2. Update `resolveTemplate(string $vendor, ?string $model = null, ?int $tenantId = null): ?string` (and pass `(int) $device->tenant_id` from `provision()`): filter `ProvisionTemplate::withoutGlobalScope('tenant')` by `->where('enabled', true)->where('vendor', strtolower($vendor))` and `->when($tenantId !== null, fn ($q) => $q->where(fn ($sub) => $sub->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))->orderByRaw('tenant_id IS NULL ASC'))` so tenant-owned templates take precedence over global templates and never leak across tenants.
 3. In `renderTemplate()`, remove `file_exists()` + `Blade::render(file_get_contents(...))`. Validate `$templatePath` against `self::TEMPLATE_PATH_PATTERN` (unless `$templatePath` is an exact path under `realpath(base_path('app-modules/provision/resources/views/templates'))` registered via `registerTemplate()`), strip optional `.blade.php`, convert `/` to `.`, verify `View::exists('provision::templates.'.$viewKey)` (aborting 404 when missing), and render strictly via `view('provision::templates.'.$viewKey, [...])->render()`.
 4. In `TemplateEdit`, validate `filePath` with `'regex:'.ProvisionService::TEMPLATE_PATH_PATTERN`, replace `$this->tenantId` with `$this->resolveTenantId()`, and call `$this->assertCanAccessTenantRecord($template)` on update.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest app-modules/provision/tests/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app-modules/provision/
@@ -385,7 +385,7 @@ git commit -m "security(provision): enforce view-namespace allowlist and tenant-
   - `PermissionService::syncIfStale(): bool` — runs `syncToDatabase()` only when `PermissionSyncPolicy` reports a stale hash; used by the two admin `mount()` call sites so those pages stay correct without an unconditional upsert on every page load.
   - Per-request in-memory memoization on `PermissionService::all()` and DB-backed lookups (`L6`), cleared on `syncToDatabase()` / `register()` and after any direct `Permission` model write that a UI action performs.
 
-- [ ] **Step 1: Write the failing `PermissionSyncPolicy` unit tests (the RED driver) plus the hot-path regression test**
+- [x] **Step 1: Write the failing `PermissionSyncPolicy` unit tests (the RED driver) plus the hot-path regression test**
 
 Create `tests/Unit/Support/PermissionSyncPolicyTest.php` first — it is the only test in this task that can legitimately start red:
 
@@ -437,14 +437,14 @@ it('executes zero permission sync writes and zero Gate definitions on mod_xml_cu
 });
 ```
 
-- [ ] **Step 2: Run the test suite to verify the RED**
+- [x] **Step 2: Run the test suite to verify the RED**
 
 Run: `./vendor/bin/pest tests/Unit/Support/PermissionSyncPolicyTest.php`
 Expected: FAIL with `Class "App\Support\PermissionSyncPolicy" not found`.
 
 **Lifecycle note — why the query-log test cannot be the RED driver.** `AppServiceProvider::booted()` callbacks are flushed once during `createApplication()` in `setUp()` — *before* the test body calls `DB::enableQueryLog()` and *before* `RefreshDatabase` creates the `permissions` table. The permission upsert therefore never executes inside a feature-test request, so the query log is empty on both the fixed and the unfixed code. The policy unit test (Step 1) plus the delegation assertion in Step 3 carry the proof; the query-log test exists only to catch a future regression that reintroduces a per-request write on the hot path.
 
-- [ ] **Step 3: Gate `syncToDatabase()` behind a `PermissionSyncPolicy` hash check, add `permissions:sync`, and fast-path `api/v1/xml-handler*`**
+- [x] **Step 3: Gate `syncToDatabase()` behind a `PermissionSyncPolicy` hash check, add `permissions:sync`, and fast-path `api/v1/xml-handler*`**
 
 1. Create `App\Support\PermissionSyncPolicy` as a pure class (`shouldSync()` takes the values it needs; it never touches the request, cache, or container) so it is unit-testable without booting Laravel.
 2. Create `App\Console\Commands\SyncPermissionsCommand` (`signature = 'permissions:sync'`) calling `$permissionService->syncToDatabase()` and writing `Cache::forever('permissions.sync.hash', $permissionService->registryHash())`. Laravel 13 auto-discovers every command class under `app/Console/Commands`, so **do not** add a manual registration to `AppServiceProvider`.
@@ -453,12 +453,12 @@ Expected: FAIL with `Class "App\Support\PermissionSyncPolicy" not found`.
 5. Replace the unconditional `$this->permissionService->syncToDatabase()` calls in `PermissionsList::mount()` and `GroupsEdit::mount()` with `syncIfStale()`, so C4 is closed on **every** HTTP path rather than only in the provider.
 6. Add `php artisan permissions:sync` after `migrate --force` in `GitUpdateService` and update `tests/Feature/Services/GitUpdatePipelineTest.php` (`$order` + step count).
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Unit/Support/PermissionSyncPolicyTest.php tests/Feature/Performance/XmlHandlerZeroSyncQueriesTest.php tests/Feature/Services/GitUpdatePipelineTest.php tests/Feature/LivewireActionPermissionTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Console/Commands/SyncPermissionsCommand.php app/Support/PermissionSyncPolicy.php app/Services/PermissionService.php app/Providers/AppServiceProvider.php app/Services/GitUpdateService.php app-modules/admin/src/Livewire/PermissionsList.php app-modules/admin/src/Livewire/GroupsEdit.php tests/Unit/Support/PermissionSyncPolicyTest.php tests/Feature/Performance/XmlHandlerZeroSyncQueriesTest.php tests/Feature/Services/GitUpdatePipelineTest.php
@@ -540,7 +540,7 @@ git commit -m "chore(php,security): align declared PHP floor to 8.5 and remove u
 > 3. Step 4 is the **Phase 1 phase gate** and runs the full parallel suite. Tasks 1–6 must already be committed and green before it runs.
 > 4. Commit **once** in Step 5. Do not commit the conference/agent half separately — the gate and the commit must describe the same verified state, or the phase gate runs against a half-remediated codebase.
 
-- [ ] **Step 1: Write the failing cross-tenant ESL control tests in `tests/Feature/Telephony/CrossTenantEslControlTest.php`**
+- [x] **Step 1: Write the failing cross-tenant ESL control tests in `tests/Feature/Telephony/CrossTenantEslControlTest.php`**
 
 Test both normal and cold-hydrated Livewire payloads *(Review Focus #4)*:
 1. Mock ESL output returning two active conferences: `'3001@tenant-a.test'` (Tenant A) and `'3002@tenant-b.test'` (Tenant B). Authenticate as Tenant A user with `active-conferences.view`, `active-conferences.mute`, `active-conferences.kick`. Calling `kickMember('3002@tenant-b.test', '1')` or `muteMember('3002@tenant-b.test', '1')` (even before `loadConferences()` populates `$this->conferences`) must NOT send an ESL `bgapi`/`api` kick/mute command and must set `$this->actionError`.
@@ -549,19 +549,19 @@ Test both normal and cold-hydrated Livewire payloads *(Review Focus #4)*:
 4. `ActiveCallsList` cross-tenant hangup/transfer *(the `H`-severity defect pinned above)*: mock `show channels as json` returning Tenant A's and Tenant B's channels. As a Tenant A user holding `active-calls.view` + `active-calls.hangup`, post a snapshot whose `calls` array contains Tenant B's UUID and call `hangupCall('<tenant-b-uuid>')` → no `uuid_kill` is sent and `$actionError` is set. Repeat for `transferCall('<tenant-b-uuid>', '2000')` with `active-calls.transfer` → no `uuid_transfer` is sent.
 5. The same test posts `updates: ['calls' => [...]]` through `/livewire/update` and asserts the mutation is rejected because `$calls` is `#[Locked]`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Telephony/CrossTenantEslControlTest.php`
 Expected: FAIL (ESL commands execute for Tenant B's conference and agent, and `ActiveCallsList` accepts a client-supplied channel UUID from a tampered snapshot).
 
-- [ ] **Step 3: Enforce allowlists in `FreeSwitchControlService`, `ActiveConferencesList`, `CallCenterActiveList`, and `ActiveCallsList`**
+- [x] **Step 3: Enforce allowlists in `FreeSwitchControlService`, `ActiveConferencesList`, `CallCenterActiveList`, and `ActiveCallsList`**
 
 1. In `FreeSwitchControlService`, **append** optional `?array $allowedConferences = null` / `?array $allowedAgents = null` parameters after the existing ones — do not remove or reorder `conferenceMute`'s `bool $muted`. When the allowlist is non-null, verify `in_array($conference, $allowedConferences, true)` / `in_array($agent, $allowedAgents, true)` before token validation and ESL execution, returning `['success' => false, 'message' => 'Target not found in active tenant.']` on mismatch.
 2. In `ActiveConferencesList` (`muteMember`, `unmuteMember`, `kickMember`) and `CallCenterActiveList` (`pauseAgent`, `unpauseAgent`, `logoutAgent`), resolve the allowed list server-side via a helper (`allowedConferenceNames(): ?array` / `allowedAgentNames(): ?array`) that queries fresh ESL state filtered through `TenantEslScoping` whenever a tenant scope applies (`! PanelActor::isAdmin()` or `TenantManager::hasTenant()`), never trusting client-hydrated state or skipping when `$this->conferences === []`.
 3. In `ActiveCallsList`, add `#[Locked]` to `public array $calls`, add `allowedChannelUuids(): array` that re-reads `show channels as json` and filters through `TenantEslScoping::filterChannelsByContext()` (the same path `refreshCalls()` uses), and replace both `array_column($this->calls, 'uuid')` call sites in `hangupCall()` and `transferCall()` with it. Rule: a control allowlist is never derived from a public Livewire property.
 4. Also improve `ActiveConferencesList` catch block so non-ESL `Throwable` errors are logged via `Log::error(...)` rather than silently masked as "FreeSWITCH is not connected".
 
-- [ ] **Step 4: Run Phase 1 verification gate**
+- [x] **Step 4: Run Phase 1 verification gate**
 
 Run:
 ```bash
@@ -572,7 +572,7 @@ php artisan test --compact --parallel
 ```
 Expected: All Phase 1 and existing suite tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/FreeSwitchControlService.php app-modules/active-conferences/src/Livewire/ActiveConferencesList.php app-modules/call-center-active/src/Livewire/CallCenterActiveList.php app-modules/active-calls/src/Livewire/ActiveCallsList.php tests/Feature/Telephony/CrossTenantEslControlTest.php

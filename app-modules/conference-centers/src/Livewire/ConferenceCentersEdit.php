@@ -6,6 +6,8 @@ namespace Modules\ConferenceCenters\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\ConferenceCenters\Models\ConferenceCenter;
@@ -33,6 +35,7 @@ class ConferenceCentersEdit extends BaseEditComponent
 
     public ?TemporaryUploadedFile $greetingUpload = null;
 
+    #[Locked]
     public ?string $conferenceCenterId = null;
 
     private ConferenceCenterService $centerService;
@@ -84,6 +87,11 @@ class ConferenceCentersEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->conferenceCenterId === null ? 'conference-centers.create' : 'conference-centers.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $existingCenter = $this->conferenceCenterId !== null
@@ -100,6 +108,7 @@ class ConferenceCentersEdit extends BaseEditComponent
         ];
 
         if ($existingCenter !== null) {
+            $this->assertCanAccessTenantRecord($existingCenter);
             $center = $this->centerService->update($existingCenter, $data);
         } else {
             $center = $this->centerService->create($data);

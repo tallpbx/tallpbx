@@ -6,7 +6,9 @@ namespace Modules\Emergency\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Locked;
 use Modules\Emergency\Services\EmergencyServiceInterface;
 
 /**
@@ -29,6 +31,7 @@ class EmergencyEdit extends BaseEditComponent
 
     public string $longitude = '';
 
+    #[Locked]
     public ?string $emergencyId = null;
 
     /** The emergency service instance. */
@@ -54,6 +57,7 @@ class EmergencyEdit extends BaseEditComponent
         }
 
         $record = $this->service->find($emergencyId);
+        $this->assertCanAccessTenantRecord($record);
         $this->emergencyId = $record->id;
         $this->tenantId = $record->tenant_id;
         $this->callerId = $record->caller_id ?? '';
@@ -75,6 +79,11 @@ class EmergencyEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->emergencyId === null ? 'emergency.create' : 'emergency.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -87,6 +96,7 @@ class EmergencyEdit extends BaseEditComponent
 
         if ($this->isEdit) {
             $record = $this->service->find($this->emergencyId);
+            $this->assertCanAccessTenantRecord($record);
             $this->service->update($record, $data);
         } else {
             $this->service->create($data);

@@ -11,6 +11,7 @@ use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use App\Support\OperationalControlFeedback;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 
 /**
@@ -29,6 +30,7 @@ class ActiveCallsList extends BaseListComponent
     public string $transferDestination = '';
 
     /** @var list<array{uuid: string, caller_id: string, caller_id_name: string, destination: string, duration: int, state: string, context: string}> */
+    #[Locked]
     public array $calls = [];
 
     private FreeSwitchServiceInterface $fs;
@@ -142,6 +144,34 @@ class ActiveCallsList extends BaseListComponent
     }
 
     /**
+     * Freshly resolve allowed channel UUIDs from ESL filtered by tenant.
+     *
+     * @return array<int, string>
+     */
+    public function allowedChannelUuids(): array
+    {
+        $tenantScoped = ! $this->isAdminGuard() || app(TenantManager::class)->hasTenant();
+
+        if (! $tenantScoped) {
+            return array_values(array_filter(array_column($this->calls, 'uuid')));
+        }
+
+        try {
+            $raw = $this->fs->api('show channels as json');
+            $scoped = $this->scoping->filterChannelsByContext(
+                $this->parseChannels($raw),
+                $this->tenantId()
+            );
+
+            return array_values(array_filter(array_column($scoped, 'uuid')));
+        } catch (\Throwable $e) {
+            Log::error('Failed to resolve allowed channel UUIDs from ESL.', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
      * Hang up a listed call.
      */
     public function hangupCall(string $uuid): void
@@ -155,7 +185,7 @@ class ActiveCallsList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->hangup($uuid, array_column($this->calls, 'uuid')));
+        $this->applyResult($this->control->hangup($uuid, $this->allowedChannelUuids()));
         $this->refreshCalls();
     }
 
@@ -173,7 +203,7 @@ class ActiveCallsList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->transfer($uuid, $destination, array_column($this->calls, 'uuid')));
+        $this->applyResult($this->control->transfer($uuid, $destination, $this->allowedChannelUuids()));
         $this->refreshCalls();
     }
 }

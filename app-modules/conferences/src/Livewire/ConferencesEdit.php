@@ -6,6 +6,8 @@ namespace Modules\Conferences\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Conferences\Models\Conference;
 use Modules\Conferences\Services\ConferenceService;
 
@@ -25,6 +27,7 @@ class ConferencesEdit extends BaseEditComponent
 
     public int $maxMembers = 100;
 
+    #[Locked]
     public ?string $conferenceId = null;
 
     private ConferenceService $conferenceService;
@@ -77,6 +80,11 @@ class ConferencesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->conferenceId === null ? 'conferences.create' : 'conferences.edit'), 403);
+
+        }
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 

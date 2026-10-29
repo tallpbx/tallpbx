@@ -7,8 +7,10 @@ namespace Modules\Extensions\Livewire;
 use App\Models\TenantDomain;
 use App\Models\User;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Modules\Extensions\Models\Extension;
 use Modules\Extensions\Services\ExtensionServiceInterface;
 use Modules\SipAccounts\Models\SipAccount;
@@ -107,6 +109,7 @@ class ExtensionsEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $extensionId = null;
 
     /** @var array<int, int> */
@@ -205,6 +208,11 @@ class ExtensionsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->extensionId === null ? 'extensions.create' : 'extensions.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -256,6 +264,7 @@ class ExtensionsEdit extends BaseEditComponent
 
         if ($this->extensionId !== null) {
             $extension = Extension::withoutGlobalScope('tenant')->findOrFail($this->extensionId);
+            $this->assertCanAccessTenantRecord($extension);
             $extension = $this->extensionService->update($extension, $data);
             $this->extensionService->syncUsers($extension, $this->selectedUserIds);
         } else {

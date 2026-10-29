@@ -6,6 +6,8 @@ namespace Modules\IvrMenus\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\FileStores\Enums\MediaCategory;
@@ -37,6 +39,7 @@ class IvrMenusEdit extends BaseEditComponent
 
     public int $digitLength = 0;
 
+    #[Locked]
     public ?string $menuUuid = null;
 
     private IvrMenuServiceInterface $ivrMenuService;
@@ -90,6 +93,11 @@ class IvrMenusEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->menuUuid === null ? 'ivr-menus.create' : 'ivr-menus.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $existingMenu = $this->menuUuid !== null
@@ -108,6 +116,7 @@ class IvrMenusEdit extends BaseEditComponent
         ];
 
         if ($existingMenu !== null) {
+            $this->assertCanAccessTenantRecord($existingMenu);
             $menu = $this->ivrMenuService->update($existingMenu, $data);
         } else {
             $menu = $this->ivrMenuService->create($data);

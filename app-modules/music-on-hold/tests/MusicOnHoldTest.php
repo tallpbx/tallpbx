@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\MusicOnHold\Livewire\MusicOnHoldEdit;
@@ -10,7 +9,7 @@ use Modules\MusicOnHold\Livewire\MusicOnHoldList;
 use Modules\MusicOnHold\Models\MusicOnHold;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['music-on-hold.view', 'music-on-hold.create', 'music-on-hold.edit', 'music-on-hold.delete']);
 });
 
 it('renders the music on hold list component', function () {

@@ -16,21 +16,28 @@ use Modules\Admin\Livewire\GroupsEdit;
 use Modules\Admin\Livewire\GroupsList;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.groups.view',
+        'admin.groups.create',
+        'admin.groups.update',
+        'admin.groups.delete',
+    ]);
     $permService = app(PermissionService::class);
     $permService->register('test-module', ['test.view', 'test.create', 'test.edit', 'test.delete']);
     $permService->syncToDatabase();
 });
 
 it('renders the groups list component', function () {
+    $initialCount = Group::count();
     Group::factory()->system()->count(3)->create();
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(GroupsList::class)
         ->assertOk()
         ->assertSee('Groups')
-        ->assertViewHas('groups', function ($groups) {
-            return $groups->count() === 3;
+        ->assertViewHas('groups', function ($groups) use ($initialCount) {
+            return $groups->count() === $initialCount + 3;
         });
 });
 
@@ -49,13 +56,14 @@ it('filters groups by tenant', function () {
 
 it('shows system groups when no tenant filter', function () {
     $tenant = Tenant::factory()->create();
+    $initialSystemCount = Group::whereNull('tenant_id')->count();
     Group::factory()->system()->count(1)->create();
     Group::factory()->forTenant($tenant->id)->count(3)->create();
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(GroupsList::class)
-        ->assertViewHas('groups', function ($groups) {
-            return $groups->count() === 1;
+        ->assertViewHas('groups', function ($groups) use ($initialSystemCount) {
+            return $groups->count() === $initialSystemCount + 1;
         });
 });
 

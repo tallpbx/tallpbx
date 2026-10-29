@@ -71,8 +71,8 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Modules\Backups\Listeners\BlockFileStoreDeletion;
@@ -349,16 +349,21 @@ class AppServiceProvider extends ServiceProvider
 
         // Define Gates after all module providers have registered their permissions
         $this->app->booted(function () {
+            $request = $this->app->bound('request') ? $this->app->make('request') : null;
+
+            if ($request?->is('api/v1/xml-handler*')) {
+                return;
+            }
+
             $permissionService = $this->app->make(PermissionService::class);
 
-            // Auto-sync permissions to the database so admin.can:* middleware works
+            // Auto-sync permissions to the database only when the registry is stale
             try {
-                if (Schema::hasTable('permissions')) {
-                    $permissionService->syncToDatabase();
-                    // Group assignments remain explicit so revoked permissions stay revoked.
-                }
+                $permissionService->syncIfStale();
             } catch (\Throwable $e) {
-                // Table may not exist yet during initial setup — skip gracefully
+                Log::warning('Permission database sync skipped during boot: '.$e->getMessage(), [
+                    'exception' => $e,
+                ]);
             }
 
             foreach ($permissionService->all() as $permission) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Admin\Livewire;
 
 use App\Services\GitUpdateService;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -85,6 +86,29 @@ class GitUpdate extends Component
     private GitUpdateService $gitService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.git-update.view']];
+
+        return [
+            '' => $viewGroup,
+            'loadBranches' => $viewGroup,
+            'fetch' => [['admin.git-update.execute']],
+            'selectChannel' => $viewGroup,
+            'refreshCommitStatus' => $viewGroup,
+            'confirmUpdate' => $viewGroup,
+            'cancelUpdate' => $viewGroup,
+            'updateApp' => [['admin.git-update.execute']],
+            'pollProgress' => $viewGroup,
+            'usesSharedSessionCache' => $viewGroup,
+        ];
+    }
+
+    /**
      * Inject the Git service and load repository state.
      */
     public function boot(GitUpdateService $gitService): void
@@ -153,6 +177,8 @@ class GitUpdate extends Component
      */
     public function fetch(): void
     {
+        abort_unless(PanelActor::can('admin.git-update.execute'), 403);
+
         $this->fetchDone = $this->gitService->fetch();
 
         if ($this->fetchDone) {
@@ -222,6 +248,8 @@ class GitUpdate extends Component
      */
     public function updateApp(): void
     {
+        abort_unless(PanelActor::can('admin.git-update.execute'), 403);
+
         // Fail fast while a pipeline is already running
         if ($this->updating) {
             return;

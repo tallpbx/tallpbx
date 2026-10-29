@@ -6,6 +6,8 @@ namespace Modules\CallBlocks\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\CallBlocks\Models\CallBlock;
 use Modules\CallBlocks\Services\CallBlockServiceInterface;
 
@@ -20,6 +22,7 @@ class CallBlocksEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $blockId = null;
 
     private CallBlockServiceInterface $callBlockService;
@@ -68,6 +71,11 @@ class CallBlocksEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->blockId === null ? 'call-blocks.create' : 'call-blocks.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -80,6 +88,7 @@ class CallBlocksEdit extends BaseEditComponent
 
         if ($this->blockId !== null) {
             $block = CallBlock::withoutGlobalScope('tenant')->findOrFail($this->blockId);
+            $this->assertCanAccessTenantRecord($block);
             $this->callBlockService->update($block, $data);
         } else {
             $this->callBlockService->create($data);

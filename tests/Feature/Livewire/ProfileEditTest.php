@@ -108,3 +108,28 @@ it('also works for web guard tenant users', function (): void {
 
     expect($user->name)->toBe('Updated Tenant');
 });
+
+it('edits the impersonated tenant user profile rather than the underlying admin', function (): void {
+    $user = User::factory()->create([
+        'name' => 'Impersonated User',
+        'email' => 'impersonated@example.com',
+        'password' => Hash::make('UserSecret123!'),
+    ]);
+
+    $this->actingAs($this->admin, 'admin');
+    $this->actingAs($user, 'web');
+    session()->put('impersonation.original_admin_id', $this->admin->id);
+
+    Livewire::test(ProfileEdit::class)
+        ->assertSet('name', 'Impersonated User')
+        ->assertSet('email', 'impersonated@example.com')
+        ->set('name', 'Updated Impersonated User')
+        ->call('updateProfile')
+        ->assertHasNoErrors();
+
+    $user->refresh();
+    $this->admin->refresh();
+
+    expect($user->name)->toBe('Updated Impersonated User')
+        ->and($this->admin->name)->toBe('Original Admin');
+});

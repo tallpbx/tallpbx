@@ -10,7 +10,12 @@ use Livewire\Livewire;
 use Modules\Admin\Livewire\SettingsEdit;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.settings.view',
+        'admin.settings.update',
+        'admin.settings.delete',
+    ]);
 });
 
 it('renders the settings list', function () {

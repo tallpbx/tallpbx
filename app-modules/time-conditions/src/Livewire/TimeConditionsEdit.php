@@ -6,6 +6,8 @@ namespace Modules\TimeConditions\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\TimeConditions\Models\TimeCondition;
 use Modules\TimeConditions\Services\TimeConditionService;
 
@@ -31,6 +33,7 @@ class TimeConditionsEdit extends BaseEditComponent
 
     public string $destinationOnNoMatch = '';
 
+    #[Locked]
     public ?string $timeConditionId = null;
 
     private TimeConditionService $timeConditionService;
@@ -82,6 +85,11 @@ class TimeConditionsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->timeConditionId === null ? 'time-conditions.create' : 'time-conditions.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -98,6 +106,7 @@ class TimeConditionsEdit extends BaseEditComponent
 
         if ($this->timeConditionId !== null) {
             $condition = TimeCondition::withoutGlobalScope('tenant')->findOrFail($this->timeConditionId);
+            $this->assertCanAccessTenantRecord($condition);
             $this->timeConditionService->update($condition, $data);
         } else {
             $this->timeConditionService->create($data);

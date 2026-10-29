@@ -17,7 +17,7 @@ use function Pest\Laravel\actingAs;
 
 describe('List Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['outbound-routes.view', 'outbound-routes.create', 'outbound-routes.edit', 'outbound-routes.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 
@@ -137,7 +137,7 @@ describe('List Component', function () {
 
 describe('Edit Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['outbound-routes.view', 'outbound-routes.create', 'outbound-routes.edit', 'outbound-routes.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 

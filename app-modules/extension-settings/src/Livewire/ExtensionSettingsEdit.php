@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\ExtensionSettings\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Locked;
 use Modules\Extensions\Models\Extension;
 use Modules\ExtensionSettings\Models\ExtensionSetting;
 use Modules\ExtensionSettings\Services\ExtensionSettingServiceInterface;
@@ -24,6 +26,7 @@ class ExtensionSettingsEdit extends BaseEditComponent
 
     public string $value = '';
 
+    #[Locked]
     public ?string $settingId = null;
 
     private ExtensionSettingServiceInterface $service;
@@ -88,6 +91,11 @@ class ExtensionSettingsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->settingId === null ? 'extension-settings.create' : 'extension-settings.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -99,6 +107,7 @@ class ExtensionSettingsEdit extends BaseEditComponent
 
         if ($this->isEdit) {
             $setting = ExtensionSetting::withoutGlobalScope('tenant')->findOrFail($this->settingId);
+            $this->assertCanAccessTenantRecord($setting);
             $this->service->update($setting, $data);
         } else {
             $this->service->create($data);

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Provision\Services;
 
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\View;
 use Modules\Devices\Models\Device;
 use Modules\Extensions\Services\ExtensionServiceInterface;
 use Modules\Provision\Models\ProvisionTemplate;
@@ -19,6 +19,8 @@ use Modules\Provision\Models\ProvisionTemplate;
  */
 class ProvisionService implements ProvisionServiceInterface
 {
+    public const TEMPLATE_PATH_PATTERN = '/^[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)?(\.blade\.php)?$/';
+
     /** @var array<string, array<string, string>> */
     private array $registeredTemplates = [];
 
@@ -68,8 +70,10 @@ class ProvisionService implements ProvisionServiceInterface
     /**
      * Resolve the template file path for a vendor and model.
      */
-    public function resolveTemplate(string $vendor, ?string $model): ?string
+    public function resolveTemplate(string $vendor, ?string $model = null, ?int $tenantId = null): ?string
     {
+        $vendor = strtolower($vendor);
+
         if ($model && isset($this->registeredTemplates[$vendor][$model])) {
             return $this->registeredTemplates[$vendor][$model];
         }
@@ -78,26 +82,43 @@ class ProvisionService implements ProvisionServiceInterface
             return $this->registeredTemplates[$vendor]['default'];
         }
 
-        // Use module-bundled default if it exists
-        $defaultPath = "{$vendor}/{$model}/default";
-        if ($model && view()->exists("provision::templates.{$defaultPath}")) {
-            return $defaultPath;
-        }
-
-        // Fall back to vendor-wide default
-        $vendorDefault = "{$vendor}/default";
-        if (view()->exists("provision::templates.{$vendorDefault}")) {
-            return $vendorDefault;
-        }
-
-        // Then try DB-persisted templates
-        $dbTemplate = ProvisionTemplate::withoutGlobalScope('tenant')
+        // Try DB-persisted templates (tenant-specific takes precedence over global)
+        $dbTemplateQuery = ProvisionTemplate::withoutGlobalScope('tenant')
             ->where('enabled', true)
-            ->when($model, fn ($q) => $q->where('model', $model))
+            ->where('vendor', $vendor)
+            ->when(
+                $tenantId !== null,
+                fn ($q) => $q->where(fn ($sub) => $sub->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+                    ->orderByRaw('tenant_id IS NULL ASC'),
+                fn ($q) => $q->whereNull('tenant_id')
+            );
+
+        if ($model) {
+            $dbModelTemplate = (clone $dbTemplateQuery)->where('model', $model)->first();
+            if ($dbModelTemplate) {
+                return $dbModelTemplate->file_path;
+            }
+
+            // Use module-bundled model default if it exists
+            $defaultPath = "{$vendor}/{$model}/default";
+            if (View::exists("provision::templates.{$defaultPath}")) {
+                return $defaultPath;
+            }
+        }
+
+        // Try DB-persisted vendor-wide template (where model is null or empty)
+        $dbVendorTemplate = (clone $dbTemplateQuery)
+            ->where(fn ($q) => $q->whereNull('model')->orWhere('model', ''))
             ->first();
 
-        if ($dbTemplate) {
-            return $dbTemplate->file_path;
+        if ($dbVendorTemplate) {
+            return $dbVendorTemplate->file_path;
+        }
+
+        // Fall back to vendor-wide bundled default
+        $vendorDefault = "{$vendor}/default";
+        if (View::exists("provision::templates.{$vendorDefault}")) {
+            return $vendorDefault;
         }
 
         return null;
@@ -115,7 +136,11 @@ class ProvisionService implements ProvisionServiceInterface
 
         $vendor = $device->vendor;
         $model = $device->model;
-        $templatePath = $this->resolveTemplate($vendor, $model);
+        $templatePath = $this->resolveTemplate(
+            $vendor,
+            $model,
+            $device->tenant_id !== null ? (int) $device->tenant_id : null
+        );
 
         if ($templatePath === null) {
             abort(404, 'No provisioning template found for this device.');
@@ -130,7 +155,7 @@ class ProvisionService implements ProvisionServiceInterface
     }
 
     /**
-     * Render a template by filesystem path or view name.
+     * Render a template by normalized view name.
      *
      * The device's settings are merged over the resolved line so real
      * SipAccount credentials win while vendor-specific settings survive.
@@ -141,16 +166,27 @@ class ProvisionService implements ProvisionServiceInterface
     {
         $settings = array_merge($device->settings ?? [], $line);
 
-        // Filesystem path (from vendor modules)
-        if (file_exists($templatePath)) {
-            return Blade::render(
-                file_get_contents($templatePath),
-                ['device' => $device, 'settings' => $settings]
-            );
+        $templatesDir = realpath(base_path('app-modules/provision/resources/views/templates'));
+
+        $normalized = $templatePath;
+        if ($templatesDir !== false && str_starts_with($templatePath, $templatesDir.'/')) {
+            $normalized = substr($templatePath, strlen($templatesDir) + 1);
         }
 
-        // View name (from module-bundled or DB templates)
-        $viewName = 'provision::templates.'.str_replace(['/', '.blade.php'], ['.', ''], $templatePath);
+        if (! preg_match(self::TEMPLATE_PATH_PATTERN, $normalized)) {
+            throw new \InvalidArgumentException("Invalid template path [{$templatePath}].");
+        }
+
+        if (str_ends_with($normalized, '.blade.php')) {
+            $normalized = substr($normalized, 0, -strlen('.blade.php'));
+        }
+
+        $viewKey = str_replace('/', '.', $normalized);
+        $viewName = 'provision::templates.'.$viewKey;
+
+        if (! View::exists($viewName)) {
+            abort(404, "Provisioning template view [{$viewName}] not found.");
+        }
 
         return view($viewName, ['device' => $device, 'settings' => $settings])->render();
     }

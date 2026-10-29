@@ -15,7 +15,7 @@ use function Pest\Laravel\actingAs;
 
 describe('List Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['dialplans.view', 'dialplans.create', 'dialplans.edit', 'dialplans.delete']);
     });
 
     it('renders the dialplans list component', function () {
@@ -88,7 +88,7 @@ describe('List Component', function () {
 
 describe('Edit Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['dialplans.view', 'dialplans.create', 'dialplans.edit', 'dialplans.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 

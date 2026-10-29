@@ -15,7 +15,7 @@ use function Pest\Laravel\actingAs;
 
 describe('List Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['voicemails.view', 'voicemails.create', 'voicemails.edit', 'voicemails.delete']);
     });
 
     it('renders the voicemails list component', function () {
@@ -94,7 +94,7 @@ describe('List Component', function () {
 
 describe('Edit Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['voicemails.view', 'voicemails.create', 'voicemails.edit', 'voicemails.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 

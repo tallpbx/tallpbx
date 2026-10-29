@@ -12,7 +12,13 @@ use Modules\Admin\Livewire\TenantDomainsEdit;
 use Modules\Admin\Livewire\TenantDomainsList;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.tenant-domains.view',
+        'admin.tenant-domains.create',
+        'admin.tenant-domains.update',
+        'admin.tenant-domains.delete',
+    ]);
 });
 
 it('renders the tenant domains list component', function () {

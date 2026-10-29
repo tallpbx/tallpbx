@@ -6,6 +6,8 @@ namespace Modules\FollowMe\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\FollowMe\Models\FollowMe;
 use Modules\FollowMe\Services\FollowMeService;
 
@@ -25,6 +27,7 @@ class FollowMeEdit extends BaseEditComponent
 
     public int $ringTimeout = 30;
 
+    #[Locked]
     public ?string $followMeId = null;
 
     private FollowMeService $followMeService;
@@ -73,6 +76,11 @@ class FollowMeEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->followMeId === null ? 'follow-me.create' : 'follow-me.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -86,6 +94,7 @@ class FollowMeEdit extends BaseEditComponent
 
         if ($this->followMeId !== null) {
             $record = FollowMe::withoutGlobalScope('tenant')->findOrFail($this->followMeId);
+            $this->assertCanAccessTenantRecord($record);
             $this->followMeService->update($record, $data);
         } else {
             $this->followMeService->create($data);

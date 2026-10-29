@@ -11,7 +11,10 @@ use Livewire\Livewire;
 use Modules\Admin\Livewire\NotificationsList;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create();
+    $this->admin = grantAdminPermissions(Admin::factory()->create(), [
+        'panel.dashboard.view',
+        'admin.notifications.view',
+    ]);
     $this->actingAs($this->admin, 'admin');
 });
 

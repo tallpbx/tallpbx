@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
@@ -11,7 +10,7 @@ use Modules\Recordings\Livewire\RecordingsList;
 use Modules\Recordings\Models\Recording;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['recordings.view', 'recordings.create', 'recordings.edit', 'recordings.delete']);
 });
 
 it('renders the recordings list component', function () {

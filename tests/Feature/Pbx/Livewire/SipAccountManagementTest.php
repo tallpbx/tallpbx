@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\SipAccounts\Livewire\SipAccountsEdit;
@@ -10,7 +9,7 @@ use Modules\SipAccounts\Livewire\SipAccountsList;
 use Modules\SipAccounts\Models\SipAccount;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['sip-accounts.view', 'sip-accounts.create', 'sip-accounts.edit', 'sip-accounts.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\TenantLimits\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\TenantLimits\Models\TenantLimit;
 use Modules\TenantLimits\Services\TenantLimitService;
 
@@ -19,6 +21,7 @@ class TenantLimitsEdit extends BaseEditComponent
 
     public int $hardLimit = 0;
 
+    #[Locked]
     public ?string $limitId = null;
 
     private TenantLimitService $limitService;
@@ -67,6 +70,11 @@ class TenantLimitsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->limitId === null ? 'tenant-limits.create' : 'tenant-limits.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -78,6 +86,7 @@ class TenantLimitsEdit extends BaseEditComponent
 
         if ($this->isEdit) {
             $limit = TenantLimit::withoutGlobalScope('tenant')->findOrFail($this->limitId);
+            $this->assertCanAccessTenantRecord($limit);
             $this->limitService->update($limit, $data);
         } else {
             $this->limitService->create($data);

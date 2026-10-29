@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Acl\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Modules\Acl\Models\AccessControl;
 use Modules\Acl\Services\AccessControlServiceInterface;
 
@@ -20,6 +22,7 @@ class AclEdit extends BaseEditComponent
 
     public string $action = 'allow';
 
+    #[Locked]
     public ?string $ruleId = null;
 
     private AccessControlServiceInterface $accessControlService;
@@ -65,6 +68,11 @@ class AclEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->ruleId === null ? 'acl.create' : 'acl.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -77,6 +85,7 @@ class AclEdit extends BaseEditComponent
 
         if ($this->ruleId !== null) {
             $rule = AccessControl::withoutGlobalScope('tenant')->findOrFail($this->ruleId);
+            $this->assertCanAccessTenantRecord($rule);
             $this->accessControlService->update($rule, $data);
         } else {
             $this->accessControlService->create($data);

@@ -78,7 +78,7 @@
             "properties": {
                 "php": {
                     "type": "string",
-                    "description": "Required PHP version constraint (e.g., >=8.3)."
+                    "description": "Required PHP version constraint (e.g., >=8.5)."
                 },
                 "laravel": {
                     "type": "string",

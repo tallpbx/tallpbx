@@ -36,6 +36,24 @@ class TenantDomainsList extends Component
     private TenantDomainServiceInterface $domainService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.tenant-domains.view']];
+
+        return [
+            '' => $viewGroup,
+            'confirmDomainDeletion' => $viewGroup,
+            'cancelDomainDeletion' => $viewGroup,
+            'deleteDomain' => [['admin.tenant-domains.delete']],
+            'dismissFeedback' => $viewGroup,
+        ];
+    }
+
+    /**
      * Inject the tenant domain service used by this component.
      */
     public function boot(TenantDomainServiceInterface $domainService): void

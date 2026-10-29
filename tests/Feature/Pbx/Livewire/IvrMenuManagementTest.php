@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\IvrMenus\Livewire\IvrMenusEdit;
@@ -10,7 +9,7 @@ use Modules\IvrMenus\Livewire\IvrMenusList;
 use Modules\IvrMenus\Models\IvrMenu;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['ivr-menus.view', 'ivr-menus.create', 'ivr-menus.edit', 'ivr-menus.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

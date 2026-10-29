@@ -35,7 +35,7 @@ interface ProvisionServiceInterface
     /**
      * Resolve the best-matching template path for a vendor and model.
      */
-    public function resolveTemplate(string $vendor, ?string $model): ?string;
+    public function resolveTemplate(string $vendor, ?string $model = null, ?int $tenantId = null): ?string;
 
     /**
      * Render the provisioning configuration for a device by MAC address.

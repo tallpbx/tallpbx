@@ -6,6 +6,8 @@ namespace Modules\Bridges\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Bridges\Models\Bridge;
 use Modules\Bridges\Services\BridgeService;
 
@@ -31,6 +33,7 @@ class BridgesEdit extends BaseEditComponent
     public string $description = '';
 
     /** UUID of the bridge being edited (null when creating new). */
+    #[Locked]
     public ?string $bridgeId = null;
 
     /** Service layer for bridge CRUD operations. */
@@ -93,6 +96,11 @@ class BridgesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->bridgeId === null ? 'bridges.create' : 'bridges.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -106,6 +114,7 @@ class BridgesEdit extends BaseEditComponent
 
         if ($this->bridgeId !== null) {
             $bridge = Bridge::withoutGlobalScope('tenant')->findOrFail($this->bridgeId);
+            $this->assertCanAccessTenantRecord($bridge);
             $this->bridgeService->update($bridge, $data);
         } else {
             $this->bridgeService->create($data);

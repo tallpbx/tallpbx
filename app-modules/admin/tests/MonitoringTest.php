@@ -29,6 +29,14 @@ beforeEach(function (): void {
             'created_at' => now(),
             'updated_at' => now(),
         ],
+        [
+            'id' => Str::uuid()->toString(),
+            'name' => 'admin.queue.retry',
+            'module' => 'admin',
+            'description' => 'Retry failed queue jobs.',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
     ]);
 });
 
@@ -90,7 +98,7 @@ it('aborts with 403 when admin without queue view permission calls loadRecentFai
 });
 
 it('allows authorized admin to open queue modal, load failures, and retry', function (): void {
-    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.monitoring.view', 'admin.queue.view']);
+    $admin = grantAdminPermissions(Admin::factory()->create(), ['admin.monitoring.view', 'admin.queue.view', 'admin.queue.retry']);
 
     $uuid = (string) Str::uuid();
     DB::table('failed_jobs')->insert([

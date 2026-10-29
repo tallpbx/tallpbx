@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\HotDesking\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Locked;
 use Modules\Extensions\Models\Extension;
 use Modules\HotDesking\Models\HotDeskSession;
 use Modules\HotDesking\Services\HotDeskingServiceInterface;
@@ -15,6 +17,7 @@ use Modules\HotDesking\Services\HotDeskingServiceInterface;
  */
 class HotDeskingEdit extends BaseEditComponent
 {
+    #[Locked]
     public ?string $sessionId = null;
 
     public ?string $extensionId = null;
@@ -136,6 +139,11 @@ class HotDeskingEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->sessionId === null ? 'hot-desking.create' : 'hot-desking.edit'), 403);
+
+        }
         $this->validate();
         $tenantId = $this->resolveTenantId();
 

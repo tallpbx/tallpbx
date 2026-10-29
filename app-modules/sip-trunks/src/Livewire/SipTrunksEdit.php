@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\SipTrunks\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\SipTrunks\Models\SipTrunk;
 use Modules\SipTrunks\Services\SipTrunkServiceInterface;
 
@@ -27,6 +29,7 @@ class SipTrunksEdit extends BaseEditComponent
 
     public string $codecs = '';
 
+    #[Locked]
     public ?string $trunkId = null;
 
     private SipTrunkServiceInterface $service;
@@ -79,6 +82,11 @@ class SipTrunksEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->trunkId === null ? 'sip-trunks.create' : 'sip-trunks.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -94,6 +102,7 @@ class SipTrunksEdit extends BaseEditComponent
 
         if ($this->isEdit) {
             $trunk = SipTrunk::withoutGlobalScope('tenant')->findOrFail($this->trunkId);
+            $this->assertCanAccessTenantRecord($trunk);
             $this->service->update($trunk, $data);
         } else {
             $this->service->create($data);

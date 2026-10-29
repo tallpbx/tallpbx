@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\MusicOnHold\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\FileStores\Enums\MediaCategory;
@@ -27,6 +29,7 @@ class MusicOnHoldEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $mohId = null;
 
     private MusicOnHoldService $musicOnHoldService;
@@ -79,6 +82,11 @@ class MusicOnHoldEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->mohId === null ? 'music-on-hold.create' : 'music-on-hold.edit'), 403);
+
+        }
         $this->validate();
 
         $existingMusicOnHold = $this->mohId !== null
@@ -94,6 +102,7 @@ class MusicOnHoldEdit extends BaseEditComponent
         ];
 
         if ($existingMusicOnHold !== null) {
+            $this->assertCanAccessTenantRecord($existingMusicOnHold);
             $moh = $this->musicOnHoldService->update($existingMusicOnHold, $data);
         } else {
             $moh = $this->musicOnHoldService->create($data);

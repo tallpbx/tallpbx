@@ -15,7 +15,7 @@ use function Pest\Laravel\actingAs;
 
 describe('Component Interactions', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['ring-groups.view', 'ring-groups.create', 'ring-groups.edit', 'ring-groups.delete']);
     });
 
     it('renders the ring groups list component', function () {

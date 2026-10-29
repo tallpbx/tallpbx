@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\PinNumbers\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\PinNumbers\Models\PinNumber;
 use Modules\PinNumbers\Services\PinNumberService;
 
@@ -17,6 +19,7 @@ class PinNumbersEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $pinId = null;
 
     private PinNumberService $pinNumberService;
@@ -63,6 +66,11 @@ class PinNumbersEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->pinId === null ? 'pin-numbers.create' : 'pin-numbers.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -74,6 +82,7 @@ class PinNumbersEdit extends BaseEditComponent
 
         if ($this->pinId !== null) {
             $pin = PinNumber::withoutGlobalScope('tenant')->findOrFail($this->pinId);
+            $this->assertCanAccessTenantRecord($pin);
             $this->pinNumberService->update($pin, $data);
         } else {
             $this->pinNumberService->create($data);

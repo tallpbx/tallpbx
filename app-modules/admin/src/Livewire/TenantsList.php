@@ -40,6 +40,24 @@ class TenantsList extends Component
     private TenantServiceInterface $tenantService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.tenants.view']];
+
+        return [
+            '' => $viewGroup,
+            'confirmTenantDeletion' => $viewGroup,
+            'cancelTenantDeletion' => $viewGroup,
+            'deleteTenant' => [['admin.tenants.delete']],
+            'dismissFeedback' => $viewGroup,
+        ];
+    }
+
+    /**
      * Inject the tenant service used by this component.
      */
     public function boot(TenantServiceInterface $tenantService): void

@@ -10,10 +10,12 @@ use App\Models\Permission;
 use App\Models\Tenant;
 use App\Services\GroupServiceInterface;
 use App\Services\PermissionService;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Rule as LivewireRule;
 use Livewire\Component;
 
@@ -37,6 +39,7 @@ class GroupsEdit extends Component
 
     public ?int $tenantId = null;
 
+    #[Locked]
     public ?string $groupId = null;
 
     /** @var list<int> */
@@ -51,6 +54,20 @@ class GroupsEdit extends Component
     private GroupServiceInterface $groupService;
 
     private PermissionService $permissionService;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.groups.view']],
+            'save' => [['admin.groups.create', 'admin.groups.update']],
+            'getIsEditProperty' => [['admin.groups.view']],
+        ];
+    }
 
     /**
      * Receive the services used to save groups and sync permissions.
@@ -73,13 +90,18 @@ class GroupsEdit extends Component
     {
         $this->tenants = Tenant::orderBy('name')->get();
 
-        // Ensure permissions are synced so they're available for assignment
-        $this->permissionService->syncToDatabase();
+        // Ensure permissions are synced if stale so they're available for assignment
+        $this->permissionService->syncIfStale();
         $this->loadPermissionGroups();
 
         if ($group !== null) {
             $this->groupId = $group;
             $groupModel = Group::findOrFail($group);
+
+            if ($groupModel->name === 'Super Administrators' && $groupModel->tenant_id === null && ! PanelActor::isSuperAdmin()) {
+                abort(403, 'Unauthorized to edit Super Administrators group.');
+            }
+
             $this->name = $groupModel->name;
             $this->description = $groupModel->description ?? '';
             $this->tenantId = $groupModel->tenant_id;
@@ -149,6 +171,21 @@ class GroupsEdit extends Component
      */
     public function save(): void
     {
+        abort_unless(PanelActor::can($this->groupId === null ? 'admin.groups.create' : 'admin.groups.update'), 403);
+
+        if (! PanelActor::isSuperAdmin()) {
+            if ($this->groupId !== null) {
+                $group = $this->resolveGroup();
+                if ($group !== null && $group->name === 'Super Administrators' && $group->tenant_id === null) {
+                    abort(403, 'Unauthorized to edit Super Administrators group.');
+                }
+            }
+
+            if ($this->name === 'Super Administrators' && $this->tenantId === null) {
+                abort(403, 'Unauthorized to modify Super Administrators group.');
+            }
+        }
+
         $this->validate($this->rules());
 
         $data = [

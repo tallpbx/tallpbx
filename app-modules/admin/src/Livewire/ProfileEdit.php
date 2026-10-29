@@ -7,8 +7,8 @@ namespace Modules\Admin\Livewire;
 use App\Models\Admin;
 use App\Models\User;
 use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -39,6 +39,23 @@ class ProfileEdit extends Component
     public ?string $profileSuccess = null;
 
     public ?string $passwordSuccess = null;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $wildcard = [['*']];
+
+        return [
+            '' => $wildcard,
+            'updateProfile' => $wildcard,
+            'updatePassword' => $wildcard,
+            'dismissFeedback' => $wildcard,
+        ];
+    }
 
     /**
      * Mount the component with the currently authenticated user details.
@@ -122,7 +139,7 @@ class ProfileEdit extends Component
      */
     private function currentUser(): Admin|User|null
     {
-        return Auth::guard('admin')->user() ?? Auth::guard('web')->user();
+        return PanelActor::resolve();
     }
 
     /**

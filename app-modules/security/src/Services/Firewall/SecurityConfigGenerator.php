@@ -308,25 +308,6 @@ class SecurityConfigGenerator
     }
 
     /**
-     * Write the generated ruleset directly to the active configuration file.
-     */
-    public function writeActive(?string $path = null): string
-    {
-        $target = $path ?? $this->activeFile;
-        $content = $this->generate();
-
-        $dir = dirname($target);
-        if (! is_dir($dir)) {
-            @mkdir($dir, 0750, true);
-        }
-
-        file_put_contents($target, $content);
-        @chmod($target, 0640);
-
-        return $target;
-    }
-
-    /**
      * Validate ruleset syntax using the host nft utility ('nft -c -f').
      */
     public function validateSyntax(string $filePath): bool

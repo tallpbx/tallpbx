@@ -7,11 +7,13 @@ namespace Modules\Admin\Livewire;
 use App\Models\Admin;
 use App\Models\Group;
 use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
@@ -25,6 +27,7 @@ class AdminsEdit extends Component
 {
     use HasOperationalFeedback;
 
+    #[Locked]
     public ?int $adminId = null;
 
     public string $name = '';
@@ -46,7 +49,7 @@ class AdminsEdit extends Component
     /**
      * Load the system groups and, when editing, fill the form with the
      * administrator's current details. New admins default to the
-     * Super Administrators group when it exists.
+     * Super Administrators group when it exists and the actor is a Super Admin.
      */
     public function mount(?int $adminId = null): void
     {
@@ -59,17 +62,37 @@ class AdminsEdit extends Component
         if ($this->adminId !== null) {
             $admin = Admin::with('groups')->findOrFail($this->adminId);
 
+            if (! PanelActor::isSuperAdmin() && $admin->groups->contains(fn ($g) => $g->name === 'Super Administrators' && $g->tenant_id === null)) {
+                abort(403, 'Unauthorized to edit Super Administrator account.');
+            }
+
             $this->name = $admin->name;
             $this->email = $admin->email;
             $this->enabled = (bool) $admin->enabled;
             $this->selectedGroupIds = $admin->groups->pluck('id')->map(fn ($id) => (string) $id)->toArray();
         } else {
-            // Default new admins to Super Administrators if group exists
-            $superAdmin = $this->systemGroups->firstWhere('name', 'Super Administrators');
-            if ($superAdmin !== null) {
-                $this->selectedGroupIds = [(string) $superAdmin->id];
+            // Default new admins to Super Administrators if group exists and actor is super admin
+            if (PanelActor::isSuperAdmin()) {
+                $superAdmin = $this->systemGroups->firstWhere('name', 'Super Administrators');
+                if ($superAdmin !== null) {
+                    $this->selectedGroupIds = [(string) $superAdmin->id];
+                }
             }
         }
+    }
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.users.view']],
+            'save' => [['admin.users.create', 'admin.users.update']],
+            'dismissFeedback' => [['admin.users.view']],
+        ];
     }
 
     /**
@@ -77,6 +100,22 @@ class AdminsEdit extends Component
      */
     public function save(): void
     {
+        abort_unless(PanelActor::can($this->adminId === null ? 'admin.users.create' : 'admin.users.update'), 403);
+
+        if (! PanelActor::isSuperAdmin()) {
+            $superAdminGroupId = Group::whereNull('tenant_id')->where('name', 'Super Administrators')->value('id');
+            if ($superAdminGroupId !== null && in_array((string) $superAdminGroupId, array_map('strval', $this->selectedGroupIds), true)) {
+                abort(403, 'Unauthorized to assign Super Administrators group.');
+            }
+
+            if ($this->adminId !== null) {
+                $targetAdmin = Admin::findOrFail($this->adminId);
+                if ($targetAdmin->groups()->whereNull('tenant_id')->where('name', 'Super Administrators')->exists()) {
+                    abort(403, 'Unauthorized to edit Super Administrator account.');
+                }
+            }
+        }
+
         $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => [

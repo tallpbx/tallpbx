@@ -33,6 +33,18 @@ class PermissionsList extends Component
     private PermissionService $permissionService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.permissions.view']],
+        ];
+    }
+
+    /**
      * Inject the permission service used by this component.
      */
     public function boot(PermissionService $permissionService): void
@@ -41,15 +53,11 @@ class PermissionsList extends Component
     }
 
     /**
-     * Mount the component, auto-sync permissions, and load current state.
-     *
-     * Permissions are automatically synchronized to the database
-     * on page load so the registry always reflects what modules
-     * have declared.
+     * Mount the component, ensure permissions are synchronized if stale, and load current state.
      */
     public function mount(): void
     {
-        $this->permissionService->syncToDatabase();
+        $this->permissionService->syncIfStale();
         $this->loadPermissions();
     }
 

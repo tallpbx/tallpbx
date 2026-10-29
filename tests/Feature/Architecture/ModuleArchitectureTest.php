@@ -2,13 +2,20 @@
 
 declare(strict_types=1);
 
+use App\Models\Tenant;
+use App\Services\TenantEslScoping;
 use App\Support\ModuleServiceProvider;
 use Illuminate\Support\Facades\Route;
+use Livewire\Attributes\Locked;
+use Modules\Admin\Livewire\ProfileEdit;
 use Modules\CallRecordings\Services\CallRecordingService;
+use Modules\EmailConnector\Livewire\EmailConnectorEdit;
+use Modules\Extensions\Models\Extension;
 use Modules\Fax\Services\FaxService;
 use Modules\FileStores\Services\MediaStorageServiceInterface;
 use Modules\MusicOnHold\Services\MusicOnHoldService;
 use Modules\Recordings\Services\RecordingService;
+use Modules\Security\Services\Firewall\SecurityConfigGenerator;
 use Modules\VoicemailMessages\Services\VoicemailMessageService;
 
 /**
@@ -305,4 +312,144 @@ it('verifies that FreeSWITCH domain listeners have been migrated out of app/List
         'BroadcastDashboardStatsOnFreeSwitchEvent.php',
         'BroadcastTelephonyOnFreeSwitchEvent.php',
     ]);
+});
+
+it('ensures all record-backed Livewire edit components lock their primary record identifier', function (): void {
+    $exemptions = [
+        ProfileEdit::class,
+        EmailConnectorEdit::class,
+    ];
+
+    $files = glob(base_path('app-modules/*/src/Livewire/*Edit.php'));
+    $testedClasses = 0;
+    $missingLocked = [];
+
+    foreach ($files as $file) {
+        $content = file_get_contents($file);
+        if (! preg_match('/namespace\s+([^;]+);/', $content, $nsMatches) ||
+            ! preg_match('/class\s+(\w+)/', $content, $classMatches)) {
+            continue;
+        }
+
+        $fqcn = $nsMatches[1].'\\'.$classMatches[1];
+
+        if (in_array($fqcn, $exemptions, true)) {
+            continue;
+        }
+
+        $testedClasses++;
+        $reflection = new ReflectionClass($fqcn);
+        $lockedProps = [];
+
+        foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+            $attrs = $property->getAttributes(Locked::class);
+            if (! empty($attrs)) {
+                $lockedProps[] = $property->getName();
+            }
+        }
+
+        $shortName = $reflection->getShortName();
+
+        // Must lock primary identifier (Id/Uuid, including editingId, tenantId, menuUuid)
+        $hasLockedId = false;
+        foreach ($lockedProps as $propName) {
+            if (! preg_match('/(Id|Uuid)$/', $propName)) {
+                continue;
+            }
+
+            // Exclude modal state
+            if ($propName === 'pendingDeletionId') {
+                continue;
+            }
+
+            // Exclude foreign-key selectors
+            if ($propName === 'tenantId' && $shortName !== 'TenantsEdit') {
+                continue;
+            }
+            if ($propName === 'extensionId' && $shortName !== 'ExtensionsEdit') {
+                continue;
+            }
+            if ($propName === 'fileStoreId' && $shortName !== 'FileStoresEdit') {
+                continue;
+            }
+            if ($propName === 'destinationId' && $shortName !== 'DestinationsEdit') {
+                continue;
+            }
+            if ($propName === 'sipAccountId' && $shortName !== 'SipAccountsEdit') {
+                continue;
+            }
+            if ($propName === 'gatewayId' && $shortName !== 'GatewaysEdit') {
+                continue;
+            }
+
+            $hasLockedId = true;
+            break;
+        }
+
+        if (! $hasLockedId) {
+            $missingLocked[] = $fqcn.' (locked properties: '.implode(', ', $lockedProps).')';
+        }
+    }
+
+    expect($testedClasses)->toBe(43)
+        ->and($missingLocked)->toBeEmpty(
+            "The following edit components must have #[Locked] on their primary record identifier:\n".implode("\n", $missingLocked)
+        );
+});
+
+it('enforces PHP 8.5 floor across composer.json and all module manifests', function (): void {
+    $composer = json_decode((string) file_get_contents(base_path('composer.json')), true);
+    expect($composer['require']['php'] ?? null)->toBe('^8.5');
+
+    $manifests = glob(base_path('app-modules/*/module.json'));
+    expect($manifests)->not->toBeEmpty();
+
+    $invalid = [];
+    foreach ($manifests as $manifestPath) {
+        $data = json_decode((string) file_get_contents($manifestPath), true);
+        $module = basename(dirname($manifestPath));
+        $php = $data['requirements']['php'] ?? null;
+        if ($php !== '>=8.5') {
+            $invalid[$module] = $php;
+        }
+    }
+
+    expect($invalid)->toBeEmpty('Modules failing PHP 8.5 requirement floor: '.json_encode($invalid));
+});
+
+it('ensures SecurityConfigGenerator does not expose dead or unguarded writeActive method', function (): void {
+    expect(method_exists(SecurityConfigGenerator::class, 'writeActive'))->toBeFalse();
+});
+
+it('verifies TenantEslScoping filters conferences by member caller_id using native array_any', function (): void {
+    $tenant = Tenant::factory()->create();
+    $otherTenant = Tenant::factory()->create();
+
+    Extension::factory()->create(['tenant_id' => $tenant->id, 'extension_number' => '1001']);
+    Extension::factory()->create(['tenant_id' => $otherTenant->id, 'extension_number' => '2001']);
+
+    $scoping = app(TenantEslScoping::class);
+
+    $conferences = [
+        [
+            'name' => 'conf-matching',
+            'members_list' => [
+                ['caller_id' => '1001', 'uuid' => 'm1'],
+            ],
+        ],
+        [
+            'name' => 'conf-other-tenant',
+            'members_list' => [
+                ['caller_id' => '2001', 'uuid' => 'm2'],
+            ],
+        ],
+        [
+            'name' => 'conf-no-members',
+            'members_list' => [],
+        ],
+    ];
+
+    $filtered = $scoping->filterConferencesByTenant($conferences, (int) $tenant->id);
+
+    expect(array_column($filtered, 'name'))->toBe(['conf-matching']);
 });

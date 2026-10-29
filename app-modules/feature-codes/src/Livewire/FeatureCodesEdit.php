@@ -6,6 +6,8 @@ namespace Modules\FeatureCodes\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\FeatureCodes\Models\FeatureCode;
 use Modules\FeatureCodes\Services\FeatureCodeServiceInterface;
 
@@ -20,6 +22,7 @@ class FeatureCodesEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $codeId = null;
 
     private FeatureCodeServiceInterface $featureCodeService;
@@ -66,6 +69,11 @@ class FeatureCodesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->codeId === null ? 'feature-codes.create' : 'feature-codes.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -78,6 +86,7 @@ class FeatureCodesEdit extends BaseEditComponent
 
         if ($this->codeId !== null) {
             $code = FeatureCode::withoutGlobalScope('tenant')->findOrFail($this->codeId);
+            $this->assertCanAccessTenantRecord($code);
             $this->featureCodeService->update($code, $data);
         } else {
             $this->featureCodeService->create($data);

@@ -6,6 +6,8 @@ namespace Modules\OutboundRoutes\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Gateways\Models\Gateway;
 use Modules\OutboundRoutes\Models\OutboundRoute;
 use Modules\OutboundRoutes\Services\OutboundRouteServiceInterface;
@@ -30,6 +32,7 @@ class OutboundRoutesEdit extends BaseEditComponent
 
     public int $priority = 100;
 
+    #[Locked]
     public ?string $routeId = null;
 
     /** @var array<int, array{id: string, name: string, profile: string}> */
@@ -92,6 +95,11 @@ class OutboundRoutesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->routeId === null ? 'outbound-routes.create' : 'outbound-routes.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -107,7 +115,9 @@ class OutboundRoutesEdit extends BaseEditComponent
         ];
 
         if ($this->routeId !== null) {
-            $this->outboundRouteService->update(OutboundRoute::withoutGlobalScope('tenant')->findOrFail($this->routeId), $data);
+            $route = OutboundRoute::withoutGlobalScope('tenant')->findOrFail($this->routeId);
+            $this->assertCanAccessTenantRecord($route);
+            $this->outboundRouteService->update($route, $data);
         } else {
             $this->outboundRouteService->create($data);
         }

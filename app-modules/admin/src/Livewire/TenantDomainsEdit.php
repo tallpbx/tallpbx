@@ -7,10 +7,12 @@ namespace Modules\Admin\Livewire;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Services\TenantDomainServiceInterface;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Rule as LivewireRule;
 use Livewire\Component;
 
@@ -35,12 +37,27 @@ class TenantDomainsEdit extends Component
 
     public bool $enabled = true;
 
+    #[Locked]
     public ?string $domainId = null;
 
     /** @var Collection<int, Tenant> */
     public Collection $tenants;
 
     private TenantDomainServiceInterface $domainService;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.tenant-domains.view']],
+            'save' => [['admin.tenant-domains.create', 'admin.tenant-domains.update']],
+            'getIsEditProperty' => [['admin.tenant-domains.view']],
+        ];
+    }
 
     /**
      * Inject the tenant domain service used by this component.
@@ -80,6 +97,8 @@ class TenantDomainsEdit extends Component
      */
     public function save(): void
     {
+        abort_unless(PanelActor::can($this->domainId === null ? 'admin.tenant-domains.create' : 'admin.tenant-domains.update'), 403);
+
         $this->validate($this->rules());
 
         $data = [

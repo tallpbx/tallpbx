@@ -7,14 +7,13 @@ namespace Modules\OperatorPanel\Livewire;
 use App\Services\DialplanContext;
 use App\Services\FreeSwitchControlService;
 use App\Services\FreeSwitchServiceInterface;
-use App\Services\ImpersonationServiceInterface;
 use App\Services\TenantContext;
 use App\Services\TenantEslScoping;
 use App\Services\TenantManager;
 use App\Support\OperationalControlFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -162,8 +161,7 @@ class OperatorPanelIndex extends Component
      */
     private function isAdminGuard(): bool
     {
-        return Auth::guard('admin')->check()
-            && ! app(ImpersonationServiceInterface::class)->isImpersonating();
+        return PanelActor::isAdmin();
     }
 
     /**

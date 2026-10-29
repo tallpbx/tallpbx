@@ -6,6 +6,8 @@ namespace Modules\RingGroups\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Services\RingGroupServiceInterface;
 
@@ -26,6 +28,7 @@ class RingGroupsEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $ringGroupId = null;
 
     /**
@@ -122,6 +125,11 @@ class RingGroupsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->ringGroupId === null ? 'ring-groups.create' : 'ring-groups.edit'), 403);
+
+        }
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate($this->rules());
 

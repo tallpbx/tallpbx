@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Destinations\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Destinations\Models\Destination;
 use Modules\Destinations\Services\DestinationServiceInterface;
 
@@ -21,6 +23,7 @@ class DestinationsEdit extends BaseEditComponent
 
     public string $description = '';
 
+    #[Locked]
     public ?string $destinationId = null;
 
     private DestinationServiceInterface $destinationService;
@@ -67,6 +70,11 @@ class DestinationsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->destinationId === null ? 'destinations.create' : 'destinations.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -80,6 +88,7 @@ class DestinationsEdit extends BaseEditComponent
 
         if ($this->destinationId !== null) {
             $destination = Destination::withoutGlobalScope('tenant')->findOrFail($this->destinationId);
+            $this->assertCanAccessTenantRecord($destination);
             $this->destinationService->update($destination, $data);
         } else {
             $this->destinationService->create($data);

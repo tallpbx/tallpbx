@@ -36,6 +36,24 @@ class UsersList extends Component
     private UserServiceInterface $userService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.users.view']];
+
+        return [
+            '' => $viewGroup,
+            'confirmUserDeletion' => $viewGroup,
+            'cancelUserDeletion' => $viewGroup,
+            'deleteUser' => [['admin.users.delete']],
+            'dismissFeedback' => $viewGroup,
+        ];
+    }
+
+    /**
      * Inject the user service used by this component.
      */
     public function boot(UserServiceInterface $userService): void

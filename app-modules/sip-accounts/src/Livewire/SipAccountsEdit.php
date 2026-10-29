@@ -6,7 +6,9 @@ namespace Modules\SipAccounts\Livewire;
 
 use App\Models\TenantDomain;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Locked;
 use Modules\SipAccounts\Livewire\Validation\SipAccountValidation;
 use Modules\SipAccounts\Models\SipAccount;
 use Modules\SipAccounts\Services\SipAccountServiceInterface;
@@ -24,6 +26,7 @@ class SipAccountsEdit extends BaseEditComponent
 
     public string $authPassword = '';
 
+    #[Locked]
     public ?string $accountId = null;
 
     /** @var Collection<int, TenantDomain> */
@@ -76,6 +79,11 @@ class SipAccountsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->accountId === null ? 'sip-accounts.create' : 'sip-accounts.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -89,6 +97,7 @@ class SipAccountsEdit extends BaseEditComponent
 
         if ($this->accountId !== null) {
             $account = SipAccount::withoutGlobalScope('tenant')->findOrFail($this->accountId);
+            $this->assertCanAccessTenantRecord($account);
             if (empty($this->authPassword)) {
                 unset($data['auth_password']);
             }

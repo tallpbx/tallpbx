@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\Destinations\Livewire\DestinationsEdit;
@@ -10,7 +9,7 @@ use Modules\Destinations\Livewire\DestinationsList;
 use Modules\Destinations\Models\Destination;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['destinations.view', 'destinations.create', 'destinations.edit', 'destinations.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

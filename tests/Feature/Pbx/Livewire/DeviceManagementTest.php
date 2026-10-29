@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\Devices\Livewire\DevicesEdit;
@@ -10,7 +9,7 @@ use Modules\Devices\Livewire\DevicesList;
 use Modules\Devices\Models\Device;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['devices.view', 'devices.create', 'devices.edit', 'devices.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

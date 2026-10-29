@@ -180,3 +180,37 @@ it('marks only the current actors notifications as read', function (): void {
 
     $this->assertDatabaseHas('notifications', ['id' => $foreign->id, 'read_at' => null]);
 });
+
+it('scopes notifications to the impersonated user rather than the underlying admin', function (): void {
+    $tenant = Tenant::factory()->create();
+    $user = tenantUser($tenant);
+
+    $userNotification = DatabaseNotification::create([
+        'id' => (string) Str::uuid(),
+        'type' => 'App\Notifications\TestNotification',
+        'notifiable_type' => User::class,
+        'notifiable_id' => $user->id,
+        'data' => '[]',
+    ]);
+    $adminNotification = DatabaseNotification::create([
+        'id' => (string) Str::uuid(),
+        'type' => 'App\Notifications\TestNotification',
+        'notifiable_type' => Admin::class,
+        'notifiable_id' => $this->admin->id,
+        'data' => '[]',
+    ]);
+
+    $this->actingAs($this->admin, 'admin');
+    $this->actingAs($user, 'web');
+    session()->put('impersonation.original_admin_id', $this->admin->id);
+
+    Livewire::test(NotificationsList::class)
+        ->assertSet('unreadCount', 1)
+        ->call('deleteNotification', $userNotification->id)
+        ->assertSet('actionMessage', 'Notification deleted.');
+
+    $this->assertModelMissing($userNotification);
+    $this->assertDatabaseHas('notifications', ['id' => $adminNotification->id]);
+
+    app(TenantManager::class)->setTenantId(null);
+});

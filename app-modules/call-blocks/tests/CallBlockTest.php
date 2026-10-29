@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\CallBlocks\Livewire\CallBlocksEdit;
@@ -10,7 +9,7 @@ use Modules\CallBlocks\Livewire\CallBlocksList;
 use Modules\CallBlocks\Models\CallBlock;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['call-blocks.view', 'call-blocks.create', 'call-blocks.edit', 'call-blocks.delete']);
 });
 
 it('renders the call blocks list component', function () {

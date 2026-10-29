@@ -46,9 +46,10 @@ class AdminSeeder extends Seeder
             ['description' => 'Full PBX management without system-level admin or tenant management.'],
         );
 
-        // Exclude only admin-user management from the Administrator group
+        // Exclude admin-user management and sensitive system mutations from the Administrator group
         $adminPermissionIds = Permission::whereNotIn('name', [
             'admin.users.view', 'admin.users.create', 'admin.users.update', 'admin.users.delete',
+            'admin.git-update.execute', 'admin.settings.update', 'admin.settings.delete',
             'backups.restore',
         ])->pluck('id');
 

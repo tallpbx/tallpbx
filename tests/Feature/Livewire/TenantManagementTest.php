@@ -12,7 +12,13 @@ use Modules\Admin\Livewire\TenantsEdit;
 use Modules\Admin\Livewire\TenantsList;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(Admin::factory()->create(['enabled' => true]), [
+        'panel.dashboard.view',
+        'admin.tenants.view',
+        'admin.tenants.create',
+        'admin.tenants.update',
+        'admin.tenants.delete',
+    ]);
 });
 
 it('renders the tenants list component', function () {

@@ -43,6 +43,25 @@ class GroupsList extends Component
     private GroupServiceInterface $groupService;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.groups.view']];
+
+        return [
+            '' => $viewGroup,
+            'setFilter' => $viewGroup,
+            'confirmGroupDeletion' => $viewGroup,
+            'cancelGroupDeletion' => $viewGroup,
+            'deleteGroup' => [['admin.groups.delete']],
+            'dismissFeedback' => $viewGroup,
+        ];
+    }
+
+    /**
      * Inject the group service used by this component.
      */
     public function boot(GroupServiceInterface $groupService): void

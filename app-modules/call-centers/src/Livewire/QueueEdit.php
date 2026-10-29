@@ -6,7 +6,9 @@ namespace Modules\CallCenters\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Locked;
 use Modules\CallCenters\Models\Queue;
 use Modules\CallCenters\Services\CallCenterServiceInterface;
 
@@ -26,6 +28,7 @@ class QueueEdit extends BaseEditComponent
 
     public string $musicOnHold = '';
 
+    #[Locked]
     public ?string $queueId = null;
 
     private CallCenterServiceInterface $service;
@@ -78,6 +81,11 @@ class QueueEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->queueId === null ? 'call-centers.create' : 'call-centers.edit'), 403);
+
+        }
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate(['tenantId' => ['required', 'integer', 'exists:tenants,id'], 'name' => ['required', 'string', 'max:255'], 'strategy' => ['required', 'string', 'max:255'], 'timeout' => ['required', 'integer', 'min:1', 'max:600'], 'enabled' => ['boolean']]);
         $data = ['tenant_id' => $this->tenantId, 'name' => $this->name, 'strategy' => $this->strategy, 'timeout' => $this->timeout, 'music_on_hold' => $this->musicOnHold ?: null, 'enabled' => $this->enabled];

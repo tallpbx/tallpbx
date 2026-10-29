@@ -10,6 +10,7 @@ use App\Services\TenantEslScoping;
 use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use App\Support\OperationalControlFeedback;
+use App\Support\PanelActor;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
@@ -155,6 +156,40 @@ class CallCenterActiveList extends BaseListComponent
     }
 
     /**
+     * Compute allowed agent names server-side from fresh ESL state.
+     *
+     * Returns null for unscoped admin callers without an active tenant filter.
+     *
+     * @return array<int, string>|null
+     */
+    public function allowedAgentNames(): ?array
+    {
+        $tenantScoped = ! PanelActor::isAdmin() || app(TenantManager::class)->hasTenant();
+
+        if (! $tenantScoped) {
+            return null;
+        }
+
+        if (! $this->fs->isConnected()) {
+            return [];
+        }
+
+        try {
+            $raw = $this->fs->api('callcenter_config agent list');
+            $scoped = $this->scoping->filterAgentsByTenant(
+                $this->parseAgents($raw),
+                $this->tenantId()
+            );
+
+            return array_values(array_filter(array_column($scoped, 'agent')));
+        } catch (\Throwable $e) {
+            Log::error('Failed to resolve allowed agents from ESL.', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
      * Pause a call center agent.
      */
     public function pauseAgent(string $agent): void
@@ -168,7 +203,7 @@ class CallCenterActiveList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->agentPause($agent));
+        $this->applyResult($this->control->agentPause($agent, $this->allowedAgentNames()));
         $this->refresh();
     }
 
@@ -186,7 +221,7 @@ class CallCenterActiveList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->agentUnpause($agent));
+        $this->applyResult($this->control->agentUnpause($agent, $this->allowedAgentNames()));
         $this->refresh();
     }
 
@@ -204,7 +239,7 @@ class CallCenterActiveList extends BaseListComponent
             return;
         }
 
-        $this->applyResult($this->control->agentLogout($agent));
+        $this->applyResult($this->control->agentLogout($agent, $this->allowedAgentNames()));
         $this->refresh();
     }
 }

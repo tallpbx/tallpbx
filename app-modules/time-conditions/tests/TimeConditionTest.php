@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\TimeConditions\Livewire\TimeConditionsEdit;
@@ -10,7 +9,7 @@ use Modules\TimeConditions\Livewire\TimeConditionsList;
 use Modules\TimeConditions\Models\TimeCondition;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['time-conditions.view', 'time-conditions.create', 'time-conditions.edit', 'time-conditions.delete']);
 });
 
 it('renders the time conditions list component', function () {

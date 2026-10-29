@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\FeatureCodes\Livewire\FeatureCodesEdit;
@@ -10,7 +9,7 @@ use Modules\FeatureCodes\Livewire\FeatureCodesList;
 use Modules\FeatureCodes\Models\FeatureCode;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['feature-codes.view', 'feature-codes.create', 'feature-codes.edit', 'feature-codes.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

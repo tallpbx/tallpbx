@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\Acl\Livewire\AclEdit;
@@ -10,7 +9,7 @@ use Modules\Acl\Livewire\AclList;
 use Modules\Acl\Models\AccessControl;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['acl.view', 'acl.create', 'acl.edit', 'acl.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

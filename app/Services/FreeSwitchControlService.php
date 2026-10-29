@@ -69,10 +69,15 @@ class FreeSwitchControlService
     /**
      * Mute or unmute a conference member.
      *
+     * @param  array<int, string>|null  $allowedConferences
      * @return array{success: bool, message: string}
      */
-    public function conferenceMute(string $conference, string $memberId, bool $muted): array
+    public function conferenceMute(string $conference, string $memberId, bool $muted, ?array $allowedConferences = null): array
     {
+        if ($allowedConferences !== null && ! in_array($conference, $allowedConferences, true)) {
+            return ['success' => false, 'message' => 'Target not found in active tenant.'];
+        }
+
         if (! $this->fs->isConnected()) {
             return ['success' => false, 'message' => 'FreeSWITCH is not connected.'];
         }
@@ -90,10 +95,15 @@ class FreeSwitchControlService
     /**
      * Kick a member from a conference.
      *
+     * @param  array<int, string>|null  $allowedConferences
      * @return array{success: bool, message: string}
      */
-    public function conferenceKick(string $conference, string $memberId): array
+    public function conferenceKick(string $conference, string $memberId, ?array $allowedConferences = null): array
     {
+        if ($allowedConferences !== null && ! in_array($conference, $allowedConferences, true)) {
+            return ['success' => false, 'message' => 'Target not found in active tenant.'];
+        }
+
         if (! $this->fs->isConnected()) {
             return ['success' => false, 'message' => 'FreeSWITCH is not connected.'];
         }
@@ -111,10 +121,15 @@ class FreeSwitchControlService
     /**
      * Pause a call center agent.
      *
+     * @param  array<int, string>|null  $allowedAgents
      * @return array{success: bool, message: string}
      */
-    public function agentPause(string $agent): array
+    public function agentPause(string $agent, ?array $allowedAgents = null): array
     {
+        if ($allowedAgents !== null && ! in_array($agent, $allowedAgents, true)) {
+            return ['success' => false, 'message' => 'Target not found in active tenant.'];
+        }
+
         if (! $this->fs->isConnected()) {
             return ['success' => false, 'message' => 'FreeSWITCH is not connected.'];
         }
@@ -131,10 +146,15 @@ class FreeSwitchControlService
     /**
      * Unpause a call center agent.
      *
+     * @param  array<int, string>|null  $allowedAgents
      * @return array{success: bool, message: string}
      */
-    public function agentUnpause(string $agent): array
+    public function agentUnpause(string $agent, ?array $allowedAgents = null): array
     {
+        if ($allowedAgents !== null && ! in_array($agent, $allowedAgents, true)) {
+            return ['success' => false, 'message' => 'Target not found in active tenant.'];
+        }
+
         if (! $this->fs->isConnected()) {
             return ['success' => false, 'message' => 'FreeSWITCH is not connected.'];
         }
@@ -151,10 +171,15 @@ class FreeSwitchControlService
     /**
      * Log out a call center agent.
      *
+     * @param  array<int, string>|null  $allowedAgents
      * @return array{success: bool, message: string}
      */
-    public function agentLogout(string $agent): array
+    public function agentLogout(string $agent, ?array $allowedAgents = null): array
     {
+        if ($allowedAgents !== null && ! in_array($agent, $allowedAgents, true)) {
+            return ['success' => false, 'message' => 'Target not found in active tenant.'];
+        }
+
         if (! $this->fs->isConnected()) {
             return ['success' => false, 'message' => 'FreeSWITCH is not connected.'];
         }

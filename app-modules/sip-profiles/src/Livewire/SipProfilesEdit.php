@@ -6,7 +6,9 @@ namespace Modules\SipProfiles\Livewire;
 
 use App\Jobs\ReloadSofiaProfile;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Modules\SipProfiles\Models\SipProfile;
 use Modules\SipProfiles\Services\SipProfileServiceInterface;
 
@@ -23,6 +25,7 @@ class SipProfilesEdit extends BaseEditComponent
 
     public string $sipIp = '';
 
+    #[Locked]
     public ?string $profileId = null;
 
     private SipProfileServiceInterface $profileService;
@@ -69,11 +72,17 @@ class SipProfilesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->profileId === null ? 'sip-profiles.create' : 'sip-profiles.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $settings = [];
         if ($this->profileId !== null) {
             $profile = SipProfile::withoutGlobalScope('tenant')->findOrFail($this->profileId);
+            $this->assertCanAccessTenantRecord($profile);
             $settings = $this->normalizeSettings($profile->settings ?? []);
         }
 

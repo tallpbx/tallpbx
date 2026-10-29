@@ -7,6 +7,8 @@ namespace Modules\Gateways\Livewire;
 use App\Jobs\ManageGateway;
 use App\Jobs\ReloadSofiaProfile;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Gateways\Models\Gateway;
 use Modules\Gateways\Services\GatewayServiceInterface;
 
@@ -29,6 +31,7 @@ class GatewaysEdit extends BaseEditComponent
 
     public string $profile = 'external';
 
+    #[Locked]
     public ?string $gatewayId = null;
 
     private GatewayServiceInterface $gatewayService;
@@ -79,6 +82,11 @@ class GatewaysEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->gatewayId === null ? 'gateways.create' : 'gateways.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         // Reload original gateway state during save because private Livewire properties do not persist between requests.
@@ -101,6 +109,7 @@ class GatewaysEdit extends BaseEditComponent
         ];
 
         if ($existingGateway !== null) {
+            $this->assertCanAccessTenantRecord($existingGateway);
             if (empty($this->password)) {
                 unset($data['password']);
             }

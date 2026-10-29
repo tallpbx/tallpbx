@@ -6,6 +6,8 @@ namespace Modules\CallFlows\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\CallFlows\Models\CallFlow;
 use Modules\CallFlows\Services\CallFlowService;
 
@@ -22,6 +24,7 @@ class CallFlowsEdit extends BaseEditComponent
 
     public string $destinationId = '';
 
+    #[Locked]
     public ?string $callFlowId = null;
 
     private CallFlowService $callFlowService;
@@ -71,6 +74,11 @@ class CallFlowsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->callFlowId === null ? 'call-flows.create' : 'call-flows.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
@@ -84,6 +92,7 @@ class CallFlowsEdit extends BaseEditComponent
 
         if ($this->callFlowId !== null) {
             $flow = CallFlow::withoutGlobalScope('tenant')->findOrFail($this->callFlowId);
+            $this->assertCanAccessTenantRecord($flow);
             $this->callFlowService->update($flow, $data);
         } else {
             $this->callFlowService->create($data);

@@ -56,6 +56,27 @@ class ModulesList extends Component
     public bool $canManage = false;
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.modules.view']];
+        $manageGroup = [['admin.modules.manage']];
+
+        return [
+            '' => $viewGroup,
+            'groupedModules' => $viewGroup,
+            'categoryLabel' => $viewGroup,
+            'confirmDeleteCustom' => $viewGroup,
+            'cancelCustomDeletion' => $viewGroup,
+            'deleteCustomModule' => $manageGroup,
+            'toggleEnabled' => $manageGroup,
+        ];
+    }
+
+    /**
      * Mount the component and initialize management permissions.
      */
     public function mount(): void

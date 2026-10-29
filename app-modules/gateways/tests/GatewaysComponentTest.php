@@ -30,7 +30,7 @@ function gatewayJobProperty(object $job, string $property): mixed
 
 describe('List Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['gateways.view', 'gateways.create', 'gateways.edit', 'gateways.delete']);
     });
 
     it('renders the gateways list component', function () {
@@ -103,7 +103,7 @@ describe('List Component', function () {
 
 describe('Edit Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['gateways.view', 'gateways.create', 'gateways.edit', 'gateways.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 

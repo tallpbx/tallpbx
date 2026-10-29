@@ -13,7 +13,7 @@
         "Modules\\Certificates\\Providers\\ModuleServiceProvider"
     ],
     "requirements": {
-        "php": ">=8.3",
+        "php": ">=8.5",
         "laravel": ">=13.0",
         "modules": [],
         "packages": []

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Modules\Provision\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\Provision\Models\ProvisionTemplate;
+use Modules\Provision\Services\ProvisionService;
 use Modules\Provision\Services\ProvisionServiceInterface;
 
 /**
@@ -22,6 +25,7 @@ class TemplateEdit extends BaseEditComponent
 
     public string $filePath = '';
 
+    #[Locked]
     public ?string $templateId = null;
 
     private ProvisionServiceInterface $service;
@@ -70,10 +74,15 @@ class TemplateEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->templateId === null ? 'provision.create' : 'provision.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'vendor' => $this->vendor,
             'model' => $this->model ?: null,
@@ -83,6 +92,7 @@ class TemplateEdit extends BaseEditComponent
 
         if ($this->templateId !== null) {
             $t = ProvisionTemplate::withoutGlobalScope('tenant')->findOrFail($this->templateId);
+            $this->assertCanAccessTenantRecord($t);
             $this->service->updateTemplate($t, $data);
         } else {
             $this->service->createTemplate($data);
@@ -96,13 +106,18 @@ class TemplateEdit extends BaseEditComponent
      */
     public function rules(): array
     {
-        return [
-            'tenantId' => ['required', 'integer', 'exists:tenants,id'],
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'vendor' => ['required', 'string', 'max:255'],
             'model' => ['nullable', 'string', 'max:255'],
-            'filePath' => ['required', 'string', 'max:255'],
+            'filePath' => ['required', 'string', 'max:255', 'regex:'.ProvisionService::TEMPLATE_PATH_PATTERN],
             'enabled' => ['boolean'],
         ];
+
+        if ($this->isAdminGuard()) {
+            $rules['tenantId'] = ['required', 'integer', 'exists:tenants,id'];
+        }
+
+        return $rules;
     }
 }

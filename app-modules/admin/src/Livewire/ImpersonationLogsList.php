@@ -38,6 +38,28 @@ class ImpersonationLogsList extends Component
     public string $actionFilter = '';
 
     /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $impersonateGroup = [['admin.impersonate']];
+
+        return [
+            '' => $impersonateGroup,
+            'resetFilters' => $impersonateGroup,
+            'queryStringHandlesPagination' => $impersonateGroup,
+            'getPage' => $impersonateGroup,
+            'previousPage' => $impersonateGroup,
+            'nextPage' => $impersonateGroup,
+            'gotoPage' => $impersonateGroup,
+            'resetPage' => $impersonateGroup,
+            'setPage' => $impersonateGroup,
+        ];
+    }
+
+    /**
      * Ensure the authenticated user has permission to view audit logs.
      */
     public function mount(): void

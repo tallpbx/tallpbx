@@ -15,7 +15,7 @@ use function Pest\Laravel\actingAs;
 
 describe('Component Interactions', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['call-centers.view', 'call-centers.create', 'call-centers.edit', 'call-centers.delete']);
     });
 
     it('renders the queue list component', function () {

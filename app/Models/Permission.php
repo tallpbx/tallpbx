@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\PermissionService;
 use Database\Factories\PermissionFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -34,6 +35,24 @@ class Permission extends Model
         'module',
         'description',
     ];
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            if (app()->bound(PermissionService::class)) {
+                app(PermissionService::class)->clearMemoization();
+            }
+        });
+
+        static::deleted(function () {
+            if (app()->bound(PermissionService::class)) {
+                app(PermissionService::class)->clearMemoization();
+            }
+        });
+    }
 
     /**
      * Groups that have this permission.

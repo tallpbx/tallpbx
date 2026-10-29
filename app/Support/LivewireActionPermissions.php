@@ -64,14 +64,14 @@ class LivewireActionPermissions
         $module = $this->moduleSlug($componentClass);
 
         if ($module === null) {
-            return [];
+            return [['__unmapped_deny__']];
         }
 
-        // Form submissions on edit forms create or update records, so the
-        // actor needs whichever of the two write permissions the module has.
-        if ($action === 'save' && str_ends_with($componentClass, 'Edit')) {
+        // Form submissions on edit, create, or settings forms create or update
+        // records, so the actor needs whichever write permission the module has.
+        if (str_starts_with($action, 'save') && (str_ends_with($componentClass, 'Edit') || str_ends_with($componentClass, 'Create') || str_ends_with($componentClass, 'Settings'))) {
             $candidates = array_values(array_filter(
-                [$module.'.edit', $module.'.create'],
+                [$module.'.edit', $module.'.update', $module.'.create', $module.'.manage'],
                 fn (string $ability): bool => $this->isRegistered($ability),
             ));
 
@@ -97,10 +97,10 @@ class LivewireActionPermissions
     }
 
     /**
-     * Build the fallback ability group that only requires module viewing.
+     * Build the fallback ability group that requires module viewing.
      *
-     * Returns an empty list when the module declares no view permission so
-     * modules without matching permissions are left unchanged.
+     * Returns fail-closed sentinel [['__unmapped_deny__']] when the module
+     * declares no view permission.
      *
      * @return array<int, array<int, string>>
      */
@@ -108,7 +108,7 @@ class LivewireActionPermissions
     {
         $view = $module.'.view';
 
-        return $this->isRegistered($view) ? [[$view]] : [];
+        return $this->isRegistered($view) ? [[$view]] : [['__unmapped_deny__']];
     }
 
     /**

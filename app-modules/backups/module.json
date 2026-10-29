@@ -13,6 +13,7 @@
     "required": true,
     "priority": 40,
     "requirements": {
+        "php": ">=8.5",
         "modules": [
             "file-stores"
         ]

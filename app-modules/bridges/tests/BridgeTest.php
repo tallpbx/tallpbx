@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\Bridges\Livewire\BridgesEdit;
@@ -10,7 +9,7 @@ use Modules\Bridges\Livewire\BridgesList;
 use Modules\Bridges\Models\Bridge;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['bridges.view', 'bridges.create', 'bridges.edit', 'bridges.delete']);
 });
 
 it('renders the bridges list component', function () {

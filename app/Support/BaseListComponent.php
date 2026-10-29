@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Services\ImpersonationServiceInterface;
 use App\Services\TenantManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
@@ -31,8 +29,7 @@ abstract class BaseListComponent extends Component
      */
     protected function isAdminGuard(): bool
     {
-        return Auth::guard('admin')->check()
-            && ! app(ImpersonationServiceInterface::class)->isImpersonating();
+        return PanelActor::isAdmin();
     }
 
     /**

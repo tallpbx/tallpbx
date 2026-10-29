@@ -21,7 +21,7 @@ use function Pest\Laravel\actingAs;
 
 describe('List Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['extensions.view', 'extensions.create', 'extensions.edit', 'extensions.delete']);
     });
 
     it('renders the extensions list component', function () {
@@ -135,7 +135,7 @@ describe('List Component', function () {
 
 describe('Edit Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['extensions.view', 'extensions.create', 'extensions.edit', 'extensions.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 
@@ -382,7 +382,7 @@ describe('Edit Component', function () {
 
 describe('Bulk Create Component', function () {
     beforeEach(function () {
-        $this->admin = Admin::factory()->create(['enabled' => true]);
+        $this->admin = grantAdminPermissions(permissions: ['extensions.view', 'extensions.create', 'extensions.edit', 'extensions.delete']);
         $this->tenant = Tenant::factory()->create();
     });
 

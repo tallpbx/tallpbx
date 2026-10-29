@@ -6,6 +6,8 @@ namespace Modules\CallForwards\Livewire;
 
 use App\Jobs\ReloadFreeSwitchXml;
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\CallForwards\Models\CallForward;
 use Modules\CallForwards\Services\CallForwardServiceInterface;
 
@@ -24,6 +26,7 @@ class CallForwardsEdit extends BaseEditComponent
 
     public int $ringTimeout = 30;
 
+    #[Locked]
     public ?string $forwardId = null;
 
     private CallForwardServiceInterface $callForwardService;
@@ -73,6 +76,11 @@ class CallForwardsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->forwardId === null ? 'call-forwards.create' : 'call-forwards.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -86,6 +94,7 @@ class CallForwardsEdit extends BaseEditComponent
 
         if ($this->forwardId !== null) {
             $forward = CallForward::withoutGlobalScope('tenant')->findOrFail($this->forwardId);
+            $this->assertCanAccessTenantRecord($forward);
             $this->callForwardService->update($forward, $data);
         } else {
             $this->callForwardService->create($data);

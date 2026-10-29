@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\FollowMe\Livewire\FollowMeEdit;
@@ -10,7 +9,7 @@ use Modules\FollowMe\Livewire\FollowMeList;
 use Modules\FollowMe\Models\FollowMe;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['follow-me.view', 'follow-me.create', 'follow-me.edit', 'follow-me.delete']);
 });
 
 it('renders the follow me list component', function () {

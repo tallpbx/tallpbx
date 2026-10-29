@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\EmailTemplates\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\EmailTemplates\Models\EmailTemplate;
 use Modules\EmailTemplates\Services\EmailTemplateService;
 
@@ -21,6 +23,7 @@ class EmailTemplatesEdit extends BaseEditComponent
 
     public string $body = '';
 
+    #[Locked]
     public ?string $templateId = null;
 
     private EmailTemplateService $templateService;
@@ -69,6 +72,11 @@ class EmailTemplatesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->templateId === null ? 'email-templates.create' : 'email-templates.edit'), 403);
+
+        }
         $this->validate();
 
         $data = [
@@ -80,6 +88,7 @@ class EmailTemplatesEdit extends BaseEditComponent
 
         if ($this->isEdit) {
             $template = EmailTemplate::withoutGlobalScope('tenant')->findOrFail($this->templateId);
+            $this->assertCanAccessTenantRecord($template);
             $this->templateService->update($template, $data);
         } else {
             $this->templateService->create($data);

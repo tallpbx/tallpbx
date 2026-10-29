@@ -7,10 +7,12 @@ namespace Modules\Admin\Livewire;
 use App\Models\Setting;
 use App\Services\SettingServiceInterface;
 use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
 
@@ -43,6 +45,7 @@ class SettingsEdit extends Component
     public string $newType = 'string';
 
     // Edit form
+    #[Locked]
     public ?int $editingId = null;
 
     public string $editKey = '';
@@ -52,6 +55,28 @@ class SettingsEdit extends Component
     public string $editType = 'string';
 
     private SettingServiceInterface $settingService;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.settings.view']];
+
+        return [
+            '' => $viewGroup,
+            'createSetting' => [['admin.settings.update']],
+            'editSetting' => $viewGroup,
+            'saveSetting' => [['admin.settings.update']],
+            'cancelEdit' => $viewGroup,
+            'confirmSettingDeletion' => $viewGroup,
+            'cancelSettingDeletion' => $viewGroup,
+            'deleteSetting' => [['admin.settings.delete']],
+            'dismissFeedback' => $viewGroup,
+        ];
+    }
 
     /**
      * Inject the settings service used by this component.
@@ -82,6 +107,8 @@ class SettingsEdit extends Component
      */
     public function createSetting(): void
     {
+        abort_unless(PanelActor::can('admin.settings.update'), 403);
+
         $validated = $this->validate([
             'newKey' => ['required', 'string', 'max:255', Rule::unique('settings', 'key')],
             'newValue' => ['required', 'string'],
@@ -118,6 +145,8 @@ class SettingsEdit extends Component
      */
     public function saveSetting(): void
     {
+        abort_unless(PanelActor::can('admin.settings.update'), 403);
+
         $this->validate([
             'editValue' => ['required', 'string'],
         ]);
@@ -162,6 +191,8 @@ class SettingsEdit extends Component
     /** Delete the setting that the user confirmed, keeping expected failures in the modal. */
     public function deleteSetting(): void
     {
+        abort_unless(PanelActor::can('admin.settings.delete'), 403);
+
         if ($this->pendingDeletionId === null) {
             return;
         }

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Livewire\Livewire;
 use Modules\CallFlows\Livewire\CallFlowsEdit;
@@ -10,7 +9,7 @@ use Modules\CallFlows\Livewire\CallFlowsList;
 use Modules\CallFlows\Models\CallFlow;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['call-flows.view', 'call-flows.create', 'call-flows.edit', 'call-flows.delete']);
 });
 
 it('renders the call flows list component', function () {

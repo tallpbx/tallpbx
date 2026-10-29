@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\XmlCdr\Livewire;
 
-use App\Services\ImpersonationServiceInterface;
 use App\Services\TenantManager;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Modules\XmlCdr\Models\Cdr;
@@ -48,7 +47,6 @@ class CdrDetail extends Component
      */
     protected function isAdminGuard(): bool
     {
-        return Auth::guard('admin')->check()
-            && ! app(ImpersonationServiceInterface::class)->isImpersonating();
+        return PanelActor::isAdmin();
     }
 }

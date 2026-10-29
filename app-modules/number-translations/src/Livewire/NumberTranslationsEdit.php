@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\NumberTranslations\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
+use Livewire\Attributes\Locked;
 use Modules\NumberTranslations\Models\NumberTranslation;
 use Modules\NumberTranslations\Services\NumberTranslationServiceInterface;
 
@@ -23,6 +25,7 @@ class NumberTranslationsEdit extends BaseEditComponent
 
     public int $order = 0;
 
+    #[Locked]
     public ?string $translationId = null;
 
     private NumberTranslationServiceInterface $service;
@@ -74,6 +77,11 @@ class NumberTranslationsEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->translationId === null ? 'number-translations.create' : 'number-translations.edit'), 403);
+
+        }
         $this->validate();
 
         // Admins choose the tenant from the dropdown; tenant users are

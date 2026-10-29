@@ -7,10 +7,12 @@ namespace Modules\Admin\Livewire;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantServiceInterface;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Rule as LivewireRule;
 use Livewire\Component;
 
@@ -34,12 +36,27 @@ class TenantsEdit extends Component
 
     public ?int $primaryUserId = null;
 
+    #[Locked]
     public ?int $tenantId = null;
 
     /** @var Collection<int, User> */
     public Collection $users;
 
     private TenantServiceInterface $tenantService;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        return [
+            '' => [['admin.tenants.view']],
+            'save' => [['admin.tenants.create', 'admin.tenants.update']],
+            'getIsEditProperty' => [['admin.tenants.view']],
+        ];
+    }
 
     /**
      * Inject the tenant service used for tenant lookups and saves.
@@ -79,6 +96,8 @@ class TenantsEdit extends Component
      */
     public function save(): void
     {
+        abort_unless(PanelActor::can($this->tenantId === null ? 'admin.tenants.create' : 'admin.tenants.update'), 403);
+
         $this->validate($this->rules());
 
         $data = [

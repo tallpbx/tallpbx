@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Services\ImpersonationServiceInterface;
 use App\Services\TenantManager;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -42,8 +41,7 @@ class TenantMutationGuard
 
         // A real administrator (not impersonating) works system-wide and is
         // allowed to touch records of any tenant.
-        if (Auth::guard('admin')->check()
-            && ! app(ImpersonationServiceInterface::class)->isImpersonating()) {
+        if (PanelActor::isAdmin()) {
             return;
         }
 

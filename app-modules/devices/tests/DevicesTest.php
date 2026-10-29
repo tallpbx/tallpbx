@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Admin;
 use App\Models\Tenant;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -13,7 +12,7 @@ use Modules\Devices\Services\DeviceService;
 use Modules\SipAccounts\Models\SipAccount;
 
 beforeEach(function () {
-    $this->admin = Admin::factory()->create(['enabled' => true]);
+    $this->admin = grantAdminPermissions(permissions: ['devices.view', 'devices.create', 'devices.edit', 'devices.delete']);
     $this->tenant = Tenant::factory()->create();
 });
 

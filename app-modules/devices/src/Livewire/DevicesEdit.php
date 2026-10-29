@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Devices\Livewire;
 
 use App\Support\BaseEditComponent;
+use App\Support\PanelActor;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Modules\Devices\Models\Device;
 use Modules\Devices\Services\DeviceServiceInterface;
 use Modules\SipAccounts\Models\SipAccount;
@@ -30,6 +32,7 @@ class DevicesEdit extends BaseEditComponent
     /** @var Collection<int, SipAccount> */
     public Collection $sipAccounts;
 
+    #[Locked]
     public ?string $deviceId = null;
 
     private DeviceServiceInterface $deviceService;
@@ -102,6 +105,11 @@ class DevicesEdit extends BaseEditComponent
      */
     public function save(): void
     {
+        if ($this->isAdminGuard()) {
+
+            abort_unless(PanelActor::can($this->deviceId === null ? 'devices.create' : 'devices.edit'), 403);
+
+        }
         $this->validate($this->rules());
 
         // Admins choose the tenant from the dropdown; tenant users are

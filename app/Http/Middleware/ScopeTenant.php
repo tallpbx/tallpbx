@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use App\Services\TenantContext;
+use App\Support\PanelActor;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -49,12 +51,14 @@ class ScopeTenant
      */
     protected function verifyTenantAccess(Request $request, string $tenantId): bool
     {
-        if (Auth::guard('admin')->check()) {
+        if (PanelActor::isAdmin()) {
             return true;
         }
 
-        if (Auth::guard('web')->check()) {
-            return Auth::guard('web')->user()->isInTenant((int) $tenantId);
+        $actor = PanelActor::resolve();
+
+        if ($actor instanceof User) {
+            return $actor->isInTenant((int) $tenantId);
         }
 
         return false;

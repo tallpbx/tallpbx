@@ -251,11 +251,15 @@ class ModuleServiceProvider extends ServiceProvider
             'admin.notifications.view' => 'View notifications',
             'admin.notifications.delete' => 'Delete notifications',
             'admin.settings.view' => 'View application settings',
+            'admin.settings.update' => 'Create and edit application settings',
+            'admin.settings.delete' => 'Delete application settings',
             'admin.modules.view' => 'View installed modules',
             'admin.modules.manage' => 'Manage and uninstall modules',
             'admin.monitoring.view' => 'View monitoring dashboard',
             'admin.queue.view' => 'View queue status',
-            'admin.git-update.view' => 'View and trigger git updates',
+            'admin.queue.retry' => 'Retry failed queue jobs',
+            'admin.git-update.view' => 'View git update status',
+            'admin.git-update.execute' => 'Fetch remote refs and execute git updates',
         ]);
     }
 }

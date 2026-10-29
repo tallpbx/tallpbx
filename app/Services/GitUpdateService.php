@@ -275,7 +275,7 @@ class GitUpdateService
      * Run the full update pipeline for a target branch or tag.
      *
      * Preflight (clean tree, lockfiles, valid target) → pull (--ff-only) →
-     * composer install → migrate → npm ci + build → permissions repair →
+     * composer install → migrate → permissions sync → npm ci + build → permissions repair →
      * optimize clear. Each step is logged in real time to the progress log.
      * Failure after the pull triggers the code+assets rollback.
      * An atomic lock prevents concurrent pipelines.
@@ -451,6 +451,7 @@ class GitUpdateService
         $sequence = [
             'Composer install' => 'composer install --no-interaction --prefer-dist',
             'Migrate' => $this->artisanCommand('migrate --force'),
+            'Sync permissions' => $this->artisanCommand('permissions:sync'),
             'NPM install' => 'npm ci --ignore-scripts',
             'NPM build' => 'npm run build',
             'Repair permissions' => $this->artisanCommand('permissions:repair --scope='.$permissionsScope),

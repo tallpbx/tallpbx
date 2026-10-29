@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\EmailConnector\Livewire;
 
 use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\PanelActor;
 use Livewire\Component;
 use Modules\EmailConnector\Services\EmailConnectorServiceInterface;
 
@@ -135,6 +136,8 @@ class EmailConnectorEdit extends Component
      */
     public function save(): void
     {
+        abort_unless(PanelActor::can('email-connector.edit') || PanelActor::can('email-connector.update'), 403);
+
         $this->validate($this->rules());
 
         $data = [

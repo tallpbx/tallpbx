@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Modules\Admin\Livewire;
 
 use App\Support\OperationalControlFeedback;
+use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -34,6 +34,23 @@ class QueueStatus extends Component
     public array $recentFailures = [];
 
     public ?string $retryResult = null;
+
+    /**
+     * Map actions on this component to required ability groups.
+     *
+     * @return array<string, array<int, array<int, string>>>
+     */
+    public static function livewireActionAbilities(): array
+    {
+        $viewGroup = [['admin.queue.view']];
+
+        return [
+            '' => $viewGroup,
+            'refresh' => $viewGroup,
+            'retry' => [['admin.queue.retry']],
+            'retryAll' => [['admin.queue.retry']],
+        ];
+    }
 
     /**
      * Load the current queue statistics when the page opens.
@@ -126,13 +143,11 @@ class QueueStatus extends Component
     }
 
     /**
-     * Only admins holding the queue view permission may retry jobs.
+     * Only admins holding the queue retry permission may retry jobs.
      */
     private function authorizeRetry(): bool
     {
-        $admin = Auth::guard('admin')->user();
-
-        return $admin !== null && $admin->hasPermission('admin.queue.view');
+        return PanelActor::can('admin.queue.retry');
     }
 
     /**
