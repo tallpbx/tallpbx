@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Services\MenuService;
-use App\Services\ModuleCollisionGuard;
+use App\Services\Modules\ModulePermissionRegistrar;
+use App\Services\Modules\ModuleRouteRegistrar;
 use App\Services\ModuleState;
 use App\Services\PermissionService;
-use Illuminate\Contracts\Foundation\CachesRoutes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -533,36 +532,12 @@ abstract class ModuleServiceProvider extends ServiceProvider
      */
     private function registerRoutes(): void
     {
-        $routesPath = $this->modulePath().'/routes/web.php';
-
-        if (! file_exists($routesPath)) {
-            return;
-        }
-
-        $isCustom = $this->moduleSource() === 'custom';
-
-        // With cached routes the router holds a compiled collection that
-        // never loads this file anyway (loadRoutesFrom is a no-op), so
-        // there is no snapshot to take and no audit to run.
-        $routesCached = $this->app instanceof CachesRoutes
-            && $this->app->routesAreCached();
-
-        // Snapshot the router before a custom module loads its route file
-        // so the post-load audit can identify and undo anything it hijacked.
-        $snapshot = ($isCustom && ! $routesCached) ? Route::getRoutes()->getRoutes() : [];
-
-        // Static pre-flight (§1.7.2) stays as the cheap first line of
-        // defense; the post-load router audit catches every registration
-        // style it cannot see statically.
-        if ($isCustom && ! $this->assertRouteFileIsSafe($routesPath)) {
-            return;
-        }
-
-        $this->loadRoutesFrom($routesPath);
-
-        if ($isCustom && ! $routesCached) {
-            (new ModuleCollisionGuard)->enforceRouteBoundaries($snapshot);
-        }
+        (new ModuleRouteRegistrar)->registerForModule(
+            $this->moduleName(),
+            $this->modulePath(),
+            $this->moduleSource(),
+            fn (string $path) => $this->loadRoutesFrom($path),
+        );
     }
 
     /**
@@ -573,22 +548,7 @@ abstract class ModuleServiceProvider extends ServiceProvider
      */
     private function assertRouteFileIsSafe(string $routesPath): bool
     {
-        $guard = new ModuleCollisionGuard;
-        $registeredNames = [];
-
-        foreach (Route::getRoutes()->getRoutes() as $route) {
-            if (($name = $route->getName()) !== null) {
-                $registeredNames[] = $name;
-            }
-        }
-
-        return $guard->assertNoRouteCollision(
-            $guard->extractRouteDescriptors($routesPath),
-            [
-                'uris' => ModuleCollisionGuard::RESERVED_PANEL_URIS,
-                'names' => $registeredNames,
-            ],
-        );
+        return (new ModuleRouteRegistrar)->assertRouteFileIsSafe($routesPath);
     }
 
     /**
@@ -634,10 +594,9 @@ abstract class ModuleServiceProvider extends ServiceProvider
      */
     private function registerPermissions(PermissionService $permission): void
     {
-        $perms = $this->permissions();
-
-        if ($perms !== []) {
-            $permission->register($this->moduleName(), $perms);
-        }
+        (new ModulePermissionRegistrar($permission))->registerForModule(
+            $this->moduleName(),
+            $this->permissions(),
+        );
     }
 }

@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Contracts\ModuleUninstaller;
 use App\Models\Module;
 use App\Models\Permission;
+use App\Services\Modules\ModuleProtectionPolicy;
 use Closure;
 use Database\Seeders\AdminSeeder;
 use Illuminate\Contracts\Foundation\Application;
@@ -536,7 +537,7 @@ class ModuleLifecycleService
      */
     public function isProtected(array $manifest): bool
     {
-        return ($manifest['protected'] ?? false) || ($manifest['required'] ?? false);
+        return (new ModuleProtectionPolicy)->isProtected($manifest);
     }
 
     /**

@@ -1204,25 +1204,25 @@ git commit -m "feat(realtime): add push-compliant WebSocket disconnect banner an
     - `public function isAllowedTag(string $tag, array $allowlist): bool`
     - `public function toString(): string`
 
-- [ ] **Step 1: Write unit tests in `tests/Unit/Support/XmlWriterTest.php`**
+- [x] **Step 1: Write unit tests in `tests/Unit/Support/XmlWriterTest.php`**
 
 Verify `ENT_XML1 | ENT_QUOTES` escaping of `<`, `>`, `&`, `"`, `'`, null/empty attribute omission, indentation, and tag allowlist rejection of invalid element names.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Unit/Support/XmlWriterTest.php`
 Expected: FAIL (`Class "App\Support\Xml\XmlWriter" not found`).
 
-- [ ] **Step 3: Implement `XmlWriter` and refactor `DialplanXmlBuilder` & `DirectoryXmlBuilder` to use it**
+- [x] **Step 3: Implement `XmlWriter` and refactor `DialplanXmlBuilder` & `DirectoryXmlBuilder` to use it**
 
 Ensure byte-for-byte identical FreeSWITCH XML output on all existing dialplan and directory feature tests.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Unit/Support/XmlWriterTest.php tests/Feature/XmlHandler* tests/Feature/Pbx/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Support/Xml/XmlWriter.php app/Services/Xml/DialplanXmlBuilder.php app/Services/Xml/DirectoryXmlBuilder.php tests/Unit/Support/XmlWriterTest.php
@@ -1253,25 +1253,25 @@ git commit -m "refactor(xml): extract shared XmlWriter across DialplanXmlBuilder
   - `ModuleRouteRegistrar::registerForModule(string $moduleName, string $modulePath): void` (owning route-collision detection)
   - `ModulePermissionRegistrar::registerForModule(string $moduleName, array $permissions): void`
 
-- [ ] **Step 1: Write unit/feature tests for the 4 extracted classes in `tests/Feature/Services/ModuleCollaboratorsTest.php`**
+- [x] **Step 1: Write unit/feature tests for the 4 extracted classes in `tests/Feature/Services/ModuleCollaboratorsTest.php`**
 
 Cover manifest discovery, route-name collision guard, translation collision guard preservation, and `ModuleProtectionPolicy::isProtected()` returning `true` whenever `protected: true` OR `required: true`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Services/ModuleCollaboratorsTest.php`
 Expected: FAIL (collaborator classes do not exist yet).
 
-- [ ] **Step 3: Extract the 4 focused collaborators and delegate from both module providers**
+- [x] **Step 3: Extract the 4 focused collaborators and delegate from both module providers**
 
 Preserve every existing public/protected method signature on `App\Support\ModuleServiceProvider` — including the static `clearRootTranslationKeysCache()` and `clearModuleTranslationKeysCache()` that `tests/Feature/Architecture/TranslationParityTest.php:10-20` calls, and the overridable hooks (`moduleName()`, `moduleNamespace()`, `menuItems()`, `permissions()`, `listeners()`, `consoleCommands()`) that every one of the 60 module providers implements. Preserve the public API of `App\Providers\ModuleServiceProvider` and `ModuleLifecycleService` as well. Move code; do not redesign signatures — every module's `ModuleServiceProvider` subclass must keep booting unmodified.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Services/ModuleCollaboratorsTest.php tests/Feature/Services/ModuleLifecycleServiceTest.php tests/Feature/Commands/ModuleLifecycleCommandsTest.php tests/Feature/Architecture/TranslationParityTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Services/Modules/ app/Providers/ModuleServiceProvider.php app/Support/ModuleServiceProvider.php app/Services/ModuleLifecycleService.php tests/Feature/Services/ModuleCollaboratorsTest.php
@@ -1295,25 +1295,25 @@ git commit -m "refactor(modules): decompose ModuleServiceProvider and ModuleLife
   - `<x-tabs :tabs="$tabs" :active="$activeTab" wire-method="setTab" />` with accessible `role="tablist"` / `role="tab"` / `aria-selected`.
   - Architecture assertion that every top-level Blade template under `app-modules/*/resources/views/` is `<= 300` lines.
 
-- [ ] **Step 1: Add failing `<= 300` line-count check and `<x-tabs>` render test in `UiArchitectureTest.php`**
+- [x] **Step 1: Add failing `<= 300` line-count check and `<x-tabs>` render test in `UiArchitectureTest.php`**
 
 Assert `Blade::render('<x-tabs :tabs="[\'general\' => \'General\']" active="general" wire-method="setTab" />')` renders `role="tablist"`, `role="tab"`, and `aria-selected="true"`, and assert every top-level `.blade.php` file directly under `app-modules/*/resources/views/` and `app-modules/*/resources/views/tabs/` has `<= 300` lines.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: FAIL (6 Blade files exceed 300 lines).
 
-- [ ] **Step 3: Create `<x-tabs>` and extract cohesive sub-partials from the 6 oversized views**
+- [x] **Step 3: Create `<x-tabs>` and extract cohesive sub-partials from the 6 oversized views**
 
 Keep Livewire `wire:key` and parent component property bindings intact (`@include('...::partials....')`) so zero Livewire snapshot or event boundaries change.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php app-modules/security/tests/ app-modules/certificates/tests/ tests/Feature/Livewire/GitUpdateTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add resources/views/components/tabs.blade.php app-modules/ tests/Feature/Architecture/UiArchitectureTest.php

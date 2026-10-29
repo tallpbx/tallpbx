@@ -7,6 +7,7 @@ namespace App\Services\Xml;
 use App\Services\TenantManager;
 use App\Support\Concerns\EscapesXml;
 use App\Support\RoutingCacheVersion;
+use App\Support\Xml\XmlWriter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Modules\Extensions\Models\Extension;
@@ -51,20 +52,21 @@ class DirectoryXmlBuilder
      */
     private function buildDirectoryXml(string $tagName, string $domain, string $username, string $keyValue): string
     {
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $xml .= '<document type="freeswitch/xml">'."\n";
+        $writer = new XmlWriter;
+        $writer->startDocument();
+        $writer->openTag('document', ['type' => 'freeswitch/xml']);
 
         $tenantId = $this->tenantManager->getTenantId();
 
         if ($tagName === 'domain') {
-            $xml .= '  <section name="directory">'."\n";
-            $xml .= '    <domain name="'.$this->escapeXml($domain).'">'."\n";
-            $xml .= '      <params>'."\n";
-            $xml .= '        <param name="dial-string" value="{presence_id=\${dialed_user}@\${dialed_domain}}\${sofia_contact(\${dialed_user}@\${dialed_domain})}"/>'."\n";
-            $xml .= '      </params>'."\n";
-            $xml .= '      <groups>'."\n";
-            $xml .= '        <group name="default">'."\n";
-            $xml .= '          <users>'."\n";
+            $writer->openTag('section', ['name' => 'directory'], 2);
+            $writer->openTag('domain', ['name' => $domain], 4);
+            $writer->openTag('params', [], 6);
+            $writer->selfClosingTag('param', ['name' => 'dial-string', 'value' => '{presence_id=\${dialed_user}@\${dialed_domain}}\${sofia_contact(\${dialed_user}@\${dialed_domain})}'], 8);
+            $writer->closeTag('params', 6);
+            $writer->openTag('groups', [], 6);
+            $writer->openTag('group', ['name' => 'default'], 8);
+            $writer->openTag('users', [], 10);
 
             if ($tenantId !== null) {
                 /** @var Collection<int, SipAccount> $accounts */
@@ -89,15 +91,15 @@ class DirectoryXmlBuilder
                     : collect();
 
                 foreach ($accounts as $account) {
-                    $xml .= $this->buildUserEntryXml($account, $extensions, $settings);
+                    $writer->rawTrustedFragment($this->buildUserEntryXml($account, $extensions, $settings));
                 }
             }
 
-            $xml .= '          </users>'."\n";
-            $xml .= '        </group>'."\n";
-            $xml .= '      </groups>'."\n";
-            $xml .= '    </domain>'."\n";
-            $xml .= '  </section>'."\n";
+            $writer->closeTag('users', 10);
+            $writer->closeTag('group', 8);
+            $writer->closeTag('groups', 6);
+            $writer->closeTag('domain', 4);
+            $writer->closeTag('section', 2);
         } elseif ($tagName === 'user') {
             $lookupUsername = $username !== '' ? $username : $keyValue;
             $found = false;
@@ -112,26 +114,26 @@ class DirectoryXmlBuilder
 
                 if ($account !== null) {
                     $found = true;
-                    $xml .= '  <section name="directory">'."\n";
-                    $xml .= $this->buildUserEntryXml($account);
-                    $xml .= '  </section>'."\n";
+                    $writer->openTag('section', ['name' => 'directory'], 2);
+                    $writer->rawTrustedFragment($this->buildUserEntryXml($account));
+                    $writer->closeTag('section', 2);
                 }
             }
 
             if (! $found) {
-                $xml .= '  <section name="directory">'."\n";
-                $xml .= '    <!-- User not found: '.$this->escapeXml($lookupUsername).' -->'."\n";
-                $xml .= '  </section>'."\n";
+                $writer->openTag('section', ['name' => 'directory'], 2);
+                $writer->comment('User not found: '.$writer->escape($lookupUsername), 4);
+                $writer->closeTag('section', 2);
             }
         } else {
-            $xml .= '  <section name="directory">'."\n";
-            $xml .= '    <'.$this->escapeXml($tagName).' name="'.$this->escapeXml($keyValue).'"/>'."\n";
-            $xml .= '  </section>'."\n";
+            $writer->openTag('section', ['name' => 'directory'], 2);
+            $writer->selfClosingTag($tagName, ['name' => $keyValue], 4);
+            $writer->closeTag('section', 2);
         }
 
-        $xml .= '</document>';
+        $writer->closeTag('document', 0, false);
 
-        return $xml;
+        return $writer->toString();
     }
 
     /**
@@ -193,27 +195,26 @@ class DirectoryXmlBuilder
         ?\Illuminate\Support\Collection $extensions = null,
         ?\Illuminate\Support\Collection $extensionSettings = null
     ): string {
-        $xml = '            <user id="'.$this->escapeXml($account->auth_username).'">'."\n";
-        $xml .= '              <params>'."\n";
-        $xml .= '                <param name="password" value="'.$this->escapeXml($account->auth_password).'"/>'."\n";
+        $writer = new XmlWriter;
+        $writer->openTag('user', ['id' => $account->auth_username], 12);
+        $writer->openTag('params', [], 14);
+        $writer->selfClosingTag('param', ['name' => 'password', 'value' => $account->auth_password], 16);
 
         // mod_voicemail resolves the deposit storage dir from this param on
         // modern builds (and from the variable below on older builds); both
         // point at the tenant's managed voicemail root so deposits stay inside
         // the managed media tree and the listener can register them.
-        $xml .= '                <param name="vm-domain-storage-dir" value="'.$this->escapeXml(
-            rtrim((string) config('media-storage.store_root'), '/').'/runtime/'.$account->tenant_id.'/voicemail-message'
-        ).'"/>'."\n";
-        $xml .= '              </params>'."\n";
-        $xml .= '              <variables>'."\n";
-        $xml .= '                <variable name="user_context" value="'.$this->escapeXml($account->user_context ?? 'default').'"/>'."\n";
-        $xml .= '                <variable name="tenant_id" value="'.$this->escapeXml((string) $account->tenant_id).'"/>'."\n";
-        $xml .= '                <variable name="vm-domain-storage-dir" value="'.$this->escapeXml(
-            rtrim((string) config('media-storage.store_root'), '/').'/runtime/'.$account->tenant_id.'/voicemail-message'
-        ).'"/>'."\n";
+        $vmStorageDir = rtrim((string) config('media-storage.store_root'), '/').'/runtime/'.$account->tenant_id.'/voicemail-message';
+        $writer->selfClosingTag('param', ['name' => 'vm-domain-storage-dir', 'value' => $vmStorageDir], 16);
+        $writer->closeTag('params', 14);
+
+        $writer->openTag('variables', [], 14);
+        $writer->selfClosingTag('variable', ['name' => 'user_context', 'value' => $account->user_context ?? 'default'], 16);
+        $writer->selfClosingTag('variable', ['name' => 'tenant_id', 'value' => (string) $account->tenant_id], 16);
+        $writer->selfClosingTag('variable', ['name' => 'vm-domain-storage-dir', 'value' => $vmStorageDir], 16);
 
         if ($account->extension_id !== null) {
-            $xml .= '                <variable name="extension_id" value="'.$this->escapeXml($account->extension_id).'"/>'."\n";
+            $writer->selfClosingTag('variable', ['name' => 'extension_id', 'value' => $account->extension_id], 16);
 
             /** @var Extension|null $extension */
             $extension = $extensions !== null
@@ -250,13 +251,13 @@ class DirectoryXmlBuilder
             }
 
             foreach ($extensionVars as $key => $val) {
-                $xml .= '                <variable name="'.$this->escapeXml($key).'" value="'.$this->escapeXml((string) $val).'"/>'."\n";
+                $writer->selfClosingTag('variable', ['name' => $key, 'value' => (string) $val], 16);
             }
         }
 
-        $xml .= '              </variables>'."\n";
-        $xml .= '            </user>'."\n";
+        $writer->closeTag('variables', 14);
+        $writer->closeTag('user', 12);
 
-        return $xml;
+        return $writer->toString();
     }
 }

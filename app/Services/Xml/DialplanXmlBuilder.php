@@ -8,6 +8,7 @@ use App\Services\DialplanXmlCollector;
 use App\Services\TenantManager;
 use App\Support\Concerns\EscapesXml;
 use App\Support\RoutingCacheVersion;
+use App\Support\Xml\XmlWriter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -48,9 +49,10 @@ class DialplanXmlBuilder
      */
     private function buildDialplanXml(string $context, string $destination, string $callerId): string
     {
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
-        $xml .= '<document type="freeswitch/xml">'."\n";
-        $xml .= '  <section name="dialplan">'."\n";
+        $writer = new XmlWriter;
+        $writer->startDocument();
+        $writer->openTag('document', ['type' => 'freeswitch/xml']);
+        $writer->openTag('section', ['name' => 'dialplan'], 2);
 
         $tenantId = $this->tenantManager->getTenantId();
         $rewrittenDestination = null;
@@ -74,28 +76,28 @@ class DialplanXmlBuilder
 
             // Always create a context when tenant is resolved — feature
             // contributors may produce XML even without base dialplans.
-            $xml .= '    <context name="'.$this->escapeXml($context).'">'."\n";
+            $writer->openTag('context', ['name' => $context], 4);
 
             // Capture the original caller ID before any auth or routing
             // overwrites it. This is essential for call-block contributors
             // which need the pre-auth From header value. Exported so it
             // survives context transfers (e.g. public → tenant internal).
-            $xml .= '      <extension name="capture_orig_caller" continue="true">'."\n";
-            $xml .= '        <condition>'."\n";
-            $xml .= '          <action application="export" data="orig_caller_id_number=${caller_id_number}"/>'."\n";
-            $xml .= '        </condition>'."\n";
-            $xml .= '      </extension>'."\n";
-            $xml .= "\n";
+            $writer->openTag('extension', ['name' => 'capture_orig_caller', 'continue' => 'true'], 6);
+            $writer->openTag('condition', [], 8);
+            $writer->selfClosingTag('action', ['application' => 'export', 'data' => 'orig_caller_id_number=${caller_id_number}'], 10);
+            $writer->closeTag('condition', 8);
+            $writer->closeTag('extension', 6);
+            $writer->newline();
 
             // The translated destination must be applied before any feature
             // or standard condition evaluates, so it leads the context.
             if ($rewrittenDestination !== null) {
-                $xml .= '      <extension name="translate_destination" continue="true">'."\n";
-                $xml .= '        <condition>'."\n";
-                $xml .= '          <action application="set" data="destination_number='.$this->escapeXml($rewrittenDestination).'"/>'."\n";
-                $xml .= '        </condition>'."\n";
-                $xml .= '      </extension>'."\n";
-                $xml .= "\n";
+                $writer->openTag('extension', ['name' => 'translate_destination', 'continue' => 'true'], 6);
+                $writer->openTag('condition', [], 8);
+                $writer->selfClosingTag('action', ['application' => 'set', 'data' => 'destination_number='.$rewrittenDestination], 10);
+                $writer->closeTag('condition', 8);
+                $writer->closeTag('extension', 6);
+                $writer->newline();
             }
 
             // Feature module contributions MUST come BEFORE standard
@@ -112,17 +114,17 @@ class DialplanXmlBuilder
             $contributorXml = $collected['xml'];
 
             if ($contributorXml !== '') {
-                $xml .= '      <!-- Feature module dialplan contributions -->'."\n";
-                $xml .= $contributorXml;
+                $writer->comment('Feature module dialplan contributions', 6);
+                $writer->rawTrustedFragment($contributorXml);
             }
 
             $standardDialplanXml = $this->buildCachedStandardDialplanXml((int) $tenantId, $context);
 
             if ($contributorXml !== '' && $standardDialplanXml['has_dialplans']) {
-                $xml .= "\n";
+                $writer->newline();
             }
 
-            $xml .= $standardDialplanXml['xml'];
+            $writer->rawTrustedFragment($standardDialplanXml['xml']);
 
             // Default no-route only when neither standard dialplans nor any
             // ROUTING contributor produced rules — never skip contributors
@@ -130,30 +132,30 @@ class DialplanXmlBuilder
             // guard contribution (e.g. SIP scanner detection) make an
             // unrouted call look routed.
             if (! $standardDialplanXml['has_dialplans'] && ! $collected['has_routing_contribution']) {
-                $xml .= '      <extension name="default_not_found">'."\n";
-                $xml .= '        <condition field="destination_number" expression="^(.*)$">'."\n";
-                $xml .= '          <action application="hangup" data="NO_ROUTE_DESTINATION"/>'."\n";
-                $xml .= '        </condition>'."\n";
-                $xml .= '      </extension>'."\n";
+                $writer->openTag('extension', ['name' => 'default_not_found'], 6);
+                $writer->openTag('condition', ['field' => 'destination_number', 'expression' => '^(.*)$'], 8);
+                $writer->selfClosingTag('action', ['application' => 'hangup', 'data' => 'NO_ROUTE_DESTINATION'], 10);
+                $writer->closeTag('condition', 8);
+                $writer->closeTag('extension', 6);
             }
 
-            $xml .= '    </context>'."\n";
+            $writer->closeTag('context', 4);
         } else {
             // No tenant context — return default no-route
-            $xml .= '    <context name="'.$this->escapeXml($context).'">'."\n";
-            $xml .= '      <extension name="default_not_found">'."\n";
-            $xml .= '        <condition field="destination_number" expression="^(.*)$">'."\n";
-            $xml .= '          <action application="log" data="INFO [TallPBX] No route found for \${destination_number} in context='.$this->escapeXml($context).'"/>'."\n";
-            $xml .= '          <action application="hangup" data="NO_ROUTE_DESTINATION"/>'."\n";
-            $xml .= '        </condition>'."\n";
-            $xml .= '      </extension>'."\n";
-            $xml .= '    </context>'."\n";
+            $writer->openTag('context', ['name' => $context], 4);
+            $writer->openTag('extension', ['name' => 'default_not_found'], 6);
+            $writer->openTag('condition', ['field' => 'destination_number', 'expression' => '^(.*)$'], 8);
+            $writer->selfClosingTag('action', ['application' => 'log', 'data' => 'INFO [TallPBX] No route found for \${destination_number} in context='.$context], 10);
+            $writer->selfClosingTag('action', ['application' => 'hangup', 'data' => 'NO_ROUTE_DESTINATION'], 10);
+            $writer->closeTag('condition', 8);
+            $writer->closeTag('extension', 6);
+            $writer->closeTag('context', 4);
         }
 
-        $xml .= '  </section>'."\n";
-        $xml .= '</document>';
+        $writer->closeTag('section', 2);
+        $writer->closeTag('document', 0, false);
 
-        return $xml;
+        return $writer->toString();
     }
 
     /**
@@ -166,7 +168,7 @@ class DialplanXmlBuilder
      */
     private function buildStandardDialplanXml(int $tenantId, string $context): array
     {
-        $xml = '';
+        $writer = new XmlWriter;
 
         // Standard dialplan rules ordered by the 'order' column.
         /** @var Collection<int, Dialplan> $dialplans */
@@ -179,13 +181,17 @@ class DialplanXmlBuilder
             ->get();
 
         foreach ($dialplans as $dialplan) {
-            $xml .= '      <extension name="'.$this->escapeXml($dialplan->name).'"'.$this->dialplanExtensionAttributes($dialplan).'>'."\n";
+            $extAttrs = ['name' => $dialplan->name];
+            if ($this->shouldContinueExtension($dialplan)) {
+                $extAttrs['continue'] = 'true';
+            }
+            $writer->openTag('extension', $extAttrs, 6);
 
             foreach ($dialplan->details as $detail) {
                 // Validate that the detail tag is a known-safe FreeSWITCH
                 // element. Unknown tags are skipped to prevent arbitrary
                 // XML injection from database-backed dialplan records.
-                if (! in_array($detail->tag, config('freeswitch.xml_handler.allowed_dialplan_tags', ['condition', 'action', 'anti-action']), true)) {
+                if (! $writer->isAllowedTag((string) $detail->tag, config('freeswitch.xml_handler.allowed_dialplan_tags', ['condition', 'action', 'anti-action']))) {
                     Log::warning('Dialplan detail has unknown tag, skipping.', [
                         'detail_id' => $detail->id,
                         'tag' => $detail->tag,
@@ -198,31 +204,32 @@ class DialplanXmlBuilder
                     continue;
                 }
 
-                $xml .= $this->optionalHiredisDialplanXml($dialplan, $detail, $tenantId);
+                $writer->rawTrustedFragment($this->optionalHiredisDialplanXml($dialplan, $detail, $tenantId));
 
-                $xml .= '        <'.$this->escapeXml($detail->tag);
+                $detailAttrs = [];
                 if ($detail->field) {
-                    $xml .= ' field="'.$this->escapeXml($detail->field).'"';
+                    $detailAttrs['field'] = $detail->field;
                 }
                 if ($detail->expression) {
-                    $xml .= ' expression="'.$this->escapeXml($detail->expression).'"';
+                    $detailAttrs['expression'] = $detail->expression;
                 }
-                $xml .= '>'."\n";
+
+                $writer->openTag((string) $detail->tag, $detailAttrs, 8);
                 if ($detail->action) {
-                    $xml .= '          <action application="'.$this->escapeXml($detail->action).'"';
+                    $actionAttrs = ['application' => $detail->action];
                     if ($detail->data) {
-                        $xml .= ' data="'.$this->escapeXml($this->dialplanActionData($dialplan, $detail->data)).'"';
+                        $actionAttrs['data'] = $this->dialplanActionData($dialplan, $detail->data);
                     }
-                    $xml .= '/>'."\n";
+                    $writer->selfClosingTag('action', $actionAttrs, 10);
                 }
-                $xml .= '        </'.$this->escapeXml($detail->tag).'>'."\n";
+                $writer->closeTag((string) $detail->tag, 8);
             }
 
-            $xml .= '      </extension>'."\n";
+            $writer->closeTag('extension', 6);
         }
 
         return [
-            'xml' => $xml,
+            'xml' => $writer->toString(),
             'has_dialplans' => $dialplans->isNotEmpty(),
         ];
     }
@@ -240,9 +247,9 @@ class DialplanXmlBuilder
             return '';
         }
 
-        $xml = '';
-        $field = $this->escapeXml((string) $detail->field);
-        $expression = $this->escapeXml((string) $detail->expression);
+        $writer = new XmlWriter;
+        $field = (string) $detail->field;
+        $expression = (string) $detail->expression;
 
         if ((bool) config('freeswitch.xml_handler.hiredis_limit_enabled', false)) {
             $limits = TenantLimit::withoutGlobalScope('tenant')
@@ -257,30 +264,30 @@ class DialplanXmlBuilder
             $emitted = false;
 
             foreach ($limits as $limit) {
-                $data = $this->escapeXml("hiredis default pbx:\${domain_name}:{$limit->resource}:active {$limit->hard_limit}");
-                $xml .= '        <condition field="'.$field.'" expression="'.$expression.'">'."\n";
-                $xml .= '          <action application="limit" data="'.$data.'"/>'."\n";
-                $xml .= '        </condition>'."\n";
+                $data = "hiredis default pbx:\${domain_name}:{$limit->resource}:active {$limit->hard_limit}";
+                $writer->openTag('condition', ['field' => $field, 'expression' => $expression], 8);
+                $writer->selfClosingTag('action', ['application' => 'limit', 'data' => $data], 10);
+                $writer->closeTag('condition', 8);
                 $emitted = true;
             }
 
             if (! $emitted || $limits->where('resource', 'local_extension')->isEmpty()) {
                 $max = max(1, (int) config('freeswitch.xml_handler.hiredis_limit_max', 100000));
-                $data = $this->escapeXml("hiredis default pbx:\${domain_name}:local_extension:active {$max}");
-                $xml .= '        <condition field="'.$field.'" expression="'.$expression.'">'."\n";
-                $xml .= '          <action application="limit" data="'.$data.'"/>'."\n";
-                $xml .= '        </condition>'."\n";
+                $data = "hiredis default pbx:\${domain_name}:local_extension:active {$max}";
+                $writer->openTag('condition', ['field' => $field, 'expression' => $expression], 8);
+                $writer->selfClosingTag('action', ['application' => 'limit', 'data' => $data], 10);
+                $writer->closeTag('condition', 8);
             }
         }
 
         if ((bool) config('freeswitch.xml_handler.hiredis_marker_enabled', false)) {
-            $data = $this->escapeXml('default set pbx:mod_hiredis:last_call:${uuid} ${caller_id_number}->${destination_number}');
-            $xml .= '        <condition field="'.$field.'" expression="'.$expression.'">'."\n";
-            $xml .= '          <action application="hiredis_raw" data="'.$data.'"/>'."\n";
-            $xml .= '        </condition>'."\n";
+            $data = 'default set pbx:mod_hiredis:last_call:${uuid} ${caller_id_number}->${destination_number}';
+            $writer->openTag('condition', ['field' => $field, 'expression' => $expression], 8);
+            $writer->selfClosingTag('action', ['application' => 'hiredis_raw', 'data' => $data], 10);
+            $writer->closeTag('condition', 8);
         }
 
-        return $xml;
+        return $writer->toString();
     }
 
     /**
@@ -300,16 +307,20 @@ class DialplanXmlBuilder
      */
     private function dialplanExtensionAttributes(Dialplan $dialplan): string
     {
+        return $this->shouldContinueExtension($dialplan) ? ' continue="true"' : '';
+    }
+
+    /**
+     * Determine if an extension should have continue="true".
+     */
+    private function shouldContinueExtension(Dialplan $dialplan): bool
+    {
         $actions = $dialplan->details
             ->pluck('action')
             ->filter()
             ->unique();
 
-        if ($actions->isNotEmpty() && $actions->every(fn (string $action): bool => in_array($action, ['export', 'set'], true))) {
-            return ' continue="true"';
-        }
-
-        return '';
+        return $actions->isNotEmpty() && $actions->every(fn (string $action): bool => in_array($action, ['export', 'set'], true));
     }
 
     /**

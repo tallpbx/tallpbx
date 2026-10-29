@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\MessageBag;
 use Illuminate\Support\ViewErrorBag;
@@ -390,6 +391,10 @@ it('restricts checkbox classes exclusively to the multi-select allowlist', funct
         'app-modules/admin/resources/views/users-edit.blade.php',
         'app-modules/admin/resources/views/admins-edit.blade.php',
         'app-modules/certificates/resources/views/certificate-manager.blade.php',
+        'app-modules/certificates/resources/views/partials/tab-selfsigned.blade.php',
+        'app-modules/certificates/resources/views/partials/tab-import.blade.php',
+        'app-modules/certificates/resources/views/partials/tab-letsencrypt.blade.php',
+        'app-modules/certificates/resources/views/partials/certificate-modals.blade.php',
         'app-modules/extensions/resources/views/extensions-bulk-create.blade.php',
         'app-modules/admin/resources/views/auth/admin-login.blade.php',
         'app-modules/tenant/resources/views/auth/tenant-login.blade.php',
@@ -608,11 +613,20 @@ it('enforces secondary helper text scale and restricts text-xs opacity modifiers
 
     $allowedExceptions = [
         'app-modules/security/resources/views/tabs/firewall-rules.blade.php',
+        'app-modules/security/resources/views/tabs/partials/firewall-prefilters.blade.php',
+        'app-modules/security/resources/views/tabs/partials/firewall-services.blade.php',
+        'app-modules/security/resources/views/tabs/partials/firewall-custom-rules.blade.php',
         'app-modules/security/resources/views/tabs/block-allow.blade.php',
+        'app-modules/security/resources/views/tabs/partials/whitelist-section.blade.php',
+        'app-modules/security/resources/views/tabs/partials/blacklist-section.blade.php',
         'app-modules/security/resources/views/tabs/attackers.blade.php',
+        'app-modules/security/resources/views/tabs/partials/banned-attackers-section.blade.php',
+        'app-modules/security/resources/views/tabs/partials/sip-scanner-section.blade.php',
         'app-modules/security/resources/views/tabs/geo-blocking.blade.php',
         'app-modules/security/resources/views/drawers/observe-activity.blade.php',
         'app-modules/certificates/resources/views/certificate-manager.blade.php',
+        'app-modules/certificates/resources/views/partials/tab-inventory.blade.php',
+        'app-modules/certificates/resources/views/partials/tab-logs.blade.php',
         'app-modules/admin/resources/views/permissions-list.blade.php',
         'app-modules/admin/resources/views/admins-list.blade.php',
         'app-modules/admin/resources/views/groups-edit.blade.php',
@@ -620,8 +634,10 @@ it('enforces secondary helper text scale and restricts text-xs opacity modifiers
         'app-modules/admin/resources/views/notifications-list.blade.php',
         'app-modules/admin/resources/views/modules-list.blade.php',
         'app-modules/admin/resources/views/git-update.blade.php',
+        'app-modules/admin/resources/views/partials/git-channels.blade.php',
         'app-modules/feature-codes/resources/views/feature-codes-list.blade.php',
         'app-modules/email-connector/resources/views/email-connector-edit.blade.php',
+        'app-modules/email-connector/resources/views/partials/oauth-section.blade.php',
         'resources/views/pages/home.blade.php',
         'resources/views/errors/500.blade.php',
         'resources/views/layouts/app.blade.php',
@@ -674,11 +690,15 @@ it('forbids w-2 h-2 and w-8 h-8 sizes and confines w-3 h-3 and w-6 h-6 to explic
     $w3Allowlist = [
         'app-modules/security/resources/views/partials/status-overview-cards.blade.php',
         'app-modules/security/resources/views/tabs/firewall-rules.blade.php',
+        'app-modules/security/resources/views/tabs/partials/firewall-services.blade.php',
         'app-modules/security/resources/views/tabs/attackers.blade.php',
+        'app-modules/security/resources/views/tabs/partials/sip-scanner-section.blade.php',
         'app-modules/security/resources/views/tabs/geo-blocking.blade.php',
         'app-modules/active-calls/resources/views/active-calls-list.blade.php',
         'app-modules/admin/resources/views/settings-edit.blade.php',
         'app-modules/admin/resources/views/git-update.blade.php',
+        'app-modules/admin/resources/views/partials/git-channels.blade.php',
+        'app-modules/admin/resources/views/partials/git-terminal.blade.php',
         'app-modules/operator-panel/resources/views/operator-panel-index.blade.php',
         'resources/views/layouts/app.blade.php',
         'resources/views/components/common/language-switcher.blade.php',
@@ -688,6 +708,7 @@ it('forbids w-2 h-2 and w-8 h-8 sizes and confines w-3 h-3 and w-6 h-6 to explic
         'app-modules/security/resources/views/modals/confirm-disable-prefilter.blade.php',
         'app-modules/security/resources/views/partials/cockpit-banners.blade.php',
         'app-modules/security/resources/views/tabs/attackers.blade.php',
+        'app-modules/security/resources/views/tabs/partials/banned-attackers-section.blade.php',
         'app-modules/security/resources/views/drawers/protection-settings.blade.php',
         'app-modules/admin/resources/views/monitoring.blade.php',
         'resources/views/pages/home.blade.php',
@@ -809,5 +830,39 @@ it('enforces accessible names on all toggle and checkbox inputs', function (): v
 
     expect($violations)->toBeEmpty(
         'Every toggle/checkbox input must carry an aria-label, aria-labelledby, or be associated with non-empty label text: '.implode("\n", $violations)
+    );
+});
+
+it('renders accessible x-tabs component with tablist and aria-selected', function (): void {
+    $rendered = Blade::render('<x-tabs :tabs="[\'general\' => \'General\']" active="general" wire-method="setTab" />');
+
+    expect($rendered)
+        ->toContain('role="tablist"')
+        ->toContain('role="tab"')
+        ->toContain('aria-selected="true"');
+});
+
+it('enforces all top-level blade views and tabs are 300 lines or fewer', function (): void {
+    $projectRoot = base_path();
+
+    $files = array_merge(
+        glob($projectRoot.'/app-modules/*/resources/views/*.blade.php') ?: [],
+        glob($projectRoot.'/app-modules/*/resources/views/tabs/*.blade.php') ?: [],
+    );
+
+    expect(count($files))->toBeGreaterThan(50);
+
+    $oversized = [];
+
+    foreach ($files as $file) {
+        $lines = count(file($file));
+        if ($lines > 300) {
+            $relativePath = str_replace($projectRoot.'/', '', $file);
+            $oversized[] = "{$relativePath} has {$lines} lines (max 300)";
+        }
+    }
+
+    expect($oversized)->toBeEmpty(
+        "Blade views must not exceed 300 lines. Extract cohesive sub-partials into partials/: \n".implode("\n", $oversized)
     );
 });
