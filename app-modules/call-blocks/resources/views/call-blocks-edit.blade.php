@@ -1,12 +1,12 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.call_block') }}</h1>
+        <x-page-header :title="($this->isEdit ? __('client.edit') : __('client.create')) . ' ' . __('admin.call_block')" />
 
         <form wire:submit="save" class="space-y-6">
             {{-- Tenant --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="tenantId">
-                    <span class="label-text font-medium">Tenant</span>
+                    <span class="label-text font-medium">{{ __('admin.tenant') }}</span>
                     <x-tooltip :tip="__('admin.tenant_select_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>
@@ -17,7 +17,7 @@
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             {{-- Name --}}
@@ -30,7 +30,7 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., Block Telemarketers"
                 />
-                @error('name') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="name" />
             </div>
 
             {{-- Caller ID Number --}}
@@ -43,7 +43,7 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., 1234567890, *SPAM*, +1*"
                 />
-                @error('callerIdNumber') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="callerIdNumber" />
             </div>
 
             {{-- Description --}}
@@ -56,13 +56,13 @@
                     class="textarea textarea-bordered w-full" rows="2"
                     placeholder="{{ __('admin.optional_description') }}"
                 ></textarea>
-                @error('description') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="description" />
             </div>
 
             {{-- Enabled --}}
             <div class="form-control w-full">
                 <label class="label cursor-pointer justify-start gap-3">
-                    <input wire:model="enabled" type="checkbox" class="checkbox checkbox-primary" />
+                    <input wire:model="enabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                     <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                 </label>
             </div>

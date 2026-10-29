@@ -9,15 +9,15 @@
                 <div class="form-control">
                     <label class="label"><span class="label-text font-medium">{{ __('admin.security_rule_name') }}</span></label>
                     <input wire:model="ruleDescription" type="text" placeholder="e.g. Allow Office VoIP Phones"
-                           class="input input-bordered input-sm @error('ruleDescription') input-error @enderror" />
-                    @error('ruleDescription') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                           class="input input-bordered input-sm {{ $errors->has('ruleDescription') ? 'input-error' : '' }}" />
+                    <x-form-error name="ruleDescription" />
                 </div>
 
                 <div class="form-control">
                     <label class="label"><span class="label-text font-medium">{{ __('admin.security_source_ip') }}</span></label>
                     <input wire:model="ruleSourceIp" type="text" placeholder="any or 192.168.1.0/24"
-                           class="input input-bordered input-sm font-mono @error('ruleSourceIp') input-error @enderror" />
-                    @error('ruleSourceIp') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                           class="input input-bordered input-sm font-mono {{ $errors->has('ruleSourceIp') ? 'input-error' : '' }}" />
+                    <x-form-error name="ruleSourceIp" />
                 </div>
 
                 <div class="form-control">
@@ -35,8 +35,8 @@
                         <div class="form-control">
                             <label class="label"><span class="label-text font-medium">Custom Port</span></label>
                             <input wire:model="ruleCustomPort" type="text" placeholder="e.g. 5060, 10000-20000"
-                                   class="input input-bordered input-sm font-mono @error('ruleCustomPort') input-error @enderror" />
-                            @error('ruleCustomPort') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                                   class="input input-bordered input-sm font-mono {{ $errors->has('ruleCustomPort') ? 'input-error' : '' }}" />
+                            <x-form-error name="ruleCustomPort" />
                         </div>
                         <div class="form-control">
                             <label class="label"><span class="label-text font-medium">Protocol</span></label>
@@ -60,7 +60,7 @@
                     <div class="form-control">
                         <label class="label"><span class="label-text font-medium">{{ __('client.status') }}</span></label>
                         <label class="label cursor-pointer justify-start gap-2 pt-2">
-                            <input wire:model="ruleEnabled" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                            <input wire:model="ruleEnabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                             <span class="label-text">{{ __('client.enabled') }}</span>
                         </label>
                     </div>

@@ -41,4 +41,6 @@ return [
     'modal_delete_ivr_menu_title' => 'Supprimer le menu IVR ?',
     'modal_delete_ivr_menu_confirm' => 'Supprimer le menu IVR',
     'modal_delete_ivr_menu_error_title' => 'Le menu IVR ne peut pas être supprimé',
+    'ivr_menu_max_failures' => 'Échecs Maximaux',
+    'ivr_menu_digit_length_hint' => 'Longueur des Chiffres (0 = variable)',
 ];

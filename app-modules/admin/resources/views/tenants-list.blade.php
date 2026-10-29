@@ -1,13 +1,14 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.tenants_title') }}</h2>
-        <x-tooltip :tip="__('admin.create_tenant_tooltip')" position="left">
-            <a href="{{ route('panel.tenants.create') }}" class="btn btn-primary btn-sm">
-                <x-heroicon-o-plus class="w-4 h-4" />
-                {{ __('admin.create_tenant') }}
-            </a>
-        </x-tooltip>
-    </div>
+    <x-page-header :title="__('admin.tenants_title')">
+        <x-slot:actions>
+            <x-tooltip :tip="__('admin.create_tenant_tooltip')" position="left">
+                <a href="{{ route('panel.tenants.create') }}" wire:navigate class="btn btn-primary btn-sm">
+                    <x-heroicon-o-plus class="w-4 h-4" />
+                    {{ __('admin.create_tenant') }}
+                </a>
+            </x-tooltip>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>

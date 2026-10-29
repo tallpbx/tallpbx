@@ -90,6 +90,12 @@ class ActiveCallsList extends BaseListComponent
         }
     }
 
+    #[On('echo-reconnected')]
+    public function resyncAfterReconnect(): void
+    {
+        $this->refreshCalls();
+    }
+
     /**
      * Parse the JSON output of "show channels as json".
      *

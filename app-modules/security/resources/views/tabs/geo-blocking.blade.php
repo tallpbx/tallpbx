@@ -129,7 +129,7 @@
                      class="flex flex-wrap gap-1.5 p-2.5 bg-base-200/30 rounded-box border border-base-200 min-h-[42px] items-center">
                     @foreach ($geoCountries as $cc)
                         <span wire:key="geo-badge-{{ $cc }}"
-                              wire:loading.class="opacity-40 pointer-events-none"
+                              wire:loading.class="opacity-70 pointer-events-none"
                               wire:target="toggleGeoCountry('{{ $cc }}')"
                               class="badge badge-primary badge-sm gap-1 font-mono transition-opacity">
                             <span class="font-bold">{{ $cc }}</span>
@@ -167,7 +167,7 @@
                         @php $isSelected = in_array($code, $geoCountries, true); @endphp
                         <label x-show="search === '' || (countries['{{ $code }}'] || '').toLowerCase().includes(search.toLowerCase()) || '{{ strtolower($code) }}'.includes(search.toLowerCase())"
                                wire:key="geo-chip-{{ $code }}"
-                               wire:loading.class="opacity-60 pointer-events-none"
+                               wire:loading.class="opacity-70 pointer-events-none"
                                wire:target="toggleGeoCountry('{{ $code }}')"
                                @click="if (! $wire.geoCountries.includes('{{ $code }}')) addPending('{{ $code }}')"
                                class="flex items-center gap-2 p-1.5 rounded hover:bg-base-200/60 cursor-pointer select-none text-xs transition-colors {{ $isSelected ? 'bg-primary/10 text-primary font-semibold' : 'text-base-content/80' }}">

@@ -7,7 +7,7 @@
                 <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_firewall_status') }}</span>
                 @if ($firewallEnabled)
                     <span class="badge badge-success badge-sm gap-1 shrink-0">
-                        <span class="inline-block w-2 h-2 rounded-full bg-success-content"></span>
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-success-content"></span>
                         {{ __('admin.active') }}
                     </span>
                 @else
@@ -55,7 +55,7 @@
                 <span class="text-sm font-medium text-base-content/70 min-w-0">{{ __('admin.security_attack_protection') }}</span>
                 @if ($attackProtectionEnabled)
                     <span class="badge badge-success badge-sm gap-1 shrink-0">
-                        <span class="inline-block w-2 h-2 rounded-full bg-success-content"></span>
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-success-content"></span>
                         {{ __('admin.active') }}
                     </span>
                 @else

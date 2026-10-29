@@ -1,6 +1,6 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ __('admin.create_call_broadcast') }}</h1>
+        <x-page-header :title="__('admin.create_call_broadcast')" />
 
         <form wire:submit="save" class="space-y-6">
             <div class="form-control w-full">
@@ -16,9 +16,7 @@
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             <div class="form-control w-full">
@@ -26,9 +24,7 @@
                     <span class="label-text font-medium">{{ __('admin.call_broadcast_name') }}</span>
                 </label>
                 <input wire:model="name" type="text" id="name" class="input input-bordered w-full" placeholder="e.g., Emergency Alert" />
-                @error('name')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="name" />
             </div>
 
             <div class="form-control w-full">
@@ -36,9 +32,7 @@
                     <span class="label-text font-medium">{{ __('admin.call_broadcast_phone_numbers') }}</span>
                 </label>
                 <textarea wire:model="phoneNumbers" id="phoneNumbers" class="textarea textarea-bordered w-full" rows="5" placeholder="+15551234567&#10;+15559876543"></textarea>
-                @error('phoneNumbers')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="phoneNumbers" />
             </div>
 
             <div class="flex items-center gap-3">

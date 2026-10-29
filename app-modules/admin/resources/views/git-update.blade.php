@@ -1,16 +1,14 @@
 <div class="max-w-3xl space-y-6" @if ($updating) wire:poll.1s="pollProgress" @endif>
-    <div class="flex items-center justify-between">
-        <div>
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.git_update') }}</h2>
-            <p class="text-sm text-base-content/60 mt-1">{{ __('admin.git_channel') }}</p>
-        </div>
-        <button wire:click="fetch"
-                @disabled($currentBranch === '' || $updating)
-                class="btn btn-outline btn-sm gap-2">
-            <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.class="animate-spin" wire:target="fetch" />
-            <span>{{ __('admin.git_fetch') }}</span>
-        </button>
-    </div>
+    <x-page-header :title="__('admin.git_update')" :subtitle="__('admin.git_channel')">
+        <x-slot:actions>
+            <button wire:click="fetch"
+                    @disabled($currentBranch === '' || $updating)
+                    class="btn btn-outline btn-sm gap-2">
+                <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.class="animate-spin" wire:target="fetch" />
+                <span>{{ __('admin.git_fetch') }}</span>
+            </button>
+        </x-slot:actions>
+    </x-page-header>
 
     {{-- Shared Session / Cache Connection Warning --}}
     @if ($this->usesSharedSessionCache)
@@ -74,7 +72,7 @@
                      class="cursor-pointer border rounded-xl p-4 transition-all {{ $selectedChannel === 'stable' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 hover:border-base-content/20' }}">
                     <div class="flex items-center justify-between">
                         <span class="font-medium text-sm flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-success"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-success"></span>
                             {{ __('admin.git_stable_channel') }}
                         </span>
                         @if ($selectedChannel === 'stable')
@@ -90,7 +88,7 @@
                      class="cursor-pointer border rounded-xl p-4 transition-all {{ $selectedChannel === 'development' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 hover:border-base-content/20' }}">
                     <div class="flex items-center justify-between">
                         <span class="font-medium text-sm flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-warning"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-warning"></span>
                             {{ __('admin.git_dev_channel') }}
                         </span>
                         @if ($selectedChannel === 'development')
@@ -106,7 +104,7 @@
                      class="cursor-pointer border rounded-xl p-4 transition-all {{ $selectedChannel === 'custom' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-base-300 hover:border-base-content/20' }}">
                     <div class="flex items-center justify-between">
                         <span class="font-medium text-sm flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-base-content/40"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-base-content/40"></span>
                             {{ __('admin.git_custom_channel') }}
                         </span>
                         @if ($selectedChannel === 'custom')

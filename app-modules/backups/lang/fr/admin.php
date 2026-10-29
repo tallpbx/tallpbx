@@ -53,4 +53,6 @@ return [
     'backup_retention_tooltip' => 'Nombre de fichiers de sauvegarde à conserver. Les plus anciennes sont automatiquement supprimées lorsque ce nombre est dépassé.',
     'backup_compression_tooltip' => 'Compressez l\'archive de sauvegarde avec gzip pour économiser de l\'espace disque.',
     'backup_encryption_tooltip' => 'Chiffrez l\'archive de sauvegarde avec GPG à l\'aide de la clé de chiffrement de l\'application.',
+    'backups_file_store' => 'Stockage de Fichiers',
+    'backups_select_destination' => 'Sélectionner une destination',
 ];

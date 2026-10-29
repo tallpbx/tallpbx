@@ -12,7 +12,7 @@
                         <option value="drop">{{ __('admin.security_policy_drop') }} (Drop)</option>
                         <option value="accept">{{ __('admin.security_policy_accept') }} (Accept)</option>
                     </select>
-                    @error('firewallDefaultPolicy') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="firewallDefaultPolicy" />
                 </div>
 
                 <div class="modal-action">

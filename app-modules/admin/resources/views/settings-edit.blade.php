@@ -1,7 +1,5 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.settings_title') }}</h2>
-    </div>
+    <x-page-header :title="__('admin.settings_title')" />
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>
@@ -10,22 +8,22 @@
     {{-- New Setting Form --}}
     <div class="card bg-base-100 border border-base-300 mb-6">
         <div class="card-body">
-            <h3 class="card-title text-lg mb-4">Add Setting</h3>
+            <h3 class="card-title text-lg mb-4">{{ __('admin.add_setting') }}</h3>
             <div class="flex flex-wrap gap-3 items-end">
                 <div class="form-control flex-1 min-w-48">
-                    <label for="newKey" class="label justify-start gap-2 pb-1"><span class="label-text font-medium">Key</span></label>
+                    <label for="newKey" class="label justify-start gap-2 pb-1"><span class="label-text font-medium">{{ __('admin.setting_key') }}</span></label>
                     <input type="text" id="newKey" wire:model="newKey"
                            class="input input-bordered w-full" placeholder="app.name" />
-                    @error('newKey') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="newKey" />
                 </div>
                 <div class="form-control flex-1 min-w-48">
-                    <label for="newValue" class="label justify-start gap-2 pb-1"><span class="label-text font-medium">Value</span></label>
+                    <label for="newValue" class="label justify-start gap-2 pb-1"><span class="label-text font-medium">{{ __('admin.setting_value') }}</span></label>
                     <input type="text" id="newValue" wire:model="newValue"
                            class="input input-bordered w-full" placeholder="MyPBX" />
-                    @error('newValue') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="newValue" />
                 </div>
                 <div class="form-control w-32">
-                    <label for="newType" class="label justify-start gap-2 pb-1"><span class="label-text font-medium">Type</span></label>
+                    <label for="newType" class="label justify-start gap-2 pb-1"><span class="label-text font-medium">{{ __('admin.setting_type') }}</span></label>
                     <select id="newType" wire:model="newType" class="select select-bordered w-full">
                         <option value="string">string</option>
                         <option value="integer">integer</option>
@@ -33,8 +31,8 @@
                         <option value="json">json</option>
                     </select>
                 </div>
-                <button wire:click="createSetting" class="btn btn-primary">
-                    <x-heroicon-o-plus class="w-4 h-4" /> Add
+                <button wire:click="createSetting" class="btn btn-primary btn-sm">
+                    <x-heroicon-o-plus class="w-4 h-4" /> {{ __('admin.setting_add') }}
                 </button>
             </div>
         </div>
@@ -43,7 +41,7 @@
     {{-- Settings Table --}}
     <div class="card bg-base-100 border border-base-300">
         <div class="overflow-x-auto">
-            <table class="table table-zebra">
+            <table class="table table-zebra text-xs">
                 <thead>
                     <tr>
                         <th>{{ __('client.key') }}</th>
@@ -56,11 +54,11 @@
                     @forelse($settings as $setting)
                         @if($editingId === $setting->id)
                             <tr class="bg-base-200">
-                                <td class="font-mono text-sm">{{ $setting->key }}</td>
+                                <td class="font-mono">{{ $setting->key }}</td>
                                 <td>
                                     <input type="text" wire:model="editValue"
                                            class="input input-bordered input-sm w-full" />
-                                    @error('editValue') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                                    <x-form-error name="editValue" />
                                 </td>
                                 <td>
                                     <select wire:model="editType" class="select select-bordered select-sm w-28">
@@ -81,7 +79,7 @@
                             </tr>
                         @else
                             <tr>
-                                <td class="font-mono text-sm">{{ $setting->key }}</td>
+                                <td class="font-mono">{{ $setting->key }}</td>
                                 <td class="text-base-content/80 max-w-xs truncate">{{ $setting->value }}</td>
                                 <td><span class="badge badge-ghost">{{ $setting->type }}</span></td>
                                 <td>
@@ -95,7 +93,7 @@
                     @empty
                         <tr>
                             <td colspan="4" class="text-center py-8 text-base-content/40">
-                                No settings configured.
+                                {{ __('admin.settings_empty') }}
                             </td>
                         </tr>
                     @endforelse

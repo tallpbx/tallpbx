@@ -1,18 +1,12 @@
 <div class="max-w-5xl">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.backups') }}</h2>
-            <x-tooltip :tip="__('admin.backups_list_tooltip')" position="right">
-                <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-40 hover:opacity-80 ml-1 inline" />
-            </x-tooltip>
-        </div>
-        <div class="flex items-center gap-2">
+    <x-page-header :title="__('admin.backups')" :tooltip="__('admin.backups_list_tooltip')">
+        <x-slot:actions>
             <a href="{{ route('panel.backups.restore') }}" class="btn btn-outline btn-error" wire:navigate>Restore</a>
             <a href="{{ route('panel.backups.create') }}" class="btn btn-primary" wire:navigate>
                 {{ __('admin.backup_create') }}
             </a>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">
@@ -62,7 +56,7 @@
                                     <span class="badge badge-ghost">{{ __('admin.backup_pending') }}</span>
                                 @endif
                             </td>
-                            <td class="text-sm text-base-content/60">
+                            <td class="text-xs text-base-content/60">
                                 {{ $backup->last_run_at?->diffForHumans() ?? '—' }}
                             </td>
                             <td class="text-sm">

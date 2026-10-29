@@ -40,4 +40,11 @@ return [
     'extension_outbound_caller_id_number_tooltip' => 'Le numéro de téléphone transmis aux correspondants externes lors d\'appels sortants (ex. votre DID direct ou numéro principal), remplaçant le Numéro effectif (sauf s\'il est remplacé par une route sortante).',
     'modal_delete_extension_title' => 'Supprimer la poste ?',
     'modal_delete_extension_confirm' => 'Supprimer la poste',
+    'extension_display_name' => 'Nom Affiché',
+    'extension_sip_password' => 'Mot de Passe SIP',
+    'extension_effective_caller_id_name' => 'Nom de l\'Identifiant Effectif',
+    'extension_effective_caller_id_number' => 'Numéro de l\'Identifiant Effectif',
+    'extension_outbound_caller_id_name' => 'Nom de l\'Identifiant Sortant',
+    'extension_outbound_caller_id_number' => 'Numéro de l\'Identifiant Sortant',
+    'extension_voicemail_enabled' => 'Messagerie Vocale Activée',
 ];

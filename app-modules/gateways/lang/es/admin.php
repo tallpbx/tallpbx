@@ -40,4 +40,8 @@ return [
     'gateway_register_tooltip' => 'Indica si se deben enviar solicitudes SIP REGISTER a esta pasarela. Deshabilítelo para troncales autenticadas por IP.',
     'modal_delete_gateway_title' => '¿Eliminar pasarela?',
     'modal_delete_gateway_confirm' => 'Eliminar pasarela',
+    'gateway_port' => 'Puerto',
+    'gateway_profile' => 'Perfil',
+    'gateway_profile_hint' => 'Nombre del perfil de Sofia (predeterminado: external)',
+    'gateway_register_provider' => 'Registrarse con el proveedor',
 ];

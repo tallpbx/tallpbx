@@ -29,4 +29,12 @@ return [
     'tenant_outbound_routes' => 'Rutas Salientes',
     'modal_delete_outbound_route_title' => '¿Eliminar ruta saliente?',
     'modal_delete_outbound_route_confirm' => 'Eliminar ruta saliente',
+    'outbound_route_name' => 'Nombre de la Ruta',
+    'outbound_route_dial_pattern' => 'Patrón de Marcado (regex)',
+    'outbound_route_gateway' => 'Pasarela',
+    'outbound_route_external_fallback' => 'Usar reserva de perfil externo',
+    'outbound_route_legacy_gateway' => 'Nombre de Pasarela Heredada',
+    'outbound_route_caller_id_name' => 'Nombre de Identificador de Llamadas',
+    'outbound_route_caller_id_number' => 'Número de Identificador de Llamadas',
+    'outbound_route_priority' => 'Prioridad',
 ];

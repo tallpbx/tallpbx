@@ -53,4 +53,6 @@ return [
     'modal_delete_backup_confirm' => 'Delete Backup',
     'modal_delete_backup_message' => 'Delete “:name” and its stored backup archives. This cannot be undone.',
     'modal_delete_backup_error_title' => 'Backup cannot be deleted',
+    'backups_file_store' => 'File Store',
+    'backups_select_destination' => 'Select a destination',
 ];

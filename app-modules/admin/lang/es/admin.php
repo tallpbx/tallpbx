@@ -60,4 +60,6 @@ return [
     'modules_protected_hint' => 'Los módulos protegidos no se pueden desinstalar.',
     'modules_delete_not_custom' => 'Solo los módulos personalizados se pueden eliminar desde el panel de módulos.',
     'modules_delete_failed' => 'No se pudo eliminar el módulo.',
+    'admin_system_group_no_tenant' => '-- Grupo del Sistema (sin inquilino) --',
+    'admin_slug' => 'Identificador',
 ];

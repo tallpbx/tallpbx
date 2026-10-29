@@ -1,11 +1,12 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.tenant_limits_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
-        <a href="{{ route('panel.tenant-limits.create') }}" class="btn btn-primary btn-sm">
+    <x-page-header :title="__('admin.tenant_limits_title')" :tooltip="__('admin.page_info_tooltip')">
+        <x-slot:actions>
+            <a href="{{ route('panel.tenant-limits.create') }}" wire:navigate class="btn btn-primary btn-sm">
             <x-heroicon-o-plus class="w-4 h-4" />
             {{ __('admin.create_tenant_limit') }}
-        </a>
-    </div>
+            </a>
+        </x-slot:actions>
+    </x-page-header>
 
     <div class="card bg-base-100 border border-base-300">
         <div class="overflow-x-auto">

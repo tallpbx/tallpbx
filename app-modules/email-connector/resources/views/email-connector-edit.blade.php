@@ -1,13 +1,5 @@
 <div class="max-w-2xl">
-    <div class="mb-6">
-        <div class="flex items-center gap-2">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.email_connector_title') }}</h2>
-            <x-tooltip :tip="__('admin.email_connector_tooltip')" align="start" position="right">
-                <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-            </x-tooltip>
-        </div>
-        <p class="text-sm text-base-content/60 mt-1">{{ __('admin.email_connector_description') }}</p>
-    </div>
+    <x-page-header :title="__('admin.email_connector_title')" :tooltip="__('admin.email_connector_tooltip')" :subtitle="__('admin.email_connector_description')" />
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">
@@ -64,7 +56,7 @@
             <input type="text" id="smtp_host" wire:model="smtp_host"
                    class="input input-bordered w-full"
                    placeholder="{{ $preset === 'gmail' ? 'smtp.gmail.com' : 'smtp.example.com' }}" />
-            @error('smtp_host') <span class="text-error text-sm">{{ $message }}</span> @enderror
+            <x-form-error name="smtp_host" />
         </div>
 
         {{-- Port + Encryption --}}
@@ -78,7 +70,7 @@
                 </label>
                 <input type="number" id="smtp_port" wire:model="smtp_port"
                        class="input input-bordered w-full" placeholder="587" />
-                @error('smtp_port') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                <x-form-error name="smtp_port" />
             </div>
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="smtp_encryption">
@@ -103,7 +95,7 @@
             <input type="text" id="smtp_username" wire:model="smtp_username"
                    class="input input-bordered w-full"
                    placeholder="{{ $preset === 'gmail' ? 'you@gmail.com' : 'user@example.com' }}" />
-            @error('smtp_username') <span class="text-error text-sm">{{ $message }}</span> @enderror
+            <x-form-error name="smtp_username" />
         </div>
 
         {{-- Authentication type — Alpine handles the instant UI toggle; Livewire stays in sync for validation --}}
@@ -143,7 +135,7 @@
                     </label>
                     <input type="password" id="smtp_password" wire:model="smtp_password"
                            class="input input-bordered w-full" placeholder="••••••••" />
-                    @error('smtp_password') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                    <x-form-error name="smtp_password" />
                 </div>
             </div>
 
@@ -173,7 +165,7 @@
                             <option value="microsoft">{{ __('admin.smtp_oauth_provider_microsoft') }}</option>
                             <option value="custom">{{ __('admin.smtp_oauth_provider_custom') }}</option>
                         </select>
-                        @error('smtp_oauth_provider') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                        <x-form-error name="smtp_oauth_provider" />
                     </div>
 
                     {{-- Client ID --}}
@@ -187,7 +179,7 @@
                         <input type="text" id="smtp_oauth_client_id" wire:model="smtp_oauth_client_id"
                                class="input input-bordered w-full"
                                placeholder="your-client-id.apps.googleusercontent.com" />
-                        @error('smtp_oauth_client_id') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                        <x-form-error name="smtp_oauth_client_id" />
                     </div>
 
                     {{-- Client Secret --}}
@@ -201,7 +193,7 @@
                         </label>
                         <input type="password" id="smtp_oauth_client_secret" wire:model="smtp_oauth_client_secret"
                                class="input input-bordered w-full" placeholder="••••••••" />
-                        @error('smtp_oauth_client_secret') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                        <x-form-error name="smtp_oauth_client_secret" />
                     </div>
 
                     {{-- Custom provider fields --}}
@@ -216,7 +208,7 @@
                             <input type="url" id="smtp_oauth_auth_endpoint" wire:model="smtp_oauth_auth_endpoint"
                                    class="input input-bordered w-full"
                                    placeholder="https://provider.example.com/oauth2/auth" />
-                            @error('smtp_oauth_auth_endpoint') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                            <x-form-error name="smtp_oauth_auth_endpoint" />
                         </div>
                         <div class="form-control w-full">
                             <label class="label justify-start gap-2 pb-1" for="smtp_oauth_token_endpoint">
@@ -228,7 +220,7 @@
                             <input type="url" id="smtp_oauth_token_endpoint" wire:model="smtp_oauth_token_endpoint"
                                    class="input input-bordered w-full"
                                    placeholder="https://provider.example.com/oauth2/token" />
-                            @error('smtp_oauth_token_endpoint') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                            <x-form-error name="smtp_oauth_token_endpoint" />
                         </div>
                         <div class="form-control w-full">
                             <label class="label justify-start gap-2 pb-1" for="smtp_oauth_scopes">
@@ -240,7 +232,7 @@
                             <input type="text" id="smtp_oauth_scopes" wire:model="smtp_oauth_scopes"
                                    class="input input-bordered w-full"
                                    placeholder="smtp.send offline_access" />
-                            @error('smtp_oauth_scopes') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                            <x-form-error name="smtp_oauth_scopes" />
                         </div>
                     @endif
 
@@ -293,7 +285,7 @@
                 <input type="email" id="smtp_from_address" wire:model="smtp_from_address"
                        class="input input-bordered w-full"
                        placeholder="{{ $preset === 'gmail' ? 'no-reply@gmail.com' : 'noreply@example.com' }}" />
-                @error('smtp_from_address') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                <x-form-error name="smtp_from_address" />
             </div>
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="smtp_from_name">
@@ -304,7 +296,7 @@
                 </label>
                 <input type="text" id="smtp_from_name" wire:model="smtp_from_name"
                        class="input input-bordered w-full" placeholder="TallPBX" />
-                @error('smtp_from_name') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                <x-form-error name="smtp_from_name" />
             </div>
         </div>
 
@@ -338,7 +330,7 @@
                 </label>
                 <input type="email" id="testEmailAddress" wire:model="testEmailAddress"
                        class="input input-bordered w-full" placeholder="admin@example.com" />
-                @error('testEmailAddress') <span class="text-error text-sm">{{ $message }}</span> @enderror
+                <x-form-error name="testEmailAddress" />
             </div>
             <button type="button" wire:click="sendTest" class="btn btn-outline"
                     :disabled="!$wire.isConfigured">

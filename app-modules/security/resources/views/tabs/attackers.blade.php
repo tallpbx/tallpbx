@@ -257,10 +257,10 @@
                         </div>
                         <div class="flex items-start gap-2">
                             <input wire:model="newScannerSignature" type="text" placeholder="Zoiper"
-                                   class="input input-bordered input-sm font-mono w-full max-w-xs @error('newScannerSignature') input-error @enderror" />
+                                   class="input input-bordered input-sm font-mono w-full max-w-xs {{ $errors->has('newScannerSignature') ? 'input-error' : '' }}" />
                             <button wire:click="addScannerSignature" type="button" class="btn btn-outline btn-sm">{{ __('admin.security_scanner_add') }}</button>
                         </div>
-                        @error('newScannerSignature') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="newScannerSignature" />
                     </div>
                 </div>
 

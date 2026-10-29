@@ -9,7 +9,7 @@
                     <label for="name" class="label"><span class="label-text">{{ __('client.name') }}</span></label>
                     <input type="text" id="name" wire:model="name"
                            class="input input-bordered w-full" placeholder="{{ __('client.name_placeholder') }}" required />
-                    @error('name') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="name" />
                 </div>
 
                 {{-- Email --}}
@@ -17,7 +17,7 @@
                     <label for="email" class="label"><span class="label-text">{{ __('client.email') }}</span></label>
                     <input type="email" id="email" wire:model="email"
                            class="input input-bordered w-full" placeholder="{{ __('client.email_placeholder') }}" required />
-                    @error('email') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="email" />
                 </div>
 
                 {{-- Password --}}
@@ -27,9 +27,9 @@
                         <span class="label-text-alt text-base-content/60">{{ __('client.password_requirements_min') }}</span>
                     </label>
                     <input type="password" id="password" wire:model="password"
-                           class="input input-bordered w-full @error('password') input-error @enderror" placeholder="{{ __('client.password_placeholder') }}" required />
+                           class="input input-bordered w-full {{ $errors->has('password') ? 'input-error' : '' }}" placeholder="{{ __('client.password_placeholder') }}" required />
                     <p class="text-xs text-base-content/60 mt-1">{{ __('client.password_requirements_hint') }}</p>
-                    @error('password') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="password" />
                 </div>
 
                 {{-- Confirm Password --}}
@@ -46,9 +46,9 @@
                 <button type="submit" class="btn btn-primary w-full mt-6">{{ __('client.create_account') }}</button>
             </form>
 
-            <div class="text-center mt-4 text-sm text-base-content/60">
+            <div class="text-center mt-4 text-xs text-base-content/60">
                 {{ __('client.already_have_account') }}
-                <a href="{{ route('panel.login') }}" class="link link-primary">{{ __('client.sign_in') }}</a>
+                <a href="{{ route('panel.login') }}" wire:navigate class="link link-primary">{{ __('client.sign_in') }}</a>
             </div>
         </div>
     </div>

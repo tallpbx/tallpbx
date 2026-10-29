@@ -21,6 +21,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Event;
 use Livewire\Attributes\On;
+use Livewire\Livewire;
 use Modules\ActiveCalls\Livewire\ActiveCallsList;
 use Modules\ActiveConferences\Livewire\ActiveConferencesList;
 use Modules\CallCenterActive\Livewire\CallCenterActiveList;
@@ -248,4 +249,55 @@ test('channel authorization is configured with web and admin guards', function (
 
     expect($options)->toHaveKey('tenant.{tenantId}.telephony');
     expect($options['tenant.{tenantId}.telephony']['guards'] ?? [])->toBe(['web', 'admin']);
+});
+
+test('all five live telephony components handle echo-reconnected event and define resyncAfterReconnect', function () {
+    $components = [
+        ActiveCallsList::class,
+        ActiveConferencesList::class,
+        CallCenterActiveList::class,
+        RegistrationsList::class,
+        OperatorPanelIndex::class,
+    ];
+
+    foreach ($components as $class) {
+        $reflection = new ReflectionClass($class);
+        expect($reflection->hasMethod('resyncAfterReconnect'))->toBeTrue("Component {$class} must have resyncAfterReconnect method.");
+        $method = $reflection->getMethod('resyncAfterReconnect');
+        $attributes = $method->getAttributes(On::class);
+        $eventNames = array_map(fn ($attr) => $attr->getArguments()[0] ?? '', $attributes);
+        expect($eventNames)->toContain('echo-reconnected');
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test($class)
+            ->dispatch('echo-reconnected')
+            ->assertStatus(200);
+    }
+});
+
+test('all five live telephony views include websocket health banner and contain zero wire:poll directives', function () {
+    $views = [
+        'active-calls' => base_path('app-modules/active-calls/resources/views/active-calls-list.blade.php'),
+        'active-conferences' => base_path('app-modules/active-conferences/resources/views/active-conferences-list.blade.php'),
+        'call-center-active' => base_path('app-modules/call-center-active/resources/views/call-center-active-list.blade.php'),
+        'registrations' => base_path('app-modules/registrations/resources/views/registrations-list.blade.php'),
+        'operator-panel' => base_path('app-modules/operator-panel/resources/views/operator-panel-index.blade.php'),
+    ];
+
+    foreach ($views as $name => $filePath) {
+        expect(file_exists($filePath))->toBeTrue("View file for {$name} should exist.");
+        $content = file_get_contents($filePath);
+        expect($content)->toContain('<x-websocket-health-banner');
+        expect($content)->not->toContain('wire:poll');
+    }
+});
+
+test('websocket health banner component exists and contains zero wire:poll directives', function () {
+    $bannerPath = resource_path('views/components/websocket-health-banner.blade.php');
+    expect(file_exists($bannerPath))->toBeTrue('websocket-health-banner.blade.php must exist.');
+    $content = file_get_contents($bannerPath);
+    expect($content)->not->toContain('wire:poll');
+    expect($content)->toContain('tallpbx:ws-disconnected');
+    expect($content)->toContain('tallpbx:ws-reconnected');
+    expect($content)->toContain("window.Livewire.dispatch('echo-reconnected')");
 });

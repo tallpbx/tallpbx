@@ -237,3 +237,90 @@ it('enforces that all registered menu item translation keys resolve across all l
         'Registered menu items reference missing translation keys: '.json_encode($missingByLocale, JSON_PRETTY_PRINT)
     );
 });
+
+it('enforces zero duplicate keys in language dictionary files', function (): void {
+    $projectRoot = base_path();
+    $files = array_merge(
+        glob($projectRoot.'/lang/*/*.php') ?: [],
+        glob($projectRoot.'/app-modules/*/lang/*/*.php') ?: [],
+    );
+
+    $duplicates = [];
+
+    foreach ($files as $file) {
+        $tokens = token_get_all((string) file_get_contents($file));
+        $keysByDepth = [];
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        $bracketDepth = 0;
+
+        for ($i = 0; $i < count($tokens); $i++) {
+            $token = $tokens[$i];
+
+            if ($token === '[') {
+                $bracketDepth++;
+                $keysByDepth[$bracketDepth] = [];
+            } elseif ($token === ']') {
+                unset($keysByDepth[$bracketDepth]);
+                $bracketDepth--;
+            }
+
+            // Find array key strings followed by T_DOUBLE_ARROW
+            if (is_array($token) && $token[0] === T_CONSTANT_ENCAPSED_STRING) {
+                // Peek ahead for '=>'
+                for ($j = $i + 1; $j < count($tokens); $j++) {
+                    if (is_array($tokens[$j]) && $tokens[$j][0] === T_WHITESPACE) {
+                        continue;
+                    }
+                    if (is_array($tokens[$j]) && $tokens[$j][0] === T_DOUBLE_ARROW) {
+                        $key = trim($token[1], "'\"");
+                        if (isset($keysByDepth[$bracketDepth][$key])) {
+                            $duplicates[] = "{$relativePath}: duplicate key '{$key}' (line {$token[2]})";
+                        } else {
+                            $keysByDepth[$bracketDepth][$key] = $token[2];
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    expect($duplicates)->toBeEmpty('Duplicate keys found in translation dictionaries: '.implode("\n", $duplicates));
+});
+
+it('enforces that module edit views do not contain hardcoded English form labels or empty select options', function (): void {
+    $projectRoot = base_path();
+    $files = glob($projectRoot.'/app-modules/*/resources/views/*-edit.blade.php') ?: [];
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        // Check label-text spans
+        if (preg_match_all('/<span\b[^>]*\bclass=["\'][^"\']*\blabel-text\b[^"\']*["\'][^>]*>(.*?)<\/span>/s', $content, $matches)) {
+            foreach ($matches[1] as $text) {
+                $trimmed = trim($text);
+                if ($trimmed !== '' && ! str_starts_with($trimmed, '{{') && ! str_starts_with($trimmed, '{!!') && ! str_starts_with($trimmed, '@')) {
+                    $violations[] = "{$relativePath}: hardcoded label text '{$trimmed}'";
+                }
+            }
+        }
+
+        // Check empty select option
+        if (preg_match_all('/<option\s+value=["\']["\']\s*>(.*?)<\/option>/s', $content, $matches)) {
+            foreach ($matches[1] as $text) {
+                $trimmed = trim($text);
+                if ($trimmed !== '' && ! str_starts_with($trimmed, '{{') && ! str_starts_with($trimmed, '{!!') && ! str_starts_with($trimmed, '@')) {
+                    $violations[] = "{$relativePath}: hardcoded select option '{$trimmed}'";
+                }
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Module edit views must localize form labels and empty select options: '.implode("\n", $violations)
+    );
+});

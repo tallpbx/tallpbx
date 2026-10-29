@@ -169,7 +169,7 @@ new class extends Component {
 <div>
     <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
-            <h2 class="text-xl font-semibold">{{ __('admin.dashboard_overview') }}</h2>
+            <h2 class="text-lg font-semibold">{{ __('admin.dashboard_overview') }}</h2>
             @if($isAdmin && $fsConnected)
                 <span class="badge badge-success badge-sm gap-1">
                     <span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
@@ -182,7 +182,7 @@ new class extends Component {
         @foreach($this->cardItems as $card)
             <div wire:key="dashboard-stat-{{ $card['icon'] }}" class="card bg-base-100 border border-base-300 p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <span class="text-sm font-medium text-base-content/60">{{ $card['title'] }}</span>
+                    <span class="text-xs font-medium text-base-content/60">{{ $card['title'] }}</span>
                     @if($card['icon'] === 'users')
                         <x-tooltip :tip="__('admin.total_users_tooltip')">
                             <x-heroicon-o-users class="w-5 h-5 text-primary" />
@@ -216,7 +216,7 @@ new class extends Component {
             <div class="card-body">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold">{{ __('admin.recent_calls') }}</h3>
-                    <a href="{{ route('panel.cdr.index') }}" class="btn btn-ghost btn-sm">{{ __('admin.view_all') }}</a>
+                    <a href="{{ route('panel.cdr.index') }}" wire:navigate class="btn btn-ghost btn-sm">{{ __('admin.view_all') }}</a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="table table-sm">

@@ -41,4 +41,6 @@ return [
     'modal_delete_ivr_menu_title' => '¿Eliminar menú IVR?',
     'modal_delete_ivr_menu_confirm' => 'Eliminar menú IVR',
     'modal_delete_ivr_menu_error_title' => 'El menú IVR no se puede eliminar',
+    'ivr_menu_max_failures' => 'Máximo de Fallos',
+    'ivr_menu_digit_length_hint' => 'Longitud de Dígitos (0 = variable)',
 ];

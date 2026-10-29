@@ -90,6 +90,12 @@ class OperatorPanelIndex extends Component
         $this->loadActiveCalls();
     }
 
+    #[On('echo-reconnected')]
+    public function resyncAfterReconnect(): void
+    {
+        $this->refresh();
+    }
+
     /**
      * Load active calls from FreeSWITCH ESL with error resilience.
      *

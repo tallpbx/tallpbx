@@ -295,6 +295,8 @@ return [
     'security_rule_updated' => 'Regla de firewall actualizada con éxito.',
     'security_rule_deleted' => 'Regla de firewall eliminada.',
     'security_rule_reordered' => 'Prioridad de regla actualizada.',
+    'security_move_up' => 'Mover arriba',
+    'security_move_down' => 'Mover abajo',
     'security_apply_changes' => 'Guardar y Aplicar Cambios',
     'security_pending_changes' => ':count cambio(s) pendiente(s) por aplicar al firewall',
     'security_firewall_applied_success' => 'Reglas del firewall aplicadas exitosamente al kernel de Linux.',

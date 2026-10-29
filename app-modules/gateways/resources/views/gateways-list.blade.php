@@ -1,11 +1,12 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.gateways_title') }}</h2>
-        <a href="{{ route('panel.gateways.create') }}" class="btn btn-primary btn-sm">
-            <x-heroicon-o-plus class="w-4 h-4" />
-            {{ __('admin.create_gateway') }}
-        </a>
-    </div>
+    <x-page-header :title="__('admin.gateways_title')">
+        <x-slot:actions>
+            <a href="{{ route('panel.gateways.create') }}" wire:navigate class="btn btn-primary btn-sm">
+                <x-heroicon-o-plus class="w-4 h-4" />
+                {{ __('admin.create_gateway') }}
+            </a>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>

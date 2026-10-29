@@ -25,4 +25,5 @@ return [
     'extension_setting_key' => 'Key',
     'extension_setting_value' => 'Value',
     'extension_setting_extension' => 'Extension',
+    'extension_setting_select_extension' => 'Select an extension...',
 ];

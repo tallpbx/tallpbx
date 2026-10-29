@@ -12,7 +12,7 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @click="open = false; $wire.closeSettingsDrawer()"
-         class="fixed inset-0 bg-black/40 backdrop-blur-xs"></div>
+         class="fixed inset-0 bg-black/50 backdrop-blur-xs"></div>
 
     {{-- Drawer Panel --}}
     <div class="fixed inset-y-0 right-0 max-w-md w-full bg-base-100 shadow-2xl p-6 overflow-y-auto flex flex-col justify-between border-l border-base-200">
@@ -37,7 +37,7 @@
                         </x-tooltip>
                     </label>
                     <input wire:model="maxRetry" type="number" min="1" max="100" class="input input-bordered input-sm w-full" />
-                    @error('maxRetry') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="maxRetry" />
                 </div>
 
                 {{-- Find Time --}}
@@ -49,7 +49,7 @@
                         </x-tooltip>
                     </label>
                     <input wire:model="findTime" type="number" min="10" max="86400" class="input input-bordered input-sm w-full" />
-                    @error('findTime') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="findTime" />
                 </div>
 
                 {{-- Ban Time --}}
@@ -61,22 +61,22 @@
                         </x-tooltip>
                     </label>
                     <input wire:model="banTime" type="number" min="60" max="31536000" class="input input-bordered input-sm w-full" />
-                    @error('banTime') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="banTime" />
                 </div>
 
                 {{-- Attack Vectors --}}
                 <div class="space-y-2 pt-2 border-t border-base-200">
                     <div class="text-xs font-semibold text-base-content/70 mb-2">Monitored Services</div>
                     <label class="label cursor-pointer justify-start gap-3">
-                        <input wire:model="protectSip" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                        <input wire:model="protectSip" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                         <span class="label-text">{{ __('admin.security_protect_sip') }}</span>
                     </label>
                     <label class="label cursor-pointer justify-start gap-3">
-                        <input wire:model="protectWeb" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                        <input wire:model="protectWeb" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                         <span class="label-text">{{ __('admin.security_protect_web') }}</span>
                     </label>
                     <label class="label cursor-pointer justify-start gap-3">
-                        <input wire:model="protectSsh" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                        <input wire:model="protectSsh" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                         <span class="label-text">{{ __('admin.security_protect_ssh') }}</span>
                     </label>
                 </div>

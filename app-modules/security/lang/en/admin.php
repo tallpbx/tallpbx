@@ -295,6 +295,8 @@ return [
     'security_rule_updated' => 'Firewall rule updated.',
     'security_rule_deleted' => 'Firewall rule deleted.',
     'security_rule_reordered' => 'Rule priority updated.',
+    'security_move_up' => 'Move up',
+    'security_move_down' => 'Move down',
     'security_apply_changes' => 'Save & Apply Changes',
     'security_pending_changes' => ':count pending change(s) not yet applied to firewall',
     'security_firewall_applied_success' => 'Firewall ruleset successfully applied to Linux kernel.',

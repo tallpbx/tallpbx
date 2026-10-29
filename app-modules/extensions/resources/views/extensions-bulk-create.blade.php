@@ -1,15 +1,5 @@
 <div>
-    <div class="mb-6">
-        <div class="flex items-center gap-2">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.create_multiple_extensions') }}</h2>
-            <x-tooltip :tip="__('admin.extension_header_tooltip')" align="start" position="right">
-                <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-            </x-tooltip>
-        </div>
-        <p class="text-sm text-base-content/60 mt-1">
-            Create a numeric range of extensions for the selected tenant.
-        </p>
-    </div>
+    <x-page-header :title="__('admin.create_multiple_extensions')" :tooltip="__('admin.extension_header_tooltip')" subtitle="Create a numeric range of extensions for the selected tenant." />
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">
         <div class="card-body">
@@ -21,13 +11,13 @@
                             <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                         </x-tooltip>
                     </label>
-                    <select wire:model="tenantId" class="select select-bordered w-full @error('tenantId') select-error @enderror">
+                    <select wire:model="tenantId" class="select select-bordered w-full {{ $errors->has('tenantId') ? 'select-error' : '' }}">
                         <option value="">Select tenant</option>
                         @foreach($tenants as $tenant)
                             <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                         @endforeach
                     </select>
-                    @error('tenantId') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="tenantId" />
                 </div>
 
                 <div class="grid gap-4 grid-cols-1 md:grid-cols-3">
@@ -39,8 +29,8 @@
                             </x-tooltip>
                         </label>
                         <input type="number" min="1" wire:model.live="startExtension"
-                               class="input input-bordered w-full @error('startExtension') input-error @enderror" />
-                        @error('startExtension') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('startExtension') ? 'input-error' : '' }}" />
+                        <x-form-error name="startExtension" />
                     </div>
 
                     <div class="form-control w-full">
@@ -51,15 +41,15 @@
                             </x-tooltip>
                         </label>
                         <input type="number" min="1" wire:model.live="endExtension"
-                               class="input input-bordered w-full @error('endExtension') input-error @enderror" />
-                        @error('endExtension') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('endExtension') ? 'input-error' : '' }}" />
+                        <x-form-error name="endExtension" />
                     </div>
 
                     <div class="form-control w-full">
                         <label class="label justify-start gap-2 pb-1"><span class="label-text font-medium">Increment</span></label>
                         <input type="number" min="1" wire:model.live="increment"
-                               class="input input-bordered w-full @error('increment') input-error @enderror" />
-                        @error('increment') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('increment') ? 'input-error' : '' }}" />
+                        <x-form-error name="increment" />
                     </div>
                 </div>
 
@@ -71,9 +61,9 @@
                         </x-tooltip>
                     </label>
                     <input type="text" wire:model="displayNameTemplate"
-                           class="input input-bordered w-full @error('displayNameTemplate') input-error @enderror" />
+                           class="input input-bordered w-full {{ $errors->has('displayNameTemplate') ? 'input-error' : '' }}" />
                     <span class="label-text-alt text-base-content/50 mt-1">Use {number} where the extension number should appear.</span>
-                    @error('displayNameTemplate') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="displayNameTemplate" />
                 </div>
 
                 <div class="pt-2 space-y-3">
@@ -111,8 +101,8 @@
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1"><span class="label-text font-medium">Description</span></label>
                     <textarea wire:model="description"
-                              class="textarea textarea-bordered w-full @error('description') textarea-error @enderror"></textarea>
-                    @error('description') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                              class="textarea textarea-bordered w-full {{ $errors->has('description') ? 'textarea-error' : '' }}"></textarea>
+                    <x-form-error name="description" />
                 </div>
 
                 @if($this->previewNumbers !== [])

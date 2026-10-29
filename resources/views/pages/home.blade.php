@@ -66,7 +66,7 @@
 
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-3">
-                        <a href="{{ route('panel.login') }}" class="btn btn-primary btn-sm rounded-xl px-4">
+                        <a href="{{ route('panel.login') }}" wire:navigate class="btn btn-primary btn-sm rounded-xl px-4">
                             {{ __('home.nav.sign_in') }}
                         </a>
                     </div>
@@ -195,7 +195,7 @@
                             <x-heroicon-o-users class="w-6 h-6" />
                         </div>
                         <h3 class="text-lg font-bold text-base-content">{{ __('home.features.extensions.title') }}</h3>
-                        <p class="text-sm text-base-content/60 leading-relaxed">
+                        <p class="text-xs text-base-content/60 leading-relaxed">
                             {{ __('home.features.extensions.desc') }}
                         </p>
                     </div>
@@ -205,7 +205,7 @@
                             <x-heroicon-o-server class="w-6 h-6" />
                         </div>
                         <h3 class="text-lg font-bold text-base-content">{{ __('home.features.trunks.title') }}</h3>
-                        <p class="text-sm text-base-content/60 leading-relaxed">
+                        <p class="text-xs text-base-content/60 leading-relaxed">
                             {{ __('home.features.trunks.desc') }}
                         </p>
                     </div>
@@ -215,7 +215,7 @@
                             <x-heroicon-o-globe-alt class="w-6 h-6" />
                         </div>
                         <h3 class="text-lg font-bold text-base-content">{{ __('home.features.inbound.title') }}</h3>
-                        <p class="text-sm text-base-content/60 leading-relaxed">
+                        <p class="text-xs text-base-content/60 leading-relaxed">
                             {{ __('home.features.inbound.desc') }}
                         </p>
                     </div>
@@ -225,7 +225,7 @@
                             <x-heroicon-o-arrows-right-left class="w-6 h-6" />
                         </div>
                         <h3 class="text-lg font-bold text-base-content">{{ __('home.features.outbound.title') }}</h3>
-                        <p class="text-sm text-base-content/60 leading-relaxed">
+                        <p class="text-xs text-base-content/60 leading-relaxed">
                             {{ __('home.features.outbound.desc') }}
                         </p>
                     </div>

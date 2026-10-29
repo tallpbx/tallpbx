@@ -2,17 +2,17 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
             <div class="flex items-center gap-2">
-                <a href="{{ route('panel.users.index') }}" class="btn btn-ghost btn-xs btn-circle">
+                <a href="{{ route('panel.users.index') }}" wire:navigate class="btn btn-ghost btn-xs btn-circle">
                     <x-heroicon-o-arrow-left class="w-4 h-4" />
                 </a>
                 <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.impersonation_logs_title') }}</h1>
             </div>
-            <p class="text-sm text-base-content/60 mt-1">
+            <p class="text-xs text-base-content/60 mt-1">
                 {{ __('admin.impersonation_logs_description') }}
             </p>
         </div>
         <div class="flex items-center gap-2">
-            <a href="{{ route('panel.users.index') }}" class="btn btn-ghost btn-sm gap-1.5">
+            <a href="{{ route('panel.users.index') }}" wire:navigate class="btn btn-ghost btn-sm gap-1.5">
                 <x-heroicon-o-users class="w-4 h-4" />
                 {{ __('admin.users') }}
             </a>
@@ -106,7 +106,7 @@
                         <tr>
                             <td colspan="6" class="text-center py-12 text-base-content/40">
                                 <div class="flex flex-col items-center justify-center gap-2">
-                                    <x-heroicon-o-clipboard-document-list class="w-8 h-8 opacity-40" />
+                                    <x-heroicon-o-clipboard-document-list class="w-4 h-4 opacity-40" />
                                     <span>{{ __('admin.no_impersonation_logs') }}</span>
                                 </div>
                             </td>

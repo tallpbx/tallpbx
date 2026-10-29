@@ -1,7 +1,5 @@
 <div>
-    <div class="mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.sip_status_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
-    </div>
+    <x-page-header :title="__('admin.sip_status_title')" :tooltip="__('admin.page_info_tooltip')" />
 
     @if (!$fsConnected)
         <x-inline-alert type="warning">{{ __('admin.fs_not_connected') }}</x-inline-alert>

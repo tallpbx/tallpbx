@@ -23,19 +23,15 @@
         this.allOpen = this.openCategories.length === {{ count($groupedModules) }};
     }
 }">
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.modules_title') }}</h2>
-            <x-tooltip :tip="__('admin.page_info_tooltip')" position="right" align="start">
-                <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-            </x-tooltip>
-        </div>
-        <button type="button" @click="toggleAll()" class="btn btn-ghost btn-sm text-xs gap-1.5">
-            <x-heroicon-o-arrows-pointing-out class="w-4 h-4" x-show="!allOpen" />
-            <x-heroicon-o-arrows-pointing-in class="w-4 h-4" x-show="allOpen" />
-            <span x-text="allOpen ? '{{ __('admin.collapse_all') }}' : '{{ __('admin.expand_all') }}'"></span>
-        </button>
-    </div>
+    <x-page-header :title="__('admin.modules_title')" :tooltip="__('admin.page_info_tooltip')">
+        <x-slot:actions>
+            <button type="button" @click="toggleAll()" class="btn btn-ghost btn-sm text-xs gap-1.5">
+                <x-heroicon-o-arrows-pointing-out class="w-4 h-4" x-show="!allOpen" />
+                <x-heroicon-o-arrows-pointing-in class="w-4 h-4" x-show="allOpen" />
+                <span x-text="allOpen ? '{{ __('admin.collapse_all') }}' : '{{ __('admin.expand_all') }}'"></span>
+            </button>
+        </x-slot:actions>
+    </x-page-header>
 
     @foreach($groupedModules as $category => $categoryModules)
         <details class="collapse collapse-arrow bg-base-100 border border-base-300 mb-3"
@@ -102,7 +98,7 @@
                                                 <div class="flex items-center gap-2"
                                                      wire:loading.class="opacity-70 pointer-events-none"
                                                      wire:target="toggleEnabled('{{ $module->id }}')">
-                                                    <input type="checkbox" class="toggle toggle-sm {{ $module->enabled ? 'toggle-primary' : 'toggle-warning' }}"
+                                                    <input type="checkbox" class="toggle toggle-sm {{ $module->enabled ? 'toggle-success' : 'toggle-neutral' }}"
                                                            @checked($module->enabled)
                                                            wire:click="toggleEnabled('{{ $module->id }}')"
                                                            wire:target="toggleEnabled('{{ $module->id }}')"

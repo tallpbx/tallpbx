@@ -29,4 +29,10 @@ return [
     'tenant_inbound_routes' => 'Routes Entrantes',
     'modal_delete_inbound_route_title' => 'Supprimer la route entrante ?',
     'modal_delete_inbound_route_confirm' => 'Supprimer la route entrante',
+    'inbound_route_name' => 'Nom de la Route',
+    'inbound_route_destination_number' => 'Numéro de Destination (DID)',
+    'inbound_route_action' => 'Action',
+    'inbound_route_select_action' => 'Sélectionner l\'action',
+    'inbound_route_action_data' => 'Données d\'Action',
+    'inbound_route_priority' => 'Priorité',
 ];

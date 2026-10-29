@@ -41,4 +41,6 @@ return [
     'modal_delete_ivr_menu_title' => 'Delete IVR Menu?',
     'modal_delete_ivr_menu_confirm' => 'Delete IVR Menu',
     'modal_delete_ivr_menu_error_title' => 'IVR Menu Cannot Be Deleted',
+    'ivr_menu_max_failures' => 'Max Failures',
+    'ivr_menu_digit_length_hint' => 'Digit Length (0 = variable)',
 ];

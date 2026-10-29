@@ -1,51 +1,41 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">
-            {{ $this->isEdit ? 'Edit Tenant' : 'Create Tenant' }}
-        </h2>
-    </div>
+    <x-page-header :title="$this->isEdit ? 'Edit Tenant' : 'Create Tenant'" />
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">
         <form wire:submit="save" class="card-body">
             {{-- Name --}}
             <div class="form-control w-full">
                 <label for="name" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Name</span>
+                    <span class="label-text font-medium">{{ __('admin.name') }}</span>
                 </label>
                 <input type="text" id="name" wire:model="name"
                        class="input input-bordered w-full" placeholder="Tenant name" required />
-                @error('name')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="name" />
             </div>
 
             {{-- Slug --}}
             <div class="form-control w-full mt-4">
                 <label for="slug" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Slug</span>
+                    <span class="label-text font-medium">{{ __('admin.admin_slug') }}</span>
                 </label>
                 <input type="text" id="slug" wire:model="slug"
                        class="input input-bordered w-full" placeholder="tenant-slug" required />
-                @error('slug')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="slug" />
             </div>
 
             {{-- Primary User --}}
             <div class="form-control w-full mt-4">
                 <label for="primaryUserId" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Primary User</span>
+                    <span class="label-text font-medium">{{ __('admin.primary_user') }}</span>
                 </label>
                 <select id="primaryUserId" wire:model="primaryUserId"
                         class="select select-bordered w-full">
-                    <option value="">None</option>
+                    <option value="">{{ __('admin.none') }}</option>
                     @foreach($users as $user)
                         <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->email }})</option>
                     @endforeach
                 </select>
-                @error('primaryUserId')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="primaryUserId" />
             </div>
 
             {{-- Enabled --}}

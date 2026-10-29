@@ -295,6 +295,8 @@ return [
     'security_rule_updated' => 'Règle de pare-feu mise à jour avec succès.',
     'security_rule_deleted' => 'Règle de pare-feu supprimée.',
     'security_rule_reordered' => 'Priorité de la règle mise à jour.',
+    'security_move_up' => 'Déplacer vers le haut',
+    'security_move_down' => 'Déplacer vers le bas',
     'security_apply_changes' => 'Enregistrer et Appliquer',
     'security_pending_changes' => ':count changement(s) en attente non appliqué(s) au pare-feu',
     'security_firewall_applied_success' => 'Règles du pare-feu appliquées avec succès au noyau Linux.',

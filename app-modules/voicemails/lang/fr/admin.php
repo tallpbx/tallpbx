@@ -36,4 +36,10 @@ return [
     'modal_delete_voicemail_mailbox_confirm' => 'Supprimer la boîte vocale',
     'modal_delete_voicemail_mailbox_message' => 'Supprimer la boîte vocale « :name » ? Cette action est irréversible.',
     'modal_delete_voicemail_mailbox_error_title' => 'La boîte vocale ne peut pas être supprimée',
+    'voicemail_id' => 'Identifiant de Messagerie Vocale',
+    'voicemail_pin_password' => 'PIN / Mot de passe',
+    'voicemail_email_notification' => 'Notification par Email',
+    'voicemail_greeting_audio' => 'Audio de Salutation',
+    'voicemail_options' => 'Options',
+    'voicemail_delete_after_email' => 'Supprimer le message du serveur après l\'envoi par email',
 ];

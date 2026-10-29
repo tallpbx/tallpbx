@@ -1,31 +1,29 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.ivr_menu') }}</h1>
+        <x-page-header :title="($this->isEdit ? __('client.edit') : __('client.create')) . ' ' . __('admin.ivr_menu')" />
 
         <form wire:submit="save" class="space-y-6">
             {{-- Tenant --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="tenantId">
-                    <span class="label-text font-medium">Tenant</span>
+                    <span class="label-text font-medium">{{ __('admin.tenant') }}</span>
                     <x-tooltip :tip="__('admin.tenant_select_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>
                 </label>
                 <select wire:model="tenantId" id="tenantId" class="select select-bordered w-full">
-                    <option value="">Select a tenant...</option>
+                    <option value="">{{ __('admin.select_tenant') }}</option>
                     @foreach ($tenants as $tenant)
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             {{-- Name --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="name">
-                    <span class="label-text font-medium">Name</span>
+                    <span class="label-text font-medium">{{ __('admin.name') }}</span>
                     <x-tooltip :tip="__('admin.name_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>
@@ -37,15 +35,13 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., Main IVR, Support Menu"
                 />
-                @error('name')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="name" />
             </div>
 
             {{-- Greeting --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="greetingUpload">
-                    <span class="label-text font-medium">Greeting</span>
+                    <span class="label-text font-medium">{{ __('admin.ivr_menu_greeting') }}</span>
                     <x-tooltip :tip="__('admin.ivr_menu_greeting_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>
@@ -58,17 +54,15 @@
                     class="file-input file-input-bordered w-full"
                 />
                 @if ($this->isEdit && $greeting)
-                    <span class="label-text-alt mt-1">Leave blank to keep the existing greeting.</span>
+                    <span class="label-text-alt mt-1">{{ __('admin.leave_blank_keep_existing_greeting') }}</span>
                 @endif
-                @error('greetingUpload')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="greetingUpload" />
             </div>
 
             {{-- Description --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="description">
-                    <span class="label-text font-medium">Description</span>
+                    <span class="label-text font-medium">{{ __('admin.description') }}</span>
                 </label>
                 <textarea
                     wire:model="description"
@@ -77,9 +71,7 @@
                     rows="2"
                     placeholder="Optional description of this IVR menu"
                 ></textarea>
-                @error('description')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="description" />
             </div>
 
             {{-- Settings Grid --}}
@@ -87,7 +79,7 @@
                 {{-- Timeout --}}
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1" for="timeout">
-                        <span class="label-text font-medium">Timeout (seconds)</span>
+                        <span class="label-text font-medium">{{ __('admin.ivr_menu_timeout') }}</span>
                     </label>
                     <input
                         wire:model="timeout"
@@ -97,15 +89,13 @@
                         min="1"
                         max="300"
                     />
-                    @error('timeout')
-                        <span class="text-error text-xs mt-1">{{ $message }}</span>
-                    @enderror
+                    <x-form-error name="timeout" />
                 </div>
 
                 {{-- Max Failures --}}
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1" for="maxFailures">
-                        <span class="label-text font-medium">Max Failures</span>
+                        <span class="label-text font-medium">{{ __('admin.ivr_menu_max_failures') }}</span>
                     </label>
                     <input
                         wire:model="maxFailures"
@@ -115,15 +105,13 @@
                         min="1"
                         max="100"
                     />
-                    @error('maxFailures')
-                        <span class="text-error text-xs mt-1">{{ $message }}</span>
-                    @enderror
+                    <x-form-error name="maxFailures" />
                 </div>
 
                 {{-- Digit Length --}}
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1" for="digitLength">
-                        <span class="label-text font-medium">Digit Length (0 = variable)</span>
+                        <span class="label-text font-medium">{{ __('admin.ivr_menu_digit_length_hint') }}</span>
                     </label>
                     <input
                         wire:model="digitLength"
@@ -133,17 +121,15 @@
                         min="0"
                         max="20"
                     />
-                    @error('digitLength')
-                        <span class="text-error text-xs mt-1">{{ $message }}</span>
-                    @enderror
+                    <x-form-error name="digitLength" />
                 </div>
             </div>
 
             {{-- Enabled --}}
             <div class="form-control w-full">
                 <label class="label cursor-pointer justify-start gap-3">
-                    <input wire:model="enabled" type="checkbox" class="checkbox checkbox-primary" />
-                    <span class="label-text font-medium">Enabled</span>
+                    <input wire:model="enabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
+                    <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                     <x-tooltip :tip="__('admin.enabled_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>

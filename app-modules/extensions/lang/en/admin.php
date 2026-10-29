@@ -40,4 +40,11 @@ return [
     'extension_outbound_caller_id_number_tooltip' => 'The phone number transmitted to external parties when making outbound calls (e.g. your direct DID or company main number), overriding Effective Caller ID Number (unless overridden by an outbound route).',
     'modal_delete_extension_title' => 'Delete Extension?',
     'modal_delete_extension_confirm' => 'Delete Extension',
+    'extension_display_name' => 'Display Name',
+    'extension_sip_password' => 'SIP Password',
+    'extension_effective_caller_id_name' => 'Effective Caller ID Name',
+    'extension_effective_caller_id_number' => 'Effective Caller ID Number',
+    'extension_outbound_caller_id_name' => 'Outbound Caller ID Name',
+    'extension_outbound_caller_id_number' => 'Outbound Caller ID Number',
+    'extension_voicemail_enabled' => 'Voicemail Enabled',
 ];

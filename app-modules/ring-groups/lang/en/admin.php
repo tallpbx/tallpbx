@@ -36,4 +36,5 @@ return [
     'modal_delete_ring_group_title' => 'Delete Ring Group?',
     'modal_delete_ring_group_confirm' => 'Delete Ring Group',
     'modal_delete_ring_group_message' => 'Delete “:name” and its members? This cannot be undone.',
+    'ring_group_timeout_seconds' => 'Ring Timeout (seconds)',
 ];

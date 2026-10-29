@@ -1,16 +1,12 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.acl_title') }}</h2>
-            <x-tooltip :tip="__('admin.acl_tooltip')" align="start" position="right">
-                <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-            </x-tooltip>
-        </div>
-        <a href="{{ route('panel.acl.create') }}" class="btn btn-primary btn-sm">
-            <x-heroicon-o-plus class="w-4 h-4" />
-            {{ __('admin.create_acl') }}
-        </a>
-    </div>
+    <x-page-header :title="__('admin.acl_title')" :tooltip="__('admin.acl_tooltip')">
+        <x-slot:actions>
+            <a href="{{ route('panel.acl.create') }}" wire:navigate class="btn btn-primary btn-sm">
+                <x-heroicon-o-plus class="w-4 h-4" />
+                {{ __('admin.create_acl') }}
+            </a>
+        </x-slot:actions>
+    </x-page-header>
 
     <div class="card bg-base-100 border border-base-300">
         <div class="overflow-x-auto">

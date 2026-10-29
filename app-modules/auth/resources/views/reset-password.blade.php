@@ -2,7 +2,7 @@
     <div class="card bg-base-100 border border-base-300 w-full max-w-md">
         <div class="card-body">
             <h2 class="card-title text-2xl font-bold tracking-tight text-base-content mb-4">{{ __('client.reset_password') }}</h2>
-            <p class="text-sm text-base-content/60 mb-4">
+            <p class="text-xs text-base-content/60 mb-4">
                 Enter your email and a new password to reset your account.
             </p>
 
@@ -15,7 +15,7 @@
                     <label for="email" class="label"><span class="label-text">Email</span></label>
                     <input type="email" id="email" wire:model="email"
                            class="input input-bordered w-full" placeholder="email@example.com" required />
-                    @error('email') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="email" />
                 </div>
 
                 {{-- Password --}}
@@ -25,9 +25,9 @@
                         <span class="label-text-alt text-base-content/60">{{ __('client.password_requirements_min') }}</span>
                     </label>
                     <input type="password" id="password" wire:model="password"
-                           class="input input-bordered w-full @error('password') input-error @enderror" placeholder="{{ __('client.password_requirements_min') }}" required />
+                           class="input input-bordered w-full {{ $errors->has('password') ? 'input-error' : '' }}" placeholder="{{ __('client.password_requirements_min') }}" required />
                     <p class="text-xs text-base-content/60 mt-1">{{ __('client.password_requirements_hint') }}</p>
-                    @error('password') <span class="label-text-alt text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="password" />
                 </div>
 
                 {{-- Confirm Password --}}
@@ -44,8 +44,8 @@
                 <button type="submit" class="btn btn-primary w-full mt-6">{{ __('client.reset_password') }}</button>
             </form>
 
-            <div class="text-center mt-4 text-sm text-base-content/60">
-                <a href="{{ route('panel.login') }}" class="link link-primary">{{ __('client.back_to_sign_in') }}</a>
+            <div class="text-center mt-4 text-xs text-base-content/60">
+                <a href="{{ route('panel.login') }}" wire:navigate class="link link-primary">{{ __('client.back_to_sign_in') }}</a>
             </div>
         </div>
     </div>

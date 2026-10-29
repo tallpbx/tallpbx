@@ -1,9 +1,14 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <div class="flex items-center justify-between mb-6">
-            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.operator_panel_title') }}</h1>
-            @if ($fsConnected)<span class="badge badge-success gap-1"><x-heroicon-o-arrow-path class="w-3 h-3 animate-spin" /> {{ __('admin.live') }}</span>@endif
-        </div>
+        <x-page-header :title="__('admin.operator_panel_title')">
+            @if ($fsConnected)
+                <x-slot:actions>
+                    <span class="badge badge-success gap-1"><x-heroicon-o-arrow-path class="w-3 h-3 animate-spin" /> {{ __('admin.live') }}</span>
+                </x-slot:actions>
+            @endif
+        </x-page-header>
+
+        <x-websocket-health-banner />
 
         @if (!$fsConnected)
             <x-inline-alert type="warning">{{ __('admin.fs_not_connected') }}</x-inline-alert>

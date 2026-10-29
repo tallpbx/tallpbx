@@ -8,8 +8,8 @@
                 <div class="form-control">
                     <label class="label"><span class="label-text font-medium">{{ __('admin.security_attacker_ip') }}</span></label>
                     <input wire:model="manualBanIp" type="text" placeholder="e.g. 198.51.100.42 or 2001:db8::1"
-                           class="input input-bordered input-sm font-mono @error('manualBanIp') input-error @enderror" />
-                    @error('manualBanIp') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                           class="input input-bordered input-sm font-mono {{ $errors->has('manualBanIp') ? 'input-error' : '' }}" />
+                    <x-form-error name="manualBanIp" />
                 </div>
 
                 <div class="form-control">

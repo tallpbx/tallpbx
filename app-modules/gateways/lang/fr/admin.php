@@ -40,4 +40,8 @@ return [
     'gateway_register_tooltip' => 'Indique s\'il faut envoyer des requêtes SIP REGISTER à cette passerelle. Désactiver pour les troncs authentifiés par IP.',
     'modal_delete_gateway_title' => 'Supprimer la passerelle ?',
     'modal_delete_gateway_confirm' => 'Supprimer la passerelle',
+    'gateway_port' => 'Port',
+    'gateway_profile' => 'Profil',
+    'gateway_profile_hint' => 'Nom du profil Sofia (par défaut : external)',
+    'gateway_register_provider' => 'S\'enregistrer auprès du fournisseur',
 ];

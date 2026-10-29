@@ -6,19 +6,15 @@
         <div class="alert alert-error mb-4"><span>{{ $actionError }}</span></div>
     @endif
 
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.notifications_title') }}</h1>
-            <p class="text-sm text-base-content/60 mt-1">
-                {{ trans_choice('admin.unread_notifications', $unreadCount, ['count' => $unreadCount]) }}
-            </p>
-        </div>
+    <x-page-header :title="__('admin.notifications_title')" :subtitle="trans_choice('admin.unread_notifications', $unreadCount, ['count' => $unreadCount])">
         @if ($unreadCount > 0)
-            <button wire:click="markAllAsRead" class="btn btn-ghost btn-sm">
-                {{ __('admin.mark_all_read') }}
-            </button>
+            <x-slot:actions>
+                <button wire:click="markAllAsRead" class="btn btn-ghost btn-sm">
+                    {{ __('admin.mark_all_read') }}
+                </button>
+            </x-slot:actions>
         @endif
-    </div>
+    </x-page-header>
 
     <div class="card bg-base-100 border border-base-300">
         <div class="card-body p-0">
@@ -44,7 +40,7 @@
                                 <p class="font-medium text-sm">
                                     {{ data_get($notification->data, 'title', __('admin.notification_default_title')) }}
                                 </p>
-                                <p class="text-sm text-base-content/60 mt-0.5">
+                                <p class="text-xs text-base-content/60 mt-0.5">
                                     {{ data_get($notification->data, 'message', '') }}
                                 </p>
                                 @if (data_get($notification->data, 'category') !== null && data_get($notification->data, 'original_filename') !== null)

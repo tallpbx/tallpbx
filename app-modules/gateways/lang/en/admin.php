@@ -40,4 +40,8 @@ return [
     'gateway_register_tooltip' => 'Whether to send SIP REGISTER requests to this gateway. Disable for IP-authenticated trunks.',
     'modal_delete_gateway_title' => 'Delete Gateway?',
     'modal_delete_gateway_confirm' => 'Delete Gateway',
+    'gateway_port' => 'Port',
+    'gateway_profile' => 'Profile',
+    'gateway_profile_hint' => 'Sofia profile name (default: external)',
+    'gateway_register_provider' => 'Register with provider',
 ];

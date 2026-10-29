@@ -28,4 +28,8 @@ return [
     'confirm_delete_sip_account' => 'Êtes-vous sûr de vouloir supprimer ce compte SIP ?',
     'modal_delete_sip_account_title' => 'Supprimer le compte SIP ?',
     'modal_delete_sip_account_confirm' => 'Supprimer le compte SIP',
+    'sip_account_identity_mode' => 'Mode d\'Identité',
+    'sip_account_select_domain' => 'Sélectionner le domaine',
+    'sip_account_auth_username' => 'Nom d\'Utilisateur d\'Authentification',
+    'sip_account_auth_password' => 'Mot de Passe d\'Authentification',
 ];

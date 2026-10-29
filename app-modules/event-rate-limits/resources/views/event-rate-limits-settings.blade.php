@@ -1,12 +1,6 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <div class="flex items-center gap-2 mb-6">
-            <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.event_rate_limits_title') }}</h1>
-            <x-tooltip :tip="__('admin.event_rate_limits_tooltip')" align="start" position="right">
-                <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-            </x-tooltip>
-        </div>
-        <p class="text-base-content/60 mb-6">{{ __('admin.event_rate_limits_description') }}</p>
+        <x-page-header :title="__('admin.event_rate_limits_title')" :tooltip="__('admin.event_rate_limits_tooltip')" :subtitle="__('admin.event_rate_limits_description')" />
         <form wire:submit="save" class="space-y-6 max-w-lg">
             <div class="form-control w-full">
                 <x-tooltip :tip="__('admin.event_rate_limits_max_events_tooltip')" align="start" position="right">
@@ -15,7 +9,7 @@
                     </label>
                 </x-tooltip>
                 <input wire:model="maxEventsPerMinute" id="maxEventsPerMinute" type="number" min="1" class="input input-bordered w-full" />
-                @error('maxEventsPerMinute')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
+                <x-form-error name="maxEventsPerMinute" />
             </div>
             <div class="form-control w-full">
                 <x-tooltip :tip="__('admin.event_rate_limits_burst_tooltip')" align="start" position="right">
@@ -24,7 +18,7 @@
                     </label>
                 </x-tooltip>
                 <input wire:model="burstLimit" id="burstLimit" type="number" min="1" class="input input-bordered w-full" />
-                @error('burstLimit')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
+                <x-form-error name="burstLimit" />
             </div>
             <div class="form-control w-full">
                 <x-tooltip :tip="__('admin.event_rate_limits_block_duration_tooltip')" align="start" position="right">
@@ -33,7 +27,7 @@
                     </label>
                 </x-tooltip>
                 <input wire:model="blockDuration" id="blockDuration" type="number" min="1" class="input input-bordered w-full" />
-                @error('blockDuration')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
+                <x-form-error name="blockDuration" />
             </div>
             <div class="flex gap-3">
                 <x-form-submit-button>{{ __('client.save') }}</x-form-submit-button>

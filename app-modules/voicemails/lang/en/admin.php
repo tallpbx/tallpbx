@@ -36,4 +36,10 @@ return [
     'modal_delete_voicemail_mailbox_confirm' => 'Delete Voicemail Mailbox',
     'modal_delete_voicemail_mailbox_message' => 'Delete mailbox “:name”? This cannot be undone.',
     'modal_delete_voicemail_mailbox_error_title' => 'Voicemail Mailbox Cannot Be Deleted',
+    'voicemail_id' => 'Voicemail ID',
+    'voicemail_pin_password' => 'PIN / Password',
+    'voicemail_email_notification' => 'Email Notification',
+    'voicemail_greeting_audio' => 'Greeting Audio',
+    'voicemail_options' => 'Options',
+    'voicemail_delete_after_email' => 'Delete message from server after emailing',
 ];

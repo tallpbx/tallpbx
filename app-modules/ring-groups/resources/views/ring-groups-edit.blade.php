@@ -1,28 +1,26 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.ring_group') }}</h1>
+        <x-page-header :title="($this->isEdit ? __('client.edit') : __('client.create')) . ' ' . __('admin.ring_group')" />
 
         <form wire:submit="save" class="space-y-6">
             {{-- Tenant --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="tenantId">
-                    <span class="label-text font-medium">Tenant</span>
+                    <span class="label-text font-medium">{{ __('admin.tenant') }}</span>
                 </label>
                 <select wire:model="tenantId" id="tenantId" class="select select-bordered w-full">
-                    <option value="">Select a tenant...</option>
+                    <option value="">{{ __('admin.select_tenant') }}</option>
                     @foreach ($tenants as $tenant)
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             {{-- Name --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="name">
-                    <span class="label-text font-medium">Name</span>
+                    <span class="label-text font-medium">{{ __('admin.name') }}</span>
                 </label>
                 <input
                     wire:model="name"
@@ -31,15 +29,13 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., Sales Team, Support Group"
                 />
-                @error('name')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="name" />
             </div>
 
             {{-- Strategy --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="strategy">
-                    <span class="label-text font-medium">Strategy</span>
+                    <span class="label-text font-medium">{{ __('admin.ring_group_strategy') }}</span>
                     <x-tooltip :tip="__('admin.ring_group_strategy_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>
@@ -49,15 +45,13 @@
                     <option value="sequential">Sequential</option>
                     <option value="round-robin">Round Robin</option>
                 </select>
-                @error('strategy')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="strategy" />
             </div>
 
             {{-- Ring Timeout --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="ringTimeout">
-                    <span class="label-text font-medium">Ring Timeout (seconds)</span>
+                    <span class="label-text font-medium">{{ __('admin.ring_group_timeout_seconds') }}</span>
                     <x-tooltip :tip="__('admin.ring_group_timeout_tooltip')" position="right">
                         <x-heroicon-o-information-circle class="w-4 h-4 text-base-content/60 cursor-help" />
                     </x-tooltip>
@@ -70,15 +64,13 @@
                     min="1"
                     max="300"
                 />
-                @error('ringTimeout')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="ringTimeout" />
             </div>
 
             {{-- Description --}}
             <div class="form-control w-full">
                 <label class="label justify-start gap-2 pb-1" for="description">
-                    <span class="label-text font-medium">Description</span>
+                    <span class="label-text font-medium">{{ __('admin.description') }}</span>
                 </label>
                 <textarea
                     wire:model="description"
@@ -87,15 +79,13 @@
                     rows="2"
                     placeholder="Optional description of this ring group"
                 ></textarea>
-                @error('description')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="description" />
             </div>
 
             {{-- Extensions --}}
             <div class="form-control w-full">
                 <div class="flex items-center justify-between mb-2">
-                    <label class="label-text font-medium">Extensions</label>
+                    <label class="label-text font-medium">{{ __('admin.extensions') }}</label>
                     <button type="button" wire:click="addExtension" class="btn btn-sm btn-outline">
                         <x-heroicon-o-plus class="w-4 h-4" />
                         {{ __('admin.add_extension') }}
@@ -121,16 +111,14 @@
                     <p class="text-sm text-base-content/50 italic">No extensions assigned. Click "Add Extension" to add one.</p>
                 @endif
 
-                @error('extensions.*.extension_uuid')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="extensions.*.extension_uuid" />
             </div>
 
             {{-- Enabled --}}
             <div class="form-control w-full">
                 <label class="label cursor-pointer justify-start gap-3">
-                    <input wire:model="enabled" type="checkbox" class="checkbox checkbox-primary" />
-                    <span class="label-text font-medium">Enabled</span>
+                    <input wire:model="enabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
+                    <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                 </label>
             </div>
 

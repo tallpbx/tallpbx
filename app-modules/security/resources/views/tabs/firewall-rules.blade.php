@@ -231,7 +231,9 @@
                                                wire:loading.attr="disabled"
                                                wire:target="setPrefilterEnabled, confirmDisablePrefilter, executeDisablePrefilter"
                                                :checked="$wire.prefilterEnabled"
-                                               type="checkbox" class="toggle toggle-primary toggle-xs" @checked($prefilterEnabled) />
+                                               type="checkbox"
+                                               aria-label="{{ __('admin.security_system_invariants_prefilters') }}"
+                                               class="toggle toggle-primary toggle-xs" @checked($prefilterEnabled) />
                                     </label>
 
                                     <span class="uppercase tracking-wider text-xs {{ ! $prefilterEnabled ? 'text-base-content/50' : '' }}">{{ __('admin.security_system_invariants_prefilters') }}</span>
@@ -246,7 +248,7 @@
                                         </x-tooltip>
                                     </span>
 
-                                    <span class="badge badge-ghost badge-sm text-xs font-normal h-auto py-0.5 leading-tight text-center {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
+                                    <span class="badge badge-ghost badge-sm text-xs font-normal text-center {{ ! $prefilterEnabled ? 'opacity-50' : '' }}">
                                         {{ __('admin.security_invariants_rules_count', ['count' => count($this->preFilterRows) + 1]) }}
                                     </span>
                                 </div>
@@ -290,9 +292,9 @@
                                         </x-tooltip>
                                     @endif
                                     @if ($preFilterRow['invariant'] && ! $preFilterRow['pinned'])
-                                        <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight inline-block">{{ __('admin.security_kernel_invariant') }}</span>
+                                        <span class="badge badge-ghost badge-xs font-mono opacity-75 inline-block">{{ __('admin.security_kernel_invariant') }}</span>
                                     @endif
-                                    <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight inline-block" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
+                                    <span class="badge badge-ghost badge-xs font-mono opacity-75 inline-block" title="{{ $preFilterRow['badge'] }}">{{ $preFilterRow['badge'] }}</span>
                                 </div>
                             </td>
                             <td class="text-center text-xs font-mono font-semibold text-base-content/70 px-1.5">
@@ -319,11 +321,11 @@
                             </td>
                             <td class="text-center px-1.5">
                                 @if (! $rowActive)
-                                    <span class="badge badge-neutral badge-sm font-semibold opacity-75 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_threat_feed_status_disabled') }}</span>
+                                    <span class="badge badge-neutral badge-sm font-semibold opacity-75 text-center inline-block max-w-full">{{ __('admin.security_threat_feed_status_disabled') }}</span>
                                 @elseif ($preFilterRow['action'] === 'allow')
-                                    <span class="badge badge-success badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm font-semibold text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @else
-                                    <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
+                                    <span class="badge badge-error badge-sm font-semibold text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                                 @endif
                             </td>
                             {{-- Reorder, primary action, and delete each get their own column so
@@ -333,11 +335,13 @@
                                     @if (! $preFilterRow['pinned'])
                                         <button wire:click="movePreFilterUp('{{ $preFilterRow['key'] }}')" type="button"
                                                 @disabled(! $prefilterEnabled)
+                                                aria-label="{{ __('admin.security_move_up') }}"
                                                 class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content disabled:opacity-30">
                                             <x-heroicon-s-chevron-up class="w-3.5 h-3.5" />
                                         </button>
                                         <button wire:click="movePreFilterDown('{{ $preFilterRow['key'] }}')" type="button"
                                                 @disabled(! $prefilterEnabled)
+                                                aria-label="{{ __('admin.security_move_down') }}"
                                                 class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content disabled:opacity-30">
                                             <x-heroicon-s-chevron-down class="w-3.5 h-3.5" />
                                         </button>
@@ -409,10 +413,10 @@
                                 </x-tooltip>
                             </div>
                             <div class="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                <span class="badge badge-ghost badge-xs font-mono opacity-75 h-auto py-0.5 leading-tight text-center inline-block" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
+                                <span class="badge badge-ghost badge-xs font-mono opacity-75 text-center inline-block" title="{{ $geoMode === 'whitelist' ? '@geo_allowed_ips & @geo_allowed_ips6' : '@geo_blocked_ips & @geo_blocked_ips6' }}">
                                     {{ $geoMode === 'whitelist' ? '@geo_allowed_ips' : '@geo_blocked_ips' }}
                                 </span>
-                                <span class="badge badge-neutral badge-xs font-mono h-auto py-0.5 leading-tight text-center inline-block max-w-full">
+                                <span class="badge badge-neutral badge-xs font-mono text-center inline-block max-w-full">
                                     {{ $geoMode === 'whitelist' ? __('admin.security_geo_mode_whitelist_badge') : __('admin.security_geo_mode_blacklist_badge') }}
                                 </span>
                             </div>
@@ -445,13 +449,13 @@
                         </td>
                         <td class="text-center px-1.5">
                             @if ($geoStatus === 'disabled')
-                                <span class="badge badge-neutral badge-sm font-semibold opacity-75 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_geo_status_disabled') }}</span>
+                                <span class="badge badge-neutral badge-sm font-semibold opacity-75 text-center inline-block max-w-full">{{ __('admin.security_geo_status_disabled') }}</span>
                             @elseif ($geoStatus === 'idle')
-                                <span class="badge badge-warning badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full" title="{{ __('admin.security_geo_no_countries') }}">
+                                <span class="badge badge-warning badge-sm font-semibold text-center inline-block max-w-full" title="{{ __('admin.security_geo_no_countries') }}">
                                     {{ __('admin.security_geo_status_idle') }}
                                 </span>
                             @else
-                                <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
+                                <span class="badge badge-error badge-sm font-semibold text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                             @endif
                         </td>
                         {{-- Reorder and delete columns are reserved empty so the manage link
@@ -491,6 +495,7 @@
                                 <input wire:click="toggleSystemService({{ $service->id }})" type="checkbox"
                                        wire:loading.attr="disabled"
                                        wire:target="toggleSystemService({{ $service->id }})"
+                                       aria-label="{{ ($service->name ?? 'Service').' '.($service->enabled ? __('client.enabled') : __('client.disabled')) }}"
                                        class="toggle toggle-success toggle-sm"
                                        @checked($service->enabled)
                                        title="{{ $service->enabled ? __('client.enabled') : __('client.disabled') }}" />
@@ -525,7 +530,7 @@
                                                 <input wire:click="setTftpDefense({{ $tftpDefense['enabled'] ? 'false' : 'true' }})"
                                                        wire:loading.attr="disabled"
                                                        wire:target="setTftpDefense"
-                                                       type="checkbox" class="toggle toggle-warning toggle-xs" @checked($tftpDefense['enabled']) />
+                                                       type="checkbox" class="toggle toggle-sm {{ $tftpDefense['enabled'] ? 'toggle-success' : 'toggle-neutral' }}" @checked($tftpDefense['enabled']) />
                                                 <span wire:loading.remove wire:target="setTftpDefense" class="label-text text-xs">
                                                     {{ $tftpDefense['enabled'] ? __('client.enabled') : __('client.disabled') }}
                                                 </span>
@@ -579,16 +584,16 @@
                             </td>
                             <td class="px-2">
                                 @if ($service->source_ip === 'any' || $service->source_ip === '0.0.0.0/0' || empty($service->source_ip))
-                                    <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
+                                    <span class="badge badge-ghost badge-xs text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                                 @else
                                     <span class="font-mono text-xs text-base-content/70">{{ $service->source_ip }}</span>
                                 @endif
                             </td>
                             <td class="text-center px-1.5">
                                 @if ($service->enabled)
-                                    <span class="badge badge-success badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @else
-                                    <span class="badge badge-ghost badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('client.disabled') }}</span>
+                                    <span class="badge badge-ghost badge-sm text-center inline-block max-w-full">{{ __('client.disabled') }}</span>
                                 @endif
                             </td>
                             {{-- Reorder and delete columns reserved empty; edit sits in the shared
@@ -624,6 +629,7 @@
                                 <input wire:click="toggleRule({{ $rule->id }})" type="checkbox"
                                        wire:loading.attr="disabled"
                                        wire:target="toggleRule({{ $rule->id }})"
+                                       aria-label="{{ ($rule->description ?: $rule->source_ip).' '.($rule->enabled ? __('client.enabled') : __('client.disabled')) }}"
                                        class="toggle toggle-primary toggle-sm"
                                        @checked($rule->enabled) />
                             </td>
@@ -660,7 +666,7 @@
                             {{-- Source Network --}}
                             <td class="px-2">
                                 @if ($rule->source_ip === 'any' || $rule->source_ip === '0.0.0.0/0')
-                                    <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
+                                    <span class="badge badge-ghost badge-xs text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                                 @else
                                     <span class="font-mono text-xs text-base-content/70">{{ $rule->source_ip }}</span>
                                 @endif
@@ -669,9 +675,9 @@
                             {{-- Action Badge --}}
                             <td class="text-center px-1.5">
                                 @if ($rule->action === 'accept')
-                                    <span class="badge badge-success badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @else
-                                    <span class="badge badge-error badge-sm h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_block') }}</span>
+                                    <span class="badge badge-error badge-sm text-center inline-block max-w-full">{{ __('admin.security_action_block') }}</span>
                                 @endif
                             </td>
 
@@ -679,10 +685,10 @@
                                  with every other section. Delete carries the destructive red tone. --}}
                             <td class="text-center px-1 w-10">
                                 <div class="flex flex-col items-center gap-0.5">
-                                    <button wire:click="moveRuleUp({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
+                                    <button wire:click="moveRuleUp({{ $rule->id }})" type="button" aria-label="{{ __('admin.security_move_up') }}" class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
                                         <x-heroicon-s-chevron-up class="w-3.5 h-3.5" />
                                     </button>
-                                    <button wire:click="moveRuleDown({{ $rule->id }})" type="button" class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
+                                    <button wire:click="moveRuleDown({{ $rule->id }})" type="button" aria-label="{{ __('admin.security_move_down') }}" class="btn btn-ghost btn-xs btn-square text-base-content/70 hover:text-base-content">
                                         <x-heroicon-s-chevron-down class="w-3.5 h-3.5" />
                                     </button>
                                 </div>
@@ -734,19 +740,19 @@
                             <span title="{{ __('admin.security_all_remaining_traffic') }}">{{ __('admin.security_all_ports') }}</span>
                         </td>
                         <td class="px-2">
-                            <span class="badge badge-ghost badge-xs h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
+                            <span class="badge badge-ghost badge-xs text-center inline-block max-w-full">{{ __('admin.security_source_anywhere') }}</span>
                         </td>
                         <td class="text-center px-1.5">
                             <span wire:loading.remove wire:target="saveDefaultPolicy">
                                 @if ($firewallDefaultPolicy === 'drop')
-                                    <span class="badge badge-error badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
+                                    <span class="badge badge-error badge-sm font-semibold text-center inline-block max-w-full">{{ __('admin.security_action_drop') }}</span>
                                 @else
-                                    <span class="badge badge-success badge-sm font-semibold h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
+                                    <span class="badge badge-success badge-sm font-semibold text-center inline-block max-w-full">{{ __('admin.security_action_allow') }}</span>
                                 @endif
                             </span>
                             <span wire:loading wire:target="saveDefaultPolicy" class="inline-flex items-center gap-1.5">
                                 <span class="loading loading-spinner loading-xs text-primary"></span>
-                                <span class="badge badge-ghost badge-sm font-semibold text-base-content/60 h-auto py-0.5 leading-tight text-center inline-block max-w-full">{{ __('admin.saving') }}</span>
+                                <span class="badge badge-ghost badge-sm font-semibold text-base-content/60 text-center inline-block max-w-full">{{ __('admin.saving') }}</span>
                             </span>
                         </td>
                         {{-- Reorder and delete reserved empty; configure becomes an icon-only control

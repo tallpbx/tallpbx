@@ -1,6 +1,9 @@
 <?php
 
 declare(strict_types=1);
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 
 /**
  * Architecture tests enforcing user interface conventions, design token discipline,
@@ -109,10 +112,15 @@ it('enforces standardized page-title typography across all module and panel view
 
     $violations = [];
     $matchedHeadings = 0;
+    $xPageHeaders = 0;
 
     foreach ($files as $file) {
         $content = (string) file_get_contents($file);
         $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (preg_match_all('/<x-page-header\b/i', $content, $pageHeaderMatches)) {
+            $xPageHeaders += count($pageHeaderMatches[0]);
+        }
 
         if (preg_match_all('/<h[12]\b[^>]*class=[\"\']([^\"\']*)[\"\'][^>]*>/i', $content, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
@@ -139,7 +147,8 @@ it('enforces standardized page-title typography across all module and panel view
         }
     }
 
-    expect($matchedHeadings)->toBeGreaterThanOrEqual(125)
+    $totalHeadings = $matchedHeadings + $xPageHeaders;
+    expect($totalHeadings)->toBeGreaterThanOrEqual(125)
         ->and($violations)->toBeEmpty();
 });
 
@@ -246,4 +255,559 @@ it('enforces standardized sizing and loading locks on all toggle switches', func
         ->and($violations)->toBeEmpty(
             'All toggle switches must specify an explicit size token (e.g. toggle-sm) and wire:loading.attr="disabled".'
         );
+});
+
+it('renders form errors using the shared x-form-error component', function (): void {
+    View::share('errors', new ViewErrorBag);
+    $view = (string) $this->blade('<x-form-error name="email" />', [
+        'errors' => new ViewErrorBag,
+    ]);
+    expect(trim($view))->toBe('');
+
+    $errorBag = new MessageBag(['email' => ['The email field is required.']]);
+    $viewErrorBag = new ViewErrorBag;
+    $viewErrorBag->put('default', $errorBag);
+    View::share('errors', $viewErrorBag);
+
+    $rendered = (string) $this->blade('<x-form-error name="email" />', [
+        'errors' => $viewErrorBag,
+    ]);
+
+    expect($rendered)
+        ->toContain('class="mt-1 text-xs text-error"')
+        ->toContain('role="alert"')
+        ->toContain('The email field is required.');
+});
+
+it('enforces that all module views use x-form-error instead of raw @error directives', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (preg_match_all('/@error\s*\(/i', $content, $matches, PREG_OFFSET_CAPTURE)) {
+            foreach ($matches[0] as $match) {
+                $lineNumber = substr_count(substr($content, 0, $match[1]), "\n") + 1;
+                $violations[] = "{$relativePath}:{$lineNumber} contains raw @error directive";
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Module views must not contain raw @error directives. Use <x-form-error name="..." /> instead: '.implode("\n", $violations)
+    );
+});
+
+it('enforces settings-edit follows standard page header, button, table, and empty state conventions', function (): void {
+    $file = base_path('app-modules/admin/resources/views/settings-edit.blade.php');
+    $content = (string) file_get_contents($file);
+
+    expect($content)->toContain('<x-page-header')
+        ->and($content)->toContain('btn-primary btn-sm')
+        ->and($content)->toContain('table-zebra text-xs')
+        ->and($content)->toContain('__(\'admin.settings_empty\')')
+        ->and($content)->toContain('<x-icon-button');
+});
+
+it('enforces layouts/app contains zero raw tooltip divs and uses localized close_sidebar', function (): void {
+    $file = base_path('resources/views/layouts/app.blade.php');
+    $content = (string) file_get_contents($file);
+
+    expect($content)->not->toMatch('/class=[\"\']tooltip\b/i')
+        ->and($content)->toContain('aria-label="{{ __(\'admin.close_sidebar\') }}"');
+});
+
+it('enforces dashboard stats overview heading uses standard text-lg font-semibold', function (): void {
+    $file = base_path('resources/views/components/dashboard/stats.blade.php');
+    $content = (string) file_get_contents($file);
+
+    expect($content)->toContain('text-lg font-semibold')
+        ->and($content)->not->toContain('text-xl font-semibold');
+});
+
+it('restricts toggle-warning exclusively to the firewall observe-mode switch', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if ($relativePath === 'app-modules/security/resources/views/partials/firewall-switches.blade.php') {
+            continue;
+        }
+
+        if (str_contains($content, 'toggle-warning')) {
+            $violations[] = "{$relativePath} contains forbidden 'toggle-warning' (only allowed in firewall-switches.blade.php)";
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'toggle-warning is reserved exclusively for the observe-mode switch in firewall-switches.blade.php: '.implode("\n", $violations)
+    );
+});
+
+it('restricts checkbox classes exclusively to the multi-select allowlist', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $allowlist = [
+        'app-modules/admin/resources/views/groups-edit.blade.php',
+        'app-modules/admin/resources/views/users-edit.blade.php',
+        'app-modules/admin/resources/views/admins-edit.blade.php',
+        'app-modules/certificates/resources/views/certificate-manager.blade.php',
+        'app-modules/extensions/resources/views/extensions-bulk-create.blade.php',
+        'app-modules/admin/resources/views/auth/admin-login.blade.php',
+        'app-modules/tenant/resources/views/auth/tenant-login.blade.php',
+        'resources/views/layouts/app.blade.php',
+        'app-modules/security/resources/views/tabs/geo-blocking.blade.php',
+        'app-modules/backups/resources/views/backups-edit.blade.php',
+    ];
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (in_array($relativePath, $allowlist, true)) {
+            continue;
+        }
+
+        if (preg_match_all('/<input\b[^>]*class=["\'][^"\']*\bcheckbox\b[^"\']*["\'][^>]*>/i', $content, $matches)) {
+            foreach ($matches[0] as $match) {
+                $violations[] = "{$relativePath} contains unauthorized checkbox: {$match}";
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Binary switches must use toggle toggle-sm toggle-success. Checkboxes are restricted to multi-select tables/matrices: '.implode("\n", $violations)
+    );
+});
+
+it('enforces two-tier loading dimming standards across all blade views', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (str_contains($content, 'opacity-60 pointer-events-none')) {
+            $violations[] = "{$relativePath} contains forbidden 'opacity-60 pointer-events-none' (expected 'opacity-70 pointer-events-none')";
+        }
+
+        if (preg_match_all('/wire:loading\.class=[\x22\x27]opacity-40\s+pointer-events-none[\x22\x27]/i', $content, $matches, PREG_OFFSET_CAPTURE)) {
+            foreach ($matches[0] as $match) {
+                $pos = $match[1];
+                $before = substr($content, 0, $pos);
+                $lastTagOpen = strrpos($before, '<');
+                if ($lastTagOpen !== false) {
+                    $tagSnippet = substr($before, $lastTagOpen);
+                    if (! preg_match('/^<tr\b/i', $tagSnippet)) {
+                        $violations[] = "{$relativePath}: 'wire:loading.class=\"opacity-40 pointer-events-none\"' must only be used on <tr> elements";
+                    }
+                }
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Two-tier loading dimming strictly requires opacity-40 pointer-events-none for <tr> table rows and opacity-70 pointer-events-none for interactive controls: '.implode("\n", $violations)
+    );
+});
+
+it('enforces standardized backdrop scrims and forbids redundant badge dimension overrides', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (str_contains($content, 'bg-black/40')) {
+            $violations[] = "{$relativePath} contains non-standard backdrop 'bg-black/40' (expected 'bg-black/50')";
+        }
+
+        if (str_contains($content, 'h-auto py-0.5 leading-tight')) {
+            $violations[] = "{$relativePath} contains redundant badge dimensions 'h-auto py-0.5 leading-tight'";
+        }
+
+        if (preg_match_all('/bg-black\/(\d+)/', $content, $matches)) {
+            foreach ($matches[1] as $opacity) {
+                if ($opacity === '15' && $relativePath === 'resources/views/components/operational-toast.blade.php') {
+                    continue;
+                }
+                if ($opacity !== '50') {
+                    $violations[] = "{$relativePath} contains unexpected bg-black/{$opacity}";
+                }
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(implode("\n", $violations));
+});
+
+it('enforces wire:navigate on all internal panel navigation links', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (preg_match_all('/<a\b(?:[^\x22\x27>]|[\x22\x27][^\x22\x27]*[\x22\x27])*>/is', $content, $matches)) {
+            foreach ($matches[0] as $tag) {
+                if (! str_contains($tag, "route('panel.") && ! str_contains($tag, 'route("panel.')) {
+                    continue;
+                }
+
+                if (str_contains($tag, 'target=') || str_contains($tag, 'download')) {
+                    continue;
+                }
+
+                if (! str_contains($tag, 'wire:navigate')) {
+                    $violations[] = "{$relativePath}: link missing wire:navigate -> ".preg_replace('/\s+/', ' ', $tag);
+                }
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'All internal panel routes must use wire:navigate for SPA continuity: '.implode("\n", $violations)
+    );
+});
+
+it('enforces accessible labels on all btn-square buttons', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (preg_match_all('/<button\b(?:[^\x22\x27>]|[\x22\x27][^\x22\x27]*[\x22\x27])*>/is', $content, $matches)) {
+            foreach ($matches[0] as $tag) {
+                if (! preg_match('/class=[\x22\x27][^\x22\x27]*\bbtn-square\b[^\x22\x27]*[\x22\x27]/i', $tag)) {
+                    continue;
+                }
+
+                if (! str_contains($tag, 'aria-label=') && ! str_contains($tag, 'aria-labelledby=')) {
+                    $violations[] = "{$relativePath}: btn-square button missing aria-label -> ".preg_replace('/\s+/', ' ', $tag);
+                }
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'All btn-square icon buttons must include an aria-label or use <x-icon-button>: '.implode("\n", $violations)
+    );
+});
+
+it('enforces secondary helper text scale and restricts text-xs opacity modifiers', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $allowedExceptions = [
+        'app-modules/security/resources/views/tabs/firewall-rules.blade.php',
+        'app-modules/security/resources/views/tabs/block-allow.blade.php',
+        'app-modules/security/resources/views/tabs/attackers.blade.php',
+        'app-modules/security/resources/views/tabs/geo-blocking.blade.php',
+        'app-modules/security/resources/views/drawers/observe-activity.blade.php',
+        'app-modules/certificates/resources/views/certificate-manager.blade.php',
+        'app-modules/admin/resources/views/permissions-list.blade.php',
+        'app-modules/admin/resources/views/admins-list.blade.php',
+        'app-modules/admin/resources/views/groups-edit.blade.php',
+        'app-modules/admin/resources/views/impersonation-logs-list.blade.php',
+        'app-modules/admin/resources/views/notifications-list.blade.php',
+        'app-modules/admin/resources/views/modules-list.blade.php',
+        'app-modules/admin/resources/views/git-update.blade.php',
+        'app-modules/feature-codes/resources/views/feature-codes-list.blade.php',
+        'app-modules/email-connector/resources/views/email-connector-edit.blade.php',
+        'resources/views/pages/home.blade.php',
+        'resources/views/errors/500.blade.php',
+        'resources/views/layouts/app.blade.php',
+        'resources/views/components/sidebar-menu-item.blade.php',
+        'resources/views/components/horizontal-menu-item.blade.php',
+    ];
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (str_contains($content, 'text-sm text-base-content/60') || str_contains($content, 'text-base-content/60 text-sm')) {
+            $violations[] = "{$relativePath} contains deprecated 'text-sm text-base-content/60' (expected 'text-xs text-base-content/60')";
+        }
+
+        if (preg_match_all('/class=[\x22\x27]([^\x22\x27]*)[\x22\x27]/', $content, $matches)) {
+            foreach ($matches[1] as $classes) {
+                if (preg_match('/\btext-xs\b/', $classes) && preg_match('/\btext-base-content\/(\d+)\b/', $classes, $opMatch)) {
+                    $op = (int) $opMatch[1];
+                    if (! in_array($op, [60, 70], true) && ! in_array($relativePath, $allowedExceptions, true)) {
+                        $violations[] = "{$relativePath}: text-xs has non-standard opacity /{$op} in '{$classes}'";
+                    }
+                }
+            }
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Secondary helper copy must use text-xs text-base-content/60 or text-xs text-base-content/70: '.implode("\n", $violations)
+    );
+});
+
+it('forbids w-2 h-2 and w-8 h-8 sizes and confines w-3 h-3 and w-6 h-6 to explicit allowlists', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $w3Allowlist = [
+        'app-modules/security/resources/views/partials/status-overview-cards.blade.php',
+        'app-modules/security/resources/views/tabs/firewall-rules.blade.php',
+        'app-modules/security/resources/views/tabs/attackers.blade.php',
+        'app-modules/security/resources/views/tabs/geo-blocking.blade.php',
+        'app-modules/active-calls/resources/views/active-calls-list.blade.php',
+        'app-modules/admin/resources/views/settings-edit.blade.php',
+        'app-modules/admin/resources/views/git-update.blade.php',
+        'app-modules/operator-panel/resources/views/operator-panel-index.blade.php',
+        'resources/views/layouts/app.blade.php',
+        'resources/views/components/common/language-switcher.blade.php',
+    ];
+
+    $w6Allowlist = [
+        'app-modules/security/resources/views/modals/confirm-disable-prefilter.blade.php',
+        'app-modules/security/resources/views/partials/cockpit-banners.blade.php',
+        'app-modules/security/resources/views/tabs/attackers.blade.php',
+        'app-modules/security/resources/views/drawers/protection-settings.blade.php',
+        'app-modules/admin/resources/views/monitoring.blade.php',
+        'resources/views/pages/home.blade.php',
+    ];
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if (preg_match('/\b(?:w-2\s+h-2|h-2\s+w-2)\b/', $content)) {
+            $violations[] = "{$relativePath} contains forbidden 'w-2 h-2'";
+        }
+
+        if (preg_match('/\b(?:w-8\s+h-8|h-8\s+w-8)\b/', $content)) {
+            $violations[] = "{$relativePath} contains forbidden 'w-8 h-8'";
+        }
+
+        if (preg_match('/\b(?:w-3\s+h-3|h-3\s+w-3)\b/', $content) && ! in_array($relativePath, $w3Allowlist, true)) {
+            $violations[] = "{$relativePath} contains un-allowlisted 'w-3 h-3'";
+        }
+
+        if (preg_match('/\b(?:w-6\s+h-6|h-6\s+w-6)\b/', $content) && ! in_array($relativePath, $w6Allowlist, true)) {
+            $violations[] = "{$relativePath} contains un-allowlisted 'w-6 h-6'";
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Icon sizing must follow standard scales (w-4 h-4, w-5 h-5), forbidding w-2 h-2 / w-8 h-8 and allowlisting w-3 h-3 / w-6 h-6: '.implode("\n", $violations)
+    );
+});
+
+it('enforces accessible names on all toggle and checkbox inputs', function (): void {
+    $projectRoot = base_path();
+    $files = [];
+
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/app-modules')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($projectRoot.'/resources/views')) as $file) {
+        if ($file->isFile() && str_ends_with($file->getFilename(), '.blade.php')) {
+            $files[] = $file->getPathname();
+        }
+    }
+
+    $violations = [];
+
+    foreach ($files as $file) {
+        $content = (string) file_get_contents($file);
+        $relativePath = str_replace($projectRoot.'/', '', $file);
+
+        if ($relativePath === 'resources/views/layouts/app.blade.php') {
+            continue;
+        }
+
+        $offset = 0;
+        $len = strlen($content);
+        while (($pos = stripos($content, '<input', $offset)) !== false) {
+            $end = false;
+            for ($i = $pos + 6; $i < $len; $i++) {
+                $c = $content[$i];
+                if ($c === '>') {
+                    if ($i > 0 && ($content[$i - 1] === '-' || $content[$i - 1] === '=')) {
+                        continue;
+                    }
+                    $end = $i;
+                    break;
+                }
+            }
+
+            if ($end === false) {
+                break;
+            }
+
+            $tag = substr($content, $pos, $end - $pos + 1);
+            $offset = $end + 1;
+
+            if (! preg_match('/class=[\x22\x27][^\x22\x27]*\b(toggle|checkbox)\b[^\x22\x27]*[\x22\x27]/i', $tag)) {
+                continue;
+            }
+
+            if (preg_match('/\baria-label(ledby)?=/i', $tag)) {
+                continue;
+            }
+
+            if (preg_match('/\bid=[\x22\x27]([^\x22\x27]+)[\x22\x27]/i', $tag, $idMatch)) {
+                $id = preg_quote($idMatch[1], '/');
+                if (preg_match('/<label\b[^>]*\bfor=[\x22\x27]'.$id.'[\x22\x27][^>]*>(.*?)<\/label>/is', $content, $labelForMatch)) {
+                    $labelClean = trim(strip_tags((string) $labelForMatch[1]));
+                    if (! empty($labelClean)) {
+                        continue;
+                    }
+                }
+            }
+
+            $before = substr($content, 0, $pos);
+            $after = substr($content, $pos + strlen($tag));
+            $lastLabelOpen = strrpos($before, '<label');
+            $lastLabelClose = strrpos($before, '</label>');
+            $nextLabelClose = strpos($after, '</label>');
+            $nextLabelOpen = strpos($after, '<label');
+
+            if ($lastLabelOpen !== false && ($lastLabelClose === false || $lastLabelOpen > $lastLabelClose)) {
+                if ($nextLabelClose !== false && ($nextLabelOpen === false || $nextLabelClose < $nextLabelOpen)) {
+                    $labelBlock = substr($before, $lastLabelOpen).$tag.substr($after, 0, $nextLabelClose);
+                    $labelClean = trim(strip_tags((string) preg_replace('/<[^>]+>/', '', $labelBlock)));
+                    if (! empty($labelClean)) {
+                        continue;
+                    }
+                }
+            }
+
+            $violations[] = "{$relativePath}: input missing accessible label -> ".preg_replace('/\s+/', ' ', $tag);
+        }
+    }
+
+    expect($violations)->toBeEmpty(
+        'Every toggle/checkbox input must carry an aria-label, aria-labelledby, or be associated with non-empty label text: '.implode("\n", $violations)
+    );
 });

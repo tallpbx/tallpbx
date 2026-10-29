@@ -1,16 +1,6 @@
 <div class="space-y-6">
     {{-- Header & Top Actions --}}
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <div class="flex items-center gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.security_title') }}</h1>
-                <x-tooltip :tip="__('admin.security_description')" align="start" position="right">
-                    {{-- Info icon marks this as hover tooltip text; size and style match the page-title info icon used across the UI, and the shield stays reserved for the nav menu. --}}
-                    <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-                </x-tooltip>
-            </div>
-        </div>
-    </div>
+    <x-page-header :title="__('admin.security_title')" :tooltip="__('admin.security_description')" />
 
     {{-- Transient feedback toast (shared standard component — see tallpbx-custom skill) --}}
     <x-operational-toast :message="$operationalMessage" :type="$operationalMessageType" />

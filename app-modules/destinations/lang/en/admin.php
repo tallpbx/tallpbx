@@ -37,4 +37,5 @@ return [
     'destination_number_tooltip' => 'The number callers dial to reach this destination. Used in dialplan expressions for routing.',
     'modal_delete_destination_title' => 'Delete Destination?',
     'modal_delete_destination_confirm' => 'Delete Destination',
+    'destination_select_type' => 'Select type',
 ];

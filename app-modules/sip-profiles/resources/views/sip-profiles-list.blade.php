@@ -1,11 +1,12 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.sip_profiles_title') }}</h2><x-tooltip :tip="__('admin.sip_profile_header_tooltip')" align="start" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
-        <a href="{{ route('panel.sip-profiles.create') }}" class="btn btn-primary btn-sm">
+    <x-page-header :title="__('admin.sip_profiles_title')" :tooltip="__('admin.sip_profile_header_tooltip')">
+        <x-slot:actions>
+            <a href="{{ route('panel.sip-profiles.create') }}" wire:navigate class="btn btn-primary btn-sm">
             <x-heroicon-o-plus class="w-4 h-4" />
             {{ __('admin.create_sip_profile') }}
-        </a>
-    </div>
+            </a>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>

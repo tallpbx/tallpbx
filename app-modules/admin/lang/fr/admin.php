@@ -60,4 +60,6 @@ return [
     'modules_protected_hint' => 'Les modules protégés ne peuvent pas être désinstallés.',
     'modules_delete_not_custom' => 'Seuls les modules personnalisés peuvent être supprimés depuis le panneau des modules.',
     'modules_delete_failed' => 'Le module n\'a pas pu être supprimé.',
+    'admin_system_group_no_tenant' => '-- Groupe Système (sans locataire) --',
+    'admin_slug' => 'Identifiant',
 ];

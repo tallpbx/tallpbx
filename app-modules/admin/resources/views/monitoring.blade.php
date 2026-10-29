@@ -1,17 +1,11 @@
 <div class="max-w-5xl">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.monitoring') }}</h2>
-            <p class="text-sm text-base-content/60 mt-1">
-                Real-time system health overview — disk and memory usage, essential service status,
-                FreeSWITCH telephony engine runtime, queue worker backlog, and TLS certificate expiry.
-                Click Refresh to update all metrics from the live system.
-            </p>
-        </div>
-        <button wire:click="refresh" class="btn btn-ghost btn-sm">
-            {{ __('admin.refresh') }}
-        </button>
-    </div>
+    <x-page-header :title="__('admin.monitoring')" subtitle="Real-time system health overview — disk and memory usage, essential service status, FreeSWITCH telephony engine runtime, queue worker backlog, and TLS certificate expiry. Click Refresh to update all metrics from the live system.">
+        <x-slot:actions>
+            <button wire:click="refresh" class="btn btn-ghost btn-sm">
+                {{ __('admin.refresh') }}
+            </button>
+        </x-slot:actions>
+    </x-page-header>
 
     {{-- Service Status Row --}}
     <h3 class="text-lg font-medium mb-3" title="Essential system services checked via systemctl. Red means the service is stopped or crashed — investigate immediately.">{{ __('admin.monitoring_services') }}</h3>
@@ -31,7 +25,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {{-- Disk --}}
         <div class="card bg-base-100 border border-base-300 p-4" title="Root filesystem disk usage from df. Red bar at >90% means the disk is nearly full — free up space to avoid service disruption.">
-            <h4 class="text-sm font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_disk') }}</h4>
+            <h4 class="text-xs font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_disk') }}</h4>
             <div class="text-2xl font-bold">{{ $disk['percent_used'] }}%</div>
             <div class="text-xs text-base-content/60 mt-1">
                 {{ $disk['used_gb'] }} / {{ $disk['total_gb'] }} GB used
@@ -42,7 +36,7 @@
 
         {{-- Memory --}}
         <div class="card bg-base-100 border border-base-300 p-4" title="System memory from /proc/meminfo. Red bar at >90% means the server is low on RAM — consider reducing worker processes or adding swap.">
-            <h4 class="text-sm font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_memory') }}</h4>
+            <h4 class="text-xs font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_memory') }}</h4>
             <div class="text-2xl font-bold">{{ $memory['percent_used'] }}%</div>
             <div class="text-xs text-base-content/60 mt-1">
                 {{ $memory['used_gb'] }} / {{ $memory['total_gb'] }} GB used
@@ -53,7 +47,7 @@
 
         {{-- FreeSWITCH --}}
         <div class="card bg-base-100 border {{ $freeswitch['running'] ? 'border-success/30' : 'border-error/30' }} p-4" title="FreeSWITCH status from fs_cli. Uptime shows how long since last restart. Sessions counts active calls. CPS is the configured max calls-per-second.">
-            <h4 class="text-sm font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_freeswitch') }}</h4>
+            <h4 class="text-xs font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_freeswitch') }}</h4>
             @if ($freeswitch['running'])
                 <div class="text-xs space-y-1">
                     <div><span class="text-base-content/60">Uptime:</span> {{ $freeswitch['uptime'] }}</div>
@@ -70,7 +64,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div class="card bg-base-100 border border-base-300 p-4" title="Database queue worker stats. Pending jobs are waiting to run. Failed jobs have exhausted retries — investigate on the Queue Status page.">
             <div class="flex items-center justify-between mb-2">
-                <h4 class="text-sm font-medium text-base-content/60">{{ __('admin.monitoring_queues') }}</h4>
+                <h4 class="text-xs font-medium text-base-content/60">{{ __('admin.monitoring_queues') }}</h4>
                 @if(auth('admin')->user()?->hasPermission('admin.queue.view'))
                     <button type="button" wire:click="openQueueModal" class="btn btn-ghost btn-xs gap-1 text-base-content/70 hover:text-base-content">
                         {{ __('admin.queue_status') }}
@@ -106,7 +100,7 @@
 
         {{-- Certificate --}}
         <div class="card bg-base-100 border border-base-300 p-4" title="TLS certificate expiry for the primary domain. Checked via OpenSSL or the local certificate file. Red means the cert expires in less than 30 days — renew immediately.">
-            <h4 class="text-sm font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_certificate') }}</h4>
+            <h4 class="text-xs font-medium text-base-content/60 mb-2">{{ __('admin.monitoring_certificate') }}</h4>
             @if ($certificate)
                 <div class="text-xs space-y-1">
                     <div><span class="text-base-content/60">Domain:</span> {{ $certificate['domain'] }}</div>
@@ -212,7 +206,7 @@
                         </table>
                     </div>
                 @else
-                    <div class="card bg-base-200 p-6 text-center text-sm text-base-content/60">
+                    <div class="card bg-base-200 p-6 text-center text-xs text-base-content/60">
                         {{ __('admin.queue_no_failures') }}
                     </div>
                 @endif

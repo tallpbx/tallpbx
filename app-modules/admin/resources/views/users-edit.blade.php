@@ -1,34 +1,26 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">
-            {{ $this->isEdit ? 'Edit User' : 'Create User' }}
-        </h2>
-    </div>
+    <x-page-header :title="$this->isEdit ? 'Edit User' : 'Create User'" />
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">
         <form wire:submit="save" class="card-body">
             {{-- Name --}}
             <div class="form-control w-full">
                 <label for="name" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Name</span>
+                    <span class="label-text font-medium">{{ __('admin.name') }}</span>
                 </label>
                 <input type="text" id="name" wire:model="name"
                        class="input input-bordered w-full" placeholder="Full name" required />
-                @error('name')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="name" />
             </div>
 
             {{-- Email --}}
             <div class="form-control w-full mt-4">
                 <label for="email" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Email</span>
+                    <span class="label-text font-medium">{{ __('admin.email') }}</span>
                 </label>
                 <input type="email" id="email" wire:model="email"
                        class="input input-bordered w-full" placeholder="email@example.com" required />
-                @error('email')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="email" />
             </div>
 
             {{-- Password --}}
@@ -43,20 +35,18 @@
                 </label>
                 <input type="password" id="password" wire:model="password"
                        autocomplete="new-password"
-                       class="input input-bordered w-full @error('password') input-error @enderror"
+                       class="input input-bordered w-full {{ $errors->has('password') ? 'input-error' : '' }}"
                        placeholder="{{ $this->isEdit ? 'Leave blank to keep current password' : 'Minimum 8 characters' }}" />
                 <p class="text-xs text-base-content/60 mt-1">
                     {{ $this->isEdit ? 'Leave blank to keep current password, or enter at least 8 characters to set a new one.' : 'Must be at least 8 characters.' }}
                 </p>
-                @error('password')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="password" />
             </div>
 
             {{-- Tenant Memberships --}}
             <div class="form-control w-full mt-6">
                 <label class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Tenants</span>
+                    <span class="label-text font-medium">{{ __('admin.tenants') }}</span>
                 </label>
 
                 @php
@@ -118,24 +108,20 @@
                                     </span>
                                 </label>
                             @empty
-                                <div class="p-3 text-sm text-base-content/60">No tenants available.</div>
+                                <div class="p-3 text-xs text-base-content/60">No tenants available.</div>
                             @endforelse
                         </div>
                     </div>
                 </div>
 
-                @error('selectedTenantIds')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
-                @error('selectedTenantIds.*')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="selectedTenantIds" />
+                <x-form-error name="selectedTenantIds.*" />
             </div>
 
             {{-- Group Assignments --}}
             <div class="form-control w-full mt-6">
                 <label class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Groups</span>
+                    <span class="label-text font-medium">{{ __('admin.groups') }}</span>
                 </label>
 
                 <div class="rounded-box border border-base-300 divide-y divide-base-300">
@@ -153,16 +139,12 @@
                             </span>
                         </label>
                     @empty
-                        <div class="p-3 text-sm text-base-content/60">No groups available.</div>
+                        <div class="p-3 text-xs text-base-content/60">No groups available.</div>
                     @endforelse
                 </div>
 
-                @error('selectedGroupIds')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
-                @error('selectedGroupIds.*')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="selectedGroupIds" />
+                <x-form-error name="selectedGroupIds.*" />
             </div>
 
             {{-- Actions --}}

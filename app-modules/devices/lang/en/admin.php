@@ -29,6 +29,7 @@ return [
     'edit_device' => 'Edit Device',
     'device_name' => 'Device Name',
     'device_vendor' => 'Vendor',
+    'device_model' => 'Model',
     'device_vendor_placeholder' => 'Polycom, Yealink, Cisco...',
     'device_mac' => 'MAC Address',
     'device_template' => 'Template',

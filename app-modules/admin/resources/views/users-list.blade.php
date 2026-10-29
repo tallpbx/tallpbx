@@ -1,23 +1,22 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.users_title') }}</h2>
-        <div class="flex items-center gap-2">
+    <x-page-header :title="__('admin.users_title')">
+        <x-slot:actions>
             @if(Auth::guard('admin')->user()?->hasPermission('admin.impersonate'))
                 <x-tooltip :tip="__('admin.impersonation_logs_tooltip')" position="left">
-                    <a href="{{ route('panel.impersonation-logs.index') }}" class="btn btn-outline btn-sm">
+                    <a href="{{ route('panel.impersonation-logs.index') }}" wire:navigate class="btn btn-outline btn-sm">
                         <x-heroicon-o-clipboard-document-list class="w-4 h-4" />
                         {{ __('admin.impersonation_logs') }}
                     </a>
                 </x-tooltip>
             @endif
             <x-tooltip :tip="__('admin.create_user_tooltip')" position="left">
-                <a href="{{ route('panel.users.create') }}" class="btn btn-primary btn-sm">
+                <a href="{{ route('panel.users.create') }}" wire:navigate class="btn btn-primary btn-sm">
                     <x-heroicon-o-plus class="w-4 h-4" />
                     {{ __('admin.create_user') }}
                 </a>
             </x-tooltip>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>

@@ -1,6 +1,6 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ __('admin.fax_send_title') }}</h1>
+        <x-page-header :title="__('admin.fax_send_title')" />
 
         @if ($operationalMessage !== null)
             <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">
@@ -21,9 +21,7 @@
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             <div class="form-control w-full">
@@ -31,9 +29,7 @@
                     <span class="label-text">{{ __('admin.fax_number') }}</span>
                 </label>
                 <input wire:model="faxNumber" type="text" id="faxNumber" class="input input-bordered w-full" placeholder="e.g., +15551234567" />
-                @error('faxNumber')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="faxNumber" />
             </div>
 
             <div class="form-control w-full">
@@ -41,9 +37,7 @@
                     <span class="label-text">{{ __('admin.fax_document_path') }}</span>
                 </label>
                 <input wire:model="document" type="file" id="document" accept="application/pdf" class="file-input file-input-bordered w-full" />
-                @error('document')
-                    <span class="text-error text-xs mt-1">{{ $message }}</span>
-                @enderror
+                <x-form-error name="document" />
             </div>
 
             <div class="flex items-center gap-3">

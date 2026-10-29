@@ -7,7 +7,7 @@ return [
     'login_title' => 'TallPBX Admin',
     'login_subtitle' => 'Sign in to your admin account',
     'sign_in' => 'Sign In to Portal',
-    'email' => 'Email Address',
+    'email' => 'Email',
     'password' => 'Password',
     'password_visibility' => 'Show or hide password',
     'unknown' => 'Unknown',
@@ -16,6 +16,7 @@ return [
     'logout' => 'Logout',
     'sign_out' => 'Sign out of the control panel.',
     'toggle_navigation' => 'Toggle navigation menu.',
+    'close_sidebar' => 'Close sidebar',
     'change_language' => 'Change interface language.',
 
     // ─── Navigation ─────────────────────────────────────────────────────────
@@ -48,6 +49,10 @@ return [
     'inbound_routes' => 'Inbound Routes',
     'outbound_routes' => 'Outbound Routes',
     'voicemails' => 'Voicemails',
+    'voicemail' => 'Voicemail',
+    'leave_blank_keep_existing_greeting' => 'Leave blank to keep the existing greeting.',
+    'leave_blank_keep_existing_audio' => 'Leave blank to keep the existing audio file.',
+    'audio_file' => 'Audio File',
     'devices' => 'Devices',
     'destinations' => 'Destinations',
     'dialplans' => 'Dialplans',
@@ -81,10 +86,7 @@ return [
     'name' => 'Name',
     'description' => 'Description',
     'name_tooltip' => 'Full name of the user.',
-    'email' => 'Email',
     'email_tooltip' => 'Email address used for sign-in and notifications.',
-    'tenants' => 'Tenants',
-    'groups' => 'Groups',
     'groups_count_tooltip' => 'Number of permission groups assigned to this user.',
     'no_users_found' => 'No users found.',
     'impersonate' => 'Impersonate this user',
@@ -105,6 +107,8 @@ return [
     'confirm_delete_user' => 'Are you sure you want to delete this user?',
 
     // ─── Tenants ────────────────────────────────────────────────────────────
+    'tenant' => 'Tenant',
+    'select_tenant' => 'Select tenant',
     'create_tenant_tooltip' => 'Add a new tenant organization to the system.',
     'delete_tenant_tooltip' => 'Permanently remove this tenant and all its data.',
     'none' => 'None',
@@ -196,6 +200,7 @@ return [
     'setting_key_placeholder' => 'app.name',
     'setting_value_placeholder' => 'MyPBX',
     'setting_add' => 'Add',
+    'settings_empty' => 'No settings configured.',
     'media_archive_destination' => 'Media archive destination',
     'media_archive_destination_help' => 'Completed call recordings and faxes are archived here. Other managed media remains local.',
     'media_archive_destination_save' => 'Save archive destination',
@@ -502,9 +507,9 @@ return [
     'confirm_delete_cdr' => 'Are you sure you want to delete this CDR record?',
 
     // ─── Active Calls ───────────────────────────────────────────────────
-    'active_calls' => 'Active Calls',
     'fs_not_connected' => 'FreeSWITCH not connected. Live data is unavailable.',
     'live' => 'Live',
+    'realtime_reconnecting' => 'Live connection interrupted. Reconnecting and synchronizing state...',
 
     // ─── Active Conferences ─────────────────────────────────────────────
     'active_conferences' => 'Active Conferences',
@@ -648,7 +653,6 @@ return [
     'confirm_password_help' => 'Must match password',
     'confirm_password_hint' => 'Re-enter password to confirm.',
     'create_admin_tooltip' => 'Create a new system administrator',
-    'administrator' => 'Administrator',
     'my_profile' => 'My Profile',
     'profile_description' => 'Update your account details and password credentials.',
     'profile_information' => 'Profile Information',

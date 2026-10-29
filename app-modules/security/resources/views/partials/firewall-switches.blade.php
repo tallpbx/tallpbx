@@ -12,7 +12,7 @@
                        wire:loading.attr="disabled"
                        wire:target="setFirewallEnabled"
                        :checked="$wire.firewallEnabled"
-                       type="checkbox" class="toggle toggle-primary toggle-sm" @checked($firewallEnabled) />
+                       type="checkbox" class="toggle toggle-sm {{ $firewallEnabled ? 'toggle-success' : 'toggle-neutral' }}" @checked($firewallEnabled) />
                 <span class="text-sm font-medium">{{ __('admin.security_toggle_firewall') }}</span>
                 <span wire:loading wire:target="setFirewallEnabled" class="loading loading-spinner loading-xs text-primary"></span>
                 <span wire:loading.remove wire:target="setFirewallEnabled">

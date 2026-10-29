@@ -1,19 +1,18 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.extensions_title') }}</h2><x-tooltip :tip="__('admin.extension_header_tooltip')" align="start" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
-        <div class="flex gap-2">
+    <x-page-header :title="__('admin.extensions_title')" :tooltip="__('admin.extension_header_tooltip')">
+        <x-slot:actions>
             @if(\Illuminate\Support\Facades\Route::has('panel.extensions.create-multiple'))
-                <a href="{{ route('panel.extensions.create-multiple') }}" class="btn btn-primary btn-sm">
+                <a href="{{ route('panel.extensions.create-multiple') }}" wire:navigate class="btn btn-primary btn-sm">
                     <x-heroicon-o-queue-list class="w-4 h-4" />
                     {{ __('admin.create_multiple_extensions') }}
                 </a>
             @endif
-            <a href="{{ route('panel.extensions.create') }}" class="btn btn-primary btn-sm">
+            <a href="{{ route('panel.extensions.create') }}" wire:navigate class="btn btn-primary btn-sm">
                 <x-heroicon-o-plus class="w-4 h-4" />
                 {{ __('admin.create_extension') }}
             </a>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>
@@ -26,7 +25,7 @@
                     <tr>
                         <th><x-tooltip :tip="__('admin.extension_number_tooltip')" position="bottom">{{ __('admin.extension_number') }}</x-tooltip></th>
                         <th><x-tooltip :tip="__('admin.extension_description_tooltip')" position="bottom">{{ __('admin.name') }}</x-tooltip></th>
-                        <th><x-tooltip :tip="__('admin.voicemail_enabled_tooltip')" position="bottom">Voicemail</x-tooltip></th>
+                        <th><x-tooltip :tip="__('admin.voicemail_enabled_tooltip')" position="bottom">{{ __('admin.voicemail') }}</x-tooltip></th>
                         <th>{{ __('client.status') }}</th>
                         <th>{{ __('client.actions') }}</th>
                     </tr>

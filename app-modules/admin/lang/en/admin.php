@@ -60,4 +60,6 @@ return [
     'modules_protected_hint' => 'Protected modules cannot be uninstalled.',
     'modules_delete_not_custom' => 'Only custom modules can be deleted from the workbench.',
     'modules_delete_failed' => 'The module could not be deleted.',
+    'admin_system_group_no_tenant' => '-- System Group (no tenant) --',
+    'admin_slug' => 'Slug',
 ];

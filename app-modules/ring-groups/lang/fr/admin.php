@@ -36,4 +36,5 @@ return [
     'modal_delete_ring_group_title' => 'Supprimer le groupe de sonnerie ?',
     'modal_delete_ring_group_confirm' => 'Supprimer le groupe de sonnerie',
     'modal_delete_ring_group_message' => 'Supprimer « :name » et ses membres ? Cette action est irréversible.',
+    'ring_group_timeout_seconds' => 'Délai de Sonnerie (secondes)',
 ];

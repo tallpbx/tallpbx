@@ -40,4 +40,11 @@ return [
     'extension_outbound_caller_id_number_tooltip' => 'El número transmitido a partes externas al realizar llamadas salientes (p. ej., su DID directo o número principal), anulando el Número de Identificador Efectivo (a menos que una ruta de salida lo anule).',
     'modal_delete_extension_title' => '¿Eliminar extensión?',
     'modal_delete_extension_confirm' => 'Eliminar extensión',
+    'extension_display_name' => 'Nombre para Mostrar',
+    'extension_sip_password' => 'Contraseña SIP',
+    'extension_effective_caller_id_name' => 'Nombre de Identificador Efectivo',
+    'extension_effective_caller_id_number' => 'Número de Identificador Efectivo',
+    'extension_outbound_caller_id_name' => 'Nombre de Identificador Saliente',
+    'extension_outbound_caller_id_number' => 'Número de Identificador Saliente',
+    'extension_voicemail_enabled' => 'Buzón de Voz Habilitado',
 ];

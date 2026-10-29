@@ -36,4 +36,10 @@ return [
     'modal_delete_voicemail_mailbox_confirm' => 'Eliminar buzón de correo de voz',
     'modal_delete_voicemail_mailbox_message' => '¿Eliminar el buzón “:name”? Esta acción no se puede deshacer.',
     'modal_delete_voicemail_mailbox_error_title' => 'El buzón de correo de voz no se puede eliminar',
+    'voicemail_id' => 'ID de Buzón de Voz',
+    'voicemail_pin_password' => 'PIN / Contraseña',
+    'voicemail_email_notification' => 'Notificación por Correo Electrónico',
+    'voicemail_greeting_audio' => 'Audio de Saludo',
+    'voicemail_options' => 'Opciones',
+    'voicemail_delete_after_email' => 'Eliminar mensaje del servidor después de enviar por correo',
 ];

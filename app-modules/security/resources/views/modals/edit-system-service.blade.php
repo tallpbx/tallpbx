@@ -48,7 +48,7 @@
                     <div class="p-3.5 bg-base-200/50 rounded-lg space-y-3 border border-base-200">
                         <div class="flex items-center justify-between">
                             <label class="label cursor-pointer justify-start gap-2 p-0">
-                                <input wire:model.live="systemServiceRateLimitEnabled" type="checkbox" class="checkbox checkbox-primary checkbox-xs" />
+                                <input wire:model.live="systemServiceRateLimitEnabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                                 <span class="label-text font-semibold text-xs">{{ __('admin.security_enable_rate_limit') }}</span>
                             </label>
                             <span class="text-xs font-mono px-2 py-0.5 rounded {{ $systemServiceRateLimitEnabled ? 'bg-success/10 text-success' : 'bg-base-content/10 text-base-content/70' }}">
@@ -86,8 +86,8 @@
                         </label>
                         <input wire:model="systemServicePortRange" type="text"
                                placeholder="e.g. 5060, 10000-20000"
-                               class="input input-bordered input-sm font-mono @error('systemServicePortRange') input-error @enderror" />
-                        @error('systemServicePortRange') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered input-sm font-mono {{ $errors->has('systemServicePortRange') ? 'input-error' : '' }}" />
+                        <x-form-error name="systemServicePortRange" />
                     </div>
 
                     {{-- Protocol --}}
@@ -98,7 +98,7 @@
                             <option value="tcp">{{ __('admin.security_service_protocol_tcp') }}</option>
                             <option value="udp">{{ __('admin.security_service_protocol_udp') }}</option>
                         </select>
-                        @error('systemServiceProtocol') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="systemServiceProtocol" />
                     </div>
                 @endif
 
@@ -111,14 +111,14 @@
                         </x-tooltip>
                     </label>
                     <input wire:model="systemServiceSourceIp" type="text" placeholder="any or 10.8.0.0/24"
-                           class="input input-bordered input-sm font-mono @error('systemServiceSourceIp') input-error @enderror" />
-                    @error('systemServiceSourceIp') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                           class="input input-bordered input-sm font-mono {{ $errors->has('systemServiceSourceIp') ? 'input-error' : '' }}" />
+                    <x-form-error name="systemServiceSourceIp" />
                 </div>
 
                 {{-- Status Enabled / Disabled --}}
                 <div class="form-control pt-1">
                     <label class="label cursor-pointer justify-start gap-3">
-                        <input wire:model="systemServiceEnabled" type="checkbox" class="checkbox checkbox-primary checkbox-sm" />
+                        <input wire:model="systemServiceEnabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                         <span class="label-text font-medium">{{ __('admin.security_service_enabled') }}</span>
                     </label>
                 </div>

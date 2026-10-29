@@ -1,12 +1,5 @@
 <div class="max-w-3xl">
-    <div class="mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">
-            {{ $adminId ? __('admin.admin_edit') : __('admin.admin_add') }}
-        </h2>
-        <p class="text-sm text-base-content/60 mt-1">
-            {{ __('admin.admin_edit_description') }}
-        </p>
-    </div>
+    <x-page-header :title="$adminId ? __('admin.admin_edit') : __('admin.admin_add')" :subtitle="__('admin.admin_edit_description')" />
 
     <form wire:submit.prevent="save" class="space-y-6">
         <div class="card bg-base-100 border border-base-300">
@@ -14,15 +7,15 @@
                 {{-- Name --}}
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1" for="name"><span class="label-text font-medium">{{ __('admin.name') }}</span></label>
-                    <input type="text" id="name" wire:model="name" class="input input-bordered w-full @error('name') input-error @enderror" required />
-                    @error('name') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <input type="text" id="name" wire:model="name" class="input input-bordered w-full {{ $errors->has('name') ? 'input-error' : '' }}" required />
+                    <x-form-error name="name" />
                 </div>
 
                 {{-- Email --}}
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1" for="email"><span class="label-text font-medium">{{ __('admin.email') }}</span></label>
-                    <input type="email" id="email" wire:model="email" class="input input-bordered w-full @error('email') input-error @enderror" required />
-                    @error('email') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <input type="email" id="email" wire:model="email" class="input input-bordered w-full {{ $errors->has('email') ? 'input-error' : '' }}" required />
+                    <x-form-error name="email" />
                 </div>
 
                 {{-- Password --}}
@@ -31,9 +24,9 @@
                         <span class="label-text font-medium">{{ $adminId ? __('admin.new_password') : __('admin.password') }}</span>
                         <span class="label-text-alt text-base-content/60">{{ $adminId ? __('admin.admin_password_help') : __('admin.password_requirements_min') }}</span>
                     </label>
-                    <input type="password" id="password" wire:model="password" autocomplete="new-password" class="input input-bordered w-full @error('password') input-error @enderror" placeholder="{{ $adminId ? __('admin.admin_password_help') : __('admin.password_requirements_min') }}" {{ $adminId ? '' : 'required' }} />
+                    <input type="password" id="password" wire:model="password" autocomplete="new-password" class="input input-bordered w-full {{ $errors->has('password') ? 'input-error' : '' }}" placeholder="{{ $adminId ? __('admin.admin_password_help') : __('admin.password_requirements_min') }}" {{ $adminId ? '' : 'required' }} />
                     <p class="text-xs text-base-content/60 mt-1">{{ $adminId ? __('admin.admin_password_edit_hint') : __('admin.admin_password_create_hint') }}</p>
-                    @error('password') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="password" />
                 </div>
 
                 {{-- Password Confirmation --}}
@@ -54,10 +47,10 @@
                         <input type="checkbox" wire:model="enabled"
                                wire:loading.attr="disabled"
                                wire:target="enabled"
-                               class="toggle toggle-sm toggle-primary" />
+                               class="toggle toggle-sm toggle-success" />
                         <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                     </label>
-                    @error('enabled') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="enabled" />
                 </div>
 
                 {{-- System Groups --}}
@@ -76,7 +69,7 @@
                             </label>
                         @endforeach
                     </div>
-                    @error('selectedGroupIds') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="selectedGroupIds" />
                 </div>
             </div>
         </div>

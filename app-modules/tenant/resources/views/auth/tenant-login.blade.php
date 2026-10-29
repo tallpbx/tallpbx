@@ -23,7 +23,7 @@
         <div class="text-center mb-8">
             <x-heroicon-o-phone class="w-12 h-12 text-primary mx-auto mb-3" />
             <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ config('app.name', 'TallPBX') }}</h1>
-            <p class="text-sm text-base-content/60 mt-1">{{ __('client.sign_in_title') }}</p>
+            <p class="text-xs text-base-content/60 mt-1">{{ __('client.sign_in_title') }}</p>
         </div>
 
         <div class="card bg-base-100 border border-base-300 p-6">
@@ -47,7 +47,7 @@
                 </div>
                 <div class="mb-6 flex items-center gap-2">
                     <input type="checkbox" name="remember" id="remember" class="checkbox checkbox-primary" />
-                    <label for="remember" class="text-sm text-base-content/60">{{ __('client.remember_me') }}</label>
+                    <label for="remember" class="text-xs text-base-content/60">{{ __('client.remember_me') }}</label>
                 </div>
                 <button type="submit" class="btn btn-primary w-full">{{ __('client.sign_in') }}</button>
             </form>

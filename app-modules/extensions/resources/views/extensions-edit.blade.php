@@ -1,12 +1,5 @@
 <div>
-    <div class="flex items-center gap-2 mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">
-            {{ $this->isEdit ? 'Edit Extension' : 'Create Extension' }}
-        </h2>
-        <x-tooltip :tip="__('admin.extension_header_tooltip')" align="start" position="right">
-            <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-        </x-tooltip>
-    </div>
+    <x-page-header :title="$this->isEdit ? 'Edit Extension' : 'Create Extension'" :tooltip="__('admin.extension_header_tooltip')" />
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">
         <div class="card-body">
@@ -14,48 +7,48 @@
                 @if($this->isAdminGuard())
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1">
-                        <span class="label-text font-medium">Tenant</span>
+                        <span class="label-text font-medium">{{ __('admin.tenant') }}</span>
                         <x-tooltip :tip="__('admin.tenant_select_tooltip')" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                         </x-tooltip>
                     </label>
-                    <select wire:model="tenantId" class="select select-bordered w-full @error('tenantId') select-error @enderror">
-                        <option value="">Select tenant</option>
+                    <select wire:model="tenantId" class="select select-bordered w-full {{ $errors->has('tenantId') ? 'select-error' : '' }}">
+                        <option value="">{{ __('admin.select_tenant') }}</option>
                         @foreach($tenants as $tenant)
                             <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                         @endforeach
                     </select>
-                    @error('tenantId') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="tenantId" />
                 </div>
                 @endif
 
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1">
-                        <span class="label-text font-medium">Extension Number</span>
+                        <span class="label-text font-medium">{{ __('admin.extension_number') }}</span>
                         <x-tooltip :tip="__('admin.extension_number_tooltip')" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                         </x-tooltip>
                     </label>
                     <input type="text" wire:model="extensionNumber"
-                           class="input input-bordered w-full @error('extensionNumber') input-error @enderror" />
-                    @error('extensionNumber') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                           class="input input-bordered w-full {{ $errors->has('extensionNumber') ? 'input-error' : '' }}" />
+                    <x-form-error name="extensionNumber" />
                 </div>
 
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1">
-                        <span class="label-text font-medium">Display Name</span>
+                        <span class="label-text font-medium">{{ __('admin.extension_display_name') }}</span>
                         <x-tooltip :tip="__('admin.extension_description_tooltip')" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                         </x-tooltip>
                     </label>
                     <input type="text" wire:model="displayName"
-                           class="input input-bordered w-full @error('displayName') input-error @enderror" />
-                    @error('displayName') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                           class="input input-bordered w-full {{ $errors->has('displayName') ? 'input-error' : '' }}" />
+                    <x-form-error name="displayName" />
                 </div>
 
                 <div class="form-control w-full">
                     <label class="label justify-start gap-2 pb-1">
-                        <span class="label-text font-medium">SIP Password</span>
+                        <span class="label-text font-medium">{{ __('admin.extension_sip_password') }}</span>
                         <x-tooltip :tip="__('admin.sip_password_tooltip')" position="right">
                             <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                         </x-tooltip>
@@ -74,7 +67,7 @@
                                name="sip_device_auth_secret"
                                :style="show ? '' : '-webkit-text-security: disc; text-security: disc;'"
                                placeholder="{{ $this->isEdit ? 'Leave blank to keep existing password' : '' }}"
-                               class="input input-bordered w-full pr-10 font-mono @error('password') input-error @enderror" />
+                               class="input input-bordered w-full pr-10 font-mono {{ $errors->has('password') ? 'input-error' : '' }}" />
                         <button type="button"
                                 @click="show = !show"
                                 class="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/50 hover:text-base-content"
@@ -85,60 +78,60 @@
                             <x-heroicon-o-eye-slash x-show="show" x-cloak class="w-5 h-5" />
                         </button>
                     </div>
-                    @error('password') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="password" />
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="form-control w-full">
                         <label class="label justify-start gap-2 pb-1">
-                            <span class="label-text font-medium">Effective Caller ID Name</span>
+                            <span class="label-text font-medium">{{ __('admin.extension_effective_caller_id_name') }}</span>
                             <x-tooltip :tip="__('admin.extension_effective_caller_id_name_tooltip')" position="top">
                                 <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                             </x-tooltip>
                         </label>
                         <input type="text" wire:model="effectiveCallerIdName"
                                placeholder="e.g. John Doe"
-                               class="input input-bordered w-full @error('effectiveCallerIdName') input-error @enderror" />
-                        @error('effectiveCallerIdName') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('effectiveCallerIdName') ? 'input-error' : '' }}" />
+                        <x-form-error name="effectiveCallerIdName" />
                     </div>
 
                     <div class="form-control w-full">
                         <label class="label justify-start gap-2 pb-1">
-                            <span class="label-text font-medium">Effective Caller ID Number</span>
+                            <span class="label-text font-medium">{{ __('admin.extension_effective_caller_id_number') }}</span>
                             <x-tooltip :tip="__('admin.extension_effective_caller_id_number_tooltip')" position="top">
                                 <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                             </x-tooltip>
                         </label>
                         <input type="text" wire:model="effectiveCallerIdNumber"
                                placeholder="e.g. 1001"
-                               class="input input-bordered w-full @error('effectiveCallerIdNumber') input-error @enderror" />
-                        @error('effectiveCallerIdNumber') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('effectiveCallerIdNumber') ? 'input-error' : '' }}" />
+                        <x-form-error name="effectiveCallerIdNumber" />
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="form-control w-full">
                         <label class="label justify-start gap-2 pb-1">
-                            <span class="label-text font-medium">Outbound Caller ID Name</span>
+                            <span class="label-text font-medium">{{ __('admin.extension_outbound_caller_id_name') }}</span>
                             <x-tooltip :tip="__('admin.extension_outbound_caller_id_name_tooltip')" position="top">
                                 <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                             </x-tooltip>
                         </label>
                         <input type="text" wire:model="outboundCallerIdName"
-                               class="input input-bordered w-full @error('outboundCallerIdName') input-error @enderror" />
-                        @error('outboundCallerIdName') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('outboundCallerIdName') ? 'input-error' : '' }}" />
+                        <x-form-error name="outboundCallerIdName" />
                     </div>
 
                     <div class="form-control w-full">
                         <label class="label justify-start gap-2 pb-1">
-                            <span class="label-text font-medium">Outbound Caller ID Number</span>
+                            <span class="label-text font-medium">{{ __('admin.extension_outbound_caller_id_number') }}</span>
                             <x-tooltip :tip="__('admin.extension_outbound_caller_id_number_tooltip')" position="top">
                                 <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                             </x-tooltip>
                         </label>
                         <input type="text" wire:model="outboundCallerIdNumber"
-                               class="input input-bordered w-full @error('outboundCallerIdNumber') input-error @enderror" />
-                        @error('outboundCallerIdNumber') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                               class="input input-bordered w-full {{ $errors->has('outboundCallerIdNumber') ? 'input-error' : '' }}" />
+                        <x-form-error name="outboundCallerIdNumber" />
                     </div>
                 </div>
 
@@ -146,8 +139,8 @@
                     <div class="flex flex-col sm:flex-row gap-6">
                         <div class="form-control">
                             <label class="label cursor-pointer justify-start gap-3">
-                                <input type="checkbox" wire:model.live="voicemailEnabled" class="checkbox checkbox-info" />
-                                <span class="label-text font-medium">Voicemail Enabled</span>
+                                <input type="checkbox" wire:model.live="voicemailEnabled" wire:loading.attr="disabled" class="toggle toggle-sm toggle-success" />
+                                <span class="label-text font-medium">{{ __('admin.extension_voicemail_enabled') }}</span>
                                 <x-tooltip :tip="__('admin.voicemail_enabled_tooltip')" position="right">
                                     <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                                 </x-tooltip>
@@ -156,8 +149,8 @@
 
                         <div class="form-control">
                             <label class="label cursor-pointer justify-start gap-3">
-                                <input type="checkbox" wire:model="enabled" class="checkbox checkbox-primary" />
-                                <span class="label-text font-medium">Enabled</span>
+                                <input type="checkbox" wire:model="enabled" wire:loading.attr="disabled" class="toggle toggle-sm toggle-success" />
+                                <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                                 <x-tooltip :tip="__('admin.enabled_tooltip')" position="right">
                                     <x-heroicon-o-information-circle class="w-4 h-4 cursor-help opacity-50 hover:opacity-100 text-base-content/70" />
                                 </x-tooltip>
@@ -188,7 +181,7 @@
                                    name="voicemail_auth_secret"
                                    :style="show ? '' : '-webkit-text-security: disc; text-security: disc;'"
                                    placeholder="{{ $this->isEdit ? ($voicemailPassword ? 'Keep existing password' : $this->extensionNumber) : ($this->extensionNumber ?: 'e.g. 1001') }}"
-                                   class="input input-bordered w-full pr-10 font-mono @error('voicemailPassword') input-error @enderror" />
+                                   class="input input-bordered w-full pr-10 font-mono {{ $errors->has('voicemailPassword') ? 'input-error' : '' }}" />
                             <button type="button"
                                     @click="show = !show"
                                     class="absolute inset-y-0 right-0 pr-3 flex items-center text-base-content/50 hover:text-base-content"
@@ -199,7 +192,7 @@
                                 <x-heroicon-o-eye-slash x-show="show" x-cloak class="w-5 h-5" />
                             </button>
                         </div>
-                        @error('voicemailPassword') <span class="label-text-alt text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="voicemailPassword" />
                     </div>
                     @endif
                 </div>

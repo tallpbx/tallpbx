@@ -1,6 +1,6 @@
 import Echo from 'laravel-echo';
-
 import Pusher from 'pusher-js';
+
 window.Pusher = Pusher;
 
 const scheme = import.meta.env.VITE_REVERB_SCHEME ?? (typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https' : 'http');
@@ -16,3 +16,21 @@ window.Echo = new Echo({
     enabledTransports: ['ws', 'wss'],
 });
 
+if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
+    let wasConnected = false;
+
+    window.Echo.connector.pusher.connection.bind('state_change', (states) => {
+        const { current } = states;
+
+        if (current === 'connected') {
+            if (wasConnected) {
+                window.dispatchEvent(new CustomEvent('tallpbx:ws-reconnected'));
+            }
+            wasConnected = true;
+        } else if (current === 'unavailable' || current === 'failed' || current === 'disconnected') {
+            if (wasConnected) {
+                window.dispatchEvent(new CustomEvent('tallpbx:ws-disconnected'));
+            }
+        }
+    });
+}

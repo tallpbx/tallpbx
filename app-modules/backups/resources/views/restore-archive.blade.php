@@ -1,11 +1,9 @@
 <div class="max-w-4xl space-y-6">
-    <div class="flex items-center justify-between gap-4">
-        <div>
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">Restore backup</h2>
-            <p class="mt-1 text-sm text-base-content/70">A restore replaces the selected database and file scopes on this PBX.</p>
-        </div>
-        <a href="{{ route('panel.backups.index') }}" class="btn btn-ghost" wire:navigate>Back to backups</a>
-    </div>
+    <x-page-header title="Restore backup" subtitle="A restore replaces the selected database and file scopes on this PBX.">
+        <x-slot:actions>
+            <a href="{{ route('panel.backups.index') }}" class="btn btn-ghost" wire:navigate>Back to backups</a>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null">
@@ -57,7 +55,7 @@
                             </option>
                         @endforeach
                     </select>
-                    @error('backupId') <span class="mt-1 text-sm text-error">{{ $message }}</span> @enderror
+                    <x-form-error name="backupId" />
                 </div>
 
                 @if ($backupId !== null)
@@ -91,12 +89,12 @@
             <div class="form-control">
                 <label class="label" for="archiveUpload"><span class="label-text">Archive file</span></label>
                 <input id="archiveUpload" wire:model="archiveUpload" type="file" accept=".tar,.gz" class="file-input file-input-bordered w-full" />
-                @error('archiveUpload') <span class="mt-1 text-sm text-error">{{ $message }}</span> @enderror
+                <x-form-error name="archiveUpload" />
             </div>
             <div class="form-control">
                 <label class="label" for="manifestUpload"><span class="label-text">Matching manifest</span></label>
                 <input id="manifestUpload" wire:model="manifestUpload" type="file" accept="application/json,.json" class="file-input file-input-bordered w-full" />
-                @error('manifestUpload') <span class="mt-1 text-sm text-error">{{ $message }}</span> @enderror
+                <x-form-error name="manifestUpload" />
             </div>
             <button type="button" class="btn btn-error" wire:click="confirmUploadedRestore" wire:loading.attr="disabled" wire:target="confirmUploadedRestore,archiveUpload,manifestUpload">Restore uploaded archive</button>
         </div>

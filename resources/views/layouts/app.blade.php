@@ -66,7 +66,7 @@
          :class="{ 'lg:drawer-open': layoutMode === 'sidebar' }">
         <input id="sidebar-drawer" type="checkbox" class="drawer-toggle" />
         <aside class="drawer-side z-50 h-full min-h-full overflow-hidden" data-panel-sidebar-scroll="drawer">
-            <label for="sidebar-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+            <label for="sidebar-drawer" aria-label="{{ __('admin.close_sidebar') }}" class="drawer-overlay"></label>
             <div class="panel-sidebar bg-base-100 border-r border-base-300 flex flex-col h-full min-h-0 overflow-hidden transition-all duration-200 ease-in-out"
                  :class="sidebarCollapsed ? 'w-16' : 'w-64'">
                 <div class="flex items-center gap-3 h-16 border-b border-base-300 shrink-0 transition-all duration-200"
@@ -89,7 +89,7 @@
                 {{-- Mini Rail Collapse / Expand Toggle Button --}}
                 <div class="p-2 border-t border-base-300 hidden lg:flex items-center shrink-0 transition-all duration-200"
                      :class="sidebarCollapsed ? 'justify-center' : 'justify-end'">
-                    <div class="tooltip tooltip-right" :data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
+                    <x-tooltip position="right" ::data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
                         <button
                             type="button"
                             @click="toggleSidebar()"
@@ -103,7 +103,7 @@
                                 <x-heroicon-o-chevron-double-left class="w-4 h-4" />
                             </template>
                         </button>
-                    </div>
+                    </x-tooltip>
                 </div>
             </div>
         </aside>
@@ -120,7 +120,7 @@
 
                     {{-- Desktop Sidebar Mini Toggle (when in sidebar mode) --}}
                     <template x-if="layoutMode === 'sidebar'">
-                        <div class="tooltip tooltip-right hidden lg:inline-flex" :data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
+                        <x-tooltip position="right" class="hidden lg:inline-flex" ::data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
                             <button
                                 type="button"
                                 @click="toggleSidebar()"
@@ -129,7 +129,7 @@
                             >
                                 <x-heroicon-o-bars-3 class="w-5 h-5" />
                             </button>
-                        </div>
+                        </x-tooltip>
                     </template>
 
                     {{-- Horizontal Mode Brand Header on Desktop --}}

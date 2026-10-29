@@ -1,8 +1,6 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">
-            {{ $this->isEdit ? __('admin.edit') : __('admin.create') }} {{ __('admin.hot_desk_session') }}
-        </h1>
+        <x-page-header :title="($this->isEdit ? __('admin.edit') : __('admin.create')) . ' ' . __('admin.hot_desk_session')" />
 
         <form wire:submit="save" class="space-y-6">
             {{-- Tenant (Admin Only) --}}
@@ -20,7 +18,7 @@
                             <option value="{{ $t->id }}">{{ $t->name }}</option>
                         @endforeach
                     </select>
-                    @error('tenantId') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="tenantId" />
                 </div>
             @endif
 
@@ -40,7 +38,7 @@
                         </option>
                     @endforeach
                 </select>
-                @error('extensionId') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="extensionId" />
             </div>
 
             {{-- Desk Phone Extension --}}
@@ -59,7 +57,7 @@
                         </option>
                     @endforeach
                 </select>
-                @error('deviceExtensionId') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="deviceExtensionId" />
             </div>
 
             {{-- Description / Notes --}}
@@ -74,7 +72,7 @@
                     class="input input-bordered w-full"
                     placeholder="e.g. Desk 12 - Sales Floor"
                 />
-                @error('description') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="description" />
             </div>
 
             {{-- Active Status --}}
@@ -82,13 +80,14 @@
                 <label class="label cursor-pointer justify-start gap-3" for="isActive">
                     <input
                         wire:model="isActive"
+                        wire:loading.attr="disabled"
                         type="checkbox"
                         id="isActive"
-                        class="checkbox checkbox-primary"
+                        class="toggle toggle-sm toggle-success"
                     />
                     <span class="label-text font-medium">{{ __('admin.active') }}</span>
                 </label>
-                @error('isActive') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="isActive" />
             </div>
 
             {{-- Form Actions --}}

@@ -1,15 +1,12 @@
 <div class="max-w-6xl space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold tracking-tight text-base-content">File Stores</h1>
-            <p class="text-sm text-base-content/60">Remote storage locations for media archives and backups.</p>
-        </div>
-
-        <a href="{{ route('panel.file-stores.create') }}" class="btn btn-primary btn-sm whitespace-nowrap" wire:navigate>
-            <x-heroicon-o-plus class="w-4 h-4" />
-            Add file store
-        </a>
-    </div>
+    <x-page-header title="File Stores" subtitle="Remote storage locations for media archives and backups.">
+        <x-slot:actions>
+            <a href="{{ route('panel.file-stores.create') }}" class="btn btn-primary btn-sm whitespace-nowrap" wire:navigate>
+                <x-heroicon-o-plus class="w-4 h-4" />
+                Add file store
+            </a>
+        </x-slot:actions>
+    </x-page-header>
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null">
@@ -22,7 +19,7 @@
             <x-heroicon-o-server-stack class="mt-0.5 h-5 w-5 shrink-0 text-base-content/60" />
             <div>
                 <h2 class="font-medium">Local storage</h2>
-                <p class="text-sm text-base-content/60">TallPBX keeps media and backups in separate protected local folders. Media uses checksum verification; backups use verified manifests.</p>
+                <p class="text-xs text-base-content/60">TallPBX keeps media and backups in separate protected local folders. Media uses checksum verification; backups use verified manifests.</p>
                 <dl class="mt-2 space-y-1 text-sm text-base-content/70">
                     <div>
                         <dt class="inline font-medium">Media library:</dt>
@@ -52,7 +49,7 @@
                     <option value="{{ $fileStore->id }}">{{ $fileStore->name }} ({{ str($fileStore->provider)->headline() }})</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-sm text-base-content/60">{{ __('admin.media_archive_destination_help') }}</p>
+            <p class="mt-1 text-xs text-base-content/60">{{ __('admin.media_archive_destination_help') }}</p>
         </div>
         <button type="submit" class="btn btn-primary">{{ __('admin.media_archive_destination_save') }}</button>
         </form>
@@ -64,10 +61,10 @@
     <div class="card border border-base-300 bg-base-100">
         <div class="border-b border-base-300 p-4">
             <h2 class="font-medium">Media archive transfers</h2>
-            <p class="mt-1 text-sm text-base-content/60">Completed recordings and faxes remain in protected local staging until TallPBX verifies the selected archive destination. Failed transfers retain their local spool and can be retried here.</p>
+            <p class="mt-1 text-xs text-base-content/60">Completed recordings and faxes remain in protected local staging until TallPBX verifies the selected archive destination. Failed transfers retain their local spool and can be retried here.</p>
         </div>
         @if ($archiveTransfers->isEmpty())
-            <p class="p-4 text-sm text-base-content/60">No media archive transfers need attention.</p>
+            <p class="p-4 text-xs text-base-content/60">No media archive transfers need attention.</p>
         @else
             <div class="overflow-x-auto">
                 <table class="table table-zebra">
@@ -96,7 +93,7 @@
                                     @if ($canUpdateFileStores && $transfer->status->value === 'failed')
                                         <button type="button" class="btn btn-ghost btn-xs" wire:click="retryMediaArchive('{{ $transfer->id }}')" wire:loading.attr="disabled" wire:target="retryMediaArchive('{{ $transfer->id }}')">Retry transfer</button>
                                     @else
-                                        <span class="text-sm text-base-content/60">—</span>
+                                        <span class="text-xs text-base-content/60">—</span>
                                     @endif
                                 </td>
                             </tr>

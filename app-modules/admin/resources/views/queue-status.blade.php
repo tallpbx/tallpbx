@@ -1,19 +1,19 @@
 <div class="max-w-4xl">
-    <h2 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ __('admin.queue_status') }}</h2>
+    <x-page-header :title="__('admin.queue_status')" />
 
     {{-- Stats cards --}}
     <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="card bg-base-100 border border-base-300 p-4 text-center">
             <div class="text-3xl font-bold">{{ $pendingJobs }}</div>
-            <div class="text-sm text-base-content/60">{{ __('admin.queue_pending') }}</div>
+            <div class="text-xs text-base-content/60">{{ __('admin.queue_pending') }}</div>
         </div>
         <div class="card bg-base-100 border border-base-300 p-4 text-center">
             <div class="text-3xl font-bold text-error">{{ $failedJobs }}</div>
-            <div class="text-sm text-base-content/60">{{ __('admin.queue_failed') }}</div>
+            <div class="text-xs text-base-content/60">{{ __('admin.queue_failed') }}</div>
         </div>
         <div class="card bg-base-100 border border-base-300 p-4 text-center">
             <div class="text-3xl font-bold">{{ $pendingJobs + $failedJobs }}</div>
-            <div class="text-sm text-base-content/60">{{ __('admin.queue_total') }}</div>
+            <div class="text-xs text-base-content/60">{{ __('admin.queue_total') }}</div>
         </div>
     </div>
 

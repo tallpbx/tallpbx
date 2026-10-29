@@ -16,6 +16,7 @@ return [
     'logout' => 'Cerrar Sesión',
     'sign_out' => 'Cerrar sesión del panel de control.',
     'toggle_navigation' => 'Mostrar/ocultar menú de navegación.',
+    'close_sidebar' => 'Cerrar barra lateral',
     'change_language' => 'Cambiar idioma de la interfaz.',
 
     // ─── Navigation ─────────────────────────────────────────────────────────
@@ -36,6 +37,10 @@ return [
     'inbound_routes' => 'Rutas Entrantes',
     'outbound_routes' => 'Rutas Salientes',
     'voicemails' => 'Buzones de Voz',
+    'voicemail' => 'Buzón de Voz',
+    'leave_blank_keep_existing_greeting' => 'Deje en blanco para conservar el saludo existente.',
+    'leave_blank_keep_existing_audio' => 'Deje en blanco para conservar el archivo de audio existente.',
+    'audio_file' => 'Archivo de Audio',
     'devices' => 'Dispositivos',
     'destinations' => 'Destinos',
     'dialplans' => 'Planos de Marcado',
@@ -59,9 +64,6 @@ return [
     'create_user' => 'Crear Usuario',
     'edit_user' => 'Editar Usuario',
     'name' => 'Nombre',
-    'email' => 'Correo Electrónico',
-    'tenants' => 'Inquilinos',
-    'groups' => 'Grupos',
     'no_users_found' => 'No se encontraron usuarios.',
     'impersonate' => 'Suplantar este usuario',
     'impersonation_logs' => 'Registros de Suplantación',
@@ -80,6 +82,8 @@ return [
     'confirm_delete_user' => '¿Está seguro de que desea eliminar este usuario?',
 
     // ─── Tenants ────────────────────────────────────────────────────────────
+    'tenant' => 'Inquilino',
+    'select_tenant' => 'Seleccionar inquilino',
     'none' => 'Ninguno',
     'domain' => 'Dominio',
     'enabled' => 'Habilitado',
@@ -143,6 +147,7 @@ return [
     'setting_key_placeholder' => 'app.name',
     'setting_value_placeholder' => 'MiPBX',
     'setting_add' => 'Agregar',
+    'settings_empty' => 'No hay configuraciones definidas.',
 
     // ─── Modules ────────────────────────────────────────────────────────────
     'modules_title' => 'Módulos',
@@ -312,7 +317,6 @@ return [
     'view_all' => 'Ver Todo',
     'create_user_tooltip' => 'Agregar una nueva cuenta de usuario al sistema.',
     'delete_user_tooltip' => 'Eliminar permanentemente esta cuenta de usuario.',
-    'name' => 'Nombre',
     'description' => 'Descripción',
     'name_tooltip' => 'Nombre completo del usuario.',
     'email_tooltip' => 'Dirección de correo electrónico utilizada para inicio de sesión y notificaciones.',
@@ -503,6 +507,7 @@ return [
     'confirm_delete_cdr' => '¿Está seguro de que desea eliminar este registro CDR?',
     'fs_not_connected' => 'FreeSWITCH no está conectado. Los datos en vivo no están disponibles.',
     'live' => 'En Vivo',
+    'realtime_reconnecting' => 'Conexión en vivo interrumpida. Reconectando y sincronizando estado...',
     'active_conferences' => 'Conferencias Activas',
     'no_active_conferences' => 'No hay conferencias activas.',
     'registrations' => 'Registros',
@@ -541,7 +546,6 @@ return [
     'confirm_password_help' => 'Debe coincidir con la contraseña',
     'confirm_password_hint' => 'Vuelva a ingresar la contraseña para confirmar.',
     'create_admin_tooltip' => 'Crear un nuevo administrador del sistema',
-    'administrator' => 'Administrador',
     'my_profile' => 'Mi Perfil',
     'profile_description' => 'Actualice los detalles de su cuenta y credenciales de contraseña.',
     'profile_information' => 'Información del Perfil',

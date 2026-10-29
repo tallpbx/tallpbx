@@ -1,45 +1,37 @@
 <div>
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">
-            {{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.tenant_domains_title') }}
-        </h2>
-    </div>
+    <x-page-header :title="($this->isEdit ? __('client.edit') : __('client.create')) . ' ' . __('admin.tenant_domains_title')" />
 
     <div class="card bg-base-100 border border-base-300 max-w-2xl">
         <form wire:submit="save" class="card-body">
             {{-- Tenant --}}
             <div class="form-control w-full">
                 <label for="tenantId" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Tenant</span>
+                    <span class="label-text font-medium">{{ __('admin.tenant') }}</span>
                 </label>
                 <select id="tenantId" wire:model="tenantId"
                         class="select select-bordered w-full" required>
-                    <option value="">Select a tenant</option>
+                    <option value="">{{ __('admin.select_tenant') }}</option>
                     @foreach($tenants as $tenant)
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             {{-- Domain --}}
             <div class="form-control w-full mt-4">
                 <label for="domain" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Domain</span>
+                    <span class="label-text font-medium">{{ __('admin.domain') }}</span>
                 </label>
                 <input type="text" id="domain" wire:model="domain"
                        class="input input-bordered w-full" placeholder="sip.example.com" required />
-                @error('domain')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="domain" />
             </div>
 
             {{-- Purpose --}}
             <div class="form-control w-full mt-4">
                 <label for="purpose" class="label justify-start gap-2 pb-1">
-                    <span class="label-text font-medium">Purpose</span>
+                    <span class="label-text font-medium">{{ __('admin.purpose') }}</span>
                 </label>
                 <select id="purpose" wire:model="purpose"
                         class="select select-bordered w-full">
@@ -48,9 +40,7 @@
                     <option value="web">Web</option>
                     <option value="alias">Alias</option>
                 </select>
-                @error('purpose')
-                    <span class="label-text-alt text-error">{{ $message }}</span>
-                @enderror
+                <x-form-error name="purpose" />
             </div>
 
             {{-- Enabled --}}

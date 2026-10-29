@@ -29,6 +29,7 @@ return [
     'edit_device' => 'Editar Dispositivo',
     'device_name' => 'Nombre del Dispositivo',
     'device_vendor' => 'Fabricante',
+    'device_model' => 'Modelo',
     'device_vendor_placeholder' => 'Polycom, Yealink, Cisco...',
     'device_mac' => 'Dirección MAC',
     'device_template' => 'Plantilla',

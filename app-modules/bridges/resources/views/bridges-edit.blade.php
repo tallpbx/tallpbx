@@ -1,12 +1,12 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ $this->isEdit ? __('client.edit') : __('client.create') }} {{ __('admin.bridge') }}</h1>
+        <x-page-header :title="($this->isEdit ? __('client.edit') : __('client.create')) . ' ' . __('admin.bridge')" />
 
         <form wire:submit="save" class="space-y-6">
             {{-- Tenant --}}
             <div class="form-control w-full" @if(! $this->isAdminGuard()) hidden @endif>
                 <label class="label justify-start gap-2 pb-1" for="tenantId">
-                    <span class="label-text font-medium">Tenant</span>
+                    <span class="label-text font-medium">{{ __('admin.tenant') }}</span>
                 </label>
                 <select wire:model="tenantId" id="tenantId" class="select select-bordered w-full">
                     <option value="">{{ __('client.select_tenant') }}</option>
@@ -14,7 +14,7 @@
                         <option value="{{ $tenant->id }}">{{ $tenant->name }}</option>
                     @endforeach
                 </select>
-                @error('tenantId') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="tenantId" />
             </div>
 
             {{-- Bridge Name --}}
@@ -27,7 +27,7 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., Conference Room A"
                 />
-                @error('bridgeName') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="bridgeName" />
             </div>
 
             {{-- Destination Number --}}
@@ -43,7 +43,7 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., 8000"
                 />
-                @error('destinationNumber') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="destinationNumber" />
             </div>
 
             {{-- PIN Number --}}
@@ -59,7 +59,7 @@
                     class="input input-bordered w-full"
                     placeholder="e.g., 1234"
                 />
-                @error('pinNumber') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="pinNumber" />
             </div>
 
             {{-- Description --}}
@@ -72,13 +72,13 @@
                     class="textarea textarea-bordered w-full" rows="2"
                     placeholder="{{ __('admin.optional_description') }}"
                 ></textarea>
-                @error('description') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                <x-form-error name="description" />
             </div>
 
             {{-- Enabled --}}
             <div class="form-control w-full">
                 <label class="label cursor-pointer justify-start gap-3">
-                    <input wire:model="enabled" type="checkbox" class="checkbox checkbox-primary" />
+                    <input wire:model="enabled" wire:loading.attr="disabled" type="checkbox" class="toggle toggle-sm toggle-success" />
                     <span class="label-text font-medium">{{ __('admin.enabled') }}</span>
                 </label>
             </div>

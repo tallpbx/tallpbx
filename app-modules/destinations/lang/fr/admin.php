@@ -37,4 +37,5 @@ return [
     'destination_number_tooltip' => 'Le numéro composé par les appelants pour atteindre cette destination. Utilisé dans les expressions du plan de numérotation pour le routage.',
     'modal_delete_destination_title' => 'Supprimer la destination ?',
     'modal_delete_destination_confirm' => 'Supprimer la destination',
+    'destination_select_type' => 'Sélectionner le type',
 ];

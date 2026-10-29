@@ -12,7 +12,7 @@
         <div class="text-center mb-8">
             <x-heroicon-o-shield-check class="w-12 h-12 text-primary mx-auto mb-3" />
             <h1 class="text-2xl font-bold tracking-tight text-base-content">Create the first administrator</h1>
-            <p class="text-sm text-base-content/60 mt-1">This step is available only until an administrator account is created.</p>
+            <p class="text-xs text-base-content/60 mt-1">This step is available only until an administrator account is created.</p>
         </div>
 
         <div class="card bg-base-100 border border-base-300 p-6">
@@ -41,9 +41,9 @@
                     </label>
                     <input type="password" name="password" id="password" required autocomplete="new-password"
                         placeholder="Minimum 8 characters"
-                        class="input input-bordered w-full @error('password') input-error @enderror" />
+                        class="input input-bordered w-full {{ $errors->has('password') ? 'input-error' : '' }}" />
                     <p class="text-xs text-base-content/60 mt-1">Must be at least 8 characters.</p>
-                    @error('password') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="password" />
                 </div>
                 <div class="mb-6">
                     <label class="label justify-start gap-2 pb-1" for="password_confirmation">

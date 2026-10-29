@@ -23,7 +23,7 @@
         <div class="text-center mb-8">
             <x-heroicon-o-phone class="w-12 h-12 text-primary mx-auto mb-3" />
             <h1 class="text-2xl font-bold tracking-tight text-base-content">{{ config('app.name', 'TallPBX') }}</h1>
-            <p class="text-sm text-base-content/60 mt-1">{{ __('client.sign_in_title') }}</p>
+            <p class="text-xs text-base-content/60 mt-1">{{ __('client.sign_in_title') }}</p>
         </div>
 
         <div class="card bg-base-100 border border-base-300 p-6">
@@ -48,9 +48,9 @@
                 <div class="mb-6 flex items-center justify-between">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="remember" id="remember" class="checkbox checkbox-primary" />
-                        <span class="text-sm text-base-content/60">{{ __('admin.remember_me') }}</span>
+                        <span class="text-xs text-base-content/60">{{ __('admin.remember_me') }}</span>
                     </label>
-                    <a href="{{ route('panel.password.request') }}" class="text-sm link link-primary">{{ __('client.forgot_password') }}</a>
+                    <a href="{{ route('panel.password.request') }}" wire:navigate class="text-sm link link-primary">{{ __('client.forgot_password') }}</a>
                 </div>
                 <button type="submit" class="btn btn-primary w-full">{{ __('admin.sign_in') }}</button>
             </form>

@@ -29,4 +29,12 @@ return [
     'tenant_outbound_routes' => 'Routes Sortantes',
     'modal_delete_outbound_route_title' => 'Supprimer la route sortante ?',
     'modal_delete_outbound_route_confirm' => 'Supprimer la route sortante',
+    'outbound_route_name' => 'Nom de la Route',
+    'outbound_route_dial_pattern' => 'Modèle de Numérotation (regex)',
+    'outbound_route_gateway' => 'Passerelle',
+    'outbound_route_external_fallback' => 'Utiliser le profil externe de secours',
+    'outbound_route_legacy_gateway' => 'Nom de la Passerelle Héritée',
+    'outbound_route_caller_id_name' => 'Nom de l\'Appelant',
+    'outbound_route_caller_id_number' => 'Numéro de l\'Appelant',
+    'outbound_route_priority' => 'Priorité',
 ];

@@ -1,8 +1,5 @@
 <div class="max-w-4xl space-y-6">
-    <div>
-        <h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.my_profile') }}</h2>
-        <p class="text-sm text-base-content/60 mt-1">{{ __('admin.profile_description') }}</p>
-    </div>
+    <x-page-header :title="__('admin.my_profile')" :subtitle="__('admin.profile_description')" />
 
     {{-- Profile Information Card --}}
     <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -19,14 +16,14 @@
             <form wire:submit.prevent="updateProfile" class="space-y-4 mt-3">
                 <div class="form-control w-full max-w-md">
                     <label class="label justify-start gap-2 pb-1" for="name"><span class="label-text font-medium">{{ __('admin.name') }}</span></label>
-                    <input type="text" id="name" wire:model="name" class="input input-bordered w-full @error('name') input-error @enderror" required />
-                    @error('name') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <input type="text" id="name" wire:model="name" class="input input-bordered w-full {{ $errors->has('name') ? 'input-error' : '' }}" required />
+                    <x-form-error name="name" />
                 </div>
 
                 <div class="form-control w-full max-w-md">
                     <label class="label justify-start gap-2 pb-1" for="email"><span class="label-text font-medium">{{ __('admin.email') }}</span></label>
-                    <input type="email" id="email" wire:model="email" class="input input-bordered w-full @error('email') input-error @enderror" required />
-                    @error('email') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <input type="email" id="email" wire:model="email" class="input input-bordered w-full {{ $errors->has('email') ? 'input-error' : '' }}" required />
+                    <x-form-error name="email" />
                 </div>
 
                 <div class="pt-2">
@@ -53,8 +50,8 @@
             <form wire:submit.prevent="updatePassword" class="space-y-4 mt-3">
                 <div class="form-control w-full max-w-md">
                     <label class="label justify-start gap-2 pb-1" for="currentPassword"><span class="label-text font-medium">{{ __('admin.current_password') }}</span></label>
-                    <input type="password" id="currentPassword" wire:model="currentPassword" autocomplete="current-password" class="input input-bordered w-full @error('currentPassword') input-error @enderror" required />
-                    @error('currentPassword') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <input type="password" id="currentPassword" wire:model="currentPassword" autocomplete="current-password" class="input input-bordered w-full {{ $errors->has('currentPassword') ? 'input-error' : '' }}" required />
+                    <x-form-error name="currentPassword" />
                 </div>
 
                 <div class="form-control w-full max-w-md">
@@ -62,9 +59,9 @@
                         <span class="label-text font-medium">{{ __('admin.new_password') }}</span>
                         <span class="label-text-alt text-base-content/60">{{ __('admin.password_requirements_min') }}</span>
                     </label>
-                    <input type="password" id="newPassword" wire:model="newPassword" autocomplete="new-password" placeholder="{{ __('admin.password_requirements_min') }}" class="input input-bordered w-full @error('newPassword') input-error @enderror" required />
+                    <input type="password" id="newPassword" wire:model="newPassword" autocomplete="new-password" placeholder="{{ __('admin.password_requirements_min') }}" class="input input-bordered w-full {{ $errors->has('newPassword') ? 'input-error' : '' }}" required />
                     <p class="text-xs text-base-content/60 mt-1">{{ __('admin.profile_new_password_hint') }}</p>
-                    @error('newPassword') <span class="text-error text-xs mt-1">{{ $message }}</span> @enderror
+                    <x-form-error name="newPassword" />
                 </div>
 
                 <div class="form-control w-full max-w-md">

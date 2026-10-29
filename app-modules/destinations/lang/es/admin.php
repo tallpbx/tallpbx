@@ -37,4 +37,5 @@ return [
     'destination_number_tooltip' => 'El número que los llamantes marcan para llegar a este destino. Se utiliza en expresiones de plan de marcado para el enrutamiento.',
     'modal_delete_destination_title' => '¿Eliminar destino?',
     'modal_delete_destination_confirm' => 'Eliminar destino',
+    'destination_select_type' => 'Seleccionar tipo',
 ];

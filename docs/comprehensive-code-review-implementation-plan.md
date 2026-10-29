@@ -906,27 +906,27 @@ git commit -m "security(process): migrate SystemProcessRunner and GitUpdateServi
     @enderror
     ```
 
-- [ ] **Step 1: Write the failing UI convention test in `tests/Feature/Architecture/UiArchitectureTest.php`**
+- [x] **Step 1: Write the failing UI convention test in `tests/Feature/Architecture/UiArchitectureTest.php`**
 
 Assert:
 1. `<x-form-error name="email" />` renders `<p class="mt-1 text-xs text-error" role="alert">` when validation error `'email'` is present in `$errors` and renders empty string when absent.
 2. Zero raw `@error(` directives remain in `app-modules/*/resources/views/**/*.blade.php` (only allowed inside `resources/views/components/form-error.blade.php`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: FAIL (362 raw `@error` blocks found across 64 module view files).
 
-- [ ] **Step 3: Create `form-error.blade.php` and migrate all `@error` blocks**
+- [x] **Step 3: Create `form-error.blade.php` and migrate all `@error` blocks**
 
 Create `resources/views/components/form-error.blade.php` and replace the 8 inconsistent `@error(...) ... @enderror` class variants in all 64 module view files with `<x-form-error name="..." />`. Work module-by-module and keep `optimize:clear` out of the inner loop — run it once per batch.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add resources/views/components/form-error.blade.php app-modules/ resources/views/ tests/Feature/Architecture/UiArchitectureTest.php
@@ -951,28 +951,28 @@ git commit -m "ui(forms): standardize all validation errors onto shared <x-form-
 - Produces:
   - `<x-page-header :title="__('admin.extensions')" :tooltip="__('admin.extensions_tooltip')" :subtitle="null">` with named `actions` slot for right-aligned toolbar buttons (`btn btn-primary btn-sm`, etc.).
 
-- [ ] **Step 1: Extend `UiArchitectureTest.php` with failing assertions for `settings-edit`, `layouts/app`, and `<x-page-header>`**
+- [x] **Step 1: Extend `UiArchitectureTest.php` with failing assertions for `settings-edit`, `layouts/app`, and `<x-page-header>`**
 
 Assert:
 1. `settings-edit.blade.php` uses `<x-page-header>`, `btn-sm` on its primary action, `<x-icon-button>` (or explicit `aria-label` + `w-4 h-4`) on row actions, `text-xs` table cells, and translated empty-state copy (`__('admin.settings_empty')`).
 2. `resources/views/layouts/app.blade.php` contains zero raw `class="tooltip` divs (uses `<x-tooltip>` only) and translates `aria-label="{{ __('admin.close_sidebar') }}"`. Match on the **prefix** `class="tooltip` — the file currently holds two raw divs at `:92` and `:123` written as `class="tooltip tooltip-right"`, so an exact-match assertion for `class="tooltip"` passes today and would never fail.
 3. `resources/views/components/dashboard/stats.blade.php` uses `text-lg font-semibold` instead of `text-xl font-semibold`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: FAIL on checks 1 and 3, and on check 2 once the match is corrected to the `class="tooltip` prefix. Check 2 as originally written (exact `class="tooltip"`) already passes — do not "fix" a non-existent defect by inventing work, and do not weaken the assertion to keep it green.
 
-- [ ] **Step 3: Implement `<x-page-header>`, overhaul `settings-edit.blade.php`, fix layout quick wins, and migrate page headers**
+- [x] **Step 3: Implement `<x-page-header>`, overhaul `settings-edit.blade.php`, fix layout quick wins, and migrate page headers**
 
 Create `resources/views/components/page-header.blade.php` matching the established `flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between` + `h1.text-2xl.font-bold.tracking-tight` + optional `<x-tooltip>` pattern, add `close_sidebar` / `settings_*` keys across `en`/`es`/`fr`, modernize `settings-edit.blade.php`, fix `layouts/app.blade.php` and `dashboard/stats.blade.php`, and migrate the 127 copy-pasted page headers.
 
-- [ ] **Step 4: Run Phase 3A verification gate**
+- [x] **Step 4: Run Phase 3A verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php tests/Feature/Architecture/TranslationParityTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add resources/views/ app-modules/ lang/ tests/Feature/Architecture/UiArchitectureTest.php
@@ -996,25 +996,25 @@ git commit -m "ui(layout): introduce <x-page-header> and bring settings-edit and
 
 **Test Impact (Phase 3B):** `UiArchitectureTest` already has a toggle test requiring every `toggle` input to carry an explicit size token AND `wire:loading.attr="disabled"`. Every one of the ~52 checkbox→toggle conversions must therefore ship with `toggle-sm` plus a `wire:loading.attr="disabled"` lock (and the `wire:loading.class="opacity-70 pointer-events-none"` wrapper per Pattern 2), or the existing toggle test goes red. Add this requirement to the per-view conversion checklist, not as a later cleanup pass.
 
-- [ ] **Step 1: Add failing `checkbox` allowlist and zero-`toggle-warning` assertions to `UiArchitectureTest.php`**
+- [x] **Step 1: Add failing `checkbox` allowlist and zero-`toggle-warning` assertions to `UiArchitectureTest.php`**
 
 Scan all Blade files asserting that `toggle-warning` appears only inside `partials/firewall-switches.blade.php` and that `checkbox` appears only in the explicit multi-select allowlist.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: FAIL (`modules-list.blade.php:105` and `firewall-rules.blade.php:528` use `toggle-warning`; 63 `class="checkbox` sites exist outside the multi-select allowlist).
 
-- [ ] **Step 3: Migrate binary checkboxes to `toggle toggle-sm toggle-success` and restrict `toggle-warning` to the observe-mode allowlist**
+- [x] **Step 3: Migrate binary checkboxes to `toggle toggle-sm toggle-success` and restrict `toggle-warning` to the observe-mode allowlist**
 
 Update `modules-list.blade.php` so enabled modules render `toggle toggle-sm toggle-success` and disabled modules render `toggle toggle-sm toggle-neutral` (never `toggle-warning`), convert the TFTP-defense toggle at `firewall-rules.blade.php:528` to `toggle-success` / `toggle-neutral`, and leave the observe-mode switch in `firewall-switches.blade.php` on `toggle-warning` as the documented exception. Convert the remaining binary state checkboxes across edit/settings views to `toggle toggle-sm toggle-success` — each conversion must include `wire:loading.attr="disabled"` so the pre-existing toggle test keeps passing.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app-modules/ resources/views/ tests/Feature/Architecture/UiArchitectureTest.php
@@ -1046,7 +1046,7 @@ git commit -m "ui(controls): unify binary feature states onto toggle-success and
   - **Icon sizing (U11):** `w-2 h-2` and `w-8 h-8` are eliminated; the 13 `w-3 h-3` and 12 `w-6 h-6` occurrences survive only inside a reviewed literal allowlist.
 - **Review-checked, not test-gated:** `font-mono` on table-cell badges and the absence of skeleton loaders on static pages cannot be asserted reliably by regex against positional Blade markup. They are verified by visual review in Step 3 and recorded in the task's completion note. §2.4's "0 skeleton loaders" is **not** treated as a defect for static pages — see Task 19 for the live-list case, which is the only place a skeleton is required.
 
-- [ ] **Step 1: Add failing convention checks for dimming, navigation, scrims, typography, icon sizing, and accessible names in `UiArchitectureTest.php`**
+- [x] **Step 1: Add failing convention checks for dimming, navigation, scrims, typography, icon sizing, and accessible names in `UiArchitectureTest.php`**
 
 Assert across all Blade templates in `app-modules/` and `resources/views/`:
 1. Zero occurrences of `opacity-60 pointer-events-none`; `opacity-40 pointer-events-none` appears only on `<tr` elements; `opacity-70 pointer-events-none` appears on non-`<tr>` interactive wrappers/buttons.
@@ -1057,23 +1057,23 @@ Assert across all Blade templates in `app-modules/` and `resources/views/`:
 6. **(U11)** Zero `w-2 h-2` and zero `w-8 h-8`. `w-3 h-3` and `w-6 h-6` are confined to a literal allowlist generated from the pre-migration `grep -rln 'w-3 h-3\|w-6 h-6'`, with each entry reviewed against its context (badge-internal compact icon vs page-level icon). Because the list lives in the test, any *new* outlier fails even though the reviewed 25 are accepted.
 7. **(U13)** Every `<input type="checkbox">` whose class contains `toggle` or `checkbox` either carries `aria-label`/`aria-labelledby`, or sits inside an enclosing `<label>` element containing non-empty text (`__('…')` or a literal word). Resolve "enclosing" by scanning backwards to the nearest `<label` and forwards to its `</label>`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php`
 Expected: FAIL on all seven assertions — `opacity-60` in `geo-blocking`; `bg-black/40` in `protection-settings`; 55 links missing `wire:navigate`; unlabeled `btn-square` buttons in `block-allow` / `firewall-rules`; 51 `text-sm text-base-content/60` sites; 8 indefensible icon sizes plus 25 unrecorded `w-3`/`w-6` occurrences; unlabelled toggle/checkbox inputs in `block-allow`.
 
-- [ ] **Step 3: Apply the mechanical UI normalizations across views**
+- [x] **Step 3: Apply the mechanical UI normalizations across views**
 
 Keep all 35 `<tr>` `opacity-40 pointer-events-none` usages intact (preserving Pattern 3 and `SecurityManagerLivewireTest`), fix `geo-blocking.blade.php:170`, standardize drawer scrim to `bg-black/50`, strip the 21 dead badge overrides in `firewall-rules.blade.php`, add `wire:navigate` to all 55 internal panel links, normalize secondary helper copy to `text-xs text-base-content/60` (the 51 `text-sm` sites), replace `w-2 h-2`/`w-8 h-8` icons with `w-4 h-4` (or `w-3 h-3` where the icon sits inside a `badge-xs`), add `font-mono` to technical identifier badges in tables, and add translated `aria-label`s to every icon-only button and standalone toggle/checkbox.
 
 Work module-by-module and keep `optimize:clear` out of the inner loop — one run per batch. In the completion note, list the files where `font-mono` badges were added and confirm the static pages intentionally have no skeleton loaders.
 
-- [ ] **Step 4: Run Phase 3B verification gate**
+- [x] **Step 4: Run Phase 3B verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pest tests/Feature/Architecture/UiArchitectureTest.php app-modules/security/tests/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app-modules/ resources/views/ lang/ tests/Feature/Architecture/UiArchitectureTest.php
@@ -1097,28 +1097,28 @@ git commit -m "ui(polish): normalize wire:navigate links, scrims, badges, dimmin
   - Zero duplicate array keys inside `lang/{en,es,fr}/admin.php` and `app-modules/*/lang/{en,es,fr}/admin.php` (parsed via AST / token scan, since `require` silently overwrites duplicates in PHP).
   - Zero hardcoded English `<span class="label-text...">Literal</span>`, `'Create ...' : 'Edit ...'` ternaries, or `<option value="">Select ...</option>` strings in `app-modules/*/resources/views/*-edit.blade.php`.
 
-- [ ] **Step 1: Add failing duplicate-key AST check and edit-view hardcoded-label scan to `tests/Feature/Architecture/TranslationParityTest.php`**
+- [x] **Step 1: Add failing duplicate-key AST check and edit-view hardcoded-label scan to `tests/Feature/Architecture/TranslationParityTest.php`**
 
 1. Tokenize every `lang/*/*.php` and `app-modules/*/lang/*/*.php` file with `token_get_all()` to detect duplicate string keys in returned arrays (`active_calls`, `email`, `tenants`, `groups`, `administrator` currently fail in `en` and `es`).
 2. Scan `app-modules/*/resources/views/*-edit.blade.php` asserting `<span class="label-text` and `<option value="">` contents invoke `{{ __(...) }}` rather than raw English words.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php`
 Expected: FAIL (duplicate keys in `lang/en/admin.php` and `lang/es/admin.php`; ~50 edit views contain hardcoded English labels).
 
-- [ ] **Step 3: Deduplicate root dictionaries and localize all ~50 edit/create views across `en`, `es`, and `fr`**
+- [x] **Step 3: Deduplicate root dictionaries and localize all ~50 edit/create views across `en`, `es`, and `fr`**
 
 1. Remove the 5 duplicate key lines in `lang/en/admin.php` and `lang/es/admin.php`.
 2. Reuse shared root keys where they already exist (`__('admin.tenant')`, `__('admin.enabled')`, `__('admin.disabled')`, `__('admin.description')`, `__('admin.name')`, `__('admin.save')`, `__('admin.cancel')`) — NEVER redeclare root keys in module dictionaries.
 3. Add module-specific field labels and placeholders to `app-modules/<module>/lang/{en,es,fr}/admin.php` prefixed by entity slug (e.g. `sip_profile_name`, `acl_select_tenant`) with the mandatory collision-warning PHP header, and update the ~50 edit views plus `extensions-list.blade.php:29`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php`
 Expected: PASS (100% parity across `en`, `es`, `fr`, zero root or cross-module collisions, zero duplicate keys, zero hardcoded form labels).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lang/ app-modules/ tests/Feature/Architecture/TranslationParityTest.php
@@ -1147,22 +1147,22 @@ git commit -m "i18n(panel): localize module edit forms across en/es/fr and dedup
   - Alpine-driven `<x-websocket-health-banner />` (`alert alert-warning text-xs` hidden while connected, visible during disconnect, dispatching `Livewire.dispatch('echo-reconnected')` once upon recovery) plus subtle skeleton shimmer rows (`animate-pulse`) during initial mount/resync (`§2.4`).
   - `#[On('echo-reconnected')] public function resyncAfterReconnect(): void` on live telephony components.
 
-- [ ] **Step 1: Add failing tests in `tests/Feature/Telephony/TelephonyPushBroadcastingTest.php`**
+- [x] **Step 1: Add failing tests in `tests/Feature/Telephony/TelephonyPushBroadcastingTest.php`**
 
 Assert:
 1. All live telephony components listen to `#[On('echo-reconnected')]` and reload their live state when `Livewire::test(...)->dispatch('echo-reconnected')` is triggered.
 2. All live telephony views render `<x-websocket-health-banner` (connection-state indicator) and STILL contain zero `wire:poll` directives and zero manual refresh buttons.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Telephony/TelephonyPushBroadcastingTest.php`
 Expected: FAIL (`echo-reconnected` listener and `<x-websocket-health-banner>` missing).
 
-- [ ] **Step 3: Implement Echo state-change bridge, `<x-websocket-health-banner />`, and `#[On('echo-reconnected')]` handlers**
+- [x] **Step 3: Implement Echo state-change bridge, `<x-websocket-health-banner />`, and `#[On('echo-reconnected')]` handlers**
 
 Wire Pusher/Reverb `state_change` listener in `resources/js/echo.js`, build `resources/views/components/websocket-health-banner.blade.php` with translated `en`/`es`/`fr` warning copy (`__('admin.realtime_reconnecting')`), add `#[On('echo-reconnected')]` to the 5 live telephony components, and run `npm run build` so compiled Vite assets stay in sync.
 
-- [ ] **Step 4: Run Phase 3C verification gate**
+- [x] **Step 4: Run Phase 3C verification gate**
 
 Run:
 ```bash
@@ -1174,7 +1174,7 @@ php artisan test --compact --parallel
 ```
 Expected: All Phase 3C, Phase 3A/3B and full parallel suite tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add resources/ app-modules/ lang/ public/build/ tests/Feature/Telephony/TelephonyPushBroadcastingTest.php

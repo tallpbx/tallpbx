@@ -1,10 +1,6 @@
 <div>
     <div class="space-y-6">
-        <div class="flex items-center justify-between">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">
-                {{ __('Log Viewer') }}
-            </h2>
-        </div>
+        <x-page-header :title="__('Log Viewer')" />
 
         {{-- Controls --}}
         <div class="card bg-base-100 border border-base-300 p-4">

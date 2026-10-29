@@ -75,6 +75,12 @@ class RegistrationsList extends BaseListComponent
         }
     }
 
+    #[On('echo-reconnected')]
+    public function resyncAfterReconnect(): void
+    {
+        $this->refresh();
+    }
+
     /**
      * The current tenant id for tenant users, null for admins.
      */

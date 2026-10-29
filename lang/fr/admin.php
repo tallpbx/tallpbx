@@ -7,7 +7,7 @@ return [
     'login_title' => 'TallPBX Admin',
     'login_subtitle' => 'Connectez-vous à votre compte administrateur',
     'sign_in' => 'Se Connecter',
-    'email' => 'Adresse Email',
+    'email' => 'Email',
     'password' => 'Mot de Passe',
     'password_visibility' => 'Afficher ou masquer le mot de passe',
     'unknown' => 'Inconnu',
@@ -16,6 +16,7 @@ return [
     'logout' => 'Déconnexion',
     'sign_out' => 'Se déconnecter du panneau de contrôle.',
     'toggle_navigation' => 'Afficher/masquer le menu de navigation.',
+    'close_sidebar' => 'Fermer la barre latérale',
     'change_language' => 'Changer la langue de l\'interface.',
 
     // ─── Navigation ─────────────────────────────────────────────────────────
@@ -36,6 +37,10 @@ return [
     'inbound_routes' => 'Routes Entrantes',
     'outbound_routes' => 'Routes Sortantes',
     'voicemails' => 'Messageries Vocales',
+    'voicemail' => 'Messagerie Vocale',
+    'leave_blank_keep_existing_greeting' => 'Laissez vide pour conserver le message d\'accueil existant.',
+    'leave_blank_keep_existing_audio' => 'Laissez vide pour conserver le fichier audio existant.',
+    'audio_file' => 'Fichier Audio',
     'devices' => 'Appareils',
     'destinations' => 'Destinations',
     'dialplans' => 'Plans de Numérotation',
@@ -60,9 +65,6 @@ return [
     'edit_user' => 'Modifier l\'Utilisateur',
     'name' => 'Nom',
     'description' => 'Description',
-    'email' => 'Email',
-    'tenants' => 'Locataires',
-    'groups' => 'Groupes',
     'no_users_found' => 'Aucun utilisateur trouvé.',
     'impersonate' => 'Usurper cet utilisateur',
     'impersonation_logs' => 'Journaux d\'Usurpation',
@@ -81,6 +83,8 @@ return [
     'confirm_delete_user' => 'Êtes-vous sûr de vouloir supprimer cet utilisateur ?',
 
     // ─── Tenants ────────────────────────────────────────────────────────────
+    'tenant' => 'Locataire',
+    'select_tenant' => 'Sélectionner un locataire',
     'none' => 'Aucun',
     'domain' => 'Domaine',
     'enabled' => 'Activé',
@@ -144,6 +148,7 @@ return [
     'setting_key_placeholder' => 'app.name',
     'setting_value_placeholder' => 'MonPBX',
     'setting_add' => 'Ajouter',
+    'settings_empty' => 'Aucun paramètre configuré.',
 
     // ─── Modules ────────────────────────────────────────────────────────────
     'modules_title' => 'Modules',
@@ -502,6 +507,7 @@ return [
     'confirm_delete_cdr' => 'Êtes-vous sûr de vouloir supprimer cet enregistrement CDR ?',
     'fs_not_connected' => 'FreeSWITCH n\'est pas connecté. Les données en direct sont indisponibles.',
     'live' => 'En Direct',
+    'realtime_reconnecting' => 'Connexion en direct interrompue. Reconnexion et synchronisation en cours...',
     'active_conferences' => 'Conférences Actives',
     'no_active_conferences' => 'Aucune conférence active.',
     'registrations' => 'Enregistrements',
@@ -540,7 +546,6 @@ return [
     'confirm_password_help' => 'Doit correspondre au mot de passe',
     'confirm_password_hint' => 'Ressaisissez le mot de passe pour confirmer.',
     'create_admin_tooltip' => 'Créer un nouvel administrateur système',
-    'administrator' => 'Administrateur',
     'my_profile' => 'Mon Profil',
     'profile_description' => 'Mettez à jour les détails de votre compte et vos identifiants.',
     'profile_information' => 'Informations du Profil',

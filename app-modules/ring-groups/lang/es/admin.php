@@ -36,4 +36,5 @@ return [
     'modal_delete_ring_group_title' => '¿Eliminar grupo de timbrado?',
     'modal_delete_ring_group_confirm' => 'Eliminar grupo de timbrado',
     'modal_delete_ring_group_message' => '¿Eliminar “:name” y sus miembros? Esta acción no se puede deshacer.',
+    'ring_group_timeout_seconds' => 'Tiempo de Espera de Timbrado (segundos)',
 ];

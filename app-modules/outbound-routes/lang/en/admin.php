@@ -29,4 +29,12 @@ return [
     'tenant_outbound_routes' => 'Outbound Routes',
     'modal_delete_outbound_route_title' => 'Delete Outbound Route?',
     'modal_delete_outbound_route_confirm' => 'Delete Outbound Route',
+    'outbound_route_name' => 'Route Name',
+    'outbound_route_dial_pattern' => 'Dial Pattern (regex)',
+    'outbound_route_gateway' => 'Gateway',
+    'outbound_route_external_fallback' => 'Use external profile fallback',
+    'outbound_route_legacy_gateway' => 'Legacy Gateway Name',
+    'outbound_route_caller_id_name' => 'Caller ID Name',
+    'outbound_route_caller_id_number' => 'Caller ID Number',
+    'outbound_route_priority' => 'Priority',
 ];

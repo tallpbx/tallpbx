@@ -1,7 +1,5 @@
 <div>
-    <div class="mb-6">
-        <div class="flex items-center gap-2"><h2 class="text-2xl font-bold tracking-tight text-base-content">{{ __('admin.call_recordings_title') }}</h2><x-tooltip :tip="__('admin.page_info_tooltip')" position="right"><x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" /></x-tooltip></div>
-    </div>
+    <x-page-header :title="__('admin.call_recordings_title')" :tooltip="__('admin.page_info_tooltip')" />
 
     @if ($operationalMessage !== null)
         <x-inline-alert :type="$operationalMessageType" :title="null" class="mb-4">{{ $operationalMessage }}</x-inline-alert>
@@ -24,7 +22,7 @@
                         <tr>
                             <td>
                                 <span class="font-medium">{{ $recording->caller_id_name }}</span>
-                                <span class="text-sm text-base-content/60 block">{{ $recording->caller_id }}</span>
+                                <span class="text-xs text-base-content/60 block">{{ $recording->caller_id }}</span>
                             </td>
                             <td><span class="font-mono text-sm">{{ $recording->destination }}</span></td>
                             <td>{{ gmdate('i:s', $recording->duration) }}</td>

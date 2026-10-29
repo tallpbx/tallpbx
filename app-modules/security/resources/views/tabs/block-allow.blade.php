@@ -83,10 +83,8 @@
                             <div>
                                 <input wire:model="newWhitelistIp" type="text"
                                        placeholder="{{ __('admin.security_ip_or_cidr') }}"
-                                       class="input input-bordered input-sm w-full font-mono @error('newWhitelistIp') input-error @enderror" />
-                                @error('newWhitelistIp')
-                                    <span class="text-error text-xs mt-0.5 block">{{ $message }}</span>
-                                @enderror
+                                       class="input input-bordered input-sm w-full font-mono {{ $errors->has('newWhitelistIp') ? 'input-error' : '' }}" />
+                                <x-form-error name="newWhitelistIp" />
                             </div>
                             <input wire:model="newWhitelistDescription" type="text"
                                    placeholder="{{ __('admin.security_ip_description') }}"
@@ -245,10 +243,8 @@
                             <div>
                                 <input wire:model="newBlacklistIp" type="text"
                                        placeholder="{{ __('admin.security_ip_or_cidr') }}"
-                                       class="input input-bordered input-sm w-full font-mono @error('newBlacklistIp') input-error @enderror" />
-                                @error('newBlacklistIp')
-                                    <span class="text-error text-xs mt-0.5 block">{{ $message }}</span>
-                                @enderror
+                                       class="input input-bordered input-sm w-full font-mono {{ $errors->has('newBlacklistIp') ? 'input-error' : '' }}" />
+                                <x-form-error name="newBlacklistIp" />
                             </div>
                             <input wire:model="newBlacklistDescription" type="text"
                                    placeholder="{{ __('admin.security_ip_description') }}"

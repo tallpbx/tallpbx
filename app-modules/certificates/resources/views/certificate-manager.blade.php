@@ -1,20 +1,6 @@
 <div class="space-y-6">
     {{-- Header & Top Actions --}}
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <div class="flex items-center gap-2">
-                <h1 class="text-2xl font-bold tracking-tight text-base-content">
-                    {{ __('admin.certificates') }}
-                </h1>
-                <x-tooltip :tip="__('admin.certificates_description')" align="start" position="right">
-                    <x-heroicon-o-information-circle class="w-5 h-5 cursor-help opacity-40 hover:opacity-80" />
-                </x-tooltip>
-            </div>
-            <p class="text-sm text-base-content/70 mt-1">
-                {{ __('admin.certificates_description') }}
-            </p>
-        </div>
-    </div>
+    <x-page-header :title="__('admin.certificates')" :tooltip="__('admin.certificates_description')" :subtitle="__('admin.certificates_description')" />
 
     {{-- Transient feedback toast (shared standard component) --}}
     <x-operational-toast :message="$operationalMessage" :type="$operationalMessageType" />
@@ -28,7 +14,7 @@
                     <span class="text-sm font-medium text-base-content/70">{{ __('admin.certificates_active_web') }}</span>
                     @if ($this->deploymentStatus['active_web_certificate'])
                         <span class="badge badge-success badge-sm gap-1">
-                            <span class="inline-block w-2 h-2 rounded-full bg-success-content"></span>
+                            <span class="inline-block w-2.5 h-2.5 rounded-full bg-success-content"></span>
                             {{ __('admin.certificates_active_badge') }}
                         </span>
                     @else
@@ -59,7 +45,7 @@
                     <span class="text-sm font-medium text-base-content/70">{{ __('admin.certificates_active_telephony') }}</span>
                     @if ($this->deploymentStatus['active_telephony_certificate'])
                         <span class="badge badge-success badge-sm gap-1">
-                            <span class="inline-block w-2 h-2 rounded-full bg-success-content"></span>
+                            <span class="inline-block w-2.5 h-2.5 rounded-full bg-success-content"></span>
                             {{ __('admin.certificates_active_badge') }}
                         </span>
                     @else
@@ -303,7 +289,7 @@
                             <span class="label-text font-medium">Certificate Display Name</span>
                         </label>
                         <input type="text" wire:model="le_name" placeholder="e.g. Primary PBX FQDN" class="input input-sm input-bordered w-full" required />
-                        @error('le_name') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="le_name" />
                     </div>
 
                     <div class="form-control">
@@ -314,7 +300,7 @@
                             </x-tooltip>
                         </label>
                         <input type="text" wire:model="le_domain" placeholder="e.g. pbx.example.com" class="input input-sm input-bordered w-full font-mono" required />
-                        @error('le_domain') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="le_domain" />
                     </div>
 
                     <div class="form-control">
@@ -325,7 +311,7 @@
                             </x-tooltip>
                         </label>
                         <input type="email" wire:model="le_email" placeholder="admin@example.com" class="input input-sm input-bordered w-full" required />
-                        @error('le_email') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="le_email" />
                     </div>
 
                     <div class="form-control">
@@ -363,7 +349,7 @@
                                         <option value="{{ $cred->id }}">{{ $cred->name }} ({{ $cred->provider }})</option>
                                     @endforeach
                                 </select>
-                                @error('le_dns_credential_id') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                                <x-form-error name="le_dns_credential_id" />
                             </div>
 
                             <label class="flex items-center gap-2 cursor-pointer">
@@ -419,7 +405,7 @@
                             <span class="label-text font-medium">Certificate Display Name</span>
                         </label>
                         <input type="text" wire:model="custom_name" placeholder="e.g. Commercial Wildcard SSL" class="input input-sm input-bordered w-full" required />
-                        @error('custom_name') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="custom_name" />
                     </div>
 
                     <div class="form-control">
@@ -437,7 +423,7 @@
                                   rows="5"
                                   placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
                                   class="textarea textarea-bordered font-mono text-xs w-full" required></textarea>
-                        @error('custom_cert') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="custom_cert" />
                     </div>
 
                     <div class="form-control">
@@ -448,7 +434,7 @@
                                   rows="5"
                                   placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
                                   class="textarea textarea-bordered font-mono text-xs w-full" required></textarea>
-                        @error('custom_key') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="custom_key" />
                     </div>
 
                     <div class="form-control">
@@ -503,7 +489,7 @@
                             <span class="label-text font-medium">Certificate Display Name</span>
                         </label>
                         <input type="text" wire:model="self_name" placeholder="e.g. Lab PBX Internal Cert" class="input input-sm input-bordered w-full" required />
-                        @error('self_name') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="self_name" />
                     </div>
 
                     <div class="form-control">
@@ -511,7 +497,7 @@
                             <span class="label-text font-medium">Common Name (Primary FQDN or IP)</span>
                         </label>
                         <input type="text" wire:model="self_common_name" placeholder="e.g. 192.168.1.100 or pbx.local" class="input input-sm input-bordered w-full font-mono" required />
-                        @error('self_common_name') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                        <x-form-error name="self_common_name" />
                     </div>
 
                     <div class="form-control">
@@ -614,7 +600,7 @@
                                 <span class="label-text font-medium">Credential Name</span>
                             </label>
                             <input type="text" wire:model="new_dns_name" placeholder="e.g. Cloudflare Production" class="input input-sm input-bordered w-full" required />
-                            @error('new_dns_name') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                            <x-form-error name="new_dns_name" />
                         </div>
 
                         <div class="form-control">
@@ -625,7 +611,7 @@
                                 </x-tooltip>
                             </label>
                             <input type="password" wire:model="new_dns_api_token" placeholder="••••••••••••••••" class="input input-sm input-bordered w-full font-mono" required />
-                            @error('new_dns_api_token') <span class="text-xs text-error mt-1">{{ $message }}</span> @enderror
+                            <x-form-error name="new_dns_api_token" />
                         </div>
 
                         <div class="pt-2">

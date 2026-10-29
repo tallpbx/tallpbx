@@ -53,4 +53,6 @@ return [
     'backup_retention_tooltip' => 'Número de archivos de copia de seguridad que se conservarán. Las copias de seguridad más antiguas se eliminan automáticamente cuando se supera este recuento.',
     'backup_compression_tooltip' => 'Comprima el archivo de copia de seguridad con gzip para ahorrar espacio en disco.',
     'backup_encryption_tooltip' => 'Cifre el archivo de copia de seguridad con GPG mediante la clave de cifrado de la aplicación.',
+    'backups_file_store' => 'Almacén de Archivos',
+    'backups_select_destination' => 'Seleccionar un destino',
 ];

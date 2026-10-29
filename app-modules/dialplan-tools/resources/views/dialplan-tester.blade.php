@@ -1,17 +1,16 @@
 <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-        <h1 class="text-2xl font-bold tracking-tight text-base-content mb-6">{{ __('admin.dialplan_tools_title') }}</h1>
-        <p class="text-base-content/60 mb-6">{{ __('admin.dialplan_tools_description') }}</p>
+        <x-page-header :title="__('admin.dialplan_tools_title')" :subtitle="__('admin.dialplan_tools_description')" />
         <form wire:submit="testRegex" class="space-y-6 max-w-lg">
             <div class="form-control w-full">
                 <label class="label" for="testPattern"><span class="label-text">{{ __('admin.dialplan_tools_pattern') }}</span></label>
                 <input wire:model="testPattern" id="testPattern" type="text" class="input input-bordered w-full font-mono" placeholder="^(\d{3})(\d{4})$" />
-                @error('testPattern')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
+                <x-form-error name="testPattern" />
             </div>
             <div class="form-control w-full">
                 <label class="label" for="testNumber"><span class="label-text">{{ __('admin.dialplan_tools_number') }}</span></label>
                 <input wire:model="testNumber" id="testNumber" type="text" class="input input-bordered w-full font-mono" placeholder="1234567" />
-                @error('testNumber')<span class="text-error text-xs mt-1">{{ $message }}</span>@enderror
+                <x-form-error name="testNumber" />
             </div>
             <div class="flex gap-3">
                 <x-form-submit-button target="testRegex" busy-text="Testing...">{{ __('admin.dialplan_tools_test') }}</x-form-submit-button>
