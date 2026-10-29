@@ -40,10 +40,5 @@ Thumbs.db
 app-modules/backups/backups
 tests/Browser/Screenshots/
 /storage/framework/browser-media*
-# Internal security/architecture/UI audit findings — never committed to the public repository.
-# Each report file and its entry are deleted together once every finding is remediated or deferred.
-/docs/project-audit-report.md
-/docs/architecture-audit-report.md
-/docs/ui-audit-report.md
 /custom-modules/*
 !/custom-modules/.gitkeep
