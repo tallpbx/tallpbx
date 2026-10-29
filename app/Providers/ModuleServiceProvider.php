@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Models\Module;
 use App\Services\ModuleCollisionGuard;
 use App\Support\CustomModuleAutoloader;
+use App\Support\ModuleDependencySorter;
 use Composer\InstalledVersions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -132,9 +133,7 @@ class ModuleServiceProvider extends ServiceProvider
         $this->validateModuleNames($modules);
         $this->checkDependencies($modules);
 
-        uasort($modules, fn (array $a, array $b): int => ($a['priority'] ?? 0) <=> ($b['priority'] ?? 0));
-
-        return $modules;
+        return ModuleDependencySorter::sort($modules);
     }
 
     /**

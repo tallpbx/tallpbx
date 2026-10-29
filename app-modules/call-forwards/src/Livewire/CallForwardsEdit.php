@@ -84,7 +84,7 @@ class CallForwardsEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'extension_uuid' => $this->extensionUuid,
             'forward_type' => $this->forwardType,
             'destination' => $this->destination,

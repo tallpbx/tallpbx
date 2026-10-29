@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\TenantContextMissingException;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -65,14 +66,14 @@ class TenantContext
      * When no User is provided, evaluates the three-tier resolution order:
      *   1. Session-stored tenant (selected_tenant_id)
      *   2. Authenticated user's default tenant (User model only)
-     *   3. Single-tenant fallback (if exactly one enabled tenant exists)
+     *   3. Single-tenant fallback (if enabled and exactly one enabled tenant exists)
      *
      * Does NOT mutate TenantManager or session.
      */
-    public function resolve(?User $user = null): ?Tenant
+    public function resolve(?User $user = null, bool $allowSingleTenantFallback = true): ?Tenant
     {
         if ($user !== null) {
-            return $this->resolveForUser($user);
+            return $this->resolveForUser($user, $allowSingleTenantFallback);
         }
 
         // 1. Session-stored tenant
@@ -96,7 +97,7 @@ class TenantContext
             // resolution — return null so downstream middleware can
             // redirect them to the admin login.
             if ($authUser instanceof User) {
-                $tenant = $this->resolveForUser($authUser);
+                $tenant = $this->resolveForUser($authUser, $allowSingleTenantFallback);
 
                 if ($tenant !== null) {
                     return $tenant;
@@ -104,12 +105,45 @@ class TenantContext
             }
         }
 
-        // 3. Single-tenant fallback (only if exactly one enabled tenant exists)
-        if (Tenant::query()->where('enabled', true)->count() === 1) {
+        // 3. Single-tenant fallback (only if exactly one enabled tenant exists and allowed)
+        if ($allowSingleTenantFallback && Tenant::query()->where('enabled', true)->count() === 1) {
             return Tenant::query()->where('enabled', true)->first();
         }
 
         return null;
+    }
+
+    /**
+     * Strict tenant resolution that disallows the single-tenant fallback.
+     */
+    public function resolveStrict(?User $user = null): ?Tenant
+    {
+        return $this->resolve($user, allowSingleTenantFallback: false);
+    }
+
+    /**
+     * Assert that a tenant context is active and return the active Tenant model.
+     *
+     * @throws TenantContextMissingException
+     */
+    public function assertResolved(): Tenant
+    {
+        $tenantId = $this->manager->getTenantId();
+
+        if ($tenantId === null) {
+            throw new TenantContextMissingException('No active tenant context is configured.');
+        }
+
+        $tenant = Tenant::query()
+            ->whereKey($tenantId)
+            ->where('enabled', true)
+            ->first();
+
+        if ($tenant === null) {
+            throw new TenantContextMissingException("Active tenant [{$tenantId}] not found or disabled.");
+        }
+
+        return $tenant;
     }
 
     /**
@@ -145,9 +179,9 @@ class TenantContext
      * Resolution order:
      *   1. User's primary tenant (where tenant_user.primary = true)
      *   2. User's first attached tenant
-     *   3. Single-tenant fallback (if exactly one enabled tenant exists)
+     *   3. Single-tenant fallback (if enabled and exactly one enabled tenant exists)
      */
-    protected function resolveForUser(User $user): ?Tenant
+    protected function resolveForUser(User $user, bool $allowSingleTenantFallback = true): ?Tenant
     {
         // 1. Primary tenant
         $primary = $user->tenants()
@@ -168,8 +202,8 @@ class TenantContext
             return $first;
         }
 
-        // 3. Single-tenant fallback (only if exactly one enabled tenant exists)
-        if (Tenant::query()->where('enabled', true)->count() === 1) {
+        // 3. Single-tenant fallback (only if exactly one enabled tenant exists and allowed)
+        if ($allowSingleTenantFallback && Tenant::query()->where('enabled', true)->count() === 1) {
             return Tenant::query()->where('enabled', true)->first();
         }
 

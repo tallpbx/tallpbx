@@ -22,27 +22,39 @@ class FakeProcessRunner implements ProcessRunner
     /** @var array<int, string> */
     public array $commands = [];
 
+    /** @var array<int, array<int, string>> */
+    public array $argvCommands = [];
+
     /** @var array<string, true> Commands that should throw. */
     public array $throwOn = [];
 
     /**
      * Run a command and return the configured scripted result.
+     *
+     * @param  array<int, string>  $argv
+     * @param  array<string, string>  $env
      */
-    public function run(string $command): ProcessResult
-    {
-        $this->commands[] = $command;
+    public function run(
+        array $argv,
+        ?string $cwd = null,
+        ?int $timeoutSeconds = null,
+        array $env = [],
+    ): ProcessResult {
+        $joined = implode(' ', $argv);
+        $this->commands[] = $joined;
+        $this->argvCommands[] = $argv;
 
         foreach ($this->throwOn as $needle => $_) {
-            if (str_contains($command, $needle)) {
+            if (str_contains($joined, $needle)) {
                 throw new RuntimeException('Simulated process failure.');
             }
         }
 
         $exitCode = 0;
-        $output = 'output of: '.$command;
+        $output = 'output of: '.$joined;
 
         foreach ($this->exitCodes as $needle => $code) {
-            if (str_contains($command, $needle)) {
+            if (str_contains($joined, $needle)) {
                 $exitCode = $code;
 
                 break;
@@ -50,7 +62,7 @@ class FakeProcessRunner implements ProcessRunner
         }
 
         foreach ($this->outputs as $needle => $text) {
-            if (str_contains($command, $needle)) {
+            if (str_contains($joined, $needle)) {
                 $output = $text;
 
                 break;

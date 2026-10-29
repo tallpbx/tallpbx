@@ -8,7 +8,7 @@
     "description": "Tail and filter application log files",
     "required": false,
     "protected": false,
-    "priority": 0,
+    "priority": 30,
     "providers": [
         "Modules\\Logs\\Providers\\ModuleServiceProvider"
     ],

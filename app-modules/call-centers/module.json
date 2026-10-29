@@ -8,7 +8,7 @@
     "description": "Call center queue management for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 460,
+    "priority": 450,
     "providers": [
         "Modules\\CallCenters\\Providers\\ModuleServiceProvider"
     ],

@@ -8,7 +8,9 @@ use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\OutboundRoutes\Models\OutboundRoute;
 use Modules\OutboundRoutes\Services\OutboundRouteServiceInterface;
 
@@ -23,8 +25,7 @@ use Modules\OutboundRoutes\Services\OutboundRouteServiceInterface;
  */
 class OutboundRoutesList extends BaseListComponent
 {
-    /** @var Collection<int, OutboundRoute> */
-    public Collection $routes;
+    use WithPagination;
 
     public ?string $pendingDeletionId = null;
 
@@ -41,16 +42,17 @@ class OutboundRoutesList extends BaseListComponent
     }
 
     /**
-     * Mount the component and load outbound routes.
-     *
-     * Admin users see all routes across all tenants. Tenant users
-     * are explicitly filtered to the selected tenant from the panel
-     * session because feature page requests may not have initialized
-     * the global tenant scope context yet.
+     * Load outbound routes for the active panel guard.
      */
-    public function mount(): void
+    #[Computed]
+    public function routes(): LengthAwarePaginator
     {
-        $this->loadRoutes();
+        return OutboundRoute::withoutGlobalScope('tenant')
+            ->with('gatewayRelation')
+            ->when(! $this->isAdminGuard(), fn (Builder $query) => $query->where('tenant_id', app(TenantManager::class)->getTenantId()))
+            ->orderBy('priority')
+            ->orderBy('name')
+            ->paginate(25);
     }
 
     /**
@@ -69,7 +71,6 @@ class OutboundRoutesList extends BaseListComponent
         $this->assertCanAccessTenantRecord($route);
         $this->outboundRouteService->delete($route);
         $this->cancelRouteDeletion();
-        $this->loadRoutes();
         $this->showSuccess('Outbound route deleted.');
         $this->dispatch('route-deleted');
     }
@@ -95,19 +96,6 @@ class OutboundRoutesList extends BaseListComponent
     }
 
     /**
-     * Load outbound routes for the active panel guard.
-     */
-    private function loadRoutes(): void
-    {
-        $this->routes = OutboundRoute::withoutGlobalScope('tenant')
-            ->with('gatewayRelation')
-            ->when(! $this->isAdminGuard(), fn (Builder $query) => $query->where('tenant_id', app(TenantManager::class)->getTenantId()))
-            ->orderBy('priority')
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
      * Render the appropriate list view based on the authenticated guard.
      *
      * Admin users see the full CRUD table; tenant users see a
@@ -117,6 +105,8 @@ class OutboundRoutesList extends BaseListComponent
     {
         return view($this->isAdminGuard()
             ? 'outbound-routes::outbound-routes-list'
-            : 'outbound-routes::tenant-outbound-routes-list');
+            : 'outbound-routes::tenant-outbound-routes-list', [
+                'routes' => $this->routes,
+            ]);
     }
 }

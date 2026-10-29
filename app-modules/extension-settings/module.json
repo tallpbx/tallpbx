@@ -8,7 +8,7 @@
     "description": "Per-extension feature overrides",
     "required": false,
     "protected": false,
-    "priority": 630,
+    "priority": 510,
     "providers": [
         "Modules\\ExtensionSettings\\Providers\\ModuleServiceProvider"
     ],

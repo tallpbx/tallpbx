@@ -8,7 +8,7 @@
     "description": "Voicemail message inbox for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 330,
+    "priority": 350,
     "providers": [
         "Modules\\VoicemailMessages\\Providers\\ModuleServiceProvider"
     ],

@@ -6,6 +6,7 @@ namespace App\Services\Xml;
 
 use App\Services\TenantManager;
 use App\Support\Concerns\EscapesXml;
+use App\Support\RoutingCacheVersion;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Modules\Extensions\Models\Extension;
@@ -173,6 +174,7 @@ class DirectoryXmlBuilder
             $domain,
             $username,
             $keyValue,
+            (string) RoutingCacheVersion::get((int) $tenantId),
         ]));
     }
 

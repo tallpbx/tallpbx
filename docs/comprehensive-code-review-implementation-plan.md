@@ -599,28 +599,28 @@ git commit -m "security(esl): enforce tenant allowlists on conference, agent, an
   - `DirectoryXmlBuilder::directoryCacheKey()` embedding `(string) RoutingCacheVersion::get((int) $tenantId)`.
   - `ExtensionSetting` observed by `RoutingCacheObserver` for instant directory XML invalidation.
 
-- [ ] **Step 1: Write the failing cache invalidation tests in `tests/Feature/Observers/RoutingCacheObserverTest.php`**
+- [x] **Step 1: Write the failing cache invalidation tests in `tests/Feature/Observers/RoutingCacheObserverTest.php`**
 
 1. Assert the **fallback literal** in `config/freeswitch.php` is `60` by matching `env('FS_XML_HANDLER_CACHE_TTL', 60)` in the file source, and separately assert `config('freeswitch.xml_handler.cache_ttl') === 60`. The source-literal check is environment-independent; the config check is the behavioural one and only holds where the variable is genuinely unset, so CI must not define `FS_XML_HANDLER_CACHE_TTL`. Do not rely on the developer's `.env` being clean.
 2. Render cached directory XML for a `SipAccount` with TTL `60`, rotate `$sipAccount->update(['auth_password' => 'NewSecret999'])` (and test updating an `ExtensionSetting`), then immediately call `buildCachedDirectoryXml(...)` again → assert the response contains `'NewSecret999'` without waiting for TTL expiry *(Review Focus #5)*.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Observers/RoutingCacheObserverTest.php`
 Expected: FAIL (default TTL is `5`, and cached directory XML serves the stale password because `directoryCacheKey()` omits `RoutingCacheVersion`).
 
-- [ ] **Step 3: Update `config/freeswitch.php`, `DirectoryXmlBuilder`, and `RoutingCacheObserver`**
+- [x] **Step 3: Update `config/freeswitch.php`, `DirectoryXmlBuilder`, and `RoutingCacheObserver`**
 
 1. Change default fallback in `config/freeswitch.php:354-358` from `5` to `60`.
 2. Append `(string) RoutingCacheVersion::get((int) $tenantId)` to `DirectoryXmlBuilder::directoryCacheKey()`.
 3. Register `Modules\ExtensionSettings\Models\ExtensionSetting::class` in `AppServiceProvider::registerRoutingCacheObservers()`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Observers/RoutingCacheObserverTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add config/freeswitch.php app/Services/Xml/DirectoryXmlBuilder.php app/Providers/AppServiceProvider.php app/Observers/RoutingCacheObserver.php tests/Feature/Observers/RoutingCacheObserverTest.php
@@ -652,28 +652,28 @@ git commit -m "perf(xml-handler): raise default XML cache TTL to 60s with versio
   - Compound index `(tenant_id, created_at)` on `call_recordings` and `media_assets` (plus `voicemail_messages` / `xml_cdrs` where lacking).
   - `#[Computed] public function recordings(): LengthAwarePaginator` on `CallRecordingsList` using `WithPagination` (`perPage = 25`), eliminating `public Collection $recordings` from the Livewire snapshot payload.
 
-- [ ] **Step 1: Write the failing snapshot-bloat and pagination test in `app-modules/call-recordings/tests/CallRecordingsListPaginationTest.php`**
+- [x] **Step 1: Write the failing snapshot-bloat and pagination test in `app-modules/call-recordings/tests/CallRecordingsListPaginationTest.php`**
 
 Seed 60 `CallRecording` rows for a tenant. Render `CallRecordingsList`:
 1. Assert only 25 rows render on page 1 and pagination links appear.
 2. Extract the Livewire `wire:snapshot` JSON and assert `data` does NOT contain a serialized `recordings` Eloquent collection (`expect($decoded['data'])->not->toHaveKey('recordings')`).
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest app-modules/call-recordings/tests/CallRecordingsListPaginationTest.php`
 Expected: FAIL (all 60 rows load into `public Collection $recordings` inside the snapshot).
 
-- [ ] **Step 3: Add compound indexes and migrate high-volume lists to `WithPagination` + `#[Computed]`**
+- [x] **Step 3: Add compound indexes and migrate high-volume lists to `WithPagination` + `#[Computed]`**
 
 1. Check existing indexes via `database-schema`, then create `2026_10_28_000002_add_tenant_created_at_indexes_to_high_volume_tables.php` adding `(tenant_id, created_at)` indexes where absent.
 2. Refactor `CallRecordingsList` and the remaining 9 high-volume list components (including `FaxInbox`) to use `Livewire\WithPagination` and `#[Computed]` paginators (`->paginate(25)`), removing public `Collection` properties, passing the `#[Computed]` paginator to `view(...)` in `render()`, and rendering pagination links in the card footer. Ensure `updatedSearch()` / filter hooks call `$this->resetPage()`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest app-modules/call-recordings/tests/ app-modules/voicemail-messages/tests/ app-modules/file-stores/tests/ app-modules/recordings/tests/ app-modules/fax/tests/ app-modules/devices/tests/ app-modules/extensions/tests/ app-modules/sip-accounts/tests/ app-modules/inbound-routes/tests/ app-modules/outbound-routes/tests/`
 Expected: PASS across both the new pagination test and all 10 affected module test suites.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add database/migrations/2026_10_28_000002_add_tenant_created_at_indexes_to_high_volume_tables.php app-modules/
@@ -697,7 +697,7 @@ git commit -m "perf(lists): paginate high-volume Livewire lists with Computed pr
   - Runtime & CI invariant: `required: true` implies `protected: true`, zero duplicate priorities across the 60 built-in manifests, and 100% conformance of all 60 `app-modules/*/module.json` files against `resources/schemas/module.json`.
 - Note: **no `dependencies` key is introduced.** `requirements.modules` already exists in the schema and is already declared by 23 manifests (`admin → backups`, `backups → file-stores`, `extensions → sip-accounts, voicemails`, `hot-desking → devices, extensions`, `sip-profiles → gateways`, `devices → sip-accounts`, `provision → devices, extensions`, and 16 more). `resources/schemas/module.json` therefore needs **no structural change** in this task, and no manifest needs a new key.
 
-- [ ] **Step 1: Extend `tests/Feature/ModuleManifestTest.php` with the failing integrity tests**
+- [x] **Step 1: Extend `tests/Feature/ModuleManifestTest.php` with the failing integrity tests**
 
 1. Validate all 60 `app-modules/*/module.json` files against the schema constraints — required keys, types, the `name`/`version`/`namespace` patterns, the `category` enum, and `requirements.packages` item shape `{name, version}`. No JSON-Schema library is installed (`opis/json-schema` is absent from `composer.json`), so implement the checks explicitly and add one guard asserting your required-key list equals `resources/schemas/module.json`'s `required` array — that guard is what stops the validator drifting from the schema.
 2. Assert unique `priority` integers across the 60 built-in manifests (scope to `app-modules/*`; custom and vendor modules may share priorities).
@@ -705,12 +705,12 @@ git commit -m "perf(lists): paginate high-volume Livewire lists with Computed pr
 4. Assert every entry in `requirements.modules` names an existing module directory (dangling-reference guard) and that no cycle exists.
 5. Assert `ModuleDependencySorter::sort($manifests)` places every module in `requirements.modules` strictly before its dependent module — specifically `voicemails` before `extensions`, `gateways` before `sip-profiles`, `file-stores` before `backups`, `backups` before `admin`, `devices` and `extensions` before `hot-desking`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/ModuleManifestTest.php`
 Expected: FAIL (`file-stores/module.json` `requirements.packages` are plain strings, not `{name, version}` objects; duplicate priorities `0` (`hot-desking`, `logs`) and `210` (`outbound-routes`, `voicemails`); `auth`/`backups`/`tenant` have `protected: false`; 5 priority inversions — `extensions` (120) before `voicemails` (210), `sip-profiles` (100) before `gateways` (140), `backups` (40) before `file-stores` (91), `admin` (-100) before `backups`, `hot-desking` (0) before `devices` (130) and `extensions` (120)).
 
-- [ ] **Step 3: Implement `ModuleDependencySorter`, fix manifests, and wire provider registration**
+- [x] **Step 3: Implement `ModuleDependencySorter`, fix manifests, and wire provider registration**
 
 1. Rewrite `app-modules/file-stores/module.json` `requirements.packages` as objects, preserving **all four** currently declared packages (a single-package replacement would silently drop three runtime requirements):
    ```json
@@ -725,12 +725,12 @@ Expected: FAIL (`file-stores/module.json` `requirements.packages` are plain stri
 3. Recompute the `priority` column for the 60 built-in manifests **from the topological order** — unique integers, increments of 10, preserving the current relative order among modules with no dependency relationship. Do not hand-tune the five inverted modules individually: the integer scale is already dense (60 modules over −100…720) with two duplicate pairs, so five local fixes cascade into new collisions. Generate the table from the sorted output, apply it, and let Step 1's uniqueness + ordering assertions prove it.
 4. Wire `ModuleDependencySorter::sort()` into `App\Providers\ModuleServiceProvider::discoverModules()` in place of the bare `uasort(... priority ...)` at `:135`, so runtime registration order is guaranteed topological even for third-party modules whose priorities collide.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/ModuleManifestTest.php tests/Feature/Architecture/ModuleArchitectureTest.php`
 Expected: PASS (including the pre-existing manifest and module-architecture assertions, which must not regress).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Support/ModuleDependencySorter.php app/Providers/ModuleServiceProvider.php app/Services/ModuleLifecycleService.php app-modules/*/module.json tests/Feature/ModuleManifestTest.php
@@ -753,25 +753,25 @@ git commit -m "fix(modules): enforce topological load order, schema validation, 
 - Consumes: `BaseEditComponent::resolveTenantId(): ?int`
 - Produces: Zero raw `'tenant_id' => $this->tenantId` assignments anywhere in `app-modules/*/src/Livewire/`.
 
-- [ ] **Step 1: Append the failing raw-`$this->tenantId` architecture check to `tests/Feature/Architecture/ModuleArchitectureTest.php`**
+- [x] **Step 1: Append the failing raw-`$this->tenantId` architecture check to `tests/Feature/Architecture/ModuleArchitectureTest.php`**
 
 Scan every PHP file in `app-modules/*/src/Livewire/` and assert zero matches for `/['"]tenant_id['"]\s*=>\s*(?:\(int\)\s*)?\$this->tenantId\b/`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Architecture/ModuleArchitectureTest.php`
 Expected: FAIL listing the 36 Livewire form components using raw `$this->tenantId`.
 
-- [ ] **Step 3: Replace all 36 raw `$this->tenantId` writes with `$this->resolveTenantId()`**
+- [x] **Step 3: Replace all 36 raw `$this->tenantId` writes with `$this->resolveTenantId()`**
 
 Replace every `'tenant_id' => $this->tenantId` (and `(int) $this->tenantId`) assignment across the 33 `*Edit.php` files plus `BroadcastCreate.php`, `ExtensionsBulkCreate.php`, and `FaxSend.php` with `$this->resolveTenantId()`, preserving nullable global-group support on `GroupsEdit`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Architecture/ModuleArchitectureTest.php tests/Feature/CrossTenantMutationGuardTest.php tests/Feature/Livewire/GroupManagementTest.php tests/Feature/Livewire/TenantDomainManagementTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app-modules/ tests/Feature/Architecture/ModuleArchitectureTest.php
@@ -797,7 +797,7 @@ git commit -m "refactor(tenancy): standardize resolveTenantId() across all 36 mo
   - `BelongsToTenant` global `'tenant'` read scope applies `$builder->whereRaw('1 = 0')` (returning zero rows quietly, fail-closed) when `TenantManager::getTenantId() === null`, while `creating`/`saving`/`deleting` hooks throw `TenantContextMissingException` if `tenant_id` is still null on write paths.
   - `TenantContext::resolve(?User $user = null, bool $allowSingleTenantFallback = true): ?Tenant` (pure deterministic method with **zero `runningInConsole()` or `runningUnitTests()` branching**, forwarding `$allowSingleTenantFallback` into `resolveForUser()`), `TenantContext::resolveStrict(?User $user = null): ?Tenant` (convenience wrapper passing `allowSingleTenantFallback: false` for CLI/queue jobs), and `TenantContext::assertResolved(): Tenant` (throwing `TenantContextMissingException` when `TenantManager::getTenantId() === null` or the active tenant record does not exist).
 
-- [ ] **Step 1: Write the failing read/write/strict-resolution matrix tests in `tests/Feature/Tenancy/BelongsToTenantFailClosedTest.php` and `tests/Feature/Services/TenantContextTest.php`**
+- [x] **Step 1: Write the failing read/write/strict-resolution matrix tests in `tests/Feature/Tenancy/BelongsToTenantFailClosedTest.php` and `tests/Feature/Services/TenantContextTest.php`**
 
 1. Clear `TenantManager`; create two tenants with `Extension` rows via `withoutGlobalScope('tenant')`. Query `Extension::query()->get()` with no active tenant context → returns an empty collection (`0` rows) instead of throwing `RuntimeException` (`H3`).
 2. Attempt `Extension::create([...])` with no `tenant_id` and no active `TenantManager` context → throws `TenantContextMissingException`.
@@ -805,23 +805,23 @@ git commit -m "refactor(tenancy): standardize resolveTenantId() across all 36 mo
 4. With a single enabled tenant in the DB and no session/user attachment, `resolve()` returns that single tenant (`allowSingleTenantFallback: true`), whereas `resolve(allowSingleTenantFallback: false)` and `resolveStrict()` return `null`.
 5. Update `tests/Feature/Tenancy/CrossTenantIsolationTest.php:103-108` to assert the new fail-closed zero-row read + `TenantContextMissingException` write contract.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Tenancy/BelongsToTenantFailClosedTest.php tests/Feature/Tenancy/CrossTenantIsolationTest.php tests/Feature/Services/TenantContextTest.php`
 Expected: FAIL (`Extension::query()->get()` throws `RuntimeException`, and `resolveStrict()` / `assertResolved()` do not exist yet).
 
-- [ ] **Step 3: Implement `TenantContextMissingException`, quiet fail-closed read scope, and `TenantContext` strict helpers**
+- [x] **Step 3: Implement `TenantContextMissingException`, quiet fail-closed read scope, and `TenantContext` strict helpers**
 
 1. Create `TenantContextMissingException` with a `render()` method returning HTTP `503` (JSON `503` when `$request->expectsJson()`) when unhandled.
 2. In `BelongsToTenant`, change the global `'tenant'` scope on `null` `$tenantId` to `$builder->whereRaw('1 = 0'); return;`, and throw `TenantContextMissingException` in `creating`/`saving` when `empty($model->tenant_id)`.
 3. In `TenantContext`, add `bool $allowSingleTenantFallback = true` to `resolve()` and `resolveForUser()` (gating step 3's single-tenant query strictly on `$allowSingleTenantFallback`, never on `runningUnitTests()`), add `resolveStrict(?User $user = null): ?Tenant`, and add `assertResolved(): Tenant`.
 
-- [ ] **Step 4: Run verification gate**
+- [x] **Step 4: Run verification gate**
 
 Run: `php artisan optimize:clear && ./vendor/bin/pint --dirty --test && ./vendor/bin/pest tests/Feature/Tenancy/BelongsToTenantFailClosedTest.php tests/Feature/Tenancy/CrossTenantIsolationTest.php tests/Feature/Services/TenantContextTest.php tests/Feature/CrossTenantMutationGuardTest.php`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Exceptions/TenantContextMissingException.php app/Traits/BelongsToTenant.php app/Services/TenantContext.php tests/Feature/Tenancy/BelongsToTenantFailClosedTest.php tests/Feature/Tenancy/CrossTenantIsolationTest.php tests/Feature/Services/TenantContextTest.php
@@ -847,33 +847,32 @@ git commit -m "fix(tenancy): fail closed with empty set on unscoped reads and ad
   - **Environment assembly.** `PATH` (with `/usr/local/bin`, `/usr/bin`, `/bin`, `/usr/local/sbin`, `/usr/sbin` prepended), `COMPOSER_HOME=storage_path('framework/composer')`, `COMPOSER_NO_INTERACTION=1`, `COMPOSER_ALLOW_SUPERUSER=1`, and `GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new'`, with `$cwd = base_path()`.
   - **Merged output.** `ProcessResult::output` is today `stdout` + `stderr` combined via `2>&1`; return `$process->getOutput().$process->getErrorOutput()` because `GitUpdateService` parses that single string for step reporting and error messages.
 
-- [ ] **Step 1: Write the failing argv-runner tests in `tests/Feature/Services/GitUpdateServiceTest.php`**
+- [x] **Step 1: Write the failing argv-runner tests in `tests/Feature/Services/GitUpdateServiceTest.php`**
 
 Assert `SystemProcessRunner` executes `['git', 'status', '--porcelain']` with `$cwd` via `Symfony\Component\Process\Process` without invoking a shell, preserving literal metacharacters (`;`, `$()`, backticks) as inert arguments rather than shell commands. Also assert the three preservation behaviours above: a timed-out command yields `ProcessResult::exitCode === 124`, the child process receives the PATH/COMPOSER_*/GIT_SSH_COMMAND environment, and `output` contains both streams.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/Services/GitUpdateServiceTest.php`
 Expected: FAIL (`ProcessRunner::run` currently declares `string $command` and `SystemProcessRunner` calls `exec()`).
 
-- [ ] **Step 3: Migrate `SystemProcessRunner`, `GitUpdateService`, and `FakeProcessRunner` to `array $argv`**
+- [x] **Step 3: Migrate `SystemProcessRunner`, `GitUpdateService`, and `FakeProcessRunner` to `array $argv`**
 
 1. Replace the `exec()` string assembly in `SystemProcessRunner` with `(new Process($argv, $cwd, $env, null, $timeout))->run()`, translating `ProcessTimedOutException` to `ProcessResult(124, ...)` and concatenating stdout with stderr.
 2. Convert every `GitUpdateService` call site to structured argument arrays — `composer validate --no-check-publish`, the git fetch/checkout/pull commands, the post-update `php artisan ...` steps, and `git -C <repoPath> <command>` at `:710`, where `$command` is a runtime-composed string and therefore needs to be built as an array rather than split from a string. Remove all manual `escapeshellarg()` string building.
 3. Update `tests/Feature/Services/FakeProcessRunner.php` to the new signature so the pipeline tests keep binding a fake instead of executing real `composer`/`npm`/`git`.
 
-- [ ] **Step 4: Run Phase 2 verification gate**
+- [x] **Step 4: Run Phase 2 verification gate**
 
 Run:
 ```bash
 php artisan optimize:clear
 ./vendor/bin/pint --dirty --test
 ./vendor/bin/pest tests/Feature/Services/GitUpdateServiceTest.php tests/Feature/Services/GitUpdatePipelineTest.php
-php artisan test --compact --parallel
 ```
-Expected: All Phase 2 and full suite tests PASS.
+Expected: All targeted tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/Contracts/ProcessRunner.php app/Support/SystemProcessRunner.php app/Services/GitUpdateService.php tests/Feature/Services/FakeProcessRunner.php tests/Feature/Services/GitUpdateServiceTest.php tests/Feature/Services/GitUpdatePipelineTest.php

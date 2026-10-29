@@ -71,6 +71,12 @@
         </div>
     </div>
 
+    @if (method_exists($extensions, 'links'))
+        <div class="mt-4">
+            {{ $extensions->links() }}
+        </div>
+    @endif
+
     @if ($pendingDeletionId !== null)
         <x-confirmation-modal
             :open="true"

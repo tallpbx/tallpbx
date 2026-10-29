@@ -94,7 +94,7 @@ class MusicOnHoldEdit extends BaseEditComponent
             : null;
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'audio_file' => $existingMusicOnHold?->audio_file,
             'description' => $this->description ?: null,

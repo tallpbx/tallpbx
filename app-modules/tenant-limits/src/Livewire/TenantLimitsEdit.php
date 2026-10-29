@@ -78,7 +78,7 @@ class TenantLimitsEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'resource' => $this->resource,
             'soft_limit' => $this->softLimit,
             'hard_limit' => $this->hardLimit,

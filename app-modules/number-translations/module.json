@@ -8,7 +8,7 @@
     "description": "Number translation and manipulation rules",
     "required": false,
     "protected": false,
-    "priority": 610,
+    "priority": 490,
     "providers": [
         "Modules\\NumberTranslations\\Providers\\ModuleServiceProvider"
     ],

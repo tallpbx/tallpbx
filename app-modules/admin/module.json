@@ -8,7 +8,7 @@
     "description": "Core administration module providing the management UI.",
     "required": true,
     "protected": true,
-    "priority": -100,
+    "priority": 90,
     "providers": [
         "Modules\\Admin\\Providers\\ModuleServiceProvider"
     ],

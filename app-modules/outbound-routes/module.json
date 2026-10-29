@@ -8,7 +8,7 @@
     "description": "Manage outbound call routing rules with dial pattern matching, gateway selection, and caller ID manipulation.",
     "required": false,
     "protected": true,
-    "priority": 210,
+    "priority": 200,
     "providers": [
         "Modules\\OutboundRoutes\\Providers\\ModuleServiceProvider"
     ],

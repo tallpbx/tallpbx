@@ -57,6 +57,10 @@
         </div>
     </div>
 
+    <div class="mt-4">
+        {{ $recordings->links() }}
+    </div>
+
     @if ($pendingDeletionId !== null)
         <x-confirmation-modal
             :open="true"

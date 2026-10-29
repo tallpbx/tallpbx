@@ -7,8 +7,8 @@
     "category": "core",
     "description": "Tenant authentication pages (forgot password, register, reset password).",
     "required": true,
-    "protected": false,
-    "priority": -90,
+    "protected": true,
+    "priority": 10,
     "providers": [
         "Modules\\Auth\\Providers\\ModuleServiceProvider"
     ],

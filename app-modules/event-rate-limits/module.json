@@ -8,7 +8,7 @@
     "description": "FreeSWITCH event rate limiting configuration",
     "required": false,
     "protected": false,
-    "priority": 640,
+    "priority": 520,
     "providers": [
         "Modules\\EventRateLimits\\Providers\\ModuleServiceProvider"
     ],

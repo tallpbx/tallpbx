@@ -8,7 +8,7 @@
     "description": "Manage per-extension call forwarding settings with unconditional, busy, no-answer, and not-found strategies.",
     "required": false,
     "protected": false,
-    "priority": 220,
+    "priority": 240,
     "providers": [
         "Modules\\CallForwards\\Providers\\ModuleServiceProvider"
     ],

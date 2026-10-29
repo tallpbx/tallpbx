@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Modules\Extensions\Livewire;
 
 use App\Support\BaseListComponent;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\Extensions\Models\Extension;
 use Modules\Extensions\Services\ExtensionServiceInterface;
 
@@ -14,8 +17,7 @@ use Modules\Extensions\Services\ExtensionServiceInterface;
  */
 class ExtensionsList extends BaseListComponent
 {
-    /** @var Collection<int, Extension> */
-    public Collection $extensions;
+    use WithPagination;
 
     public ?string $pendingDeletionId = null;
 
@@ -32,23 +34,16 @@ class ExtensionsList extends BaseListComponent
     }
 
     /**
-     * Mount the component and load extensions.
-     */
-    public function mount(): void
-    {
-        $this->loadExtensions();
-    }
-
-    /**
      * Load all extensions ordered by extension number.
      */
-    private function loadExtensions(): void
+    #[Computed]
+    public function extensions(): LengthAwarePaginator
     {
         $query = $this->isAdminGuard()
             ? Extension::withoutGlobalScope('tenant')
             : Extension::query();
 
-        $this->extensions = $query->orderBy('extension_number')->get();
+        return $query->orderBy('extension_number')->paginate(25);
     }
 
     /** Open the shared confirmation modal for an extension. */
@@ -73,7 +68,6 @@ class ExtensionsList extends BaseListComponent
         $this->assertCanAccessTenantRecord($extension);
         $this->extensionService->delete($extension);
         $this->cancelExtensionDeletion();
-        $this->loadExtensions();
         $this->showSuccess('Extension deleted.');
         $this->dispatch('extension-deleted');
     }
@@ -81,4 +75,10 @@ class ExtensionsList extends BaseListComponent
     /**
      * Render the list component.
      */
+    public function render(): View
+    {
+        return view('extensions::extensions-list', [
+            'extensions' => $this->extensions,
+        ])->layout('layouts.app');
+    }
 }

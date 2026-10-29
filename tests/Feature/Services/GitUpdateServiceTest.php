@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Contracts\ProcessRunner;
 use App\Services\GitUpdateService;
 use App\Support\ProcessResult;
+use App\Support\SystemProcessRunner;
 
 beforeEach(function (): void {
     // The service reads from the actual git repository at base_path().
@@ -139,16 +140,16 @@ it('executes checkout -B when pulling a target different from current branch', f
     $runner = Mockery::mock(ProcessRunner::class);
     // 1. currentBranch check
     $runner->shouldReceive('run')
-        ->with(Mockery::pattern('/branch -r/'))
+        ->with(Mockery::on(fn (array $argv): bool => in_array('branch', $argv, true)))
         ->andReturn(new ProcessResult(0, "origin/main\norigin/1.0\n"));
     $runner->shouldReceive('run')
-        ->with(Mockery::pattern('/tag -l/'))
+        ->with(Mockery::on(fn (array $argv): bool => in_array('tag', $argv, true)))
         ->andReturn(new ProcessResult(0, ''));
     $runner->shouldReceive('run')
-        ->with(Mockery::pattern('/rev-parse --abbrev-ref HEAD/'))
+        ->with(Mockery::on(fn (array $argv): bool => in_array('--abbrev-ref', $argv, true)))
         ->andReturn(new ProcessResult(0, "main\n"));
     $runner->shouldReceive('run')
-        ->with(Mockery::pattern('/checkout -B.*1\.0.*origin\/1\.0/'))
+        ->with(Mockery::on(fn (array $argv): bool => in_array('checkout', $argv, true) && in_array('1.0', $argv, true) && in_array('origin/1.0', $argv, true)))
         ->once()
         ->andReturn(new ProcessResult(0, "Switched to a new branch '1.0'\n"));
 
@@ -156,4 +157,48 @@ it('executes checkout -B when pulling a target different from current branch', f
     $result = $service->pull('1.0');
 
     expect($result)->toBeTrue();
+});
+
+describe('system process runner argv execution', function (): void {
+    it('executes argv array commands and returns success', function (): void {
+        $runner = new SystemProcessRunner;
+        $result = $runner->run(['git', 'status', '--porcelain']);
+
+        expect($result->exitCode)->toBe(0)
+            ->and($result->output)->toBeString();
+    });
+
+    it('preserves shell metacharacters as literal inert arguments', function (): void {
+        $testFile = '/tmp/fake_danger_'.uniqid();
+        if (file_exists($testFile)) {
+            unlink($testFile);
+        }
+
+        $runner = new SystemProcessRunner;
+        $result = $runner->run(['echo', '; touch '.$testFile]);
+
+        expect($result->exitCode)->toBe(0)
+            ->and($result->output)->toContain('; touch '.$testFile)
+            ->and(file_exists($testFile))->toBeFalse();
+    });
+
+    it('returns exit code 124 when a command exceeds timeout', function (): void {
+        $runner = new SystemProcessRunner;
+        $result = $runner->run(['sleep', '2'], timeoutSeconds: 1);
+
+        expect($result->exitCode)->toBe(124)
+            ->and($result->output)->toContain('timed out');
+    });
+
+    it('passes standard environment variables to the child process', function (): void {
+        $runner = new SystemProcessRunner;
+        $result = $runner->run([
+            'php',
+            '-r',
+            'echo getenv("COMPOSER_NO_INTERACTION")."|".getenv("COMPOSER_ALLOW_SUPERUSER")."|".getenv("GIT_SSH_COMMAND");',
+        ]);
+
+        expect($result->exitCode)->toBe(0)
+            ->and($result->output)->toContain('1|1|ssh -o StrictHostKeyChecking=accept-new');
+    });
 });

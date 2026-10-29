@@ -8,7 +8,7 @@
     "description": "HTTPS, SIP TLS, and WebRTC WSS certificate management",
     "required": false,
     "protected": false,
-    "priority": 20,
+    "priority": 50,
     "providers": [
         "Modules\\Certificates\\Providers\\ModuleServiceProvider"
     ],

@@ -8,7 +8,7 @@
     "description": "Dialplan testing utilities",
     "required": false,
     "protected": true,
-    "priority": 690,
+    "priority": 570,
     "providers": [
         "Modules\\DialplanTools\\Providers\\ModuleServiceProvider"
     ],

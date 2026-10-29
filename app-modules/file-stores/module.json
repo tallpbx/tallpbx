@@ -8,7 +8,7 @@
     "description": "Reusable local and remote file destination profiles.",
     "required": false,
     "protected": false,
-    "priority": 91,
+    "priority": 70,
     "providers": [
         "Modules\\FileStores\\Providers\\ModuleServiceProvider"
     ],
@@ -17,10 +17,10 @@
         "laravel": ">=13.0",
         "modules": [],
         "packages": [
-            "league/flysystem-aws-s3-v3",
-            "league/flysystem-ftp",
-            "league/flysystem-sftp-v3",
-            "spatie/flysystem-dropbox"
+            {"name": "league/flysystem-aws-s3-v3", "version": "^3.35"},
+            {"name": "league/flysystem-ftp", "version": "^3.35"},
+            {"name": "league/flysystem-sftp-v3", "version": "^3.36"},
+            {"name": "spatie/flysystem-dropbox", "version": "^3.1"}
         ]
     }
 }

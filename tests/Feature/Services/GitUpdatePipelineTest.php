@@ -125,9 +125,9 @@ it('reports a failed rollback step', function (): void {
         ->and($result->rollbackReport)->toContain('Rollback failed');
 });
 
-it('shell-escapes the target in the pull command', function (): void {
-    // Git permits shell metacharacters in ref names, so the validated target
-    // must still be shell-quoted before interpolation (defense in depth).
+it('passes target with metacharacters safely as an argv array element in the pull command', function (): void {
+    // Git permits shell metacharacters in ref names; argv arrays pass the target
+    // as an isolated argument without shell interpolation.
     $runner = pipelineRunner();
     $runner->outputs['branch -r'] = "origin/main;id\n";
     $runner->outputs['rev-parse --abbrev-ref HEAD'] = "main;id\n";
@@ -136,10 +136,9 @@ it('shell-escapes the target in the pull command', function (): void {
     $result = $service->update('main;id');
 
     expect($result->success)->toBeTrue();
-    $pull = collect($runner->commands)->first(fn (string $c): bool => str_contains($c, 'pull --ff-only'));
+    $pullArgv = collect($runner->argvCommands)->first(fn (array $argv): bool => in_array('pull', $argv, true));
 
-    expect($pull)->toContain("'main;id'")
-        ->not->toContain('origin main;id');
+    expect($pullArgv)->toBe(['git', '-C', base_path(), 'pull', '--ff-only', 'origin', 'main;id']);
 });
 
 it('refuses to run while another update holds the lock', function (): void {
@@ -210,7 +209,7 @@ it('restores original branch on rollback when branch switch fails down the line'
     expect($result->success)->toBeFalse();
 
     $joined = implode("\n", $runner->commands);
-    expect($joined)->toContain('checkout \'main\'')
+    expect($joined)->toContain('checkout main')
         ->and($joined)->toContain('reset --hard');
 });
 

@@ -8,7 +8,7 @@
     "description": "Host firewall, trusted and blocked IP lists, and automatic attack protection.",
     "required": false,
     "protected": false,
-    "priority": 10,
+    "priority": 40,
     "providers": [
         "Modules\\Security\\Providers\\ModuleServiceProvider"
     ],

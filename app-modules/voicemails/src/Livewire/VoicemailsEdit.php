@@ -117,7 +117,7 @@ class VoicemailsEdit extends BaseEditComponent
             : null;
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'voicemail_id' => $this->voicemailId,
             'mailbox' => $this->mailbox ?: $this->voicemailId,
             'name' => $this->name ?: null,

@@ -6,6 +6,9 @@ namespace Modules\VoicemailMessages\Livewire;
 
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\VoicemailMessages\Models\VoicemailMessage;
 use Modules\VoicemailMessages\Services\VoicemailMessageService;
 
@@ -14,6 +17,8 @@ use Modules\VoicemailMessages\Services\VoicemailMessageService;
  */
 class VoicemailMessagesList extends BaseListComponent
 {
+    use WithPagination;
+
     public ?string $pendingDeletionId = null;
 
     public ?string $deleteError = null;
@@ -26,6 +31,23 @@ class VoicemailMessagesList extends BaseListComponent
     public function boot(VoicemailMessageService $messageService): void
     {
         $this->messageService = $messageService;
+    }
+
+    /**
+     * Get the paginated voicemail message list. Administrators see
+     * every tenant's messages; tenant users only see their own.
+     */
+    #[Computed]
+    public function messages(): LengthAwarePaginator
+    {
+        $query = $this->isAdminGuard()
+            ? VoicemailMessage::withoutGlobalScope('tenant')
+            : VoicemailMessage::query();
+
+        return $query
+            ->with('mediaAsset')
+            ->orderBy('created_at', 'desc')
+            ->paginate(25);
     }
 
     /**
@@ -68,20 +90,12 @@ class VoicemailMessagesList extends BaseListComponent
     }
 
     /**
-     * Render the paginated voicemail message list. Administrators see
-     * every tenant's messages; tenant users only see their own.
+     * Render the paginated voicemail message list.
      */
     public function render(): View
     {
-        $query = $this->isAdminGuard()
-            ? VoicemailMessage::withoutGlobalScope('tenant')
-            : VoicemailMessage::query();
-
         return view('voicemail-messages::voicemail-messages-list', [
-            'messages' => $query
-                ->with('mediaAsset')
-                ->orderBy('created_at', 'desc')
-                ->paginate(15),
-        ]);
+            'messages' => $this->messages,
+        ])->layout('layouts.app');
     }
 }

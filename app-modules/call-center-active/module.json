@@ -8,7 +8,7 @@
     "description": "Live call center queue monitoring",
     "required": false,
     "protected": false,
-    "priority": 470,
+    "priority": 460,
     "providers": [
         "Modules\\CallCenterActive\\Providers\\ModuleServiceProvider"
     ],

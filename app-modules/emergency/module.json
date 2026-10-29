@@ -8,7 +8,7 @@
     "description": "Emergency call configuration and location",
     "required": false,
     "protected": false,
-    "priority": 670,
+    "priority": 550,
     "providers": [
         "Modules\\Emergency\\Providers\\ModuleServiceProvider"
     ],

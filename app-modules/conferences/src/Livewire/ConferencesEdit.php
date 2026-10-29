@@ -89,7 +89,7 @@ class ConferencesEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'profile' => $this->profile,
             'pin' => $this->pin ?: null,

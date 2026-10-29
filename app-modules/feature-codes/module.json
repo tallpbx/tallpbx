@@ -8,7 +8,7 @@
     "description": "Manage star codes and feature codes like *97 voicemail for per-tenant customization.",
     "required": false,
     "protected": false,
-    "priority": 160,
+    "priority": 150,
     "providers": [
         "Modules\\FeatureCodes\\Providers\\ModuleServiceProvider"
     ],

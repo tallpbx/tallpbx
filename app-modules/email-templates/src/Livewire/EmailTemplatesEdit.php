@@ -80,7 +80,7 @@ class EmailTemplatesEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'subject' => $this->subject,
             'body' => $this->body,

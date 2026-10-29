@@ -82,7 +82,7 @@ class CallFlowsEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'extension' => $this->extension,
             'destination_type' => $this->destinationType ?: null,

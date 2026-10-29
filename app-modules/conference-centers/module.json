@@ -8,7 +8,7 @@
     "description": "Conference center dial-in service for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 290,
+    "priority": 310,
     "providers": [
         "Modules\\ConferenceCenters\\Providers\\ModuleServiceProvider"
     ],

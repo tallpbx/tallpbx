@@ -103,7 +103,7 @@ class TenantDomainsEdit extends Component
 
         $data = [
             'domain' => $this->domain,
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'purpose' => $this->purpose,
             'enabled' => $this->enabled,
         ];
@@ -116,6 +116,14 @@ class TenantDomainsEdit extends Component
         }
 
         $this->redirect(route('panel.tenant-domains.index'));
+    }
+
+    /**
+     * Resolve the tenant ID for the domain.
+     */
+    protected function resolveTenantId(): ?int
+    {
+        return $this->tenantId !== null ? (int) $this->tenantId : null;
     }
 
     /**

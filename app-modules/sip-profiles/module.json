@@ -8,7 +8,7 @@
     "description": "Manage FreeSWITCH Sofia SIP profiles with per-tenant JSON settings.",
     "required": true,
     "protected": true,
-    "priority": 100,
+    "priority": 130,
     "providers": [
         "Modules\\SipProfiles\\Providers\\ModuleServiceProvider"
     ],

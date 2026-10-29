@@ -79,7 +79,7 @@ class CallBlocksEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'caller_id_number' => $this->callerIdNumber,
             'description' => $this->description ?: null,

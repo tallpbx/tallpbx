@@ -90,7 +90,7 @@ class SipTrunksEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'host' => $this->host,
             'port' => $this->port,

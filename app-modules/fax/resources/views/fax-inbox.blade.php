@@ -56,6 +56,12 @@
                 </tbody>
             </table>
         </div>
+
+        @if (method_exists($faxes, 'links'))
+            <div class="mt-4">
+                {{ $faxes->links() }}
+            </div>
+        @endif
     </div>
 
     @if ($pendingDeletionId !== null)

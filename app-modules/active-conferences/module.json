@@ -8,7 +8,7 @@
     "description": "Real-time conference monitoring for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 430,
+    "priority": 420,
     "providers": [
         "Modules\\ActiveConferences\\Providers\\ModuleServiceProvider"
     ],

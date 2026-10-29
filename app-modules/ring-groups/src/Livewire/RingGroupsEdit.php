@@ -134,7 +134,7 @@ class RingGroupsEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'strategy' => $this->strategy,
             'ring_timeout' => $this->ringTimeout,

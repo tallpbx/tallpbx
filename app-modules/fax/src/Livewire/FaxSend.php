@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Fax\Livewire;
 
-use App\Models\Tenant;
-use App\Support\Concerns\HasOperationalFeedback;
+use App\Support\BaseEditComponent;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
 use Livewire\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Modules\Fax\Services\FaxServiceInterface;
@@ -18,15 +15,9 @@ use Modules\Fax\Services\FaxServiceInterface;
  * Livewire component for uploading a document and sending it as a fax.
  */
 #[Layout('layouts.app')]
-class FaxSend extends Component
+class FaxSend extends BaseEditComponent
 {
-    use HasOperationalFeedback;
     use WithFileUploads;
-
-    /** @var Collection<int, Tenant> */
-    public Collection $tenants;
-
-    public ?int $tenantId = null;
 
     public string $faxNumber = '';
 
@@ -48,7 +39,7 @@ class FaxSend extends Component
      */
     public function mount(): void
     {
-        $this->tenants = Tenant::orderBy('name')->get();
+        $this->loadTenants();
     }
 
     /**
@@ -61,7 +52,7 @@ class FaxSend extends Component
 
         try {
             $this->faxService->send([
-                'tenant_id' => $this->tenantId,
+                'tenant_id' => $this->resolveTenantId(),
                 'fax_number' => $this->faxNumber,
                 'source_path' => $this->document->getRealPath(),
                 'original_filename' => $this->document->getClientOriginalName(),

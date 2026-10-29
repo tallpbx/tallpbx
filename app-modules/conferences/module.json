@@ -8,7 +8,7 @@
     "description": "Conference room management for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 280,
+    "priority": 300,
     "providers": [
         "Modules\\Conferences\\Providers\\ModuleServiceProvider"
     ],

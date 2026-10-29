@@ -42,7 +42,7 @@ it('creates module records with correct manifest data', function () {
     expect($admin->display_name)->toBe('Admin');
     expect($admin->version)->toBe('1.0.0');
     expect($admin->required)->toBeTrue();
-    expect($admin->priority)->toBe(-100);
+    expect($admin->priority)->toBe(90);
 });
 
 it('sets module metadata from manifest', function () {

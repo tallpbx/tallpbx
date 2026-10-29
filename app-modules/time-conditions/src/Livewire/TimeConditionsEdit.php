@@ -93,7 +93,7 @@ class TimeConditionsEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'timezone' => $this->timezone ?: null,
             'weekdays' => $this->weekdays,

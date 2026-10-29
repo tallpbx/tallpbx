@@ -102,13 +102,13 @@ it('allows granular FS_XML_HANDLER cache store overrides to take precedence', fu
         ->and($xmlHandler['acl_cache_store'])->toBe('redis');
 });
 
-it('defaults all XML handler cache TTLs to 5 when neither master nor granular settings are defined', function (): void {
+it('defaults all XML handler cache TTLs to 60 when neither master nor granular settings are defined', function (): void {
     $config = require config_path('freeswitch.php');
     $xmlHandler = $config['xml_handler'];
 
-    expect($xmlHandler['cache_ttl'])->toBe(5)
-        ->and($xmlHandler['dialplan_cache_ttl'])->toBe(5)
-        ->and($xmlHandler['dialplan_contributor_cache_ttl'])->toBe(5)
-        ->and($xmlHandler['directory_cache_ttl'])->toBe(5)
-        ->and($xmlHandler['acl_cache_ttl'])->toBe(5);
+    expect($xmlHandler['cache_ttl'])->toBe(60)
+        ->and($xmlHandler['dialplan_cache_ttl'])->toBe(60)
+        ->and($xmlHandler['dialplan_contributor_cache_ttl'])->toBe(60)
+        ->and($xmlHandler['directory_cache_ttl'])->toBe(60)
+        ->and($xmlHandler['acl_cache_ttl'])->toBe(60);
 });

@@ -18,7 +18,7 @@ describe('system process runner', function (): void {
     it('runs a command and returns the exit code and output', function (): void {
         $runner = new SystemProcessRunner;
 
-        $result = $runner->run('php -r "echo \'hello\';"');
+        $result = $runner->run(['php', '-r', "echo 'hello';"]);
 
         expect($result->exitCode)->toBe(0)
             ->and($result->output)->toContain('hello');
@@ -27,7 +27,7 @@ describe('system process runner', function (): void {
     it('captures a failing command exit code', function (): void {
         $runner = new SystemProcessRunner;
 
-        $result = $runner->run('php -r "exit(3);"');
+        $result = $runner->run(['php', '-r', 'exit(3);']);
 
         expect($result->exitCode)->toBe(3);
     });
@@ -36,7 +36,7 @@ describe('system process runner', function (): void {
         config(['git-update.step_timeout_seconds' => 1]);
         $runner = new SystemProcessRunner;
 
-        $result = $runner->run('php -r "sleep(5);"');
+        $result = $runner->run(['php', '-r', 'sleep(5);']);
 
         expect($result->exitCode)->toBe(124);
     });
@@ -44,7 +44,7 @@ describe('system process runner', function (): void {
     it('finds and executes binaries in /usr/local/bin such as composer', function (): void {
         $runner = new SystemProcessRunner;
 
-        $result = $runner->run('composer --version');
+        $result = $runner->run(['composer', '--version']);
 
         expect($result->exitCode)->toBe(0)
             ->and($result->output)->toContain('Composer');

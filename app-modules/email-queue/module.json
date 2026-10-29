@@ -8,7 +8,7 @@
     "description": "Email delivery tracking",
     "required": false,
     "protected": false,
-    "priority": 700,
+    "priority": 580,
     "providers": [
         "Modules\\EmailQueue\\Providers\\ModuleServiceProvider"
     ],

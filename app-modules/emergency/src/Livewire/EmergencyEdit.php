@@ -87,7 +87,7 @@ class EmergencyEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'caller_id' => $this->callerId ?: null,
             'address' => $this->address,
             'latitude' => $this->latitude ?: null,

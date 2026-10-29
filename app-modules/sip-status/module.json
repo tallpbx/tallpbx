@@ -8,7 +8,7 @@
     "description": "SIP profile and gateway status for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 450,
+    "priority": 440,
     "providers": [
         "Modules\\SipStatus\\Providers\\ModuleServiceProvider"
     ],

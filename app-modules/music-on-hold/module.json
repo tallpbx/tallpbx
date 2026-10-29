@@ -8,7 +8,7 @@
     "description": "Manage music on hold audio files and settings.",
     "required": false,
     "protected": false,
-    "priority": 250,
+    "priority": 270,
     "providers": [
         "Modules\\MusicOnHold\\Providers\\ModuleServiceProvider"
     ],

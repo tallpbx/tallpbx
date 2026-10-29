@@ -8,7 +8,7 @@
     "description": "Manage physical and soft phones with vendor, model, MAC address, and provisioning templates.",
     "required": false,
     "protected": true,
-    "priority": 130,
+    "priority": 110,
     "providers": [
         "Modules\\Devices\\Providers\\ModuleServiceProvider"
     ],

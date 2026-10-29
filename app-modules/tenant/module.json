@@ -7,8 +7,8 @@
     "category": "core",
     "description": "Tenant-facing portal shell (dashboard and login).",
     "required": true,
-    "protected": false,
-    "priority": -80,
+    "protected": true,
+    "priority": 20,
     "providers": [
         "Modules\\Tenant\\Providers\\ModuleServiceProvider"
     ],

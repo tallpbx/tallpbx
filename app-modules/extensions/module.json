@@ -8,7 +8,7 @@
     "description": "Manage tenant-local phone extensions and extension-level settings.",
     "required": true,
     "protected": true,
-    "priority": 120,
+    "priority": 220,
     "providers": [
         "Modules\\Extensions\\Providers\\ModuleServiceProvider"
     ],

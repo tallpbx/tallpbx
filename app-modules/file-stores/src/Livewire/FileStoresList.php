@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Modules\FileStores\Livewire;
 
 use App\Support\BaseListComponent;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\FileStores\Enums\MediaAssetStatus;
 use Modules\FileStores\Models\FileStore;
 use Modules\FileStores\Models\MediaAsset;
@@ -19,8 +23,7 @@ use Modules\FileStores\Services\MediaStorageServiceInterface;
  */
 class FileStoresList extends BaseListComponent
 {
-    /** @var Collection<int, FileStore> */
-    public Collection $fileStores;
+    use WithPagination;
 
     /** @var array<string, string> */
     public array $connectionMessages = [];
@@ -50,9 +53,20 @@ class FileStoresList extends BaseListComponent
     {
         $this->authorizeSystemAdmin();
         $this->canUpdateFileStores = Auth::guard('admin')->user()?->hasPermission('file-stores.update') ?? false;
-        $this->loadFileStores();
         $this->loadArchiveDestination();
         $this->loadArchiveTransfers();
+    }
+
+    /**
+     * Load profiles in a stable order for predictable administration.
+     */
+    #[Computed]
+    public function fileStores(): LengthAwarePaginator
+    {
+        return FileStore::query()
+            ->where('provider', '!=', 'local')
+            ->orderBy('name')
+            ->paginate(25);
     }
 
     /**
@@ -90,7 +104,6 @@ class FileStoresList extends BaseListComponent
         }
 
         $this->cancelFileStoreDeletion();
-        $this->loadFileStores();
         $this->loadArchiveDestination();
     }
 
@@ -164,14 +177,6 @@ class FileStoresList extends BaseListComponent
     }
 
     /**
-     * Load profiles in a stable order for predictable administration.
-     */
-    private function loadFileStores(): void
-    {
-        $this->fileStores = FileStore::query()->where('provider', '!=', 'local')->orderBy('name')->get();
-    }
-
-    /**
      * Load the selected archive destination and all readable choices.
      */
     private function loadArchiveDestination(): void
@@ -208,5 +213,15 @@ class FileStoresList extends BaseListComponent
     private function authorizeSystemAdmin(): void
     {
         abort_unless(Auth::guard('admin')->check(), 403);
+    }
+
+    /**
+     * Render the component's view with paginated file stores.
+     */
+    public function render(): View
+    {
+        return view('file-stores::file-stores-list', [
+            'fileStores' => $this->fileStores,
+        ])->layout('layouts.app');
     }
 }

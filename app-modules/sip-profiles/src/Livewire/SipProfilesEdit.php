@@ -99,7 +99,7 @@ class SipProfilesEdit extends BaseEditComponent
         if ($this->profileId !== null) {
             $this->profileService->update($profile, $data);
         } else {
-            $data['tenant_id'] = $this->tenantId;
+            $data['tenant_id'] = $this->resolveTenantId();
             $this->profileService->create($data);
         }
 

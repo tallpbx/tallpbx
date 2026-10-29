@@ -8,7 +8,7 @@
     "description": "Manage call bridge (conference) destinations.",
     "required": false,
     "protected": false,
-    "priority": 260,
+    "priority": 280,
     "providers": [
         "Modules\\Bridges\\Providers\\ModuleServiceProvider"
     ],

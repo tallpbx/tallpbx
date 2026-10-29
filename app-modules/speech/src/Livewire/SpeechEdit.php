@@ -87,7 +87,7 @@ class SpeechEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'engine' => $this->engine,
             'voice' => $this->voice ?: null,
             'language' => $this->language ?: null,

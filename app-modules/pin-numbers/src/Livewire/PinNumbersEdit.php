@@ -74,7 +74,7 @@ class PinNumbersEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'pin_number' => $this->pinNumber,
             'description' => $this->description ?: null,
             'enabled' => $this->enabled,

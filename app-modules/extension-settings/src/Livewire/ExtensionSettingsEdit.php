@@ -99,7 +99,7 @@ class ExtensionSettingsEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'extension_id' => $this->extensionId,
             'key' => $this->key,
             'value' => $this->value,

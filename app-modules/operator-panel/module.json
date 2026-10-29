@@ -8,7 +8,7 @@
     "description": "Visual operator panel for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 480,
+    "priority": 470,
     "providers": [
         "Modules\\OperatorPanel\\Providers\\ModuleServiceProvider"
     ],

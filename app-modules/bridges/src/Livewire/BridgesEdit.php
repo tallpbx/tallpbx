@@ -104,7 +104,7 @@ class BridgesEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'bridge_name' => $this->bridgeName,
             'destination_number' => $this->destinationNumber,
             'pin_number' => $this->pinNumber ?: null,

@@ -41,4 +41,10 @@
             </table>
         </div>
     </div>
+
+    @if (method_exists($routes, 'links'))
+        <div class="mt-4">
+            {{ $routes->links() }}
+        </div>
+    @endif
 </div>

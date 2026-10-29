@@ -78,7 +78,7 @@ class DestinationsEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'type' => $this->type,
             'dial_string' => $this->dialString,

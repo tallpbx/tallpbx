@@ -8,7 +8,7 @@
     "description": "Manage call routing dialplans with ordered conditions and actions.",
     "required": true,
     "protected": true,
-    "priority": 170,
+    "priority": 160,
     "providers": [
         "Modules\\Dialplans\\Providers\\ModuleServiceProvider"
     ],

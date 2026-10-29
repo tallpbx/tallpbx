@@ -453,3 +453,48 @@ it('verifies TenantEslScoping filters conferences by member caller_id using nati
 
     expect(array_column($filtered, 'name'))->toBe(['conf-matching']);
 });
+
+it('forbids raw tenant_id writes using $this->tenantId across all Livewire form components', function (): void {
+    $projectRoot = base_path();
+    $livewireDirs = glob($projectRoot.'/app-modules/*/src/Livewire');
+
+    $scannedFiles = 0;
+    $violations = [];
+
+    foreach ($livewireDirs as $livewireDir) {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($livewireDir)
+        );
+
+        foreach ($iterator as $file) {
+            if (! $file->isFile() || $file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $filePath = $file->getPathname();
+            $relativePath = str_replace($projectRoot.'/', '', $filePath);
+            $scannedFiles++;
+
+            $content = (string) file_get_contents($filePath);
+            $lines = explode("\n", $content);
+
+            foreach ($lines as $lineIndex => $line) {
+                $trimmed = trim($line);
+
+                if (preg_match('/[\'"]tenant_id[\'"]\s*(?:=>|\]\s*=)\s*(?:\(int\)\s*)?\$this->tenantId\b/', $trimmed)) {
+                    $violations[] = sprintf(
+                        '%s:%d uses raw $this->tenantId [%s]',
+                        $relativePath,
+                        $lineIndex + 1,
+                        $trimmed
+                    );
+                }
+            }
+        }
+    }
+
+    expect($scannedFiles)->toBeGreaterThan(30)
+        ->and($violations)->toBeEmpty(
+            "Found raw \$this->tenantId payload assignment in Livewire form components. Use \$this->resolveTenantId() instead:\n".implode("\n", $violations)
+        );
+});

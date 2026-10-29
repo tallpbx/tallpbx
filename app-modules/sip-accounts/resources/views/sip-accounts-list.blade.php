@@ -68,9 +68,11 @@
        </div>
     </div>
 
-    <div class="mt-4">
-        {{ $accounts->links() }}
-    </div>
+    @if (method_exists($accounts, 'links'))
+        <div class="mt-4">
+            {{ $accounts->links() }}
+        </div>
+    @endif
 
     @if ($pendingDeletionId !== null)
         <x-confirmation-modal

@@ -6,6 +6,9 @@ namespace Modules\Recordings\Livewire;
 
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\Recordings\Models\Recording;
 use Modules\Recordings\Services\RecordingService;
 
@@ -14,6 +17,8 @@ use Modules\Recordings\Services\RecordingService;
  */
 class RecordingsList extends BaseListComponent
 {
+    use WithPagination;
+
     public ?string $pendingDeletionId = null;
 
     public string $pendingDeletionName = '';
@@ -26,6 +31,22 @@ class RecordingsList extends BaseListComponent
     public function boot(RecordingService $recordingService): void
     {
         $this->recordingService = $recordingService;
+    }
+
+    /**
+     * Get the paginated recordings list. Administrators see every
+     * tenant's recordings; tenant users only see their own.
+     */
+    #[Computed]
+    public function recordings(): LengthAwarePaginator
+    {
+        $query = $this->isAdminGuard()
+            ? Recording::withoutGlobalScope('tenant')
+            : Recording::query();
+
+        return $query
+            ->orderBy('name')
+            ->paginate(25);
     }
 
     /** Open the shared confirmation modal for a recording. */
@@ -55,19 +76,12 @@ class RecordingsList extends BaseListComponent
     }
 
     /**
-     * Render the paginated recordings list. Administrators see every
-     * tenant's recordings; tenant users only see their own.
+     * Render the paginated recordings list.
      */
     public function render(): View
     {
-        $query = $this->isAdminGuard()
-            ? Recording::withoutGlobalScope('tenant')
-            : Recording::query();
-
         return view('recordings::recordings-list', [
-            'recordings' => $query
-                ->orderBy('name')
-                ->paginate(15),
-        ]);
+            'recordings' => $this->recordings,
+        ])->layout('layouts.app');
     }
 }

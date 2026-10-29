@@ -77,7 +77,7 @@ class FeatureCodesEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'code' => $this->code,
             'description' => $this->description ?: null,

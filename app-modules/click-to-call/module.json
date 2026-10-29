@@ -8,7 +8,7 @@
     "description": "Click-to-call widget",
     "required": false,
     "protected": false,
-    "priority": 680,
+    "priority": 560,
     "providers": [
         "Modules\\ClickToCall\\Providers\\ModuleServiceProvider"
     ],

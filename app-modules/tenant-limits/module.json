@@ -8,7 +8,7 @@
     "description": "Per-tenant resource limit management",
     "required": false,
     "protected": false,
-    "priority": 620,
+    "priority": 500,
     "providers": [
         "Modules\\TenantLimits\\Providers\\ModuleServiceProvider"
     ],

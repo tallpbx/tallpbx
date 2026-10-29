@@ -8,7 +8,7 @@
     "description": "Fax send and receive for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 360,
+    "priority": 380,
     "providers": [
         "Modules\\Fax\\Providers\\ModuleServiceProvider"
     ],

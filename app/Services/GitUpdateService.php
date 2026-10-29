@@ -41,7 +41,7 @@ class GitUpdateService
      */
     public function remoteUrl(): string
     {
-        $output = $this->runGitCommand('remote get-url origin', $exitCode);
+        $output = $this->runGitCommand(['remote', 'get-url', 'origin'], $exitCode);
 
         if ($exitCode !== 0) {
             return '';
@@ -55,7 +55,7 @@ class GitUpdateService
      */
     public function currentBranch(): string
     {
-        $output = $this->runGitCommand('rev-parse --abbrev-ref HEAD', $exitCode);
+        $output = $this->runGitCommand(['rev-parse', '--abbrev-ref', 'HEAD'], $exitCode);
 
         if ($exitCode !== 0) {
             return '';
@@ -69,7 +69,7 @@ class GitUpdateService
      */
     public function currentVersion(): string
     {
-        $output = $this->runGitCommand('describe --tags --always', $exitCode);
+        $output = $this->runGitCommand(['describe', '--tags', '--always'], $exitCode);
 
         if ($exitCode !== 0) {
             return '';
@@ -138,7 +138,7 @@ class GitUpdateService
      */
     public function commitsBehind(string $target): int
     {
-        $output = $this->runGitCommand('rev-list --count HEAD..origin/'.escapeshellarg($target), $exitCode);
+        $output = $this->runGitCommand(['rev-list', '--count', 'HEAD..origin/'.$target], $exitCode);
 
         if ($exitCode !== 0) {
             return 0;
@@ -154,7 +154,7 @@ class GitUpdateService
      */
     public function incomingCommits(string $target, int $limit = 5): array
     {
-        $output = $this->runGitCommand('log HEAD..origin/'.escapeshellarg($target).' -n '.(int) $limit.' --format='.escapeshellarg('%h|%an|%ar|%s'), $exitCode);
+        $output = $this->runGitCommand(['log', 'HEAD..origin/'.$target, '-n', (string) $limit, '--format=%h|%an|%ar|%s'], $exitCode);
 
         if ($exitCode !== 0 || trim($output) === '') {
             return [];
@@ -181,7 +181,7 @@ class GitUpdateService
      */
     public function isClean(): bool
     {
-        $output = $this->runGitCommand('status --porcelain', $exitCode);
+        $output = $this->runGitCommand(['status', '--porcelain'], $exitCode);
 
         if ($exitCode !== 0) {
             return false;
@@ -195,7 +195,7 @@ class GitUpdateService
      */
     public function fetch(): bool
     {
-        $output = $this->runGitCommand('fetch origin --prune --quiet', $exitCode);
+        $output = $this->runGitCommand(['fetch', 'origin', '--prune', '--quiet'], $exitCode);
 
         return $exitCode === 0;
     }
@@ -216,10 +216,10 @@ class GitUpdateService
 
         $current = $this->currentBranch();
         if ($current !== '' && $current !== $target) {
-            $this->runGitCommand('checkout -B '.escapeshellarg($target).' '.escapeshellarg('origin/'.$target), $exitCode);
+            $this->runGitCommand(['checkout', '-B', $target, 'origin/'.$target], $exitCode);
         } else {
             // Use --ff-only for safe fast-forward (no merge commits)
-            $this->runGitCommand('pull --ff-only origin '.escapeshellarg($target), $exitCode);
+            $this->runGitCommand(['pull', '--ff-only', 'origin', $target], $exitCode);
         }
 
         return $exitCode === 0;
@@ -232,7 +232,7 @@ class GitUpdateService
      */
     public function remoteBranches(): array
     {
-        $output = $this->runGitCommand('branch -r --format="%(refname:short)"', $exitCode);
+        $output = $this->runGitCommand(['branch', '-r', '--format=%(refname:short)'], $exitCode);
 
         if ($exitCode !== 0 || $output === '') {
             return [];
@@ -262,7 +262,7 @@ class GitUpdateService
      */
     public function remoteTags(): array
     {
-        $output = $this->runGitCommand('tag -l --sort=-version:refname', $exitCode);
+        $output = $this->runGitCommand(['tag', '-l', '--sort=-version:refname'], $exitCode);
 
         if ($exitCode !== 0 || $output === '') {
             return [];
@@ -324,7 +324,7 @@ class GitUpdateService
         }
 
         try {
-            $prePullHead = trim($this->runGitCommand('rev-parse HEAD'));
+            $prePullHead = trim($this->runGitCommand(['rev-parse', 'HEAD']));
             $preSwitchBranch = $this->currentBranch();
 
             $result = $this->runUpdate($target, $prePullHead, $steps, $preSwitchBranch);
@@ -383,7 +383,7 @@ class GitUpdateService
             return UpdateResult::failed($target, 'Missing dependency lockfile. Cannot update safely.', $steps);
         }
 
-        $validate = $this->runner->run('composer validate --no-check-publish');
+        $validate = $this->runner->run(['composer', 'validate', '--no-check-publish']);
 
         if (! $validate->ok()) {
             $this->addStep($steps, 'Preflight', 'failed', $validate->output);
@@ -432,10 +432,10 @@ class GitUpdateService
         $isSwitch = $preSwitchBranch !== '' && $preSwitchBranch !== $target;
 
         if ($isSwitch) {
-            $gitCmd = 'git -C '.escapeshellarg($this->repoPath).' checkout -B '.escapeshellarg($target).' '.escapeshellarg('origin/'.$target);
+            $gitCmd = ['git', '-C', $this->repoPath, 'checkout', '-B', $target, 'origin/'.$target];
             $gitLabel = 'Switch branch';
         } else {
-            $gitCmd = 'git -C '.escapeshellarg($this->repoPath).' pull --ff-only origin '.escapeshellarg($target);
+            $gitCmd = ['git', '-C', $this->repoPath, 'pull', '--ff-only', 'origin', $target];
             $gitLabel = 'Pull';
         }
 
@@ -449,13 +449,13 @@ class GitUpdateService
         $permissionsScope = (function_exists('posix_geteuid') && posix_geteuid() === 0) ? 'full' : 'runtime';
 
         $sequence = [
-            'Composer install' => 'composer install --no-interaction --prefer-dist',
-            'Migrate' => $this->artisanCommand('migrate --force'),
-            'Sync permissions' => $this->artisanCommand('permissions:sync'),
-            'NPM install' => 'npm ci --ignore-scripts',
-            'NPM build' => 'npm run build',
-            'Repair permissions' => $this->artisanCommand('permissions:repair --scope='.$permissionsScope),
-            'Optimize clear' => $this->artisanCommand('optimize:clear'),
+            'Composer install' => ['composer', 'install', '--no-interaction', '--prefer-dist'],
+            'Migrate' => $this->artisanCommand(['migrate', '--force']),
+            'Sync permissions' => $this->artisanCommand(['permissions:sync']),
+            'NPM install' => ['npm', 'ci', '--ignore-scripts'],
+            'NPM build' => ['npm', 'run', 'build'],
+            'Repair permissions' => $this->artisanCommand(['permissions:repair', '--scope='.$permissionsScope]),
+            'Optimize clear' => $this->artisanCommand(['optimize:clear']),
         ];
 
         foreach ($sequence as $label => $command) {
@@ -484,16 +484,16 @@ class GitUpdateService
         $rollbackSteps = [];
 
         if ($preSwitchBranch !== '' && $preSwitchBranch !== $target) {
-            $rollbackSteps['Rollback branch'] = 'git -C '.escapeshellarg($this->repoPath).' checkout '.escapeshellarg($preSwitchBranch);
+            $rollbackSteps['Rollback branch'] = ['git', '-C', $this->repoPath, 'checkout', $preSwitchBranch];
         }
 
         $permissionsScope = (function_exists('posix_geteuid') && posix_geteuid() === 0) ? 'full' : 'runtime';
 
-        $rollbackSteps['Rollback git'] = 'git -C '.escapeshellarg($this->repoPath)." reset --hard {$prePullHead}";
-        $rollbackSteps['Rollback composer'] = 'composer install --no-interaction --prefer-dist';
-        $rollbackSteps['Rollback build'] = 'npm run build';
-        $rollbackSteps['Rollback repair'] = $this->artisanCommand('permissions:repair --scope='.$permissionsScope);
-        $rollbackSteps['Rollback clear'] = $this->artisanCommand('optimize:clear');
+        $rollbackSteps['Rollback git'] = ['git', '-C', $this->repoPath, 'reset', '--hard', $prePullHead];
+        $rollbackSteps['Rollback composer'] = ['composer', 'install', '--no-interaction', '--prefer-dist'];
+        $rollbackSteps['Rollback build'] = ['npm', 'run', 'build'];
+        $rollbackSteps['Rollback repair'] = $this->artisanCommand(['permissions:repair', '--scope='.$permissionsScope]);
+        $rollbackSteps['Rollback clear'] = $this->artisanCommand(['optimize:clear']);
 
         foreach ($rollbackSteps as $label => $command) {
             $result = $this->runner->run($command);
@@ -665,10 +665,13 @@ class GitUpdateService
 
     /**
      * Build an artisan command for the CLI PHP binary.
+     *
+     * @param  array<int, string>  $arguments
+     * @return array<int, string>
      */
-    private function artisanCommand(string $arguments): string
+    private function artisanCommand(array $arguments): array
     {
-        return escapeshellarg($this->phpBinary()).' '.escapeshellarg(base_path('artisan')).' '.$arguments;
+        return array_merge([$this->phpBinary(), base_path('artisan')], $arguments);
     }
 
     /**
@@ -703,12 +706,14 @@ class GitUpdateService
     /**
      * Execute a git command from within the repository root.
      *
+     * @param  array<int, string>  $command
      * @param  int|null  $exitCode  Filled with the command's exit code
      * @return string The command's stdout output
      */
-    private function runGitCommand(string $command, ?int &$exitCode = null): string
+    private function runGitCommand(array $command, ?int &$exitCode = null): string
     {
-        $result = $this->runner->run('git -C '.escapeshellarg($this->repoPath).' '.$command);
+        $argv = array_merge(['git', '-C', $this->repoPath], $command);
+        $result = $this->runner->run($argv);
         $exitCode = $result->exitCode;
 
         return $result->output;

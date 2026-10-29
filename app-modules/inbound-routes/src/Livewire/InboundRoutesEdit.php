@@ -86,7 +86,7 @@ class InboundRoutesEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'destination_number' => $this->destinationNumber,
             'action' => $this->action,

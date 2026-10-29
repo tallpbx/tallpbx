@@ -95,7 +95,8 @@ class ModuleLifecycleService
 
         // Both the on-disk manifest and the registry row carry protection
         // flags; either one refusing is enough to refuse removal.
-        if (($manifest['protected'] ?? false) || ($manifest['required'] ?? false)
+        // Core invariant (L2): required modules are inherently protected.
+        if ($this->isProtected($manifest)
             || ($registryRow?->protected ?? false) || ($registryRow?->required ?? false)) {
             return $this->refusal('Required and protected modules cannot be uninstalled.');
         }
@@ -527,6 +528,18 @@ class ModuleLifecycleService
     }
 
     /**
+     * Determine whether a manifest declares or implies protected status.
+     *
+     * Core invariant (L2): required modules are inherently protected.
+     *
+     * @param  array<string, mixed>  $manifest
+     */
+    public function isProtected(array $manifest): bool
+    {
+        return ($manifest['protected'] ?? false) || ($manifest['required'] ?? false);
+    }
+
+    /**
      * Sync the registry row from the restored on-disk manifest and re-enable it.
      */
     private function refreshRegistryRow(string $name): void
@@ -542,7 +555,7 @@ class ModuleLifecycleService
                 'version' => $manifest['version'] ?? '0.0.0',
                 'enabled' => true,
                 'status' => Module::StatusEnabled,
-                'protected' => $manifest['protected'] ?? false,
+                'protected' => $this->isProtected($manifest ?? []),
                 'required' => $manifest['required'] ?? false,
                 'priority' => $manifest['priority'] ?? 0,
             ],

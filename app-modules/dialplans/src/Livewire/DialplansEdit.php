@@ -78,7 +78,7 @@ class DialplansEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'context' => $this->context,
             'description' => $this->description ?: null,

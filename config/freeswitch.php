@@ -351,11 +351,11 @@ return [
         | an explicit granular override is defined in the environment.
         |
         */
-        'cache_ttl' => (int) env('FS_XML_HANDLER_CACHE_TTL', 5),
-        'dialplan_cache_ttl' => (int) env('FS_XML_HANDLER_DIALPLAN_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
-        'dialplan_contributor_cache_ttl' => (int) env('FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
-        'directory_cache_ttl' => (int) env('FS_XML_HANDLER_DIRECTORY_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
-        'acl_cache_ttl' => (int) env('FS_XML_HANDLER_ACL_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 5)),
+        'cache_ttl' => (int) env('FS_XML_HANDLER_CACHE_TTL', 60),
+        'dialplan_cache_ttl' => (int) env('FS_XML_HANDLER_DIALPLAN_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 60)),
+        'dialplan_contributor_cache_ttl' => (int) env('FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 60)),
+        'directory_cache_ttl' => (int) env('FS_XML_HANDLER_DIRECTORY_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 60)),
+        'acl_cache_ttl' => (int) env('FS_XML_HANDLER_ACL_CACHE_TTL', env('FS_XML_HANDLER_CACHE_TTL', 60)),
 
         'cache_store' => env('FS_XML_HANDLER_CACHE_STORE'),
         'dialplan_cache_store' => env('FS_XML_HANDLER_DIALPLAN_CACHE_STORE', env('FS_XML_HANDLER_CACHE_STORE')),

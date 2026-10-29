@@ -8,7 +8,9 @@ use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\InboundRoutes\Services\InboundRouteServiceInterface;
 
@@ -23,8 +25,7 @@ use Modules\InboundRoutes\Services\InboundRouteServiceInterface;
  */
 class InboundRoutesList extends BaseListComponent
 {
-    /** @var Collection<int, InboundRoute> */
-    public Collection $routes;
+    use WithPagination;
 
     public ?string $pendingDeletionId = null;
 
@@ -41,16 +42,16 @@ class InboundRoutesList extends BaseListComponent
     }
 
     /**
-     * Mount the component and load inbound routes.
-     *
-     * Admin users see all routes across all tenants. Tenant users
-     * are explicitly filtered to the selected tenant from the panel
-     * session because feature page requests may not have initialized
-     * the global tenant scope context yet.
+     * Load inbound routes for the active panel guard.
      */
-    public function mount(): void
+    #[Computed]
+    public function routes(): LengthAwarePaginator
     {
-        $this->loadRoutes();
+        return InboundRoute::withoutGlobalScope('tenant')
+            ->when(! $this->isAdminGuard(), fn (Builder $query) => $query->where('tenant_id', app(TenantManager::class)->getTenantId()))
+            ->orderBy('priority')
+            ->orderBy('name')
+            ->paginate(25);
     }
 
     /**
@@ -69,7 +70,6 @@ class InboundRoutesList extends BaseListComponent
         $this->assertCanAccessTenantRecord($route);
         $this->inboundRouteService->delete($route);
         $this->cancelRouteDeletion();
-        $this->loadRoutes();
         $this->showSuccess('Inbound route deleted.');
         $this->dispatch('route-deleted');
     }
@@ -95,18 +95,6 @@ class InboundRoutesList extends BaseListComponent
     }
 
     /**
-     * Load inbound routes for the active panel guard.
-     */
-    private function loadRoutes(): void
-    {
-        $this->routes = InboundRoute::withoutGlobalScope('tenant')
-            ->when(! $this->isAdminGuard(), fn (Builder $query) => $query->where('tenant_id', app(TenantManager::class)->getTenantId()))
-            ->orderBy('priority')
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
      * Render the appropriate list view based on the authenticated guard.
      *
      * Admin users see the full CRUD table; tenant users see a
@@ -116,6 +104,8 @@ class InboundRoutesList extends BaseListComponent
     {
         return view($this->isAdminGuard()
             ? 'inbound-routes::inbound-routes-list'
-            : 'inbound-routes::tenant-inbound-routes-list');
+            : 'inbound-routes::tenant-inbound-routes-list', [
+                'routes' => $this->routes,
+            ]);
     }
 }

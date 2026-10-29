@@ -6,7 +6,10 @@ namespace Modules\CallRecordings\Livewire;
 
 use App\Services\TenantManager;
 use App\Support\BaseListComponent;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\CallRecordings\Models\CallRecording;
 use Modules\CallRecordings\Services\CallRecordingService;
 
@@ -15,8 +18,7 @@ use Modules\CallRecordings\Services\CallRecordingService;
  */
 class CallRecordingsList extends BaseListComponent
 {
-    /** @var Collection<int, CallRecording> */
-    public Collection $recordings;
+    use WithPagination;
 
     public ?string $pendingDeletionId = null;
 
@@ -33,24 +35,17 @@ class CallRecordingsList extends BaseListComponent
     }
 
     /**
-     * Load the call recording list when the page opens.
-     */
-    public function mount(): void
-    {
-        $this->loadRecordings();
-    }
-
-    /**
      * Fetch call recordings newest first. Administrators see every
      * tenant's recordings; tenant users only see their own.
      */
-    private function loadRecordings(): void
+    #[Computed]
+    public function recordings(): LengthAwarePaginator
     {
-        $this->recordings = CallRecording::withoutGlobalScope('tenant')
+        return CallRecording::withoutGlobalScope('tenant')
             ->with('mediaAsset')
             ->when(! $this->isAdminGuard(), fn ($q) => $q->where('tenant_id', app(TenantManager::class)->getTenantId()))
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(25);
     }
 
     /**
@@ -74,7 +69,6 @@ class CallRecordingsList extends BaseListComponent
         }
 
         $this->cancelRecordingDeletion();
-        $this->loadRecordings();
         $this->showSuccess('Call recording deleted.');
         $this->dispatch('call-recording-deleted');
     }
@@ -93,5 +87,15 @@ class CallRecordingsList extends BaseListComponent
     {
         $this->pendingDeletionId = null;
         $this->deleteError = null;
+    }
+
+    /**
+     * Render the component's view with paginated recordings.
+     */
+    public function render(): View
+    {
+        return view('call-recordings::call-recordings-list', [
+            'recordings' => $this->recordings,
+        ])->layout('layouts.app');
     }
 }

@@ -839,12 +839,18 @@ it('caches repeated directory user lookups when enabled', function () {
         ->assertOk()
         ->assertSee('old-secret', false);
 
+    // Repeated query hits cache
+    $this->get('/api/v1/xml-handler?'.$query)
+        ->assertOk()
+        ->assertSee('old-secret', false);
+
+    // Updating the SIP account invalidates the directory cache immediately via RoutingCacheVersion
     $account->update(['auth_password' => 'new-secret']);
 
     $this->get('/api/v1/xml-handler?'.$query)
         ->assertOk()
-        ->assertSee('old-secret', false)
-        ->assertDontSee('new-secret', false);
+        ->assertSee('new-secret', false)
+        ->assertDontSee('old-secret', false);
 });
 
 it('returns not-found for unknown user in directory', function () {

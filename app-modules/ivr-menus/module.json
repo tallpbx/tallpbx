@@ -8,7 +8,7 @@
     "description": "Manage interactive voice response (IVR) menus with digit-mapped options for call routing.",
     "required": false,
     "protected": false,
-    "priority": 190,
+    "priority": 180,
     "providers": [
         "Modules\\IvrMenus\\Providers\\ModuleServiceProvider"
     ],

@@ -8,7 +8,7 @@
     "description": "Text-to-speech engine configuration",
     "required": false,
     "protected": false,
-    "priority": 720,
+    "priority": 600,
     "providers": [
         "Modules\\Speech\\Providers\\ModuleServiceProvider"
     ],

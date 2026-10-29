@@ -216,7 +216,7 @@ class ExtensionsEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'extension_number' => $this->extensionNumber,
             'number_alias' => $this->nullableString($this->numberAlias),
             'display_name' => $this->displayName ?: null,
@@ -352,12 +352,13 @@ class ExtensionsEdit extends BaseEditComponent
             return;
         }
 
-        $tenantDomain = TenantDomain::where('tenant_id', $this->tenantId)->first();
-        $userContext = ! empty($this->userContext) ? $this->userContext : "tenant_{$this->tenantId}_internal";
+        $tenantId = $this->resolveTenantId();
+        $tenantDomain = TenantDomain::where('tenant_id', $tenantId)->first();
+        $userContext = ! empty($this->userContext) ? $this->userContext : "tenant_{$tenantId}_internal";
 
         if ($sipAccount !== null) {
             $sipData = [
-                'tenant_id' => $this->tenantId,
+                'tenant_id' => $tenantId,
                 'auth_username' => $this->extensionNumber,
                 'user_context' => $userContext,
                 'enabled' => $this->enabled,
@@ -378,7 +379,7 @@ class ExtensionsEdit extends BaseEditComponent
             $sipAccount->update($sipData);
         } else {
             SipAccount::withoutGlobalScope('tenant')->create([
-                'tenant_id' => $this->tenantId,
+                'tenant_id' => $tenantId,
                 'extension_id' => $extension->id,
                 'tenant_domain_id' => $tenantDomain?->id,
                 'identity_mode' => $tenantDomain !== null ? 'domain_username' : 'global_username',
@@ -408,11 +409,13 @@ class ExtensionsEdit extends BaseEditComponent
      */
     private function syncVoicemail(Extension $extension): void
     {
+        $tenantId = $this->resolveTenantId();
+
         if ($this->voicemailEnabled) {
             $vmPassword = trim($this->voicemailPassword);
             if ($vmPassword === '') {
                 $existingVm = Voicemail::withoutGlobalScope('tenant')
-                    ->where('tenant_id', $this->tenantId)
+                    ->where('tenant_id', $tenantId)
                     ->where('voicemail_id', $this->extensionNumber)
                     ->first();
                 $vmPassword = $existingVm?->password ?: $this->extensionNumber;
@@ -420,7 +423,7 @@ class ExtensionsEdit extends BaseEditComponent
 
             Voicemail::withoutGlobalScope('tenant')->updateOrCreate(
                 [
-                    'tenant_id' => $this->tenantId,
+                    'tenant_id' => $tenantId,
                     'voicemail_id' => $this->extensionNumber,
                 ],
                 [
@@ -432,7 +435,7 @@ class ExtensionsEdit extends BaseEditComponent
             );
         } else {
             Voicemail::withoutGlobalScope('tenant')
-                ->where('tenant_id', $this->tenantId)
+                ->where('tenant_id', $tenantId)
                 ->where('voicemail_id', $this->extensionNumber)
                 ->update(['enabled' => false]);
         }

@@ -94,7 +94,7 @@ class RecordingsEdit extends BaseEditComponent
             : null;
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'type' => $this->type,
             'file_path' => $existingRecording?->file_path ?? '',

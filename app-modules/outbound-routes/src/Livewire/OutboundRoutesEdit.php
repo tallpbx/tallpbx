@@ -103,7 +103,7 @@ class OutboundRoutesEdit extends BaseEditComponent
         $this->validate($this->rules());
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'dial_pattern' => $this->dialPattern,
             'gateway' => $this->gateway ?: null,

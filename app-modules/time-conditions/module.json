@@ -8,7 +8,7 @@
     "description": "Time-based call routing conditions for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 300,
+    "priority": 320,
     "providers": [
         "Modules\\TimeConditions\\Providers\\ModuleServiceProvider"
     ],

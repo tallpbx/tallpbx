@@ -6,6 +6,9 @@ namespace Modules\SipAccounts\Livewire;
 
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\SipAccounts\Models\SipAccount;
 use Modules\SipAccounts\Services\SipAccountServiceInterface;
 
@@ -14,6 +17,8 @@ use Modules\SipAccounts\Services\SipAccountServiceInterface;
  */
 class SipAccountsList extends BaseListComponent
 {
+    use WithPagination;
+
     public ?string $pendingDeletionId = null;
 
     public string $pendingDeletionName = '';
@@ -24,6 +29,20 @@ class SipAccountsList extends BaseListComponent
     public function boot(SipAccountServiceInterface $accountService): void
     {
         $this->accountService = $accountService;
+    }
+
+    /** Get the paginated SIP account list. */
+    #[Computed]
+    public function accounts(): LengthAwarePaginator
+    {
+        $query = $this->isAdminGuard()
+            ? SipAccount::withoutGlobalScope('tenant')
+            : SipAccount::query();
+
+        return $query
+            ->with('tenantDomain')
+            ->orderBy('auth_username')
+            ->paginate(25);
     }
 
     /** Delete the confirmed SIP account. */
@@ -56,15 +75,8 @@ class SipAccountsList extends BaseListComponent
     /** Render the paginated SIP account list. */
     public function render(): View
     {
-        $query = $this->isAdminGuard()
-            ? SipAccount::withoutGlobalScope('tenant')
-            : SipAccount::query();
-
         return view('sip-accounts::sip-accounts-list', [
-            'accounts' => $query
-                ->with('tenantDomain')
-                ->orderBy('auth_username')
-                ->paginate(15),
-        ]);
+            'accounts' => $this->accounts,
+        ])->layout('layouts.app');
     }
 }

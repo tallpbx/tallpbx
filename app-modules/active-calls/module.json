@@ -8,7 +8,7 @@
     "description": "Real-time active call monitoring for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 420,
+    "priority": 410,
     "providers": [
         "Modules\\ActiveCalls\\Providers\\ModuleServiceProvider"
     ],

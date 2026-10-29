@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenancy;
 
+use App\Exceptions\TenantContextMissingException;
 use App\Models\Group;
 use App\Models\Permission;
 use App\Models\Tenant;
@@ -13,7 +14,6 @@ use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Extensions\Models\Extension;
 use Modules\InboundRoutes\Models\InboundRoute;
-use RuntimeException;
 
 use function Pest\Laravel\actingAs;
 
@@ -100,11 +100,16 @@ describe('belongstotenant trait scoping', function (): void {
         expect($all)->toHaveCount(2);
     });
 
-    it('throws RuntimeException when querying without tenant context', function (): void {
+    it('returns zero rows on reads and throws TenantContextMissingException on writes without tenant context', function (): void {
         app(TenantManager::class)->clear();
 
-        expect(fn () => Extension::query()->count())
-            ->toThrow(RuntimeException::class, 'Tenant scope applied but no tenant context is set.');
+        expect(Extension::query()->count())->toBe(0)
+            ->and(Extension::query()->get())->toBeEmpty();
+
+        expect(fn () => Extension::create([
+            'extension_number' => '999',
+            'display_name' => 'Unscoped Write',
+        ]))->toThrow(TenantContextMissingException::class);
     });
 
     it('auto-assigns tenant_id on model creation', function (): void {

@@ -5,21 +5,31 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Contracts\ProcessRunner;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\Process;
+use Throwable;
 
 /**
- * Executes commands through the system shell from the application root.
+ * Executes processes through Symfony Process from the application root or custom cwd.
  */
 class SystemProcessRunner implements ProcessRunner
 {
     /**
-     * Run a command from the application base path under a per-step timeout.
+     * Run a process command under a per-step timeout.
      *
-     * GNU timeout kills a hung command with exit code 124, so a stuck step
-     * fails the pipeline (rollback path) instead of blocking the request.
+     * When a command times out, returns exit code 124 (matching GNU timeout semantics).
+     *
+     * @param  array<int, string>  $argv
+     * @param  array<string, string>  $env
      */
-    public function run(string $command): ProcessResult
-    {
-        $timeout = max(1, (int) config('git-update.step_timeout_seconds', 600));
+    public function run(
+        array $argv,
+        ?string $cwd = null,
+        ?int $timeoutSeconds = null,
+        array $env = [],
+    ): ProcessResult {
+        $timeout = $timeoutSeconds ?? max(1, (int) config('git-update.step_timeout_seconds', 600));
+        $workingDir = $cwd ?? base_path();
 
         // Ensure standard binary paths (/usr/local/bin for composer, npm, node) are in PATH
         // even when running under minimal environments like PHP-FPM.
@@ -33,25 +43,36 @@ class SystemProcessRunner implements ProcessRunner
         // Ensure COMPOSER_HOME points to writable runtime storage for www-data
         $composerHome = storage_path('framework/composer');
         if (! is_dir($composerHome)) {
-            // The directory may appear concurrently; a failed mkdir is harmless.
             @mkdir($composerHome, 0775, true);
         }
 
-        $gitSshCommand = 'ssh -o StrictHostKeyChecking=accept-new';
+        $defaultEnv = [
+            'PATH' => $pathEnv,
+            'COMPOSER_HOME' => $composerHome,
+            'COMPOSER_NO_INTERACTION' => '1',
+            'COMPOSER_ALLOW_SUPERUSER' => '1',
+            'GIT_SSH_COMMAND' => 'ssh -o StrictHostKeyChecking=accept-new',
+        ];
 
-        // -k escalates to SIGKILL if the command ignores SIGTERM.
-        $fullCommand = sprintf(
-            'cd %s && PATH=%s COMPOSER_HOME=%s COMPOSER_NO_INTERACTION=1 COMPOSER_ALLOW_SUPERUSER=1 GIT_SSH_COMMAND=%s timeout -k 30s %ds %s 2>&1',
-            escapeshellarg(base_path()),
-            escapeshellarg($pathEnv),
-            escapeshellarg($composerHome),
-            escapeshellarg($gitSshCommand),
-            $timeout,
-            $command,
+        $mergedEnv = array_merge($defaultEnv, $env);
+
+        $process = new Process(
+            command: $argv,
+            cwd: $workingDir,
+            env: $mergedEnv,
+            timeout: (float) $timeout,
         );
 
-        exec($fullCommand, $output, $code);
+        try {
+            $process->run();
+            $exitCode = $process->getExitCode() ?? 1;
+            $output = $process->getOutput().$process->getErrorOutput();
+        } catch (ProcessTimedOutException $e) {
+            return new ProcessResult(124, $process->getOutput().$process->getErrorOutput()."\nCommand timed out after {$timeout} seconds.");
+        } catch (Throwable $e) {
+            return new ProcessResult(1, $process->getOutput().$process->getErrorOutput()."\n".$e->getMessage());
+        }
 
-        return new ProcessResult($code, implode("\n", $output));
+        return new ProcessResult($exitCode, $output);
     }
 }

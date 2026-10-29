@@ -8,7 +8,7 @@
     "description": "Speech-to-text transcription management",
     "required": false,
     "protected": false,
-    "priority": 710,
+    "priority": 590,
     "providers": [
         "Modules\\Transcribe\\Providers\\ModuleServiceProvider"
     ],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Traits;
 
+use App\Exceptions\TenantContextMissingException;
 use App\Models\Tenant;
 use App\Services\TenantManager;
 use App\Support\TenantMutationGuard;
@@ -31,39 +32,50 @@ trait BelongsToTenant
             $tenantId = app(TenantManager::class)->getTenantId();
 
             if ($tenantId === null) {
-                throw new \RuntimeException(
-                    'Tenant scope applied but no tenant context is set. '
-                    .'Call TenantManager::setTenantId() or use withoutGlobalScope(\'tenant\').'
-                );
+                $builder->whereRaw('1 = 0');
+
+                return;
             }
 
             $builder->where('tenant_id', $tenantId);
         });
 
-        static::creating(function (Model $model) {
+        static::creating(function (Model $model): void {
             $tenantId = app(TenantManager::class)->getTenantId();
             if ($tenantId !== null && empty($model->tenant_id)) {
                 $model->tenant_id = $tenantId;
             }
+
+            if (empty($model->tenant_id)) {
+                throw new TenantContextMissingException(
+                    'Cannot persist tenant-scoped model ['.get_class($model).'] without an active tenant context or explicit tenant_id.'
+                );
+            }
+
+            TenantMutationGuard::assertCanMutate($model);
         });
 
-        // Cross-tenant mutation guards. Registered after the auto-assign
-        // hook above so the creating check sees the final tenant_id. Updates
-        // are checked in "saving"; creates are deferred to "creating" because
-        // tenant_id may not be assigned yet when "saving" fires.
         static::saving(function (Model $model): void {
             if (! $model->exists) {
                 return;
             }
 
-            TenantMutationGuard::assertCanMutate($model);
-        });
+            if (empty($model->tenant_id)) {
+                throw new TenantContextMissingException(
+                    'Cannot update tenant-scoped model ['.get_class($model).'] without an active tenant context or explicit tenant_id.'
+                );
+            }
 
-        static::creating(function (Model $model): void {
             TenantMutationGuard::assertCanMutate($model);
         });
 
         static::deleting(function (Model $model): void {
+            if (empty($model->tenant_id)) {
+                throw new TenantContextMissingException(
+                    'Cannot delete tenant-scoped model ['.get_class($model).'] without an active tenant context or explicit tenant_id.'
+                );
+            }
+
             TenantMutationGuard::assertCanMutate($model);
         });
     }

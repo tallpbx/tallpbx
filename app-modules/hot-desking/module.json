@@ -8,7 +8,7 @@
     "description": "Manage hot desking device and extension mobility",
     "required": false,
     "protected": false,
-    "priority": 0,
+    "priority": 230,
     "providers": [
         "Modules\\HotDesking\\Providers\\ModuleServiceProvider"
     ],

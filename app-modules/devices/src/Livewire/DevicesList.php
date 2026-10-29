@@ -6,6 +6,9 @@ namespace Modules\Devices\Livewire;
 
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Modules\Devices\Models\Device;
 use Modules\Devices\Services\DeviceServiceInterface;
 
@@ -14,6 +17,8 @@ use Modules\Devices\Services\DeviceServiceInterface;
  */
 class DevicesList extends BaseListComponent
 {
+    use WithPagination;
+
     public ?string $pendingDeletionId = null;
 
     public string $pendingDeletionName = '';
@@ -26,6 +31,21 @@ class DevicesList extends BaseListComponent
     public function boot(DeviceServiceInterface $deviceService): void
     {
         $this->deviceService = $deviceService;
+    }
+
+    /**
+     * Get the paginated device list.
+     */
+    #[Computed]
+    public function devices(): LengthAwarePaginator
+    {
+        $query = $this->isAdminGuard()
+            ? Device::withoutGlobalScope('tenant')
+            : Device::query();
+
+        return $query
+            ->orderBy('vendor')
+            ->paginate(25);
     }
 
     /**
@@ -60,14 +80,8 @@ class DevicesList extends BaseListComponent
     /** Render the paginated device list. */
     public function render(): View
     {
-        $query = $this->isAdminGuard()
-            ? Device::withoutGlobalScope('tenant')
-            : Device::query();
-
         return view('devices::devices-list', [
-            'devices' => $query
-                ->orderBy('vendor')
-                ->paginate(15),
-        ]);
+            'devices' => $this->devices,
+        ])->layout('layouts.app');
     }
 }

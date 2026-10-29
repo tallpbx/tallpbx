@@ -8,7 +8,7 @@
     "description": "Manage network-level allow/deny rules with CIDR, domain, and IP nodes.",
     "required": false,
     "protected": false,
-    "priority": 150,
+    "priority": 140,
     "providers": [
         "Modules\\Acl\\Providers\\ModuleServiceProvider"
     ],

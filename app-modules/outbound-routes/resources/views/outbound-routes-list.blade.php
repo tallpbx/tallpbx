@@ -59,6 +59,12 @@
         </div>
     </div>
 
+    @if (method_exists($routes, 'links'))
+        <div class="mt-4">
+            {{ $routes->links() }}
+        </div>
+    @endif
+
     @if ($pendingDeletionId !== null)
         <x-confirmation-modal :open="true" :title="__('admin.modal_delete_outbound_route_title')" :message="__('admin.modal_delete_generic_question', ['name' => $pendingDeletionName])" :confirm-label="__('admin.modal_delete_outbound_route_confirm')" confirm-action="deleteRoute('{{ $pendingDeletionId }}')" cancel-action="cancelRouteDeletion" />
     @endif

@@ -8,7 +8,7 @@
     "description": "Call flow routing rules for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 320,
+    "priority": 340,
     "providers": [
         "Modules\\CallFlows\\Providers\\ModuleServiceProvider"
     ],

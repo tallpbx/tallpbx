@@ -5,20 +5,25 @@ declare(strict_types=1);
 use App\Models\Tenant;
 use App\Services\DialplanContext;
 use App\Services\DialplanXmlCollector;
+use App\Services\TenantManager;
+use App\Services\Xml\DirectoryXmlBuilder;
 use App\Support\RoutingCacheVersion;
 use Illuminate\Support\Facades\Cache;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
 use Modules\Extensions\Models\Extension;
+use Modules\ExtensionSettings\Models\ExtensionSetting;
 use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\IvrMenus\Models\IvrMenu;
 use Modules\IvrMenus\Models\IvrMenuOption;
 use Modules\OutboundRoutes\Models\OutboundRoute;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Models\RingGroupExtension;
+use Modules\SipAccounts\Models\SipAccount;
 
 beforeEach(function (): void {
     Cache::flush();
+    app(TenantManager::class)->clear();
 });
 
 it('bumps routing cache version when an extension is created, updated, or deleted', function (): void {
@@ -190,4 +195,87 @@ it('immediately invalidates cached dialplan XML when an extension is updated', f
 
     // Next query must miss the cache and hit the collector again immediately with fresh XML
     $this->get('/api/v1/xml-handler?'.$query)->assertOk()->assertSee('v2');
+});
+
+it('bumps routing cache version when an extension setting is created, updated, or deleted', function (): void {
+    $tenant = Tenant::factory()->create();
+    $extension = Extension::factory()->create(['tenant_id' => $tenant->id]);
+    $versionBefore = RoutingCacheVersion::get((int) $tenant->id);
+
+    $setting = ExtensionSetting::factory()->create([
+        'tenant_id' => $tenant->id,
+        'extension_id' => $extension->id,
+        'key' => 'call_waiting',
+        'value' => 'disabled',
+    ]);
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 1);
+
+    $setting->update(['value' => 'enabled']);
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 2);
+
+    $setting->delete();
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 3);
+});
+
+it('defaults XML handler cache TTL fallback to 60 seconds', function (): void {
+    $configContent = (string) file_get_contents(config_path('freeswitch.php'));
+    expect($configContent)->toContain("env('FS_XML_HANDLER_CACHE_TTL', 60)");
+    expect(config('freeswitch.xml_handler.cache_ttl'))->toBe(60);
+});
+
+it('immediately invalidates cached directory XML when a sip account or extension setting is updated', function (): void {
+    config([
+        'freeswitch.xml_handler.directory_cache_ttl' => 60,
+    ]);
+    Cache::flush();
+
+    $tenant = Tenant::factory()->create();
+    app(TenantManager::class)->setTenantId((string) $tenant->id);
+
+    $extension = Extension::factory()->create([
+        'tenant_id' => $tenant->id,
+        'extension_number' => '1001',
+    ]);
+
+    $sipAccount = SipAccount::factory()->create([
+        'tenant_id' => $tenant->id,
+        'extension_id' => $extension->id,
+        'auth_username' => '1001',
+        'auth_password' => 'InitialSecret123',
+        'enabled' => true,
+    ]);
+
+    $setting = ExtensionSetting::factory()->create([
+        'tenant_id' => $tenant->id,
+        'extension_id' => $extension->id,
+        'key' => 'call_waiting',
+        'value' => 'disabled',
+    ]);
+
+    $builder = app(DirectoryXmlBuilder::class);
+
+    // Initial build caches the XML
+    $xml1 = $builder->buildCachedDirectoryXml('user', 'domain.test', '1001', '1001');
+    expect($xml1)->toContain('InitialSecret123')
+        ->and($xml1)->toContain('name="call_waiting" value="disabled"');
+
+    // Verify cache hit (same content returned from cache)
+    $xmlCached = $builder->buildCachedDirectoryXml('user', 'domain.test', '1001', '1001');
+    expect($xmlCached)->toBe($xml1);
+
+    // 1. Rotate sip account auth_password
+    $sipAccount->update(['auth_password' => 'NewSecret999']);
+
+    // Must serve NewSecret999 immediately without waiting for TTL expiration
+    $xml2 = $builder->buildCachedDirectoryXml('user', 'domain.test', '1001', '1001');
+    expect($xml2)->toContain('NewSecret999')
+        ->and($xml2)->not->toContain('InitialSecret123');
+
+    // 2. Update extension setting
+    $setting->update(['value' => 'enabled']);
+
+    // Must serve updated extension setting immediately without waiting for TTL expiration
+    $xml3 = $builder->buildCachedDirectoryXml('user', 'domain.test', '1001', '1001');
+    expect($xml3)->toContain('name="call_waiting" value="enabled"')
+        ->and($xml3)->not->toContain('name="call_waiting" value="disabled"');
 });

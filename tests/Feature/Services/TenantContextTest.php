@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Exceptions\TenantContextMissingException;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantContext;
@@ -236,4 +237,88 @@ it('resolve returns single tenant when only one exists even if user is unattache
 
     expect($result)->not->toBeNull()
         ->and((string) $result->id)->toBe((string) $tenant->id);
+});
+
+// ─── TenantContext::resolve(allowSingleTenantFallback: false) & resolveStrict() ───
+
+it('resolve with allowSingleTenantFallback false returns null when single tenant exists and no context', function () {
+    Tenant::factory()->create();
+
+    $context = app(TenantContext::class);
+    $result = $context->resolve(allowSingleTenantFallback: false);
+
+    expect($result)->toBeNull();
+});
+
+it('resolve with allowSingleTenantFallback false returns null when user is unattached and single tenant exists', function () {
+    Tenant::factory()->create();
+    $user = User::factory()->create();
+
+    $context = app(TenantContext::class);
+    $result = $context->resolve($user, allowSingleTenantFallback: false);
+
+    expect($result)->toBeNull();
+});
+
+it('resolveStrict returns null when single tenant exists and no context', function () {
+    Tenant::factory()->create();
+
+    $context = app(TenantContext::class);
+    $result = $context->resolveStrict();
+
+    expect($result)->toBeNull();
+});
+
+it('resolveStrict with unattached user returns null when single tenant exists', function () {
+    Tenant::factory()->create();
+    $user = User::factory()->create();
+
+    $context = app(TenantContext::class);
+    $result = $context->resolveStrict($user);
+
+    expect($result)->toBeNull();
+});
+
+it('resolveStrict returns user tenant when user belongs to a tenant', function () {
+    $tenant = Tenant::factory()->create();
+    $user = User::factory()->create();
+    $user->tenants()->attach($tenant, ['primary' => true]);
+
+    $context = app(TenantContext::class);
+    $result = $context->resolveStrict($user);
+
+    expect($result)->not->toBeNull()
+        ->and((string) $result->id)->toBe((string) $tenant->id);
+});
+
+// ─── TenantContext::assertResolved() ─────────────────────────────
+
+it('assertResolved throws TenantContextMissingException when TenantManager has no tenant ID', function () {
+    expect(app(TenantManager::class)->getTenantId())->toBeNull();
+
+    $context = app(TenantContext::class);
+
+    expect(fn () => $context->assertResolved())
+        ->toThrow(TenantContextMissingException::class, 'No active tenant context is configured.');
+});
+
+it('assertResolved throws TenantContextMissingException when TenantManager has an invalid or disabled tenant ID', function () {
+    $disabledTenant = Tenant::factory()->create(['enabled' => false]);
+    app(TenantManager::class)->setTenantId((string) $disabledTenant->id);
+
+    $context = app(TenantContext::class);
+
+    expect(fn () => $context->assertResolved())
+        ->toThrow(TenantContextMissingException::class, "Active tenant [{$disabledTenant->id}] not found or disabled.");
+});
+
+it('assertResolved returns active Tenant when TenantManager holds valid tenant ID', function () {
+    $tenant = Tenant::factory()->create(['enabled' => true]);
+    app(TenantManager::class)->setTenantId((string) $tenant->id);
+
+    $context = app(TenantContext::class);
+    $resolved = $context->assertResolved();
+
+    expect($resolved)->not->toBeNull()
+        ->and((string) $resolved->id)->toBe((string) $tenant->id);
 });

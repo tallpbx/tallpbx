@@ -91,6 +91,7 @@ use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
 use Modules\Emergency\Models\Emergency;
 use Modules\Extensions\Models\Extension;
+use Modules\ExtensionSettings\Models\ExtensionSetting;
 use Modules\Fax\Models\FaxInbox;
 use Modules\Fax\Models\FaxOutgoing;
 use Modules\FeatureCodes\Models\FeatureCode;
@@ -386,6 +387,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $telephonyModels = [
             Extension::class,
+            ExtensionSetting::class,
             SipAccount::class,
             RingGroup::class,
             RingGroupExtension::class,

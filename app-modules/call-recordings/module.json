@@ -8,7 +8,7 @@
     "description": "Call recording management for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 340,
+    "priority": 360,
     "providers": [
         "Modules\\CallRecordings\\Providers\\ModuleServiceProvider"
     ],

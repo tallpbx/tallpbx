@@ -8,7 +8,7 @@
     "description": "Notification template editor",
     "required": false,
     "protected": false,
-    "priority": 650,
+    "priority": 530,
     "providers": [
         "Modules\\EmailTemplates\\Providers\\ModuleServiceProvider"
     ],

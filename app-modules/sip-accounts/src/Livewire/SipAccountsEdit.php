@@ -87,7 +87,7 @@ class SipAccountsEdit extends BaseEditComponent
         $this->validate();
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'tenant_domain_id' => $this->tenantDomainId,
             'identity_mode' => $this->identityMode,
             'auth_username' => $this->authUsername,

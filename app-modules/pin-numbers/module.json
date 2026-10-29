@@ -8,7 +8,7 @@
     "description": "Manage PIN numbers for restricted dialing.",
     "required": false,
     "protected": false,
-    "priority": 240,
+    "priority": 260,
     "providers": [
         "Modules\\PinNumbers\\Providers\\ModuleServiceProvider"
     ],

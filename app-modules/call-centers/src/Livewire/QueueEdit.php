@@ -88,7 +88,7 @@ class QueueEdit extends BaseEditComponent
         }
         $this->tenantId = $this->resolveTenantId() ?? $this->tenantId;
         $this->validate(['tenantId' => ['required', 'integer', 'exists:tenants,id'], 'name' => ['required', 'string', 'max:255'], 'strategy' => ['required', 'string', 'max:255'], 'timeout' => ['required', 'integer', 'min:1', 'max:600'], 'enabled' => ['boolean']]);
-        $data = ['tenant_id' => $this->tenantId, 'name' => $this->name, 'strategy' => $this->strategy, 'timeout' => $this->timeout, 'music_on_hold' => $this->musicOnHold ?: null, 'enabled' => $this->enabled];
+        $data = ['tenant_id' => $this->resolveTenantId(), 'name' => $this->name, 'strategy' => $this->strategy, 'timeout' => $this->timeout, 'music_on_hold' => $this->musicOnHold ?: null, 'enabled' => $this->enabled];
         if ($this->queueId !== null) {
             $q = Queue::withoutGlobalScope('tenant')->findOrFail($this->queueId);
             $this->assertCanAccessTenantRecord($q);

@@ -10,6 +10,7 @@ use App\Support\BaseEditComponent;
 use App\Support\BaseListComponent;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
 use Livewire\Livewire;
 use ReflectionMethod;
 
@@ -139,7 +140,7 @@ function discoverUnscopedListComponents(): array
 
         $viewKey = null;
 
-        if (preg_match("/return view\([^)]*?,\s*\[\s*'([a-zA-Z]+)'\s*=>/s", $source, $viewMatch)) {
+        if (preg_match("/return view\s*\(.+?,\s*\[\s*'([a-zA-Z]+)'\s*=>/s", $source, $viewMatch)) {
             $viewKey = $viewMatch[1];
         }
 
@@ -185,6 +186,16 @@ function exposedRecordKeys($livewire, string $model, ?string $viewKey): array
 
     foreach (get_object_vars($livewire->instance()) as $property) {
         $collect($property);
+    }
+
+    $reflection = new \ReflectionClass($livewire->instance());
+    foreach ($reflection->getMethods() as $method) {
+        if (! empty($method->getAttributes(Computed::class))) {
+            try {
+                $collect($livewire->instance()->{$method->getName()});
+            } catch (\Throwable) {
+            }
+        }
     }
 
     return $keys;

@@ -191,7 +191,7 @@ class GroupsEdit extends Component
         $data = [
             'name' => $this->name,
             'description' => $this->description ?: null,
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
         ];
 
         $group = $this->resolveGroup();
@@ -206,6 +206,16 @@ class GroupsEdit extends Component
         $this->groupService->syncPermissions($group, $this->selectedPermissions);
 
         $this->redirect(route('panel.groups.index'));
+    }
+
+    /**
+     * Resolve the tenant ID for the group.
+     *
+     * Returns null for global system groups, or the selected tenant ID.
+     */
+    protected function resolveTenantId(): ?int
+    {
+        return $this->tenantId !== null ? (int) $this->tenantId : null;
     }
 
     /**

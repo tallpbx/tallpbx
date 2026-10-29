@@ -8,7 +8,7 @@
     "description": "Outbound call broadcasting for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 370,
+    "priority": 390,
     "providers": [
         "Modules\\CallBroadcast\\Providers\\ModuleServiceProvider"
     ],

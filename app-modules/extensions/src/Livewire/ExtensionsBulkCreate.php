@@ -90,7 +90,7 @@ class ExtensionsBulkCreate extends BaseEditComponent
 
         $this->extensionService->createRange(
             [
-                'tenant_id' => $this->tenantId,
+                'tenant_id' => $this->resolveTenantId(),
                 'number_alias' => $this->copyNumberAlias ? $this->startExtension : null,
                 'display_name' => $this->nullableString($this->displayNameTemplate),
                 'voicemail_enabled' => $this->voicemailEnabled,

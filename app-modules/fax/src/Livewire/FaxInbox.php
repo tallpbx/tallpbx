@@ -6,8 +6,10 @@ namespace Modules\Fax\Livewire;
 
 use App\Support\BaseListComponent;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\WithPagination;
 use Modules\Fax\Models\FaxInbox as FaxInboxModel;
 use Modules\Fax\Services\FaxServiceInterface;
 
@@ -17,8 +19,7 @@ use Modules\Fax\Services\FaxServiceInterface;
 #[Layout('layouts.app')]
 class FaxInbox extends BaseListComponent
 {
-    /** @var Collection<int, FaxInboxModel> */
-    public Collection $faxes;
+    use WithPagination;
 
     public ?string $pendingDeletionId = null;
 
@@ -37,27 +38,20 @@ class FaxInbox extends BaseListComponent
     }
 
     /**
-     * Load the received fax list when the page opens.
-     */
-    public function mount(): void
-    {
-        $this->loadFaxes();
-    }
-
-    /**
      * Fetch received faxes newest first. Administrators see every
      * tenant's faxes; tenant users only see their own.
      */
-    private function loadFaxes(): void
+    #[Computed]
+    public function faxes(): LengthAwarePaginator
     {
         $query = $this->isAdminGuard()
             ? FaxInboxModel::withoutGlobalScope('tenant')
             : FaxInboxModel::query();
 
-        $this->faxes = $query
+        return $query
             ->with('mediaAsset')
             ->orderBy('received_at', 'desc')
-            ->get();
+            ->paginate(25);
     }
 
     /** Open the shared confirmation modal for a received fax. */
@@ -91,7 +85,6 @@ class FaxInbox extends BaseListComponent
         }
 
         $this->cancelFaxDeletion();
-        $this->loadFaxes();
         $this->showSuccess('Fax deleted.');
         $this->dispatch('fax-deleted');
     }
@@ -101,6 +94,8 @@ class FaxInbox extends BaseListComponent
      */
     public function render(): View
     {
-        return view('fax::fax-inbox');
+        return view('fax::fax-inbox', [
+            'faxes' => $this->faxes,
+        ]);
     }
 }

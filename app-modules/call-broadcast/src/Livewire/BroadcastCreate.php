@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\CallBroadcast\Livewire;
 
-use App\Models\Tenant;
+use App\Support\BaseEditComponent;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
 use Modules\CallBroadcast\Services\CallBroadcastService;
 
 /**
@@ -16,13 +14,8 @@ use Modules\CallBroadcast\Services\CallBroadcastService;
  * pasted list of phone numbers.
  */
 #[Layout('layouts.app')]
-class BroadcastCreate extends Component
+class BroadcastCreate extends BaseEditComponent
 {
-    /** @var Collection<int, Tenant> */
-    public Collection $tenants;
-
-    public ?int $tenantId = null;
-
     public string $name = '';
 
     public string $phoneNumbers = '';
@@ -56,7 +49,7 @@ class BroadcastCreate extends Component
      */
     public function mount(): void
     {
-        $this->tenants = Tenant::orderBy('name')->get();
+        $this->loadTenants();
     }
 
     /**
@@ -80,7 +73,7 @@ class BroadcastCreate extends Component
         }
 
         $this->broadcastService->createWithRecipients([
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'status' => 'draft',
         ], $numbers);

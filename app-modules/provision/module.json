@@ -8,7 +8,7 @@
     "description": "HTTP provisioning server for IP phones",
     "required": false,
     "protected": false,
-    "priority": 510,
+    "priority": 480,
     "providers": [
         "Modules\\Provision\\Providers\\ModuleServiceProvider"
     ],

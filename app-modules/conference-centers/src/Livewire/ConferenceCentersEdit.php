@@ -99,7 +99,7 @@ class ConferenceCentersEdit extends BaseEditComponent
             : null;
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'extension' => $this->extension,
             'pin' => $this->pin ?: null,

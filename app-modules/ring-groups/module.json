@@ -8,7 +8,7 @@
     "description": "Manage ring groups with multiple extensions for simultaneous or sequential call distribution.",
     "required": false,
     "protected": false,
-    "priority": 270,
+    "priority": 290,
     "providers": [
         "Modules\\RingGroups\\Providers\\ModuleServiceProvider"
     ],

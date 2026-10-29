@@ -8,7 +8,7 @@
     "description": "SIP registration monitoring for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 440,
+    "priority": 430,
     "providers": [
         "Modules\\Registrations\\Providers\\ModuleServiceProvider"
     ],

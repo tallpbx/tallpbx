@@ -8,7 +8,7 @@
     "description": "Manage named call destinations (conferences, IVRs, voicemails, ring groups).",
     "required": false,
     "protected": true,
-    "priority": 180,
+    "priority": 170,
     "providers": [
         "Modules\\Destinations\\Providers\\ModuleServiceProvider"
     ],

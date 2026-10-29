@@ -8,7 +8,7 @@
     "description": "Call detail record management for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 410,
+    "priority": 400,
     "providers": [
         "Modules\\XmlCdr\\Providers\\ModuleServiceProvider"
     ],

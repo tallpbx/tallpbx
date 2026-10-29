@@ -8,6 +8,7 @@ use App\Support\RoutingCacheVersion;
 use Illuminate\Database\Eloquent\Model;
 use Modules\CallCenters\Models\Queue;
 use Modules\Dialplans\Models\Dialplan;
+use Modules\Extensions\Models\Extension;
 use Modules\IvrMenus\Models\IvrMenu;
 use Modules\RingGroups\Models\RingGroup;
 
@@ -19,6 +20,7 @@ use Modules\RingGroups\Models\RingGroup;
  * - Full dialplan XML caches
  * - Standard dialplan XML caches
  * - Dialplan contributor fragment caches
+ * - Directory XML caches
  *
  * Eliminates stale routing across all PBX feature modules without manual
  * cache flushing or waiting for TTL expiry.
@@ -107,6 +109,14 @@ class RoutingCacheObserver
             $queue = Queue::withoutGlobalScope('tenant')->find($model->queue_id);
             if ($queue !== null) {
                 return (int) $queue->tenant_id;
+            }
+        }
+
+        // ExtensionSetting -> Extension
+        if (isset($model->extension_id) && class_exists(Extension::class)) {
+            $extension = Extension::withoutGlobalScope('tenant')->find($model->extension_id);
+            if ($extension !== null && isset($extension->tenant_id)) {
+                return (int) $extension->tenant_id;
             }
         }
 

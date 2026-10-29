@@ -8,7 +8,7 @@
     "description": "Follow-me call forwarding for FreeSWITCH",
     "required": false,
     "protected": false,
-    "priority": 310,
+    "priority": 330,
     "providers": [
         "Modules\\FollowMe\\Providers\\ModuleServiceProvider"
     ],

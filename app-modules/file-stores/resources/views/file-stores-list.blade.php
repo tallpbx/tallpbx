@@ -154,6 +154,10 @@
         </div>
     </div>
 
+    <div class="mt-4">
+        {{ $fileStores->links() }}
+    </div>
+
     @if ($pendingDeletionFileStoreId !== null)
         <x-confirmation-modal
             :open="true"

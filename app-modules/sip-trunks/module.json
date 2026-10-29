@@ -8,7 +8,7 @@
     "description": "SIP trunk management",
     "required": false,
     "protected": false,
-    "priority": 660,
+    "priority": 540,
     "providers": [
         "Modules\\SipTrunks\\Providers\\ModuleServiceProvider"
     ],

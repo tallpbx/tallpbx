@@ -8,7 +8,7 @@
     "description": "Manage call blocking rules by caller ID pattern matching for FreeSwitchPBX.",
     "required": false,
     "protected": false,
-    "priority": 230,
+    "priority": 250,
     "providers": [
         "Modules\\CallBlocks\\Providers\\ModuleServiceProvider"
     ],

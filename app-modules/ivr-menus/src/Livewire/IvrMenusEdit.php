@@ -105,7 +105,7 @@ class IvrMenusEdit extends BaseEditComponent
             : null;
 
         $data = [
-            'tenant_id' => $this->tenantId,
+            'tenant_id' => $this->resolveTenantId(),
             'name' => $this->name,
             'greeting' => $existingMenu?->greeting,
             'description' => $this->description ?: null,
