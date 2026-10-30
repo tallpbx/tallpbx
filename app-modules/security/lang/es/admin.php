@@ -323,6 +323,7 @@ return [
     'security_protect_sip' => 'Proteger Extensiones Telefónicas (SIP)',
     'security_protect_web' => 'Proteger Portal de Administración Web',
     'security_protect_ssh' => 'Proteger Terminal del Servidor (SSH)',
+    'security_monitored_services' => 'Servicios Monitoreados',
     'security_settings_saved' => 'Ajustes de protección guardados con éxito.',
     'security_pipeline_step4_desc' => 'Evaluadas de arriba a abajo',
     'security_pipeline_step5_desc' => 'Acción de reserva',

@@ -63,26 +63,50 @@
 
         {{-- Tab Panels --}}
         @if ($activeTab === 'firewall-rules')
-            @include('security::tabs.firewall-rules')
+            <div wire:key="security-tab-firewall-rules">
+                @include('security::tabs.firewall-rules')
+            </div>
         @elseif ($activeTab === 'block-allow')
-            @include('security::tabs.block-allow')
+            <div wire:key="security-tab-block-allow">
+                @include('security::tabs.block-allow')
+            </div>
         @elseif ($activeTab === 'attackers')
-            @include('security::tabs.attackers')
+            <div wire:key="security-tab-attackers">
+                @include('security::tabs.attackers')
+            </div>
         @elseif (in_array($activeTab, ['external-blocklists', 'threat-feeds'], true))
-            @include('security::tabs.external-blocklists')
+            <div wire:key="security-tab-external-blocklists">
+                @include('security::tabs.external-blocklists')
+            </div>
         @elseif ($activeTab === 'geo-blocking')
-            @include('security::tabs.geo-blocking')
+            <div wire:key="security-tab-geo-blocking">
+                @include('security::tabs.geo-blocking')
+            </div>
         @endif
     @endif
 
     {{-- Drawers & Modals --}}
-    @include('security::drawers.protection-settings')
-    @include('security::modals.confirm-disable-prefilter')
-    @include('security::modals.default-policy')
-    @include('security::modals.manual-ban')
-    @include('security::modals.custom-rule')
-    @include('security::modals.edit-system-service')
-    @include('security::drawers.observe-activity')
+    <div wire:key="security-modal-protection-settings">
+        @include('security::modals.protection-settings')
+    </div>
+    <div wire:key="security-modal-confirm-disable-prefilter">
+        @include('security::modals.confirm-disable-prefilter')
+    </div>
+    <div wire:key="security-modal-default-policy">
+        @include('security::modals.default-policy')
+    </div>
+    <div wire:key="security-modal-manual-ban">
+        @include('security::modals.manual-ban')
+    </div>
+    <div wire:key="security-modal-custom-rule">
+        @include('security::modals.custom-rule')
+    </div>
+    <div wire:key="security-modal-edit-system-service">
+        @include('security::modals.edit-system-service')
+    </div>
+    <div wire:key="security-drawer-observe-activity">
+        @include('security::drawers.observe-activity')
+    </div>
 
     {{-- Confirmation Modals --}}
     <x-confirmation-modal

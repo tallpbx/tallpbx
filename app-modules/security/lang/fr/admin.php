@@ -323,6 +323,7 @@ return [
     'security_protect_sip' => 'Protéger les Postes Téléphoniques (SIP)',
     'security_protect_web' => 'Protéger le Portail de Gestion Web',
     'security_protect_ssh' => 'Protéger la Console Serveur (SSH)',
+    'security_monitored_services' => 'Services Surveillés',
     'security_settings_saved' => 'Paramètres de protection enregistrés avec succès.',
     'security_pipeline_step4_desc' => 'Évaluées de haut en bas',
     'security_pipeline_step5_desc' => 'Action de repli',

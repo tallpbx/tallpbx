@@ -44,3 +44,23 @@ it('reflects the geo rule state in the master Firewall Rules table', function ()
 
     $page->assertPresent('tr[wire\\:key="geo-blocking-cockpit-row"]');
 });
+
+it('opens manual ban modal and protection settings drawer on attackers tab', function (): void {
+    $this->loginAs($this->admin, 'admin');
+
+    $page = visit('/panel/security')->resize(1920, 2400);
+
+    // Switch to Attackers tab
+    $page->click('button[role="tab"]:has-text("Attackers")');
+
+    // Click "Block IP Manually"
+    $page->click('button:has-text("Block IP Manually")');
+    $page->assertSee('Manually Block IP Address');
+
+    // Cancel modal
+    $page->click('.modal-open button:has-text("Cancel")');
+
+    // Click "Protection Settings"
+    $page->click('button:has-text("Protection Settings")');
+    $page->assertSee('Attack Protection Settings');
+});

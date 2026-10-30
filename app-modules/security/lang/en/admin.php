@@ -323,6 +323,7 @@ return [
     'security_protect_sip' => 'Protect Phone Extensions (SIP)',
     'security_protect_web' => 'Protect Web Management Portal',
     'security_protect_ssh' => 'Protect Server Terminal (SSH)',
+    'security_monitored_services' => 'Monitored Services',
     'security_settings_saved' => 'Protection settings saved successfully.',
     'security_pipeline_step4_desc' => 'Evaluated top-to-bottom',
     'security_pipeline_step5_desc' => 'Fallback action',
