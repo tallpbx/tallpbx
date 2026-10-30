@@ -119,6 +119,7 @@ it('enforces standardized page-title typography and x-page-header usage across a
         'app-modules/auth/resources/views/register.blade.php',
         'app-modules/auth/resources/views/forgot-password.blade.php',
         'app-modules/auth/resources/views/reset-password.blade.php',
+        'resources/views/errors/403.blade.php',
         'resources/views/errors/500.blade.php',
         'resources/views/errors/503.blade.php',
     ];

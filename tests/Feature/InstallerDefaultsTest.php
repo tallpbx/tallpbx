@@ -1043,8 +1043,8 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
         ->and($installDoc)->toContain('php artisan pbx:sounds:default')
         ->and($operationsDoc)->toContain('## FreeSWITCH Sound Prompt Languages')
         ->and($operationsDoc)->toContain('## Outgoing Mail & Notifications (Email Connector)')
-        ->and($operationsDoc)->toContain('php artisan pbx:sounds:list')
-        ->and($operationsDoc)->toContain('php artisan pbx:sounds:install');
+        ->and($operationsDoc)->toContain('tpbx pbx:sounds:list')
+        ->and($operationsDoc)->toContain('tpbx pbx:sounds:install');
 });
 
 it('auto-configures PHP-FPM static worker pools based on host memory', function (): void {

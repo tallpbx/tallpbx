@@ -33,6 +33,10 @@ class AuthPanelMiddleware
             return $next($request);
         }
 
+        if (Auth::guard('web')->check() && app(ImpersonationServiceInterface::class)->isImpersonating()) {
+            return app(ScopeTenant::class)->handle($request, $next);
+        }
+
         if (Auth::guard('admin')->check()) {
             return $next($request);
         }

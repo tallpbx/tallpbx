@@ -28,7 +28,7 @@
                                 {{ __('client.impersonating', ['name' => Auth::user()?->name ?? 'User', 'admin' => $originalAdmin?->name ?? 'Admin']) }}
                             </p>
                             <div class="mt-3">
-                                <a href="{{ route('panel.impersonation.stop') }}" class="btn btn-warning btn-sm w-full">
+                                <a href="{{ route('panel.impersonation.stop') }}" wire:navigate class="btn btn-warning btn-sm w-full">
                                     {{ __('client.stop_impersonating') }}
                                 </a>
                             </div>
@@ -37,7 +37,7 @@
                 </div>
             @else
                 <div class="mt-6 flex flex-col gap-2">
-                    <a href="{{ url()->previous() ?: route('panel.dashboard') }}" class="btn btn-primary btn-sm">
+                    <a href="{{ url()->previous() ?: route('panel.dashboard') }}" wire:navigate class="btn btn-primary btn-sm">
                         {{ __('admin.back') }}
                     </a>
                 </div>

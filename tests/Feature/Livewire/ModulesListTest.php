@@ -170,7 +170,7 @@ it('shows a CLI restore hint for uninstalled modules without destructive buttons
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(ModulesList::class)
-        ->assertSee('php artisan module:restore extensions')
+        ->assertSee('tpbx module:restore extensions')
         ->assertDontSee('prepareUninstall')
         ->assertDontSee('reinstallModule');
 });

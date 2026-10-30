@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-10-30
+
 ### Added
 - **Appliance CLI Wrapper (`tallpbx`, `tpbx`, `artisan`)**: Introduced `/usr/local/bin/tallpbx` executable with `tpbx` and `artisan` symlinks and shell autocompletion (`/etc/bash_completion.d/tallpbx`), enabling administrators and scripts to run PBX maintenance commands globally from any directory without needing `cd /var/www/tallpbx` or typing `php`. Updated all UI snippets, tooltips, translations, and documentation to reflect `tpbx` while preserving full backwards compatibility for standard `php artisan`.
 - **Session Flush Console Command**: Added `session:flush` (with `session:clear` alias) providing a driver-aware, guarded command to invalidate active HTTP sessions across Redis DB 2, filesystem (`storage/framework/sessions`), or database tables, with confirmation prompt and `--force` support.

@@ -215,7 +215,7 @@ it('documents service management in the operations guide', function (): void {
         ->and($operations)->toContain('systemctl status <name>')
         ->and($operations)->toContain('tallpbx-queue')
         ->and($operations)->toContain('In-memory storage')
-        ->and($operations)->toContain('php artisan app:test --smoke')
-        ->and($operations)->toContain('php artisan app:test --full')
-        ->and($operations)->toContain('php artisan app:test --sequential');
+        ->and($operations)->toContain('tpbx app:test --smoke')
+        ->and($operations)->toContain('tpbx app:test --full')
+        ->and($operations)->toContain('tpbx app:test --sequential');
 });
