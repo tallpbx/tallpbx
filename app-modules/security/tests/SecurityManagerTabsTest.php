@@ -65,7 +65,7 @@ it('defaults to the Firewall Rules tab and renders every tab control', function 
         ->assertSee(__('admin.security_toggle_observe'))
         ->assertSee(__('admin.security_firewall_rules_tooltip'))
         ->assertSee(__('admin.security_firewall_rules_cli_hint'))
-        ->assertSee('php artisan security:status');
+        ->assertSee('tpbx security:status');
 });
 
 it('shows only the selected tab panel', function (): void {

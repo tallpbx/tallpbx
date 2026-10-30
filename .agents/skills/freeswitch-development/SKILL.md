@@ -15,7 +15,7 @@ Use this skill for PBX and telephony behavior in this Laravel/TALL application. 
 - Preserve tenant isolation in all SIP, directory, dialplan, CDR, registration, provisioning, and ESL flows.
 - Keep module data, generated XML, ESL commands, and manual call behavior aligned.
 - Prefer existing module services, models, Livewire patterns, and `App\Support\ModuleServiceProvider`.
-- Run `php artisan optimize:clear` after code changes, per project policy.
+- Run `tpbx optimize:clear` after code changes, per project policy.
 
 ## First Inspection
 
@@ -143,7 +143,7 @@ When validating true calls per second, test the full SIP call path rather than o
 
 Keep direct XML-handler capacity tests separate from live SIPp/FreeSWITCH tests:
 
-- `php artisan pbx:load-test:dialplan` or direct HTTP requests to `/api/v1/xml-handler` measure Nginx/PHP-FPM/Laravel XML generation capacity. They do not create FreeSWITCH sessions and usually will not show call activity in `fs_cli`.
+- `tpbx pbx:load-test:dialplan` or direct HTTP requests to `/api/v1/xml-handler` measure Nginx/PHP-FPM/Laravel XML generation capacity. They do not create FreeSWITCH sessions and usually will not show call activity in `fs_cli`.
 - SIPp validation exercises Sofia, registrations, directory XML curl, dialplan XML curl, bridging, and RTP/media behavior. Use this when the user expects to see FreeSWITCH activity.
 - Document the two result types separately. Do not present direct XML-handler requests as simultaneous-call capacity.
 
@@ -175,7 +175,7 @@ Before every SIPp CPS run, perform the repeatable preflight gate instead of trou
 8. FreeSWITCH `sessions-per-second` is high enough for the test target; the project default is 60 so tests are not accidentally capped by the old 30 SPS setting.
 9. PHP-FPM and Laravel config caches have been refreshed after `.env` or code changes.
 
-If the PBX data or CSV preflight fails, run `php artisan pbx:load-test:seed --tenant=load-test-virtualbox --domain=192.168.1.76 --extensions=20 --start=2000 --password='LoadTest1234!' --sipp-host=192.168.1.65 --sipp-port=5066 --output=storage/app/load-tests/sipp-users-virtualbox-sps60.csv --reset --no-interaction`, copy the CSV to WSL, regenerate the auth CSV, and clear Laravel's application cache before retrying. A missing SIP account or malformed auth CSV produces `403 Forbidden` setup failures and must not be counted as a CPS result.
+If the PBX data or CSV preflight fails, run `tpbx pbx:load-test:seed --tenant=load-test-virtualbox --domain=192.168.1.76 --extensions=20 --start=2000 --password='LoadTest1234!' --sipp-host=192.168.1.65 --sipp-port=5066 --output=storage/app/load-tests/sipp-users-virtualbox-sps60.csv --reset --no-interaction`, copy the CSV to WSL, regenerate the auth CSV, and clear Laravel's application cache before retrying. A missing SIP account or malformed auth CSV produces `403 Forbidden` setup failures and must not be counted as a CPS result.
 
 When clearing stale SIPp processes from WSL through SSH, prefer `pgrep -x sipp` plus `kill`. Avoid putting `pkill -f /usr/local/bin/sipp` directly in the SSH command string because the pattern can match and terminate the SSH shell running the cleanup command.
 

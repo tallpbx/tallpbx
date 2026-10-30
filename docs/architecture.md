@@ -24,7 +24,10 @@ Rather than maintaining all models, controllers, Livewire components, routes, mi
 4. **Clean Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community modules reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External modules are guarded by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
 5. **Standardized Base Service Provider**: All modules boot via a child class extending `App\Support\ModuleServiceProvider`, eliminating repetitive boilerplate for views, migrations, routes, Livewire components, permissions, and translations.
 6. **Decoupled Cross-Domain Communication**: High cohesion within domains, low coupling between domains. Modules communicate through Laravel events, service contracts, or published interfaces rather than deep cross-domain database coupling.
-7. **Zero-Friction Scaffolding**: The Artisan command `php artisan make:module <name>` scaffolds production-ready modules conforming strictly to project conventions.
+7. **Zero-Friction Scaffolding**: Scaffolding production-ready modules conforming strictly to project conventions is supported via `tpbx make:module <name>` or `tallpbx make:module <name>`, which wrap Laravel's native `artisan make:module` (`artisan <command>` also works for developers familiar with Laravel). In this documentation, `tpbx` is used.
+
+> [!NOTE]
+> **CLI Invocation Convention (Interactive vs. Automated Contexts)**: Use `tpbx <command>` for interactive shells, documentation, UI snippets, and developer commands on `/var/www/tallpbx`. For non-interactive automation—such as shell scripts, cron jobs, systemd service units (`WorkingDirectory=/var/www/tallpbx` with `ExecStart=/usr/bin/php artisan <command>`), installers, Git worktrees, and CI workflows—use native `php artisan <command>` (or `/usr/bin/php /var/www/tallpbx/artisan <command>` when explicit full paths are needed).
 
 ---
 
@@ -98,11 +101,11 @@ flowchart TD
 
 ### 3.1 Migration Gating and `--all-modules` Flag
 
-By default, disabled modules do not register their database migrations. This ensures standard maintenance commands like `php artisan migrate` only mutate the database schema for active, enabled modules and the shared kernel.
+By default, disabled modules do not register their database migrations. This ensures standard maintenance commands like `tpbx migrate` only mutate the database schema for active, enabled modules and the shared kernel.
 
 When an administrator or automated deployment script needs to retain or run database migrations across all installed modules regardless of enablement state, pass the global `--all-modules` flag:
 ```bash
-php artisan migrate --all-modules
+tpbx migrate --all-modules
 ```
 Programmatic tests and maintenance jobs can control this behavior using `ModuleState::setForceAllModulesMigrations(true)`.
 
@@ -179,12 +182,12 @@ The test suite at `tests/Feature/Architecture/TranslationParityTest.php` runs on
 
 ---
 
-## 5. Scaffolding Custom Modules with Artisan (`make:module`)
+## 5. Scaffolding Custom Modules with tpbx (`make:module`)
 
-In the Domain-Driven Modular Monolith, built-in modules (`app-modules/`) are part of the permanent appliance monorepo maintained directly in version control. To keep the developer experience clean and avoid fragile runtime mutations of root `composer.json`, the scaffolding command `php artisan make:module` is dedicated exclusively to generating **third-party community modules** in `custom-modules/`:
+In the Domain-Driven Modular Monolith, built-in modules (`app-modules/`) are part of the permanent appliance monorepo maintained directly in version control. To keep the developer experience clean and avoid fragile runtime mutations of root `composer.json`, the scaffolding command `tpbx make:module` is dedicated exclusively to generating **third-party community modules** in `custom-modules/`:
 
 ```bash
-php artisan make:module my-crm-connector \
+tpbx make:module my-crm-connector \
     --display-name="My CRM Connector" \
     --description="Third-party CRM integration for customer lookups" \
     --category="Integrations"
@@ -197,7 +200,7 @@ php artisan make:module my-crm-connector \
 - **Service Provider**: Generates `src/Providers/ModuleServiceProvider.php` extending `App\Support\ModuleServiceProvider` with `moduleNamespace()` returning `CustomModules\{Studly}`.
 - **Instant Dynamic Autoloading**: Automatically discovered and autoloaded at runtime via `CustomModuleAutoloader` (`CustomModules\` namespace) without running `composer dump-autoload`.
 - **Component Stubs**: Pre-generates boilerplate Livewire component directories, model factories, Blade views, migration directories, and collision-safe translation files (`lang/{en,es,fr}/admin.php`).
-- **Core Collision Protection**: Rejects names that collide with existing core modules in `app-modules/` (e.g. `php artisan make:module extensions` will fail with an error).
+- **Core Collision Protection**: Rejects names that collide with existing core modules in `app-modules/` (e.g. `tpbx make:module extensions` will fail with an error).
 
 ### 5.1 Distributing Custom Modules as Composer Packages (`vendor/`)
 
@@ -208,7 +211,7 @@ While developing locally in `custom-modules/` provides instant zero-build feedba
 1. **Scaffold the Module Locally**:
    Start by generating the module skeleton in `custom-modules/`:
    ```bash
-   php artisan make:module my-crm-connector \
+   tpbx make:module my-crm-connector \
        --display-name="My CRM Connector" \
        --category="custom"
    ```
@@ -251,7 +254,7 @@ While developing locally in `custom-modules/` provides instant zero-build feedba
 5. **Discovery & Activation**:
    TallPBX's discovery scanner inspects `vendor/*/*/module.json` on boot and caches the discovered manifest (`bootstrap/cache/modules.php`). Synchronize and activate the module:
    ```bash
-   php artisan module:sync
+   tpbx module:sync
    ```
    The module will appear in `/panel/modules` under the **Custom** category with a `"Vendor"` source tag, and can be enabled, disabled, or uninstalled (`module:uninstall`) directly from the panel or CLI.
 
@@ -266,7 +269,7 @@ When creating translation keys for a module:
 4. **Header Docblock (Suggested)**: A collision-warning header is suggested for custom and third-party modules to document the cascading merge behavior; it is optional.
 5. **Verification**: Verify that keys follow the runtime collision rule:
    ```bash
-   php artisan optimize:clear
+   tpbx optimize:clear
    ./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php
    ```
 
@@ -312,7 +315,7 @@ Third-party modules are untrusted code. Before and during registration the appli
 `module:sync` prunes ghost core registry rows (a `source = 'core'` row whose directory is gone is
 always dead) while preserving custom/vendor rows so unplugged modules keep their state.
 
-Scaffold new modules with `php artisan make:module <name>` — it writes to
+Scaffold new modules with `tpbx make:module <name>` — it writes to
 `custom-modules/{name}/` only, tags the manifest `source: custom`, and refreshes the manifest
 cache. Route auto-registration (Livewire `List`/`Edit` component conventions) and dialplan XML
 hooks (`DialplanXmlContributor`) work identically for custom modules and core modules.
@@ -423,7 +426,7 @@ sequenceDiagram
 
 - **Standalone Redis 3-Tier Keyspace Isolation**: TallPBX structures its Redis deployment across isolated database indexes:
   - **DB 0 (Persistent Coordination & Security)**: Default connection used for atomic distributed mutex locks (`tallpbx_database_lock:*`), queue jobs, intrusion detection sliding-window counters, scanner dedup sets, and event broadcasting.
-  - **DB 1 (Disposable Cache)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`REDIS_CACHE_DB=1`). Cleared aggressively during `php artisan optimize:clear` or XML cache sweeps without touching session or security state.
+  - **DB 1 (Disposable Cache)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`REDIS_CACHE_DB=1`). Cleared aggressively during `tpbx optimize:clear` or XML cache sweeps without touching session or security state.
   - **DB 2 (Stateful HTTP Sessions)**: User and administrator web sessions (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`). Completely decoupled from cache flushes so background sweeps, module syncs, and web Git updates never evict active logins.
   - **DB 13–15 (Isolated Test Workspaces)**: Confined execution for automated unit, feature, and browser test suites (`tallpbx-test-*`), ensuring tests never mutate or wipe production keyspaces.
 - **Direct Redis Communication**: TallPBX's intrusion detection engine (`SecurityIncidentService`) talks directly to Redis via `Illuminate\Support\Facades\Redis` facade (`Redis::incr()`, `expire()`), bypassing Laravel's general `CACHE_STORE`. Configuring `CACHE_STORE=file` or `database` in `.env` does not alter or disable intrusion tracking.
@@ -453,7 +456,7 @@ The **Security Center** (`/panel/security`) provides an evaluation-ordered, five
 ### Master Operational Switches (Top Banner)
 Pinned directly above the tab strip for immediate visibility:
 1. **Firewall Master Switch**: Toggles the entire host firewall on or off. When disabled, the kernel allows all traffic while maintaining loopback and established connection rules. In the web interface, turning off the firewall visually greys out the top telemetry dashboard and automatically hides all tab navigation and panels until re-enabled.
-2. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops to the kernel journal, but nothing is blocked (the default policy is forced to `accept`). A prominent amber banner displays across all Security Center tabs with live packet hit counters and a 1-click **"View Observed Activity"** drawer, supplemented by the `php artisan security:observe` CLI command.
+2. **Global Observe Mode Switch**: Puts the entire firewall into non-blocking observation mode. Every rule still evaluates, counts packets, and logs would-be drops to the kernel journal, but nothing is blocked (the default policy is forced to `accept`). A prominent amber banner displays across all Security Center tabs with live packet hit counters and a 1-click **"View Observed Activity"** drawer, supplemented by the `tpbx security:observe` CLI command.
 
 ---
 
@@ -496,7 +499,7 @@ Pinned directly above the tab strip for immediate visibility:
 * **Dual Filtering Modes**:
   - **Block Selected Countries (`blacklist`)**: Selectively drops traffic originating from specific high-risk jurisdictions.
   - **Block All Except Selected (`whitelist`)**: Strict allow-list perimeter dropping all traffic outside your operating countries. Protected by fail-closed completeness guards requiring valid IPv4 and IPv6 zone data for every selected country; if an upstream country has zero published IPv6 ranges or fails to download, the whitelist refuses to arm to prevent perimeter bypass or unintended lockout.
-* **Automatic Scheduled Synchronization**: Pre-aggregated country zone files are cached locally in `/etc/tallpbx/geoip/` and automatically refreshed weekly via the scheduler (`php artisan security:sync-geoip`), or on demand via `php artisan security:sync-geoip --force`.
+* **Automatic Scheduled Synchronization**: Pre-aggregated country zone files are cached locally in `/etc/tallpbx/geoip/` and automatically refreshed weekly via the scheduler (`tpbx security:sync-geoip`), or on demand via `tpbx security:sync-geoip --force`.
 * **Zero-Lockout Concurrency**: Set compilations merge atomically into the shared kernel set-element pipeline under an exclusive `flock(LOCK_EX)` taken on the never-renamed shared lock file (`/etc/tallpbx/external_blocklist.lock`) — the same lock the root helper takes before promoting the pending file — so no concurrent threat-feed sync, geo merge, or helper promotion can interleave or race the promote's rename (the pending file itself is never used as the lock target).
 * **Operational Telemetry & CLI Inspection**: Live packet drop counter anchored to kernel rule counters, and a 1-click CLI hint for terminal inspection (`sudo nft list set inet tallpbx_filter geo_blocked_ips`).
 
@@ -587,39 +590,39 @@ TallPBX provides three complementary levels of CLI control:
 
 ---
 
-### 16.1 Method 1: TallPBX Artisan CLI (Recommended)
+### 16.1 Method 1: TallPBX Appliance CLI (Recommended)
 
-Running Artisan commands from the project root (`/var/www/tallpbx`) ensures that changes update the MariaDB authoritative database, Redis sliding windows, and the Linux kernel simultaneously.
+Running CLI commands (`tpbx security:*`, `tallpbx`, or `artisan` from any directory) ensures that changes update the MariaDB authoritative database, Redis sliding windows, and the Linux kernel simultaneously.
 
 #### View Engine Status & Active Bans
 ```bash
-php artisan security:status
+tpbx security:status
 ```
 *Displays the firewall engine state, default policy (DROP/ACCEPT), observe mode state, whitelist/blacklist counts, threat feed sync status, active custom rule counts, and a formatted table of all currently banned IP addresses with their expiration timers.*
 
 #### Lift an Attacker Ban
 ```bash
-php artisan security:unban 198.51.100.22
+tpbx security:unban 198.51.100.22
 ```
 *Removes the IP from the MariaDB `security_bans` table, clears the failure count in Redis, removes the IP from the kernel `@banned_ips`/`@banned_ips6` set, flushes conntrack sessions, and broadcasts a real-time event to all open browser sessions.*
 
 #### Sync Public Threat Feeds
 ```bash
 # Sync all active threat feeds
-php artisan security:sync-threat-feeds
+tpbx security:sync-threat-feeds
 
 # Force sync ignoring HTTP cache
-php artisan security:sync-threat-feeds --force
+tpbx security:sync-threat-feeds --force
 ```
 *Downloads the latest IP blocklists from configured threat feed providers (VoIPBL), writes `/etc/tallpbx/external_blocklist.nft.pending`, validates syntax with `nft -c`, and atomically promotes elements into kernel sets.*
 
 #### Recompile & Apply Active Ruleset
 ```bash
-php artisan security:apply
+tpbx security:apply
 ```
 *Compiles the ruleset from MariaDB into `/etc/tallpbx/firewall.nft`, validates syntax with `nft -c`, tests zero-lockout safety against your connection IP and local loopback services, and safely applies the new ruleset to the kernel in a single all-or-nothing operation.*
 
-*(To bypass lockout protection when working on a local serial console, pass the `--force` flag: `php artisan security:apply --force`)*
+*(To bypass lockout protection when working on a local serial console, pass the `--force` flag: `tpbx security:apply --force`)*
 
 ---
 
@@ -689,9 +692,9 @@ System administrators with root or sudo access can inspect and interact directly
 | **View Geo Perimeter Subchain** | `sudo nft list chain inet tallpbx_filter geo_perimeter` |
 | **View Inbound Chain & Packet Counters** | `sudo nft list chain inet tallpbx_filter input` |
 
-#### Emergency Recovery: Panel and `php artisan` Unreachable
+#### Emergency Recovery: Panel and tpbx CLI Unreachable
 
-When a misapplied ruleset cuts the server's own network services, both the web panel and every `php artisan` command hang, because the application can no longer reach MariaDB (port 3306) or Redis (port 6379) over the loopback interface. SSH access usually still works — it is a direct port rule in the same ruleset. Recovery is done entirely in the shell: these commands are plain Linux `nftables` operations and need no PHP, no Laravel, and no database.
+When a misapplied ruleset cuts the server's own network services, both the web panel and every `tpbx` command hang, because the application can no longer reach MariaDB (port 3306) or Redis (port 6379) over the loopback interface. SSH access usually still works — it is a direct port rule in the same ruleset. Recovery is done entirely in the shell: these commands are plain Linux `nftables` operations and need no PHP, no Laravel, and no database.
 
 Work through the steps in order and stop as soon as the panel responds again:
 
@@ -717,7 +720,7 @@ If step 1 reports `No such file or directory`, the TallPBX table is not loaded i
 > [!WARNING]
 > Do **not** simply reload `/etc/tallpbx/firewall.nft` if it is the file that caused the lockout — reloading it re-applies the same problem. Fix the configuration first, then apply.
 
-After recovery, re-apply from the Security Center (or `php artisan security:apply`) so the saved configuration and the kernel agree again.
+After recovery, re-apply from the Security Center (or `tpbx security:apply`) so the saved configuration and the kernel agree again.
 
 ---
 

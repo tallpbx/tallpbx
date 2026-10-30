@@ -46,9 +46,14 @@ The entire TallPBX user interface must remain **predictably consistent, intuitiv
 ## CRITICAL — Cache Clearing After Code Changes
 
 After ANY code changes (Blade views, config, routes, events, Livewire components, compiled classes), ALWAYS run:
+```bash
+tpbx optimize:clear
 ```
-php artisan optimize:clear
-```
+> [!NOTE]
+> TallPBX includes a global appliance CLI. Commands can be run from any directory on the server using `tpbx <command>` or `tallpbx <command>`, which wrap Laravel's native `artisan` command (`artisan <command>` also works for developers familiar with Laravel). In this documentation, `tpbx` is used.
+> - **Interactive, Docs, UI & AI Agents (on `/var/www/tallpbx`)**: Use `tpbx <command>`.
+> - **Non-User / Automated / Non-Appliance Contexts** (shell scripts, cron jobs, systemd units, installers, helpers, Git worktrees, and CI): Continue using native `php artisan <command>` (or `/usr/bin/php /var/www/tallpbx/artisan <command>` when explicit full paths are needed).
+
 Do not skip this step. The application caches compiled views, config, routes, and events — failing to clear will result in stale output. This applies even to "cosmetic" changes like replacing raw SVGs with heroicons. The application listens for Artisan command completion and runs `App\Support\GeneratedFilePermissions::repair()` so generated cache/build files stay readable by `www-data`.
 
 ## CRITICAL — Mandatory Pre-Commit Verification Gate
@@ -58,7 +63,7 @@ Run this checklist **once when work is complete, before committing or declaring 
 
 ```bash
 # 1. Application boots cleanly (run once after code/template changes)
-php artisan optimize:clear
+tpbx optimize:clear
 
 # 2. Code style passes Pint (ONLY if PHP files were modified; always scope to dirty/modified files)
 ./vendor/bin/pint --dirty
@@ -68,11 +73,11 @@ php artisan optimize:clear
 
 # 4. Full test suite and full browser tests (MAXIMUM ONCE before commit, and ONLY for significant multi-subsystem changes)
 # DO NOT run these for localized, scoped, or cosmetic work (e.g. typography normalizations, translations, single-component tweaks)
-php artisan test --compact --parallel   # Only for significant architectural changes affecting several parts of the code
+tpbx test --compact --parallel   # Only for significant architectural changes affecting several parts of the code
 ./vendor/bin/pest tests/Browser         # Only when major cross-cutting UI/navigation overhauls are made
 
 # 5. Routes exist (for new routes/features)
-php artisan route:list --name=<feature-name>
+tpbx route:list --name=<feature-name>
 ```
 
 ## CRITICAL — Laravel Pint Code Style & Syntax Linting (Scoping Rules)
@@ -121,7 +126,7 @@ command demonstration. Two production outages were caused this way:
 **Rules:**
 - No raw `nft add`, `nft insert`, `nft chain`, `nft delete`, or `nft flush` commands against a
   live kernel. All firewall changes flow through the application pipeline
-  (`php artisan security:apply` or the Security Center), which enforces the lockout and
+  (`tpbx security:apply` or the Security Center), which enforces the lockout and
   local-services guards, or through the bounded helper.
 - Verification is done with `nft -c -f <file>` (check-only, never commits), unit tests with
   mocked executors, or a disposable virtual machine. Creating kernel state on the live host to
@@ -139,14 +144,14 @@ command demonstration. Two production outages were caused this way:
 - Flip the chain's policy in place without flushing its rules: `nft 'chain inet tallpbx_filter input { policy accept; }'`
 - Last resort, removes every table and rule: `nft flush ruleset`
 - After any recovery, reload the application's ruleset from the Security Center (or
-  `php artisan security:apply`) so the panel and the kernel agree again.
+  `tpbx security:apply`) so the panel and the kernel agree again.
 
 ## SIP Load Testing & Multi-Host Reproducibility Guidelines
 
-When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `scripts/pbx-sipp-validate.sh`, or `scripts/run-cache-sweep.sh`), agents must follow these operational rules:
+When reproducing or executing SIP load tests (`tpbx pbx:load-test:*`, `scripts/pbx-sipp-validate.sh`, or `scripts/run-cache-sweep.sh`), agents must follow these operational rules:
 1. **Public IP Obfuscation**: In all documentation, public test reports, and committed logs, public IP addresses must be obfuscated to show only the last octet (e.g. `x.x.x.218` or `...YYY`). Never expose complete public IP addresses.
-2. **Pest Parallel Flag**: Always run the Pest test suite with `--parallel` (`php artisan test --compact --parallel`). Running tests sequentially takes an excessively long time.
-3. **SSH Remote Password Handling**: When invoking `php artisan pbx:load-test:seed` on a remote PBX over SSH, do not use special characters (such as `!`) in the password argument (e.g., use `LoadTest1234`), or quote/escape carefully (`--password=\"...\"`). Bash subshells over SSH strip unescaped exclamation marks, creating credential mismatches that cause `403 Forbidden` on SIP REGISTER.
+2. **Pest Parallel Flag**: Always run the Pest test suite with `--parallel` (`tpbx test --compact --parallel`). Running tests sequentially takes an excessively long time.
+3. **SSH Remote Password Handling**: When invoking `tpbx pbx:load-test:seed` on a remote PBX over SSH, do not use special characters (such as `!`) in the password argument (e.g., use `LoadTest1234`), or quote/escape carefully (`--password=\"...\"`). Bash subshells over SSH strip unescaped exclamation marks, creating credential mismatches that cause `403 Forbidden` on SIP REGISTER.
 4. **Multi-Host CSV Synchronization**: When seeding accounts on a remote PBX, the generated `storage/app/load-tests/sipp-users.csv` is written on the PBX filesystem. Before running `scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the local load generator orchestrator, copy the CSV from the PBX to the local generator: `scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv`.
 5. **Load Generator Ingress Firewall Rules (`nftables`)**: When testing outbound gateway routing, media flow playback, or extended scenarios, FreeSWITCH bridges calls to the generator host (UAS ports 5088, 5090, RTP 6000). Stateful firewalls on the generator drop unsolicited inbound UDP by default. Always whitelist the PBX IP on the generator before running tests: `sudo nft add element inet tallpbx_filter whitelist_ips { <PBX_IP> }`.
 6. **FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${safeDest}/${context}` rather than raw extension strings `{dialplan=XML,context=${context}}2000` to avoid `CHAN_NOT_IMPLEMENTED` failures.
@@ -159,13 +164,13 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 **CI availability**: `.github/workflows/tests.yml` provides an on-demand Pest suite (in-memory SQLite plus a Redis service, on PHP 8.5) triggered via `workflow_dispatch`. Tests are run locally before every push as the primary verification gate (steps 1–4 above). Use the CI workflow for environment-parity checks or when verifying changes on a runner that mirrors the production PHP toolchain.
 
 **For new modules specifically**, also verify:
-- `module.json` exists and `php artisan module:sync --only-local` succeeds
-- Permissions are in the database: check with `php artisan tinker --execute 'echo Permission::where("name","your.permission")->exists() ? "YES" : "NO";'`
+- `module.json` exists and `tpbx module:sync --only-local` succeeds
+- Permissions are in the database: check with `tpbx tinker --execute 'echo Permission::where("name","your.permission")->exists() ? "YES" : "NO";'`
 - Translation keys exist in module dictionaries (`app-modules/<module>/lang/en/admin.php`) or root (`lang/en/admin.php`) with zero root collisions and 100% parity across `en`, `es`, and `fr` for built-in modules; custom modules may support any locale subset
 - Root dictionaries remain parity-complete across `en`, `es`, and `fr`
 - View namespace is registered (test by visiting the page in a browser test)
 - Route middleware includes `web` (sessions), `auth.panel` (auth), and `throttle` (rate limit)
-- Super Admin group has the new permissions: `php artisan db:seed --class=AdminSeeder`
+- Super Admin group has the new permissions: `tpbx db:seed --class=AdminSeeder`
 
 **Any deviation from this checklist is a bug.** Do not skip steps when claiming completion.
 
@@ -182,7 +187,7 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
   - `### Fixed` for any bug fixes
   - `### Security` for vulnerability fixes or hardening
 - Do not dump raw git commit logs; explain changes clearly in plain English from the perspective of an administrator or user.
-- If a change requires database migrations (`php artisan migrate`), new Linux packages (e.g. `nftables`), FreeSWITCH reloads, or `.env` updates, note it explicitly.
+- If a change requires database migrations (`tpbx migrate`), new Linux packages (e.g. `nftables`), FreeSWITCH reloads, or `.env` updates, note it explicitly.
 - When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
 
 ### Branching & Release Strategy (Laravel Model)
@@ -207,12 +212,12 @@ When reproducing or executing SIP load tests (`php artisan pbx:load-test:*`, `sc
 - Only tag after full verification passes, the changelog version is dated, and the release is ready for users.
 
 ## Application File Permissions
-- `ApplicationFilePermissions` is the authoritative PHP permission service. It exposes `generated`, `runtime`, and `full` scopes through `php artisan permissions:repair --scope=<scope>`. Full repair keeps deployed source owned by `root:www-data` (directories `755`, ordinary files `644`), Composer dependencies owned by `root:www-data` (directories `2775`, files `664`, preserving executable `vendor/bin` entry points), dependency lockfiles `root:www-data` with mode `664`, `.env` `root:www-data` with mode `640`, and `storage/` and `bootstrap/cache/` writable by `www-data` (directories `2775`, files `664`). The setgid directory mode ensures newly created runtime and vendor files keep the `www-data` group.
-- The installer runs `php artisan permissions:repair --scope=full` during the Laravel setup step, again after caches/build files are created, and once more as its final reconciliation step. Installer re-runs therefore repair the complete application tree automatically.
+- `ApplicationFilePermissions` is the authoritative PHP permission service. It exposes `generated`, `runtime`, and `full` scopes through `tpbx permissions:repair --scope=<scope>`. Full repair keeps deployed source owned by `root:www-data` (directories `755`, ordinary files `644`), Composer dependencies owned by `root:www-data` (directories `2775`, files `664`, preserving executable `vendor/bin` entry points), dependency lockfiles `root:www-data` with mode `664`, `.env` `root:www-data` with mode `640`, and `storage/` and `bootstrap/cache/` writable by `www-data` (directories `2775`, files `664`). The setgid directory mode ensures newly created runtime and vendor files keep the `www-data` group.
+- The installer runs `tpbx permissions:repair --scope=full` during the Laravel setup step, again after caches/build files are created, and once more as its final reconciliation step. Installer re-runs therefore repair the complete application tree automatically.
 - `composer update` runs the full Artisan repair through Composer's `post-update-cmd` hook after Laravel asset publication. `composer update --no-scripts` bypasses the hook and requires a manual full repair afterward. `composer install` does not use this hook.
-- Use `sudo php artisan permissions:repair --scope=full` after a manual deployment, a root-owned file operation, or a permission/ownership error involving source, runtime files, or `.env`. `scripts/repair-application-permissions.sh` remains a standalone emergency fallback when Laravel cannot boot. Do not use recursive `chown` or `chmod` commands against the whole application tree; they can make source writable by the web user or break executable scripts.
+- Use `sudo tpbx permissions:repair --scope=full` after a manual deployment, a root-owned file operation, or a permission/ownership error involving source, runtime files, or `.env`. `scripts/repair-application-permissions.sh` remains a standalone emergency fallback when Laravel cannot boot. Do not use recursive `chown` or `chmod` commands against the whole application tree; they can make source writable by the web user or break executable scripts.
 - A FreeSWITCH restart or reload does not change Laravel file ownership and does not need to run the repair script. Run it only after an operation that created or changed application files.
-- `bootstrap/cache` and `public/build` are generated by Artisan/Vite and must remain readable by PHP-FPM/Nginx (`www-data`). `php artisan optimize:clear` and other Artisan commands repair their generated paths automatically through `App\Support\GeneratedFilePermissions`.
+- `bootstrap/cache` and `public/build` are generated by Artisan/Vite and must remain readable by PHP-FPM/Nginx (`www-data`). `tpbx optimize:clear` and other Artisan commands repair their generated paths automatically through `App\Support\GeneratedFilePermissions`.
 - `npm run build` runs `vite build && bash scripts/fix-generated-permissions.sh`; keep this lightweight post-build repair in place. The full repair script calls it as its final generated-file pass.
 - If only manually run Vite, Composer scripts, or root-owned cache/build commands caused a generated-file problem, use:
 ```
@@ -222,7 +227,7 @@ bash scripts/fix-generated-permissions.sh
 
 ## Playwright Browser Testing
 - Browser tests run on Pest 4 with Playwright (`pestphp/pest-plugin-browser`). Each `visit()` opens a fresh browser context served by an in-process HTTP server backed by the same in-memory SQLite database as the rest of the suite — there is no dedicated browser-test database, no `.env` swapping, and no system browser package. Playwright uses its own Chromium download (`npx playwright install --with-deps chromium`).
-- Run browser tests with `bash scripts/test-browser.sh` (or `./vendor/bin/pest tests/Browser`). `php artisan app:test --full` runs the feature suite first, then the browser suite automatically with parallel workers capped at two (`--parallel --processes=2`) — each worker keeps a multi-process Chromium instance alive (~5–6 OS processes per worker), so capping at two prevents CPU starvation and memory thrashing on 4-vCPU servers while leaving capacity for host PBX and database processes. The browser suite takes under 5 minutes on a 4 GB server; reclaim memory by clearing orphaned `playwright run-server` processes before heavy runs.
+- Run browser tests with `bash scripts/test-browser.sh` (or `./vendor/bin/pest tests/Browser`). `tpbx app:test --full` runs the feature suite first, then the browser suite automatically with parallel workers capped at two (`--parallel --processes=2`) — each worker keeps a multi-process Chromium instance alive (~5–6 OS processes per worker), so capping at two prevents CPU starvation and memory thrashing on 4-vCPU servers while leaving capacity for host PBX and database processes. The browser suite takes under 5 minutes on a 4 GB server; reclaim memory by clearing orphaned `playwright run-server` processes before heavy runs.
 - The web panel is safe to use while browser tests run: the tests never swap `.env`, never touch the primary database, and privileged firewall execution stays blocked during test runs.
 - Authenticate browser tests through the `loginAs()` session bridge. The in-process server shares one session across visits, so switch identities sequentially (`loginAs(A)` → assert as A → `loginAs(B)` → assert as B); two users can never be active at the same time within one test.
 - Assertions retry until a timeout, but `script()` returns the evaluated value and breaks fluent chains when it returns `null` — run void snippets as standalone statements.
@@ -350,7 +355,7 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) to support modula
 In the Domain-Driven Modular Monolith architecture:
 - **Built-in Core Modules (`app-modules/`)**: Permanent first-party bounded contexts maintained directly in version control by AI agents and developers. They are autoloaded via direct root `composer.json` PSR-4 (`Modules\{Domain}\` => `app-modules/{domain}/src/`) and are never uninstalled or deleted from disk.
 - **Third-Party Custom Modules (`custom-modules/`)**: Community add-ons and external integrations reside in the untracked, git-ignored `custom-modules/{name}/` directory.
-- **Artisan Scaffolding (`php artisan make:module <name>`)**: Scaffolds **exclusively into `custom-modules/{name}/`** (no `--custom` flag needed). It does NOT scaffold into `app-modules/` and never mutates root `composer.json`. It configures `module.json` with `source: "custom"`, sets the `CustomModules\{Studly}` namespace, generates collision-safe translation files, and refuses module names that collide with existing core modules in `app-modules/`. Autoloading for custom modules is handled dynamically at runtime via `App\Support\CustomModuleAutoloader`.
+- **Scaffolding (`tpbx make:module <name>`)**: Scaffolds **exclusively into `custom-modules/{name}/`** (no `--custom` flag needed). It does NOT scaffold into `app-modules/` and never mutates root `composer.json`. It configures `module.json` with `source: "custom"`, sets the `CustomModules\{Studly}` namespace, generates collision-safe translation files, and refuses module names that collide with existing core modules in `app-modules/`. Autoloading for custom modules is handled dynamically at runtime via `App\Support\CustomModuleAutoloader`.
 
 ### CrudService Base Class for Services
 
@@ -619,8 +624,8 @@ For actions triggered directly from table rows (e.g. deleting an entry, promotin
 - Fresh non-demo installs create only the Default tenant and administrator access through `DatabaseSeeder`; demo mode is the sole creator of sample PBX data. Keep both paths idempotent so installer re-runs do not duplicate their seeded data.
 - Prefer tenant context strings (for example, `tenant_{id}_internal` and `tenant_{id}_public`) as the primary tenant discriminator for FreeSWITCH XML handling. Domain-based tenant resolution is a fallback only and must fail closed or require additional identity data when a domain is shared by multiple tenants.
 - Ensure all multi-step database writes (e.g., creating an Extension along with Voicemails and Dialplans) are wrapped inside `DB::transaction()` to prevent partial failure states.
-- For dynamic dialplan load testing, use `php artisan pbx:load-test:seed` and `php artisan pbx:load-test:dialplan` against the real Nginx/PHP-FPM endpoint (for example, `http://PBX_HOST/api/v1/xml-handler`). Do not use `php artisan serve` for performance conclusions because it is not representative under concurrency.
-- Keep XML handler auth enabled for real-server tests and pass `--token="$FS_XML_HANDLER_TOKEN"` to `pbx:load-test:dialplan`. If the token changes, run `php artisan optimize:clear` so PHP-FPM sees the new config.
+- For dynamic dialplan load testing, use `tpbx pbx:load-test:seed` and `tpbx pbx:load-test:dialplan` against the real Nginx/PHP-FPM endpoint (for example, `http://PBX_HOST/api/v1/xml-handler`). Do not use `tpbx serve` for performance conclusions because it is not representative under concurrency.
+- Keep XML handler auth enabled for real-server tests and pass `--token="$FS_XML_HANDLER_TOKEN"` to `pbx:load-test:dialplan`. If the token changes, run `tpbx optimize:clear` so PHP-FPM sees the new config.
 - XML handler successful request logging is intentionally opt-in through `FS_XML_HANDLER_LOG_REQUESTS`; avoid enabling it during load tests. Redis is the recommended default cache and session store for this project (`CACHE_STORE=redis`, `SESSION_DRIVER=redis`, `SESSION_CONNECTION=session`). The telephony XML cache is controlled by `FS_XML_HANDLER_CACHE_TTL` and `FS_XML_HANDLER_CACHE_STORE` (with granular subsystem overrides); avoid file/database stores for concurrency tests because they add their own latency. First-party context-wide contributor fragments are controlled by `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL`. Keep `mod_hiredis` installed/loaded by default, but keep generated per-call hiredis dialplan behavior opt-in through `FS_HIREDIS_LIMIT_ENABLED` and `FS_HIREDIS_MARKER_ENABLED`.
 - Use `--label`, `--max-failure-rate`, and `--max-average-ms` on `pbx:load-test:dialplan` when comparing repeat runs. The JSON report is the durable source for run ID, Git state, environment, target scenario mix, success/failure rates, average, min, and max latencies, thresholds, and pass/fail reasons.
 - For SIPp end-to-end validation, prefer running `scripts/pbx-sipp-validate.sh` from a separate Linux host or VM against the PBX host. The runner registers seeded users, starts auto-answer UAS scenarios, places extension-to-extension and outbound-route calls, and stores artifacts under `storage/app/load-tests/sipp-e2e-*`. Set `MEDIA_FLOW=1` only when live recording/MOH/announcement RTP checks are needed; it seeds synthetic media destinations and uses SIPp RTP echo with optional tcpdump pcaps. Use `docs/load-testing-guide.md` as the authoritative operating guide for topology, manual commands, and artifact interpretation, and `docs/load-testing-results.md` for empirical benchmark results and hardware sizing. If `sipp` is missing, install it on the load generator before running the script.
@@ -629,7 +634,7 @@ For actions triggered directly from table rows (e.g. deleting an entry, promotin
 - Installer mode selection must remain idempotent: with no demo or development flag, interactive runs ask for each choice and use the persisted value as the default; pressing Enter must preserve the current installation. Non-interactive runs reuse persisted or detected state. Never remove Composer development dependencies or Laravel Boost unless `--production` is explicit or production mode was explicitly recorded. Keep only approved installer flags; do not add aliases without user approval. Demo reconciliation must remain non-destructive.
 - Validate installer and installer-rerun idempotency on a fresh disposable Debian server. Do not use a host that has been repeatedly resized, tuned, or populated with synthetic load-test data for production installer conclusions.
 - When reviewing PHP-FPM limits, inspect `php-fpm8.5 -tt` and `/var/log/php8.5-fpm.log` for `pm.max_children` saturation. The standard install recommendation is `pm = static` and `pm.max_children = 12` for a 4 GB combined PBX/application server; leave `pm.max_requests` at its default of `0` unless sustained monitoring demonstrates worker memory growth. See `INSTALL.md` before changing sizing guidance. More workers may help moderate concurrency but can make CPU contention worse; confirm with before/after `pbx:load-test:dialplan` reports.
-- When changing XML handler, dialplan contributor, module-state, load-test code, or hot-path XML-handler indexes, run focused tests such as `php artisan test --compact tests/Feature/Http/XmlHandlerControllerTest.php tests/Feature/Services/ModuleStateTest.php tests/Feature/XmlHandlerContributorIndexTest.php tests/Feature/PbxLoadTestSeedCommandTest.php tests/Feature/PbxDialplanLoadTestCommandTest.php`, then run `php artisan app:test --smoke` for shared hot-path changes. Before real PHP-FPM load testing, run `php artisan optimize` after the required `php artisan optimize:clear`; do not clear optimized files while test traffic is active.
+- When changing XML handler, dialplan contributor, module-state, load-test code, or hot-path XML-handler indexes, run focused tests such as `tpbx test --compact tests/Feature/Http/XmlHandlerControllerTest.php tests/Feature/Services/ModuleStateTest.php tests/Feature/XmlHandlerContributorIndexTest.php tests/Feature/PbxLoadTestSeedCommandTest.php tests/Feature/PbxDialplanLoadTestCommandTest.php`, then run `tpbx app:test --smoke` for shared hot-path changes. Before real PHP-FPM load testing, run `tpbx optimize` after the required `tpbx optimize:clear`; do not clear optimized files while test traffic is active.
 - Key FreeSWITCH 1.11 runtime rules learned from operational drills: FreeSWITCH drops supplementary groups at startup, so its runtime group must be `tallpbx-media` with managed media directories using mode `2775`; `mod_voicemail` resolves deposit directory paths from directory user `<params>` (`vm-domain-storage-dir`), not `<variables>`; ESL event listening must decode framed message bodies beyond frame headers; and feature code extensions must specify `continue="true"` so subsequent call-processing extensions can execute.
 
 ## Testing
@@ -639,22 +644,22 @@ For actions triggered directly from table rows (e.g. deleting an entry, promotin
 
 ```bash
 # Smoke — critical-path only (~200 tests, ~20s)
-php artisan app:test --smoke
+tpbx app:test --smoke
 
 # Default — all feature tests with --parallel (~2,400 tests, a few minutes)
-php artisan app:test
+tpbx app:test
 
 # Full — features + Pest 4 browser tests via Playwright (~10 min on a 4 GB server)
-php artisan app:test --full
+tpbx app:test --full
 
 # Sequential — for debugging without --parallel
-php artisan app:test --sequential
+tpbx app:test --sequential
 
 # Optional cache refresh before a run
-php artisan app:test --smoke --clear-cache
+tpbx app:test --smoke --clear-cache
 ```
 
-**Do NOT run `php artisan test --parallel` directly.** Use `app:test` instead — it applies `--compact` and `--parallel` automatically. Both test commands force in-memory SQLite and refuse any other test database; `app:test` also removes inherited `.env` values before starting Pest. Run smoke after small changes, default before committing, and full only before pushing.
+**Do NOT run `tpbx test --parallel` directly.** Use `app:test` instead — it applies `--compact` and `--parallel` automatically. Both test commands force in-memory SQLite and refuse any other test database; `app:test` also removes inherited `.env` values before starting Pest. Run smoke after small changes, default before committing, and full only before pushing.
 
 **Never re-run the same tests without code changes.** Tests take 60-180 seconds and re-running without changes wastes time.
 
@@ -752,15 +757,15 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Artisan
 
-- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
-- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
-- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
+- Run Artisan commands directly via the command line (e.g., `tpbx route:list`). Use `tpbx list` to discover available commands and `tpbx [command] --help` to check parameters.
+- Inspect routes with `tpbx route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
+- Read configuration values using dot notation: `tpbx config:show app.name`, `tpbx config:show database.default`. Or read config files directly from the `config/` directory.
 
 ## Tinker
 
 - Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
-- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+- Always use single quotes to prevent shell expansion: `tpbx tinker --execute 'Your::code();'`
+  - Double quotes for PHP strings inside: `tpbx tinker --execute 'User::where("active", true)->count();'`
 
 === php rules ===
 

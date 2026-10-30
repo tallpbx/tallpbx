@@ -41,7 +41,7 @@ Operational manual for benchmarking, stress testing, and validating telephony pe
 Follow these operational guidelines to ensure reproducible benchmarks and avoid common testing pitfalls:
 
 1. **Obfuscate Public IP Addresses**: In all test reports, public documentation, and committed logs, obfuscate public IP addresses to show only the last octet (e.g. `x.x.x.200` or `...YYY`).
-2. **Avoid Special Characters in Remote Passwords**: When seeding a remote PBX over SSH (`php artisan pbx:load-test:seed`), avoid unescaped shell metacharacters (such as `!`) in the password argument (e.g., use alphanumeric `LoadTest1234`). Unescaped exclamation points are stripped by Bash history expansion, causing credential mismatches that result in `403 Forbidden` on SIP REGISTER.
+2. **Avoid Special Characters in Remote Passwords**: When seeding a remote PBX over SSH (`tpbx pbx:load-test:seed` or `tallpbx`, which wrap native `artisan pbx:load-test:seed`), avoid unescaped shell metacharacters (such as `!`) in the password argument (e.g., use alphanumeric `LoadTest1234`). In this guide, `tpbx` is used. Unescaped exclamation points are stripped by Bash history expansion, causing credential mismatches that result in `403 Forbidden` on SIP REGISTER.
 3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `storage/app/load-tests/sipp-users.csv` on the PBX filesystem. Before running `scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the load generator, copy the CSV to the generator host:
    ```bash
    scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv
@@ -76,7 +76,7 @@ SIPp Caller ---> FreeSWITCH (Sofia) ---> Laravel XML ---> FreeSWITCH Bridge --->
 | :--- | :--- | :--- |
 | **Primary Metric** | Completed XML responses per second (`req/sec`) | Successfully answered calls per second (`calls/sec`) |
 | **Target Subsystems** | Nginx, PHP-FPM, Laravel, MariaDB, Redis | FreeSWITCH, Sofia SIP, ESL, RTP media, plus Laravel XML |
-| **Tool** | `php artisan pbx:load-test:dialplan` | `scripts/pbx-sipp-validate.sh` (SIPp) |
+| **Tool** | `tpbx pbx:load-test:dialplan` | `scripts/pbx-sipp-validate.sh` (SIPp) |
 | **Key Question Answered** | How fast can Laravel generate call-routing instructions under concurrency? | How many real phone calls can the PBX connect, maintain, and tear down per second? |
 | **What It Does Not Measure** | SIP signaling, codec negotiation, RTP audio quality, or FreeSWITCH channel limits | Pure database/routing speed in isolation |
 
@@ -106,12 +106,12 @@ For routine benchmarking, run tests in this logical sequence:
 
 ```bash
 # 1. Seed 100 test extensions on the PBX
-php artisan pbx:load-test:seed \
+tpbx pbx:load-test:seed \
   --tenant=load-test-beta --domain=load.test.local \
   --extensions=100 --start=2000 --password='LoadTest1234' --reset
 
 # 2. Run XML routing throughput test (100 requests, 5 concurrency)
-php artisan pbx:load-test:dialplan \
+tpbx pbx:load-test:dialplan \
   --tenant=load-test-beta --url=http://127.0.0.1/api/v1/xml-handler \
   --scenario=mixed --requests=100 --concurrency=5 \
   --token="$FS_XML_HANDLER_TOKEN"
@@ -205,7 +205,7 @@ The `pbx:load-test:seed` Artisan command idempotently generates test accounts, d
 ### 1. Seeding for Test 1 (XML Throughput)
 
 ```bash
-php artisan pbx:load-test:seed \
+tpbx pbx:load-test:seed \
   --tenant=load-test-beta \
   --domain=load.test.local \
   --extensions=100 \
@@ -217,7 +217,7 @@ php artisan pbx:load-test:seed \
 ### 2. Seeding for Test 2 (SIPp Live Calls & Media)
 
 ```bash
-php artisan pbx:load-test:seed \
+tpbx pbx:load-test:seed \
   --tenant=load-test-beta \
   --domain=<PBX_IP> \
   --extensions=20 \
@@ -240,10 +240,10 @@ php artisan pbx:load-test:seed \
 
 ### Running the Test
 
-Run against the real Nginx/PHP-FPM web endpoint using `php artisan pbx:load-test:dialplan`:
+Run against the real Nginx/PHP-FPM web endpoint using `tpbx pbx:load-test:dialplan`:
 
 ```bash
-php artisan pbx:load-test:dialplan \
+tpbx pbx:load-test:dialplan \
   --tenant=load-test-beta \
   --url=http://<PBX_HOST>/api/v1/xml-handler \
   --scenario=mixed \
@@ -369,8 +369,7 @@ If a test fails or registrations are rejected with `403 Forbidden`, execute this
 ### 1. Verify Seed Account on PBX
 
 ```bash
-cd /var/www/tallpbx
-php artisan tinker --execute '
+tpbx tinker --execute '
 $a = Modules\SipAccounts\Models\SipAccount::withoutGlobalScopes()->where("auth_username", "2000")->first();
 echo json_encode(["exists" => $a !== null, "password_ok" => $a?->auth_password === "LoadTest1234"], JSON_PRETTY_PRINT).PHP_EOL;
 '

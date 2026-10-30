@@ -62,12 +62,12 @@ This document provides a comprehensive, authoritative reference for all environm
 TallPBX resolves application configuration in a three-tier pipeline:
 1. **Host Environment / `.env` File**: Host-level environment variables (and entries in `/var/www/tallpbx/.env`) provide physical deployment inputs.
 2. **Laravel Configuration Hierarchy (`config/*.php`)**: The framework reads `.env` variables using `env('VAR', default)` inside `config/` files. Never call `env()` directly in domain controllers, models, or service classes; domain code must consume settings via `config('subsystem.key')`.
-3. **Optimized Configuration Cache (`bootstrap/cache/config.php`)**: When configuration caching is active (`php artisan config:cache`), Laravel compiles the entire configuration tree into a single optimized PHP file. In this state, runtime `getenv()` calls are skipped by Laravel for performance.
+3. **Optimized Configuration Cache (`bootstrap/cache/config.php`)**: When configuration caching is active (`tpbx config:cache` or `tallpbx config:cache`, which wrap native `artisan config:cache`), Laravel compiles the entire configuration tree into a single optimized PHP file. In this state, runtime `getenv()` calls are skipped by Laravel for performance.
 
 > [!IMPORTANT]
 > **Cache Invalidation Requirement**: Whenever modifying `/var/www/tallpbx/.env` or any `config/*.php` file on a running system, you **MUST** run:
 > ```bash
-> php artisan optimize:clear
+> tpbx optimize:clear
 > ```
 > Failing to clear caches will result in stale runtime parameters, failed connections, and mismatched firewall or FreeSWITCH state.
 
@@ -341,7 +341,7 @@ TallPBX utilizes Laravel Reverb and Laravel Echo for real-time push updates acro
 | `REVERB_PORT` | `integer` | `8080` | `broadcasting.connections.reverb.options.port` | Port where Reverb listens for incoming broadcast events from the backend. |
 | `REVERB_SCHEME` | `string` | `http` | `broadcasting.connections.reverb.options.scheme` | Protocol scheme (`http` or `https`) for backend-to-Reverb broadcast transmission. |
 | `REVERB_SERVER` | `string` | `reverb` | `reverb.default` | Reverb server execution driver. |
-| `REVERB_SERVER_HOST` | `string` | `0.0.0.0` | `reverb.servers.reverb.host` | Network interface IP bound by the `php artisan reverb:start` daemon (`0.0.0.0` binds all interfaces). |
+| `REVERB_SERVER_HOST` | `string` | `0.0.0.0` | `reverb.servers.reverb.host` | Network interface IP bound by the `tpbx reverb:start` daemon (`0.0.0.0` binds all interfaces). |
 | `REVERB_SERVER_PORT` | `integer` | `8080` | `reverb.servers.reverb.port` | Local TCP port bound by the Reverb daemon. |
 | `REVERB_SERVER_PATH` | `string` | `""` | `reverb.servers.reverb.options.path` | Optional URL subpath prefix for WebSocket connections. |
 | `REVERB_APP_PING_INTERVAL` | `integer` | `60` | `reverb.apps.apps.0.ping_interval` | Ping heartbeat interval in seconds to keep WebSocket connections alive across stateful firewalls. |
@@ -579,7 +579,7 @@ Manages git-based self-updating, preflight checks, database migrations, asset re
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `GIT_UPDATE_STEP_TIMEOUT_SECONDS` | `integer` | `300` | `git-update.step_timeout_seconds` | Execution timeout in seconds (default 5 minutes) allocated to individual updater pipeline operations (`git pull`, `composer install`, `php artisan migrate`). |
+| `GIT_UPDATE_STEP_TIMEOUT_SECONDS` | `integer` | `300` | `git-update.step_timeout_seconds` | Execution timeout in seconds (default 5 minutes) allocated to individual updater pipeline operations (`git pull`, `composer install`, `tpbx migrate`). |
 
 ---
 
@@ -594,7 +594,7 @@ Variables utilized by installation scripts, frontend build tooling, and test run
 | `FSPBX_ADMIN_USERNAME` | `string` | `admin` | `ConfigureInitialAdminCommand` | Initial super-administrator username seeded during headless installer execution. |
 | `FSPBX_ADMIN_PASSWORD` | `string` | `null` | `ConfigureInitialAdminCommand` | **CRITICAL SECRET**: Initial super-administrator password seeded during headless installer execution. |
 | `FSPBX_DEVELOPMENT_MODE` | `boolean` | `false` | Installer scripts (`install.sh`) | When `true`, configures the server for local development with verbose debugging, developer tools, and hot reloading. |
-| `PHP_CLI_SERVER_WORKERS` | `integer` | `4` | `php artisan serve` | Worker process concurrency count when running PHP's built-in development CLI server. |
+| `PHP_CLI_SERVER_WORKERS` | `integer` | `4` | `tpbx serve` | Worker process concurrency count when running PHP's built-in development CLI server. |
 
 ---
 

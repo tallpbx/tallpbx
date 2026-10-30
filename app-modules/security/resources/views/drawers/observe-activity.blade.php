@@ -104,7 +104,7 @@
             <div class="pt-2 border-t border-base-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
                 <div class="flex items-center gap-2 text-base-content/70">
                     <span>{{ __('admin.security_observe_drawer_cli_tip') }}</span>
-                    <code class="px-2 py-0.5 rounded bg-base-200 text-xs font-mono select-all">php artisan security:observe --follow</code>
+                    <code class="px-2 py-0.5 rounded bg-base-200 text-xs font-mono select-all">tpbx security:observe --follow</code>
                 </div>
                 <button wire:click="closeObserveDrawer" type="button" class="btn btn-outline btn-sm">
                     {{ __('client.close') }}

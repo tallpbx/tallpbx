@@ -103,8 +103,11 @@ TallPBX is built as a **Domain-Driven Modular Monolith** — an architectural te
 
 Scaffold a new custom module in `custom-modules/`:
 
+> [!TIP]
+> TallPBX includes a global appliance CLI. Commands can be run from any directory on the server using `tpbx <command>` or `tallpbx <command>`, which wrap Laravel's native `artisan` command (`artisan <command>` also works for developers familiar with Laravel). In this documentation, `tpbx` is used.
+
 ```bash
-php artisan make:module my-crm-connector \
+tpbx make:module my-crm-connector \
     --display-name="My CRM Connector" \
     --description="Third-party CRM integration for customer lookups" \
     --category="Integrations"
@@ -113,9 +116,9 @@ php artisan make:module my-crm-connector \
 Manage modules from the command line:
 
 ```bash
-php artisan module:list            # List installed modules and their status
-php artisan module:sync            # Sync module manifests into the database registry
-php artisan module:cache           # Build the module manifest cache for fast loading
+tpbx module:list            # List installed modules and their status
+tpbx module:sync            # Sync module manifests into the database registry
+tpbx module:cache           # Build the module manifest cache for fast loading
 ```
 
 ## Telephony Integration (mod_xml_curl)
@@ -123,7 +126,7 @@ php artisan module:cache           # Build the module manifest cache for fast lo
 Instead of generating static XML files on disk, TallPBX serves dynamic configurations to FreeSWITCH on demand over HTTP using `mod_xml_curl`:
 
 - **Dynamic Configuration Delivery**: Extension directories, dialplans, and configurations are generated via the XML Handler API (`/api/v1/xml-handler`).
-- **Real-Time Telephony Events**: Call states, connections, and security alerts stream in real time via FreeSWITCH's Event Socket Layer (`php artisan freeswitch:listen`).
+- **Real-Time Telephony Events**: Call states, connections, and security alerts stream in real time via FreeSWITCH's Event Socket Layer (`tpbx freeswitch:listen`).
 - **Redis XML Caching**: Routing lookups are cached in Redis (`FS_XML_HANDLER_CACHE_TTL=5`), protecting the database and ensuring sub-millisecond call setup under heavy load. Web panel changes invalidate active caches immediately.
 - **Audio & Media Storage**: Call recordings, voicemails, and greetings are stored on disk under `/var/lib/tallpbx/media/` while metadata remains in the database.
 
@@ -154,11 +157,11 @@ TallPBX includes a first-party Security module (`app-modules/security`) providin
 Manage security from the web panel's **Security Center** or directly from the terminal:
 
 ```bash
-php artisan security:status              # Check firewall status, active sets, and banned IPs
-php artisan security:apply               # Atomically recompile and apply pending firewall rules
-php artisan security:unban <IP_ADDRESS>  # Immediately unban an IP address
-php artisan security:sync-geoip          # Synchronize IPdeny country zones for Geo-Blocking
-php artisan security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
+tpbx security:status              # Check firewall status, active sets, and banned IPs
+tpbx security:apply               # Atomically recompile and apply pending firewall rules
+tpbx security:unban <IP_ADDRESS>  # Immediately unban an IP address
+tpbx security:sync-geoip          # Synchronize IPdeny country zones for Geo-Blocking
+tpbx security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
 ```
 
 For packet flow diagrams and architecture details, see [docs/architecture.md](docs/architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering).
@@ -167,7 +170,7 @@ For packet flow diagrams and architecture details, see [docs/architecture.md](do
 
 ```bash
 # Serve the Laravel app (development)
-php artisan serve
+tpbx serve
 
 # Compile frontend assets (in a new terminal)
 npm run dev
@@ -176,7 +179,7 @@ npm run dev
 In production, Nginx serves the application automatically. After making code changes, clear application caches:
 
 ```bash
-php artisan optimize:clear
+tpbx optimize:clear
 ```
 
 ## Running Tests
@@ -185,25 +188,25 @@ Tests use Pest with a tiered runner for speed:
 
 ```bash
 # Smoke — critical-path verification (~20s)
-php artisan app:test --smoke
+tpbx app:test --smoke
 
 # Default — all feature tests, parallel by default (~65s)
-php artisan app:test
+tpbx app:test
 
 # Full — features + Pest 4 browser tests via Playwright
-php artisan app:test --full
+tpbx app:test --full
 
 # Filter a specific test file or class
-php artisan test --filter=AdminAuthTest
+tpbx test --filter=AdminAuthTest
 ```
 
-All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (13–15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `php artisan config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
+All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (13–15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `tpbx config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
 
 ## Performance & Load Testing
 
 TallPBX is built to handle busy phone systems smoothly. When phones register or place calls, FreeSWITCH asks TallPBX for user account and routing rules. TallPBX keeps frequently used rules in high-speed memory (Redis), allowing calls to connect almost instantly (sub-millisecond lookups) without straining the database even during heavy call bursts.
 
-- **Built-in Benchmarking**: Test tooling (`php artisan pbx:load-test:dialplan`) measures call routing speed and capacity.
+- **Built-in Benchmarking**: Test tooling (`tpbx pbx:load-test:dialplan`) measures call routing speed and capacity.
 - **End-to-End SIP Validation**: The test harness (`scripts/pbx-sipp-validate.sh`) verifies phone registrations, outbound calls, audio echo, call forwarding, ring groups, and voicemail.
 - **Hardware Capacity**: Tested to sustain 25+ calls/sec and 250+ concurrent channels on standard 4 GB instances.
 

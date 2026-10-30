@@ -18,8 +18,10 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
-Handy checks: `redis-cli ping` (expects `PONG`) and `php artisan security:status`
-(firewall state and active bans).
+Handy checks: `redis-cli ping` (expects `PONG`) and `tpbx security:status` (firewall state and active bans).
+
+> [!NOTE]
+> TallPBX includes a global appliance CLI. Commands can be run from any directory on the server using `tpbx <command>` or `tallpbx <command>`, which wrap Laravel's native `artisan` command (`artisan <command>` also works for developers familiar with Laravel). In this documentation, `tpbx` is used. For non-interactive automation such as systemd service units, cron jobs, and shell scripts, invoke PHP directly (`/usr/bin/php /var/www/tallpbx/artisan <command>`, or `WorkingDirectory=/var/www/tallpbx` with `ExecStart=/usr/bin/php artisan <command>`).
 
 ### Configuration Paths & Permissions
 
@@ -35,22 +37,19 @@ TallPBX enforces a strict privilege boundary across its configuration paths usin
 
 ## Health Checks and Testing
 
-Commands run via `php artisan` use Laravel's built-in command-line tool, **Artisan**, which includes custom commands for telephony, sound prompt management, and security. Always execute Artisan commands from the project directory (`cd /var/www/tallpbx`).
-
 After installation — and at any time — run the smoke check to confirm the
 application is healthy:
 
 ```bash
-cd /var/www/tallpbx
-php artisan app:test --smoke
+tpbx app:test --smoke
 ```
 
 Developers can run the broader suites:
 
 ```bash
-php artisan app:test              # all application tests
-php artisan app:test --full       # also Pest Browser tests
-php artisan app:test --sequential # one process at a time when investigating failures
+tpbx app:test              # all application tests
+tpbx app:test --full       # also Pest Browser tests
+tpbx app:test --sequential # one process at a time when investigating failures
 ```
 
 Tests run in a temporary in-memory database, never the live TallPBX database,
@@ -127,24 +126,24 @@ When Observe Mode is enabled, the ruleset compiler performs a dynamic transforma
   * **Recent Observed Events**: A table displaying recent kernel packet log entries with timestamps, matching stage, interface, source IP, and destination port.
 * **Live In-Place Counters**: The TFTP Defense profile (Firewall Rules tab) and Public Threat Feeds card (External Blocklists tab) continue counting observed matches in real time.
 
-##### In the CLI (`php artisan security:observe`)
+##### In the CLI (`tpbx security:observe`)
 * **Inspect Summary & Recent Events**:
   ```bash
-  php artisan security:observe
+  tpbx security:observe
   ```
 * **Live-Stream Observed Drops in Real Time**:
   ```bash
-  php artisan security:observe --follow
+  tpbx security:observe --follow
   ```
 * **Include in Engine Status**:
   ```bash
-  php artisan security:status
+  tpbx security:status
   ```
 * **Synchronize Country IP Zones & Threat Feeds**:
   ```bash
-  php artisan security:sync-geoip          # Sync IPdeny country zone caches (scheduled weekly)
-  php artisan security:sync-geoip --force  # Force re-download even when cache files exist
-  php artisan security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
+  tpbx security:sync-geoip          # Sync IPdeny country zone caches (scheduled weekly)
+  tpbx security:sync-geoip --force  # Force re-download even when cache files exist
+  tpbx security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
   ```
 
 ##### In Linux System Logs
@@ -178,7 +177,7 @@ When testing Observe Mode, remember that packets sent from the PBX console to it
 ### Recovering from a Firewall Lockout
 
 If a firewall change leaves the server unreachable — the phone system still runs but the
-web panel, database, or cache stop responding, and `php artisan` commands hang or time out
+web panel, database, or cache stop responding, and `tpbx` commands hang or time out
 as well — recover from an SSH session. The commands below are plain Linux firewall
 (`nftables`) operations: they need no PHP, no database, and no web panel, which is exactly
 why they still work in this situation. Run them in order and stop as soon as the panel
@@ -211,7 +210,7 @@ loaded in the kernel (for example after a reboot) — check what is present with
 `nft list tables` before continuing.
 
 After recovering, open the Security Center and press **Apply** (or run
-`php artisan security:apply`) so the saved settings and the kernel agree again. The panel
+`tpbx security:apply`) so the saved settings and the kernel agree again. The panel
 refuses configurations that would cut the server's own loopback services; if an apply is
 refused with that warning, fix the named setting first (keep the ingress pre-filters on, or
 set the default policy to ALLOW). Runtime `nft` edits are temporary — the next application
@@ -245,8 +244,7 @@ File ownership has drifted, usually after a manual deployment or running
 commands as root. Repair permissions with:
 
 ```bash
-cd /var/www/tallpbx
-sudo php artisan permissions:repair --scope=full
+sudo tpbx permissions:repair --scope=full
 ```
 
 If Laravel itself will not boot, use the emergency fallback:
@@ -270,7 +268,7 @@ Common causes:
 - **Missing configuration**: the XML-curl gateway URL may be empty. Re-run
   `bash scripts/resources/freeswitch.sh --configure-only && systemctl restart freeswitch`.
 - **Permission error on media directories**: run
-  `sudo php artisan permissions:repair --scope=full`.
+  `sudo tpbx permissions:repair --scope=full`.
 
 ### Phones Cannot Register
 
@@ -298,13 +296,12 @@ systemctl restart redis-server
 redis-cli ping    # should respond PONG
 ```
 
-Active sessions reside in isolated Redis DB 2 (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`), while application and XML dialplan caches reside in DB 1 (`REDIS_CACHE_DB=1`). Running `php artisan optimize:clear` or `php artisan cache:clear` clears only DB 1, leaving active administrator and tenant logins intact. Furthermore, standard Debian Redis configurations maintain RDB snapshot persistence (`/var/lib/redis/dump.rdb`), preserving active session keys across graceful Redis service restarts.
+Active sessions reside in isolated Redis DB 2 (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`), while application and XML dialplan caches reside in DB 1 (`REDIS_CACHE_DB=1`). Running `tpbx optimize:clear` or `tpbx cache:clear` clears only DB 1, leaving active administrator and tenant logins intact. Furthermore, standard Debian Redis configurations maintain RDB snapshot persistence (`/var/lib/redis/dump.rdb`), preserving active session keys across graceful Redis service restarts.
 
 After restoring Redis, clear stale cache:
 
 ```bash
-cd /var/www/tallpbx
-php artisan optimize:clear && php artisan optimize
+tpbx optimize:clear && tpbx optimize
 ```
 
 ### Redis Memory Limit & Eviction Policy
@@ -347,9 +344,8 @@ systemctl status tallpbx-queue
 If jobs fail or queue up, inspect failed jobs with Artisan:
 
 ```bash
-cd /var/www/tallpbx
-php artisan queue:failed            # view failed jobs and error traces
-php artisan queue:retry all         # retry failed jobs after fixing underlying issues
+tpbx queue:failed            # view failed jobs and error traces
+tpbx queue:retry all         # retry failed jobs after fixing underlying issues
 ```
 
 ---
@@ -358,24 +354,22 @@ php artisan queue:retry all         # retry failed jobs after fixing underlying 
 
 FreeSWITCH uses two components for voice prompts and system announcements: recorded audio files (`/usr/share/freeswitch/sounds/`) and grammar "say" modules (`mod_say_en`, `mod_say_es`, `mod_say_fr`) that pronounce dates, numbers, currency, and voicemail message counts.
 
-### Managing Languages with Artisan (Recommended)
+### Managing Languages with tpbx (Recommended)
 
-TallPBX provides built-in Artisan commands to manage sound packages and modules automatically across both package and source FreeSWITCH installations:
+TallPBX provides built-in CLI commands to manage sound packages and modules automatically across both package and source FreeSWITCH installations:
 
 ```bash
-cd /var/www/tallpbx
-
 # List installed and available languages
-php artisan pbx:sounds:list
+tpbx pbx:sounds:list
 
 # Install Spanish (Mario voice)
-php artisan pbx:sounds:install es
+tpbx pbx:sounds:install es
 
 # Install French (June voice) and set as system default
-php artisan pbx:sounds:install fr --default
+tpbx pbx:sounds:install fr --default
 
 # Switch system-wide default sound prompt language
-php artisan pbx:sounds:default es
+tpbx pbx:sounds:default es
 ```
 
 Switching the default language dynamically updates `/etc/freeswitch/vars.xml` and reloads FreeSWITCH XML in real time without dropping active calls.
@@ -404,8 +398,7 @@ In TallPBX, core FreeSWITCH switch parameters (`switch.conf.xml`) are served dyn
 
 2. Clear application caches and reload the FreeSWITCH XML configuration:
    ```bash
-   cd /var/www/tallpbx
-   php artisan optimize:clear && php artisan optimize
+   tpbx optimize:clear && tpbx optimize
    fs_cli -x "reloadxml"
    ```
 
@@ -459,8 +452,7 @@ If you generate a new token or change `FS_XML_HANDLER_TOKEN` in `.env`:
 Update the token in `/var/www/tallpbx/.env`, then run the resource configuration script to automatically update `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`:
 
 ```bash
-cd /var/www/tallpbx
-php artisan optimize:clear
+tpbx optimize:clear
 bash scripts/resources/freeswitch.sh --configure-only
 systemctl restart freeswitch
 ```
@@ -472,7 +464,7 @@ If editing configuration files by hand:
 2. Edit `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and paste the token into the `gateway-url` parameter query string (`?token=YOUR_TOKEN`).
 3. Clear Laravel application caches and reload FreeSWITCH:
    ```bash
-   php artisan optimize:clear
+   tpbx optimize:clear
    fs_cli -x "reloadxml"
    ```
 
@@ -492,25 +484,25 @@ TallPBX provides a unified, UI-driven Certificate Manager under the main navigat
 2. **Custom PEM Import**: Import commercial certificates with real-time browser cryptographic modulus validation between certificate and private key.
 3. **Self-Signed Certificates**: Generate modern RSA/ECDSA certificates with SAN extensions for lab, testing, or internal network deployments.
 
-### Artisan CLI Commands
+### Appliance CLI Commands
 
 * **View certificate inventory, expiration countdown, and active bindings**:
   ```bash
-  php artisan certificates:status
+  tpbx certificates:status
   ```
 
 * **Manually trigger automated renewal sweep**:
   ```bash
-  php artisan certificates:renew
-  php artisan certificates:renew --dry-run   # Simulate renewal without issuing
-  php artisan certificates:renew --force     # Force renewal regardless of expiration
+  tpbx certificates:renew
+  tpbx certificates:renew --dry-run   # Simulate renewal without issuing
+  tpbx certificates:renew --force     # Force renewal regardless of expiration
   ```
 
 * **Deploy an existing certificate to services**:
   ```bash
-  php artisan certificates:deploy 1 --service=web        # Nginx Web only
-  php artisan certificates:deploy 1 --service=telephony  # FreeSWITCH SIP/WSS only
-  php artisan certificates:deploy 1 --service=all        # Both Web and Telephony
+  tpbx certificates:deploy 1 --service=web        # Nginx Web only
+  tpbx certificates:deploy 1 --service=telephony  # FreeSWITCH SIP/WSS only
+  tpbx certificates:deploy 1 --service=all        # Both Web and Telephony
   ```
 
 ### Headless CLI Helper Scripts (Terminal Fallback)

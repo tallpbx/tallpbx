@@ -161,7 +161,7 @@ return [
     'enable_module' => 'Activer',
     'disable_module' => 'Désactiver',
     'uninstalled' => 'Désinstallé',
-    'module_restore_hint' => 'Restaurer via SSH : php artisan module:restore :name',
+    'module_restore_hint' => 'Restaurer via SSH : tpbx module:restore :name',
     'module_required' => 'Requis',
     'no_modules_found' => 'Aucun module trouvé.',
     'expand_all' => 'Tout développer',

@@ -216,7 +216,7 @@ return [
     'enable_module' => 'Enable',
     'disable_module' => 'Disable',
     'uninstalled' => 'Uninstalled',
-    'module_restore_hint' => 'Restore over SSH: php artisan module:restore :name',
+    'module_restore_hint' => 'Restore over SSH: tpbx module:restore :name',
     'module_required' => 'Required',
     'no_modules_found' => 'No modules found.',
     'expand_all' => 'Expand All',

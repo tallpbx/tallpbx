@@ -108,7 +108,7 @@
                 </div>
                 <div class="text-xs text-base-content/60 mt-1 space-y-1">
                     <p>{{ __('admin.security_firewall_rules_cli_hint') }}</p>
-                    <code class="px-1.5 py-0.5 rounded bg-base-200 font-mono select-all text-base-content inline-block">php artisan security:status</code>
+                    <code class="px-1.5 py-0.5 rounded bg-base-200 font-mono select-all text-base-content inline-block">tpbx security:status</code>
                 </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">

@@ -1,0 +1,35 @@
+#!/bin/bash
+# ==============================================================================
+# TallPBX Appliance CLI Wrapper
+# ==============================================================================
+# Runs TallPBX Artisan commands from any directory on the appliance.
+#
+# Installed system-wide as:
+#   tallpbx <command>
+#   tpbx <command>
+#   artisan <command>
+#
+# Non-interactive scripts, services, worktrees, and CI continue using native:
+#   php artisan <command>  (or /usr/bin/php /var/www/tallpbx/artisan <command>)
+#
+# Safe to run from any working directory: APP_DIR is pinned to /var/www/tallpbx
+# so running as root from an untrusted directory never executes a local file.
+# ==============================================================================
+set -euo pipefail
+
+APP_DIR="/var/www/tallpbx"
+
+if [ ! -f "$APP_DIR/artisan" ]; then
+    echo "Error: TallPBX installation not found at $APP_DIR" >&2
+    exit 1
+fi
+
+# Resolve PHP from PATH first, falling back to /usr/bin/php for minimal environments.
+PHP_BIN="$(command -v php 2>/dev/null || echo /usr/bin/php)"
+
+if [ ! -x "$PHP_BIN" ]; then
+    echo "Error: PHP binary not executable at $PHP_BIN" >&2
+    exit 1
+fi
+
+exec "$PHP_BIN" "$APP_DIR/artisan" "$@"

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Appliance CLI Wrapper (`tallpbx`, `tpbx`, `artisan`)**: Introduced `/usr/local/bin/tallpbx` executable with `tpbx` and `artisan` symlinks and shell autocompletion (`/etc/bash_completion.d/tallpbx`), enabling administrators and scripts to run PBX maintenance commands globally from any directory without needing `cd /var/www/tallpbx` or typing `php`. Updated all UI snippets, tooltips, translations, and documentation to reflect `tpbx` while preserving full backwards compatibility for standard `php artisan`.
+- **Session Flush Console Command**: Added `session:flush` (with `session:clear` alias) providing a driver-aware, guarded command to invalidate active HTTP sessions across Redis DB 2, filesystem (`storage/framework/sessions`), or database tables, with confirmation prompt and `--force` support.
 - **Themed 403 Forbidden Error View with Impersonation Recovery**: Added custom `resources/views/errors/403.blade.php` styled with DaisyUI semantic tokens and an emergency "Stop Impersonating" escape banner when impersonation is active, allowing seamless recovery if an administrator navigates to an unauthorized page while impersonating a restricted tenant user.
 
 ### Fixed

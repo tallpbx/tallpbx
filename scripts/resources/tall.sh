@@ -311,6 +311,24 @@ fi
 # Final source and generated-file permission pass after cache/build files are recreated.
 php artisan permissions:repair --scope=full
 
+# Install the global appliance CLI wrapper (tallpbx) and convenience symlinks
+# (tpbx, artisan) so administrators can run PBX commands from any directory.
+# Safe to re-run: overwrites the wrapper and completion script atomically in place.
+if [ -f /var/www/tallpbx/scripts/resources/tallpbx-cli ]; then
+    install -m 0755 -o root -g root /var/www/tallpbx/scripts/resources/tallpbx-cli /usr/local/bin/tallpbx
+    ln -sf /usr/local/bin/tallpbx /usr/local/bin/tpbx
+    ln -sf /usr/local/bin/tallpbx /usr/local/bin/artisan
+    if [ -d /etc/bash_completion.d ]; then
+        if php /var/www/tallpbx/artisan completion bash > /etc/bash_completion.d/tallpbx 2>/dev/null && [ -s /etc/bash_completion.d/tallpbx ]; then
+            echo 'complete -F _sf_artisan tallpbx' >> /etc/bash_completion.d/tallpbx
+            echo 'complete -F _sf_artisan tpbx' >> /etc/bash_completion.d/tallpbx
+            chmod 0644 /etc/bash_completion.d/tallpbx
+        else
+            rm -f /etc/bash_completion.d/tallpbx
+        fi
+    fi
+fi
+
 # Install the narrow root-owned entry point for approved restore operations.
 # The web application may only request an operation; systemd invokes this
 # helper with the operation UUID after the queue runner has staged it.

@@ -29,14 +29,16 @@ Laravel Pint runs as the authoritative code linter and formatter (`./vendor/bin/
 
 ## Test Execution Scoping & Verification Discipline
 
-Running the complete Pest suite (`php artisan test --compact --parallel`, ~3,000 tests) and the full Playwright browser suite (`./vendor/bin/pest tests/Browser`, 54 tests) takes 8+ minutes and must **never** be executed repeatedly during routine development:
+> **CLI Invocation Rule**: Use `tpbx <command>` for interactive shells, documentation, UI snippets, and AI agent commands on `/var/www/tallpbx`. Keep native `php artisan <command>` (or `/usr/bin/php /var/www/tallpbx/artisan <command>` when explicit full paths are needed) for all non-user contexts: shell scripts, cron jobs, systemd units, installers, helpers, Git worktrees, and CI.
+
+Running the complete Pest suite (`tpbx test --compact --parallel`, ~3,000 tests) and the full Playwright browser suite (`./vendor/bin/pest tests/Browser`, 54 tests) takes 8+ minutes and must **never** be executed repeatedly during routine development:
 
 - **Normally Test Only Specific Parts Changed**: Under standard development workflows, AI agents must ONLY run targeted test files or filters covering the code and templates actually modified:
   - Targeted unit/feature test: `./vendor/bin/pest tests/Feature/.../SpecificTest.php` or `app-modules/<module>/tests/...`
   - Filtered test run: `./vendor/bin/pest --filter="specific test name"`
   - Targeted browser test: `./vendor/bin/pest tests/Browser/SpecificBrowserTest.php` (only when directly touching the UI workflow it exercises)
 - **Maximum of ONE Full Suite Run Before Commit, and ONLY for Significant Multi-Subsystem Changes**:
-  - Full test suite (`php artisan test --compact --parallel`) and full browser suite (`./vendor/bin/pest tests/Browser`) must run at most **once** prior to committing, and **ONLY** when significant changes are made that impact multiple disparate subsystems across the application (such as framework upgrades, shared kernel abstractions, major security firewall pipeline changes, or core auth refactors).
+  - Full test suite (`tpbx test --compact --parallel`) and full browser suite (`./vendor/bin/pest tests/Browser`) must run at most **once** prior to committing, and **ONLY** when significant changes are made that impact multiple disparate subsystems across the application (such as framework upgrades, shared kernel abstractions, major security firewall pipeline changes, or core auth refactors).
 - **Never Run Full Suites on Scoped or Localized Tasks**:
   - Never run full test suites or full browser test runs for localized, scoped, or cosmetic work: e.g. typography/class normalizations, Blade template styling tweaks, table header localization (`<th>`), translation dictionary additions, individual component refactors, single bugfixes, single controller/service changes, or documentation updates.
   - Rely on targeted architecture tests, scoped Pest feature tests, and Pint code-style checks for these tasks.
@@ -217,7 +219,7 @@ rules; see the recovery runbooks in `docs/operations.md` and `docs/security-arch
   passes — roll the stored value back when the apply is refused (see `setFirewallEnabled()`
   and `saveDefaultPolicy()` for the pattern).
 
-### Lockout recovery (panel and `php artisan` unreachable)
+### Lockout recovery (panel and `tpbx` unreachable)
 
 Work over SSH; no PHP, database, or panel needed. Stop as soon as the panel responds —
 step 1 alone usually fixes it by restoring the database/cache connection:
@@ -226,7 +228,7 @@ step 1 alone usually fixes it by restoring the database/cache connection:
 3. `nft 'chain inet tallpbx_filter input { policy accept; }'`
 4. `nft flush ruleset` — last resort; the server is fully open until re-applied.
 
-After recovery, re-apply from the Security Center (or `php artisan security:apply`) so the
+After recovery, re-apply from the Security Center (or `tpbx security:apply`) so the
 saved configuration and the kernel agree again. Full runbooks: `docs/operations.md` →
 "Recovering from a Firewall Lockout"; `docs/security-architecture.md` §9.3; `AGENTS.md` →
 "Live Firewall Safety".
@@ -877,7 +879,7 @@ Use Pest and test the security boundary directly:
 - Impersonated sessions stay tenant-scoped, and stopping impersonation remains possible.
 - Revoked permissions stay revoked after boot/provider sync.
 
-Run the narrow affected test files first, then `php artisan app:test --smoke` when shared middleware, layout, permission, or tenant context behavior changes. Always run `php artisan optimize:clear` after code changes.
+Run the narrow affected test files first, then `tpbx app:test --smoke` when shared middleware, layout, permission, or tenant context behavior changes. Always run `tpbx optimize:clear` after code changes.
 
 ## Changelog Maintenance & Release Management
 
@@ -892,7 +894,7 @@ Run the narrow affected test files first, then `php artisan app:test --smoke` wh
   - `### Fixed` for any bug fixes
   - `### Security` for vulnerability fixes or hardening
 - Do not dump raw git commit logs; explain changes clearly in plain English from the perspective of an administrator or user.
-- If a change requires database migrations (`php artisan migrate`), new Linux packages (e.g. `nftables`), FreeSWITCH reloads, or `.env` updates, note it explicitly.
+- If a change requires database migrations (`tpbx migrate`), new Linux packages (e.g. `nftables`), FreeSWITCH reloads, or `.env` updates, note it explicitly.
 - When cutting an official release, move `[Unreleased]` notes into a versioned section (e.g., `## [1.1.0] - YYYY-MM-DD`) and open a new empty `## [Unreleased]` block.
 
 ### Branching & Release Strategy (Laravel Model)
@@ -931,7 +933,7 @@ TallPBX is architected as a **Domain-Driven Modular Monolith**. Telephony, admin
 - **No Physical Deletion of Core Modules**: Built-in modules in `app-modules/` are **NEVER deleted or uninstalled from disk**. Disabling is strictly logical (`enabled = false` in the database registry, suppressing route and provider registration). Attempting to uninstall a core module will throw a validation error. Never dirty the Git worktree with file deletions.
 - **Extensibility Boundary (`custom-modules/` & `vendor/`)**: Third-party community modules reside in the untracked, git-ignored `custom-modules/{name}/` directory or in standard Composer packages under `vendor/`. External modules never dirty Git and are protected by strict Pre-flight Collision Guards (Route, Database Schema, Module Name, Language Keys, and Permissions).
 - **Autonomous System Utilities**: System administration utilities such as Backups are self-contained modules under Core Administration (Superadmin-centric), responsible for full appliance backup and restore.
-- **Custom Module Scaffolding**: `php artisan make:module <name>` scaffolds exclusively into `custom-modules/{name}/` (no `--custom` flag, no root `composer.json` edits). Core modules in `app-modules/` are created and maintained directly in code by AI agents and developers.
+- **Custom Module Scaffolding**: `tpbx make:module <name>` scaffolds exclusively into `custom-modules/{name}/` (no `--custom` flag, no root `composer.json` edits). Core modules in `app-modules/` are created and maintained directly in code by AI agents and developers.
 
 ## Modular Translation Architecture & Collision Safeguards (Option A)
 
