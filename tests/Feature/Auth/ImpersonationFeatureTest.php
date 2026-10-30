@@ -364,6 +364,99 @@ describe('impersonation lifecycle', function (): void {
         $response->assertDontSee('<img src=x onerror=alert("user-xss")>', false);
         $response->assertSee('&lt;script&gt;alert(&quot;admin-xss&quot;)&lt;/script&gt;', false);
     });
+
+    it('allows stopping impersonation via GET request to panel.impersonation.stop', function (): void {
+        $admin = Admin::factory()->create(['enabled' => true]);
+        $user = User::factory()->create();
+        giveAdminImpersonatePermission($admin);
+
+        $impersonationService = app(ImpersonationServiceInterface::class);
+        $this->actingAs($admin, 'admin');
+        $impersonationService->impersonate($user);
+
+        $response = $this->actingAs($user, 'web')
+            ->get(route('panel.impersonation.stop'));
+
+        $response->assertRedirect(route('panel.dashboard'));
+        $this->assertAuthenticatedAs($admin, 'admin');
+        $this->assertGuest('web');
+        expect($impersonationService->isImpersonating())->toBeFalse();
+    });
+
+    it('synchronizes selected_tenant_id to target user default enabled tenant on start and clears it on stop', function (): void {
+        $admin = Admin::factory()->create(['enabled' => true]);
+        $tenant1 = Tenant::factory()->create();
+        $tenant2 = Tenant::factory()->create(['enabled' => true]);
+        $user = User::factory()->create();
+        $tenant2->users()->attach($user, ['role' => 'admin']);
+        giveAdminImpersonatePermission($admin);
+
+        $this->actingAs($admin, 'admin');
+        session()->put('selected_tenant_id', (string) $tenant1->id);
+
+        $impersonationService = app(ImpersonationServiceInterface::class);
+        $impersonationService->impersonate($user);
+
+        expect(session('selected_tenant_id'))->toBe((string) $tenant2->id);
+
+        $impersonationService->stop();
+
+        expect(session('selected_tenant_id'))->toBeNull();
+    });
+
+    it('allows stopping impersonation without 403 even when selected_tenant_id does not belong to impersonated user', function (): void {
+        $admin = Admin::factory()->create(['enabled' => true]);
+        $user = User::factory()->create();
+        giveAdminImpersonatePermission($admin);
+
+        $impersonationService = app(ImpersonationServiceInterface::class);
+        $this->actingAs($admin, 'admin');
+        $impersonationService->impersonate($user);
+
+        // Intentionally inject an invalid/mismatched tenant in session
+        $response = $this->actingAs($user, 'web')
+            ->withSession(['selected_tenant_id' => '999999'])
+            ->get(route('panel.impersonation.stop'));
+
+        $response->assertRedirect(route('panel.dashboard'));
+        $this->assertAuthenticatedAs($admin, 'admin');
+        expect($impersonationService->isImpersonating())->toBeFalse();
+    });
+
+    it('renders emergency stop impersonation button on 403 error page during impersonation', function (): void {
+        $admin = Admin::factory()->create(['enabled' => true]);
+        $tenant = Tenant::factory()->create(['enabled' => true]);
+        $user = User::factory()->create();
+        $tenant->users()->attach($user, ['role' => 'member']);
+        giveAdminImpersonatePermission($admin);
+
+        $impersonationService = app(ImpersonationServiceInterface::class);
+        $this->actingAs($admin, 'admin');
+        $impersonationService->impersonate($user);
+
+        // Attempting to access an admin-only route will return a 403 response
+        $response = $this->actingAs($user, 'web')
+            ->withSession(['selected_tenant_id' => (string) $tenant->id])
+            ->get(route('panel.impersonation-logs.index'));
+
+        $response->assertForbidden();
+        $response->assertSee(route('panel.impersonation.stop'));
+        $response->assertSee(__('client.stop_impersonating'));
+    });
+
+    it('does not render stop impersonation button on 403 error page when not impersonating', function (): void {
+        $user = User::factory()->create();
+        $tenant = Tenant::factory()->create(['enabled' => true]);
+        $tenant->users()->attach($user, ['role' => 'member']);
+
+        $response = $this->actingAs($user, 'web')
+            ->withSession(['selected_tenant_id' => (string) $tenant->id])
+            ->get(route('panel.impersonation-logs.index'));
+
+        $response->assertForbidden();
+        $response->assertDontSee(route('panel.impersonation.stop'));
+        $response->assertDontSee(__('client.stop_impersonating'));
+    });
 });
 
 /*

@@ -48,7 +48,7 @@ Route::prefix('panel')->name('panel.')->middleware(['web', 'auth.panel', 'thrott
     Route::post('/users/{user}/impersonate', [ImpersonationController::class, 'impersonate'])
         ->middleware('admin.can:admin.impersonate')
         ->name('users.impersonate');
-    Route::post('/impersonation/stop', [ImpersonationController::class, 'stop'])
+    Route::match(['get', 'post'], '/impersonation/stop', [ImpersonationController::class, 'stop'])
         ->name('impersonation.stop');
     Route::get('/impersonation-logs', ImpersonationLogsList::class)
         ->middleware('admin.can:admin.impersonate')

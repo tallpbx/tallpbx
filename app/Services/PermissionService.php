@@ -259,9 +259,12 @@ class PermissionService
 
             // Remove stale active-module permissions, but keep disabled module
             // permissions so existing group assignments survive disablement.
-            Permission::whereNotIn('name', $allNames)
-                ->whereNotIn('module', $this->disabledModules())
-                ->delete();
+            // Never prune when registration is empty to avoid wiping the entire RBAC matrix.
+            if (! empty($allNames)) {
+                Permission::whereNotIn('name', $allNames)
+                    ->whereNotIn('module', $this->disabledModules())
+                    ->delete();
+            }
         });
 
         $this->synced = true;

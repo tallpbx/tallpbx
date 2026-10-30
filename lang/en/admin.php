@@ -629,6 +629,8 @@ return [
     'modal_restore_confirm' => 'Restore Backup',
     'modal_restore_message' => 'Restore “:name”? This replaces the selected database and file scopes on this PBX.',
     'modal_restore_error_title' => 'Restore Not Accepted',
+    'error_page_403_title' => 'Access Denied.',
+    'error_page_403_message' => 'You do not have permission to access this resource.',
     'error_page_500_title' => 'Something went wrong.',
     'error_page_500_message' => 'An unexpected error occurred. The team has been notified; please try again in a few minutes.',
     'error_page_503_title' => 'TallPBX is temporarily unavailable.',

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Themed 403 Forbidden Error View with Impersonation Recovery**: Added custom `resources/views/errors/403.blade.php` styled with DaisyUI semantic tokens and an emergency "Stop Impersonating" escape banner when impersonation is active, allowing seamless recovery if an administrator navigates to an unauthorized page while impersonating a restricted tenant user.
+
+### Fixed
+- **Impersonation Tenant Scope Lockout**: Synchronized `selected_tenant_id` to the target user's default enabled tenant upon starting impersonation and purged it upon stopping, and updated `AuthPanelMiddleware` to bypass tenant scoping for `panel.impersonation.stop`, preventing 403 authorization lockouts when impersonating users belonging to different tenants.
+- **Impersonation Stop Navigation Flexibility**: Allowed both `GET` and `POST` methods on `/panel/impersonation/stop` so administrators encountering unexpected permission errors can escape impersonation directly via address bar navigation or standard anchor links.
+- **Super Administrator RBAC Permission Resolution**: Implemented `Admin::isSuperAdmin()` and updated `getPermissionNames()` and `hasPermission()` so system-level Super Administrators always inherit all registered permissions, preventing lockouts from permission-gated navigation and panel routes even if the `group_permission` pivot table is unpopulated.
+- **Empty Permission Pruning Safeguard**: Added an `if (! empty($allNames))` guard in `PermissionService::syncToDatabase()` to prevent `whereNotIn('name', [])` from running when module registrations are empty, which previously wiped the permissions table and cascaded into clearing group permissions.
+- **Layout Mini Rail Tooltip Syntax**: Fixed double-colon component escaping on `<x-tooltip>` in `resources/views/layouts/app.blade.php`, replacing raw `@js` expressions with `x-bind:data-tip` and `x-bind:aria-label` to prevent browser Alpine/Livewire JavaScript syntax errors.
+
 ## [4.2.0] - 2026-10-29
 
 ### Added

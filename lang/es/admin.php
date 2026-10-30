@@ -290,6 +290,8 @@ return [
     'modal_restore_confirm' => 'Restaurar copia de seguridad',
     'modal_restore_message' => '¿Restaurar “:name”? Esto reemplaza los ámbitos de base de datos y archivos seleccionados en este PBX.',
     'modal_restore_error_title' => 'Restauración No Aceptada',
+    'error_page_403_title' => 'Acceso denegado.',
+    'error_page_403_message' => 'No tiene permiso para acceder a este recurso.',
     'error_page_500_title' => 'Algo salió mal.',
     'error_page_500_message' => 'Ocurrió un error inesperado. El equipo ha sido notificado; inténtelo de nuevo en unos minutos.',
     'error_page_503_title' => 'TallPBX no está disponible temporalmente.',

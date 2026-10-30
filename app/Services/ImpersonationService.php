@@ -64,6 +64,13 @@ class ImpersonationService implements ImpersonationServiceInterface
             session()->put(self::SESSION_TARGET_USER_ID, $user->id);
             session()->put(self::SESSION_STARTED_AT, now());
 
+            // Clear any prior admin tenant context and synchronize to the target user's default enabled tenant
+            session()->forget('selected_tenant_id');
+            $targetTenant = $user->tenants()->where('tenants.enabled', true)->first();
+            if ($targetTenant !== null) {
+                session()->put('selected_tenant_id', (string) $targetTenant->id);
+            }
+
             // Log the impersonation start with snapshot information
             ImpersonationLog::create([
                 'admin_id' => $admin->id,
@@ -163,11 +170,12 @@ class ImpersonationService implements ImpersonationServiceInterface
             ]);
         }
 
-        // Clear impersonation session data
+        // Clear impersonation session data and active tenant selection
         session()->forget([
             self::SESSION_ORIGINAL_ADMIN_ID,
             self::SESSION_TARGET_USER_ID,
             self::SESSION_STARTED_AT,
+            'selected_tenant_id',
         ]);
 
         // Logout the web guard (impersonated user)

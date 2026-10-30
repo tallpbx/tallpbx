@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\PermissionService;
 use Database\Factories\AdminFactory;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -50,6 +51,23 @@ class Admin extends Authenticatable implements HasLocalePreference
     }
 
     /**
+     * Determine whether this administrator belongs to the system-level Super Administrators group.
+     */
+    public function isSuperAdmin(): bool
+    {
+        if ($this->relationLoaded('groups')) {
+            return $this->groups->contains(
+                fn (Group $group) => $group->name === 'Super Administrators' && $group->tenant_id === null
+            );
+        }
+
+        return $this->groups()
+            ->where('name', 'Super Administrators')
+            ->whereNull('tenant_id')
+            ->exists();
+    }
+
+    /**
      * In-memory cache of permission names, loaded once per request.
      *
      * @var array<int, string>|null
@@ -59,11 +77,22 @@ class Admin extends Authenticatable implements HasLocalePreference
     /**
      * Load all permission names via eager-loaded groups, cached in-memory.
      *
+     * Super Administrators possess all registered module permissions.
+     * Other administrators inherit permissions assigned to their groups.
+     *
      * @return array<int, string>
      */
     public function getPermissionNames(): array
     {
         if ($this->cachedPermissions === null) {
+            if ($this->isSuperAdmin() && app()->bound(PermissionService::class)) {
+                $registered = app(PermissionService::class)->all();
+
+                if (! empty($registered)) {
+                    return $this->cachedPermissions = $registered;
+                }
+            }
+
             $this->cachedPermissions = $this->groups()
                 ->with('permissions')
                 ->get()
@@ -80,8 +109,8 @@ class Admin extends Authenticatable implements HasLocalePreference
     /**
      * Check if this admin has a specific permission via their groups.
      *
-     * Uses the in-memory cache from getPermissionNames() to avoid
-     * repeated database queries during Gate authorization.
+     * Super Administrators possess all registered system permissions.
+     * Other administrators inherit permissions assigned to their groups.
      */
     public function hasPermission(string $permission): bool
     {

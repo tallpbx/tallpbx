@@ -291,6 +291,8 @@ return [
     'modal_restore_confirm' => 'Restaurer la sauvegarde',
     'modal_restore_message' => 'Restaurer « :name » ? Cela remplace les périmètres de base de données et de fichiers sélectionnés sur ce PBX.',
     'modal_restore_error_title' => 'Restauration non acceptée',
+    'error_page_403_title' => 'Accès refusé.',
+    'error_page_403_message' => 'Vous n\'avez pas la permission d\'accéder à cette ressource.',
     'error_page_500_title' => 'Une erreur est survenue.',
     'error_page_500_message' => 'Une erreur inattendue s\'est produite. L\'équipe a été prévenue ; réessayez dans quelques minutes.',
     'error_page_503_title' => 'TallPBX est temporairement indisponible.',

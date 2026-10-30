@@ -29,12 +29,8 @@ class AuthPanelMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->routeIs('panel.impersonation.stop') && Auth::guard('admin')->check()) {
+        if ($request->routeIs('panel.impersonation.stop') && (Auth::guard('admin')->check() || app(ImpersonationServiceInterface::class)->isImpersonating())) {
             return $next($request);
-        }
-
-        if (Auth::guard('web')->check() && app(ImpersonationServiceInterface::class)->isImpersonating()) {
-            return app(ScopeTenant::class)->handle($request, $next);
         }
 
         if (Auth::guard('admin')->check()) {

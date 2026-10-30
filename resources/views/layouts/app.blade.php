@@ -89,12 +89,12 @@
                 {{-- Mini Rail Collapse / Expand Toggle Button --}}
                 <div class="p-2 border-t border-base-300 hidden lg:flex items-center shrink-0 transition-all duration-200"
                      :class="sidebarCollapsed ? 'justify-center' : 'justify-end'">
-                    <x-tooltip position="right" ::data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
+                    <x-tooltip position="right" x-bind:data-tip="sidebarCollapsed ? '{{ __('admin.expand_sidebar') }}' : '{{ __('admin.collapse_sidebar') }}'">
                         <button
                             type="button"
                             @click="toggleSidebar()"
                             class="btn btn-ghost btn-sm btn-square text-base-content/60 hover:text-base-content"
-                            :aria-label="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))"
+                            x-bind:aria-label="sidebarCollapsed ? '{{ __('admin.expand_sidebar') }}' : '{{ __('admin.collapse_sidebar') }}'"
                         >
                             <template x-if="sidebarCollapsed">
                                 <x-heroicon-o-chevron-double-right class="w-4 h-4" />
@@ -120,12 +120,12 @@
 
                     {{-- Desktop Sidebar Mini Toggle (when in sidebar mode) --}}
                     <template x-if="layoutMode === 'sidebar'">
-                        <x-tooltip position="right" class="hidden lg:inline-flex" ::data-tip="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))">
+                        <x-tooltip position="right" class="hidden lg:inline-flex" x-bind:data-tip="sidebarCollapsed ? '{{ __('admin.expand_sidebar') }}' : '{{ __('admin.collapse_sidebar') }}'">
                             <button
                                 type="button"
                                 @click="toggleSidebar()"
                                 class="btn btn-ghost btn-sm btn-square"
-                                :aria-label="sidebarCollapsed ? @js(__('admin.expand_sidebar')) : @js(__('admin.collapse_sidebar'))"
+                                x-bind:aria-label="sidebarCollapsed ? '{{ __('admin.expand_sidebar') }}' : '{{ __('admin.collapse_sidebar') }}'"
                             >
                                 <x-heroicon-o-bars-3 class="w-5 h-5" />
                             </button>

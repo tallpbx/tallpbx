@@ -220,3 +220,12 @@ it('evaluates syncIfStale as false on a fresh unsynced instance when cache is wa
     expect($freshService->syncIfStale())->toBeFalse()
         ->and($freshService->isSynced())->toBeFalse();
 });
+
+it('does not prune existing permissions when registration list is empty', function (): void {
+    Permission::factory()->create(['name' => 'extensions.view', 'module' => 'extensions']);
+
+    $emptyService = new PermissionService;
+    $emptyService->syncToDatabase();
+
+    expect(Permission::where('name', 'extensions.view')->exists())->toBeTrue();
+});
