@@ -6,7 +6,7 @@ This document is the authoritative technical reference for the architecture of T
 
 ## 1. Domain-Driven Modular Monolith Architecture
 
-TallPBX 4.x organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**.
+TallPBX 5.x organizes its telecommunications, administrative, and PBX capabilities as a **Domain-Driven Modular Monolith**.
 
 ### What This Means in Plain English
 

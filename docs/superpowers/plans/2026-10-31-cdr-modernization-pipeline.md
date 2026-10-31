@@ -75,7 +75,7 @@ Update `module.json`:
 - `"display_name": "Call Detail Records"`
 - `"providers": ["Modules\\Cdr\\Providers\\ModuleServiceProvider"]`
 
-- [ ] **Step 2: Create `cdrs` table migration (with 4.x upgrade support)**
+- [ ] **Step 2: Create canonical `cdrs` table migration**
 
 Create `app-modules/cdr/database/migrations/2026_10_31_000001_create_cdrs_table.php`:
 ```php
@@ -91,40 +91,28 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('xml_cdr')) {
-            // Upgrade path from 4.x: rename and alter in-place
-            Schema::rename('xml_cdr', 'cdrs');
-            Schema::table('cdrs', function (Blueprint $table) {
-                $table->string('b_leg_uuid')->nullable()->after('call_uuid')->index();
-                $table->char('leg', 1)->default('a')->after('b_leg_uuid')->index();
-                $table->string('record_path')->nullable()->after('hangup_cause');
-                $table->longText('json_data')->nullable()->after('end_stamp');
-                $table->unique(['call_uuid', 'leg'], 'cdrs_call_uuid_leg_unique');
-            });
-        } else {
-            // Fresh 5.x path: create modern table
-            Schema::create('cdrs', function (Blueprint $table) {
-                $table->uuid('id')->primary();
-                $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-                $table->string('call_uuid')->nullable()->index();
-                $table->string('b_leg_uuid')->nullable()->index();
-                $table->char('leg', 1)->default('a')->index();
-                $table->string('caller_id')->nullable();
-                $table->string('caller_id_name')->nullable();
-                $table->string('destination')->nullable();
-                $table->unsignedInteger('duration')->default(0);
-                $table->unsignedInteger('billsec')->default(0);
-                $table->string('hangup_cause')->nullable();
-                $table->string('direction')->nullable();
-                $table->string('record_path')->nullable();
-                $table->timestamp('start_stamp')->nullable();
-                $table->timestamp('answer_stamp')->nullable();
-                $table->timestamp('end_stamp')->nullable();
-                $table->longText('json_data')->nullable();
-                $table->timestamps();
-                $table->unique(['call_uuid', 'leg'], 'cdrs_call_uuid_leg_unique');
-            });
-        }
+        // 5.x canonical table (fresh install; not backwards compatible with 4.x xml_cdr)
+        Schema::create('cdrs', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->string('call_uuid')->nullable()->index();
+            $table->string('b_leg_uuid')->nullable()->index();
+            $table->char('leg', 1)->default('a')->index();
+            $table->string('caller_id')->nullable();
+            $table->string('caller_id_name')->nullable();
+            $table->string('destination')->nullable();
+            $table->unsignedInteger('duration')->default(0);
+            $table->unsignedInteger('billsec')->default(0);
+            $table->string('hangup_cause')->nullable();
+            $table->string('direction')->nullable();
+            $table->string('record_path')->nullable();
+            $table->timestamp('start_stamp')->nullable();
+            $table->timestamp('answer_stamp')->nullable();
+            $table->timestamp('end_stamp')->nullable();
+            $table->longText('json_data')->nullable();
+            $table->timestamps();
+            $table->unique(['call_uuid', 'leg'], 'cdrs_call_uuid_leg_unique');
+        });
     }
 
     public function down(): void

@@ -8,8 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **5.x Major Release Series Kickoff**: Created the `5.x` series branch (`5.x`) for next-generation telecommunications features and high-throughput architectural enhancements, starting with the Pulse-style Redis Stream CDR Ingestion Pipeline and Version-Aware Lua Redis Proxy.
+- **Architectural Implementation Plans**: Created implementation blueprints for the high-concurrency Redis Stream CDR buffer (`docs/superpowers/plans/2026-10-31-cdr-modernization-pipeline.md`), the `tallpbx_cache` Lua proxy (`docs/superpowers/plans/2026-10-31-lua-redis-proxy.md`), and the comprehensive static architectural review (`docs/superpowers/plans/implementation-plan-review.md`).
 
 ### Changed
+- **Active Series Branch Transition**: Transitioned active development and default branch references across project documentation, installer scripts, and agent skills from `4.x` to `5.x`.
+- **Breaking Changes & Fresh Install Policy**: Declared `5.x` as a breaking major release line. The `5.x` branch is explicitly not backwards compatible with the `4.x` branch and requires a fresh install rather than an in-place upgrade. Earlier major release lines (`4.x`, `3.x`, `2.0`, `1.1`) continue maintenance on their respective branches.
 
 ### Fixed
 
