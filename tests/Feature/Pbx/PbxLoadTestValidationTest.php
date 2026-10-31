@@ -38,14 +38,14 @@ describe('pbx load test scripts and scenarios', function (): void {
         expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
     });
 
-    it('defines the 5 standard cache sweep tiers in the runner', function (): void {
+    it('defines the 4 standard cache sweep tiers in the runner', function (): void {
         $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('cold-baseline')
-            ->and($script)->toContain('contributor-only')
+            ->and($script)->toContain('dialplan-cache-off')
             ->and($script)->toContain('prod-baseline-60')
-            ->and($script)->toContain('call-center-ttl30')
-            ->and($script)->toContain('memory-hit-ceiling');
+            ->and($script)->toContain('memory-hit-ceiling')
+            ->and($script)->not->toContain('call-center-ttl30');
     });
 
     it('inspects Redis stats and calculates keyspace hit rates', function (): void {

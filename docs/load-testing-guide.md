@@ -297,13 +297,13 @@ FS_SESSIONS_PER_SECOND=60
 
 ### Cache Sweep & Hit Rate Benchmarking
 
-To benchmark all 5 standard cache tiers on your host and measure exact Redis keyspace hit rates:
+To benchmark all 4 standard cache tiers on your host and measure exact Redis keyspace hit rates:
 
 ```bash
 bash scripts/run-cache-sweep.sh
 ```
 
-The script runs a standardized 5-tier test (Cold baseline, Dialplan cache off, Default 60s burst, Call-center 30s profile, and Memory hit ceiling) and automatically restores the exact `.env` TTL values captured before the sweep upon completion — including when interrupted mid-run.
+The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache off, Production baseline 60s, and Memory hit ceiling) and automatically restores the exact `.env` TTL values captured before the sweep upon completion — including when interrupted mid-run.
 
 **The five cache settings, in plain English:**
 
@@ -315,15 +315,14 @@ The script runs a standardized 5-tier test (Cold baseline, Dialplan cache off, D
 | `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` | "Phone book" lookups: which SIP user is calling, and their credentials. |
 | `FS_XML_HANDLER_ACL_CACHE_TTL` | The list of trusted IP addresses. |
 
-**What each cache profile sets** (numbers are seconds; `0` means the cache is off; the column names refer to the four `FS_XML_HANDLER_*_CACHE_TTL` settings above). The sweep only ever changes the first two — Directory and ACL keep whatever `.env` already has (`60` by default):
+**What each cache profile sets** (numbers are seconds; `0` means the cache is off; the column names refer to the four individual cache settings above). The sweep only changes the first two — Directory and ACL keep whatever `.env` already has (`60` by default):
 
-| Profile | `DIALPLAN` | `CONTRIBUTOR` | `DIRECTORY` | `ACL` | What this run tells you |
+| Profile | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | What this run tells you |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Cold baseline** | `0` | `0` | `60` | `60` | The floor: caching is off, so every request is rebuilt from the database. Shows what the caches are saving you. |
-| **Dialplan cache off** (everything else on) | `0` | `60` | `60` | `60` | Each number's final routing answer is rebuilt on every request, while the shared pieces stay cached. |
-| **Default 60s burst** | `60` | `60` | `60` | `60` | Normal production settings: everything cached, and panel changes still apply immediately — the cache keys change the moment an administrator edits routing. |
-| **Call-center 30s profile** | `30` | `30` | `60` | `60` | The legacy 30-second window, kept as a mid-point comparison. |
-| **Memory hit ceiling** | `60` | `60` | `60` | `60` | The best case: the same number is requested repeatedly, so every answer comes straight from cache memory with zero database queries. |
+| **Cold baseline** | `0` | `0` | `60` | `60` | The floor: dialplan and contributor caches are off, so routing logic is rebuilt from the database on every call. Shows what the caches are saving you. |
+| **Dialplan cache off** (snippets on) | `0` | `60` | `60` | `60` | Each number's final routing answer is rebuilt on every request, while the shared module snippets stay cached. |
+| **Production baseline (60s)** | `60` | `60` | `60` | `60` | Normal production settings: full caching enabled, with instant panel invalidation via cache versioning (`RoutingCacheVersion`). |
+| **Memory hit ceiling** | `60` | `60` | `60` | `60` | The best case: the same number is requested repeatedly, so every answer comes straight from Redis memory with zero database queries. |
 
 > [!NOTE]
 > The XML-only benchmark only exercises the dialplan and contributor caches — it never asks the directory or ACL caches anything. That is why their values never change between profiles, and why testing them one at a time would show no difference.

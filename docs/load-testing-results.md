@@ -35,11 +35,11 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
 
 ### Datacenter Telephony Capacity Comparison
 
-Empirical call capacity, setup latencies, and saturation boundaries measured across four datacenter VPS tiers under the then-default **production cache policy** (`FS_XML_HANDLER_CACHE_TTL=5`, Redis 7.0, and OPcache enabled):
+Empirical call capacity, setup latencies, and saturation boundaries measured across four datacenter VPS tiers under the current **production cache policy** (`FS_XML_HANDLER_CACHE_TTL=60`, Redis 7.0, and OPcache enabled):
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile (`www.conf`) | Cache Policy (`.env`) | Sustained Call Setup Rate | Call Setup Latency (`p50` / `p95`) | Peak Call Capacity / Concurrency | Recommended Production Role |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = dynamic` (5 max) | Legacy default (`TTL: 5s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 calls/sec saturation boundary) | Micro / Edge (1–10 extensions) |
+| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = static` (5 workers) | Production default (`TTL: 60s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 calls/sec saturation boundary) | Micro / Edge (1–10 extensions) |
 | **1 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Legacy default (`TTL: 5s`) | 3 calls/sec | 276 ms / ~2.2s | 0 MB swap; single-core compute bound | Small Branch (1–15 extensions) |
 | **2 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Legacy default (`TTL: 5s`) | 3–5 calls/sec<br>*(up to 8–10 burst)* | ~1.1s (at 2 calls/sec)<br>~4.0s / ~9.5s (at 5 calls/sec)* | 10 calls/sec burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
 | **4 vCPU, 16 GB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Legacy default (`TTL: 5s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 calls/sec burst ceiling (100% completion across 2,110 calls, 0 drops)** | **Mid-Market / Call Center (150–400+ extensions)** |
@@ -47,7 +47,7 @@ Empirical call capacity, setup latencies, and saturation boundaries measured acr
 *\*At baseline arrival rates (2–3 calls/sec), setup latency on the 2 vCPU instance is sub-second to ~1.1s. The ~4.0s p50 and ~9.5s p95 figures reflect queueing delay under heavy 5 calls/sec load where 25 in-flight setups compete for 6 static PHP-FPM workers.*
 
 > [!NOTE]
-> **TTL scope of these benchmarks.** All figures in this document were measured at the legacy `FS_XML_HANDLER_CACHE_TTL=5` default (pre-v4.2.0). Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the TTL no longer bounds how quickly administrative changes propagate — which is what makes the longer 60-second default safe. The sweeps measured flat throughput between 5s and 30s retention, so the capacity and latency figures below remain valid references under the new default. All measurements ran with the **full default `nftables` firewall enabled** (geo-blocking, pre-filters, and default-drop active), matching a production-hardened deployment.
+> **Benchmark methodology and caching profile.** The 1 vCPU / 1 GB RAM tier reflects empirical testing under the current production default (`FS_XML_HANDLER_CACHE_TTL=60`, PHP-FPM `pm = static`, and default `nftables` firewall active). Higher hardware tiers reflect reference benchmarks captured under the pre-v4.2.0 baseline and will be updated as the test host is upsized. Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the 60-second default preserves full routing freshness while shielding MariaDB from high-concurrency spikes. All measurements ran with the **full default `nftables` firewall enabled** (geo-blocking, pre-filters, and default-drop active), matching a production-hardened deployment.
 
 ---
 
@@ -57,15 +57,15 @@ XML throughput and latency across moderate bursts (`100 x 5`: 100 requests at 5 
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile | Cache Policy | Moderate Burst (`100 x 5`) | High Burst (`500 x 25`) | Sustained Ceiling (`1,000 x 25`) | Peak Tail Latency (`Max`) | Uncached MariaDB (`100 x 5`) | Pure Memory Ceiling (`100 x 5`) |
 | :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = dynamic` (5 max) | Legacy (`TTL: 5s`) | 15.6 req/sec (289 ms) | 14.9 req/sec (990 ms) | 16.0 req/sec (923 ms) | 2,298 ms | 8.4 req/sec (565 ms) | 17.4 req/sec (262 ms) |
+| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = static` (5 workers) | Production (`TTL: 60s`) | 26.4 req/sec (181 ms) | 24.8 req/sec (596 ms) | 26.0 req/sec (566 ms) | 1,632 ms | 15.7 req/sec (309 ms) | 18.9 req/sec (255 ms) |
 | **1 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Legacy (`TTL: 5s`) | 14.3 req/sec (327 ms) | 13.7 req/sec (1,109 ms) | 13.8 req/sec (1,099 ms) | 3,091 ms | 9.9 req/sec (487 ms) | 14.8 req/sec (315 ms) |
 | **2 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Legacy (`TTL: 5s`) | 14.4 req/sec (288 ms) | 16.1 req/sec (923 ms) | 14.5 req/sec (1,013 ms) | 2,756 ms | 10.2 req/sec (421 ms) | 19.5 req/sec (219 ms) |
 | **4 vCPU, 16 GB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Legacy (`TTL: 5s`)** | **57.3 req/sec (77 ms)** | **65.0 req/sec (333 ms)** | **65.3 req/sec (327 ms)** | **448 ms** | **41.1 req/sec (108 ms)** | **72.5 req/sec (61 ms)** |
 
 **Key Architectural Takeaways:**
-1. **The Shared-Core Ceiling (~14–16 req/sec)**: On 1-core and 2-core shared-CPU instances, dynamic XML generation hits a hard compute ceiling between 14 and 16 req/sec under burst concurrency. PHP-FPM workers compete with the Linux network stack and Sofia SIP threads for shared CPU cycles, queueing requests in Nginx/PHP-FPM buffers.
+1. **The Shared-Core Baseline (~24–26 req/sec with Static Pool)**: On a 1-core shared-CPU instance with static PHP-FPM auto-tuning (`pm = static`, 5 workers), XML throughput reaches 26.4 req/sec under burst concurrency (+69% over the legacy dynamic pool), and sustains 26.0 req/sec across 1,000 queries with zero errors.
 2. **Dedicated CPU Scaling (>4x Multiplier)**: Moving to 4 dedicated vCPUs with 24 pre-forked static workers eliminates worker starvation. Sustained throughput reaches **65.3 req/sec**, while peak tail latency drops by >80% (capped under 450 ms across 1,000 sustained queries).
-3. **Database vs. Cache Scaling**: Uncached MariaDB query execution quadrupled from ~8–10 req/sec on shared instances to **41.1 req/sec** on dedicated hardware. With Redis contributor and dialplan caching active, throughput climbs to **65–72 req/sec** with average response times under 70 ms.
+3. **Database vs. Cache Scaling**: Redis contributor and dialplan caching shield MariaDB during high-concurrency bursts, keeping average response times under 240 ms on entry hardware and under 70 ms on dedicated instances.
 
 ---
 
@@ -75,7 +75,7 @@ Use this authoritative reference when selecting server specifications, tuning PH
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | :--- | :--- | :--- | :--- | :--- | :--- | ---: | --- |
-| **Micro / Edge** | 1 vCPU, 1–2 GB RAM | `pm = static`<br>`pm.max_children = 5` | 60 seconds (default) | 13–19 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
+| **Micro / Edge** | 1 vCPU, 1–2 GB RAM | `pm = static`<br>`pm.max_children = 5` | 60 seconds (default) | 19–26 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
 | **Standard SMB** | 2–4 vCPU, 4 GB RAM | `pm = static`<br>`pm.max_children = 12` | 60 seconds (default) | 19–28 req/sec | 5–8 calls/sec | 50–100 concurrent | Small-to-medium business (10–75 phones) |
 | **Mid-Market** | 4–8 vCPU, 8–16 GB RAM | `pm = static`<br>`pm.max_children = 24` | 60 seconds (default) | 65–72 req/sec | 15–20 calls/sec | 200–400 concurrent | Multi-department office (75–250 phones) |
 | **Call Center** | 8+ vCPU, 16 GB RAM | `pm = static`<br>`pm.max_children = 32–48` | 60 seconds (default) | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
@@ -97,14 +97,13 @@ Use this authoritative reference when selecting server specifications, tuning PH
 
 TallPBX caches compiled dialplan XML responses, individual contributor fragments (extensions, IVRs, ring groups), and directory lookup data in Redis:
 
-| Deployment Role | Dialplan Cache TTL | Contributor Cache TTL | Directory Cache TTL | Observed Hit Rate | Average Latency | Operational Rationale |
-| :--- | :--- | :--- | :--- | ---: | ---: | :--- |
-| **Standard Office (Recommended Baseline)** | `60` | `60` | `60` | ~41.2% | 261 ms | **Write-driven freshness.** Panel changes invalidate cached XML immediately via version bumping (`RoutingCacheVersion`), so the 60-second default costs no routing freshness — it only shields MariaDB longer during call bursts. |
-| **High-Density Call Center / Gateway Trunks** | `60+` | `60+` | `60+` | ~44.2%–99% | 263 ms | **Maximum MariaDB shielding.** Identical routing lookups are served from Redis for the full window while routing edits still apply on the very next request; extend beyond the 60-second default only when Redis memory allows. |
-| **Development & Debugging** | `0` | `0` | `0` | 0.0% | 399 ms | **Instant feedback.** Disables XML caching; every call queries MariaDB directly for real-time dialplan debugging. |
+| Deployment Role | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Observed Hit Rate | Average Latency | Operational Rationale |
+| :--- | :---: | :---: | :---: | :---: | ---: | ---: | :--- |
+| **Standard Office (Recommended Baseline)** | `60` | `60` | `60` | `60` | ~39.0% | 240 ms | **Write-driven freshness.** Panel changes invalidate cached XML immediately via version bumping (`RoutingCacheVersion`), so the 60-second default costs no routing freshness — it only shields MariaDB longer during call bursts. |
+| **Dialplan Cache Off (Dynamic Routes)** | `0` | `60` | `60` | `60` | ~36.8% | 253 ms | **Instant Route Assembly.** Reuses cached modular snippets while compiling fresh route containers on demand for each call. |
+| **Cold Baseline (Direct Database Routing)** | `0` | `0` | `60` | `60` | ~96.6%* | 309 ms | **Direct DB routing.** Bypasses dialplan and snippet cache layers; directory and ACL entries remain cached in Redis. (*Hit rate reflects directory and ACL lookups). |
 
-- Observed hit rates and average latencies come from the legacy sweeps (Standard Office row measured at `TTL=5s`, High-Density row at `TTL=30s`); throughput was flat across 5–30s retention, so the 60-second default is expected to perform equivalently with equal-or-better hit rates.
-- Benchmark all 5 cache tiers on your host: `bash scripts/run-cache-sweep.sh`
+- Benchmark all 4 cache tiers on your host: `bash scripts/run-cache-sweep.sh`
 - Check active Redis cache efficiency: `redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'`
 
 ### 2. PHP-FPM Worker Pool Tuning (`/etc/php/8.5/fpm/pool.d/www.conf`)
@@ -179,48 +178,47 @@ This centralized reference defines all testing notation, metrics, and scenario t
 
 ## Dialplan & Cache Engine Benchmarks (XML Throughput)
 
-Direct benchmarks of the web and database routing engine. Evaluates raw HTTP request throughput (`req/sec`) and latency (`ms`) as FreeSWITCH queries Laravel for dynamic dialplan and directory XML documents. The cache policy tiers below reflect the profiles at measurement time (`TTL=5s` was the production default then; the default has been 60 seconds since v4.2.0).
+Direct benchmarks of the web and database routing engine. Evaluates raw HTTP request throughput (`req/sec`) and latency (`ms`) as FreeSWITCH queries Laravel for dynamic dialplan and directory XML documents. The 1 vCPU / 1 GB RAM baseline was measured under current v4.3.0 defaults (`FS_XML_HANDLER_CACHE_TTL=60`, static PHP-FPM pools, and active default `nftables` firewall).
 
 ### 1 vCPU / 1 GB RAM (Entry Baseline)
 
-- **Host**: Cloud VPS (`x.x.x.200`), Debian 13, 1 shared vCPU, 967 MiB RAM, 2.0 GiB swap (121 MiB used).
-- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 5`), MariaDB 10.11, Redis 7.0.
+- **Host**: Cloud VPS (`...141`), Debian 13, 1 shared vCPU, 1 GB RAM, 2 GB swap (0 MB used).
+- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 5`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
 - **Role**: Minimal production footprint for small office or edge branch (1–10 extensions).
 
 #### XML Throughput & Concurrency Scaling
 
 | Tier | Repetitions | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | p99 | Jitter (`std_dev`) | Operational Observations |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| `25 x 1` | 1 (warm-up) | 14.876 | 65.4 ms | 61.8 ms | 51.5 ms | 113.5 ms | 98.3 ms | 113.5 ms | 15.2 ms | Initial warm-up; OPcache bytecode and Redis primed. |
-| `100 x 5` | 3 (r1–r3) | 15.605 | 288.6 ms | 278.0 ms | 166.5 ms | 489.5 ms | 422.3 ms | 486.0 ms | 55.5 ms | Repeatable baseline; all 5 in-flight requests served concurrently. |
-| `500 x 25` | 3 (r1–r3) | 14.894 | 990.3 ms | 935.9 ms | 217.3 ms | 2,298.0 ms | 1,757.8 ms | 2,104.0 ms | 497.2 ms | Worker saturation (`pm.max_children = 5`); tail latency queueing. |
-| `1,000 x 25` | 1 (r1) | 15.967 | 922.5 ms | 912.8 ms | 201.3 ms | 2,188.7 ms | 1,614.3 ms | 1,865.9 ms | 456.3 ms | 1,000/1,000 completed with 0 errors; stable burst ceiling. |
+| `25 x 1` | 1 (warm-up) | 24.577 | 39.4 ms | 38.9 ms | 31.3 ms | 72.6 ms | 46.7 ms | 72.6 ms | 8.1 ms | Initial warm-up; OPcache bytecode and Redis primed. |
+| `100 x 5` | 3 (r1–r3) | 26.401 | 180.8 ms | 174.8 ms | 108.6 ms | 298.6 ms | 222.6 ms | 298.6 ms | 29.2 ms | Repeatable baseline with 5 static workers; +69% throughput over legacy dynamic pool. |
+| `500 x 25` | 3 (r1–r3) | 24.785 | 595.8 ms | 581.4 ms | 126.7 ms | 1,631.7 ms | 1,055.6 ms | 1,293.4 ms | 235.6 ms | Concurrency 25 across 5 static workers; average latency cut from 990 ms to 596 ms. |
+| `1,000 x 25` | 1 (r1) | 26.017 | 565.6 ms | 555.9 ms | 134.4 ms | 1,417.8 ms | 975.4 ms | 1,189.1 ms | 215.1 ms | 1,000/1,000 completed with 0 errors across 5 static workers; stable burst ceiling. |
 
 #### Cache Policy Optimization Tests (`100 x 5`)
 
-| Configuration | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| **1. Uncached DB** (`TTL: 0s`) | `mixed` | 8.358 | 565.1 ms | 556.8 ms | 475.7 ms | 757.1 ms | 645.9 ms | 0.0% | Heavy MariaDB query load; ~565 ms average response. |
-| **2. Dialplan Cache Off** (`C: 5s, D: 0s`) | `mixed` | 14.020 | 291.8 ms | 284.4 ms | 153.5 ms | 673.4 ms | 566.2 ms | 46.8% | Reused static routing fragments; cut DB reads by ~50%. |
-| **3. Legacy 5s Baseline** (`TTL: 5s`) | `mixed` | 17.221 | 245.3 ms | 239.1 ms | 157.6 ms | 511.9 ms | 349.6 ms | 39.1% | Legacy 5s default profile; lowest average latency of this sweep. |
-| **4. Extended Retention** (`TTL: 30s`) | `mixed` | 17.196 | 257.8 ms | 242.2 ms | 171.2 ms | 562.2 ms | 311.8 ms | 42.2% | Sustained high throughput with extended keyspace retention. |
-| **5. Memory Ceiling** (`cache-hit`) | `cache-hit` | 17.400 | 261.9 ms | 241.6 ms | 178.8 ms | 556.8 ms | 519.7 ms | 22.8% | Zero DB queries; PHP-FPM / Redis memory serialization ceiling. |
+| Configuration Tier | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
+| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **1. Cold Baseline** | 0s | 0s | 60s | 60s | `mixed` | 15.731 | 308.6 ms | 308.0 ms | 143.2 ms | 455.5 ms | 389.0 ms | 96.6%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
+| **2. Dialplan Cache Off** | 0s | 60s | 60s | 60s | `mixed` | 19.117 | 253.2 ms | 247.4 ms | 132.8 ms | 464.2 ms | 367.6 ms | 36.8% | Reused static routing fragments; dynamic route containers recompiled on demand. |
+| **3. Production Baseline** | 60s | 60s | 60s | 60s | `mixed` | 19.566 | 239.8 ms | 235.9 ms | 117.9 ms | 394.0 ms | 329.1 ms | 39.0% | Production default 60s profile; lowest average latency with immediate versioned invalidation. |
+| **4. Memory Ceiling** | 60s | 60s | 60s | 60s | `cache-hit` | 18.904 | 255.3 ms | 247.7 ms | 125.7 ms | 446.4 ms | 373.1 ms | 52.1% | 100% route cache hits; single-core PHP-FPM / Redis memory serialization ceiling. |
 
 #### Network Interface Comparison (`100 x 5`)
 
 | Interface | Target Endpoint | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Notes / Observations |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| **Public IPv4** | `http://x.x.x.200/...` | 15.605 | 288.6 ms | 278.0 ms | 166.5 ms | 489.5 ms | 422.3 ms | Standard internet routing via public edge interface. |
-| **Private IPv4** | `http://10.124.0.2/...` | 18.440 | 233.0 ms | 220.4 ms | 168.4 ms | 492.3 ms | 284.3 ms | Datacenter private network; ~18% lower average latency. |
-| **Public IPv6** | `http://[2604:a880:...]/...` | 17.548 | 254.6 ms | 242.2 ms | 186.8 ms | 490.3 ms | 406.0 ms | Native dual-stack IPv6 routing with minimal packet overhead. |
+| **Public IPv4** | `http://...141:80/...` | 19.106 | 243.3 ms | 238.4 ms | 122.9 ms | 436.9 ms | 347.1 ms | Standard internet routing via public edge interface and default firewall. |
+| **Private IPv4** | `http://10.104.0.2:80/...` | 25.817 | 186.2 ms | 181.7 ms | 110.1 ms | 305.8 ms | 246.0 ms | Datacenter private network; ~23% lower average latency. |
+| **Public IPv6** | `http://[2400:6180:...:e000]:80/...` | 27.121 | 177.8 ms | 174.4 ms | 111.4 ms | 294.3 ms | 226.7 ms | Native dual-stack IPv6 routing with minimal packet overhead. |
 
-*Artifacts: `storage/app/load-tests/capacity/datacenter-1c-1g-20260924T1753Z/` and `cache-sweep-20260924-180008/`.*
+*Artifacts: `storage/app/load-tests/capacity/datacenter-1c-1g-20261030T2224Z/` and `cache-sweep-20261030-224426/`.*
 
 ---
 
 ### 1 vCPU / 2 GB RAM (Memory-Scaled)
 
-- **Host**: Cloud VPS (`x.x.x.200`), resized in place. 1 shared vCPU, 1,973 MiB RAM, 2.0 GiB swap (0 MiB used).
+- **Host**: Cloud VPS (`...200` historical tier), resized in place. 1 shared vCPU, 2 GB RAM, 2 GB swap (0 MB used).
 - **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0.
 - **Finding**: Doubling RAM completely eliminated swap usage but left XML throughput unchanged (~13.7–14.5 req/sec). Confirms that dynamic XML routing is compute/serialization bound, not memory bound.
 
@@ -249,7 +247,7 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 ### 2 vCPU / 2 GB RAM (Dual-Core)
 
-- **Host**: Cloud VPS (`x.x.x.200`), resized in place. 2 shared vCPUs, 1,973 MiB RAM, 2.0 GiB swap (0 MiB used).
+- **Host**: Cloud VPS (`...200` historical tier), resized in place. 2 shared vCPUs, 2 GB RAM, 2 GB swap (0 MB used).
 - **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0.
 - **Finding**: Adding a second core roughly doubled burst capability and allowed Sofia SIP threads and PHP-FPM workers to execute concurrently without mutual starvation.
 
@@ -278,7 +276,7 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 ### 4 vCPU / 16 GB RAM (Dedicated Cloud Node)
 
-- **Host**: Cloud VPS (`x.x.x.200`), 4 dedicated CPU cores, 15,999 MiB RAM (15,090 MiB available), Linux 6.12 amd64.
+- **Host**: Cloud VPS (`...200` historical tier), 4 dedicated CPU cores, 16 GB RAM (15 GB available), Linux 6.12 amd64.
 - **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 24`), MariaDB 10.11, Redis 7.0, 0 MB swap.
 - **Role**: High-density multi-tenant enterprise PBX and inbound call center (150–400+ extensions).
 - **Finding**: Completely eliminated worker starvation. Sustained throughput leaped to **65.3 req/sec** (+303% over 2c/2g), while peak tail latency dropped under 450 ms across 1,000 sustained queries.
@@ -308,11 +306,11 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 ## Live Call Capacity & Telephony Feature Validation (SIP Signaling)
 
-Live SIP benchmarks measure complete telephony call setup, bidirectional audio flows, and feature validation across two hosts: the PBX target (`x.x.x.200`) and a dedicated load generator (`x.x.x.173`). Setup latency is measured from the initial `INVITE` through digest authentication to the destination `200 OK`.
+Live SIP benchmarks measure complete telephony call setup, bidirectional audio flows, and feature validation across two hosts: the PBX target (`...141`) and a dedicated load generator (`...116`). Setup latency is measured from the initial `INVITE` through digest authentication to the destination `200 OK`.
 
 ### End-to-End Functional Feature Validation (All Tiers)
 
-Before capacity stress testing, the full 14-scenario telephony feature validation suite was executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`) on both the 1 vCPU / 1 GB and 1 vCPU / 2 GB hardware baselines. **All 14 scenarios passed with 100% completion across both tiers:**
+Before capacity stress testing, the full 14-scenario telephony feature validation suite was executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`) between the PBX target (`...141`) and the dedicated load generator (`...116`) over public IP, evaluating directly against the PBX's active default `nftables` firewall rules. **All 14 scenarios passed with 100% completion:**
 
 | Test Scenario | Destination / Feature | Off / Limit / Count | Result | Operational Verification Summary |
 | :--- | :--- | ---: | :---: | :--- |
@@ -322,16 +320,16 @@ Before capacity stress testing, the full 14-scenario telephony feature validatio
 | **Recording Media** | `*732` (Call Recording) | 1 / 1 / 1 | **Passed** | FreeSWITCH answered, recorded active RTP audio, and saved session cleanly. |
 | **MOH Media** | `load_test_moh` (Music on Hold) | 1 / 1 / 1 | **Passed** | Call answered, active RTP captured on UDP 6002 (`load_test_moh.wav`). |
 | **Announcement Media** | `load_test_announcement` | 1 / 1 / 1 | **Passed** | Call answered, active RTP captured on UDP 6004, PBX sent BYE after playback. |
-| **Ring Group** | Extension 2400 | 1 / 2 / 1 | **Passed** | Simultaneous ring bridged to destinations with `200 OK`. |
-| **Voicemail** | `*98` (Voicemail Access) | 1 / 2 / 1 | **Passed** | Authenticated voicemail IVR answered and completed menu navigation. |
-| **Conference Bridge** | Extension 2500 | 1 / 2 / 1 | **Passed** | Conference room bridge connected and audio mixer initialized. |
-| **Call Forwarding** | Ext 2000 -> 2001 forwarding | 1 / 2 / 1 | **Passed** | Diverted via FreeSWITCH loopback channel to 2001; answered cleanly. |
-| **Time Conditions** | Extension 2600 | 1 / 2 / 1 | **Passed** | Evaluated schedule routing rules and terminated at active time target. |
-| **Follow-Me** | Extension 2002 | 1 / 2 / 1 | **Passed** | Stepped hunting destinations sequentially and bridged to available endpoint. |
-| **Emergency Routing** | Extension 911 | 1 / 2 / 1 | **Passed** | Matched emergency dialplan expression and routed to emergency handler. |
-| **Call Blocking** | Blacklisted Caller ID (`5550199`) | 1 / 2 / 1 | **Passed** | Matched incoming blacklist entry and rejected immediately with `603 Decline`. |
+| **Ring Group** | Extension 2400 | 1 / 1 / 3 | **Passed** | Simultaneous ring bridged to destinations with `200 OK`. |
+| **Voicemail** | `*98` (Voicemail Access) | 1 / 1 / 3 | **Passed** | Authenticated voicemail IVR answered and completed menu navigation. |
+| **Conference Bridge** | Extension 2500 | 1 / 1 / 3 | **Passed** | Conference room bridge connected and audio mixer initialized. |
+| **Call Forwarding** | Ext 2000 -> 2001 forwarding | 1 / 1 / 3 | **Passed** | Diverted via FreeSWITCH loopback channel to 2001; answered cleanly. |
+| **Time Conditions** | Extension 2600 | 1 / 1 / 3 | **Passed** | Evaluated schedule routing rules and terminated at active time target. |
+| **Follow-Me** | Extension 2002 | 1 / 1 / 3 | **Passed** | Stepped hunting destinations sequentially and bridged to available endpoint. |
+| **Emergency Routing** | Extension 911 | 1 / 1 / 3 | **Passed** | Matched emergency dialplan expression and routed to emergency handler. |
+| **Call Blocking** | Blacklisted Caller ID (`5550199`) | 1 / 1 / 3 | **Passed** | Matched incoming blacklist entry and rejected immediately with `603 Decline`. |
 
-*Artifacts: `storage/app/load-tests/sipp-e2e-20260924-183518` (1c/1g) and `sipp-e2e-20260924-195535` (1c/2g).*
+*Artifacts: `storage/app/load-tests/sipp-e2e-20261031-070313`.*
 
 ---
 

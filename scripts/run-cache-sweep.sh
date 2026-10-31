@@ -31,19 +31,17 @@ echo " Interface:  $NETWORK_INTERFACE"
 echo " Artifacts:  $OUTPUT_DIR"
 echo "=========================================================="
 
-# Define the 5 sweep tiers. Tier 3 sweeps the current production default (60s
-# since v4.2.0); tier 4 keeps the legacy 30s profile as a mid-point comparison.
+# Define the 4 standard sweep tiers under current defaults (60s since v4.2.0).
 # Format: num | label | dialplan_ttl | contributor_ttl | scenario | requests | concurrency
 declare -a RUNS=(
   "1|cold-baseline|0|0|mixed|100|5"
-  "2|contributor-only|0|5|mixed|100|5"
+  "2|dialplan-cache-off|0|60|mixed|100|5"
   "3|prod-baseline-60|60|60|mixed|100|5"
-  "4|call-center-ttl30|30|30|mixed|100|5"
-  "5|memory-hit-ceiling|60|60|cache-hit|100|5"
+  "4|memory-hit-ceiling|60|60|cache-hit|100|5"
 )
 
-printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Configuration" "D-TTL" "C-TTL" "Req/sec" "Avg (ms)" "Hit Rate"
-printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "----" "--------------------" "--------" "--------" "----------" "----------" "----------"
+printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s\n" "Run" "Operational Mode" "Dialplan TTL" "Contrib TTL" "Directory TTL" "ACL TTL" "Req/sec" "Avg (ms)" "Hit Rate"
+printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s\n" "----" "----------------------" "------------" "-----------" "-------------" "-------" "----------" "----------" "----------"
 
 # Snapshot the granular TTL lines the sweep will modify so the operator's exact
 # values (including commented-out lines) can be restored afterward.
@@ -120,7 +118,12 @@ for item in "${RUNS[@]}"; do
     AVG=$(grep '"average"' "$REPORT" | head -n 1 | awk -F': ' '{print $2}' | tr -d ',')
   fi
 
-  printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$RPS" "${AVG}ms" "$RATE"
+  DIR_VAL="$(grep -E '^#? ?FS_XML_HANDLER_DIRECTORY_CACHE_TTL=' .env | cut -d= -f2 | tr -d ' ' || true)"
+  DIR_TTL="${DIR_VAL:-60}s"
+  ACL_VAL="$(grep -E '^#? ?FS_XML_HANDLER_ACL_CACHE_TTL=' .env | cut -d= -f2 | tr -d ' ' || true)"
+  ACL_TTL="${ACL_VAL:-60}s"
+
+  printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$DIR_TTL" "$ACL_TTL" "$RPS" "${AVG}ms" "$RATE"
 done
 
 echo "=========================================================="
