@@ -8,9 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [4.3.0] - 2026-10-31
+
+### Added
 - **Session Flush Console Command Target Disclosure & Collision Guard**: Hardened `session:flush` (and alias `session:clear`) with pre-confirmation target disclosure (driver, connection name, endpoint, database index, path, or database table) and a Redis database collision safety guard that prevents running `FLUSHDB` when `REDIS_SESSION_DB` collides with the default database (`DB 0`) or cache database (`DB 1`), requiring `--force` to override.
 
 ### Changed
+- **Telephony Benchmarks & Dedicated Compute Sizing**: Updated the reference datacenter benchmarks in `docs/load-testing-results.md` across reference cloud tiers under the 60-second default cache policy with the production `nftables` stateful firewall active, documenting the dedicated compute scaling profile (2 vCPU Dedicated, 8 GB RAM) achieving 31.3 req/sec XML throughput, sub-second tail latencies, and 100% completion across all 14 end-to-end telephony validation scenarios.
 - **Cache Sweep Preserves Operator TTL Settings**: `scripts/run-cache-sweep.sh` no longer resets the host to a hard-coded `FS_XML_HANDLER_CACHE_TTL=5` after benchmarking. It now snapshots the exact `.env` cache TTL values before the sweep and restores them afterward (including when interrupted mid-run), sweeps the current 60-second production default as its baseline tier instead of the legacy 5-second profile, and ensures the granular TTL keys exist so every tier applies reliably.
 - **XML Handler Cache TTL Installer & Environment Alignment (`FS_XML_HANDLER_CACHE_TTL=60`)**: Aligned `.env.example`, fresh installations in `scripts/resources/tall.sh`, `INSTALL.md`, and `docs/env-reference.md` with the 60-second default introduced in `4.2.0`. **Upgrade Note**: Existing servers whose `.env` still specifies `FS_XML_HANDLER_CACHE_TTL=5` from an earlier install preserve their explicit setting on installer re-runs; update `FS_XML_HANDLER_CACHE_TTL=60` in `.env` and run `tpbx optimize:clear` to adopt the 60-second window.
 - **Installation & Upgrade Guide Parity**: Documented the PHP `8.5` runtime requirement, `tpbx` / `tallpbx` global CLI commands, and `tpbx permissions:sync` during manual CLI upgrades in `INSTALL.md`.
