@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Session Flush Console Command Target Disclosure & Collision Guard**: Hardened `session:flush` (and alias `session:clear`) with pre-confirmation target disclosure (driver, connection name, endpoint, database index, path, or database table) and a Redis database collision safety guard that prevents running `FLUSHDB` when `REDIS_SESSION_DB` collides with the default database (`DB 0`) or cache database (`DB 1`), requiring `--force` to override.
+
 ### Changed
 - **Cache Sweep Preserves Operator TTL Settings**: `scripts/run-cache-sweep.sh` no longer resets the host to a hard-coded `FS_XML_HANDLER_CACHE_TTL=5` after benchmarking. It now snapshots the exact `.env` cache TTL values before the sweep and restores them afterward (including when interrupted mid-run), sweeps the current 60-second production default as its baseline tier instead of the legacy 5-second profile, and ensures the granular TTL keys exist so every tier applies reliably.
+- **XML Handler Cache TTL Installer & Environment Alignment (`FS_XML_HANDLER_CACHE_TTL=60`)**: Aligned `.env.example`, fresh installations in `scripts/resources/tall.sh`, `INSTALL.md`, and `docs/env-reference.md` with the 60-second default introduced in `4.2.0`. **Upgrade Note**: Existing servers whose `.env` still specifies `FS_XML_HANDLER_CACHE_TTL=5` from an earlier install preserve their explicit setting on installer re-runs; update `FS_XML_HANDLER_CACHE_TTL=60` in `.env` and run `tpbx optimize:clear` to adopt the 60-second window.
+- **Installation & Upgrade Guide Parity**: Documented the PHP `8.5` runtime requirement, `tpbx` / `tallpbx` global CLI commands, and `tpbx permissions:sync` during manual CLI upgrades in `INSTALL.md`.
 
 ### Fixed
 - **Load-Testing Documentation Cache Guidance**: Corrected stale guidance in the load-testing guide and results document claiming that administrative panel changes took up to the cache TTL window (5–30 seconds) to propagate. Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the documentation now reflects the 60-second default, marks the benchmark tables as measured at the legacy 5-second default, and drops the obsolete tier-differentiated TTL recommendations.
+- **Gateway Dialplan Cache Invalidation**: Registered `Gateway` on `RoutingCacheObserver` so creating, editing, disabling, or deleting SIP gateways immediately invalidates cached outbound and emergency (E911) `mod_xml_curl` dialplan responses instead of waiting up to 60 seconds.
+- **Custom SIP Scanner Signature Dialplan Invalidation**: Added a cache-backed global routing revision (`RoutingCacheVersion::bumpGlobal()`) triggered by `SipScannerSignatures::saveCustom()` so custom SIP scanner User-Agent changes take effect immediately across all tenant public dialplans while keeping cached `mod_xml_curl` lookups database-query-free.
 
 ## [4.2.1] - 2026-10-30
 

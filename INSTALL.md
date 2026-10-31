@@ -9,6 +9,7 @@ routing, voicemail, and recordings — all manageable from your browser.
 ## 1. Create the Server
 
 - **OS Type**: Linux, Debian 13 (64-bit)
+- **PHP Runtime**: PHP 8.5
 - **Hardware Requirements**:
 
 | | Minimum (Production) | Recommended (Development) |
@@ -163,22 +164,20 @@ administrator password.
 
 If you forgot your password or need to change it from the Linux command line:
 
-**Using Artisan (recommended):**
+**Using tpbx / Artisan (recommended):**
 
-TallPBX uses Laravel's built-in command-line tool, **Artisan** (`php artisan`), for system management. It provides both standard Laravel utilities and custom commands designed specifically for TallPBX.
+TallPBX includes a global appliance CLI (`tpbx <command>` or `tallpbx <command>`), which wraps Laravel's built-in **Artisan** (`php artisan`) command for system management. Commands can be run globally from any directory on the server using `tpbx` (or `php artisan` from `/var/www/tallpbx`).
 
 To change a password interactively (it will prompt for the email and new password):
 
 ```bash
-cd /var/www/tallpbx
-php artisan admin:password
+tpbx admin:password
 ```
 
 Or provide the email and new password directly:
 
 ```bash
-cd /var/www/tallpbx
-php artisan admin:password admin@example.com --password="YourNewPassword"
+tpbx admin:password admin@example.com --password="YourNewPassword"
 ```
 
 **Directly via MariaDB (if Laravel cannot boot):**
@@ -203,7 +202,7 @@ and French (June).
 
 The installer will also prompt for which language FreeSWITCH should use as its
 system-wide default sound prompt language. You can change this at any time
-after installation with `php artisan pbx:sounds:default <language>` or through
+after installation with `tpbx pbx:sounds:default <language>` or through
 `vars.xml`; see [docs/operations.md](docs/operations.md#freeswitch-sound-prompt-languages) for details.
 
 ### Post-Installation Next Steps
@@ -227,7 +226,7 @@ the old program first; that does not touch your database or recordings.
 
 ### Redis Cache & Session Storage
 
-Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=5`), protecting MariaDB during call bursts. The installer also enforces a safe universal memory ceiling (`maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`), ensuring short-lived intrusion counters and dialplan cache keys expire naturally and can be safely evicted under attack floods without risking system out-of-memory errors. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `.env`, run `php artisan optimize:clear && php artisan optimize`.
+Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=60`), protecting MariaDB during call bursts. The installer also enforces a safe universal memory ceiling (`maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`), ensuring short-lived intrusion counters and dialplan cache keys expire naturally and can be safely evicted under attack floods without risking system out-of-memory errors. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `.env`, run `tpbx optimize:clear && tpbx optimize`.
 
 ### FreeSWITCH Session Rate
 
@@ -282,8 +281,7 @@ In `static` mode, all workers remain initialized and ready for call bursts. Chec
 The installer sets file ownership and permissions automatically. After a manual deployment, Composer update, or permission issue, restore them with:
 
 ```bash
-cd /var/www/tallpbx
-sudo php artisan permissions:repair --scope=full
+sudo tpbx permissions:repair --scope=full
 ```
 
 Never run broad `chown` or `chmod` commands across the repository. If Laravel cannot boot, use the emergency fallback script: `sudo bash scripts/repair-application-permissions.sh`.
@@ -311,8 +309,8 @@ The installer configures the Linux kernel firewall for these services by default
 Automated intrusion detection protects against failed authentication attempts across SIP, Web, and SSH by applying dynamic kernel bans to offending IP addresses. You can monitor status and manage active bans from the web panel's **Security Center** or the terminal:
 
 ```bash
-php artisan security:status              # Check firewall state, sets, and bans
-php artisan security:unban <IP_ADDRESS>  # Lift a ban immediately
+tpbx security:status              # Check firewall state, sets, and bans
+tpbx security:unban <IP_ADDRESS>  # Lift a ban immediately
 sudo nft flush ruleset                   # Emergency: clear all rules if locked out
 ```
 
@@ -401,12 +399,13 @@ npm ci
 npm run build
 
 # 3. Apply database and module updates.
-php artisan migrate --force
-php artisan module:sync --only-local
+tpbx migrate --force
+tpbx module:sync --only-local
+tpbx permissions:sync
 
 # 4. Refresh caches, permissions, and FreeSWITCH configuration.
-php artisan optimize:clear
-sudo php artisan permissions:repair --scope=full
+tpbx optimize:clear
+sudo tpbx permissions:repair --scope=full
 fs_cli -x "reloadxml"
 ```
 
@@ -469,7 +468,7 @@ saved change remains available as a Git stash until it is applied successfully.
 
 ### Server Unreachable After a Firewall Change
 
-If the web panel and `php artisan` commands hang after changing firewall or pre-filter
+If the web panel and `tpbx` (`php artisan`) commands hang after changing firewall or pre-filter
 settings, the server's own connections to its database and cache are being dropped. Recover
 from an SSH session — these plain Linux commands need no PHP and no database (run them as
 root — prefix with `sudo` if needed):

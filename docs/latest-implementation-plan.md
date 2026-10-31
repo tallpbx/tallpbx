@@ -601,18 +601,18 @@ git commit -m "fix(console): disclose session:flush target before confirmation a
 - Modify: `INSTALL.md:9-23,166-183,206,230,285-287,314-316,403-411,472`
 - Modify: `CHANGELOG.md:8-22` (curating the existing `[Unreleased]` block — the Phase A `### Changed`/`### Fixed` entries are already present)
 
-- [ ] **Step 1: Update `INSTALL.md` for PHP 8.5, `tpbx` CLI parity, `FS_XML_HANDLER_CACHE_TTL=60`, and `permissions:sync`**
+- [x] **Step 1: Update `INSTALL.md` for PHP 8.5, `tpbx` CLI parity, `FS_XML_HANDLER_CACHE_TTL=60`, and `permissions:sync`**
 
 Apply these targeted updates in `INSTALL.md` (§1 PHP Runtime bullet; administrator-password section → `tpbx admin:password` variants; sound prompts → `tpbx pbx:sounds:default`; Redis Cache & Session Storage → `FS_XML_HANDLER_CACHE_TTL=60` and `tpbx optimize:clear && tpbx optimize`; File Permissions → `sudo tpbx permissions:repair --scope=full`; firewall CLI examples → `tpbx security:status` / `tpbx security:unban`; Manual CLI Upgrade → the `tpbx migrate --force` / `tpbx module:sync --only-local` / `tpbx permissions:sync` / `tpbx optimize:clear` / `sudo tpbx permissions:repair --scope=full` / `fs_cli -x "reloadxml"` sequence; lockout troubleshooting → `` `tpbx` (`php artisan`) commands ``).
 
-- [ ] **Step 2: Update `[Unreleased]` in `CHANGELOG.md`**
+- [x] **Step 2: Update `[Unreleased]` in `CHANGELOG.md`**
 
 - Update the `### Added` → **Session Flush Console Command** bullet to note pre-confirmation target disclosure (connection, endpoint, DB index / path / table) and the Redis DB collision safety guard preventing accidental `FLUSHDB` when `REDIS_SESSION_DB` collides with `REDIS_DB` (`DB 0`) or `REDIS_CACHE_DB` (`DB 1`).
 - Under `### Changed`: keep the existing Phase A entries (cache-sweep script behavior, and add the XML Handler Cache TTL Installer & Environment Alignment bullet with the explicit **Upgrade Note** — existing servers whose `.env` still specifies `FS_XML_HANDLER_CACHE_TTL=5` preserve their explicit setting on installer re-runs; set `FS_XML_HANDLER_CACHE_TTL=60` in `.env` and run `tpbx optimize:clear` to adopt the 60-second window) plus Installation & Upgrade Guide Parity (PHP `8.5` floor, `tpbx`/`tallpbx` global CLI, `tpbx permissions:sync`).
 - Under `### Fixed`: add **Gateway Dialplan Cache Invalidation** (R1) and **Custom SIP Scanner Signature Dialplan Invalidation** (R2) bullets as worded in the superseded plan.
 - Do **not** add the D7(c)-excluded items.
 
-- [ ] **Step 3: Verify documentation consistency**
+- [x] **Step 3: Verify documentation consistency**
 
 Run:
 ```bash
