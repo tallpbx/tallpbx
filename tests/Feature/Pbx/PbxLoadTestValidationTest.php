@@ -43,7 +43,7 @@ describe('pbx load test scripts and scenarios', function (): void {
 
         expect($script)->toContain('cold-baseline')
             ->and($script)->toContain('contributor-only')
-            ->and($script)->toContain('prod-baseline-100')
+            ->and($script)->toContain('prod-baseline-60')
             ->and($script)->toContain('call-center-ttl30')
             ->and($script)->toContain('memory-hit-ceiling');
     });
@@ -61,7 +61,8 @@ describe('pbx load test scripts and scenarios', function (): void {
         $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('trap restore_defaults EXIT')
-            ->and($script)->toContain('FS_XML_HANDLER_CACHE_TTL=5');
+            ->and($script)->toContain('SNAPSHOT_DIALPLAN')
+            ->and($script)->toContain('SNAPSHOT_CONTRIBUTOR');
     });
 
     it('formats output with average latency instead of percentiles', function (): void {

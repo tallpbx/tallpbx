@@ -1040,7 +1040,7 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
         ->and($freeSwitchScript)->toContain('sound_prefix=')
         ->and($installDoc)->toContain('### FreeSWITCH Sound Prompt Languages')
         ->and($installDoc)->toContain('### Post-Installation Next Steps')
-        ->and($installDoc)->toContain('php artisan pbx:sounds:default')
+        ->and($installDoc)->toContain('tpbx pbx:sounds:default')
         ->and($operationsDoc)->toContain('## FreeSWITCH Sound Prompt Languages')
         ->and($operationsDoc)->toContain('## Outgoing Mail & Notifications (Email Connector)')
         ->and($operationsDoc)->toContain('tpbx pbx:sounds:list')
@@ -1063,7 +1063,7 @@ it('auto-configures PHP-FPM static worker pools based on host memory', function 
 it('configures default XML handler cache TTL in tall.sh', function (): void {
     $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
 
-    expect($tallScript)->toContain('FS_XML_HANDLER_CACHE_TTL=5');
+    expect($tallScript)->toContain('FS_XML_HANDLER_CACHE_TTL=60');
 });
 
 it('loads the external blocklist elements file at boot alongside the main ruleset', function (): void {

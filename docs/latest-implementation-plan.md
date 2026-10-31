@@ -636,14 +636,14 @@ git commit -m "docs: synchronize INSTALL.md and CHANGELOG.md for post-v4.2.0 rem
 
 ### C1 — Consolidated targeted test pass over everything changed in Phases A+B
 
-- [ ] **Step 1:** Re-run the targeted suites covering all changed behavior, each with `--parallel`, sequentially per file (Pest's parallel mode accepts a single path):
+- [x] **Step 1:** Re-run the targeted suites covering all changed behavior, each with `--parallel`, sequentially per file (Pest's parallel mode accepts a single path):
   - `./vendor/bin/pest tests/Feature/XmlHandlerCacheConfigTest.php --parallel` (Phase A docs + R3)
   - `./vendor/bin/pest tests/Feature/Observers/RoutingCacheObserverTest.php --parallel` (R1 + R2)
   - `./vendor/bin/pest app-modules/security/tests/SipScannerSignaturesTest.php --parallel` (R2)
   - `./vendor/bin/pest tests/Feature/Performance/XmlHandlerZeroSyncQueriesTest.php --parallel` (R2 zero-query contract)
   - `./vendor/bin/pest tests/Feature/Console/SessionFlushCommandTest.php --parallel` (R4)
-- [ ] **Step 2:** Sweep the suite for any test asserting on touched docs and run those too: `grep -rln "load-testing\|run-cache-sweep\|env-reference\|architecture.md\|README" tests/ | grep -v Browser` → run each hit.
-- [ ] **Step 3:** Expected: every targeted file PASSES. Record exact pass counts as verification evidence for C3.
+- [x] **Step 2:** Sweep the suite for any test asserting on touched docs and run those too: `grep -rln "load-testing\|run-cache-sweep\|env-reference\|architecture.md\|README" tests/ | grep -v Browser` → run each hit.
+- [x] **Step 3:** Expected: every targeted file PASSES. Record exact pass counts as verification evidence for C3.
 
 ### C2 — Full 60-Second Re-Benchmark Across All Four Reference Tiers (D2b)
 
