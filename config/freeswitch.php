@@ -346,9 +346,10 @@ return [
         |--------------------------------------------------------------------------
         |
         | Short-lived caching avoids rebuilding identical XML responses during
-        | call bursts. 'cache_ttl' acts as the master default (in seconds) for
-        | all XML handler caches. Individual caches inherit this duration unless
-        | an explicit granular override is defined in the environment.
+        | call bursts. 'cache_ttl' acts as the 60-second master default (in seconds)
+        | for all XML handler caches, backed by RoutingCacheVersion immediate
+        | invalidation on routing writes. Individual caches inherit this duration
+        | unless an explicit granular override is defined in the environment.
         |
         */
         'cache_ttl' => (int) env('FS_XML_HANDLER_CACHE_TTL', 60),

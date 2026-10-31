@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Security\Support;
 
+use App\Support\RoutingCacheVersion;
 use Modules\Security\Models\SecuritySetting;
 
 /**
@@ -215,6 +216,7 @@ final class SipScannerSignatures
         $sanitized = self::sanitizeCustomList($entries);
 
         SecuritySetting::set(self::CUSTOM_SETTINGS_KEY, json_encode($sanitized));
+        RoutingCacheVersion::bumpGlobal();
 
         return $sanitized;
     }

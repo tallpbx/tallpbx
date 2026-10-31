@@ -97,6 +97,7 @@ use Modules\Fax\Models\FaxOutgoing;
 use Modules\FeatureCodes\Models\FeatureCode;
 use Modules\FileStores\Events\FileStoreDeleting;
 use Modules\FollowMe\Models\FollowMe;
+use Modules\Gateways\Models\Gateway;
 use Modules\HotDesking\Models\HotDeskSession;
 use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\IvrMenus\Models\IvrMenu;
@@ -394,6 +395,7 @@ class AppServiceProvider extends ServiceProvider
             InboundRoute::class,
             Destination::class,
             OutboundRoute::class,
+            Gateway::class,
             IvrMenu::class,
             IvrMenuOption::class,
             TimeCondition::class,

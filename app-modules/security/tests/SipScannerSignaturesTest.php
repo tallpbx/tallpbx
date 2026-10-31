@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Modules\Security;
 
+use App\Support\RoutingCacheVersion;
+use Illuminate\Support\Facades\Cache;
 use Modules\Security\Models\SecuritySetting;
 use Modules\Security\Services\Detection\SipScannerDialplanContributor;
 use Modules\Security\Support\SipScannerSignatures;
@@ -219,4 +221,15 @@ it('reads the custom signature list at render time', function (): void {
     $withoutCustom = $contributor->generateDialplanXml(1, 'tenant_abc_public', '1234');
     expect($withoutCustom)->not->toContain('Grandstream')
         ->and($withoutCustom)->toContain('friendly\-scanner');
+});
+
+it('bumps the global routing cache version whenever custom scanner signatures are saved', function (): void {
+    Cache::flush();
+    expect(RoutingCacheVersion::getGlobal())->toBe(0);
+
+    SipScannerSignatures::saveCustom(['BadScanner/1.0']);
+    expect(RoutingCacheVersion::getGlobal())->toBe(1);
+
+    SipScannerSignatures::saveCustom([]);
+    expect(RoutingCacheVersion::getGlobal())->toBe(2);
 });

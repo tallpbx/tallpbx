@@ -26,8 +26,8 @@ use Modules\Security\Support\SipScannerSignatures;
  *
  * Detection and recording are always active; the per-feature enforcement toggle
  * (which gates automatic nftables bans) is evaluated in PHP by the listener.
- * Custom signatures are merged at render time and inherit the existing
- * dialplan contributor cache TTL — no extra cache plumbing.
+ * Custom signatures are merged at render time and invalidated immediately across
+ * all tenants via RoutingCacheVersion::bumpGlobal().
  */
 class SipScannerDialplanContributor implements ContextWideDialplanXmlContributor, DialplanGuardXmlContributor
 {

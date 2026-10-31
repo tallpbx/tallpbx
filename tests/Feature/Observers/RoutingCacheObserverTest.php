@@ -9,16 +9,20 @@ use App\Services\TenantManager;
 use App\Services\Xml\DirectoryXmlBuilder;
 use App\Support\RoutingCacheVersion;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
+use Modules\Emergency\Models\Emergency;
 use Modules\Extensions\Models\Extension;
 use Modules\ExtensionSettings\Models\ExtensionSetting;
+use Modules\Gateways\Models\Gateway;
 use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\IvrMenus\Models\IvrMenu;
 use Modules\IvrMenus\Models\IvrMenuOption;
 use Modules\OutboundRoutes\Models\OutboundRoute;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Models\RingGroupExtension;
+use Modules\Security\Support\SipScannerSignatures;
 use Modules\SipAccounts\Models\SipAccount;
 
 beforeEach(function (): void {
@@ -278,4 +282,142 @@ it('immediately invalidates cached directory XML when a sip account or extension
     $xml3 = $builder->buildCachedDirectoryXml('user', 'domain.test', '1001', '1001');
     expect($xml3)->toContain('name="call_waiting" value="enabled"')
         ->and($xml3)->not->toContain('name="call_waiting" value="disabled"');
+});
+
+it('bumps routing cache version when a gateway is created, updated, disabled, or deleted', function (): void {
+    $tenant = Tenant::factory()->create();
+    $versionBefore = RoutingCacheVersion::get((int) $tenant->id);
+
+    $gateway = Gateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'host' => 'sip1.carrier.test',
+        'port' => 5060,
+        'enabled' => true,
+    ]);
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 1);
+
+    $gateway->update(['host' => 'sip2.carrier.test', 'port' => 5080]);
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 2);
+
+    $gateway->update(['enabled' => false]);
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 3);
+
+    $gateway->delete();
+    expect(RoutingCacheVersion::get((int) $tenant->id))->toBe($versionBefore + 4);
+});
+
+it('immediately invalidates cached emergency and outbound dialplan XML when a gateway is modified or disabled', function (): void {
+    config([
+        'freeswitch.xml_handler.auth' => false,
+        'freeswitch.xml_handler.dialplan_cache_ttl' => 60,
+        'freeswitch.xml_handler.dialplan_contributor_cache_ttl' => 60,
+    ]);
+    Cache::flush();
+
+    $tenant = Tenant::factory()->create();
+    $context = app(DialplanContext::class)->internal((string) $tenant->id);
+
+    Emergency::factory()->create([
+        'tenant_id' => $tenant->id,
+        'caller_id' => '+15551234567',
+        'address' => '100 Main St',
+    ]);
+
+    $emergencyGw = Gateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'emergency',
+        'host' => 'e911-primary.carrier.test',
+        'port' => 5060,
+        'enabled' => true,
+    ]);
+
+    $trunkGw = Gateway::factory()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'primary-trunk',
+        'host' => 'trunk.carrier.test',
+        'port' => 5060,
+        'enabled' => true,
+    ]);
+
+    OutboundRoute::factory()->create([
+        'tenant_id' => $tenant->id,
+        'dial_pattern' => '^(\d{10})$',
+        'gateway_id' => $trunkGw->id,
+        'gateway' => null,
+        'enabled' => true,
+    ]);
+
+    $e911Query = http_build_query([
+        'section' => 'dialplan',
+        'Caller-Context' => $context,
+        'Caller-Destination-Number' => '911',
+    ]);
+    $outboundQuery = http_build_query([
+        'section' => 'dialplan',
+        'Caller-Context' => $context,
+        'Caller-Destination-Number' => '5559876543',
+    ]);
+
+    // Warm both 60s caches (full dialplan + context-wide contributor fragments)
+    $this->get('/api/v1/xml-handler?'.$e911Query)
+        ->assertOk()
+        ->assertSee('sofia/external/${destination_number}@e911-primary.carrier.test:5060', false);
+    $this->get('/api/v1/xml-handler?'.$outboundQuery)
+        ->assertOk()
+        ->assertSee("sofia/gateway/{$trunkGw->id}/\$1", false);
+
+    // Update emergency gateway host/port and disable outbound trunk gateway without touching Emergency or OutboundRoute
+    $emergencyGw->update(['host' => 'e911-backup.carrier.test', 'port' => 5080]);
+    $trunkGw->update(['enabled' => false]);
+
+    // Next mod_xml_curl lookups must immediately reflect both gateway changes
+    $this->get('/api/v1/xml-handler?'.$e911Query)
+        ->assertOk()
+        ->assertSee('sofia/external/${destination_number}@e911-backup.carrier.test:5080', false)
+        ->assertDontSee('e911-primary.carrier.test', false);
+    $this->get('/api/v1/xml-handler?'.$outboundQuery)
+        ->assertOk()
+        ->assertDontSee("sofia/gateway/{$trunkGw->id}/\$1", false);
+});
+
+it('immediately invalidates cached public dialplans across all tenants on custom scanner signature updates while keeping cache hits query-free', function (): void {
+    config([
+        'freeswitch.xml_handler.auth' => false,
+        'freeswitch.xml_handler.dialplan_cache_ttl' => 60,
+        'freeswitch.xml_handler.dialplan_contributor_cache_ttl' => 60,
+    ]);
+    Cache::flush();
+
+    $tenantA = Tenant::factory()->create();
+    $tenantB = Tenant::factory()->create();
+    $contextA = app(DialplanContext::class)->public((string) $tenantA->id);
+    $contextB = app(DialplanContext::class)->public((string) $tenantB->id);
+
+    $queryA = http_build_query([
+        'section' => 'dialplan',
+        'Caller-Context' => $contextA,
+        'Caller-Destination-Number' => '1000',
+    ]);
+    $queryB = http_build_query([
+        'section' => 'dialplan',
+        'Caller-Context' => $contextB,
+        'Caller-Destination-Number' => '1000',
+    ]);
+
+    // Warm 60s caches for both tenants prior to adding a custom scanner signature
+    $this->get('/api/v1/xml-handler?'.$queryA)->assertOk()->assertDontSee('CustomBot99');
+    $this->get('/api/v1/xml-handler?'.$queryB)->assertOk()->assertDontSee('CustomBot99');
+
+    // Verify cached dialplan hit executes ZERO database queries
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+    $this->get('/api/v1/xml-handler?'.$queryA)->assertOk();
+    expect(DB::getQueryLog())->toBeEmpty();
+    DB::disableQueryLog();
+
+    // Save custom global SIP scanner signature — must invalidate both tenants immediately
+    SipScannerSignatures::saveCustom(['CustomBot99']);
+
+    $this->get('/api/v1/xml-handler?'.$queryA)->assertOk()->assertSee('CustomBot99');
+    $this->get('/api/v1/xml-handler?'.$queryB)->assertOk()->assertSee('CustomBot99');
 });

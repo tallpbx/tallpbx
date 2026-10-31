@@ -28,6 +28,15 @@ class RoutingCacheVersion
     }
 
     /**
+     * The global cache key holding the system-wide routing revision
+     * (e.g. custom SIP scanner signatures affecting all public dialplans).
+     */
+    public static function globalKey(): string
+    {
+        return 'freeswitch:routing-version:global';
+    }
+
+    /**
      * Resolve the cache store holding the routing revision. Defaults to the
      * application cache; configurable for deployments with unusual stores.
      */
@@ -57,10 +66,31 @@ class RoutingCacheVersion
     }
 
     /**
+     * Bump the global revision after a system-wide routing-data write
+     * (e.g. custom SIP scanner signature updates).
+     */
+    public static function bumpGlobal(): void
+    {
+        $store = self::store();
+
+        if (! is_int($store->increment(self::globalKey()))) {
+            $store->put(self::globalKey(), static::getGlobal() + 1);
+        }
+    }
+
+    /**
      * Read the current revision (never a database query).
      */
     public static function get(int $tenantId): int
     {
         return (int) self::store()->get(self::key($tenantId), 0);
+    }
+
+    /**
+     * Read the current global revision (never a database query).
+     */
+    public static function getGlobal(): int
+    {
+        return (int) self::store()->get(self::globalKey(), 0);
     }
 }

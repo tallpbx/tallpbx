@@ -164,6 +164,7 @@ class DialplanXmlCollector
             (string) $tenantId,
             $context,
             (string) RoutingCacheVersion::get($tenantId),
+            (string) RoutingCacheVersion::getGlobal(),
         ]));
     }
 }

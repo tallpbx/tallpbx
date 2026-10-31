@@ -112,3 +112,16 @@ it('defaults all XML handler cache TTLs to 60 when neither master nor granular s
         ->and($xmlHandler['directory_cache_ttl'])->toBe(60)
         ->and($xmlHandler['acl_cache_ttl'])->toBe(60);
 });
+
+it('aligns .env.example and the appliance installer script with the 60-second XML handler cache TTL default', function (): void {
+    $envExample = (string) file_get_contents(base_path('.env.example'));
+    $tallInstaller = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+
+    expect($envExample)
+        ->toContain('FS_XML_HANDLER_CACHE_TTL=60')
+        ->not->toContain('FS_XML_HANDLER_CACHE_TTL=5')
+        ->and($tallInstaller)
+        ->toContain('grep -q "^FS_XML_HANDLER_CACHE_TTL=" .env')
+        ->toContain('echo "FS_XML_HANDLER_CACHE_TTL=60" >> .env')
+        ->not->toContain('FS_XML_HANDLER_CACHE_TTL=5');
+});

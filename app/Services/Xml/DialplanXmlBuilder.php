@@ -428,6 +428,7 @@ class DialplanXmlBuilder
             (string) ((bool) config('freeswitch.xml_handler.hiredis_limit_enabled', false)),
             (string) ((int) config('freeswitch.xml_handler.hiredis_limit_max', 100000)),
             (string) ((bool) config('freeswitch.xml_handler.hiredis_marker_enabled', false)),
+            (string) RoutingCacheVersion::getGlobal(),
         ]));
     }
 }

@@ -242,8 +242,11 @@ grep -q "^REDIS_SESSION_DB=" .env 2>/dev/null \
 grep -q "^FS_XML_HANDLER_CACHE_STORE=" .env 2>/dev/null \
     && sed -i "s/^FS_XML_HANDLER_CACHE_STORE=.*/FS_XML_HANDLER_CACHE_STORE=redis/" .env \
     || echo "FS_XML_HANDLER_CACHE_STORE=redis" >> .env
+# Fresh installs default to a 60-second XML handler cache TTL, backed by
+# RoutingCacheVersion instant invalidation on routing writes. Existing .env
+# values are preserved on installer re-runs.
 grep -q "^FS_XML_HANDLER_CACHE_TTL=" .env 2>/dev/null \
-    || echo "FS_XML_HANDLER_CACHE_TTL=5" >> .env
+    || echo "FS_XML_HANDLER_CACHE_TTL=60" >> .env
 grep -q "^FS_HIREDIS_LIMIT_ENABLED=" .env 2>/dev/null \
     || echo "FS_HIREDIS_LIMIT_ENABLED=false" >> .env
 grep -q "^FS_HIREDIS_LIMIT_MAX=" .env 2>/dev/null \

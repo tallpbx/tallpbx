@@ -155,7 +155,7 @@ No commit happens without explicit user approval at this gate. Granular commits:
 
 *Carried verbatim from the superseded plan (Tasks 1–6) with the adjustments noted per task. Every task: write the failing test first, watch it fail, implement, watch it pass, then commit (user approval required).*
 
-### R1 — Observe `Gateway` in `RoutingCacheObserver` for Outbound & E911 Dialplan Invalidation
+### R1 — Observe `Gateway` in `RoutingCacheObserver` for Outbound & E911 Dialplan Invalidation — **COMPLETE (uncommitted)**
 
 **Files:**
 - Modify: `app/Providers/AppServiceProvider.php:92-95,388-420`
@@ -165,7 +165,7 @@ No commit happens without explicit user approval at this gate. Granular commits:
 - Consumes: `Modules\Gateways\Models\Gateway` (`tenant_id`, `name`, `host`, `port`, `enabled`), `App\Observers\RoutingCacheObserver`, `App\Support\RoutingCacheVersion::get(int $tenantId): int`
 - Produces: Automatic `RoutingCacheVersion::bump(int $tenantId)` on `Gateway` `saved` and `deleted` events (including cross-tenant `tenant_id` reassignment via `RoutingCacheObserver`)
 
-- [ ] **Step 1: Write the failing `Gateway` observer and E911/outbound cache-invalidation tests in `tests/Feature/Observers/RoutingCacheObserverTest.php`**
+- [x] **Step 1: Write the failing `Gateway` observer and E911/outbound cache-invalidation tests in `tests/Feature/Observers/RoutingCacheObserverTest.php`**
 
 Import `Modules\Emergency\Models\Emergency` and `Modules\Gateways\Models\Gateway`, then append two tests:
 
@@ -267,16 +267,16 @@ it('immediately invalidates cached emergency and outbound dialplan XML when a ga
 });
 ```
 
-- [ ] **Step 2: Run the targeted test file to verify the new tests fail**
+- [x] **Step 2: Run the targeted test file to verify the new tests fail**
 
 Run: `./vendor/bin/pest tests/Feature/Observers/RoutingCacheObserverTest.php`
 Expected: FAIL — `RoutingCacheVersion::get((int) $tenant->id)` stays unchanged when `Gateway` is created/updated, and cached `e911-primary.carrier.test` / `sofia/gateway/{$trunkGw->id}` XML remains stale.
 
-- [ ] **Step 3: Register `Gateway::class` in `AppServiceProvider::registerRoutingCacheObservers()`**
+- [x] **Step 3: Register `Gateway::class` in `AppServiceProvider::registerRoutingCacheObservers()`**
 
 In `app/Providers/AppServiceProvider.php`, import `use Modules\Gateways\Models\Gateway;` (alphabetically among `Modules\*` imports) and add `Gateway::class` to `$telephonyModels` inside `registerRoutingCacheObservers()`.
 
-- [ ] **Step 4: Clear caches, format, and verify tests pass**
+- [x] **Step 4: Clear caches, format, and verify tests pass**
 
 Run:
 ```bash
@@ -295,7 +295,7 @@ git commit -m "fix(xml): observe Gateway mutations in RoutingCacheObserver for E
 
 ---
 
-### R2 — Add Global Routing Cache Revision for Custom SIP Scanner Signatures
+### R2 — Add Global Routing Cache Revision for Custom SIP Scanner Signatures — **COMPLETE (uncommitted)**
 
 **Files:**
 - Modify: `app/Support/RoutingCacheVersion.php:10-66`
@@ -313,7 +313,7 @@ git commit -m "fix(xml): observe Gateway mutations in RoutingCacheObserver for E
   - `App\Support\RoutingCacheVersion::bumpGlobal(): void` (increments `'freeswitch:routing-version:global'` on `self::store()` with the same `is_int($store->increment(...))` fallback used by `bump()`)
   - `App\Support\RoutingCacheVersion::getGlobal(): int` (reads `(int) self::store()->get(self::globalKey(), 0)` — strictly cache-only, never a database query)
 
-- [ ] **Step 1: Write failing tests for global revision bumping, multi-tenant public dialplan invalidation, and zero-DB-query cache hits**
+- [x] **Step 1: Write failing tests for global revision bumping, multi-tenant public dialplan invalidation, and zero-DB-query cache hits**
 
 1. In `app-modules/security/tests/SipScannerSignaturesTest.php`, import `App\Support\RoutingCacheVersion` and `Illuminate\Support\Facades\Cache`, then add:
 
@@ -376,12 +376,12 @@ it('immediately invalidates cached public dialplans across all tenants on custom
 });
 ```
 
-- [ ] **Step 2: Run the targeted tests to verify they fail**
+- [x] **Step 2: Run the targeted tests to verify they fail**
 
 Run: `./vendor/bin/pest app-modules/security/tests/SipScannerSignaturesTest.php`
 Expected: FAIL — `Call to undefined method App\Support\RoutingCacheVersion::getGlobal()`.
 
-- [ ] **Step 3: Implement `RoutingCacheVersion::globalKey()`, `bumpGlobal()`, and `getGlobal()`, wire into dialplan cache keys, and call `bumpGlobal()` in `SipScannerSignatures::saveCustom()`**
+- [x] **Step 3: Implement `RoutingCacheVersion::globalKey()`, `bumpGlobal()`, and `getGlobal()`, wire into dialplan cache keys, and call `bumpGlobal()` in `SipScannerSignatures::saveCustom()`**
 
 1. `app/Support/RoutingCacheVersion.php`: Add `public static function globalKey(): string` (`'freeswitch:routing-version:global'`), `public static function bumpGlobal(): void`, and `public static function getGlobal(): int` mirroring `key()`, `bump()`, and `get()` on `self::store()`.
 2. `app/Services/DialplanXmlCollector.php`: Append `(string) RoutingCacheVersion::getGlobal()` to the `implode('|', [...])` array in `contributorCacheKey()`.
@@ -389,7 +389,7 @@ Expected: FAIL — `Call to undefined method App\Support\RoutingCacheVersion::ge
 4. `app-modules/security/src/Support/SipScannerSignatures.php`: Import `App\Support\RoutingCacheVersion` and call `RoutingCacheVersion::bumpGlobal();` immediately after `SecuritySetting::set(...)` inside `saveCustom()`.
 5. `app-modules/security/src/Services/Detection/SipScannerDialplanContributor.php`: Update lines 29–30 of the class docblock to state that custom signatures are merged at render time and invalidated immediately via `RoutingCacheVersion::bumpGlobal()`.
 
-- [ ] **Step 4: Clear caches, format, and verify tests pass**
+- [x] **Step 4: Clear caches, format, and verify tests pass**
 
 Run:
 ```bash
@@ -424,7 +424,7 @@ git commit -m "fix(security): invalidate cached public dialplans immediately on 
 - Consumes: `config/freeswitch.php` (`env('FS_XML_HANDLER_CACHE_TTL', 60)`)
 - Produces: Synchronized `60`-second default across `.env.example` and `scripts/resources/tall.sh` (idempotent seed for fresh installs); config comment accurately describing the 60s default and version-driven invalidation
 
-- [ ] **Step 1: Write the failing `.env.example` and installer parity test in `tests/Feature/XmlHandlerCacheConfigTest.php`**
+- [x] **Step 1: Write the failing `.env.example` and installer parity test in `tests/Feature/XmlHandlerCacheConfigTest.php`**
 
 Append to `tests/Feature/XmlHandlerCacheConfigTest.php`:
 
@@ -443,18 +443,18 @@ it('aligns .env.example and the appliance installer script with the 60-second XM
 });
 ```
 
-- [ ] **Step 2: Run the targeted test to verify it fails**
+- [x] **Step 2: Run the targeted test to verify it fails**
 
 Run: `./vendor/bin/pest tests/Feature/XmlHandlerCacheConfigTest.php`
 Expected: FAIL — `.env.example` and `scripts/resources/tall.sh` still contain `FS_XML_HANDLER_CACHE_TTL=5`.
 
-- [ ] **Step 3: Update `.env.example`, `scripts/resources/tall.sh`, and the `config/freeswitch.php` header comment**
+- [x] **Step 3: Update `.env.example`, `scripts/resources/tall.sh`, and the `config/freeswitch.php` header comment**
 
 1. `.env.example:118-122`: Update `FS_XML_HANDLER_CACHE_TTL=60` and the four commented subsystem override examples (`# FS_XML_HANDLER_*_CACHE_TTL=60`).
 2. `scripts/resources/tall.sh:245-246`: Add a plain-language comment above the `grep -q "^FS_XML_HANDLER_CACHE_TTL="` check explaining that fresh installs default to 60s (backed by `RoutingCacheVersion` instant invalidation) while existing `.env` values are preserved on re-runs, and change `echo "FS_XML_HANDLER_CACHE_TTL=5" >> .env` to `echo "FS_XML_HANDLER_CACHE_TTL=60" >> .env`.
 3. `config/freeswitch.php` (scope expansion): reword the "FreeSWITCH XML Handler Caching" header comment — "Short-lived caching avoids rebuilding identical XML responses during call bursts" → wording that states the 60-second master default with `RoutingCacheVersion` immediate invalidation on routing writes (keep it a comment-only change; no value changes).
 
-- [ ] **Step 4: Validate shell syntax, format PHP test, and run targeted test**
+- [x] **Step 4: Validate shell syntax, format PHP test, and run targeted test**
 
 Run:
 ```bash
