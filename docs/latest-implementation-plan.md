@@ -494,7 +494,7 @@ git commit -m "fix(installer): align FS_XML_HANDLER_CACHE_TTL=60 across .env.exa
   - Confirmation prompt format: `"This will invalidate all active HTTP sessions across all tenants and administrators ({$target}). Do you wish to continue?"`
   - Collision guard behavior on `'redis'`: If `$collidingConnection = $this->detectRedisDbCollision($connectionName)` is non-null and `! $this->option('force')`, emit `$this->components->error("Refusing to run FLUSHDB: Redis session connection [{$connectionName}] shares database [{$dbIndex}] on [{$host}:{$port}] with Redis [{$collidingConnection}] connection. Isolate REDIS_SESSION_DB (e.g. DB 2) or pass --force to override.")` and return `self::FAILURE` **before** prompting or calling `flushdb()`. When `--force` is passed on a colliding DB, emit `$this->components->warn(...)` and proceed.
 
-- [ ] **Step 1: Update existing confirmation tests and add Redis target disclosure + DB collision guard tests in `tests/Feature/Console/SessionFlushCommandTest.php`**
+- [x] **Step 1: Update existing confirmation tests and add Redis target disclosure + DB collision guard tests in `tests/Feature/Console/SessionFlushCommandTest.php`**
 
 1. Preserve/restore `database.redis.session`, `database.redis.default`, and `database.redis.cache` in `beforeEach` / `afterEach`.
 2. Update the two existing confirmation tests to set a deterministic driver (`array`) and expect the target-aware confirmation prompt: `'This will invalidate all active HTTP sessions across all tenants and administrators (driver: array (in-memory)). Do you wish to continue?'`
@@ -560,12 +560,12 @@ it('allows overriding the Redis database collision guard when --force is explici
 ```
 *(Remember `use Illuminate\Support\Facades\Redis;` at the top of `SessionFlushCommandTest.php`.)*
 
-- [ ] **Step 2: Run `SessionFlushCommandTest.php` to verify the tests fail**
+- [x] **Step 2: Run `SessionFlushCommandTest.php` to verify the tests fail**
 
 Run: `./vendor/bin/pest tests/Feature/Console/SessionFlushCommandTest.php`
 Expected: FAIL — prompt text does not include target descriptor and Redis DB collision does not abort before `flushdb()`.
 
-- [ ] **Step 3: Implement `describeTarget()` and `detectRedisDbCollision()` in `app/Console/Commands/SessionFlushCommand.php`**
+- [x] **Step 3: Implement `describeTarget()` and `detectRedisDbCollision()` in `app/Console/Commands/SessionFlushCommand.php`**
 
 In `SessionFlushCommand::handle(Filesystem $filesystem): int`:
 1. Resolve `$driver = (string) config('session.driver', 'redis');` first.
@@ -574,7 +574,7 @@ In `SessionFlushCommand::handle(Filesystem $filesystem): int`:
    - When non-null and `$this->option('force')`, emit `$this->components->warn(...)` noting `--force` override.
 3. Build `$target = $this->describeTarget($driver);` and pass `"This will invalidate all active HTTP sessions across all tenants and administrators ({$target}). Do you wish to continue?"` to `$this->confirm(...)` when `! $this->option('force')`.
 
-- [ ] **Step 4: Clear caches, format, and verify tests pass**
+- [x] **Step 4: Clear caches, format, and verify tests pass**
 
 Run:
 ```bash
