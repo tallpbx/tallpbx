@@ -181,10 +181,10 @@ class XmlHandlerController extends Controller
      */
     private function handleDirectory(Request $request): Response
     {
-        $tagName = $request->input('tag_name', 'user');
-        $keyValue = $request->input('key_value', '');
-        $domain = $request->input('domain', '');
-        $sipAuthUsername = $request->input('sip_auth_username', $request->input('user', ''));
+        $tagName = (string) ($request->input('tag_name') ?: 'user');
+        $keyValue = (string) ($request->input('key_value') ?? '');
+        $domain = (string) ($request->input('domain') ?? '');
+        $sipAuthUsername = (string) ($request->input('sip_auth_username', $request->input('user')) ?? '');
 
         // Resolve tenant identity using multi-factor resolution:
         //   1. Domain + SIP auth username (handles shared domains)

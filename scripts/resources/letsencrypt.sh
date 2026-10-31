@@ -208,6 +208,20 @@ server {
         root /var/www/html;
     }
 
+    # FreeSWITCH XML Handler: local loopback requests from mod_xml_curl must
+    # never be redirected to HTTPS, avoiding TLS mismatch and 301 redirect failures.
+    location = /api/v1/xml-handler {
+        access_log off;
+        try_files \$uri /index.php?\$query_string;
+    }
+
+    location ~ ^/index\.php(/|\$) {
+        fastcgi_pass unix:/var/run/php/php\${php_version:-8.5}-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
     location / {
         return 301 https://\$host\$request_uri;
     }

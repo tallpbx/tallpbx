@@ -124,7 +124,7 @@ if [[ ! -f "${CSV_ABSOLUTE}" ]]; then
   exit 2
 fi
 
-awk -F';' 'BEGIN { OFS = ";" } NR == 1 { print; next } { print $0, "[authentication username="$1" password="$2"]" }' \
+awk -F';' -v realm="${DOMAIN}" 'BEGIN { OFS = ";" } NR == 1 { print; next } { if (realm != "") $3 = realm; print $0, "[authentication username="$1" password="$2"]" }' \
   "${CSV_ABSOLUTE}" > "${AUTH_CSV_ABSOLUTE}"
 
 {
@@ -186,7 +186,7 @@ write_media_csv() {
   local destination="$1"
   local output="$2"
 
-  awk -F';' -v destination="${destination}" 'BEGIN { OFS = ";" } NR == 1 { print; next } { print $0, "[authentication username="$1" password="$2"]", destination }' \
+  awk -F';' -v destination="${destination}" -v realm="${DOMAIN}" 'BEGIN { OFS = ";" } NR == 1 { print; next } { if (realm != "") $3 = realm; print $0, "[authentication username="$1" password="$2"]", destination }' \
     "${CSV_ABSOLUTE}" > "${output}"
 }
 

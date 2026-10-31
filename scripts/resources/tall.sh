@@ -180,7 +180,15 @@ fi
 # application key the session store content is unreadable, so a copied or
 # leaked session file reveals nothing. Re-runs keep this on.
 set_env_value .env SESSION_ENCRYPT true
-set_env_value .env APP_URL "http://$(hostname -I | awk '{print $1}')"
+current_host_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+existing_app_url="$(grep -E '^APP_URL=' .env 2>/dev/null | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+existing_app_host="${existing_app_url#*://}"
+existing_app_host="${existing_app_host%%/*}"
+existing_app_host="${existing_app_host%%:*}"
+
+if [ -z "$existing_app_url" ] || [ "$existing_app_host" = "localhost" ] || [ "$existing_app_host" = "127.0.0.1" ] || [[ "$existing_app_host" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    set_env_value .env APP_URL "http://${current_host_ip}"
+fi
 set_env_value .env DB_CONNECTION mysql
 set_env_value .env DB_HOST "$database_host"
 set_env_value .env DB_PORT 3306
@@ -194,17 +202,33 @@ set_env_value .env APP_NAME TallPBX
 # Configure FreeSWITCH connection, SIP realm, and telephony XML-handler settings.
 # On a fresh installation, replace loopback placeholders with this server's primary IP
 # address so devices on the local network can register and reach the PBX.
-# Existing custom configuration is preserved across re-runs.
-if grep -q "^FS_SERVER=http://127.0.0.1" .env 2>/dev/null; then
-    sed -i "s#^FS_SERVER=.*#FS_SERVER=http://$(hostname -I | awk '{print $1}')#" .env
-elif ! grep -q "^FS_SERVER=" .env 2>/dev/null; then
-    echo "FS_SERVER=http://$(hostname -I | awk '{print $1}')" >> .env
-fi
+# If restoring from a snapshot on a new server IP, update IP placeholders while
+# preserving any custom domain names (e.g. sip.example.com).
+old_ip_to_sync=""
+if [ -n "$current_host_ip" ]; then
+    existing_fs_server="$(grep -E '^FS_SERVER=' .env 2>/dev/null | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
+    existing_sip_realm="$(grep -E '^FS_DEFAULT_SIP_REALM=' .env 2>/dev/null | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//' || true)"
 
-if grep -q "^FS_DEFAULT_SIP_REALM=127.0.0.1" .env 2>/dev/null; then
-    sed -i "s#^FS_DEFAULT_SIP_REALM=.*#FS_DEFAULT_SIP_REALM=$(hostname -I | awk '{print $1}')#" .env
-elif ! grep -q "^FS_DEFAULT_SIP_REALM=" .env 2>/dev/null; then
-    echo "FS_DEFAULT_SIP_REALM=$(hostname -I | awk '{print $1}')" >> .env
+    existing_server_host="${existing_fs_server#*://}"
+    existing_server_host="${existing_server_host%%/*}"
+    existing_server_host="${existing_server_host%%:*}"
+
+    existing_realm_host="${existing_sip_realm#*://}"
+    existing_realm_host="${existing_realm_host%%/*}"
+    existing_realm_host="${existing_realm_host%%:*}"
+
+    # Update FS_SERVER if missing, loopback, or previously set to an IP that changed
+    if [ -z "$existing_fs_server" ] || [ "$existing_server_host" = "127.0.0.1" ] || [[ "$existing_server_host" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ && "$existing_server_host" != "$current_host_ip" ]]; then
+        set_env_value .env FS_SERVER "http://${current_host_ip}"
+    fi
+
+    # Update FS_DEFAULT_SIP_REALM if missing, loopback, or previously set to an IP that changed
+    if [ -z "$existing_sip_realm" ] || [ "$existing_realm_host" = "127.0.0.1" ]; then
+        set_env_value .env FS_DEFAULT_SIP_REALM "$current_host_ip"
+    elif [[ "$existing_realm_host" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ && "$existing_realm_host" != "$current_host_ip" ]]; then
+        old_ip_to_sync="$existing_realm_host"
+        set_env_value .env FS_DEFAULT_SIP_REALM "$current_host_ip"
+    fi
 fi
 
 # Ensure default FreeSWITCH Event Socket Layer (ESL) connection parameters exist.
@@ -277,6 +301,14 @@ php artisan migrate --force
 # installer and browser modes cannot drift into separate creation logic.
 # Demo mode additionally creates customer tenant users and callable PBX fixtures.
 php artisan db:seed --force
+
+# Reconcile appliance IP addresses across database, SIP realms, and routes
+# when restoring from a host snapshot or changing server IPs.
+if [ -n "${old_ip_to_sync:-}" ]; then
+    php artisan appliance:sync-host --old-ip="$old_ip_to_sync" --new-ip="$current_host_ip"
+else
+    php artisan appliance:sync-host
+fi
 
 # Reconcile file ownership and modes after Composer, Vite, and Artisan created
 # files. This keeps PHP-FPM able to read the application without giving it

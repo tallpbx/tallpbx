@@ -384,13 +384,8 @@ configure_dynamic_xml() {
         return 0
     fi
 
-    app_url="$(grep -E '^APP_URL=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
     xml_path="$(grep -E '^FS_XML_HANDLER_PATH=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
     xml_token="$(grep -E '^FS_XML_HANDLER_TOKEN=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
-
-    if [ -z "$app_url" ]; then
-        app_url="http://127.0.0.1"
-    fi
 
     if [ -z "$xml_path" ]; then
         xml_path="/api/v1/xml-handler"
@@ -402,7 +397,10 @@ configure_dynamic_xml() {
         return 0
     fi
 
-    gateway_url="${app_url%/}${xml_path}?token=${xml_token}"
+    # FreeSWITCH and Nginx run locally on the same host. Always use local loopback (127.0.0.1)
+    # for the cURL XML gateway. This ensures zero-latency internal lookups, avoids external
+    # network and firewall dependencies, and prevents startup hangs if public IPs change.
+    gateway_url="http://127.0.0.1${xml_path}?token=${xml_token}"
 
     verbose "Configuring FreeSWITCH mod_xml_curl"
     mkdir -p "${conf_dir}/autoload_configs"
