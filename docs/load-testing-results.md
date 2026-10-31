@@ -200,12 +200,12 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 #### Cache Policy Optimization Tests (`100 x 5`)
 
-| Configuration Tier | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
-| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| **1. Cold Baseline** | 0s | 0s | 60s | 60s | `mixed` | 15.731 | 308.6 ms | 308.0 ms | 143.2 ms | 455.5 ms | 389.0 ms | 96.6%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
-| **2. Dialplan Cache Off** | 0s | 60s | 60s | 60s | `mixed` | 19.117 | 253.2 ms | 247.4 ms | 132.8 ms | 464.2 ms | 367.6 ms | 36.8% | Reused static routing fragments; dynamic route containers recompiled on demand. |
-| **3. Production Baseline** | 60s | 60s | 60s | 60s | `mixed` | 19.566 | 239.8 ms | 235.9 ms | 117.9 ms | 394.0 ms | 329.1 ms | 39.0% | Production default 60s profile; lowest average latency with immediate versioned invalidation. |
-| **4. Memory Ceiling** | 60s | 60s | 60s | 60s | `cache-hit` | 18.904 | 255.3 ms | 247.7 ms | 125.7 ms | 446.4 ms | 373.1 ms | 52.1% | 100% route cache hits; single-core PHP-FPM / Redis memory serialization ceiling. |
+| Configuration | TTL Policy (Route / Snippet / Dir / ACL) | Scenario | Req/Sec | Avg Latency | p50 | Min | Max | p95 | Hit Rate | Key Observation |
+| :--- | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **1. Cold Baseline** | `0s / 0s / 60s / 60s` | `mixed` | 15.731 | 308.6 ms | 308.0 ms | 143.2 ms | 455.5 ms | 389.0 ms | 96.6%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
+| **2. Dialplan Cache Off** | `0s / 60s / 60s / 60s` | `mixed` | 19.117 | 253.2 ms | 247.4 ms | 132.8 ms | 464.2 ms | 367.6 ms | 36.8% | Reused static routing fragments; dynamic route containers recompiled on demand. |
+| **3. Production Baseline** | `60s / 60s / 60s / 60s` | `mixed` | 19.566 | 239.8 ms | 235.9 ms | 117.9 ms | 394.0 ms | 329.1 ms | 39.0% | Production default 60s profile; lowest average latency with immediate versioned invalidation. |
+| **4. Memory Ceiling** | `60s / 60s / 60s / 60s` | `cache-hit` | 18.904 | 255.3 ms | 247.7 ms | 125.7 ms | 446.4 ms | 373.1 ms | 52.1% | 100% route cache hits; single-core PHP-FPM / Redis memory serialization ceiling. |
 
 #### Network Interface Comparison (`100 x 5`)
 
@@ -236,12 +236,12 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 #### Cache Policy Optimization Tests (`100 x 5`)
 
-| Configuration Tier | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
-| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| **1. Cold Baseline** | 0s | 0s | 60s | 60s | `mixed` | 12.467 | 313.1 ms | 286.1 ms | 237.5 ms | 535.5 ms | 399.3 ms | 58.4%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
-| **2. Dialplan Cache Off** | 0s | 60s | 60s | 60s | `mixed` | 11.815 | 326.2 ms | 299.7 ms | 237.8 ms | 641.7 ms | 468.4 ms | 57.3% | Reused static routing fragments; dynamic route containers recompiled on demand. |
-| **3. Production Baseline** | 60s | 60s | 60s | 60s | `mixed` | 12.452 | 314.8 ms | 300.0 ms | 232.0 ms | 550.0 ms | 436.5 ms | 49.9% | Production default 60s profile; balanced throughput with immediate versioned invalidation. |
-| **4. Memory Ceiling** | 60s | 60s | 60s | 60s | `cache-hit` | 12.034 | 326.7 ms | 310.9 ms | 249.5 ms | 562.3 ms | 459.6 ms | 57.5% | 100% route cache hits; single-core PHP-FPM / Redis memory serialization ceiling. |
+| Configuration | TTL Policy (Route / Snippet / Dir / ACL) | Scenario | Req/Sec | Avg Latency | p50 | Min | Max | p95 | Hit Rate | Key Observation |
+| :--- | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **1. Cold Baseline** | `0s / 0s / 60s / 60s` | `mixed` | 12.467 | 313.1 ms | 286.1 ms | 237.5 ms | 535.5 ms | 399.3 ms | 58.4%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
+| **2. Dialplan Cache Off** | `0s / 60s / 60s / 60s` | `mixed` | 11.815 | 326.2 ms | 299.7 ms | 237.8 ms | 641.7 ms | 468.4 ms | 57.3% | Reused static routing fragments; dynamic route containers recompiled on demand. |
+| **3. Production Baseline** | `60s / 60s / 60s / 60s` | `mixed` | 12.452 | 314.8 ms | 300.0 ms | 232.0 ms | 550.0 ms | 436.5 ms | 49.9% | Production default 60s profile; balanced throughput with immediate versioned invalidation. |
+| **4. Memory Ceiling** | `60s / 60s / 60s / 60s` | `cache-hit` | 12.034 | 326.7 ms | 310.9 ms | 249.5 ms | 562.3 ms | 459.6 ms | 57.5% | 100% route cache hits; single-core PHP-FPM / Redis memory serialization ceiling. |
 
 #### Network Interface Comparison (`100 x 5`)
 
@@ -272,12 +272,12 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 #### Cache Policy Optimization Tests (`100 x 5`)
 
-| Configuration Tier | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
-| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| **1. Cold Baseline** | 0s | 0s | 60s | 60s | `mixed` | 17.911 | 181.3 ms | 169.1 ms | 72.7 ms | 415.7 ms | 290.3 ms | 49.3%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
-| **2. Dialplan Cache Off** | 0s | 60s | 60s | 60s | `mixed` | 18.109 | 176.8 ms | 165.6 ms | 71.9 ms | 310.3 ms | 282.1 ms | 49.0% | Reused static routing fragments; dynamic route containers recompiled on demand. |
-| **3. Production Baseline** | 60s | 60s | 60s | 60s | `mixed` | 19.343 | 169.2 ms | 156.1 ms | 61.5 ms | 306.3 ms | 272.7 ms | 52.9% | Production default 60s profile; lowest latency with immediate versioned invalidation. |
-| **4. Memory Ceiling** | 60s | 60s | 60s | 60s | `cache-hit` | 18.132 | 181.0 ms | 166.7 ms | 88.5 ms | 316.4 ms | 282.5 ms | 49.3% | 100% route cache hits; dual-core memory serialization ceiling. |
+| Configuration | TTL Policy (Route / Snippet / Dir / ACL) | Scenario | Req/Sec | Avg Latency | p50 | Min | Max | p95 | Hit Rate | Key Observation |
+| :--- | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **1. Cold Baseline** | `0s / 0s / 60s / 60s` | `mixed` | 17.911 | 181.3 ms | 169.1 ms | 72.7 ms | 415.7 ms | 290.3 ms | 49.3%* | Dialplan and contributor caching off; queries MariaDB for routing logic. (*Hit rate reflects directory and ACL lookups). |
+| **2. Dialplan Cache Off** | `0s / 60s / 60s / 60s` | `mixed` | 18.109 | 176.8 ms | 165.6 ms | 71.9 ms | 310.3 ms | 282.1 ms | 49.0% | Reused static routing fragments; dynamic route containers recompiled on demand. |
+| **3. Production Baseline** | `60s / 60s / 60s / 60s` | `mixed` | 19.343 | 169.2 ms | 156.1 ms | 61.5 ms | 306.3 ms | 272.7 ms | 52.9% | Production default 60s profile; lowest latency with immediate versioned invalidation. |
+| **4. Memory Ceiling** | `60s / 60s / 60s / 60s` | `cache-hit` | 18.132 | 181.0 ms | 166.7 ms | 88.5 ms | 316.4 ms | 282.5 ms | 49.3% | 100% route cache hits; dual-core memory serialization ceiling. |
 
 #### Network Interface Comparison (`100 x 5`)
 
@@ -309,12 +309,12 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 #### Cache Policy Optimization Tests (`100 x 5`)
 
-| Configuration Tier | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
-| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
-| **1. Cold Baseline** | 0s | 0s | 60s | 60s | `mixed` | 26.338 | 136.6 ms | 123.6 ms | 56.7 ms | 306.0 ms | 235.1 ms | 49.3%* | MariaDB routing queries execute faster on dedicated cores. (*Hit rate reflects directory/ACL lookups). |
-| **2. Dialplan Cache Off** | 0s | 60s | 60s | 60s | `mixed` | 28.088 | 126.9 ms | 120.0 ms | 55.0 ms | 215.2 ms | 172.4 ms | 59.3% | Reused static routing fragments; dynamic route containers recompiled on demand. |
-| **3. Production Baseline** | 60s | 60s | 60s | 60s | `mixed` | 28.320 | 127.2 ms | 119.4 ms | 55.7 ms | 231.6 ms | 174.0 ms | 61.8% | Production default 60s profile; highest hit rate (61.8%) and sustained throughput. |
-| **4. Memory Ceiling** | 60s | 60s | 60s | 60s | `cache-hit` | 27.782 | 133.1 ms | 120.5 ms | 90.7 ms | 295.2 ms | 229.4 ms | 53.1% | 100% route cache hits; dedicated dual-core memory serialization ceiling. |
+| Configuration | TTL Policy (Route / Snippet / Dir / ACL) | Scenario | Req/Sec | Avg Latency | p50 | Min | Max | p95 | Hit Rate | Key Observation |
+| :--- | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| **1. Cold Baseline** | `0s / 0s / 60s / 60s` | `mixed` | 26.338 | 136.6 ms | 123.6 ms | 56.7 ms | 306.0 ms | 235.1 ms | 49.3%* | MariaDB routing queries execute faster on dedicated cores. (*Hit rate reflects directory/ACL lookups). |
+| **2. Dialplan Cache Off** | `0s / 60s / 60s / 60s` | `mixed` | 28.088 | 126.9 ms | 120.0 ms | 55.0 ms | 215.2 ms | 172.4 ms | 59.3% | Reused static routing fragments; dynamic route containers recompiled on demand. |
+| **3. Production Baseline** | `60s / 60s / 60s / 60s` | `mixed` | 28.320 | 127.2 ms | 119.4 ms | 55.7 ms | 231.6 ms | 174.0 ms | 61.8% | Production default 60s profile; highest hit rate (61.8%) and sustained throughput. |
+| **4. Memory Ceiling** | `60s / 60s / 60s / 60s` | `cache-hit` | 27.782 | 133.1 ms | 120.5 ms | 90.7 ms | 295.2 ms | 229.4 ms | 53.1% | 100% route cache hits; dedicated dual-core memory serialization ceiling. |
 
 #### Network Interface Comparison (`100 x 5`)
 
