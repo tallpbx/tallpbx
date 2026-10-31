@@ -21,6 +21,9 @@ class ApplianceSyncHostCommand extends Command
 
     protected $description = 'Reconcile appliance IP addresses across database, SIP realms, and routes after snapshot restoration';
 
+    /**
+     * Execute the console command.
+     */
     public function handle(): int
     {
         $newIp = (string) ($this->option('new-ip') ?? '');

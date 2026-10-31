@@ -310,7 +310,7 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 #### Cache Policy Optimization Tests (`100 x 5`)
 
 | Configuration Tier | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | Scenario | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Hit Rate | Key Observation |
-| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| :--- | :---: | :---: | :---: | :---: | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
 | **1. Cold Baseline** | 0s | 0s | 60s | 60s | `mixed` | 26.338 | 136.6 ms | 123.6 ms | 56.7 ms | 306.0 ms | 235.1 ms | 49.3%* | MariaDB routing queries execute faster on dedicated cores. (*Hit rate reflects directory/ACL lookups). |
 | **2. Dialplan Cache Off** | 0s | 60s | 60s | 60s | `mixed` | 28.088 | 126.9 ms | 120.0 ms | 55.0 ms | 215.2 ms | 172.4 ms | 59.3% | Reused static routing fragments; dynamic route containers recompiled on demand. |
 | **3. Production Baseline** | 60s | 60s | 60s | 60s | `mixed` | 28.320 | 127.2 ms | 119.4 ms | 55.7 ms | 231.6 ms | 174.0 ms | 61.8% | Production default 60s profile; highest hit rate (61.8%) and sustained throughput. |

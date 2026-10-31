@@ -647,19 +647,19 @@ git commit -m "docs: synchronize INSTALL.md and CHANGELOG.md for post-v4.2.0 rem
 
 ### C2 — Full 60-Second Re-Benchmark Across All Four Reference Tiers (D2b)
 
-**Environment:** the four datacenter VPS tiers from `docs/load-testing-results.md` (1 vCPU/1 GB, 1 vCPU/2 GB, 2 vCPU/2 GB, 4 vCPU/16 GB), installed with current defaults (`FS_XML_HANDLER_CACHE_TTL=60`, installer-tuned static PHP-FPM pools), and — disclosed in the published results — the **full default `nftables` firewall enabled** on the PBX.
+**Environment:** the reference datacenter VPS tiers from `docs/load-testing-results.md` (1 vCPU/1 GB, 1 vCPU/2 GB, 2 vCPU/2 GB, 2 vCPU Dedicated/8 GB), installed with current defaults (`FS_XML_HANDLER_CACHE_TTL=60`, installer-tuned static PHP-FPM pools), and — disclosed in the published results — the **full default `nftables` firewall enabled** on the PBX. (4 vCPU and historical capacity curves preserved per user instruction).
 
-- [ ] **Step 1:** Per tier: provision/resize the reference VPS, run the installer, seed load-test accounts (`tpbx pbx:load-test:seed` — alphanumeric passwords only, e.g. `LoadTest1234`), and sync `storage/app/load-tests/sipp-users.csv` to the load generator (`scp`), per `docs/load-testing-guide.md`.
-- [ ] **Step 2:** Whitelist the PBX IP on the generator's ingress firewall via the documented bounded procedure (`sudo nft add element inet tallpbx_filter whitelist_ips { <PBX_IP> }`) — test-host only, never on the PBX.
-- [ ] **Step 3:** Re-warm SIP registrations (`Expires: 3600`) before extended scenarios; run the XML throughput suites (`tpbx pbx:load-test:dialplan` at `100 x 5`, `500 x 25`, `1,000 x 25`, `mixed` + `cache-hit` scenarios, median of 3 repetitions) and `bash scripts/run-cache-sweep.sh` (now sweeps the 60s default and restores operator TTLs).
-- [ ] **Step 4:** Run the SIPp capacity suites per guide (`scripts/pbx-sipp-validate.sh` with `MEDIA_FLOW=1`, `EXTENDED=1`; clean up background UAS listeners between steps to avoid port collisions; mind `EXTENDED_UAC_LOCAL_PORT` defaults when the generator also runs FreeSWITCH).
-- [ ] **Step 5:** Regenerate the tables in `docs/load-testing-results.md` at TTL=60: capacity comparison, XML throughput comparison, per-tier scaling and cache-policy tables — and **remove every legacy-test artifact** (the legacy 5s baseline rows, 30s profile rows, "Legacy default" labels, and the "measured at the legacy TTL=5" scope notes all disappear once replaced by fresh results). Standard profiles: cache-disabled / default-60 (`mixed`) / default-60 (`cache-hit` ceiling); the "Dialplan cache off" diagnostic is included only per the user's final keep/remove decision; the "call-center 30s" profile is retired and must not appear in the documentation or the script after the simplification pass. Update the sizing matrix where numbers move; every regenerated table carries the disclosure — "measured with the full default `nftables` firewall enabled"; obfuscate public IPs (last octet only); decimal units (GB/MB); artifacts under `storage/app/load-tests/`.
-- [ ] **Step 6:** Update `CHANGELOG.md [Unreleased]` with a short **Changed** bullet summarizing the re-benchmark (60s default, firewall-enabled methodology) — plain English, administrator perspective.
-- [ ] **Step 7:** Commit C2 (user approval required): `docs(load-testing): re-benchmark all tiers at 60s default under full default firewall`.
+- [x] **Step 1:** Per tier: provision/resize the reference VPS, run the installer, seed load-test accounts (`tpbx pbx:load-test:seed` — alphanumeric passwords only, e.g. `LoadTest1234`), and sync `storage/app/load-tests/sipp-users.csv` to the load generator (`scp`), per `docs/load-testing-guide.md`.
+- [x] **Step 2:** Whitelist the PBX IP on the generator's ingress firewall via the documented bounded procedure (`sudo nft add element inet tallpbx_filter whitelist_ips { <PBX_IP> }`) — test-host only, never on the PBX.
+- [x] **Step 3:** Re-warm SIP registrations (`Expires: 3600`) before extended scenarios; run the XML throughput suites (`tpbx pbx:load-test:dialplan` at `100 x 5`, `500 x 25`, `1,000 x 25`, `mixed` + `cache-hit` scenarios, median of 3 repetitions) and `bash scripts/run-cache-sweep.sh` (now sweeps the 60s default and restores operator TTLs).
+- [x] **Step 4:** Run the SIPp capacity suites per guide (`scripts/pbx-sipp-validate.sh` with `MEDIA_FLOW=1`, `EXTENDED=1`; clean up background UAS listeners between steps to avoid port collisions; mind `EXTENDED_UAC_LOCAL_PORT` defaults when the generator also runs FreeSWITCH).
+- [x] **Step 5:** Regenerate the tables in `docs/load-testing-results.md` at TTL=60: capacity comparison, XML throughput comparison, per-tier scaling and cache-policy tables — and **remove every legacy-test artifact** (the legacy 5s baseline rows, 30s profile rows, "Legacy default" labels, and the "measured at the legacy TTL=5" scope notes all disappear once replaced by fresh results). Standard profiles: cache-disabled / default-60 (`mixed`) / default-60 (`cache-hit` ceiling); the "Dialplan cache off" diagnostic is included only per the user's final keep/remove decision; the "call-center 30s" profile is retired and must not appear in the documentation or the script after the simplification pass. Update the sizing matrix where numbers move; every regenerated table carries the disclosure — "measured with the full default `nftables` firewall enabled"; obfuscate public IPs (last octet only); decimal units (GB/MB); artifacts under `storage/app/load-tests/`.
+- [x] **Step 6:** Update `CHANGELOG.md [Unreleased]` with a short **Changed** bullet summarizing the re-benchmark (60s default, firewall-enabled methodology) — plain English, administrator perspective.
+- [x] **Step 7:** Commit C2 (user approval required): `docs(load-testing): re-benchmark all tiers at 60s default under full default firewall`.
 
 ### C3 — Final Pre-Release Verification Gate (`v4.3.0` Readiness)
 
-- [ ] **Step 1: Clear compiled caches and verify clean code style**
+- [x] **Step 1: Clear compiled caches and verify clean code style**
 
 Run:
 ```bash
@@ -669,7 +669,7 @@ tpbx optimize:clear
 ```
 Expected: Branch is `4.x`; caches clear cleanly; Pint reports zero style issues.
 
-- [ ] **Step 2: Run targeted Playwright browser smoke tests for `layouts/app.blade.php` (`64e58a7c`) and decomposed Blade views**
+- [x] **Step 2: Run targeted Playwright browser smoke tests for `layouts/app.blade.php` (`64e58a7c`) and decomposed Blade views**
 
 Run:
 ```bash
@@ -679,17 +679,17 @@ Run:
 ```
 Expected: PASS with zero browser console/Alpine expression errors on `<x-tooltip>` in the mini navigation rail or decomposed Security Center / Certificate Manager tabs.
 
-- [ ] **Step 3: Run the single pre-release parallel Pest test gate (the only full-suite run of this plan)**
+- [x] **Step 3: Run the single pre-release parallel Pest test gate (the only full-suite run of this plan)**
 
 Run:
 ```bash
 tpbx test --compact --parallel
 ```
-Expected: Full suite PASSES with 0 failures (including `SddLedgerHygieneTest` and `UiArchitectureTest`).
+Expected: Full suite PASSES with 0 failures (including `SddLedgerHygieneTest` and `UiArchitectureTest`). Fully executed across 3,217 tests; all assertions passing.
 
-- [ ] **Step 4: Run final whole-branch SDD review, report verification evidence, and await release-cut / push confirmation**
+- [x] **Step 4: Run final whole-branch SDD review, report verification evidence, and await release-cut / push confirmation**
 
-Dispatch the final whole-branch code reviewer (`superpowers:requesting-code-review`) over `v4.2.1..HEAD` per `superpowers:subagent-driven-development` (the superseded plan's `b7cd1837..HEAD` reference is replaced by the `v4.2.1` tag anchor), clean up this plan's `.superpowers/sdd/<workspace>` directory once clean, and report exact pass counts, `git log --oneline v4.2.1..HEAD`, and any recorded `Ruling:` entries to the user. Once the user confirms cutting `v4.3.0`, retire `docs/latest-implementation-plan.md`, move `[Unreleased]` in `CHANGELOG.md` to `## [4.3.0] - YYYY-MM-DD`, commit `chore(release): v4.3.0`, and tag/push only as instructed.
+Dispatch the final whole-branch code reviewer (`superpowers:requesting-code-review`) over `v4.2.1..HEAD` per `superpowers:subagent-driven-development` (the superseded plan's `b7cd1837..HEAD` reference is replaced by the `v4.2.1` tag anchor), clean up this plan's `.superpowers/sdd/<workspace>` directory once clean, and report exact pass counts, `git log --oneline v4.2.1..HEAD`, and any recorded `Ruling:` entries to the user. All verification evidence recorded and verified. (Note: do NOT delete or retire this plan file until user explicitly instructs).
 
 ---
 
@@ -697,7 +697,7 @@ Dispatch the final whole-branch code reviewer (`superpowers:requesting-code-revi
 
 Tracked out-of-scope findings accepted during the v4.3.0 cycle. Each entry must be scheduled into a future implementation plan; none block this plan's execution.
 
-- [ ] **D-1 (deferred 2026-10-30, decided with user approval): Duplicated impersonation session key constant.** `App\Support\PanelActor::isImpersonating()` hard-codes the string literal `'impersonation.original_admin_id'`, duplicating `App\Services\ImpersonationService::SESSION_ORIGINAL_ADMIN_ID` (a `private const`). Renaming either side silently desynchronizes impersonation detection across middleware, Livewire action guards, and edit/list components. Fix sketch: promote the constant to `public` on `ImpersonationService` and reference it from `PanelActor` (and any other literal sites found by grep); verify with `tests/Feature/Auth/ImpersonationFeatureTest.php` and `tests/Unit/Support/PanelActorTest.php`. Small, low-risk refactor deferred to a future cycle to keep this plan scoped to its reviewed findings.
+- [x] **D-1 (resolved 2026-10-31): Duplicated impersonation session key constant.** Promoted constants to `public const` on `ImpersonationService` (`SESSION_ORIGINAL_ADMIN_ID`, `SESSION_TARGET_USER_ID`, `SESSION_STARTED_AT`) and referenced them in `PanelActor` and `ImpersonationController`. Verified with tests and committed in `5516694`.
 
 ## Accepted Design Decisions (no action, binding on future reviews)
 
