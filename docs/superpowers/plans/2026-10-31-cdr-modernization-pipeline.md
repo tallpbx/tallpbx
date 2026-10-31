@@ -228,6 +228,7 @@ git commit -m "chore(freeswitch): add json_cdr.conf.xml template with raw stream
 **Files:**
 - Modify: `config/database.php` (add `'cdr'` connection targeting Redis DB 3)
 - Modify: `config/freeswitch.php` (add `'cdr_token'`)
+- Modify: `.env.example` (add `REDIS_CDR_DB=3`)
 - Create: `app/Services/Cdr/CdrRedisIngest.php`
 - Create: `app/Http/Controllers/Api/CdrIngestionController.php`
 - Modify: `routes/api.php`
@@ -238,7 +239,13 @@ git commit -m "chore(freeswitch): add json_cdr.conf.xml template with raw stream
 - Produces: `CdrRedisIngest::digest(int $chunkSize = 100): int`
 - Redis Connection: `config('database.redis.cdr')` $\rightarrow$ DB 3, Stream: `pbx:cdr:stream`
 
-- [ ] **Step 1: Add `'cdr'` connection in `config/database.php` and token in `config/freeswitch.php`**
+- [ ] **Step 1: Add `'cdr'` connection in `config/database.php`, `.env.example`, and token in `config/freeswitch.php`**
+
+In `.env.example`:
+```dotenv
+REDIS_CDR_DB=3
+FREESWITCH_CDR_TOKEN=
+```
 
 In `config/database.php`:
 ```php
