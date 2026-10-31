@@ -26,11 +26,11 @@ use Illuminate\Support\Facades\Log;
  */
 class ImpersonationService implements ImpersonationServiceInterface
 {
-    private const SESSION_ORIGINAL_ADMIN_ID = 'impersonation.original_admin_id';
+    public const SESSION_ORIGINAL_ADMIN_ID = 'impersonation.original_admin_id';
 
-    private const SESSION_TARGET_USER_ID = 'impersonation.target_user_id';
+    public const SESSION_TARGET_USER_ID = 'impersonation.target_user_id';
 
-    private const SESSION_STARTED_AT = 'impersonation.started_at';
+    public const SESSION_STARTED_AT = 'impersonation.started_at';
 
     /**
      * Begin impersonating the given user as the current admin.

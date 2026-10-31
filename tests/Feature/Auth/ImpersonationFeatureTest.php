@@ -11,6 +11,7 @@ use App\Models\ImpersonationLog;
 use App\Models\Permission;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\ImpersonationService;
 use App\Services\ImpersonationServiceInterface;
 use App\Services\PermissionService;
 use Illuminate\Support\Facades\Log;
@@ -53,8 +54,8 @@ describe('impersonation lifecycle', function (): void {
         $response->assertRedirect(route('panel.dashboard'));
 
         $this->assertAuthenticatedAs($user, 'web');
-        expect(session('impersonation.original_admin_id'))->toBe($admin->id);
-        expect(session('impersonation.target_user_id'))->toBe($user->id);
+        expect(session(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID))->toBe($admin->id);
+        expect(session(ImpersonationService::SESSION_TARGET_USER_ID))->toBe($user->id);
 
         $this->assertDatabaseHas('impersonation_logs', [
             'admin_id' => $admin->id,

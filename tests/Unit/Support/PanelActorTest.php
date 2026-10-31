@@ -8,6 +8,7 @@ use App\Models\Admin;
 use App\Models\Group;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\ImpersonationService;
 use App\Support\PanelActor;
 use Database\Seeders\AdminSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -22,7 +23,7 @@ it('resolves the impersonated tenant user instead of the underlying admin when i
 
     $this->actingAs($admin, 'admin');
     $this->actingAs($user, 'web');
-    session()->put('impersonation.original_admin_id', $admin->id);
+    session()->put(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID, $admin->id);
 
     expect(PanelActor::isImpersonating())->toBeTrue()
         ->and(PanelActor::resolve()?->getAuthIdentifier())->toBe($user->id)
@@ -110,7 +111,7 @@ it('ensures ScopeTenant denies impersonating admin trying to access foreign tena
 
     $this->actingAs($admin, 'admin');
     $this->actingAs($user, 'web');
-    session()->put('impersonation.original_admin_id', $admin->id);
+    session()->put(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID, $admin->id);
     session()->put('selected_tenant_id', (string) $foreignTenant->id);
 
     $this->get(route('panel.dashboard'))
@@ -124,7 +125,7 @@ it('ensures ProfileEdit resolves impersonated user instead of admin', function (
 
     $this->actingAs($admin, 'admin');
     $this->actingAs($user, 'web');
-    session()->put('impersonation.original_admin_id', $admin->id);
+    session()->put(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID, $admin->id);
 
     expect(PanelActor::resolve()?->id)->toBe($user->id)
         ->and(PanelActor::resolve()?->name)->toBe($user->name);

@@ -6,6 +6,7 @@ namespace App\Support;
 
 use App\Models\Admin;
 use App\Models\User;
+use App\Services\ImpersonationService;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -40,7 +41,7 @@ class PanelActor
      */
     public static function isImpersonating(): bool
     {
-        return session()->has('impersonation.original_admin_id') && Auth::guard('web')->check();
+        return session()->has(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID) && Auth::guard('web')->check();
     }
 
     /**

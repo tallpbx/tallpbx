@@ -7,6 +7,7 @@ namespace Modules\Admin\Http\Controllers;
 use App\Exceptions\ImpersonationException;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ImpersonationService;
 use App\Services\ImpersonationServiceInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class ImpersonationController extends Controller
      */
     public function impersonate(User $user, ImpersonationServiceInterface $service, Request $request): RedirectResponse
     {
-        if ($request->session()->has('impersonation.original_admin_id')) {
+        if ($request->session()->has(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID)) {
             abort(403, 'Already impersonating.');
         }
 
