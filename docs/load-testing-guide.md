@@ -278,8 +278,10 @@ The dialplan test command streams live progress, prints a summary table to the c
 FS_XML_HANDLER_AUTH=true
 FS_XML_HANDLER_TOKEN=generated-by-installer
 
-# Production default: 5-second TTL across all telephony caches
-FS_XML_HANDLER_CACHE_TTL=5
+# Production default (since v4.2.0): 60-second TTL across all telephony caches.
+# Freshness is not TTL-bound: panel writes invalidate cached XML immediately
+# via versioned cache keys (RoutingCacheVersion).
+FS_XML_HANDLER_CACHE_TTL=60
 
 # Master cache store (always use Redis in production)
 FS_XML_HANDLER_CACHE_STORE=redis
@@ -291,7 +293,7 @@ FS_SESSIONS_PER_SECOND=60
 ```
 
 > [!NOTE]
-> Control-panel updates (adding extensions, changing routes) automatically increment `RoutingCacheVersion`, invalidating active dialplan caches immediately across all tiers without requiring manual cache flushing.
+> Control-panel updates (adding extensions, changing routes) automatically increment `RoutingCacheVersion`, invalidating active dialplan caches immediately across all tiers without requiring manual cache flushing. See `docs/architecture.md` §7.5 for the full layered-cache design.
 
 ### Cache Sweep & Hit Rate Benchmarking
 
@@ -301,7 +303,35 @@ To benchmark all 5 standard cache tiers on your host and measure exact Redis key
 bash scripts/run-cache-sweep.sh
 ```
 
-The script runs a standardized 5-tier test (Cold baseline, Contributor-only, Default 5s burst, Call-center 30s profile, and Memory hit ceiling) and automatically restores production defaults (`TTL=5`) upon completion.
+The script runs a standardized 5-tier test (Cold baseline, Dialplan cache off, Default 60s burst, Call-center 30s profile, and Memory hit ceiling) and automatically restores the exact `.env` TTL values captured before the sweep upon completion — including when interrupted mid-run.
+
+**The five cache settings, in plain English:**
+
+| Setting | What it caches, in everyday terms |
+| :--- | :--- |
+| `FS_XML_HANDLER_CACHE_TTL` | The master default. Any of the four settings below that is not set individually simply uses this value. |
+| `FS_XML_HANDLER_DIALPLAN_CACHE_TTL` | The finished routing answer for one specific phone number, so a repeat call to the same number is served instantly. |
+| `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL` | The shared pieces that telephony modules (extensions, ring groups, IVR menus, time conditions, call blocks, outbound routes, …) each add to the routing plan. "Contributor" simply means "a module that contributes one piece of the dialplan." Caching these pieces means building any number's routing answer no longer asks the database once per module. |
+| `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` | "Phone book" lookups: which SIP user is calling, and their credentials. |
+| `FS_XML_HANDLER_ACL_CACHE_TTL` | The list of trusted IP addresses. |
+
+**What each cache profile sets** (numbers are seconds; `0` means the cache is off; the column names refer to the four `FS_XML_HANDLER_*_CACHE_TTL` settings above). The sweep only ever changes the first two — Directory and ACL keep whatever `.env` already has (`60` by default):
+
+| Profile | `DIALPLAN` | `CONTRIBUTOR` | `DIRECTORY` | `ACL` | What this run tells you |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Cold baseline** | `0` | `0` | `60` | `60` | The floor: caching is off, so every request is rebuilt from the database. Shows what the caches are saving you. |
+| **Dialplan cache off** (everything else on) | `0` | `60` | `60` | `60` | Each number's final routing answer is rebuilt on every request, while the shared pieces stay cached. |
+| **Default 60s burst** | `60` | `60` | `60` | `60` | Normal production settings: everything cached, and panel changes still apply immediately — the cache keys change the moment an administrator edits routing. |
+| **Call-center 30s profile** | `30` | `30` | `60` | `60` | The legacy 30-second window, kept as a mid-point comparison. |
+| **Memory hit ceiling** | `60` | `60` | `60` | `60` | The best case: the same number is requested repeatedly, so every answer comes straight from cache memory with zero database queries. |
+
+> [!NOTE]
+> The XML-only benchmark only exercises the dialplan and contributor caches — it never asks the directory or ACL caches anything. That is why their values never change between profiles, and why testing them one at a time would show no difference.
+>
+> **Why run the "Dialplan cache off" test?** The server keeps two kinds of memory for call routing: the **finished answer** for each phone number (so a repeat call to the same number is instant) and the **shared building blocks** used to assemble any answer (the extension list, ring groups, IVR menus, and so on). This test switches off only the finished-answer memory: every request must re-assemble its answer, but the shared building blocks stay remembered. That is useful in three ways:
+> - **It measures the safety net.** If the finished-answer memory is ever emptied or fails, this test shows exactly how the system would behave — and how much speed the shared building blocks preserve on their own (historically roughly half of the database savings).
+> - **It splits the credit for the caching win.** Comparing this test against the all-off test and the normal test shows how much of the total speed-up each kind of memory provides.
+> - **It pinpoints slowdowns.** If the normal test ever comes back slower than expected: if this test is *also* slow, the problem is in the shared building blocks; if this test is still fast, the problem is in the finished-answer memory.
 
 ---
 

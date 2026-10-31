@@ -107,6 +107,7 @@ The FreeSWITCH telephony subsystem manages real-time call control, SIP signaling
 ### 2.2 Telephony XML Handler & Dynamic Dialplan Engine
 
 TallPBX serves dynamic directory, dialplan, and configuration XML to FreeSWITCH via `mod_xml_curl` through `/api/v1/xml-handler`.
+See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path-layered-caching--versioned-invalidation) for how the layered caches and versioned invalidation work.
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
@@ -116,7 +117,7 @@ TallPBX serves dynamic directory, dialplan, and configuration XML to FreeSWITCH 
 | `FS_XML_HANDLER_LOG_REQUESTS`| `boolean`| `false` | `freeswitch.xml_handler.log_requests` | Logs all incoming XML curl requests and raw POST parameters to Laravel logs for debugging. |
 | `FS_XML_HANDLER_LOG_TIMING` | `boolean` | `false` | `freeswitch.xml_handler.log_timing` | Records request-to-response generation latency benchmarks in logs. |
 | `FS_XML_HANDLER_CACHE_STORE` | `string` | `redis` | `freeswitch.xml_handler.cache.store` | Master cache store (e.g. `redis`, `file`) for FreeSWITCH XML responses. Defaults to system `CACHE_STORE` if omitted. |
-| `FS_XML_HANDLER_CACHE_TTL` | `integer` | `5` | `freeswitch.xml_handler.cache.ttl` | Master cache time-to-live in seconds for XML responses. Changing this setting synchronizes dialplan, directory, and ACL caches simultaneously. |
+| `FS_XML_HANDLER_CACHE_TTL` | `integer` | `60` | `freeswitch.xml_handler.cache.ttl` | Master cache time-to-live in seconds for XML responses. Changing this setting synchronizes dialplan, directory, and ACL caches simultaneously. |
 | `FS_XML_HANDLER_DIALPLAN_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.cache.dialplan.store` | Specific cache store override for dialplan XML generation. |
 | `FS_XML_HANDLER_DIALPLAN_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.cache.dialplan.ttl` | Specific TTL in seconds for dialplan XML responses. |
 | `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL`| `integer` | *(master)* | `freeswitch.xml_handler.cache.contributor.ttl` | Specific TTL in seconds for modular dialplan contributor fragments. |
@@ -636,7 +637,7 @@ BROADCAST_CONNECTION=reverb
 FS_LOG_LEVEL=warning
 FS_SESSIONS_PER_SECOND=30
 FS_XML_HANDLER_AUTH=true
-FS_XML_HANDLER_CACHE_TTL=5
+FS_XML_HANDLER_CACHE_TTL=60
 FS_ESL_PASSWORD=<generate-random-secret>
 FS_XML_HANDLER_TOKEN=<generate-random-secret>
 ```
@@ -667,7 +668,7 @@ FS_ESL_BUFFER_SIZE=5000
 
 # XML Handler Caching
 FS_XML_HANDLER_AUTH=true
-FS_XML_HANDLER_CACHE_TTL=10
+FS_XML_HANDLER_CACHE_TTL=60
 FS_XML_HANDLER_CACHE_STORE=redis
 FS_XML_HANDLER_ROUTING_VERSION_STORE=redis
 FS_XML_HANDLER_THROTTLE_LIMIT=12000

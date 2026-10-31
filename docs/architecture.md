@@ -331,6 +331,77 @@ firewall-adjacent restore safety rules.
 
 ---
 
+### 7.5 Telephony XML Handler: Hot Path, Layered Caching & Versioned Invalidation
+
+#### 1. Why the Path is Hot
+During active call processing, FreeSWITCH uses `mod_xml_curl` to fetch configuration dynamically on demand. For every call leg, SIP registration, and authorization challenge, FreeSWITCH issues HTTP POST requests to `/api/v1/xml-handler`:
+- **SIP Digest Authentication**: Resolving user directory credentials and profile parameters.
+- **Dialplan Context Routing**: Evaluating dialplan logic, hunt groups, and context variables for incoming and outgoing call legs.
+- **Destination Lookup**: Dynamically matching dialed destinations against tenant routing rules.
+
+An uncached lookup requires a full HTTP request/response handshake, PHP-FPM process bootstrap and lifecycle execution, and multiple relational MariaDB SQL queries. Under production traffic, uncached lookups quickly exhaust PHP-FPM worker pools, resulting in request queues, SIP timeouts, and call setup latency.
+
+#### 2. Complete Layered Cache Architecture
+To achieve line-rate response times, TallPBX implements a layered caching hierarchy inside Redis DB 1 (the disposable cache database). Every tier incorporates granular inputs to ensure cache isolation:
+
+| Cache Layer | Target XML / Payload | Key Composition & Inputs | Invalidation Trigger |
+| :--- | :--- | :--- | :--- |
+| **Final Dialplan XML** | Complete dialplan document for routed calls | `freeswitch:xml-handler:dialplan:{sha1}` combining `tenantId`, `context`, `destination`, `RoutingCacheVersion`, and `hiredis` limit/marker flags (`standard-dialplan` for default fallback contexts) | Atomic `RoutingCacheVersion::bump($tenantId)` on dialplan, route, or gateway update |
+| **Contributor Fragments** | Context-wide XML fragments contributed by modular services (PINs, number translations, tenant limits) | `freeswitch:xml-handler:dialplan-contributor:{sha1}` combining `contributorClass`, `tenantId`, `context`, and `RoutingCacheVersion` | Atomic `RoutingCacheVersion::bump($tenantId)` on contributor model update |
+| **Directory XML** | SIP user and domain directory profiles for registration and digest authentication | `freeswitch:xml-handler:directory:{sha1}` combining `tenantId`, `tag_name`, `domain`, `username`, `key_value`, and `RoutingCacheVersion` | Atomic `RoutingCacheVersion::bump($tenantId)` on extension, SIP account, or setting update |
+| **ACL Configuration** | Dynamic instance-wide network lists document (`acl.conf`) rendering domains and access-control rules | `freeswitch:acl` | Explicit `AclConfigurationCache::forget()` and live FreeSWITCH `reloadacl` on domain / ACL change |
+| **Tenant Identity Resolution** | Mapping of incoming SIP domain or username to `TenantIdentity` prior to XML compilation | `freeswitch:tenant-identity:{type}:{sha1}` combining resolution type (`domain` or `username`) and sanitized query parameters | Evicted on tenant/domain lifecycle changes; bounded by cache TTL |
+
+#### 3. Key Composition Pattern
+Dialplan and directory cache keys employ a deterministic SHA-1 hash pattern:
+```
+sha1(tenantId | context | destination | routingVersion | hiredis flags)
+```
+This pattern ensures keys remain compact, fixed-length strings in Redis DB 1 while safely partitioning by tenant, destination, and configuration flags without character-encoding collisions or exposing raw SIP credentials in Redis keyspaces.
+
+#### 4. Separation of Roles: Invalidation Correctness vs. TTL Memory Bounding
+TallPBX decouples cache freshness from cache expiration:
+- **The Version Bump Owns Correctness**: When any telephony record (extension, dialplan, gateway, translation, limit, PIN) is created, updated, or deleted, `RoutingCacheObserver` or the corresponding service invokes `RoutingCacheVersion::bump($tenantId)`. This atomically increments the tenant's integer version in Redis (`tallpbx:cache:routing-version:{tenantId}`). Because the current version is embedded directly into the SHA-1 key hash, all existing keys for that tenant are instantly bypassed on the next request. Lookups immediately result in a cache miss, rebuilding fresh XML from MariaDB with zero stale reads. Administrative and API changes take effect on the very next call leg.
+- **The TTL Bounds Memory and Garbage Collection**: The time-to-live (TTL) serves solely to bound memory consumption in Redis and evict abandoned or superseded keys via standard Redis expiration (`volatile-lru`). Telephony routing edits never wait for the TTL window to expire.
+
+In v4.2.0, the default `FS_XML_HANDLER_CACHE_TTL` was raised from 5 seconds to 60 seconds because versioned cache invalidation guarantees instant freshness on writes. For configuration details and environment variables, refer to [Environment Reference Guide §2.2](env-reference.md#22-telephony-xml-handler--dynamic-dialplan-engine); for benchmark methodologies and production tuning guidance, see the load-testing documentation ([Load Testing Results](load-testing-results.md) and [Load Testing Guide](load-testing-guide.md)).
+
+#### 5. Request Flow & Invalidation Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant FS as FreeSWITCH (mod_xml_curl)
+    participant Handler as TallPBX (XmlHandlerController)
+    participant Redis as Redis DB 1 (Cache)
+    participant DB as MariaDB (Telephony Models)
+    participant Writer as Admin / Observer (Write Path)
+
+    Note over FS,Redis: Read Path: Call Leg / SIP Directory Lookup
+    FS->>Handler: POST /api/v1/xml-handler (call leg lookup)
+    Handler->>Redis: Get tenant RoutingCacheVersion (e.g. v=1)
+    Redis-->>Handler: Current version (v=1)
+    Handler->>Handler: Compute SHA-1 key with tenant, context, dest, v=1
+    Handler->>Redis: Query cached XML by computed key
+
+    alt Cache Hit (Warm Path)
+        Redis-->>Handler: Return cached XML string
+        Handler-->>FS: 200 OK (Served from Redis)
+    else Cache Miss (Cold Path)
+        Redis-->>Handler: Cache miss (nil)
+        Handler->>DB: Query extensions, dialplans, and translations
+        DB-->>Handler: Entity records
+        Handler->>Handler: Assemble XML document
+        Handler->>Redis: Store XML with TTL (key includes v=1)
+        Handler-->>FS: 200 OK (Freshly compiled XML)
+    end
+
+    Note over Writer,Redis: Write Path: Atomic Invalidation on Mutation
+    Writer->>DB: Update extension, dialplan, gateway, or limit
+    Writer->>Redis: RoutingCacheVersion::bump(tenantId) -> atomic INCR (v=2)
+    Note over Handler,Redis: Next mod_xml_curl computes key with v=2 -> instant cache miss
+```
+
 ---
 
 # Part II: Security Architecture & Linux Kernel Packet Filtering
@@ -426,7 +497,7 @@ sequenceDiagram
 
 - **Standalone Redis 3-Tier Keyspace Isolation**: TallPBX structures its Redis deployment across isolated database indexes:
   - **DB 0 (Persistent Coordination & Security)**: Default connection used for atomic distributed mutex locks (`tallpbx_database_lock:*`), queue jobs, intrusion detection sliding-window counters, scanner dedup sets, and event broadcasting.
-  - **DB 1 (Disposable Cache)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`REDIS_CACHE_DB=1`). Cleared aggressively during `tpbx optimize:clear` or XML cache sweeps without touching session or security state.
+  - **DB 1 (Disposable Cache)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`REDIS_CACHE_DB=1`). Cleared aggressively during `tpbx optimize:clear` or XML cache sweeps without touching session or security state. See §7.5 for the complete layered cache architecture, key composition, and `RoutingCacheVersion` immediate invalidation flow.
   - **DB 2 (Stateful HTTP Sessions)**: User and administrator web sessions (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`). Completely decoupled from cache flushes so background sweeps, module syncs, and web Git updates never evict active logins.
   - **DB 13–15 (Isolated Test Workspaces)**: Confined execution for automated unit, feature, and browser test suites (`tallpbx-test-*`), ensuring tests never mutate or wipe production keyspaces.
 - **Direct Redis Communication**: TallPBX's intrusion detection engine (`SecurityIncidentService`) talks directly to Redis via `Illuminate\Support\Facades\Redis` facade (`Redis::incr()`, `expire()`), bypassing Laravel's general `CACHE_STORE`. Configuring `CACHE_STORE=file` or `database` in `.env` does not alter or disable intrusion tracking.

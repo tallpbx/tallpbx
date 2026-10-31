@@ -127,7 +127,7 @@ Instead of generating static XML files on disk, TallPBX serves dynamic configura
 
 - **Dynamic Configuration Delivery**: Extension directories, dialplans, and configurations are generated via the XML Handler API (`/api/v1/xml-handler`).
 - **Real-Time Telephony Events**: Call states, connections, and security alerts stream in real time via FreeSWITCH's Event Socket Layer (`tpbx freeswitch:listen`).
-- **Redis XML Caching**: Routing lookups are cached in Redis (`FS_XML_HANDLER_CACHE_TTL=5`), protecting the database and ensuring sub-millisecond call setup under heavy load. Web panel changes invalidate active caches immediately.
+- **Redis XML Caching**: Routing lookups are cached in Redis (`FS_XML_HANDLER_CACHE_TTL=60`), protecting the database and ensuring sub-millisecond call setup under heavy load. Web panel changes invalidate active caches immediately.
 - **Audio & Media Storage**: Call recordings, voicemails, and greetings are stored on disk under `/var/lib/tallpbx/media/` while metadata remains in the database.
 
 ### Tenant Isolation & Phone Provisioning

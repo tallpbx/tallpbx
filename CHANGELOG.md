@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Load-Testing Documentation Cache Guidance**: Corrected stale guidance in the load-testing guide and results document claiming that administrative panel changes took up to the cache TTL window (5–30 seconds) to propagate. Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the documentation now reflects the 60-second default, marks the benchmark tables as measured at the legacy 5-second default, and drops the obsolete tier-differentiated TTL recommendations.
+
 ## [4.2.1] - 2026-10-30
 
 ### Added
