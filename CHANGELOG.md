@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Cache Sweep Preserves Operator TTL Settings**: `scripts/run-cache-sweep.sh` no longer resets the host to a hard-coded `FS_XML_HANDLER_CACHE_TTL=5` after benchmarking. It now snapshots the exact `.env` cache TTL values before the sweep and restores them afterward (including when interrupted mid-run), sweeps the current 60-second production default as its baseline tier instead of the legacy 5-second profile, and ensures the granular TTL keys exist so every tier applies reliably.
+
 ### Fixed
 - **Load-Testing Documentation Cache Guidance**: Corrected stale guidance in the load-testing guide and results document claiming that administrative panel changes took up to the cache TTL window (5–30 seconds) to propagate. Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the documentation now reflects the 60-second default, marks the benchmark tables as measured at the legacy 5-second default, and drops the obsolete tier-differentiated TTL recommendations.
 

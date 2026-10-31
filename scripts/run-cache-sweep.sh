@@ -4,7 +4,7 @@
 #
 # Purpose:
 #   Runs a standardized 5-tier sweep across different XML handler cache settings
-#   (cold baseline, contributor cache, default 5s burst, 30s call-center profile,
+#   (cold baseline, contributor cache, default 60s burst, 30s call-center profile,
 #   and 100% memory hit ceiling) and calculates the exact Redis cache hit rate.
 #
 # Usage:
@@ -31,26 +31,42 @@ echo " Interface:  $NETWORK_INTERFACE"
 echo " Artifacts:  $OUTPUT_DIR"
 echo "=========================================================="
 
-# Define the 5 sweep tiers:
+# Define the 5 sweep tiers. Tier 3 sweeps the current production default (60s
+# since v4.2.0); tier 4 keeps the legacy 30s profile as a mid-point comparison.
 # Format: num | label | dialplan_ttl | contributor_ttl | scenario | requests | concurrency
 declare -a RUNS=(
   "1|cold-baseline|0|0|mixed|100|5"
   "2|contributor-only|0|5|mixed|100|5"
-  "3|prod-baseline-100|5|5|mixed|100|5"
+  "3|prod-baseline-60|60|60|mixed|100|5"
   "4|call-center-ttl30|30|30|mixed|100|5"
-  "5|memory-hit-ceiling|5|5|cache-hit|100|5"
+  "5|memory-hit-ceiling|60|60|cache-hit|100|5"
 )
 
 printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "Run" "Configuration" "D-TTL" "C-TTL" "Req/sec" "Avg (ms)" "Hit Rate"
 printf "%-4s %-20s %-8s %-8s %-10s %-10s %-10s\n" "----" "--------------------" "--------" "--------" "----------" "----------" "----------"
 
-# Ensure cleanup on interrupt or exit so production .env is restored
+# Snapshot the granular TTL lines the sweep will modify so the operator's exact
+# values (including commented-out lines) can be restored afterward.
+SNAPSHOT_DIALPLAN=$(grep -E '^#? ?FS_XML_HANDLER_DIALPLAN_CACHE_TTL=' .env | tail -n 1 || true)
+SNAPSHOT_CONTRIBUTOR=$(grep -E '^#? ?FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=' .env | tail -n 1 || true)
+
+# Ensure both keys exist in .env so per-run overrides reliably apply. Missing
+# keys would silently inherit the master default instead of the tier's value.
+grep -qE '^#? ?FS_XML_HANDLER_DIALPLAN_CACHE_TTL=' .env || printf 'FS_XML_HANDLER_DIALPLAN_CACHE_TTL=60\n' >> .env
+grep -qE '^#? ?FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=' .env || printf 'FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=60\n' >> .env
+
+# Restore the snapshotted operator values on exit or interrupt; keys that were
+# absent before the sweep are removed again so .env returns to its original state.
 restore_defaults() {
   echo
-  echo "Restoring recommended production cache defaults in .env (TTL=5s)..."
-  sed -i 's/^FS_XML_HANDLER_CACHE_TTL=.*/FS_XML_HANDLER_CACHE_TTL=5/' .env
-  sed -i 's/^FS_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/# FS_XML_HANDLER_DIALPLAN_CACHE_TTL=5/' .env
-  sed -i 's/^FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=.*/# FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL=5/' .env
+  echo "Restoring the exact .env cache TTL values captured before the sweep..."
+  sed -i -E '/^#? ?FS_XML_HANDLER_(DIALPLAN_CACHE|CONTRIBUTOR_CACHE)_TTL=/d' .env
+  if [ -n "$SNAPSHOT_DIALPLAN" ]; then
+    printf '%s\n' "$SNAPSHOT_DIALPLAN" >> .env
+  fi
+  if [ -n "$SNAPSHOT_CONTRIBUTOR" ]; then
+    printf '%s\n' "$SNAPSHOT_CONTRIBUTOR" >> .env
+  fi
   php artisan optimize:clear > /dev/null 2>&1 || true
   php artisan optimize > /dev/null 2>&1 || true
 }
