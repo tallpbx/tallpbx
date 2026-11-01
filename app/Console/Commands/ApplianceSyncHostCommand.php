@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Redis;
 
 /**
  * Reconciles appliance IP addresses across environment configuration, tenant SIP realms,
@@ -108,10 +108,13 @@ class ApplianceSyncHostCommand extends Command
             Artisan::call('optimize:clear');
         });
 
-        // Flush Redis telephony cache
+        // Flush the telephony cache store only. Rendered XML is the only data
+        // that embeds the old address, and a full flushall() would also empty
+        // sessions (DB 2) and the CDR stream (DB 3), where losing records is
+        // unacceptable.
         $this->components->task('Flushing Redis cache store', function (): void {
             try {
-                Redis::flushall();
+                Cache::store('redis')->flush();
             } catch (\Throwable) {
                 // Redis may be down or unconfigured
             }
