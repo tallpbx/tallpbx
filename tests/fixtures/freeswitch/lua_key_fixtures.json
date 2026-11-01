@@ -490,6 +490,110 @@
                 "version": "pbx:fsxml:ver:8",
                 "payload": "pbx:fsxml:dir:8:domain:a.example.com:1001:v4"
             }
+        },
+        {
+            "name": "dialplan hit",
+            "request": {
+                "section": "dialplan"
+            },
+            "params": {
+                "Caller-Context": "tenant_7_internal",
+                "Caller-Destination-Number": "2000"
+            },
+            "tenant_id": 7,
+            "context": "tenant_7_internal",
+            "destination": "2000",
+            "version": 3,
+            "epoch": 2,
+            "redis": {
+                "pbx:fsxml:ver:global": "2",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:dp:7:tenant_7_internal:2000:v3:e2": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"><context name=\"tenant_7_internal\"/></section></document>"
+            },
+            "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"><context name=\"tenant_7_internal\"/></section></document>",
+            "expected_keys": {
+                "epoch": "pbx:fsxml:ver:global",
+                "version": "pbx:fsxml:ver:7",
+                "payload": "pbx:fsxml:dp:7:tenant_7_internal:2000:v3:e2"
+            }
+        },
+        {
+            "name": "dialplan e164 destination keeps the plus sign",
+            "request": {
+                "section": "dialplan"
+            },
+            "params": {
+                "Caller-Context": "tenant_7_public",
+                "Caller-Destination-Number": "+15551230000"
+            },
+            "tenant_id": 7,
+            "context": "tenant_7_public",
+            "destination": "+15551230000",
+            "version": 3,
+            "epoch": 2,
+            "redis": {
+                "pbx:fsxml:ver:global": "2",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:dp:7:tenant_7_public:+15551230000:v3:e2": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"><context name=\"tenant_7_public\"/></section></document>"
+            },
+            "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"><context name=\"tenant_7_public\"/></section></document>",
+            "expected_keys": {
+                "epoch": "pbx:fsxml:ver:global",
+                "version": "pbx:fsxml:ver:7",
+                "payload": "pbx:fsxml:dp:7:tenant_7_public:+15551230000:v3:e2"
+            }
+        },
+        {
+            "name": "dialplan revision moved is a miss",
+            "request": {
+                "section": "dialplan"
+            },
+            "params": {
+                "Caller-Context": "tenant_7_internal",
+                "Caller-Destination-Number": "2000"
+            },
+            "redis": {
+                "pbx:fsxml:ver:global": "2",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:dp:7:tenant_7_internal:2000:v2:e2": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"><context name=\"tenant_7_internal\"/></section></document>"
+            },
+            "expected_xml": null,
+            "expected_keys": {
+                "epoch": "pbx:fsxml:ver:global",
+                "version": "pbx:fsxml:ver:7",
+                "payload": "pbx:fsxml:dp:7:tenant_7_internal:2000:v3:e2"
+            }
+        },
+        {
+            "name": "dialplan context without a tenant is a miss",
+            "request": {
+                "section": "dialplan"
+            },
+            "params": {
+                "Caller-Context": "default",
+                "Caller-Destination-Number": "2000"
+            },
+            "redis": {
+                "pbx:fsxml:ver:global": "2",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:dp:7:default:2000:v3:e2": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"/></section></document>"
+            },
+            "expected_xml": null
+        },
+        {
+            "name": "dialplan tenant revision missing is a miss",
+            "request": {
+                "section": "dialplan"
+            },
+            "params": {
+                "Caller-Context": "tenant_7_internal",
+                "Caller-Destination-Number": "2000"
+            },
+            "redis": {
+                "pbx:fsxml:ver:global": "2",
+                "pbx:fsxml:dp:7:tenant_7_internal:2000:v3:e2": "<document type=\"freeswitch/xml\"><section name=\"dialplan\"/></section></document>"
+            },
+            "expected_xml": null
         }
     ]
 }

@@ -85,6 +85,23 @@ class FsXmlMirrorWriter
     }
 
     /**
+     * Store a rendered dialplan document under its version and epoch key.
+     *
+     * Dialplan uses its own cache lifetime, so it expires on the same schedule
+     * as the PHP cache entry it mirrors. The key carries both revisions, so a
+     * bump makes the next Lua lookup miss and rebuild rather than serve
+     * routing that has already been superseded.
+     */
+    public function writeDialplan(int $tenantId, string $context, string $destination, int $version, int $epoch, string $xml): void
+    {
+        $this->writeWithExpiry(
+            FsXmlMirrorKeys::dialplan($tenantId, $context, $destination, $version, $epoch),
+            $xml,
+            max(0, (int) config('freeswitch.xml_handler.dialplan_cache_ttl', 0)),
+        );
+    }
+
+    /**
      * Store a tenant routing revision. Version keys never expire, so a bump
      * survives the payload TTL and the next lookup misses as intended.
      */
@@ -164,19 +181,19 @@ class FsXmlMirrorWriter
     }
 
     /**
-     * Write a value that expires with the directory cache TTL.
+     * Write a value that expires with its section's cache TTL.
      *
-     * Returns early when the feature is off, when directory caching is off
-     * (there is then nothing to mirror), or when the value exceeds the size
-     * cap.
+     * Returns early when the feature is off, when that section's caching is
+     * off (there is then nothing to mirror), or when the value exceeds the
+     * size cap. When no lifetime is passed the directory setting applies.
      */
-    private function writeWithExpiry(string $key, string $value): void
+    private function writeWithExpiry(string $key, string $value, ?int $ttl = null): void
     {
         if (! $this->enabled) {
             return;
         }
 
-        $ttl = max(0, (int) config('freeswitch.xml_handler.directory_cache_ttl', 0));
+        $ttl = max(0, $ttl ?? (int) config('freeswitch.xml_handler.directory_cache_ttl', 0));
 
         if ($ttl === 0) {
             return;

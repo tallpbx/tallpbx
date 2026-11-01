@@ -67,4 +67,19 @@ class FsXmlMirrorKeys
     {
         return self::NAMESPACE.':dir:'.$tenantId.':'.$tagName.':'.$domain.':'.$user.':v'.$version;
     }
+
+    /**
+     * Label holding one rendered dialplan document.
+     *
+     * Dialplan runs on every call leg, so it carries both revisions: the tenant
+     * revision, which moves when an administrator saves anything that feeds the
+     * routing plan, and the global epoch, which moves when a SIP account or
+     * tenant domain changes and can alter how a destination resolves. A stale
+     * dialplan does not merely show wrong data, it routes a live call the wrong
+     * way, so Lua must treat any missing or unparsable revision as a miss.
+     */
+    public static function dialplan(int $tenantId, string $context, string $destination, int $version, int $epoch): string
+    {
+        return self::NAMESPACE.':dp:'.$tenantId.':'.$context.':'.$destination.':v'.$version.':e'.$epoch;
+    }
 }

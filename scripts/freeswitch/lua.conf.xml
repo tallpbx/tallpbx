@@ -16,12 +16,17 @@
     <!-- <param name="script-directory" value="$${script_dir}/?.lua"/> -->
 
     <!--
-        TallPBX optional directory cache proxy (default off).
+        TallPBX optional XML cache proxy (default off).
 
         A bare filename is resolved against $${script_dir}, which is
         /usr/share/freeswitch/scripts on a stock Debian package, so the path
         below is absolute on purpose. Copy tallpbx_xml_handler.lua from
         scripts/freeswitch/ to this location before enabling the bindings.
+
+        Bindings are comma separated. Directory covers registrations and user
+        resolution; dialplan covers call routing, which happens at least once
+        per call leg. Anything else (configuration, phrases, ACL) stays on the
+        mod_xml_curl path.
 
         mod_lua must load BEFORE mod_xml_curl in modules.conf.xml: search
         bindings are appended and tried in load order, so the earlier module
@@ -31,7 +36,7 @@
         Rollback: comment out the two params below and restart FreeSWITCH.
     -->
     <param name="xml-handler-script" value="/etc/freeswitch/scripts/tallpbx_xml_handler.lua"/>
-    <param name="xml-handler-bindings" value="directory"/>
+    <param name="xml-handler-bindings" value="directory,dialplan"/>
 
     <!--
         The following options identifies a lua script that is launched

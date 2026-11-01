@@ -21,7 +21,27 @@ it('reproduces every fixture key string with the php key builder', function () u
     $checked = 0;
 
     foreach ($fixtures['cases'] as $case) {
-        if (! isset($case['expected_keys'], $case['identity'])) {
+        if (! isset($case['expected_keys'])) {
+            continue;
+        }
+
+        // Dialplan cases carry the context and destination instead of a
+        // domain/user identity, because the tenant travels inside the context.
+        if (isset($case['context'])) {
+            expect(FsXmlMirrorKeys::dialplan(
+                $case['tenant_id'],
+                $case['context'],
+                $case['destination'],
+                $case['version'],
+                $case['epoch'],
+            ))->toBe($case['expected_keys']['payload']);
+
+            $checked++;
+
+            continue;
+        }
+
+        if (! isset($case['identity'])) {
             continue;
         }
 
@@ -43,6 +63,7 @@ it('reproduces every fixture key string with the php key builder', function () u
         $checked++;
     }
 
-    // Six cases carry expected keys (four hits, truncated, empty, foreign).
-    expect($checked)->toBeGreaterThanOrEqual(6);
+    // Directory hits plus the dialplan hits carry expected keys; the miss
+    // cases deliberately carry none, because a miss must query no payload.
+    expect($checked)->toBeGreaterThanOrEqual(8);
 });

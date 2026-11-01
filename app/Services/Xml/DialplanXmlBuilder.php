@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Xml;
 
+use App\Services\DialplanContext;
 use App\Services\DialplanXmlCollector;
 use App\Services\TenantManager;
 use App\Support\Concerns\EscapesXml;
@@ -402,33 +403,112 @@ class DialplanXmlBuilder
             ? Cache::store($cacheStore)
             : Cache::driver();
 
-        return $cache->remember(
-            $this->dialplanCacheKey((string) $tenantId, $context, $destination),
+        // Sample both revisions once. The same values key the PHP cache entry
+        // and the mirror, so a document can only be published under the
+        // revisions it was actually rendered for.
+        $version = (int) RoutingCacheVersion::get((int) $tenantId);
+        $epoch = (int) RoutingCacheVersion::getGlobal();
+
+        $xml = $cache->remember(
+            $this->dialplanCacheKey((string) $tenantId, $context, $destination, $version, $epoch),
             $ttl,
             fn (): string => $this->buildDialplanXml($context, $destination, $callerId),
         );
+
+        $this->mirrorDialplanXml($context, $destination, $ttl, (int) $tenantId, $version, $epoch, $xml);
+
+        return $xml;
+    }
+
+    /**
+     * Mirror the rendered dialplan into the raw Redis namespace read by the
+     * optional FreeSWITCH Lua handler.
+     *
+     * Runs after the cache result, so a document served from the PHP cache
+     * refreshes the mirror as well. This is the path that runs on every call
+     * leg, so nothing here may make a lookup fail; the writer swallows its own
+     * errors.
+     */
+    private function mirrorDialplanXml(string $context, string $destination, int $ttl, int $tenantId, int $version, int $epoch, string $xml): void
+    {
+        // Cheapest check first: on the default configuration the feature is
+        // off and a call setup must not resolve anything extra.
+        if (! (bool) config('freeswitch.lua_proxy.enabled', false)) {
+            return;
+        }
+
+        if ($ttl <= 0 || $context === '' || $destination === '') {
+            return;
+        }
+
+        // The Lua handler can only address a dialplan when the tenant is
+        // encoded in the context name. Mirroring anything else would write a
+        // key FreeSWITCH can never ask for, so leave those on the PHP path.
+        $contextTenant = app(DialplanContext::class)->parseTenantId($context);
+
+        if ($contextTenant === null || (int) $contextTenant !== $tenantId) {
+            return;
+        }
+
+        // A bump since the render started means this document no longer
+        // describes the current routing rules. Publishing it under the newer
+        // revision would route live calls with superseded rules, so skip and
+        // let the next lookup republish instead.
+        if ((int) RoutingCacheVersion::get($tenantId) !== $version) {
+            return;
+        }
+
+        // The same rule for ownership: an account or domain change that lands
+        // mid-render can change how a destination resolves.
+        if ((int) RoutingCacheVersion::getGlobal() !== $epoch) {
+            return;
+        }
+
+        $writer = app(FsXmlMirrorWriter::class);
+
+        // After a cache flush the store restarts at 0 while the mirror keeps
+        // the last revision and its payload keys. Publishing under the higher
+        // mirror revision keeps Lua hitting instead of missing indefinitely.
+        $mirrorVersion = $writer->readVersion($tenantId);
+        $publishVersion = max($version, $mirrorVersion ?? 0);
+
+        // Seed the version key on a genuine cold start only. Never overwrite
+        // it: RoutingCacheVersion::bump() owns the monotonic token.
+        if ($mirrorVersion === null) {
+            $writer->writeVersionIfMissing($tenantId, $publishVersion);
+        }
+
+        // Lua cannot build a dialplan key without the epoch either, so a cold
+        // Redis needs it seeded by whichever lookup happens first.
+        $mirrorEpoch = $writer->readGlobalVersion();
+        $publishEpoch = max($epoch, $mirrorEpoch ?? 0);
+
+        if ($mirrorEpoch === null) {
+            $writer->writeGlobalVersionIfMissing($publishEpoch);
+        }
+
+        $writer->writeDialplan($tenantId, $context, $destination, $publishVersion, $publishEpoch, $xml);
     }
 
     /**
      * Build a stable cache key for generated dialplan XML.
      *
-     * The generated XML currently varies by tenant, context, and destination.
-     * Caller ID is passed through to preserve method signatures, but it is not
-     * part of generated XML today and is intentionally left out of the key.
+     * The generated XML currently varies by tenant, context, and destination,
+     * plus both routing revisions. Caller ID is passed through to preserve
+     * method signatures, but it is not part of generated XML today and is
+     * intentionally left out of the key.
      */
-    private function dialplanCacheKey(string $tenantId, string $context, string $destination): string
+    private function dialplanCacheKey(string $tenantId, string $context, string $destination, int $version, int $epoch): string
     {
         return 'freeswitch:xml-handler:dialplan:'.sha1(implode('|', [
             $tenantId,
             $context,
             $destination,
-            // Bumped by translation/limit writes so DB-driven routing
-            // data never goes stale beyond the write itself.
-            (string) RoutingCacheVersion::get((int) $tenantId),
+            (string) $version,
             (string) ((bool) config('freeswitch.xml_handler.hiredis_limit_enabled', false)),
             (string) ((int) config('freeswitch.xml_handler.hiredis_limit_max', 100000)),
             (string) ((bool) config('freeswitch.xml_handler.hiredis_marker_enabled', false)),
-            (string) RoutingCacheVersion::getGlobal(),
+            (string) $epoch,
         ]));
     }
 }

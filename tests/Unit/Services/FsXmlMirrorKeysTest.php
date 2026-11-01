@@ -33,3 +33,14 @@ test('builds directory payload key embedding tenant, tag name, domain, user, and
         ->and(FsXmlMirrorKeys::directory(7, 'user', 'a.com', '1001', 3))
         ->toBe('pbx:fsxml:dir:7:user:a.com:1001:v3');
 });
+
+test('builds dialplan payload key from tenant, context, destination and both revisions', function () {
+    // Dialplan is the path that runs on every call leg, so its key carries both
+    // the tenant revision (panel saves) and the global epoch (SIP account and
+    // domain writes, which can change how a destination resolves).
+    expect(FsXmlMirrorKeys::dialplan(7, 'tenant_7_internal', '2000', 3, 9))
+        ->toBe('pbx:fsxml:dp:7:tenant_7_internal:2000:v3:e9')
+        // An E.164 destination keeps its leading plus sign, unchanged.
+        ->and(FsXmlMirrorKeys::dialplan(7, 'tenant_7_internal', '+12844952006', 3, 9))
+        ->toBe('pbx:fsxml:dp:7:tenant_7_internal:+12844952006:v3:e9');
+});
