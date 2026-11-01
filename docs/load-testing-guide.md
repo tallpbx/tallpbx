@@ -217,6 +217,30 @@ fs_cli -x 'sofia status'
 ss -lunp | grep -E ':5060|:5080'
 ```
 
+### Provisioning a Remote Test Server
+
+When a test requires real datacenter behavior, provision a **fresh Debian 13
+(amd64)** host sized to the tier under test (for example 1 shared vCPU /
+1 GB RAM / 2 GB swap for the minimal tier) and install TallPBX exactly the way
+an end user would:
+
+```bash
+wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/<branch>/scripts/bootstrap.sh | bash
+```
+
+- **Run the install interactively from a terminal.** Do not pre-seed installer
+  environment variables or `/etc/default/tallpbx`; answer the prompts in the
+  order they appear (Clean data, Production, Random database password,
+  FreeSWITCH packages, SignalWire PAT, English prompts, Setup admin now). The
+  interactive path is what validates the real end-user experience.
+- **Enter the SignalWire PAT at the interactive prompt.** Never pre-install or
+  pre-write the token to a setup file as a shortcut. If the token must not
+  remain in the installer state file afterward, remove the `SWITCH_TOKEN`
+  entry once installation completes.
+- **Keep host-specific details out of documentation and reports.** Obfuscate
+  public IP addresses to their last octet, and never record SSH key names or
+  paths, administrator credentials, or tokens in docs, plans, or test reports.
+
 ---
 
 ## Seed Data Generation

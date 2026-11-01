@@ -45,7 +45,7 @@
 
 - [ ] **Step 1: Provision and verify the remote 1 vCPU host**
 
-Provision a datacenter VPS with 1 shared vCPU, 1 GB RAM, 2 GB swap, Debian 13, and a public IPv4 address. Install TallPBX with the standard installer and verify: PHP-FPM runs `pm = static` with 5 workers, swap is active, and the full default `nftables` firewall is enabled (benchmark parity with `docs/load-testing-results.md`).
+Provision a datacenter VPS with 1 shared vCPU, 1 GB RAM, 2 GB swap, Debian 13, and a public IPv4 address. Install TallPBX by running the documented one-line installer **interactively** as an end user, following the remote test-server conventions in `docs/load-testing-guide.md#provisioning-a-remote-test-server` — answer the prompts and enter the SignalWire PAT at the prompt, never pre-seeded. Verify: PHP-FPM runs `pm = static` with 5 workers, swap is active, and the full default `nftables` firewall is enabled (benchmark parity with `docs/load-testing-results.md`).
 
 - [ ] **Step 2: Capture the clean HTTP baseline with timing off**
 
