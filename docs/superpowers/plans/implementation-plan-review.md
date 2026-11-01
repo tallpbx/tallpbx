@@ -1,11 +1,11 @@
 # Implementation Plan Review — CDR Modernization vs. Lua Redis Proxy
 
-**Revision:** 3.1 (re-evaluation of Plan B v2 with live runtime verification; resolution of connection prefix, directory lookup shape, and cold-start version seeding; marked A-R6/A-R7 completed on 5.x)
+**Revision:** 3.2 (adds the Redis topology evaluation and mirror document sizing for Plan B, and CDR durability findings A-R13/A-R14/A-R15; withdraws the earlier separate-instance recommendation)
 **Date:** 2026-11-01
 **Branch reviewed:** `5.x`
 **Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents, combined with live measurement report analysis (`docs/lua-proxy-measurement-results.md`) and runtime inspection of the Laravel Redis connection manager and FreeSWITCH 1.11.4 `find_user_xml`.
 
-> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluated `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`. Revision 3.1 records the resolution of four runtime blockers discovered during live protocol inspection (`V2-C1` unprefixed `lua_proxy` Redis connection, `V2-C2` dual-mode `domain`/`user` tag lookup support, `V2-H1` cold-start version key seeding in `DirectoryXmlBuilder`, and `V2-M1` cache-flush monotonic increment in `RoutingCacheVersion`), and marks `A-R6`/`A-R7` completed on `5.x`.
+> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluated `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`. Revision 3.1 records the resolution of four runtime blockers discovered during live protocol inspection (`V2-C1` unprefixed `lua_proxy` Redis connection, `V2-C2` dual-mode `domain`/`user` tag lookup support, `V2-H1` cold-start version key seeding in `DirectoryXmlBuilder`, and `V2-M1` cache-flush monotonic increment in `RoutingCacheVersion`), and marks `A-R6`/`A-R7` completed on `5.x`. Revision 3.2 records the Redis topology evaluation for the mirror — one instance, with documented split triggers — and withdraws the earlier recommendation to run the mirror on a second `redis-server` before general availability. It also adds three CDR durability findings: the accepted-then-crash loss window (`A-R13`), overcommit-induced write rejection (`A-R14`), and the appliance-sync `flushall()` (`A-R15`).
 
 ## Plans Under Review
 
@@ -58,6 +58,14 @@
 | E23 | `tests/Feature/Http/XmlHandlerControllerTest.php` declares 68 tests (matches Plan B's "68 tests" claim; assertion count not verified) | `grep -c` on the test file |
 | E24 | `scripts/resources/freeswitch/` does not exist yet (plans introduce it) | `ls scripts/resources/` |
 | E25 | `laravel/pulse` is not a dependency; no `pulse:*` commands exist in this project | `composer.json`, `app/Console/Commands/` |
+| E26 | Installed Redis runs `maxmemory 256mb`, `maxmemory-policy volatile-lru`, save points `3600 1 300 100 60 10000`, `appendonly no`, `stop-writes-on-bgsave-error yes`; `used_memory` is 1.07 MB and DB 0 is empty | `redis-cli CONFIG GET` / `INFO` on the installed host; `scripts/resources/php.sh:79-91` |
+| E27 | `vm.overcommit_memory` is `0` and the installer never changes it — it sets only `maxmemory` and the eviction policy. Redis documents `1` as required for `BGSAVE` | `sysctl vm.overcommit_memory`; search over `scripts/` |
+| E28 | Rendered document sizes: directory per user 799 B; directory per domain 67,866 B (100 extensions, ≈679 B per extension); dialplan per context 8,955 B | live `curl` against the installed xml-handler |
+| E29 | Mirror payload and tenant-lookup keys are written with `SET … EX directory_cache_ttl` (60 s); only `pbx:fsxml:ver:*` keys persist, so the mirror is TTL-bounded and evictable under `volatile-lru` | Plan B v2 line 239; `config/freeswitch.php:371` |
+| E30 | FreeSWITCH cannot compute SHA-1: `md5` is a working API command, `sha1` is not, and `mod_hash` exposes only `hash` / `hash_dump` / `hash_remote` | `fs_cli -x "show api"`, `fs_cli -x "sha1 abc"` |
+| E31 | `ApplianceSyncHostCommand` calls `Redis::flushall()` across all databases; `run-cache-sweep.sh` flushes DB 1 only | `app/Console/Commands/ApplianceSyncHostCommand.php:114`, `scripts/run-cache-sweep.sh:85` |
+| E32 | `Illuminate\Cache\RedisStore::serialize()` stores every non-numeric value as a PHP `serialize()` string (`s:799:"<document…";`); only finite numbers bypass serialization | `vendor/laravel/framework/src/Illuminate/Cache/RedisStore.php:505-527` |
+| E33 | Measured command costs on the installed host: `GET` 2.43 µs/call over 46,678 calls, `SETEX` 10.6 µs, `DEL` 3.8 µs, `FLUSHALL` 6,589 µs across a single call. `SLOWLOG LEN` is 0 at a 10,000 µs threshold, `LATENCY LATEST` is empty, and `evicted_keys` / `rejected_connections` are 0 | `redis-cli INFO commandstats`, `SLOWLOG LEN`, `LATENCY LATEST` on the installed host |
 
 Severity scale: **Critical** (breaks data, security, or the shipped series contract), **High** (feature cannot work or corrupts behavior as written), **Moderate** (correctness or operational gap requiring plan edits), **Low** (polish/consistency).
 
@@ -119,6 +127,15 @@ Templates land in a new `scripts/resources/freeswitch/` tree (E24) and the worke
 
 **A-R12 (Low).**
 `cdr.export` permission declared with no export feature; `direction` column exists but is omitted from the parser mapping; `getPendingCount()` has no health/monitoring consumer (unbounded stream growth unobserved); the systemd unit omits `NoNewPrivileges=yes` present in the queue-service precedent.
+
+**A-R13 (High) — A 200 response is unrecoverable; the spool only ever sees failures.**
+`mod_json_cdr` writes to `err-log-dir` only when the POST fails. Once the controller returns 200, the record exists solely in the Redis stream. With `appendonly no` and the installed save points (E26), a restart or hard reset discards every entry written since the last snapshot that has not yet been digested. The window is small while the worker is healthy (`--sleep=250000`, `XDEL` only after the MariaDB commit) but unbounded while `cdr:work` is down — the stream accumulates, and a reboot then loses up to the save-point interval of accumulated records (about five minutes of call volume under the `300 100` rule), with no spool copy because every one of those POSTs succeeded. Fix: enable AOF with `appendfsync everysec` on the instance holding DB 3 — the only mechanism that preserves undigested entries across a reboot — and keep `XLEN`/stream-age alerting (AO-A2) so a dead worker is found before any reboot. Do not relax `stop-writes-on-bgsave-error yes`: a refused write becomes a 503 and therefore a spool file, whereas a falsely accepted write is simply lost.
+
+**A-R14 (High) — `vm.overcommit_memory=0` converts a failed snapshot into a refused-write outage.**
+The installer configures `maxmemory` and the eviction policy but never sets `vm.overcommit_memory`, and the installed host reports `0` (E27). Under the kernel's heuristic, `fork()` for `BGSAVE` can fail even when free memory exists. Combined with `stop-writes-on-bgsave-error yes` (correct for CDR integrity) that failure becomes `MISCONF`, and Redis rejects **every** write until a save succeeds: panel sessions break, cache writes throw, and CDR posts return 503 and spill to disk. Set `vm.overcommit_memory=1` in the installer and assert it in the post-install verification.
+
+**A-R15 (Moderate) — `appliance:sync-host` flushes all sixteen databases.**
+`ApplianceSyncHostCommand.php:114` runs `Redis::flushall()` after a snapshot restoration or IP change (E31). That silently discards undigested CDR stream entries — no spool, no warning — and also wipes the cache, session, and mirror databases. Scope the flush to the cache databases, or commit and drain the stream before flushing. For the mirror a wipe is desirable after a realm change; for the stream it is data loss.
 
 ### Assessment
 
@@ -219,12 +236,38 @@ Where I disagree:
 | AO-B3 | Scope directory first; decide dialplan later with data | Directory lookups are the most static and the most cacheable surface. Dialplan depends on gateways, time conditions, ring groups, IVRs, scanner signatures, limiters, and markers — every one of which must be threaded into the Lua key forever |
 | AO-B4 | The permanent maintenance tax is the real cost | Three key-derivation sites (Lua plus both builders) must stay in lockstep across every future routing feature. This project just spent two releases hardening immediate invalidation, and Plan B adds a second invalidation story on the hot path |
 
+#### Redis topology for the mirror: one instance, with measured triggers
+
+An earlier draft of this opinion recommended moving the mirror to a second `redis-server` before general availability and treating that as a Phase 2 precondition. **That recommendation is withdrawn.** It was risk-aversion stated as a requirement, and the measurements do not support it.
+
+The mirror is TTL-bounded and evictable (E29), so its footprint follows "documents touched in the last 60 seconds", not total extension count; the instance currently uses 1.07 MB of a 256 MB cap (E26). The largest mirrored document is the directory *domain* document at 67,866 B for 100 extensions (E28), and the Phase 2 dialplan document is 8,955 B per context — smaller than what Phase 1 already stores. At the measured 26.4 req/s ceiling each mirror `GET` costs tens of microseconds, so head-of-line blocking, `BGSAVE` forks over a 1 MB dataset, and memory competition are all immaterial at this scale. The one argument that survives is availability decoupling during a Laravel-Redis incident, and its cost is a degraded mode the design already handles: Lua misses and FreeSWITCH falls through to `mod_xml_curl`, so calls continue. A second instance would add a unit file, installer wiring, monitoring, and about 8 MB on a 1 GB host for a benefit that has not been measured.
+
+| ID | Note | Rationale |
+|:---|:------|:----------|
+| AO-B5 | Keep the mirror in DB 0 of the main instance | No measured capacity reason to split, and every mirror failure path is fail-soft, so co-location costs availability of the optimisation rather than availability of the PBX |
+| AO-B6 | Keep the split cheap rather than exercise it | `lua_proxy` should read `FS_REDIS_HOST` / `FS_REDIS_PORT` / `FS_REDIS_DB` so a later move is a configuration edit; skip mirroring documents above ~256 KB to bound value size for large tenants; flush the mirror keyspace in `run-cache-sweep.sh`, which flushes DB 1 only (E31), or the cold-baseline tier is contaminated once the proxy is enabled; expose `used_memory` and `evicted_keys` in the panel health surface |
+
+**When single-threaded execution would become a factor.** At 2.43 µs per `GET` (E33), Redis spends roughly 0.02 % of one core at the measured 26 req/s ceiling. The constraint appears only at rates this project does not reach: about a third of a core at roughly 50,000 XML req/s, which corresponds to about 20,000 call setups per second. Concurrent channels are nearly irrelevant here, because Redis traffic follows call *setup* rate rather than live-call count — 5,000 bridged calls generate almost no Redis operations.
+
+| Sustained XML req/s | ≈ Call setups/s | Redis CPU (one core) | Observable effect |
+|---|---|---|---|
+| 26 (measured 1 vCPU ceiling) | ~10 | 0.02 % | none |
+| 500 | ~200 | 0.4 % | none; Redis is flat on any chart |
+| 2,000 | ~800 | 1.5 % | visible on a graph, no latency effect |
+| 50,000 | ~20,000 | ~35 % | tail latency begins to bend |
+| 150,000 | ~60,000 | ~100 % | the single thread is the constraint |
+
+Two qualifications belong with that table. The only burst that produces an observable spike is a registration storm against large documents — 1,000 endpoints re-registering against a 3.4 MB domain document costs roughly 400 ms of queueing, which the ~256 KB document cap in AO-B6 removes. And memory reaches its limit far sooner than CPU does: a 256 MB cap holding only documents touched inside the 60 s TTL accommodates on the order of 10,000–15,000 concurrently active tenants.
+
+Re-evaluate the topology — without changing it — if sustained XML throughput reaches roughly 500 req/s, if `SLOWLOG LEN` becomes non-zero, or if `LATENCY LATEST` returns any event. Split into a second instance if `used_memory` exceeds roughly 70 % of `maxmemory`, if `evicted_keys` grows, if mirror keyspace exceeds roughly 25 % of the cap, if `SLOWLOG` or `LATENCY` entries correlate with large-value `GET`s, if a Redis restart, flush, or `MISCONF` visibly affects the panel, or if mirrored documents consistently exceed ~256 KB.
+
 ### Verdict summary
 
 | Decision | Opinion |
 |:---------|:--------|
 | Redis Stream + micro-batch + disk spool for CDR ingestion | **Endorsed** — correct consistency model and the right isolation from the XML hot path; add consumer-group readiness (AO-A1), stream alerts (AO-A2), and a retention policy (AO-A3) |
 | Lua Redis proxy for XML | **Goal endorsed, sequencing and shape rejected** — revisit after Plan A, scope to directory first (AO-B3), and require a one-`GET` mirror design with no Lua-side resolution (AO-B2) |
+| Redis topology for the mirror | **Single instance (DB 0 on 6379)** — no measured bottleneck; keep host, port, and database configurable and act only on a documented trigger (AO-B5, AO-B6) |
 
 ---
 
@@ -237,6 +280,7 @@ Where I disagree:
    - Update `ModuleAutoloadTest` and remove the legacy migration (A-R4, A-R5).
    - *Completed on 5.x:* `5.x` series branch created (A-R6) and `CHANGELOG.md` / `INSTALL.md` upgrade notes completed (A-R7).
    - While in Task 6, resolve the recordings base directory via the `MediaStreamController` precedent (A-R9) and add parser fixture tests (A-R11).
+   - Add A-R13 to A-R15 to the punch list: choose the CDR durability mechanism (AOF `everysec` or explicit `XLEN` alerting), set `vm.overcommit_memory=1` in the installer, and scope `appliance:sync-host`'s flush instead of calling `flushall()`.
 2. **Plan B v2 — proceed with Tasks 2–7 (Phase 1):**
    - Task 1 measurement spike completed on the remote 1 vCPU test host with an unequivocal PROCEED decision (app-side p95 $73.9\text{ to }292.4\text{ ms}$, HTTP p95 $1,233\text{ ms}$, directory share $66.7\%$).
    - Execute Tasks 2–4 incorporating the Revision 3.1 hardening:
@@ -246,6 +290,7 @@ Where I disagree:
      - Monotonic version progression across cache flushes in `RoutingCacheVersion::bump()` (resolves `V2-M1`).
    - In Task 6, deploy `scripts/freeswitch/hiredis.conf.xml` tuned to `max-connections="16"` with password support, and bind `tallpbx_xml_handler.lua`.
    - Run the key parity harness (Task 5) and the end-to-end laboratory gate (Task 7).
+   - Keep the mirror in DB 0 of the main instance (AO-B5). Make the `lua_proxy` connection env-driven (`FS_REDIS_HOST` / `FS_REDIS_PORT` / `FS_REDIS_DB`), cap mirrored document size, and flush the mirror keyspace in `run-cache-sweep.sh` before the cold tier (AO-B6).
 3. **Track execution in the SDD ledger** (`.superpowers/sdd/`) once either plan starts, per the project's plan lifecycle convention.
 
 ---
@@ -263,6 +308,7 @@ Where I disagree:
 | Cache prefix | `config/cache.php`, `.env` (`APP_NAME=TallPBX`) |
 | XML handler authentication and sections | `app/Http/Controllers/Api/XmlHandlerController.php`, `routes/api.php` |
 | Redis connections | `config/database.php` |
+| Redis runtime configuration, persistence, and document sizes | `redis-cli CONFIG GET` / `INFO` on the installed host; live `curl` against the installed xml-handler |
 | hiredis capability and profile | `strings /usr/lib/freeswitch/mod/mod_hiredis.so`, `/etc/freeswitch/autoload_configs/hiredis.conf.xml` |
 | Lua handler configuration | `/etc/freeswitch/autoload_configs/lua.conf.xml` |
 | Installed modules / package availability | `/usr/lib/freeswitch/mod/`, `apt-cache policy freeswitch-mod-json-cdr` |
@@ -274,4 +320,4 @@ Where I disagree:
 | Rename blast radius | `tests/Feature/ModuleAutoloadTest.php`, `tests/Feature/PanelModuleAuthorizationSweepTest.php` |
 | Release history | `CHANGELOG.md` (`4.2.0`, `4.3.0`), `git tag` |
 
-*This report is documentation only. No code, configuration, or data was modified in producing Revision 3.0.*
+*This report is documentation only. No code, configuration, or data was modified in producing Revision 3.2.*
