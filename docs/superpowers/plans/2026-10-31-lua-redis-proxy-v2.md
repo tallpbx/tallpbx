@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Status: on hold — do not start at Task 2.** [AO-B7](implementation-plan-review.md) in the review makes a fast front controller for the PHP miss path the prerequisite, and that work is now implemented and measured (Revision 3.5, E37). The Task 1 gate below was computed against the old 55 ms miss path, so it must be re-derived (AO-B8) before this plan resumes.
+> **Status: Tasks 2–5 implemented and verified; Task 6 templates and runbook written.** The optional proxy code is in place and default-off: `FsXmlMirrorKeys`/`FsXmlMirrorWriter` with the unprefixed `lua_proxy` connection, version mirroring with a monotonic cache-flush guard, directory mirroring for both FreeSWITCH lookup shapes (domain and user), the Lua handler, and a 16-case parity harness that shares its fixtures with a PHP test. The Task 6 templates (`scripts/freeswitch/lua.conf.xml`, `scripts/freeswitch/hiredis.conf.xml`) and the rollback runbook in `docs/operations.md` are written but **not deployed**. What remains is deployment-and-restart plus the Task 7 end-to-end live gate, both of which need a maintenance window on the lab host. Conversation ledgers live in `.superpowers/sdd/2026-10-31-lua-redis-proxy-v2/`.
 
 **Goal:** Add an optional, default-off in-process Lua directory-XML cache in FreeSWITCH that serves Laravel-rendered directory XML from Redis in under 1 ms on cache hits, with automatic version-based invalidation, fail-to-miss fallback to `mod_xml_curl`, and a one-step rollback — and only after a measurement spike proves the economics.
 
