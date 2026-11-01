@@ -470,7 +470,7 @@ If editing configuration files by hand:
 
 ## Optional Lua Directory Cache (Phase 1)
 
-TallPBX can answer FreeSWITCH directory lookups from Redis inside FreeSWITCH itself, before `mod_xml_curl` reaches PHP. Laravel mirrors every rendered directory document into Redis DB 0 under the `pbx:fsxml` namespace, and a `mod_lua` search binding reads it with at most three `GET`s. The feature is **off by default** and is limited to directory lookups; dialplan and configuration lookups always use `mod_xml_curl`.
+TallPBX can answer FreeSWITCH directory lookups from Redis inside FreeSWITCH itself, before `mod_xml_curl` reaches PHP. Laravel mirrors every rendered directory document into Redis DB 0 under the `pbx:fsxml` namespace, and a `mod_lua` search binding reads it with at most four `GET`s. The feature is **off by default** and is limited to directory lookups; dialplan and configuration lookups always use `mod_xml_curl`.
 
 Nothing calls this path when the bindings are absent, so a stock install behaves exactly as before.
 
@@ -478,11 +478,16 @@ Nothing calls this path when the bindings are absent, so a stock install behaves
 
 | Key | Contents | Lifetime |
 |:--|:--|:--|
-| `pbx:fsxml:tenant:user:<domain>:<user>` | The tenant ID PHP resolved for that identity | Directory cache TTL (60 s default) |
+| `pbx:fsxml:ver:global` | The identity epoch: the system-wide routing revision | Until overwritten |
+| `pbx:fsxml:tenant:user:<domain>:<user>:e<epoch>` | The tenant ID PHP resolved for that identity | Directory cache TTL (60 s default) |
 | `pbx:fsxml:ver:<tenantId>` | Current routing revision for the tenant | Until overwritten |
 | `pbx:fsxml:dir:<tenantId>:<tag>:<domain>:<user>:v<version>` | The rendered directory document | Directory cache TTL (60 s default) |
 
 The revision is part of every payload key, so any panel change that bumps the tenant revision makes the next Lua lookup miss, fall through to `mod_xml_curl`, and re-warm the mirror with fresh credentials.
+
+The identity map carries a second token, the **identity epoch**. The payload revision cannot protect the map, because the map is what decides which tenant the revision belongs to. The epoch is the global routing revision; it moves whenever a SIP account or tenant domain is created, changed, enabled, disabled, or deleted — the only writes that can change which tenant owns a username or a realm. A missing epoch is a miss, never a default, so Lua never guesses an identity.
+
+> **Cost of the epoch rule:** the global revision also salts the dialplan cache keys, so a SIP account or domain edit invalidates every tenant's dialplan once, in addition to the tenant that owns the record. That is the price of a single, provable invalidation token for identity; it is one rebuild per tenant on the next dialplan request, not a per-request cost.
 
 ### Enabling the Lab Proxy
 
@@ -506,7 +511,8 @@ fs_cli -x "hiredis_raw default PING"        # expect +PONG (shown as PONG)
 
 # Warm one lookup, then confirm the mirror keys exist in DB 0.
 fs_cli -x "find_user_xml id <extension> <domain>"
-redis-cli -n 0 GET pbx:fsxml:tenant:user:<domain>:<extension>
+redis-cli -n 0 GET pbx:fsxml:ver:global
+redis-cli -n 0 GET "pbx:fsxml:tenant:user:<domain>:<extension>:e$(redis-cli -n 0 GET pbx:fsxml:ver:global)"
 redis-cli -n 0 GET pbx:fsxml:ver:<tenantId>
 
 # A second lookup for the same identity must not add an /api/v1/xml-handler

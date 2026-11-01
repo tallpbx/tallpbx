@@ -140,9 +140,65 @@ As in §6, most of the request time is framework boot and worker queueing, not X
 
 **Decision: KEEP on the reference appliance.** The feature stays off by default for fresh installs (`FS_LUA_PROXY_ENABLED=false`); this host is enabled deliberately as the reference deployment.
 
+> **This decision is withdrawn pending §10.** The gate below tested document freshness but not ownership freshness, and the identity map was found to be staleable across an ownership change.
+
 Caveats:
 
 - Each measurement shells out to `fs_cli`, so absolute values include roughly 74 ms of event-socket overhead (measured separately with `status`). The 269 ms gap is the lookup path itself.
 - The PHP figure is a warm PHP cache on this appliance; it is not comparable to the 1 vCPU test host in §3.
 - A live Redis-stop test was not run. The Lua miss paths are covered by the fixture harness (`-NOAUTH`, missing keys, empty and foreign values), and the PHP fallback's own Redis dependency predates this feature.
 - The domain-shape document is mirrored once per requesting username, so mirror memory scales with active endpoints rather than active tenants. This remains a deferred decision.
+
+## 10. Identity-epoch defect and fix (supersedes the KEEP decision in §9)
+
+### What was wrong
+
+Every cached answer on the directory path was audited after the §9 gate. Two of them answer *which tenant owns a username*:
+
+| Cache | Key (before) | Invalidation (before) |
+|:--|:--|:--|
+| PHP resolver identity cache (DB 1) | `freeswitch:tenant-identity:<type>:<sha1(user\|domain)>` | 60-second TTL only |
+| Lua mirror identity map (DB 0) | `pbx:fsxml:tenant:user:<domain>:<user>` | 60-second TTL only |
+
+Neither key carried a revision, and no bump touched either one. A routing bump changes a counter inside DB 1; it reaches only keys that embed that counter. The identity answer is not a document — it is the input used to build the document keys — so a cached answer survived every panel save until its TTL expired.
+
+**Impact:** if a username or a realm moves to another tenant (an account re-homed, a domain reassigned, an account disabled and recreated elsewhere), lookups keep resolving to the previous tenant for up to 60 seconds. That is a cross-tenant boundary, not a caching inefficiency, and it was present in the PHP path as well as the Lua path.
+
+**Why the gate missed it:** the gate tested *document* freshness (edit a field, see it on the next lookup). It never tested *ownership* freshness (move a record between tenants, see the new tenant). The review's risk analysis treated the identity map as the thing that *prevents* collisions, and never asked whether the map itself could be wrong.
+
+### What changed
+
+- The **identity epoch** is the existing global routing revision (`freeswitch:routing-version:global`, mirrored as `pbx:fsxml:ver:global`). One token, no new counter.
+- `RoutingCacheObserver` bumps it on every `SipAccount` and `TenantDomain` write (create, update, delete, restore). `TenantDomain` is now observed. These are the only writes that can move an identity.
+- Both identity keys now embed it: PHP `…:<sha1>:e<epoch>` (appended inside the hash input) and Lua `pbx:fsxml:tenant:user:<domain>:<user>:e<epoch>`.
+- Lua reads the epoch **first**. A missing or non-numeric value is a miss, never a default. The lookup is now four `GET`s, still with no XML logic.
+- The mirror write path seeds the global epoch with `SETNX` on a cold start, publishes under the higher of store/mirror epochs after a cache flush, and refuses to publish at all when the epoch moved while the document was rendering.
+
+**Cost:** the global revision also salts the dialplan cache keys, so a SIP account or domain edit invalidates each tenant's dialplan once on its next request. That is the accepted trade for one provable invalidation token.
+
+### Tests that now guard it
+
+| Test | Proves |
+|:--|:--|
+| `TenantIdentityResolverTest` → “drops a cached username identity when the account moves to another tenant” | The PHP resolver returns the new tenant immediately after a re-home |
+| `TenantIdentityResolverTest` → “drops a cached domain identity when the domain moves to another tenant” | Same for the domain-only lookup |
+| `RoutingCacheObserverTest` → two “global identity epoch” tests | Account and domain writes move the epoch; unrelated writes do not |
+| `DirectoryXmlMirrorTest` → “keys the identity map by the global epoch…” | The mirror seeds the epoch and republishes under the new one |
+| `DirectoryXmlMirrorTest` → “skips the mirror when the global epoch changes while the document renders” | No map entry is published for a superseded identity |
+| `lua_key_fixtures.json` cases “identity epoch moved…”, “identity epoch missing…”, “noauth on identity epoch lookup”, “new identity epoch answers…” | Lua reads the epoch, treats staleness and errors as a miss, and follows a moved epoch |
+
+### Live re-verification (reference appliance)
+
+Run after deploying the epoch-aware handler, restoring the bindings, and restarting FreeSWITCH. Test identity: tenant 6, extension `1000`, domain `192.168.1.76`. PHP requests are counted from `/var/log/nginx/access.log` (`xml-handler` lines) across each `fs_cli find_user_xml`.
+
+| Step | Action | Result |
+|:--|:--|:--|
+| Cold start | first lookup after restart | 1 PHP request; `pbx:fsxml:ver:global` seeded as `0`; map written at `…:1000:e0` = `6` |
+| Warm hit | second lookup | 0 PHP requests |
+| Ownership change (revoke) | disable the SIP account through Eloquent (as a panel save would) | epoch `0 → 1`; **very next lookup went to PHP (+1) and returned no `<user id="1000">`** — the cached identity did not survive |
+| Fail-closed | second lookup while disabled | still PHP (+1), because the account was the only discriminator for a domain shared by several tenants; the tenant resolver now reports the domain as ambiguous and resolves nothing |
+| Ownership change (restore) | re-enable the account | epoch `1 → 2`; next lookup +1 PHP, user present again, map written under `…:e2` = `6` |
+| Warm hit after restore | next lookup | 0 PHP requests |
+| Stale entry isolation | scan the identity map keys | only `…:e2` remained; the superseded `:e0` entry expired on its own TTL and was never readable under the new epoch |
+
+**Decision: KEEP, reinstated.** The epoch path is proven live: an ownership change moves the epoch, the next lookup cannot use the cached answer, and the mirror re-warms under the new epoch. The feature still ships off by default for fresh installs; this host is enabled deliberately as the reference deployment.

@@ -1,6 +1,6 @@
 # Implementation Plan Review — CDR Modernization vs. Lua Redis Proxy
 
-**Revision:** 3.5 (records the fast front controller as implemented and measured; adds E37 and the remaining deployment-wiring step)
+**Revision:** 3.6 (adds V2-C3: the identity map was TTL-only and could serve a superseded tenant after an ownership change; records the epoch fix)
 **Date:** 2026-11-01
 **Branch reviewed:** `5.x`
 **Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents, combined with live measurement report analysis (`docs/lua-proxy-measurement-results.md`) and runtime inspection of the Laravel Redis connection manager and FreeSWITCH 1.11.4 `find_user_xml`.
@@ -164,13 +164,23 @@ The architecture is sound and the previously reported integrity chain is closed.
 | B-M3 | hiredis concurrency headroom | **Fixed** | Task 6 tunes `hiredis.conf.xml` to `max-connections="16"`. |
 | **B-R1** | **DB 1 unreachable from `mod_hiredis`** | **RESOLVED** | Uses DB 0 raw mirror namespace via `Redis::connection('lua_proxy')`. |
 | **B-R2** | **Cache key prefix (`tallpbx-cache-` & `tallpbx-database-`) mismatch** | **RESOLVED** | Bypasses `Cache` facade AND configures dedicated `'lua_proxy'` connection with explicit `'prefix' => ''` to eliminate phpredis's default `tallpbx-database-` prefix (`V2-C1`). |
-| **B-R3** | **Shared domain directory leakage** | **RESOLVED** | Keyed by `(domain, user)` only after PHP resolves identity and matching tag scope. |
+| **B-R3** | **Shared domain directory leakage** | **RESOLVED (reopened and re-closed as V2-C3)** | Keyed by the tenant PHP resolved. The original closure assumed the resolved tenant was trustworthy; V2-C3 shows the cached resolution could be up to 60 seconds stale after an ownership change. The identity key now embeds the global epoch. |
 | **B-R4** | **Dialplan key format conflict** | **RESOLVED** | Dialplan caching de-scoped from Phase 1. |
 | **B-R5** | **`TenantRedisResolver` connection unstated** | **RESOLVED** | Resolver eliminated; replaced by `FsXmlMirrorWriter` using explicit `'lua_proxy'` connection. |
 | **B-R6** | **Dialplan tenant resolution failure** | **RESOLVED** | Dialplan caching de-scoped from Phase 1. |
 | **B-R7** | **Unvalidated command concatenation** | **RESOLVED** | Lua validates strict charset `^[%w%.%-_]+$` before query. |
 | **B-R8** | **Coarse builder keys** | **RESOLVED** | Directory builder retains existing SHA-1 keys in `remember()`; mirror write is purely additive. |
 | **B-R9** | **Maintenance window / dead specs** | **RESOLVED** | Maintenance window documented; dead Sofia specs and phantom commands purged. |
+
+### Revision 3.6 — Identity-Epoch Finding (V2-C3)
+
+| Finding ID | Severity | Description | Status | Verification & Resolution Detail |
+|:---|:---|:---|:---|:---|
+| **V2-C3** | **Critical** | The identity map — the cached answer to "which tenant owns this username" — carried no revision in either layer: PHP `freeswitch:tenant-identity:<type>:<sha1>` and Lua `pbx:fsxml:tenant:user:<domain>:<user>`. Both relied on a 60-second TTL, and no routing bump reached either key, because the bump changes a counter and only keys embedding that counter are invalidated. A SIP account re-homed to another tenant, or a tenant domain reassigned, could therefore keep resolving to the previous tenant until the TTL expired. | **Fixed** | Both keys now embed an **identity epoch**: the existing global routing revision (`freeswitch:routing-version:global` / `pbx:fsxml:ver:global`). `RoutingCacheObserver` bumps it on every `SipAccount` and `TenantDomain` write, and `TenantDomain` is now observed. Lua reads the epoch first (`pbx:fsxml:ver:global`) and treats a missing or non-numeric value as a miss; the lookup is four `GET`s. The mirror seeds the epoch with `SETNX`, republishes under the higher of store/mirror epoch after a cache flush, and refuses to publish when the epoch moved mid-render. Reproductions: `TenantIdentityResolverTest` (account and domain re-home), `RoutingCacheObserverTest` (epoch bumps), `DirectoryXmlMirrorTest` (epoch-keyed map), and four new `lua_key_fixtures.json` cases. |
+
+**Why the earlier reviews missed it:** the risk analysis asked whether two tenants could collide in a payload key, and answered that the identity map prevented it. It never asked whether the map itself could be wrong. Evidence E29 recorded the map's TTL as a property; no finding asked what invalidated it. The end-to-end gate tested document freshness but not ownership freshness.
+
+**Accepted cost:** the global revision also salts the dialplan cache keys, so a SIP account or domain edit invalidates each tenant's dialplan once on its next request. One token, one code path, and a provable invalidation beat a second counter that could drift from the first.
 
 ### Runtime Verification Findings & Plan B v2 Hardening (Revision 3.1)
 
