@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Load-Test App-Side Metrics & Directory Scenarios**: `pbx:load-test:dialplan` now accepts `--section=dialplan|directory|mixed` and `--timing`, recording app-side `request_ms`/`handler_ms`, database-query counts, and per-section p50/p95 in the JSON report (`schema_version: 2`). The cache sweep adds a `directory-mixed` tier with an app-side p95 column. Timing headers are opt-in (`FS_XML_HANDLER_TIMING_HEADERS=true` plus the `X-TallPBX-Timing: 1` request header) and disabled by default.
 
 ### Fixed
+- **Appliance Host Sync No Longer Empties Every Redis Database**: `appliance:sync-host`, which runs after a snapshot restore or an IP or hostname change, called `Redis::flushall()` and therefore wiped all logical databases at once — cache, sessions, and the CDR stream. Only the cache holds rendered routing XML that embeds the old address, and only the cache is safe to discard, so the command now flushes the telephony cache store alone. Signed-in administrators stay signed in, and no call records can be lost to a host sync.
 
 ## [4.3.0] - 2026-10-31
 
