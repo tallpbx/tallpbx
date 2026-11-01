@@ -421,12 +421,85 @@ XML
     load_required_freeswitch_modules
 }
 
+# Deploy the optional Lua directory cache (disabled by default).
+#
+# The handler, its bindings template, and the tuned hiredis profile are
+# installed so enabling the cache is a single .env change plus a restart.
+# Nothing here enables the feature: FS_LUA_PROXY_ENABLED stays false until an
+# administrator opts in (see docs/operations.md).
+configure_lua_directory_cache() {
+    local app_dir="/var/www/tallpbx"
+    local conf_dir=""
+    local modules_conf=""
+    local scripts_dir=""
+    local source_dir="${app_dir}/scripts/freeswitch"
+    local installed_hiredis=""
+    local redis_password_param=""
+    local escaped_password_param=""
+    local lua_line=""
+    local xml_curl_line=""
+    local temp_file=""
+
+    conf_dir="$(freeswitch_conf_dir)"
+    modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
+    scripts_dir="${conf_dir}/scripts"
+    installed_hiredis="${conf_dir}/autoload_configs/hiredis.conf.xml"
+
+    if [ ! -f "${source_dir}/tallpbx_xml_handler.lua" ]; then
+        warning "Lua directory cache templates not found in ${source_dir}; skipping"
+        return 0
+    fi
+
+    verbose "Deploying the optional Lua directory cache (disabled by default)"
+    mkdir -p "$scripts_dir"
+    install -m 0644 "${source_dir}/tallpbx_xml_handler.lua" "${scripts_dir}/tallpbx_xml_handler.lua"
+
+    # Carry an operator-supplied Redis password into the replacement profile.
+    # Dropping it would leave every lookup failing with -NOAUTH, which stops
+    # the cache at runtime without any visible error.
+    if [ -f "$installed_hiredis" ]; then
+        # Match only an active parameter: the template ships the same element
+        # commented out, and carrying that over would embed a comment inside
+        # the replacement's own comment.
+        redis_password_param="$(grep -oE '^[[:space:]]*<param name="password" value="[^"]*"[[:space:]]*/>' "$installed_hiredis" | head -1 | sed 's/^[[:space:]]*//' || true)"
+    fi
+
+    install -m 0644 "${source_dir}/lua.conf.xml" "${conf_dir}/autoload_configs/lua.conf.xml"
+    install -m 0644 "${source_dir}/hiredis.conf.xml" "$installed_hiredis"
+
+    if [ -n "$redis_password_param" ]; then
+        escaped_password_param="$(printf '%s' "$redis_password_param" | sed 's/[&|]/\\&/g')"
+        sed -i "s|.*CHANGE_ME.*|          ${escaped_password_param}|" "$installed_hiredis"
+    fi
+
+    # mod_lua must load before mod_xml_curl. FreeSWITCH appends XML search
+    # bindings and tries them in load order, so a later module is never asked.
+    ensure_freeswitch_module_enabled "$modules_conf" "mod_lua" "<!-- Languages -->"
+
+    lua_line="$(grep -n '<load module="mod_lua"/>' "$modules_conf" | head -1 | cut -d: -f1)"
+    xml_curl_line="$(grep -n '<load module="mod_xml_curl"/>' "$modules_conf" | head -1 | cut -d: -f1)"
+
+    if [ -n "$lua_line" ] && [ -n "$xml_curl_line" ] && [ "$lua_line" -gt "$xml_curl_line" ]; then
+        temp_file="$(mktemp)"
+        awk '
+            /<load module="mod_lua"\/>/ { held = $0; next }
+            /<load module="mod_xml_curl"\/>/ && !placed { if (held != "") print held; placed = 1 }
+            { print }
+        ' "$modules_conf" > "$temp_file"
+        mv "$temp_file" "$modules_conf"
+    fi
+
+    chown freeswitch:freeswitch "$modules_conf" "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
+    chmod 0644 "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
+}
+
 if [ "${1:-}" = "--configure-only" ]; then
     configure_tallpbx_media_root
     configure_freeswitch_systemd_dependencies
     configure_freeswitch_switch_defaults
     configure_freeswitch_sound_defaults
     configure_dynamic_xml
+    configure_lua_directory_cache
     systemctl daemon-reload 2>/dev/null || true
     exit 0
 fi
@@ -912,6 +985,7 @@ fi
 configure_freeswitch_switch_defaults
 configure_freeswitch_sound_defaults
 configure_dynamic_xml
+configure_lua_directory_cache
 set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALLED_METHOD "$freeswitch_install_method"
 
 verbose "FreeSWITCH installation complete"
