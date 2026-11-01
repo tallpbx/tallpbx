@@ -158,17 +158,93 @@ class DirectoryXmlBuilder
             ? Cache::store($cacheStore)
             : Cache::driver();
 
-        return $cache->remember(
-            $this->directoryCacheKey((string) $tenantId, $tagName, $domain, $username, $keyValue),
+        $tenantIdInt = (int) $tenantId;
+
+        // Sample the revision once. The same value keys the PHP cache entry
+        // and the mirror, so a document can only be published under the
+        // revision it was actually rendered for.
+        $version = (int) RoutingCacheVersion::get($tenantIdInt);
+
+        $xml = $cache->remember(
+            $this->directoryCacheKey((string) $tenantId, $tagName, $domain, $username, $keyValue, $version),
             $ttl,
             fn (): string => $this->buildDirectoryXml($tagName, $domain, $username, $keyValue),
         );
+
+        $this->mirrorDirectoryXml($tagName, $domain, $username, $keyValue, $ttl, $tenantIdInt, $version, $xml);
+
+        return $xml;
+    }
+
+    /**
+     * Mirror the rendered document into the raw Redis namespace read by the
+     * optional FreeSWITCH Lua handler.
+     *
+     * Runs after the cache result, so a document served from the PHP cache
+     * refreshes the mirror as well. Failures inside the writer are swallowed
+     * there; nothing here may make a directory lookup fail.
+     */
+    private function mirrorDirectoryXml(string $tagName, string $domain, string $username, string $keyValue, int $ttl, int $tenantId, int $version, string $xml): void
+    {
+        // Cheapest check first: on the default configuration the feature is
+        // off and a directory lookup must not resolve anything extra.
+        if (! (bool) config('freeswitch.lua_proxy.enabled', false)) {
+            return;
+        }
+
+        if (! $this->shouldMirror($tagName, $domain, $username, $keyValue, $ttl)) {
+            return;
+        }
+
+        // A bump since the render started means this document no longer
+        // describes the current revision. Publishing it under the new
+        // revision would let Lua serve stale credentials, so skip and let
+        // the next lookup republish instead.
+        if ((int) RoutingCacheVersion::get($tenantId) !== $version) {
+            return;
+        }
+
+        $writer = app(FsXmlMirrorWriter::class);
+
+        // After a cache flush the store restarts at 0 while the mirror keeps
+        // the last revision and its payload keys. Publishing under the higher
+        // mirror revision keeps Lua hitting instead of missing indefinitely.
+        $mirrorVersion = $writer->readVersion($tenantId);
+        $publishVersion = max($version, $mirrorVersion ?? 0);
+
+        // Seed the version key on a genuine cold start only. Never overwrite
+        // it: RoutingCacheVersion::bump() owns the monotonic token.
+        if ($mirrorVersion === null) {
+            $writer->writeVersionIfMissing($tenantId, $publishVersion);
+        }
+
+        $writer->writeTenantLookup($domain, $username, $tenantId);
+        $writer->writeDirectory($tenantId, $tagName, $domain, $username, $publishVersion, $xml);
+    }
+
+    /**
+     * Decide whether a directory lookup is eligible for mirroring.
+     *
+     * Two request shapes are mirrored: FreeSWITCH's native domain lookup
+     * (tag_name=domain, key_value equal to the domain) and the user lookup
+     * (tag_name=user, key_value equal to the username). A lookup whose
+     * key_value does not match its tag scope stays on the PHP path, so the
+     * mirror can never serve a document for a different identity.
+     */
+    private function shouldMirror(string $tagName, string $domain, string $username, string $keyValue, int $ttl): bool
+    {
+        if ($ttl <= 0 || $domain === '' || $username === '') {
+            return false;
+        }
+
+        return ($tagName === 'domain' && $keyValue === $domain)
+            || ($tagName === 'user' && $keyValue === $username);
     }
 
     /**
      * Build a stable cache key for directory XML lookups.
      */
-    private function directoryCacheKey(string $tenantId, string $tagName, string $domain, string $username, string $keyValue): string
+    private function directoryCacheKey(string $tenantId, string $tagName, string $domain, string $username, string $keyValue, int $version): string
     {
         return 'freeswitch:xml-handler:directory:'.sha1(implode('|', [
             $tenantId,
@@ -176,7 +252,7 @@ class DirectoryXmlBuilder
             $domain,
             $username,
             $keyValue,
-            (string) RoutingCacheVersion::get((int) $tenantId),
+            (string) $version,
         ]));
     }
 
