@@ -402,6 +402,44 @@ sequenceDiagram
     Note over Handler,Redis: Next mod_xml_curl computes key with v=2 -> instant cache miss
 ```
 
+#### 6. In-Process XML Cache (FreeSWITCH Lua + Redis Mirror)
+
+> **Status:** approved design for TallPBX 5.x, not yet enabled. It ships behind `FS_LUA_PROXY_ENABLED=false` and Phase 1 covers directory lookups only. Until it is switched on, every lookup follows the path in §7.5.5. Rationale and evidence: [implementation plan review](superpowers/plans/implementation-plan-review.md) and [measurement report](lua-proxy-measurement-results.md).
+
+**The bottleneck it removes.** A cache hit still costs a full HTTP round trip through nginx, a PHP-FPM worker, and a Laravel boot before Redis is even asked. On the reference 1 shared vCPU host a directory lookup measured roughly 55 ms app-side at concurrency 1, of which only ~11 ms was XML assembly — the other ~44 ms was framework boot and dispatch. Because each lookup holds a worker for that entire window, the pool saturates at about 26 XML requests per second and the tail stretches to roughly 1,000 ms at concurrency 25. The XML is not the expensive part; reaching it is.
+
+**How it works.** Laravel continues to render and cache the document exactly as described above, and additionally writes the same bytes into a mirror namespace in Redis that FreeSWITCH reads for itself. A hit never leaves the FreeSWITCH process: no HTTP, no nginx, no PHP-FPM worker, no framework boot.
+
+```mermaid
+flowchart TD
+    A["FreeSWITCH: REGISTER / INVITE"] --> B["mod_lua xml-handler script"]
+    B --> C{"Mirror lookup in Redis DB 0<br/>tenant map -> version -> payload"}
+    C -->|"all keys present"| D["XML returned from inside FreeSWITCH<br/>no HTTP, no PHP-FPM, no framework boot"]
+    C -->|"missing key, Redis error, or malformed value"| E["mod_xml_curl<br/>POST /api/v1/xml-handler"]
+    E --> F["PHP-FPM worker<br/>XmlHandlerController"]
+    F --> G{"Laravel cache hit?<br/>Redis DB 1"}
+    G -->|"hit"| H["Rendered XML"]
+    G -->|"miss"| I["Build XML from MariaDB"]
+    I --> H
+    I --> J["Mirror write to DB 0<br/>SET ... EX directory_cache_ttl"]
+    H --> K["HTTP 200 back to FreeSWITCH"]
+    J -.->|"next lookup hits"| C
+```
+
+| Mirror key | Purpose | Expiry |
+| :--- | :--- | :--- |
+| `pbx:fsxml:tenant:user:{domain}:{user}` | Resolves which tenant owns a SIP identity, so shared domains stay unambiguous | 60 s |
+| `pbx:fsxml:ver:{tenantId}` | The tenant's current routing version, mirrored from `RoutingCacheVersion` | none |
+| `pbx:fsxml:dir:{tenantId}:{tag}:{domain}:{user}:v{version}` | The rendered directory document itself, as raw XML | 60 s |
+
+Three properties keep the mirror safe:
+
+- **It is a second representation, not a second cache of different data.** The same rendered bytes are stored twice: PHP-serialised under a SHA-1 key in DB 1 for Laravel, and as raw XML under a readable key for Lua. Lua cannot use the DB 1 object directly — the value is wrapped by PHP `serialize()` and the key requires SHA-1, which FreeSWITCH does not provide.
+- **There is still only one invalidation mechanism.** The version is embedded in the mirror key and comes from the same `RoutingCacheVersion::bump()` described in §7.5.4, so a panel edit bypasses both stores at the same instant. The 60-second TTL exists only to bound memory.
+- **Failure means miss, never stale.** A missing key, a Redis error, or a malformed value makes the script return nil, and FreeSWITCH falls through to `mod_xml_curl` — today's path. A Redis outage costs response time; it never fails a registration or a call.
+
+The economics of a hit are three `GET` commands (about 7 µs of Redis work) replacing the roughly 55 ms of PHP that the lookup would otherwise consume. Redis itself is not a constraint at these volumes: at the measured 26 requests per second it uses well under 1 % of a single core, and pressure would appear only in the tens of thousands of requests per second.
+
 ---
 
 # Part II: Security Architecture & Linux Kernel Packet Filtering
@@ -497,6 +535,7 @@ sequenceDiagram
 
 - **Standalone Redis 3-Tier Keyspace Isolation**: TallPBX structures its Redis deployment across isolated database indexes:
   - **DB 0 (Persistent Coordination & Security)**: Default connection used for atomic distributed mutex locks (`tallpbx_database_lock:*`), queue jobs, intrusion detection sliding-window counters, scanner dedup sets, and event broadcasting.
+  - **DB 0 mirror namespace (planned, §7.5.6)**: Raw `pbx:fsxml:*` keys that FreeSWITCH reads directly, written under their own prefix alongside the keys above. They carry a 60-second TTL, so their size follows the documents touched inside that window rather than the total number of extensions, and they remain ordinary eviction candidates.
   - **DB 1 (Disposable Cache)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`REDIS_CACHE_DB=1`). Cleared aggressively during `tpbx optimize:clear` or XML cache sweeps without touching session or security state. See §7.5 for the complete layered cache architecture, key composition, and `RoutingCacheVersion` immediate invalidation flow.
   - **DB 2 (Stateful HTTP Sessions)**: User and administrator web sessions (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`). Completely decoupled from cache flushes so background sweeps, module syncs, and web Git updates never evict active logins.
   - **DB 13–15 (Isolated Test Workspaces)**: Confined execution for automated unit, feature, and browser test suites (`tallpbx-test-*`), ensuring tests never mutate or wipe production keyspaces.
@@ -806,7 +845,77 @@ After recovery, re-apply from the Security Center (or `tpbx security:apply`) so 
 
 ---
 
-## 17. Related Documentation
+# Part III: Call Detail Records
+
+## 17. CDR Ingestion: `mod_json_cdr` → Redis Stream → MariaDB
+
+> **Status:** approved design for TallPBX 5.x, not yet deployed. `mod_json_cdr` is not installed on current appliances (the `freeswitch-mod-json-cdr` package is available at the matching 1.11.4 version), `/api/v1/cdr` and `tpbx cdr:work` do not exist yet, and the `xml-cdr` module is still a placeholder. This section documents the target architecture and the durability rules it has to satisfy. Sources: [pipeline plan](superpowers/plans/2026-10-31-cdr-modernization-pipeline.md) and findings A-R13–A-R15 in the [implementation plan review](superpowers/plans/implementation-plan-review.md).
+
+### 17.1 Why records are not written synchronously
+
+FreeSWITCH already produces a record for every call leg. The obvious design — POST the JSON into an Eloquent insert — puts a MariaDB transaction inside the same request that reports call teardown, and spends a PHP-FPM worker from the pool that the XML hot path (§7.5) depends on. At the 15–20 calls per second the benchmarks treat as the top of the range, that is 1,800–2,400 database writes per minute competing with the routing path that decides whether calls connect at all.
+
+The pipeline therefore separates **acceptance** from **persistence**: the endpoint's only job is to durably append the payload, and a separate supervised worker does the slow part.
+
+### 17.2 The three stages
+
+```mermaid
+flowchart TD
+    FS["FreeSWITCH: mod_json_cdr<br/>one JSON document per call leg"]
+    POST["POST /api/v1/cdr<br/>timing-safe token check"]
+    ADD["XADD to pbx:cdr:stream"]
+    STREAM["Redis DB 3<br/>pbx:cdr:stream"]
+    OK["HTTP 200, sub-millisecond<br/>FreeSWITCH keeps no copy"]
+    SPOOL["Disk spool<br/>/var/log/freeswitch/json_cdr/failed"]
+    WORK["tpbx cdr:work<br/>250 ms idle poll, chunks of 100"]
+    TX["One MariaDB transaction<br/>idempotent upsert on (call_uuid, leg)"]
+    DEL["XDEL processed entries"]
+    DRAIN["tpbx cdr:drain-spool<br/>scheduled reconciliation"]
+
+    FS --> POST
+    POST -->|"accepted"| ADD --> STREAM
+    ADD --> OK
+    POST -->|"503, timeout, or unreachable"| SPOOL
+    STREAM -->|"XRANGE"| WORK --> TX
+    TX -->|"commit succeeded"| DEL
+    DEL -.-> STREAM
+    SPOOL --> DRAIN --> TX
+```
+
+1. **FreeSWITCH emits.** `mod_json_cdr` serialises each leg as raw JSON and POSTs it to `/api/v1/cdr`. Nothing is parsed on the way in — the raw document is preserved for diagnostics.
+2. **The endpoint appends and returns.** The controller validates the token, appends the payload with `XADD`, and returns 200 immediately. No Eloquent, no SQL, no serialisation work on the request path.
+3. **The worker digests.** `tpbx cdr:work`, owned by `tallpbx-cdr-worker.service`, reads up to 100 entries with `XRANGE`, parses them, writes the batch in a single transaction using an idempotent upsert keyed on `(call_uuid, leg)`, and deletes the entries with `XDEL` **only after the commit succeeds**. Delivery is at-least-once; the unique index makes the retry harmless.
+
+### 17.3 Failure modes and the designed response
+
+The pipeline is built around one uncomfortable fact: **the disk spool only ever sees failures.** `mod_json_cdr` writes to `err-log-dir` when the POST fails. Once the endpoint answers 200, FreeSWITCH discards its copy and the only remaining copy is in Redis memory. Every row below follows from that asymmetry.
+
+| Event | What FreeSWITCH does | What protects the record | Residual exposure |
+| :--- | :--- | :--- | :--- |
+| Endpoint returns 5xx, times out, or cannot connect | Writes the raw JSON to `err-log-dir` | Disk spool, reconciled by `cdr:drain-spool` | Delay only |
+| Redis stopped or unreachable | `XADD` throws, endpoint returns 503 | Same spool path | Delay only |
+| Redis restarted | In-flight requests fail and spool; retried records are safe because the upsert is idempotent | Spool plus the unique index | Entries that received a 200 *before* the restart and had not yet been digested are lost unless AOF is enabled (§17.4) |
+| Server hard reboot or power loss | Nothing in flight completes | Spool files survive on disk and drain after boot; the stream itself reloads only to its last `dump.rdb` snapshot | The same accepted-then-lost window, bounded by the save points — roughly five minutes of stream writes at the installed defaults |
+| `cdr:work` dead or crash-looping | Endpoint keeps answering 200 | Nothing, by design — the stream is the buffer | **The largest hazard.** A reboot then discards everything accumulated since the last snapshot, and `XLEN` / stream-age alerting is the only thing that surfaces it |
+| MariaDB unavailable | Worker transaction fails | Entries stay in the stream, because `XDEL` runs only after a successful commit | Stream growth; same alerting requirement |
+| Malformed JSON | 200 (it was already accepted) | The worker quarantines it instead of dropping it | Manual triage, never silent loss |
+| `appliance:sync-host` runs `Redis::flushall()` | Not involved | Nothing | **Known gap (A-R15).** A full-instance flush discards undigested entries with no spool copy |
+
+### 17.4 The rule that makes the accepted window acceptable
+
+The exposure is not "how much is Redis holding" but "how long passes between `XADD` and the MariaDB commit". Two mechanisms keep that window small:
+
+- **A short digestion interval.** With a 250 ms idle poll and `XDEL` after commit, a healthy worker leaves roughly a fraction of a second of records in Redis. A crash in that window costs a handful of CDRs.
+- **Append-only persistence on the instance holding DB 3.** AOF with `appendfsync everysec` is the only mechanism that preserves undigested entries across a reboot, bounding the loss to about one second. Installed appliances currently run `appendonly no` with save points `3600 1  300 100  60 10000`, so this is required work, not existing behaviour (A-R13). Shortening the poll interval shrinks the healthy-window exposure but does nothing when the worker itself is dead — which is why both mechanisms are listed.
+
+Two supporting rules belong with them:
+
+- **Do not relax `stop-writes-on-bgsave-error`.** A refused write becomes a 503, a 503 becomes a spool file, and a spool file is recoverable. A falsely accepted write is unrecoverable.
+- **Set `vm.overcommit_memory=1` (A-R14).** Under the default heuristic a `fork()` for `BGSAVE` can fail even when memory is free; with write-stopping enabled that failure turns into `MISCONF`, every write is refused, and the spool starts filling for a reason nobody expects.
+
+---
+
+## 18. Related Documentation
 
 - [Telephony Fundamentals: Users, Extensions, SIP Accounts & Devices (PBX Concepts)](pbx-concepts.md) — Comprehensive, accessible guide to how core VoIP entities relate to one another.
 - [PBX "Hello World" Quickstart](pbx-hello-world.md) — Create an extension and test your first call with an audio echo test (`*9196`).
