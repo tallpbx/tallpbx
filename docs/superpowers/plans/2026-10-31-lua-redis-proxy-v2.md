@@ -8,6 +8,10 @@
 >
 > Earlier gate results (cold miss warms the mirror, Lua hit with zero PHP requests, immediate tenant-revision invalidation, SIP password rotation accepted on the next REGISTER, tenant isolation, corrupt-payload fallback, binding rollback, 322 ms → 53 ms) were measured before the epoch fix and remain valid for the paths they exercise. The epoch path itself is now proven live on the reference appliance: disabling a SIP account moved the epoch `0 → 1` and the very next lookup could not use the cached identity, and re-enabling it moved the epoch to `2` and re-warmed the mirror (see `docs/lua-proxy-measurement-results.md` §10). Enablement, verification, and rollback are in `docs/operations.md` → Optional Lua Directory Cache.
 
+> **Priority correction (2026-11-01):** every call leg produces a dialplan lookup, while directory lookups happen only per registration and per user resolution. Dialplan is therefore the bottleneck this plan exists to remove. It now stands as **Task 9** and outranks the remaining directory work.
+
+> **Task 9 status (2026-11-01): implemented and proven on the reference host.** Laravel mirrors each rendered dialplan under `pbx:fsxml:dp:<tenantId>:<context>:<destination>:v<version>:e<epoch>` (only for contexts shaped `tenant_<id>_internal|public`, the only shape Lua can address), the Lua handler serves the binding, and the freeze proof ran end to end: after deleting the payload a call re-warmed it with **one** PHP request, and the immediately following call produced **zero** PHP requests while FreeSWITCH resolved `local_extension` and bridged. `xml-handler-bindings` is now `directory,dialplan`. Remaining: the four-configuration comparison of Task 8, repeated across directory *and* dialplan.
+
 **Goal:** Add an optional, default-off in-process Lua directory-XML cache in FreeSWITCH that serves Laravel-rendered directory XML from Redis in under 1 ms on cache hits, with automatic version-based invalidation, fail-to-miss fallback to `mod_xml_curl`, and a one-step rollback — and only after a measurement spike proves the economics.
 
 **Architecture:** A strictly additive mirror layer. Laravel keeps its existing versioned cache untouched and additionally writes raw, unprefixed keys (`pbx:fsxml:*`) into Redis DB 0 via dedicated connection `Redis::connection(config('freeswitch.lua_proxy.connection', 'lua_proxy'))`, bypassing the `Cache` facade and overriding Laravel's default database prefix (`tallpbx-database-`) with `'prefix' => ''` so keys match Lua's raw queries byte-for-byte. `RoutingCacheVersion::bump()` mirrors the new revision so the version is embedded in every payload key; a version change therefore makes the next Lua lookup miss and fall through to `mod_xml_curl`, which rebuilds and re-warms the mirror. The Lua script performs at most three `GET`s (tenant map → version → payload), contains no XML logic, and returns `nil` on any doubt. Phase 1 covers directory lookups only (supporting both native FreeSWITCH `domain` lookups and synthetic `user` lookups); dialplan is explicitly out of scope until Phase 1 data justifies it.
@@ -658,9 +662,95 @@ git commit -m "docs(changelog): record lua directory cache proxy lab results"
 
 ---
 
+### Task 8: Four-Way Comparison on the Minimal Tier
+
+**Goal:** one table showing what each optional speed-up actually buys on the smallest supported host, so the decision to keep or remove each one rests on a number rather than on an opinion.
+
+**Files:**
+- Create: `docs/xml-handler-performance-comparison.md` (method + results table + recommendation)
+- Modify: `docs/load-testing-guide.md` (a repeatable procedure, so the run does not live only in one session)
+- Reference: `docs/operations.md` → **Fast XML Handler Path** (the nginx switch) and **Optional Lua Directory Cache** (the bindings switch)
+
+**Configurations** — same host, same tenant, same warm caches, same request counts:
+
+| ID | Fast controller | Lua proxy | What it represents |
+|:--|:--|:--|:--|
+| A | off | off | Stock install before either optimisation |
+| B | off | on | Lua proxy alone |
+| C | on | on | Both, as a future default |
+| D | on | off | Fast controller alone (already recorded as E37; re-measure for a like-for-like run) |
+
+**Two measurements per configuration, because they answer different questions:**
+
+1. **What FreeSWITCH waits for.** 30 × `fs_cli -x "find_user_xml id <extension> <domain>"`, minus the floor measured by 30 × `fs_cli -x "status"`. This is the only measurement that sees a Lua **hit**, because a hit never reaches nginx or PHP.
+2. **What the web app costs when it is asked.** `tpbx pbx:load-test:dialplan --section=directory --requests=100 --concurrency=1 --timing`, reporting `request_ms` p50/p95 and requests per second. With the proxy on this measures **misses plus mirror writes**, not hits — the table must say so, or the two rows will be misread as contradicting each other.
+
+**Switching, without downtime surprises:**
+
+- **Fast controller** — an nginx `location` swap and `systemctl reload nginx`. No `.env`, cache, database, or FreeSWITCH change. Procedure: `docs/operations.md` → Fast XML Handler Path.
+- **Lua proxy** — comment or restore the two `xml-handler-*` parameters in `/etc/freeswitch/autoload_configs/lua.conf.xml` and restart FreeSWITCH. `FS_LUA_PROXY_ENABLED=false` alone is **not** a kill switch: it stops new mirror writes while FreeSWITCH keeps serving what is already in Redis. Procedure: `docs/operations.md` → Rollback: Lua XML Cache Proxy.
+
+- [ ] **Step 1: Prepare the host**
+
+Set `FS_XML_HANDLER_TIMING_HEADERS=true`, run `tpbx optimize`, and warm one lookup per configuration before measuring. Record the PHP version, worker count, and cache TTL so the table is reproducible.
+
+- [ ] **Step 2: Measure configuration A**
+
+Proxy off (bindings commented, FreeSWITCH restarted), normal controller. Take both measurements.
+
+- [ ] **Step 3: Measure configurations B and C**
+
+Restore the bindings, restart FreeSWITCH once, then measure B (normal controller), then add the fast-controller location and measure C.
+
+- [ ] **Step 4: Measure configuration D**
+
+Remove the fast-controller location (back to `try_files`), keep the proxy off, measure. Reload nginx only — no FreeSWITCH restart needed.
+
+- [ ] **Step 5: Restore the host**
+
+Return the host to the state it was found in, and delete any temporary nginx or FreeSWITCH backups created for the run.
+
+- [ ] **Step 6: Publish the table and the recommendation**
+
+`docs/xml-handler-performance-comparison.md` carries: the environment, the four configurations, both measurements per configuration, what each number means, and a keep/remove recommendation per feature with the number that justifies it. Add the procedure to the load-testing guide so the next run does not have to be reinvented.
+
+**Rule for the table:** every configuration must be measured in one session, on one host, with identical request counts. Numbers from different sessions are not comparable and must not be placed in the same column.
+
+---
+
+### Task 9: Dialplan Mirror — the path that runs on every call
+
+**Why this outranks the directory work:** every call leg produces at least one dialplan lookup, while directory lookups happen per registration and per user resolution. Phase 1 measured directory only, so every figure it produced understates the actual prize. Dialplan is the bottleneck the proxy was built for.
+
+**Files:**
+- Modify: `scripts/freeswitch/lua.conf.xml` (bindings become `directory,dialplan`)
+- Modify: `app/Services/Xml/FsXmlMirrorKeys.php` (add the dialplan key)
+- Modify: `app/Services/Xml/DialplanXmlBuilder.php` (mirror write beside the existing cache write)
+- Modify: `scripts/freeswitch/tallpbx_xml_handler.lua` (dialplan branch: context + destination)
+- Modify: `tests/fixtures/freeswitch/lua_key_fixtures.json`
+- Test: `tests/Unit/Services/FsXmlMirrorKeysTest.php`, `tests/Feature/Services/DialplanXmlMirrorTest.php`, `tests/Unit/Scripts/test_tallpbx_xml_handler.sh`
+
+**Interfaces:**
+- Produces: `FsXmlMirrorKeys::dialplan(int $tenantId, string $context, string $destination, int $version): string` → `pbx:fsxml:dp:{tenantId}:{context}:{destination}:v{version}`
+- Lua reads `Caller-Context` (`tenant_{id}_internal` or `tenant_{id}_public`) for the tenant, and `Caller-Destination-Number` for the destination. Any unparsable context, missing version, or error reply is a miss.
+
+**Invalidation is already in place — no new instrumentation.** `AppServiceProvider::registerRoutingCacheObservers()` observes 32 telephony models covering every dialplan input: extensions, extension settings, ring groups and members, inbound and outbound routes, destinations, gateways, IVR menus and options, time conditions, call flows, call blocks, bridges, follow-me, hot desk sessions, voicemails, conferences and centres, queues, agents, tiers, call forwards, feature codes, emergency numbers, dialplans and dialplan details, number translations, PIN numbers, and tenant limits. Each write bumps the tenant routing revision, which the key embeds, so the token that keeps today's Laravel dialplan cache correct keeps the mirror correct as well.
+
+- [ ] **Step 1: Write the failing key test** for `dialplan()`, including a context carrying an underscore and a destination containing `+` (E.164 style).
+- [ ] **Step 2: Run it — expect failure**, then implement the key method.
+- [ ] **Step 3: Write the failing mirror test** — render the same dialplan twice and assert the second document is served from Redis, that the key carries the revision, and that a revision bump changes the key.
+- [ ] **Step 4: Implement the mirror write** in `DialplanXmlBuilder`, beside the existing cache write, gated by `FS_LUA_PROXY_ENABLED` and fail-soft exactly like the directory writer.
+- [ ] **Step 5: Extend the Lua handler and fixtures** — the script must never guess a tenant or a destination; unknown values return `nil`.
+- [ ] **Step 6: Bind `dialplan` and verify on the host** — a cold lookup warms the mirror, a second lookup serves it with zero PHP requests, and editing a ring group or outbound route invalidates it on the very next call.
+- [ ] **Step 7: Measure the repeat rate before enabling anywhere** — dialplan keys are per destination, so the hit ratio depends entirely on how concentrated the traffic is. Sample real traffic and record it.
+
+**Risk that decides the outcome:** unlike directory, a stale dialplan **misroutes a live call**. The key must embed the tenant revision, and the Lua branch must return `nil` on anything unexpected. The byte-equality test is not optional here.
+
+---
+
 ## Out of Scope / Deferred
 
-- **Dialplan proxying (phase 2).** Revisit only if Phase 1 sustains ≥ 90 % hit ratio and the deployment target still exceeds 60 req/s. Phase 2 requires: tenant derivation from `tenant_{id}_internal|public`, destination and global version in the key, and every dialplan input (gateways, time conditions, ring groups, IVRs, scanner signatures, limiters, markers) represented in the version or the key.
+- **Dialplan proxying is no longer deferred.** It was moved ahead of the directory work as **Task 9**, because every call leg produces a dialplan lookup while directory lookups happen only per registration.
 - **Configuration / `sofia.conf` proxying** — low lookup volume, no measured benefit.
 - **`mod_hiredis` database selection** — not supported by the installed module; the mirror lives in DB 0 by design.
 - **Installer wiring** for `lua.conf.xml` and `hiredis.conf.xml` — deferred until the feature is KEEP-enabled on reference deployments.

@@ -468,9 +468,74 @@ If editing configuration files by hand:
    fs_cli -x "reloadxml"
    ```
 
-## Optional Lua Directory Cache (Phase 1)
+## Fast XML Handler Path
 
-TallPBX can answer FreeSWITCH directory lookups from Redis inside FreeSWITCH itself, before `mod_xml_curl` reaches PHP. Laravel mirrors every rendered directory document into Redis DB 0 under the `pbx:fsxml` namespace, and a `mod_lua` search binding reads it with at most four `GET`s. The feature is **off by default** and is limited to directory lookups; dialplan and configuration lookups always use `mod_xml_curl`.
+A normal request boots the whole application — roughly 90 service providers, including every module — even though a directory lookup needs almost none of that. Fresh installs therefore point `/api/v1/xml-handler` at `public/xml-handler-fast.php`, which boots a small allowlist instead. The controller, the XML builders, and the cache are unchanged, so the response is byte-identical.
+
+Measured on the 1 vCPU reference host: app-side p50 39.88 → 27.86 ms and throughput 22.9 → 33.1 requests/second at concurrency 1.
+
+If the fast path throws for any reason, the same request is served by the normal application, so a fault costs speed rather than registrations.
+
+### Check Which Path Is In Use
+
+```bash
+grep -A5 'location = /api/v1/xml-handler {' /etc/nginx/sites-available/pbx
+```
+
+- **Fast path:** the block contains `fastcgi_param SCRIPT_FILENAME $realpath_root/xml-handler-fast.php;`
+- **Normal path:** the block is the single-line `try_files $uri /index.php?$query_string;` form
+
+### Disabling It (Rollback)
+
+Replace the whole `location` block with the single-line form:
+
+```nginx
+    location = /api/v1/xml-handler { access_log off; try_files $uri /index.php?$query_string; }
+```
+
+Then reload nginx:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Enabling It Again
+
+Replace the same block with:
+
+```nginx
+    location = /api/v1/xml-handler {
+        access_log off;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root/xml-handler-fast.php;
+        fastcgi_pass unix:/var/run/php/php8.5-fpm.sock;
+    }
+```
+
+Match the PHP version to the one installed (`ls /var/run/php/`). Then `sudo nginx -t && sudo systemctl reload nginx`.
+
+Neither direction needs a `.env` change, a cache clear, a FreeSWITCH restart, or a database change: both paths call the same controller. Only the bootstrap differs.
+
+> **Installer re-runs overwrite this block.** `scripts/resources/nginx.sh` and the Let's Encrypt variants write the fast-path form, so re-running the installer restores it. Both templates carry the rollback line as a comment next to the block.
+
+### Verifying
+
+```bash
+cd /var/www/tallpbx
+TOKEN=$(grep -E '^FS_XML_HANDLER_TOKEN=' .env | cut -d= -f2- | tr -d '"')
+Q='section=directory&tag_name=user&key_name=user&key_value=2000&domain=example.com'
+
+# Both should return HTTP 200 and the same bytes.
+curl -s "http://127.0.0.1/api/v1/xml-handler?$Q" -H "X-FS-Token: $TOKEN" | head -c 80
+```
+
+To confirm the handler is responding at all, a `403` means the token check is working and the endpoint is alive; a `500` means the front controller itself failed and the request should have fallen back to the normal application — check `storage/logs/laravel.log`.
+
+## Optional Lua XML Cache (Directory and Dialplan)
+
+TallPBX can answer FreeSWITCH directory and dialplan lookups from Redis inside FreeSWITCH itself, before `mod_xml_curl` reaches PHP. Laravel mirrors every rendered document into Redis DB 0 under the `pbx:fsxml` namespace, and a `mod_lua` search binding reads it with three or four `GET`s. The feature is **off by default**. Configuration, phrase, and ACL lookups always use `mod_xml_curl`.
+
+Dialplan matters most: every call leg produces at least one dialplan lookup, while directory lookups happen per registration and per user resolution.
 
 Nothing calls this path when the bindings are absent, so a stock install behaves exactly as before.
 
@@ -482,8 +547,11 @@ Nothing calls this path when the bindings are absent, so a stock install behaves
 | `pbx:fsxml:tenant:user:<domain>:<user>:e<epoch>` | The tenant ID PHP resolved for that identity | Directory cache TTL (60 s default) |
 | `pbx:fsxml:ver:<tenantId>` | Current routing revision for the tenant | Until overwritten |
 | `pbx:fsxml:dir:<tenantId>:<tag>:<domain>:<user>:v<version>` | The rendered directory document | Directory cache TTL (60 s default) |
+| `pbx:fsxml:dp:<tenantId>:<context>:<destination>:v<version>:e<epoch>` | The rendered dialplan document | Dialplan cache TTL (60 s default) |
 
 The revision is part of every payload key, so any panel change that bumps the tenant revision makes the next Lua lookup miss, fall through to `mod_xml_curl`, and re-warm the mirror with fresh credentials.
+
+A dialplan lookup reads no tenant map: the tenant is encoded in the context name (`tenant_<id>_internal` or `tenant_<id>_public`), and PHP only mirrors contexts shaped that way. Its key carries **both** revisions — the tenant revision for panel saves and the identity epoch for SIP account or domain changes — because a stale dialplan does not merely show wrong data, it routes a live call the wrong way. If either revision is missing or the document is newer than the revisions Lua read, the lookup misses.
 
 The identity map carries a second token, the **identity epoch**. The payload revision cannot protect the map, because the map is what decides which tenant the revision belongs to. The epoch is the global routing revision; it moves whenever a SIP account or tenant domain is created, changed, enabled, disabled, or deleted — the only writes that can change which tenant owns a username or a realm. A missing epoch is a miss, never a default, so Lua never guesses an identity.
 
@@ -517,6 +585,10 @@ redis-cli -n 0 GET pbx:fsxml:ver:<tenantId>
 
 # A second lookup for the same identity must not add an /api/v1/xml-handler
 # request to the nginx access log.
+
+# Place one call inside the tenant and confirm the dialplan was mirrored and
+# that the call added no xml-handler request to the access log.
+redis-cli -n 0 --scan --pattern 'pbx:fsxml:dp:*'
 ```
 
 ### Rollback: Lua XML Cache Proxy
@@ -530,9 +602,10 @@ Removing the bindings is the kill-switch. Setting `FS_LUA_PROXY_ENABLED=false` o
    fs_cli -x "find_user_xml id <extension> <domain>"
    tail -f /var/www/tallpbx/storage/logs/laravel.log   # new xml-handler requests appear
    ```
-4. Optionally delete the mirror keys; they expire on their own within the directory cache TTL:
+4. Optionally delete the mirror keys; they expire on their own within the cache TTL:
    ```bash
    redis-cli -n 0 --scan --pattern 'pbx:fsxml:dir:*' | xargs -r redis-cli -n 0 DEL
+   redis-cli -n 0 --scan --pattern 'pbx:fsxml:dp:*' | xargs -r redis-cli -n 0 DEL
    ```
 
 No database migration, `.env` rollback, or PHP change is required — the mirror is additive storage and the PHP path is unchanged.
