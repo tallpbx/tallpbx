@@ -192,6 +192,24 @@ return [
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
+        // Raw, unprefixed connection for the optional Lua XML mirror. The
+        // FreeSWITCH Lua handler reads keys byte-for-byte, so this connection
+        // must never inherit Laravel's app prefix. FS_REDIS_* lets the mirror
+        // move to another Redis instance without changing code.
+        'lua_proxy' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('FS_REDIS_HOST', env('REDIS_HOST', '127.0.0.1')),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('FS_REDIS_PORT', env('REDIS_PORT', '6379')),
+            'database' => env('FS_REDIS_DB', env('REDIS_DB', '0')),
+            'prefix' => '',
+            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
     ],
 
 ];
