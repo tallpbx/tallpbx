@@ -160,10 +160,11 @@ class DirectoryXmlBuilder
 
         $tenantIdInt = (int) $tenantId;
 
-        // Sample the revision once. The same value keys the PHP cache entry
-        // and the mirror, so a document can only be published under the
-        // revision it was actually rendered for.
+        // Sample the tenant revision and the global identity epoch once. The
+        // same values key the PHP cache entry and the mirror, so a document
+        // can only be published under the revisions it was rendered for.
         $version = (int) RoutingCacheVersion::get($tenantIdInt);
+        $epoch = (int) RoutingCacheVersion::getGlobal();
 
         $xml = $cache->remember(
             $this->directoryCacheKey((string) $tenantId, $tagName, $domain, $username, $keyValue, $version),
@@ -171,7 +172,7 @@ class DirectoryXmlBuilder
             fn (): string => $this->buildDirectoryXml($tagName, $domain, $username, $keyValue),
         );
 
-        $this->mirrorDirectoryXml($tagName, $domain, $username, $keyValue, $ttl, $tenantIdInt, $version, $xml);
+        $this->mirrorDirectoryXml($tagName, $domain, $username, $keyValue, $ttl, $tenantIdInt, $version, $epoch, $xml);
 
         return $xml;
     }
@@ -184,7 +185,7 @@ class DirectoryXmlBuilder
      * refreshes the mirror as well. Failures inside the writer are swallowed
      * there; nothing here may make a directory lookup fail.
      */
-    private function mirrorDirectoryXml(string $tagName, string $domain, string $username, string $keyValue, int $ttl, int $tenantId, int $version, string $xml): void
+    private function mirrorDirectoryXml(string $tagName, string $domain, string $username, string $keyValue, int $ttl, int $tenantId, int $version, int $epoch, string $xml): void
     {
         // Cheapest check first: on the default configuration the feature is
         // off and a directory lookup must not resolve anything extra.
@@ -204,6 +205,14 @@ class DirectoryXmlBuilder
             return;
         }
 
+        // The same rule for ownership: an account or domain change that
+        // lands mid-render has already invalidated this identity, so the map
+        // entry this request resolved must not be published under the new
+        // epoch.
+        if ((int) RoutingCacheVersion::getGlobal() !== $epoch) {
+            return;
+        }
+
         $writer = app(FsXmlMirrorWriter::class);
 
         // After a cache flush the store restarts at 0 while the mirror keeps
@@ -218,7 +227,17 @@ class DirectoryXmlBuilder
             $writer->writeVersionIfMissing($tenantId, $publishVersion);
         }
 
-        $writer->writeTenantLookup($domain, $username, $tenantId);
+        // Lua cannot build an identity map key without the epoch, so a cold
+        // Redis needs it seeded from the read path. The same mirror-wins rule
+        // as above applies after a cache flush.
+        $mirrorEpoch = $writer->readGlobalVersion();
+        $publishEpoch = max($epoch, $mirrorEpoch ?? 0);
+
+        if ($mirrorEpoch === null) {
+            $writer->writeGlobalVersionIfMissing($publishEpoch);
+        }
+
+        $writer->writeTenantLookup($domain, $username, $tenantId, $publishEpoch);
         $writer->writeDirectory($tenantId, $tagName, $domain, $username, $publishVersion, $xml);
     }
 

@@ -20,9 +20,11 @@ test('builds namespaced version keys for tenant and global revisions', function 
         ->and(FsXmlMirrorKeys::globalVersion())->toBe('pbx:fsxml:ver:global');
 });
 
-test('builds tenant lookup key from domain and user', function () {
-    expect(FsXmlMirrorKeys::tenantLookup('a.com', '1001'))
-        ->toBe('pbx:fsxml:tenant:user:a.com:1001');
+test('builds tenant lookup key from domain, user, and identity epoch', function () {
+    // The epoch is what makes an ownership change unreachable to Lua. A key
+    // without it would keep answering with the previous tenant.
+    expect(FsXmlMirrorKeys::tenantLookup('a.com', '1001', 9))
+        ->toBe('pbx:fsxml:tenant:user:a.com:1001:e9');
 });
 
 test('builds directory payload key embedding tenant, tag name, domain, user, and routing version', function () {

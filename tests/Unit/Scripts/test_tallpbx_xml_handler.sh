@@ -119,7 +119,8 @@ local function same_keys(expected, actual)
         return false
     end
 
-    return expected.tenant == actual.tenant
+    return expected.epoch == actual.epoch
+        and expected.tenant == actual.tenant
         and expected.version == actual.version
         and expected.payload == actual.payload
 end
@@ -185,7 +186,8 @@ for _, case in ipairs(cases) do
             local got = "nil"
 
             if TALLPBX_DEBUG_KEYS ~= nil then
-                got = tostring(TALLPBX_DEBUG_KEYS.tenant) .. " | "
+                got = tostring(TALLPBX_DEBUG_KEYS.epoch) .. " | "
+                    .. tostring(TALLPBX_DEBUG_KEYS.tenant) .. " | "
                     .. tostring(TALLPBX_DEBUG_KEYS.version) .. " | "
                     .. tostring(TALLPBX_DEBUG_KEYS.payload)
             end

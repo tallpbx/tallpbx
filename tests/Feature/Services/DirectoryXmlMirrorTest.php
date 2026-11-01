@@ -19,6 +19,17 @@ use Modules\SipAccounts\Models\SipAccount;
  * Lua handler would look up under a different identity.
  */
 
+/**
+ * The identity map key the Lua handler reads right now.
+ *
+ * The epoch is part of the key, so every assertion has to build the key from
+ * the current global revision rather than a fixed string.
+ */
+function luaMirrorLookupKey(string $domain, string $user): string
+{
+    return FsXmlMirrorKeys::tenantLookup($domain, $user, (int) RoutingCacheVersion::getGlobal());
+}
+
 beforeEach(function (): void {
     config([
         'freeswitch.lua_proxy.enabled' => true,
@@ -50,7 +61,7 @@ beforeEach(function (): void {
 
         app(TenantManager::class)->setTenantId((string) $tenant->id);
 
-        $this->mirrorKeys[] = FsXmlMirrorKeys::tenantLookup($domain->domain, $user);
+        $this->mirrorKeys[] = luaMirrorLookupKey($domain->domain, $user);
 
         return [$tenant->id, $domain->domain, $user];
     };
@@ -76,7 +87,7 @@ test('mirrors directory xml, tenant lookup, and seeds version for real FreeSWITC
     $this->mirrorKeys[] = FsXmlMirrorKeys::version($tenantId);
 
     $conn = Redis::connection('lua_proxy');
-    expect($conn->get(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe((string) $tenantId)
+    expect($conn->get(luaMirrorLookupKey($domain, $user)))->toBe((string) $tenantId)
         ->and($conn->get(FsXmlMirrorKeys::version($tenantId)))->toBe((string) $version)
         ->and($conn->get(FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, $version)))->toBe($xml)
         ->and($xml)->toContain('<document');
@@ -92,7 +103,7 @@ test('mirrors directory xml and tenant lookup for synthetic user tag lookups', f
     $this->mirrorKeys[] = FsXmlMirrorKeys::version($tenantId);
 
     $conn = Redis::connection('lua_proxy');
-    expect($conn->get(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe((string) $tenantId)
+    expect($conn->get(luaMirrorLookupKey($domain, $user)))->toBe((string) $tenantId)
         ->and($conn->get(FsXmlMirrorKeys::directory($tenantId, 'user', $domain, $user, $version)))->toBe($xml);
 });
 
@@ -101,11 +112,11 @@ test('does not mirror when key value differs from expected tag scope', function 
 
     // For the domain tag, key_value must match the domain.
     app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, 'other.example');
-    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
+    expect(Redis::connection('lua_proxy')->keys(luaMirrorLookupKey($domain, $user).'*'))->toBeEmpty();
 
     // For the user tag, key_value must match the username.
     app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('user', $domain, $user, '9999');
-    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
+    expect(Redis::connection('lua_proxy')->keys(luaMirrorLookupKey($domain, $user).'*'))->toBeEmpty();
 });
 
 test('does not mirror when directory caching is disabled', function () {
@@ -114,7 +125,7 @@ test('does not mirror when directory caching is disabled', function () {
 
     app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
 
-    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
+    expect(Redis::connection('lua_proxy')->exists(luaMirrorLookupKey($domain, $user)))->toBe(0);
 });
 
 test('seeds version key on cold start without waiting for administrative bump', function () {
@@ -149,7 +160,7 @@ test('refreshes the mirror when the document is served from the php cache', func
 
 test('skips the mirror when the revision changes while the document renders', function () {
     [$tenantId, $domain, $user] = ($this->makeDirectoryFixture)();
-    $this->mirrorKeys[] = FsXmlMirrorKeys::tenantLookup($domain, $user);
+    $this->mirrorKeys[] = luaMirrorLookupKey($domain, $user);
     $this->mirrorKeys[] = FsXmlMirrorKeys::version($tenantId);
     $this->mirrorKeys[] = FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 0);
     $this->mirrorKeys[] = FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 1);
@@ -163,9 +174,58 @@ test('skips the mirror when the revision changes while the document renders', fu
     app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
 
     $conn = Redis::connection('lua_proxy');
-    expect($conn->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0)
+    expect($conn->exists(luaMirrorLookupKey($domain, $user)))->toBe(0)
         ->and($conn->exists(FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 0)))->toBe(0)
         ->and($conn->exists(FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 1)))->toBe(0);
+});
+
+test('keys the identity map by the global epoch so an ownership change misses', function () {
+    [$tenantId, $domain, $user] = ($this->makeDirectoryFixture)();
+
+    $builder = app(DirectoryXmlBuilder::class);
+    $builder->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+
+    $epoch = RoutingCacheVersion::getGlobal();
+    $this->mirrorKeys[] = FsXmlMirrorKeys::globalVersion();
+    $this->mirrorKeys[] = 'pbx:fsxml:tenant:user:'.$domain.':'.$user.':e'.$epoch;
+
+    $conn = Redis::connection('lua_proxy');
+
+    // Lua reads the epoch from Redis before it can build the map key, so the
+    // read path has to seed it on a cold start the same way it seeds the
+    // tenant revision.
+    expect($conn->get(FsXmlMirrorKeys::globalVersion()))->toBe((string) $epoch)
+        ->and($conn->get(luaMirrorLookupKey($domain, $user)))->toBe((string) $tenantId);
+
+    // An ownership change moves the epoch. The entry written before the change
+    // must not be readable under the new epoch.
+    RoutingCacheVersion::bumpGlobal();
+    $builder->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+
+    $newEpoch = RoutingCacheVersion::getGlobal();
+    $this->mirrorKeys[] = 'pbx:fsxml:tenant:user:'.$domain.':'.$user.':e'.$newEpoch;
+
+    expect($newEpoch)->toBeGreaterThan($epoch)
+        ->and($conn->get(luaMirrorLookupKey($domain, $user)))->toBe((string) $tenantId);
+});
+
+test('skips the mirror when the global epoch changes while the document renders', function () {
+    [$tenantId, $domain, $user] = ($this->makeDirectoryFixture)();
+    $this->mirrorKeys[] = FsXmlMirrorKeys::globalVersion();
+    $this->mirrorKeys[] = FsXmlMirrorKeys::version($tenantId);
+
+    // A SIP account save lands while the document is being built.
+    SipAccount::retrieved(function (): void {
+        RoutingCacheVersion::bumpGlobal();
+    });
+
+    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+
+    $conn = Redis::connection('lua_proxy');
+
+    // Nothing may be published under an epoch the document was not rendered
+    // for, or Lua could serve one tenant's directory under another's identity.
+    expect($conn->keys(luaMirrorLookupKey($domain, $user).'*'))->toBeEmpty();
 });
 
 test('publishes under the mirror revision when the cache store was flushed', function () {
@@ -176,7 +236,7 @@ test('publishes under the mirror revision when the cache store was flushed', fun
     // publish under a revision the Lua handler will never read.
     Redis::connection('lua_proxy')->set(FsXmlMirrorKeys::version($tenantId), '5');
     $this->mirrorKeys[] = FsXmlMirrorKeys::version($tenantId);
-    $this->mirrorKeys[] = FsXmlMirrorKeys::tenantLookup($domain, $user);
+    $this->mirrorKeys[] = luaMirrorLookupKey($domain, $user);
     $this->mirrorKeys[] = FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 5);
 
     $xml = app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);

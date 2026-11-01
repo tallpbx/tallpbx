@@ -2,240 +2,494 @@
     "cases": [
         {
             "name": "domain tag hit",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>"
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>",
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "user tag hit",
-            "request": {"section": "directory", "tag_name": "user", "key_value": "1001"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "user",
+                "key_value": "1001"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:user:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><user id=\"1001\"/></section></document>"
+                "pbx:fsxml:dir:7:user:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><user id=\"1001\"/></section></document>",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"directory\"><user id=\"1001\"/></section></document>",
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:user:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:user:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "user header fallback hit",
-            "request": {"section": "directory", "tag_name": "user", "key_value": "1001"},
-            "params": {"domain": "a.example.com", "user": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "user",
+                "key_value": "1001"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:user:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><user id=\"1001\"/></section></document>"
+                "pbx:fsxml:dir:7:user:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><user id=\"1001\"/></section></document>",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"directory\"><user id=\"1001\"/></section></document>",
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:user:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:user:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "domain_name fallback hit",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain_name": "a.example.com", "sip_auth_username": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain_name": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>"
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>",
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "missing tenant map",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:ver:7": "3"
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "missing version",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7"
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "noauth on tenant lookup",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "-NOAUTH Authentication required."
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "-NOAUTH Authentication required.",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "noauth on version lookup",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
-                "pbx:fsxml:ver:7": "-NOAUTH Authentication required."
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "-NOAUTH Authentication required.",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "truncated payload",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document"
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": null,
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "empty payload",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": ""
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": null,
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "foreign non-xml value",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
-            "identity": {"domain": "a.example.com", "user": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "identity": {
+                "domain": "a.example.com",
+                "user": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3",
-                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<html><body>not a freeswitch document</body></html>"
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<html><body>not a freeswitch document</body></html>",
+                "pbx:fsxml:ver:global": "2"
             },
             "expected_xml": null,
             "expected_keys": {
-                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e2",
                 "version": "pbx:fsxml:ver:7",
-                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3"
-            }
+                "payload": "pbx:fsxml:dir:7:domain:a.example.com:1001:v3",
+                "epoch": "pbx:fsxml:ver:global"
+            },
+            "epoch": 2
         },
         {
             "name": "domain key value mismatch",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "b.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "b.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
-                "pbx:fsxml:ver:7": "3"
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "user key value mismatch",
-            "request": {"section": "directory", "tag_name": "user", "key_value": "9999"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "user",
+                "key_value": "9999"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
-                "pbx:fsxml:ver:7": "3"
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "invalid charset in domain",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a example.com"},
-            "params": {"domain": "a example.com", "sip_auth_username": "1001"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a example.com"
+            },
+            "params": {
+                "domain": "a example.com",
+                "sip_auth_username": "1001"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a example.com:1001": "7",
-                "pbx:fsxml:ver:7": "3"
+                "pbx:fsxml:tenant:user:a example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:ver:global": "2"
             },
-            "expected_xml": null
+            "expected_xml": null,
+            "epoch": 2
         },
         {
             "name": "missing params",
-            "request": {"section": "directory", "tag_name": "domain", "key_value": "a.example.com"},
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
             "tenant_id": 7,
             "version": 3,
             "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:ver:global": "2"
+            },
+            "expected_xml": null,
+            "epoch": 2
+        },
+        {
+            "name": "non directory section",
+            "request": {
+                "section": "dialplan",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "tenant_id": 7,
+            "version": 3,
+            "redis": {
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:ver:global": "2"
+            },
+            "expected_xml": null,
+            "epoch": 2
+        },
+        {
+            "name": "identity epoch moved, stale map entry is ignored",
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "epoch": 2,
+            "redis": {
+                "pbx:fsxml:ver:global": "2",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e1": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>"
+            },
+            "expected_xml": null
+        },
+        {
+            "name": "identity epoch missing is a miss",
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "epoch": 2,
+            "redis": {
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:ver:7": "3",
+                "pbx:fsxml:dir:7:domain:a.example.com:1001:v3": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"/></section></document>"
+            },
+            "expected_xml": null
+        },
+        {
+            "name": "noauth on identity epoch lookup",
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
+            },
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "epoch": 2,
+            "redis": {
+                "pbx:fsxml:ver:global": "-NOAUTH Authentication required.",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
                 "pbx:fsxml:ver:7": "3"
             },
             "expected_xml": null
         },
         {
-            "name": "non directory section",
-            "request": {"section": "dialplan", "tag_name": "domain", "key_value": "a.example.com"},
-            "params": {"domain": "a.example.com", "sip_auth_username": "1001"},
-            "tenant_id": 7,
-            "version": 3,
-            "redis": {
-                "pbx:fsxml:tenant:user:a.example.com:1001": "7",
-                "pbx:fsxml:ver:7": "3"
+            "name": "new identity epoch answers from the rewritten map",
+            "request": {
+                "section": "directory",
+                "tag_name": "domain",
+                "key_value": "a.example.com"
             },
-            "expected_xml": null
+            "params": {
+                "domain": "a.example.com",
+                "sip_auth_username": "1001"
+            },
+            "epoch": 3,
+            "redis": {
+                "pbx:fsxml:ver:global": "3",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e2": "7",
+                "pbx:fsxml:tenant:user:a.example.com:1001:e3": "8",
+                "pbx:fsxml:ver:8": "4",
+                "pbx:fsxml:dir:8:domain:a.example.com:1001:v4": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"><users><user id=\"1001\"/></users></domain></section></document>"
+            },
+            "expected_xml": "<document type=\"freeswitch/xml\"><section name=\"directory\"><domain name=\"a.example.com\"><users><user id=\"1001\"/></users></domain></section></document>",
+            "expected_keys": {
+                "epoch": "pbx:fsxml:ver:global",
+                "tenant": "pbx:fsxml:tenant:user:a.example.com:1001:e3",
+                "version": "pbx:fsxml:ver:8",
+                "payload": "pbx:fsxml:dir:8:domain:a.example.com:1001:v4"
+            }
         }
     ]
 }

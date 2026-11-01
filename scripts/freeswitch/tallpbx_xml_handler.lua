@@ -5,9 +5,14 @@
 -- byte-for-byte. The shared fixtures in tests/fixtures/freeswitch/ prove the
 -- two languages agree.
 --
--- The script performs at most three GETs (tenant map, revision, payload),
--- contains no XML logic, and returns nil on any doubt so FreeSWITCH falls
--- through to mod_xml_curl, which rebuilds and re-warms the mirror.
+-- The script performs at most four GETs (identity epoch, tenant map,
+-- revision, payload), contains no XML logic, and returns nil on any doubt so
+-- FreeSWITCH falls through to mod_xml_curl, which rebuilds and re-warms the
+-- mirror.
+--
+-- The identity epoch is the system-wide routing revision. It moves whenever a
+-- SIP account or tenant domain changes ownership, so an answer written before
+-- the change can never be read under the new epoch.
 --
 -- mod_lua supplies XML_REQUEST (section, tag_name, key_name, key_value) and
 -- params (the request event). TALLPBX_DEBUG_KEYS is inert in production and
@@ -103,7 +108,17 @@ local function proxy()
 
     local api = freeswitch.API()
 
-    local tenant_key = ns .. ":tenant:user:" .. domain .. ":" .. user
+    -- The epoch is read first because the identity map key cannot be built
+    -- without it. A missing or non-numeric value is a miss, never a default:
+    -- guessing an epoch would defeat the whole invalidation contract.
+    local epoch_key = ns .. ":ver:global"
+    local epoch = redis_get(api, epoch_key)
+
+    if not epoch or not epoch:match("^%d+$") then
+        return nil
+    end
+
+    local tenant_key = ns .. ":tenant:user:" .. domain .. ":" .. user .. ":e" .. epoch
     local tenant = redis_get(api, tenant_key)
 
     if not tenant or not tenant:match("^%d+$") then
@@ -120,6 +135,7 @@ local function proxy()
     local payload_key = ns .. ":dir:" .. tenant .. ":" .. tag_name .. ":" .. domain .. ":" .. user .. ":v" .. version
 
     TALLPBX_DEBUG_KEYS = {
+        epoch = epoch_key,
         tenant = tenant_key,
         version = version_key,
         payload = payload_key,

@@ -64,11 +64,13 @@ class FsXmlMirrorWriter
      * Map a request's domain and user to the tenant PHP resolved.
      *
      * The Lua handler never guesses a tenant: when this key is missing, the
-     * lookup misses and FreeSWITCH asks PHP instead.
+     * lookup misses and FreeSWITCH asks PHP instead. The epoch is part of the
+     * key, so an answer written before an ownership change can never be read
+     * again after the global revision moves.
      */
-    public function writeTenantLookup(string $domain, string $user, int $tenantId): void
+    public function writeTenantLookup(string $domain, string $user, int $tenantId, int $epoch): void
     {
-        $this->writeWithExpiry(FsXmlMirrorKeys::tenantLookup($domain, $user), (string) $tenantId);
+        $this->writeWithExpiry(FsXmlMirrorKeys::tenantLookup($domain, $user, $epoch), (string) $tenantId);
     }
 
     /**
@@ -115,6 +117,28 @@ class FsXmlMirrorWriter
 
         try {
             Redis::connection($this->connection)->setnx(FsXmlMirrorKeys::version($tenantId), (string) $version);
+        } catch (\Throwable $e) {
+            $this->logFailure('write', $e);
+        }
+    }
+
+    /**
+     * Seed the global epoch only when no key exists yet.
+     *
+     * The Lua handler reads this key before it can build an identity map key,
+     * so a cold Redis would miss every lookup until an administrative change
+     * bumped it. The value must never be overwritten here: a read path that
+     * sampled an older epoch would otherwise roll the key back and make an
+     * obsolete identity answer readable again.
+     */
+    public function writeGlobalVersionIfMissing(int $version): void
+    {
+        if (! $this->enabled) {
+            return;
+        }
+
+        try {
+            Redis::connection($this->connection)->setnx(FsXmlMirrorKeys::globalVersion(), (string) $version);
         } catch (\Throwable $e) {
             $this->logFailure('write', $e);
         }

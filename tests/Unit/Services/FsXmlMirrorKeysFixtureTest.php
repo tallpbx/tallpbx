@@ -25,8 +25,10 @@ it('reproduces every fixture key string with the php key builder', function () u
             continue;
         }
 
-        expect(FsXmlMirrorKeys::tenantLookup($case['identity']['domain'], $case['identity']['user']))
+        expect(FsXmlMirrorKeys::tenantLookup($case['identity']['domain'], $case['identity']['user'], $case['epoch']))
             ->toBe($case['expected_keys']['tenant'])
+            ->and(FsXmlMirrorKeys::globalVersion())
+            ->toBe($case['expected_keys']['epoch'])
             ->and(FsXmlMirrorKeys::version($case['tenant_id']))
             ->toBe($case['expected_keys']['version'])
             ->and(FsXmlMirrorKeys::directory(

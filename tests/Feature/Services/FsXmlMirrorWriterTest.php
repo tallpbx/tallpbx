@@ -46,7 +46,7 @@ afterEach(function (): void {
     // purpose, so cleanup must not assume a working connection.
     try {
         luaMirrorTestConnection()->del(
-            FsXmlMirrorKeys::tenantLookup('a.com', '1001'),
+            FsXmlMirrorKeys::tenantLookup('a.com', '1001', 2),
             FsXmlMirrorKeys::directory(7, 'domain', 'a.com', '1001', 3),
             FsXmlMirrorKeys::version(7),
             FsXmlMirrorKeys::globalVersion(),
@@ -63,11 +63,11 @@ test('uses dedicated lua_proxy connection with empty redis prefix', function () 
 });
 
 test('writes directory payload with ttl and tenant lookup via raw redis without prefix', function () {
-    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7);
+    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7, 2);
     app(FsXmlMirrorWriter::class)->writeDirectory(7, 'domain', 'a.com', '1001', 3, '<document type="freeswitch/xml"/>');
 
     $conn = luaMirrorTestConnection();
-    expect($conn->get(FsXmlMirrorKeys::tenantLookup('a.com', '1001')))->toBe('7')
+    expect($conn->get(FsXmlMirrorKeys::tenantLookup('a.com', '1001', 2)))->toBe('7')
         ->and($conn->ttl(FsXmlMirrorKeys::directory(7, 'domain', 'a.com', '1001', 3)))->toBeGreaterThan(0);
 });
 
@@ -84,22 +84,22 @@ test('writes version keys without an expiry', function () {
 test('writes nothing when the feature flag is disabled', function () {
     config(['freeswitch.lua_proxy.enabled' => false]);
 
-    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7);
+    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7, 2);
     app(FsXmlMirrorWriter::class)->writeVersion(7, 4);
 
     $conn = luaMirrorTestConnection();
-    expect($conn->exists(FsXmlMirrorKeys::tenantLookup('a.com', '1001')))->toBe(0)
+    expect($conn->exists(FsXmlMirrorKeys::tenantLookup('a.com', '1001', 2)))->toBe(0)
         ->and($conn->exists(FsXmlMirrorKeys::version(7)))->toBe(0);
 });
 
 test('writes nothing when directory caching is disabled', function () {
     config(['freeswitch.xml_handler.directory_cache_ttl' => 0]);
 
-    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7);
+    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7, 2);
     app(FsXmlMirrorWriter::class)->writeDirectory(7, 'domain', 'a.com', '1001', 3, '<document type="freeswitch/xml"/>');
 
     $conn = luaMirrorTestConnection();
-    expect($conn->exists(FsXmlMirrorKeys::tenantLookup('a.com', '1001')))->toBe(0)
+    expect($conn->exists(FsXmlMirrorKeys::tenantLookup('a.com', '1001', 2)))->toBe(0)
         ->and($conn->exists(FsXmlMirrorKeys::directory(7, 'domain', 'a.com', '1001', 3)))->toBe(0);
 });
 
@@ -115,7 +115,7 @@ test('does not throw when the redis connection fails', function () {
     Redis::shouldReceive('connection')->andThrow(new RedisException('down'));
 
     app(FsXmlMirrorWriter::class)->writeVersion(7, 4);
-    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7);
+    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7, 2);
 
     // Reaching this assertion proves the three calls above swallowed the outage.
     expect(app(FsXmlMirrorWriter::class)->readVersion(7))->toBeNull();
@@ -130,6 +130,18 @@ test('seeds a version key only when it is missing', function () {
     // A reader that sampled an older revision must never roll the key back.
     $writer->writeVersionIfMissing(7, 9);
     expect(luaMirrorTestConnection()->get(FsXmlMirrorKeys::version(7)))->toBe('4');
+});
+
+test('seeds the global epoch only when it is missing', function () {
+    $writer = app(FsXmlMirrorWriter::class);
+
+    $writer->writeGlobalVersionIfMissing(3);
+    expect(luaMirrorTestConnection()->get(FsXmlMirrorKeys::globalVersion()))->toBe('3');
+
+    // RoutingCacheVersion::bumpGlobal() owns this key; a read path must never
+    // roll it back and resurrect an identity map from an earlier epoch.
+    $writer->writeGlobalVersionIfMissing(8);
+    expect(luaMirrorTestConnection()->get(FsXmlMirrorKeys::globalVersion()))->toBe('3');
 });
 
 test('reads back a literal or mirrored version for the monotonic bump guard', function () {

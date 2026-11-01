@@ -14,6 +14,11 @@ namespace App\Services\Xml;
  *
  * Every payload key embeds the tenant's current RoutingCacheVersion, so a
  * revision bump makes the next Lua lookup miss and fall through to PHP.
+ *
+ * The identity map key embeds the global routing revision instead. The map
+ * answers "which tenant owns this username", so it cannot embed a tenant
+ * revision; the global revision is the only epoch that changes when account
+ * or domain ownership moves from one tenant to another.
  */
 class FsXmlMirrorKeys
 {
@@ -40,10 +45,15 @@ class FsXmlMirrorKeys
 
     /**
      * The identity map that turns a request's domain and user into a tenant ID.
+     *
+     * The epoch is the system-wide routing revision at the moment PHP resolved
+     * the identity. An ownership change bumps it, which moves the key and makes
+     * every answer written before the change unreachable instead of merely
+     * expiring after the TTL.
      */
-    public static function tenantLookup(string $domain, string $user): string
+    public static function tenantLookup(string $domain, string $user, int $epoch): string
     {
-        return self::NAMESPACE.':tenant:user:'.$domain.':'.$user;
+        return self::NAMESPACE.':tenant:user:'.$domain.':'.$user.':e'.$epoch;
     }
 
     /**
