@@ -2,13 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status: on hold — do not start at Task 2.** [AO-B7](implementation-plan-review.md) in the review makes a fast front controller for the PHP miss path the prerequisite, and that work is now implemented and measured (Revision 3.5, E37). The Task 1 gate below was computed against the old 55 ms miss path, so it must be re-derived (AO-B8) before this plan resumes.
+
 **Goal:** Add an optional, default-off in-process Lua directory-XML cache in FreeSWITCH that serves Laravel-rendered directory XML from Redis in under 1 ms on cache hits, with automatic version-based invalidation, fail-to-miss fallback to `mod_xml_curl`, and a one-step rollback — and only after a measurement spike proves the economics.
 
 **Architecture:** A strictly additive mirror layer. Laravel keeps its existing versioned cache untouched and additionally writes raw, unprefixed keys (`pbx:fsxml:*`) into Redis DB 0 via dedicated connection `Redis::connection(config('freeswitch.lua_proxy.connection', 'lua_proxy'))`, bypassing the `Cache` facade and overriding Laravel's default database prefix (`tallpbx-database-`) with `'prefix' => ''` so keys match Lua's raw queries byte-for-byte. `RoutingCacheVersion::bump()` mirrors the new revision so the version is embedded in every payload key; a version change therefore makes the next Lua lookup miss and fall through to `mod_xml_curl`, which rebuilds and re-warms the mirror. The Lua script performs at most three `GET`s (tenant map → version → payload), contains no XML logic, and returns `nil` on any doubt. Phase 1 covers directory lookups only (supporting both native FreeSWITCH `domain` lookups and synthetic `user` lookups); dialplan is explicitly out of scope until Phase 1 data justifies it.
 
 **Tech Stack:** FreeSWITCH v1.11 (`mod_lua`, `mod_hiredis`, `mod_xml_curl`), Redis 7 (DB 0 mirror via unprefixed `lua_proxy` connection), Lua 5.x, Laravel 13 / PHP 8.5, Pest.
 
-**Spec:** [`implementation-plan-review.md`](implementation-plan-review.md) (Revision 3.1 — findings B-R1…B-R9, V2-C1…V2-M1, and opinions AO-B1…AO-B4). Supersedes [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md).
+**Spec:** [`implementation-plan-review.md`](implementation-plan-review.md) (Revision 3.5 — findings B-R1…B-R9, V2-C1…V2-M1, and opinions AO-B1…AO-B9). Supersedes [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md).
 
 ## Global Constraints
 
