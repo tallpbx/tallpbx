@@ -210,9 +210,14 @@ server {
 
     # FreeSWITCH XML Handler: local loopback requests from mod_xml_curl must
     # never be redirected to HTTPS, avoiding TLS mismatch and 301 redirect failures.
+    # Served by the minimal bootstrap (public/xml-handler-fast.php), which falls
+    # back to the full application on any error. Rollback: restore
+    #   try_files \$uri /index.php?\$query_string;
     location = /api/v1/xml-handler {
         access_log off;
-        try_files \$uri /index.php?\$query_string;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
+        fastcgi_pass unix:/var/run/php/php\${php_version:-8.5}-fpm.sock;
     }
 
     location ~ ^/index\.php(/|\$) {
@@ -284,7 +289,15 @@ server {
     # FreeSWITCH fetches its XML here with the shared token in the query
     # string; disable logging for this path so the token never lands in
     # the access log (the application logs handler activity itself).
-    location = /api/v1/xml-handler { access_log off; try_files \$uri /index.php?\$query_string; }
+    # Served by the minimal bootstrap (public/xml-handler-fast.php), which falls
+    # back to the full application on any error. Rollback: restore
+    #   try_files \$uri /index.php?\$query_string;
+    location = /api/v1/xml-handler {
+        access_log off;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
+        fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
+    }
 
     error_page 404 /index.php;
 

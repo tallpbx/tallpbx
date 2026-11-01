@@ -8,18 +8,30 @@ use Illuminate\Http\Request;
 /*
  * Fast entry point for the FreeSWITCH XML handler.
  *
- * PHP executes only /index.php on this appliance (there is no generic `.php`
- * handler in the nginx configuration), so this file is reachable only through
- * an explicit nginx location that sets SCRIPT_FILENAME to it.
+ * nginx points the /api/v1/xml-handler location at this file (see
+ * scripts/resources/nginx.sh), because PHP executes only /index.php on this
+ * appliance by default. The handler itself registers its route at whatever
+ * path the request arrived on, so no URL rewriting is needed.
  *
- * The timing middleware measures from LARAVEL_START, which /index.php defines;
- * it is defined here too so measured request times stay comparable.
+ * Failure here must never cost more than the speed it was meant to save, so
+ * any error degrades to the full application rather than failing every
+ * registration and call.
  */
 
-define('LARAVEL_START', microtime(true));
+if (! defined('LARAVEL_START')) {
+    define('LARAVEL_START', microtime(true));
+}
 
 require __DIR__.'/../vendor/autoload.php';
 
-$response = XmlHandlerFastBootstrap::handle(Request::createFromGlobals());
+try {
+    $response = XmlHandlerFastBootstrap::handle(Request::createFromGlobals());
+    $response->send();
+} catch (Throwable $exception) {
+    // Report the failure, then serve the request the normal way. index.php
+    // starts from a clean container because the fast path restores the
+    // previous one before rethrowing.
+    error_log('XML handler fast path failed, falling back: '.$exception->getMessage());
 
-$response->send();
+    require __DIR__.'/index.php';
+}

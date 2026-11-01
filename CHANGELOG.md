@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Fast XML Handler Entry Point**: The FreeSWITCH XML handler now runs through a minimal bootstrap (`public/xml-handler-fast.php`) that loads 34 service providers instead of 90, on fresh installs. Measured on the 1 vCPU reference host: 12 ms less work per lookup, latency down about 30 %, and 45–50 % more throughput, with byte-identical XML. Any error in the fast path falls back to the full application, so a fault costs speed rather than registrations. Rollback is a single nginx location block; no database, `.env`, or FreeSWITCH change is required.
 - **5.x Major Release Series Kickoff**: Created the `5.x` series branch (`5.x`) for next-generation telecommunications features and high-throughput architectural enhancements, starting with the Pulse-style Redis Stream CDR Ingestion Pipeline and Version-Aware Lua Redis Proxy.
 - **Architectural Implementation Plans**: Created implementation blueprints for the high-concurrency Redis Stream CDR buffer (`docs/superpowers/plans/2026-10-31-cdr-modernization-pipeline.md`), the `tallpbx_cache` Lua proxy (`docs/superpowers/plans/2026-10-31-lua-redis-proxy.md`), and the comprehensive static architectural review (`docs/superpowers/plans/implementation-plan-review.md`).
 

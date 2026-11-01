@@ -3,7 +3,11 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
-define('LARAVEL_START', microtime(true));
+// Guarded so the fast XML handler can fall back to this file after its own
+// bootstrap has already started the clock; redeclaring the constant warns.
+if (! defined('LARAVEL_START')) {
+    define('LARAVEL_START', microtime(true));
+}
 
 // Determine if the application is in maintenance mode...
 if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
