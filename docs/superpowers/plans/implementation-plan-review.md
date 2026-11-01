@@ -1,221 +1,174 @@
 # Implementation Plan Review — CDR Modernization vs. Lua Redis Proxy
 
+**Revision:** 2.1 (re-review of updated plans; architectural opinion added)
 **Date:** 2026-10-31
 **Branch reviewed:** `4.x` (HEAD tags through `v4.3.0`)
-**Method:** Static review of both plans against the live codebase, shipped FreeSWITCH configuration, `composer.json`, `.env`, the CHANGELOG, and the project's own benchmark documents. No runtime tests, migrations, or FreeSWITCH changes were executed during the review.
+**Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents. No runtime tests, migrations, or FreeSWITCH changes were executed.
+
+> **Revision history:** Revision 1 reviewed the original drafts of both plans. Both plans were subsequently rewritten. This revision evaluates the rewritten plans and records, per original finding ID, whether each earlier issue was fixed, partially fixed, or remains — so prior reviews stay traceable.
 
 ## Plans Under Review
 
-| ID | Plan | Path |
+| ID | Plan (current revision) | Path |
 |:---|:---|:---|
-| **Plan A** | CDR Modernization & Pulse-Style Stream Ingestion | [`2026-10-31-cdr-modernization-pipeline.md`](2026-10-31-cdr-modernization-pipeline.md) |
-| **Plan B** | Lua Redis Proxy (Approach A) | [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md) |
-
-This document records every finding produced by that review: verified environment facts, per-plan findings with severity, contradictions between what each plan promises and what its own code samples do, a comparative assessment, and a sequenced recommendation.
+| **Plan A** | CDR Modernization & Stream Ingestion (5.x Series) | [`2026-10-31-cdr-modernization-pipeline.md`](2026-10-31-cdr-modernization-pipeline.md) |
+| **Plan B** | Lua Redis Proxy — Version-Aware Architecture | [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md) |
 
 ---
 
 ## Executive Summary
 
-1. **Plan A is architecturally sound but not executable as written.** Its layering (in-process Redis Stream buffer on a dedicated Redis DB → daemon digest worker → MariaDB, with 503-driven disk failover) matches the project's conventions and uses only available packages. However it contains one destructive command (`migrate:fresh`), one guaranteed-to-fail code sample (bulk insert against a UUID primary key), three internal contradictions around data integrity, no authentication for its ingestion endpoint, no worker supervision, and an unaddressed breaking change against the shipped 4.x series.
-2. **Plan B should not be implemented as written.** Its premise is valid and its runtime dependencies are already installed, but its proposed static Redis keys directly conflict with the version-embedded cache invalidation system that shipped in v4.2.0 and was hardened in v4.3.0. As configured, the proxy would either never hit (Redis DB/auth mismatch with `hiredis.conf.xml`) or hit and serve stale SIP credentials and routes (invalidation sources outside `RoutingCacheObserver` do not delete its keys). The plan's performance baseline is also wrong (claims 25–35 ms; the project's own benchmarks measure 77–144 ms).
-3. **Recommended sequence:** amend and execute Plan A first (higher value, additive, no architectural conflict), defer the module rename or plan it as a 5.0-class breaking change, then revisit Plan B as a redesign centered on version-aware cache keys, hiredis profile alignment, and key-derivation parity.
+1. **Plan A is now executable after a short punch list of five fixes.** The rewrite resolved the entire previously reported data-integrity cluster: explicit UUID generation, transaction-bound `XDEL`, idempotent `upsert` on `(call_uuid, leg)`, quarantine instead of silent drops, token authentication, and worker supervision. Remaining items are operational and configuration-level (token provisioning, scheduler sandbox, throttle sizing, a hardcoded test reference, legacy migration removal, branch/changelog steps).
+2. **Plan B remains blocked by two verified platform facts.** The version-aware key design is conceptually correct, but (a) the installed `mod_hiredis` exposes **no database-selection parameter** — it cannot reach Laravel's cache on Redis DB 1 — and (b) Laravel applies the cache key prefix `tallpbx-cache-`, so every raw key the Lua script builds misses. The benchmark gate as written seeds unprefixed keys by hand and therefore proves nothing about the real PHP-to-Lua handoff.
+3. **Recommended sequence:** apply the Plan A punch list and execute it; run a feasibility spike on Plan B's two hard blockers before any Plan B task is attempted.
 
 ---
 
 ## Verified Environment Baseline
 
-These facts were checked against the running workspace. They drive several findings below.
-
 | # | Fact | Evidence |
 |:--|:-----|:---------|
-| E1 | Branch is `4.x`; latest tag is `v4.3.0` dated 2026-10-31 — the `xml-cdr` module, `xml_cdr` table, and `xml-cdr.*` permissions are **shipped** in the 4.x series | `git branch --show-current`, `git tag`, `CHANGELOG.md` |
-| E2 | Framework is Laravel `^13.8` on PHP `^8.5` — both plans describe "Laravel 12" | `composer.json` |
-| E3 | `app-modules/xml-cdr/` exists with model, Livewire components, services, factory, migration, routes, and 2 test files | module tree |
-| E4 | Route names are already `panel.cdr.index` / `panel.cdr.detail`; permission prefix is `xml-cdr.*` and the provider carries an explicit warning that a mismatched prefix would silently disable action authorization | `app-modules/xml-cdr/routes/web.php`, `src/Providers/ModuleServiceProvider.php` |
-| E5 | `app/Services/Cdr/` does not exist; `app/Http/Controllers/Api/` contains only `XmlHandlerController.php`; `app/Services/Xml/` contains three builders but **no** `XmlCacheService` / `XmlCacheKeyResolver` | directory listings |
-| E6 | Routing cache invalidation is **version-based**: `RoutingCacheObserver` only calls `RoutingCacheVersion::bump($tenantId)`; both XML builders embed `RoutingCacheVersion::get(...)` into their cache keys | `app/Observers/RoutingCacheObserver.php`, `app/Support/RoutingCacheVersion.php`, `app/Services/Xml/DirectoryXmlBuilder.php`, `app/Services/Xml/DialplanXmlBuilder.php` |
-| E7 | XML cache store is Redis DB 1 (`REDIS_CACHE_DB=1` via the `cache` connection); `.env` also sets `REDIS_PASSWORD` | `config/database.php`, `.env` |
-| E8 | `hiredis.conf.xml` defines profile `default` (127.0.0.1:6379, 500 ms timeout, max-connections 3) with **no `db` and no auth parameters** | `/etc/freeswitch/autoload_configs/hiredis.conf.xml` |
-| E9 | `mod_lua.so`, `mod_hiredis.so`, `mod_xml_curl.so` are installed; `mod_json_cdr.so` is **not** installed, but `freeswitch-mod-json-cdr` is available from the SignalWire repo at the exact installed version (1.11.4) | `/usr/lib/freeswitch/mod/`, `apt-cache policy freeswitch-mod-json-cdr` |
-| E10 | FreeSWITCH is 1.11.4-dev; `/etc/freeswitch/autoload_configs/lua.conf.xml` has `xml-handler-script` / `xml-handler-bindings` present but commented out | `freeswitch -version`, `lua.conf.xml` |
-| E11 | The `tallpbx-media` group exists and contains `www-data` and `freeswitch` | `getent group tallpbx-media` |
-| E12 | The project already uses Redis DBs 0 (default), 1 (cache), 2 (session) — DB 3 for CDR is consistent with that allocation | `.env`, CHANGELOG 4.2.1 (`session:flush` guard) |
-| E13 | `SafeMigrator` exists and is wired from `AppServiceProvider` to guard the primary database against destructive operations | `app/Database/SafeMigrator.php` |
-| E14 | Measured XML handler latency: 144 ms mean at 30.8 req/s (2 vCPU dedicated), 77 ms at 57.3 req/s (4 vCPU), with call-setup p50/p95 of 148–180 ms / 180–472 ms | `docs/load-testing-results.md` |
-| E15 | Worker supervision precedent exists (`scripts/tallpbx-queue.service`: `Restart=always`, `StartLimitInterval=60`, `ProtectSystem=strict`, `ReadWritePaths`, `EnvironmentFile=-/var/www/tallpbx/.env`) | `scripts/tallpbx-queue.service` |
-| E16 | A secure media-streaming precedent exists at `app-modules/file-stores/src/Http/Controllers/MediaStreamController.php` | grep for stream responses |
-| E17 | Rename blast radius in first-party code is small: only `tests/Feature/ModuleAutoloadTest.php` and `tests/Feature/PanelModuleAuthorizationSweepTest.php` reference `xml-cdr`/`XmlCdr` outside the module itself — but the **runtime** blast radius (permission rows, group pivots, module registry, table data) is not covered by that count | grep over `app/`, `app-modules/`, `tests/` |
-| E18 | `laravel/pulse` is **not** a project dependency; "adapted from `pulse:work`" refers to a package that is not installed here | `composer.json` grep |
-| E19 | The xml-handler API route is protected by a timing-safe token check (`bearerToken` → `X-FS-Token` → `?token=`) that fails closed when no token is configured, plus `throttle:xml-handler` and `LogXmlHandlerTiming` | `XmlHandlerController::handle`, `routes/api.php` |
+| E1 | Branch is `4.x`; latest tag `v4.3.0` (2026-10-31). The `xml-cdr` module, `xml_cdr` table, and `xml-cdr.*` permissions are shipped in the 4.x series | `git branch --show-current`, `git tag`, `CHANGELOG.md` |
+| E2 | Laravel `^13.8` / PHP `^8.5` | `composer.json` |
+| E3 | `app-modules/xml-cdr/` contains model (`xml_cdr` table, `HasUuids`, `BelongsToTenant`), Livewire list/detail, services, factory, migration, routes, 2 tests | module tree |
+| E4 | Route names already `panel.cdr.index` / `panel.cdr.detail`; permission prefix `xml-cdr.*`; provider documents that a mismatched prefix disables action authorization | `app-modules/xml-cdr/routes/web.php`, `src/Providers/ModuleServiceProvider.php` |
+| E5 | `app/Services/Cdr/` and `app/Http/Controllers/Api/CdrIngestionController.php` do not exist; `tests/Feature/Http/` exists | directory listings |
+| E6 | Invalidation is version-based: `RoutingCacheObserver` calls `RoutingCacheVersion::bump()`; both builders embed `RoutingCacheVersion::get()` / `getGlobal()` in their cache keys | `app/Observers/RoutingCacheObserver.php`, `app/Support/RoutingCacheVersion.php` |
+| E7 | Cache store is Redis DB 1 (`REDIS_CACHE_DB=1`); `.env` also sets `REDIS_PASSWORD` | `config/database.php`, `.env` |
+| E8 | `hiredis.conf.xml` profile `default` = 127.0.0.1:6379, 500 ms timeout, `max-connections=3`, **no auth, no db index** | `/etc/freeswitch/autoload_configs/hiredis.conf.xml` |
+| **E9** | **`mod_hiredis.so` supports only the connection params `hostname`, `port`, `password`, `timeout_ms`, `max-connections`** — no `database`/`db`, no `username` | `strings /usr/lib/freeswitch/mod/mod_hiredis.so` |
+| E10 | `mod_lua.so`, `mod_hiredis.so`, `mod_xml_curl.so` installed; `mod_json_cdr.so` not installed but `freeswitch-mod-json-cdr` is available at the matching 1.11.4 version | `/usr/lib/freeswitch/mod/`, `apt-cache policy` |
+| E11 | `lua.conf.xml` has `xml-handler-script` / `xml-handler-bindings` present but commented out | `lua.conf.xml` |
+| E12 | `tallpbx-media` group exists (`www-data`, `freeswitch`) | `getent group tallpbx-media` |
+| E13 | Redis DBs in use: 0 default, 1 cache, 2 session — DB 3 for CDR fits the allocation | `.env` |
+| E14 | `SafeMigrator` guards the primary database against destructive operations | `app/Database/SafeMigrator.php` |
+| E15 | Measured XML latency: 144 ms @30.8 req/s (2 vCPU dedicated), 77 ms @57.3 req/s (4 vCPU); call setup p50 148–180 ms | `docs/load-testing-results.md` |
+| E16 | Worker supervision precedent: `scripts/tallpbx-queue.service` (`Restart=always`, start limits, `ProtectSystem=strict`, `ReadWritePaths`, `EnvironmentFile`) | `scripts/tallpbx-queue.service` |
+| E17 | **Scheduler unit runs `schedule:work` under `ProtectSystem=strict` with `ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/www/tallpbx/bootstrap/cache /etc/tallpbx` — `/var/log/freeswitch/...` is NOT writable** | `scripts/tallpbx-scheduler.service` |
+| E18 | **Laravel cache prefix defaults to `{slug(APP_NAME)}-cache-`; `APP_NAME=TallPBX`, `CACHE_PREFIX` unset → every cache key is written as `tallpbx-cache-<key>`** | `config/cache.php`, `.env` |
+| E19 | Current builder cache keys are SHA-1 hashes that include `tag_name`, `key_value`, the routing version(s), and the hiredis limit/marker flags; directory and dialplan use separate key builders | `DirectoryXmlBuilder::directoryCacheKey()`, `DialplanXmlBuilder::dialplanCacheKey()`, `standardDialplanCacheKey()` |
+| E20 | Tenant dialplan contexts are `tenant_{id}_internal` / `tenant_{id}_public` | `app/Services/DialplanContext.php` |
+| E21 | `tests/Feature/ModuleAutoloadTest.php:87` hardcodes `['xml-cdr', 'Modules\XmlCdr\']` | test file |
+| E22 | The xml-handler API performs a timing-safe, fail-closed token check; the API route also uses `LogXmlHandlerTiming` and a named throttle | `XmlHandlerController::handle`, `routes/api.php` |
+| E23 | `tests/Feature/Http/XmlHandlerControllerTest.php` declares 68 tests (matches Plan B's "68 tests" claim; assertion count not verified) | `grep -c` on the test file |
+| E24 | `scripts/resources/freeswitch/` does not exist yet (plans introduce it) | `ls scripts/resources/` |
+| E25 | `laravel/pulse` is not a dependency; no `pulse:*` commands exist in this project | `composer.json`, `app/Console/Commands/` |
 
-Severity scale used below: **Critical** (breaks data, security, or the shipped 4.x contract), **High** (feature will not work or will corrupt behavior as written), **Moderate** (correctness or operational gap requiring plan edits), **Low** (documentation/consistency polish).
+Severity scale: **Critical** (breaks data, security, or the shipped series contract), **High** (feature cannot work or corrupts behavior as written), **Moderate** (correctness or operational gap requiring plan edits), **Low** (polish/consistency).
 
 ---
 
-## Plan A — CDR Modernization & Pulse-Style Stream Ingestion
+## Plan A — CDR Modernization (5.x Series)
 
 **Plan file:** [`2026-10-31-cdr-modernization-pipeline.md`](2026-10-31-cdr-modernization-pipeline.md)
 
-### Architecture summary (as proposed)
+### Status of Revision 1 findings
 
-FreeSWITCH `mod_json_cdr` POSTs A-leg and B-leg JSON to `/api/v1/cdr`; the controller appends payloads to a Redis Stream (`pbx:cdr:stream`) on DB 3 and returns 200 in sub-millisecond time; a continuous daemon (`tpbx cdr:work`) digests chunks via `XRANGE`, parses with `CdrPayloadParser`, bulk-inserts into `cdrs`, and `XDEL`s processed IDs; on Redis failure the endpoint returns 503 so FreeSWITCH writes payloads to `/var/log/freeswitch/json_cdr/failed/`, drained by `tpbx cdr:drain-spool`.
+| Prior ID | Finding | Status in current revision |
+|:---------|:--------|:---------------------------|
+| A-C1 | `migrate:fresh` destroys the database | **Fixed** — now `tpbx migrate` (Task 1, Step 5) |
+| A-C2 | Breaking 4.x rename with no migration path | **Mostly fixed** — explicitly reframed as a 5.x breaking clean break; `module:sync --only-local` + `AdminSeeder` added; permission set renamed to `cdr.*`. Residual: no branch step, no changelog, legacy migration not removed (A-R5, A-R6, A-R7) |
+| A-C3 | Bulk insert breaks UUID primaries | **Fixed** — `Str::orderedUuid()` assigned per row (Review Focus #1, parser contract) |
+| A-C4 | No transaction; silent drops; duplicate window | **Fixed** — `DB::transaction` around `upsert`, `XDEL` only after commit, malformed payloads quarantined to disk, idempotency via unique `(call_uuid, leg)` |
+| A-C5 | Unauthenticated ingestion endpoint | **Partially fixed** — `hash_equals`, fail-closed, Basic auth, `throttle:1200,1`. Residual: token provisioning trio is contradictory and ships a public secret (A-R1); throttle too low for reference CPS (A-R3) |
+| A-C6 | Unsupervised worker; unbounded stream | **Partially fixed** — systemd unit added with restart limits, memory ceiling, busy-loop yield, `getPendingCount()`. Residual: scheduler sandbox blocks spool drain (A-R2); unit not installed/enabled by any task (A-R10); no alerting on stream length (A-R12) |
+| A-M1 | Config tracking / wrong commit paths | **Fixed** — templates now versioned under `scripts/resources/freeswitch/` |
+| A-M2 | Parser field names unverified | **Not addressed** — A-R11 |
+| A-M3 | UI conventions diverge | **Fixed** — `badge-xs font-mono`; recording controller enforces permission, tenant, and `realpath()` containment |
+| A-L1 | Doc inaccuracies (Laravel 12, "Modify" controller) | **Fixed** — Laravel 13; controller listed as Create; test path matches the existing `tests/Feature/Http/` |
 
-### What is verified correct
+### Remaining findings
 
-| ID | Finding |
-|:---|:---|
-| A-OK1 | The 503 → disk failover design is real: `mod_json_cdr` writes failed posts to `err-log-dir`, and the SignalWire package at version 1.11.4 is installable (E9). |
-| A-OK2 | Redis DB 3 for CDR ingestion fits the existing allocation scheme (E12); `phpredis` supports the required stream commands. |
-| A-OK3 | The `tallpbx-media` group exists, so the spool `chown freeswitch:tallpbx-media` is valid (E11). |
-| A-OK4 | Tenant attribution inputs (`variable_domain_name`, `variable_sip_req_host`) are consistent with the existing `TenantIdentityResolver` domain-based resolution used by the xml-handler (E19). |
-| A-OK5 | Dual-leg persistence (`leg`, `b_leg_uuid`, `json_data`) is a genuine deficiency fix — the shipped `xml_cdr` table has no leg, bridge, recording, or raw-payload columns (E3). |
+**A-R1 (High) — The token has three disagreeing sources and ships a published secret.**
+`config/freeswitch.php` defaults `cdr_token` to a hardcoded literal; `.env.example` ships `FREESWITCH_CDR_TOKEN=` (empty — which overrides the default and trips the fail-closed 401 path); the FreeSWITCH template hardcodes the same literal in `cred`. In a public Apache-2.0 repository, a literal default is a published ingestion credential. Fresh installs would 401 every post and silently degrade to the 5-minute spool drain. Fix: generate a random token during install, write it to `.env`, inject it into the deployed `json_cdr.conf.xml` (mirroring the xml-handler token pattern), and ship no literal in `config/` or the template.
 
-### Findings
+**A-R2 (High) — The scheduler sandbox cannot drain the spool.**
+`cdr:drain-spool` is scheduled through `schedule:work`, whose unit (`scripts/tallpbx-scheduler.service`) is `ProtectSystem=strict` and does **not** include `/var/log/freeswitch/json_cdr` in `ReadWritePaths` (E17). Under that sandbox, `unlink()` of drained files and quarantine writes fail; the spool grows indefinitely while the command appears healthy. Add the spool root to the scheduler unit (or run the drain as its own unit).
 
-#### A-C1 — `migrate:fresh` is destructive on a live appliance (Critical)
+**A-R3 (Moderate) — `throttle:1200,1` is below reference peak load.**
+Documented ceiling is 15–20 calls/sec on 4 vCPU; two legs per call means 1,800–2,400 posts/min. Posts beyond 1,200/min receive 429 and spill to disk, adding five-minute ingestion lag at exactly the traffic level the pipeline is meant to survive. Align with the xml-handler limit (6,000/min) or make it env-configurable.
 
-Task 1, Step 5 instructs `tpbx migrate:fresh`, which drops **every table in the database** — all tenants, extensions, dialplans, and CDR history. On this project that is doubly wrong: `SafeMigrator` exists specifically to block destructive operations against the primary database (E13), and the appliance runs with live customer data. Replace with `tpbx migrate`. If a clean rebuild is genuinely desired for development, that belongs in a separate, explicitly labelled dev-only step — never in a production task list.
+**A-R4 (Moderate) — The rename breaks a test the plan never updates.**
+`tests/Feature/ModuleAutoloadTest.php:87` hardcodes `['xml-cdr', 'Modules\XmlCdr\']` (E21). It is absent from every task's file list and from the Task 7 gate, so the rename fails the full suite. (`PanelModuleAuthorizationSweepTest` only mentions xml-cdr in a docblock — benign.)
 
-#### A-C2 — The rename is a 4.x-series breaking change with no migration path (Critical)
+**A-R5 (Moderate) — Legacy migration is never removed.**
+The Files list only creates the new `cdrs` migration. The old `2026_07_06_000012_create_xml_cdr_table.php` travels with the directory `mv`, so fresh 5.x installs create both `xml_cdr` and `cdrs`. Add an explicit removal step and verify registry ghost-row pruning after `module:sync`.
 
-The plan renames the module directory, root namespace (`Modules\XmlCdr` → `Modules\Cdr`), table (`xml_cdr` → `cdrs`), and — implicitly — the permission prefix (`xml-cdr.*` → `cdr.*`), while deleting the legacy migration file. Consequences on any install upgraded from v4.0.0–v4.3.0:
+**A-R6 (Moderate) — "5.x Series" has no branch step.**
+The active branch is `4.x`. The plan declares a 5.x breaking release but never creates the `5.x` branch or states where the commits land. Under the project's branching policy this step is mandatory before Task 1.
 
-1. **CDR history is stranded** in the old `xml_cdr` table. No data migration exists, and deleting the old migration file leaves the orphan table behind indefinitely.
-2. **Permissions break silently.** `xml-cdr.view` / `xml-cdr.delete` rows and their `group_permission` pivots keep pointing at the old names; the provider's own comment documents that a mismatched prefix disables action authorization. The plan never schedules `permissions:sync`, `db:seed --class=AdminSeeder`, or `module:sync --only-local`.
-3. **Module registry ghost row.** Renaming the module leaves the old registry row behind; the project has prior remediation history for ghost-row pruning that this plan ignores.
-4. **SemVer policy conflict.** The project's stated policy grants backwards compatibility within 4.x maintenance releases. A module/table/permission rename belongs in a 5.0-class change, or must be delivered as an in-place migration (rename table with row preservation, rename permissions, resync registry, publish upgrade notes in the CHANGELOG).
+**A-R7 (Moderate) — No changelog or upgrade documentation task.**
+AGENTS.md mandates `CHANGELOG.md` entries for features and explicit upgrade notes for breaking changes (migrations, new apt packages, FreeSWITCH reloads, `.env` additions such as `REDIS_CDR_DB` and `FREESWITCH_CDR_TOKEN`). No task touches `CHANGELOG.md` or `INSTALL.md`.
 
-**Recommendation:** either (a) defer the rename entirely — the panel routes are already `panel.cdr.*` (E4), so the rename adds no user-visible benefit — or (b) write it as a proper breaking-change task with data, permission, and registry migration steps and explicit changelog wording.
+**A-R8 (Moderate) — Basic auth depends on nginx forwarding `Authorization`.**
+The controller verifies Basic credentials, but PHP-FPM only receives `HTTP_AUTHORIZATION` when nginx passes it. The existing xml-handler's `?token=` fallback suggests this area has bitten before. Add an explicit verification step against the installed nginx configuration.
 
-#### A-C3 — `Cdr::insert($batch)` cannot work against a UUID primary key (High)
+**A-R9 (Moderate) — `realpath($cdr->record_path)` is naive.**
+FreeSWITCH record paths are typically relative to the recordings root; `realpath()` would resolve against PHP's working directory. Join with the configured recordings base first (the `MediaStreamController` precedent already implements containment), then `realpath()` and prefix-check.
 
-The `cdrs` table keeps `id` as a UUID primary (inherited from the existing schema, E3). UUID generation in the model is performed by `HasUuids` through model **events**, which bulk `insert()` bypasses. Every row would insert with a `NULL` primary key and fail, or worse, succeed under loose SQL modes with empty ids. The plan's own Task 3 test ("digest() reads stream chunks, calls bulk database insertion") would catch this only if it actually executes against the migrated schema — the plan does not say it must. Fix: generate `Str::orderedUuid()` (or equivalent) per parsed row, or use `Cdr::upsert()` with explicit ids.
+**A-R10 (Moderate) — Installer/deployment wiring is missing.**
+Templates land in a new `scripts/resources/freeswitch/` tree (E24) and the worker unit in `scripts/`, but no task installs, enables, or deploys them (`install.sh`, `scripts/resources/freeswitch.sh` untouched). Fresh appliance installs would lack CDR ingestion.
 
-#### A-C4 — The digestion contract contradicts itself in three places (High)
+**A-R11 (Moderate) — Parser field names remain unverified.**
+`variables.bridge_uuid` / `variables.signal_bond` for B-leg correlation are plausible but unconfirmed for mod_json_cdr 1.11.4, and `signal_bond` is not guaranteed for all bridge types. Require captured A-leg/B-leg payload fixtures (including transfer/bridge scenarios) in the parser tests.
 
-The plan's Global Constraints and Review Focus promise behavior its own sample code does not implement:
+**A-R12 (Low).**
+`cdr.export` permission declared with no export feature; `direction` column exists but is omitted from the parser mapping; `getPendingCount()` has no health/monitoring consumer (unbounded stream growth unobserved); the systemd unit omits `NoNewPrivileges=yes` present in the queue-service precedent.
 
-| Promise | Sample code reality |
-|:--------|:--------------------|
-| Review Focus #1: "XDEL only deletes stream IDs after MariaDB transaction commit succeeds." | `digest()` performs a bare `Cdr::insert($batch)` with **no transaction**, then unconditionally `xdel`s. A partial failure still deletes the batch. |
-| Global Constraint "No Silent Record Dropping." | If `CdrPayloadParser::parse()` returns false (malformed/truncated payload), the entry is silently excluded from `$batch` and its ID is **still deleted** — the row is dropped. |
-| Review Focus #5: malformed JSON must "insert summary metrics without dropping the row." | Directly contradicted by the previous row of this table. |
+### Assessment
 
-Additionally, deleting after insert creates a crash window that produces **duplicate rows** (at-least-once delivery) with no idempotency guard: there is no unique index on `(call_uuid, leg)`, no upsert, and no Redis consumer group (`XACK` / `XAUTOCLAIM`). For billing- and compliance-grade CDRs, silent drops and duplicates are both unacceptable. Minimum fix set: wrap the insert in a transaction; never `XDEL` entries whose parse failed (quarantine them to a dead-letter stream or the disk spool); add a unique `(call_uuid, leg)` constraint with an upsert path.
-
-#### A-C5 — The ingestion endpoint has no authentication or rate limiting (High)
-
-`POST /api/v1/cdr` is described with no middleware. Task 2 hardcodes a `?token=` value into the FreeSWITCH configuration, but no Laravel-side verification of that token is ever specified — unlike the xml-handler, which performs a timing-safe comparison and fails closed (E19). Anyone able to reach the endpoint could inject fabricated CDRs or fill the stream. Mirror the xml-handler pattern: shared-secret middleware (`hash_equals`, fail-closed on missing config) plus a throttle. Consider `mod_json_cdr`'s native `auth-scheme`/`cred` parameters instead of a query-string token so the secret does not appear in URLs.
-
-#### A-C6 — The digest worker has no supervision and no backpressure story (High)
-
-- **No systemd unit.** `tpbx cdr:work` is a forever-loop daemon. The project's own precedent is `scripts/tallpbx-queue.service` with `Restart=always`, start-limit protection, and a hardened sandbox (E15). Without an equivalent unit, a crash silently stops CDR ingestion until the next Redis/disk spill.
-- **Busy-loop under load.** The loop only sleeps when `$processed === 0`; a continuously non-empty stream spins with no pause.
-- **Unbounded stream growth.** The plan deliberately rejects `XTRIM` (correct for compliance), but then never mentions monitoring. A stalled or slow worker grows `pbx:cdr:stream` without limit, risking Redis memory exhaustion. Add `XLEN` monitoring/alerting and a documented recovery procedure.
-
-#### A-M1 — Task 2 commit and config-tracking mismatch (Moderate)
-
-Task 2 Step 5 commits `docs/`, but no docs file is modified by Task 2, and the actual artifacts live in `/etc/freeswitch/`, which is not tracked in the repository (installer-side configuration is produced from `scripts/resources/`). Decide where the `json_cdr.conf.xml` template is versioned (most likely as an installer resource) and fix the commit step accordingly.
-
-#### A-M2 — Parser field names are unverified (Moderate)
-
-`variables.bridge_uuid` / `variables.signal_bond` for B-leg correlation are plausible but unconfirmed against mod_json_cdr 1.11.4 output, and `signal_bond` is not guaranteed for all bridge types. The parser tests must use captured real payload fixtures for both legs, including transfer and bridged scenarios, or leg correlation (Review Focus #4) will silently degrade to null.
-
-#### A-M3 — UI conventions diverge from project standards (Moderate)
-
-The UI spec uses `badge-primary` / `badge-secondary` for leg badges. Project convention is `badge-xs font-mono` in table cells and semantic DaisyUI tokens with a documented 3-tier status model. For secure recording playback, a precedent already exists (`MediaStreamController` in `file-stores`, E16) — reuse its path-containment and authorization approach rather than designing from scratch. Leg filtering should also follow the established list/pagination pattern (see the v4.2.0 pagination migration of 10 unbounded lists).
-
-#### A-L1 — Documentation inaccuracies (Low)
-
-- Tech Stack says "Laravel 12"; the project is on Laravel `^13.8` (E2).
-- Task 3 lists `app/Http/Controllers/Api/CdrIngestionController.php` as *Modify*; the file does not exist (E5) — it is a *create*.
-- "Adapted from `pulse:work`" references a package that is not installed (E18); describe it as "Pulse-inspired" without implying an installed donor command.
-
-### Requirements and effort
-
-`freeswitch-mod-json-cdr` install + module load · Redis DB 3 connection · `CdrRedisIngest`, `CdrPayloadParser`, `CdrIngestionController`, token middleware · `cdr:work` command + systemd unit · `cdr:drain-spool` + scheduler entry · migration + model changes · Livewire/Blade updates · ~5 test files. Seven tasks is realistic **after** the Critical/High amendments above; without them, the plan's own acceptance gate (Task 7) would either fail or, worse, pass while corrupting data.
+The architecture is sound and the previously reported integrity chain is closed. The remaining items are operational packaging (token provisioning, sandbox permissions, installer wiring, branch/changelog) and two small correctness details (recording path base, parser fixtures) — all bounded edits, no redesign.
 
 ---
 
-## Plan B — Lua Redis Proxy (Approach A)
+## Plan B — Lua Redis Proxy (Version-Aware)
 
 **Plan file:** [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md)
 
-### Architecture summary (as proposed)
+### Status of Revision 1 findings
 
-`mod_lua` registers as an XML search binding ahead of `mod_xml_curl`. On each directory/dialplan/configuration lookup, the Lua script computes a static Redis key, issues `hiredis_raw default GET <key>`, and on a valid XML hit assigns `XML_STRING` for an in-process answer; on a miss it leaves `XML_STRING` unset so FreeSWITCH falls through to the PHP-backed `mod_xml_curl`. Laravel populates the keys and invalidates them from `RoutingCacheObserver`.
+| Prior ID | Finding | Status in current revision |
+|:---------|:--------|:---------------------------|
+| B-C1 | Static keys conflict with `RoutingCacheVersion` | **Fixed conceptually** — version- and global-version-tagged keys, tenant map, version bump propagates automatically |
+| B-C2 | Redis DB/auth mismatch | **Attempt invalid** — `password` is supported, but `database` is not a `mod_hiredis` parameter (E9); see B-R1 |
+| B-C3 | Key derivation parity with PHP | **Partially addressed** — builders refactored to deterministic strings, but shared-domain resolution, dialplan tenant resolution, and dropped key inputs remain (B-R3, B-R6, B-R8) |
+| B-C4 | Wrong performance baseline | **Fixed** — documents 77–144 ms; <1 ms hit gate |
+| B-M1 | `luac` version caveat | **Not addressed** (Low) |
+| B-M2 | Host config source of truth | **Fixed** — `scripts/freeswitch/` versioned, deployed to `/etc/freeswitch/` |
+| B-M3 | hiredis concurrency headroom | **Addressed on paper** — 16 connections; moot until B-R1 is resolved |
 
-### What is verified correct
+### Remaining findings
 
-| ID | Finding |
-|:---|:---|
-| B-OK1 | All runtime dependencies are already installed: `mod_lua` and `mod_hiredis` are present, and `lua.conf.xml` merely requires uncommenting `xml-handler-script` / `xml-handler-bindings` (E9, E10). |
-| B-OK2 | The Lua binding API usage is correct: reading the `XML_REQUEST` global and `params:getHeader(...)`, and emitting `XML_STRING`, is the documented mod_lua XML-handler contract. |
-| B-OK3 | Miss-fallthrough semantics are standard: leaving the result unset lets FreeSWITCH continue to the next binding (`mod_xml_curl`). |
-| B-OK4 | The reply guard is defensively sound: rejecting replies that lack `<document` neutralizes both `-ERR` and `-NOAUTH` error strings, even though the `-ERR` prefix check alone would miss `-NOAUTH`. |
-| B-OK5 | A `default` hiredis profile already exists (E8), so the API call shape `hiredis_raw default GET ...` is valid — see B-C2 for why its payload is wrong. |
-| B-OK6 | TDD structure (failing test first, targeted Pest, `--parallel`) matches project conventions. |
+**B-R1 (Critical) — Redis DB 1 is unreachable from `mod_hiredis`.**
+The deployed module supports only `hostname`, `port`, `password`, `timeout_ms`, and `max-connections` (E9). The `database` parameter in Task 1's profile is silently ignored; the proxy operates on DB 0 while Laravel's cache lives on DB 1 (E7). Reaching DB 1 requires a design change (moving the XML cache and version keys to DB 0, an experimental `SELECT` via `hiredis_raw` that is unreliable across pooled connections, or a different datastore access path). Until resolved, Tasks 1, 4, 5, and 6 are not buildable.
 
-### Findings
+**B-R2 (Critical) — The cache key prefix makes every Lua GET a miss.**
+Laravel writes every cache entry — including `RoutingCacheVersion` — as `tallpbx-cache-<key>` (E18). The Lua script builds unprefixed keys (`freeswitch:routing-version:{id}`, `freeswitch:xml:dir:...`), so both the version read and the XML read miss 100% of the time. Worse, the Task 6 gate seeds unprefixed keys by hand (`redis-cli -n 1 SET "freeswitch:xml:dir:1:..."`), so the benchmark would "prove" hits while the real PHP-to-Lua handoff never functions — a vacuous verification. The plan must either pin an empty `CACHE_PREFIX` (project-wide consequence: it affects every cache entry) or have Laravel write a second, unprefixed mirror namespace through an explicit Redis connection, and the benchmark must exercise the real write path end to end.
 
-#### B-C1 — Static keys conflict with the shipped versioned-cache invalidation (Critical)
+**B-R3 (High) — The domain-to-tenant hash is lossy and permits cross-tenant directory leakage.**
+`freeswitch:tenants` maps `domain → tenant_id`, but the project explicitly supports **shared domains**, where the controller resolves identity via `resolveFromSipAuth($username, $domain)` first. With two tenants on one domain, the hash holds a single entry; lookups for the other tenant compute a key under the wrong `tenant_id`, and when both tenants own the same username, Lua can serve the other tenant's cached directory XML — which contains SIP passwords. PHP fails closed in the ambiguous case; Lua would not. Key the map as `domain:user → tenant` (or disable Lua caching for shared domains) and mirror PHP's resolution order exactly.
 
-Since v4.2.0, routing XML is cached under **version-embedded keys**: both builders incorporate `RoutingCacheVersion::get($tenantId)` and `RoutingCacheVersion::getGlobal()`, and `RoutingCacheObserver` invalidates by **bumping** those versions rather than deleting keys (E6, E1). Plan B proposes an orthogonal static namespace (`pbx:cache:xml:directory:{domain}:{user}`, etc.) purged only by explicit `DEL`s from `RoutingCacheObserver`.
+**B-R4 (High) — Global Constraint and Task 3 disagree on the dialplan key, and the constraint is wrong.**
+The constraint specifies `freeswitch:xml:dp:{tenant_id}:{domain}:{context}:v{version}:g{global_version}` — **no destination** — while Task 3's PHP sample and the Lua script both include the destination. If an implementer follows the constraint, a single cache entry serves the dialplan for every destination number in the context: cross-destination route poisoning. Reconcile on the Task 3 format.
 
-That wiring is incomplete by construction. Multiple invalidation sources never pass through `RoutingCacheObserver`:
+**B-R5 (High) — `TenantRedisResolver` never states its Redis connection.**
+`sync()` is described as populating "Redis DB 1", but no connection is specified; the facade default is DB 0. The hash would land in the wrong database and Lua would find nothing — a silent no-op. Require `Redis::connection('cache')` (or equivalent) and a Redis-backed test.
 
-- `NumberTranslationService` and `TenantLimitService` version bumps;
-- `SipScannerSignatures::bumpGlobal()` (shipped in v4.3.0 for scanner-signature dialplan invalidation);
-- the `ExtensionSetting` observer path (invalidates directory/voicemail PIN changes);
-- gateway changes routed through the observer's tenant resolution of related models.
+**B-R6 (Moderate-High) — Dialplan lookups never resolve a tenant.**
+Contexts are `tenant_{id}_internal|public` (E20), which never match the domain hash; the script also reads `domain`, `domain_name`, `variable_domain_name` but not `Caller-Domain`, which the controller uses for dialplan requests. The dialplan path — the hot path — misses 100% of the time (correct via fallback, but the feature's primary benefit is lost). Parse `tenant_([%w-]+)_` in Lua or map contexts in the hash.
 
-None of these would delete the static Lua keys, so a cache **hit** would serve stale directory credentials and stale dialplans in-process — exactly the failure the plan's own Review Focus #4 warns about ("the phone must not continue using stale credentials"). Making the design correct forces a choice between two options the plan's Global Constraints forbid dividing:
+**B-R7 (Moderate) — Unvalidated command concatenation.**
+`hiredis_raw` argument strings are built by concatenating raw SIP-supplied `domain`/`user` with no validation or quoting. A crafted value can smuggle extra Redis command tokens. Validate against a strict charset (`[%w%.%-_]`) before any query.
 
-1. **Lua reads the version key** (`freeswitch:routing-version:{tenantId}`) and embeds it in the cache key — but for directory lookups Lua has no tenant id (only domain/user), so it would need a domain→tenant map in Redis and tenant-resolution logic inside Lua, violating "zero business logic in Lua"; and the version key lives in the application cache store (DB 1), not in the hiredis profile's database.
-2. **All invalidation paths also DEL static keys** — duplicating invalidation logic across every service that bumps a version, violating the same constraint and creating a permanent drift surface.
+**B-R8 (Moderate) — The builder key refactor is coarser than today's keys.**
+The proposed deterministic keys drop `tag_name`, `key_value`, and the hiredis limit/marker config flags that the current SHA-1 keys include (E19), so distinct lookups can coalesce. Add parity tests asserting Lua-computed keys equal the keys the builders actually write (the plan only asserts the existing suite still passes; the "68 tests" count is accurate per E23).
 
-Until this is redesigned (or a deliberate decision is made to replace versioned keys with static keys project-wide), Plan B should not ship.
+**B-R9 (Low).**
+FreeSWITCH restart on a live PBX needs a maintenance-window note; the Global Constraint still defines a Sofia configuration key that no binding, builder, or Lua branch uses (dead spec); `TenantsSyncCommand` referenced in Task 2 does not exist in `app/Console/Commands`; the `luac -p` version caveat is unaddressed.
 
-#### B-C2 — As configured, the proxy cannot ever hit (Critical)
+### Assessment
 
-Two independent configuration gaps guarantee a permanent cache miss:
-
-1. **Database mismatch.** The XML cache is written by Laravel on the `cache` Redis connection, database index `REDIS_CACHE_DB=1` (E7). The hiredis `default` profile declares no `db` parameter, so it operates on DB 0 (E8). The Lua script queries DB 0; the data lives in DB 1.
-2. **Auth mismatch.** `.env` sets `REDIS_PASSWORD`, but the hiredis profile specifies no authentication parameters (E8). If the production Redis enforces `requirepass`, `hiredis_raw` returns `-NOAUTH ...`, the script treats it as a miss, and every lookup falls through to PHP.
-
-Either gap alone makes the feature a no-op; together they would also mask each other during testing. The plan must add a dedicated hiredis profile (host/port, `password`/`username`, explicit `db 1` or a dedicated DB), align it with the Laravel cache connection, and verify with an end-to-end `redis-cli` seed + `find_user_xml` test that the hit path is actually exercised.
-
-#### B-C3 — Key derivation does not reproduce the controller's tenant resolution (High)
-
-The xml-handler resolves directory requests in this order: `resolveFromSipAuth($username, $domain)`, then `resolveFromDomain($domain)`, then fail closed — because **domains can be shared across tenants** (E19, `XmlHandlerController::handleDirectory`). Plan B's key is `pbx:cache:xml:directory:{domain}:{user}`, built from `params` headers whose semantics (`user` vs `sip_auth_username`) may not match the authorization identity the PHP path considered. On a shared domain, two tenants could collide on the same key — a cross-tenant cache leak (the plan's own Review Focus #3). The dialplan key has the same class of risk if the Lua-side context derivation (`Caller-Context`, `Hunt-Context`) diverges from the controller's `Caller-Context` input handling.
-
-Additionally, even with correct keys, the Lua static namespace differs from the versioned namespace PHP writes, so the system would maintain **two caches of the same XML** with two invalidation stories — double memory and double divergence risk. Key derivation must be proven identical by tests that compare Lua-computed keys against the actual keys the builders write.
-
-#### B-C4 — The performance baseline is factually wrong (High)
-
-Plan B claims current lookups take "~25–35 ms (PHP-FPM round-trip)". The project's published benchmarks measure 144 ms mean at 30.8 req/s (2 vCPU dedicated) and 77 ms mean at 57.3 req/s (4 vCPU), with call setup at 148–180 ms p50 (E14). The real gap is **larger** than claimed, which strengthens the proposal — but a SIPp acceptance gate calibrated against a fictional baseline cannot prove improvement. Task 5 must state the documented before-figures and measure the after-state on the same hardware tier.
-
-#### B-M1 — Script validation command may produce false results (Moderate)
-
-`luac -p` validates against the host's Lua toolchain, which may differ from the Lua embedded in this FreeSWITCH build. Validate by loading the script through FreeSWITCH itself (e.g. executing it once via `fs_cli`) in addition to the syntax check, and keep the `hiredis` connection failure path (`ignore-connect-fail`, `ignore-error` are already set in the profile) explicitly asserted as a miss.
-
-#### B-M2 — Host configuration tracking is unresolved (Moderate)
-
-Task 3's commit step references `/etc/freeswitch/scripts/tallpbx_xml_handler.lua`, which is outside the repository, with a parenthetical "or tracking script in `scripts/freeswitch/`". Decide the source of truth before execution: version the script under `scripts/freeswitch/` (or an installer resource) and have the install/reload documented as a host-ops step, consistent with how `lua.conf.xml` activation is described.
-
-#### B-M3 — Concurrency headroom of the hiredis profile is unquantified (Moderate)
-
-The `default` profile allows `max-connections=3` with a 500 ms timeout (E8). At sub-millisecond replies this is ample, but the proposal's purpose is sustained registration sweeps; the acceptance gate should include a concurrent lookup test (not only a single `find_user_xml`) to prove the 3-connection ceiling does not serialize the hot path.
-
-#### B-L1 — Minor consistency items (Low)
-
-- Review Focus #5 asks to "verify that loading `mod_lua` before or alongside `mod_xml_curl` preserves the fallback chain" — correct concern, but the plan never states the intended modules.conf ordering, so the verification step has no expected result to assert.
-- The Lua script's `string.sub(reply, 1, 4) ~= "-ERR"` misses non-`-ERR` error prefixes (e.g. `-NOAUTH`); the subsequent `<document` guard saves it, but the comment should say so to avoid a future "simplification" removing the guard.
-
-### Requirements and effort
-
-One Lua script (~80 lines) · `lua.conf.xml` activation · hiredis profile alignment (db + auth, missing today) · `XmlCacheKeyResolver` · **invalidation redesign (the dominant, currently unsolved work)** · SIPp benchmark gate. Code volume is low; the invalidation redesign and the DB/auth alignment are the real cost and are not in the plan.
+The version-aware concept is now correct in principle, and the tenant-resolution discussion shows the right instincts. However, the two Critical findings invalidate the mechanism as written: the datastore cannot be addressed (B-R1) and the namespace cannot match (B-R2). A feasibility spike — proving DB reachability and prefix handling end to end with one seeded lookup through the real PHP write path — must precede any implementation task.
 
 ---
 
@@ -223,35 +176,76 @@ One Lua script (~80 lines) · `lua.conf.xml` activation · hiredis profile align
 
 | Dimension | Plan A — CDR Modernization | Plan B — Lua Redis Proxy |
 |:----------|:---------------------------|:-------------------------|
-| Architectural fit with shipped systems | Additive; no conflicts (DB 3 is free, package available) | **Conflicts** with v4.2+ versioned cache invalidation |
-| Dependency risk | One new apt package (version-matched, available) | All dependencies already installed |
-| Data-integrity risk as written | **Critical**: `migrate:fresh`, UUID bulk-insert failure, silent drops, duplicate window | High: stale credentials/routes on hit; key collisions across shared domains |
-| Security surface | Unauthenticated ingestion endpoint | Local-only reads; no new external surface |
-| Series/BC impact | **Critical**: rename breaks 4.x contract and strands data | None |
-| Operational readiness | No worker supervision; unbounded stream growth | One-line module activation; but hiredis profile must be reconciled |
-| Performance case | Eventual consistency for dashboards; not latency-bound | Strong case (77–144 ms → <1 ms on hits) once correctness is solved |
-| Effort to a safe deliverable | 7 tasks + amendments (moderate, mostly mechanical) | 5 tasks, but Task 2 becomes a redesign (open-ended) |
-| Self-consistency | 3 contradictions between stated constraints and sample code | 1 major integration gap (invalidation) + 1 configuration gap (DB/auth) |
-| Verdict | **Proceed after amendments** | **Do not implement as written; redesign first** |
+| Architectural fit | Additive; DB 3 free; package available at matching version | Blocked: DB reachability + cache namespace mismatch |
+| Data-integrity risk (current revision) | Low — transaction + upsert idempotency + quarantine + post-commit XDEL | N/A (mechanism not yet functional) |
+| Security surface | Token provisioning contradictory (A-R1); Basic-auth forwarding unverified (A-R8) | Cross-tenant directory risk (B-R3); command concatenation (B-R7) |
+| Series/BC impact | Explicit 5.x breaking change; branch + changelog steps still missing (A-R6, A-R7) | None |
+| Operational readiness | Worker unit exists; scheduler sandbox and installer wiring missing (A-R2, A-R10) | Depends on unresolved DB/prefix work |
+| Verification quality | Task 7 gate runs real tests; parser fixtures still needed (A-R11) | Benchmark gate is vacuous until B-R2 is fixed |
+| Effort to safe deliverable | 7 tasks + bounded punch list | Feasibility spike, then redesign, then 6 tasks |
+| Verdict | **Execute after five fixes** | **Do not execute; spike first** |
 
-### Note on whether Plan B is even needed now
+---
 
-The Lua proxy accelerates only cache-hit lookups. The published benchmarks attribute the current XML ceiling primarily to PHP-FPM pool sizing (static pools lifted sustained throughput from ~30 to ~65 req/s, E14), and each call triggers only 2–3 XML lookups. The proxy's upside is therefore real but concentrated in high-CPS tenants; Plan A's value (billing-compliant dual-leg CDRs, recording playback, diagnostics) applies to every deployment. Sequencing A first costs nothing to B.
+## Architectural Opinion
+
+This section records judgment about the *direction* of each decision, separately from the severity-rated findings above. The findings state what must be fixed for each plan to work; this section states whether the chosen approach is worth building. These are opinions, not defect statuses, and no finding above changes as a result.
+
+### Plan A — Redis Stream with micro-batch digestion: decision endorsed
+
+The chosen approach is sound, and I would build it this way:
+
+- **The problem is genuinely greenfield.** `XmlCdrService` and `CdrService` are both empty `CrudService` stubs, and nothing in the installer or FreeSWITCH resources references a CDR module — no legacy pipeline is being abandoned.
+- **Decoupling the ingest endpoint from MariaDB is the correct call.** CDR posts share PHP-FPM workers with the xml-handler hot path; a synchronous insert would occupy workers and database connections exactly during the registration and call-setup peaks the benchmarks show saturating at 30–65 req/s.
+- **Redis Streams fit this shape better than per-row queue jobs:** ordered IDs and batch-level crash recovery at O(1) write cost, without adding volume to the queue that already carries ESL events.
+- **At-least-once delivery plus an idempotent upsert on `(call_uuid, leg)` is the right consistency model** for billing data; the unique index enforces it in the database rather than in application logic.
+- **The disk-spool failover is the strongest idea in the plan.** Delegating durability to `mod_json_cdr`'s `err-log-dir` lets PHP fail cheaply and lose nothing, instead of building application-level retry machinery.
+
+Decision-level notes, which complement the defect findings rather than duplicate them:
+
+| ID | Note | Rationale |
+|:---|:------|:----------|
+| AO-A1 | Plan for consumer groups before parallelizing digestion (`XREADGROUP` / `XACK` / `XAUTOCLAIM`) | `XRANGE` + `XDEL` is a single-consumer design. It is adequate for one worker per host, but the upgrade path should be stated now so a second worker is not bolted on later without visibility-timeout semantics |
+| AO-A2 | Treat `XLEN` alerting as mandatory | Rejecting `XTRIM` is correct for compliance data, which makes unbounded stream growth a designed possibility. `getPendingCount()` with no consumer is not a monitoring story |
+| AO-A3 | Decide a CDR retention policy in this plan | `cdrs` grows without bound and `json_data` duplicates every payload. Retention is a data-lifecycle decision, not a later follow-up |
+| AO-A4 | Collapse the duplicate CRUD services during the rename | `XmlCdrService` and `CdrService` are identical stubs. Carrying both into `Modules\Cdr` preserves pointless legacy |
+
+### Plan B — Lua Redis proxy: goal endorsed, sequencing and shape not
+
+What I agree with: eliminating two to three HTTP round trips per call setup is a legitimate scaling lever; `mod_lua` as an XML search binding is the correct FreeSWITCH mechanism; and falling through to `mod_xml_curl` on any doubt is the right failure mode.
+
+Where I disagree:
+
+| ID | Position | Rationale |
+|:---|:---------|:----------|
+| AO-B1 | The decision is premature | The documented XML bottleneck was PHP-FPM pool sizing (addressed in v4.2.0), and current throughput is 30–65 req/s with sub-second tails. The remaining benefit is CPS headroom and registration-storm tail latency — real at enterprise scale, but not the current binding constraint. Plan A's value applies to every deployment; Plan B's applies to the top of the hardware ladder |
+| AO-B2 | The mechanism contradicts its own "zero business logic in Lua" constraint | The script performs an `HGET` tenant lookup, a version `GET`, a global-version `GET`, then the payload `GET` — up to four round trips plus tenant-resolution logic in a language with no test harness in this project. PHP should write an unprefixed mirror key with the version already baked in, so Lua performs exactly one `GET` and no resolution |
+| AO-B3 | Scope directory first; decide dialplan later with data | Directory lookups are the most static and the most cacheable surface. Dialplan depends on gateways, time conditions, ring groups, IVRs, scanner signatures, limiters, and markers — every one of which must be threaded into the Lua key forever |
+| AO-B4 | The permanent maintenance tax is the real cost | Three key-derivation sites (Lua plus both builders) must stay in lockstep across every future routing feature. This project just spent two releases hardening immediate invalidation, and Plan B adds a second invalidation story on the hot path |
+
+### Verdict summary
+
+| Decision | Opinion |
+|:---------|:--------|
+| Redis Stream + micro-batch + disk spool for CDR ingestion | **Endorsed** — correct consistency model and the right isolation from the XML hot path; add consumer-group readiness (AO-A1), stream alerts (AO-A2), and a retention policy (AO-A3) |
+| Lua Redis proxy for XML | **Goal endorsed, sequencing and shape rejected** — revisit after Plan A, scope to directory first (AO-B3), and require a one-`GET` mirror design with no Lua-side resolution (AO-B2) |
 
 ---
 
 ## Recommendations
 
-1. **Amend Plan A before execution:**
-   - Replace `tpbx migrate:fresh` with `tpbx migrate` (A-C1).
-   - Decide the rename up front: defer it (recommended — routes are already `panel.cdr.*`) or execute it as a 5.0-class breaking change with table-data preservation, permission rename + `permissions:sync`/AdminSeeder, registry resync, and CHANGELOG upgrade notes (A-C2).
-   - Generate UUIDs explicitly for every bulk-inserted row (A-C3).
-   - Wrap digestion in a transaction, quarantine parse-failed entries instead of deleting them, add a unique `(call_uuid, leg)` idempotency constraint (A-C4).
-   - Add timing-safe token authentication and throttling to the ingestion endpoint (A-C5).
-   - Add a systemd unit for `cdr:work`, sleep on busy loops, and add `XLEN` monitoring (A-C6).
-2. **Do not implement Plan B as written.** Redesign it around version-aware cache keys (or a deliberate project-wide migration to static keys), add the hiredis profile `db`/auth alignment, prove key-derivation parity against all three builders, and re-baseline the acceptance gate with the documented 77–144 ms figures.
-3. **Revisit Plan B after Plan A lands**, when the CDR pipeline's Redis conventions (DB 3, stream keys, worker service) are established and a versioned-key-aware Lua design can be evaluated against them.
-4. **Track both plans with the SDD ledger convention** (`.superpowers/sdd/`) once execution starts, as with the previously shipped implementation plans.
+1. **Plan A — apply the punch list before Task 1:**
+   - Installer-generated token; no literal defaults in `config/freeswitch.php`, `.env.example`, or the FreeSWITCH template (A-R1).
+   - Add `/var/log/freeswitch/json_cdr` to the scheduler unit's `ReadWritePaths` (A-R2).
+   - Raise or externalize the ingestion throttle (A-R3).
+   - Update `ModuleAutoloadTest` and remove the legacy migration (A-R4, A-R5).
+   - Create the `5.x` branch and add `CHANGELOG.md` / upgrade notes tasks (A-R6, A-R7).
+   - While in Task 6, resolve the recordings base directory via the `MediaStreamController` precedent (A-R9) and add parser fixture tests (A-R11).
+2. **Plan B — run a feasibility spike, not a task list:**
+   - Prove DB reachability from `mod_hiredis` (B-R1) and resolve cache-prefix handling with a real PHP write followed by a Lua read (B-R2).
+   - Fix the dialplan key contradiction (B-R4) and the resolver connection (B-R5) regardless of spike outcome.
+   - If the spike fails, prefer the mirror-namespace design (explicit `Redis::connection('cache')` writes of unprefixed keys) or shelve Plan B behind Plan A.
+3. **Track execution in the SDD ledger** (`.superpowers/sdd/`) once either plan starts, per the project's plan lifecycle convention.
 
 ---
 
@@ -262,15 +256,20 @@ The Lua proxy accelerates only cache-hit lookups. The published benchmarks attri
 | Plan A text | `docs/superpowers/plans/2026-10-31-cdr-modernization-pipeline.md` |
 | Plan B text | `docs/superpowers/plans/2026-10-31-lua-redis-proxy.md` |
 | Module manifest, model, migration, provider, routes | `app-modules/xml-cdr/` |
-| Versioned cache invalidation | `app/Observers/RoutingCacheObserver.php`, `app/Support/RoutingCacheVersion.php`, `app/Services/Xml/DirectoryXmlBuilder.php`, `app/Services/Xml/DialplanXmlBuilder.php` |
+| Versioned cache invalidation | `app/Observers/RoutingCacheObserver.php`, `app/Support/RoutingCacheVersion.php` |
+| Cache key composition | `app/Services/Xml/DirectoryXmlBuilder.php`, `app/Services/Xml/DialplanXmlBuilder.php` |
+| Cache prefix | `config/cache.php`, `.env` (`APP_NAME=TallPBX`) |
 | XML handler authentication and sections | `app/Http/Controllers/Api/XmlHandlerController.php`, `routes/api.php` |
-| Redis connections and env | `config/database.php`, `.env` (values redacted here) |
-| FreeSWITCH profile configuration | `/etc/freeswitch/autoload_configs/hiredis.conf.xml`, `/etc/freeswitch/autoload_configs/lua.conf.xml` |
+| Redis connections | `config/database.php` |
+| hiredis capability and profile | `strings /usr/lib/freeswitch/mod/mod_hiredis.so`, `/etc/freeswitch/autoload_configs/hiredis.conf.xml` |
+| Lua handler configuration | `/etc/freeswitch/autoload_configs/lua.conf.xml` |
 | Installed modules / package availability | `/usr/lib/freeswitch/mod/`, `apt-cache policy freeswitch-mod-json-cdr` |
 | Benchmarks | `docs/load-testing-results.md` |
 | Worker supervision precedent | `scripts/tallpbx-queue.service` |
+| Scheduler sandbox | `scripts/tallpbx-scheduler.service` |
 | Secure streaming precedent | `app-modules/file-stores/src/Http/Controllers/MediaStreamController.php` |
-| Framework versions | `composer.json` |
-| Release history / invalidation guarantees | `CHANGELOG.md` (`4.2.0`, `4.3.0`), `git tag` |
+| Dialplan context format | `app/Services/DialplanContext.php` |
+| Rename blast radius | `tests/Feature/ModuleAutoloadTest.php`, `tests/Feature/PanelModuleAuthorizationSweepTest.php` |
+| Release history | `CHANGELOG.md` (`4.2.0`, `4.3.0`), `git tag` |
 
-*No code, configuration, or data was modified in producing this review. Only this report file was created, at the user's explicit request.*
+*This report is documentation only. No code, configuration, or data was modified in producing either revision.*
