@@ -202,3 +202,17 @@ Run after deploying the epoch-aware handler, restoring the bindings, and restart
 | Stale entry isolation | scan the identity map keys | only `…:e2` remained; the superseded `:e0` entry expired on its own TTL and was never readable under the new epoch |
 
 **Decision: KEEP, reinstated.** The epoch path is proven live: an ownership change moves the epoch, the next lookup cannot use the cached answer, and the mirror re-warms under the new epoch. The feature still ships off by default for fresh installs; this host is enabled deliberately as the reference deployment.
+
+### Cost of the epoch reads (post-fix regression check)
+
+The fix adds two cache reads and two Redis reads to every directory render. Re-running the same Task 1 harness tiers on the same appliance, proxy enabled and timing headers on:
+
+| Tier | Metric | Before the fix | After the fix |
+|:--|:--|:--|:--|
+| 25 x 1 | `request_ms` p50 / p95 | 265.7 / 425.3 | **236.5 / 338.0** |
+| 25 x 1 | `handler_ms` p50 | 19.4 | 24.6 |
+| 100 x 5 | `request_ms` p50 / p95 | 416.2 / 598.2 | **341.3 / 418.0** |
+| 100 x 5 | `handler_ms` p50 | 24.5 | 27.6 |
+| both | DB queries per request | 0.56 / 0 | 0.56 / 0 |
+
+End-to-end request latency did not regress. The handler itself moved by roughly 3–5 ms at p50, which is the expected cost of the extra reads and is small against the ~240 ms request; the sample spread (`std_dev` 21–26 ms) means this is directional rather than a controlled A/B, and one run per tier was taken.
