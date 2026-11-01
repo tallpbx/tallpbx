@@ -109,3 +109,27 @@ The sweep runs with a freshly flushed Redis DB 1 per tier, so its throughput is 
 ## 8. Next steps
 
 Proceed with Phase 1 of the v2 plan (Tasks 2–7): mirror namespace, version mirroring, directory mirror writes, the directory-only Lua handler, bindings, and the end-to-end gate. Re-run this measurement after Phase 1 lands for an apples-to-apples comparison against the baseline above.
+
+## 9. Phase 1 end-to-end gate (reference appliance)
+
+**Environment:** the TallPBX reference appliance (4 vCPU), FreeSWITCH 1.11.4, Redis 7, PHP 8.5 / Laravel 13. The proxy was enabled with `FS_LUA_PROXY_ENABLED=true`, the handler installed at `/etc/freeswitch/scripts/tallpbx_xml_handler.lua`, `mod_lua` moved ahead of `mod_xml_curl` in `modules.conf.xml`, and the handler bound to the `directory` section. Checks used real data: tenant 7 / `acme.192.168.1.76` / extension 2000, and tenant 2 / `192.168.1.71` / extension 2000.
+
+| Check | Method | Result |
+|:--|:--|:--|
+| Cold miss warms the mirror | one `find_user_xml`, then inspect DB 0 | 1 xml-handler request; `tenant`, `ver` and `dir` keys written (1,840-byte payload) |
+| Lua serves the hit | second `find_user_xml` | 0 xml-handler requests; output byte-identical to the PHP-rendered document |
+| Immediate invalidation | revision bump, then two lookups | first lookup missed to PHP, second hit; payload key moved from `:v0` to `:v1` |
+| Content freshness | extension edit (observer bump), lookup, revert | the edited value appeared in the mirrored document on the very next lookup; the revert propagated the same way |
+| Multi-tenant isolation | same extension number on two tenants | distinct tenant maps and payload keys; documents carry `tenant_id` 2 and 7 |
+| Corrupt payload | overwrite a payload with `<document` | lookup served by `mod_xml_curl`, document correct, mirror re-warmed |
+| Rollback | comment the two bindings, restart | every lookup returned to PHP; restoring the bindings restored hits |
+| Cost, Lua vs PHP | 20 sequential `find_user_xml` per path (about 74 ms of `fs_cli` overhead per call) | **PHP 322 ms average, 20 PHP requests** vs **Lua 53 ms average, 0 PHP requests** |
+
+**Decision: KEEP on the reference appliance.** The feature stays off by default for fresh installs (`FS_LUA_PROXY_ENABLED=false`); this host is enabled deliberately as the reference deployment.
+
+Caveats:
+
+- Each measurement shells out to `fs_cli`, so absolute values include roughly 74 ms of event-socket overhead (measured separately with `status`). The 269 ms gap is the lookup path itself.
+- The PHP figure is a warm PHP cache on this appliance; it is not comparable to the 1 vCPU test host in §3.
+- A live Redis-stop test was not run. The Lua miss paths are covered by the fixture harness (`-NOAUTH`, missing keys, empty and foreign values), and the PHP fallback's own Redis dependency predates this feature.
+- The domain-shape document is mirrored once per requesting username, so mirror memory scales with active endpoints rather than active tenants. This remains a deferred decision.
