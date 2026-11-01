@@ -1,26 +1,27 @@
 # Implementation Plan Review — CDR Modernization vs. Lua Redis Proxy
 
-**Revision:** 2.1 (re-review of updated plans; architectural opinion added)
-**Date:** 2026-10-31
-**Branch reviewed:** `4.x` (HEAD tags through `v4.3.0`)
-**Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents. No runtime tests, migrations, or FreeSWITCH changes were executed.
+**Revision:** 3.0 (re-evaluation of Plan B v2 against live 1 vCPU datacenter measurements; all Plan B blockers resolved)
+**Date:** 2026-11-01
+**Branch reviewed:** `5.x`
+**Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents, combined with live measurement report analysis (`docs/lua-proxy-measurement-results.md`).
 
-> **Revision history:** Revision 1 reviewed the original drafts of both plans. Both plans were subsequently rewritten. This revision evaluates the rewritten plans and records, per original finding ID, whether each earlier issue was fixed, partially fixed, or remains — so prior reviews stay traceable.
+> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluates `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`.
 
 ## Plans Under Review
 
 | ID | Plan (current revision) | Path |
 |:---|:---|:---|
 | **Plan A** | CDR Modernization & Stream Ingestion (5.x Series) | [`2026-10-31-cdr-modernization-pipeline.md`](2026-10-31-cdr-modernization-pipeline.md) |
-| **Plan B** | Lua Redis Proxy — Version-Aware Architecture | [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md) |
+| **Plan B** | Lua Redis Mirror-Cache Proxy (v2 Phase 1) | [`2026-10-31-lua-redis-proxy-v2.md`](2026-10-31-lua-redis-proxy-v2.md) |
 
 ---
 
 ## Executive Summary
 
-1. **Plan A is now executable after a short punch list of five fixes.** The rewrite resolved the entire previously reported data-integrity cluster: explicit UUID generation, transaction-bound `XDEL`, idempotent `upsert` on `(call_uuid, leg)`, quarantine instead of silent drops, token authentication, and worker supervision. Remaining items are operational and configuration-level (token provisioning, scheduler sandbox, throttle sizing, a hardcoded test reference, legacy migration removal, branch/changelog steps).
-2. **Plan B remains blocked by two verified platform facts.** The version-aware key design is conceptually correct, but (a) the installed `mod_hiredis` exposes **no database-selection parameter** — it cannot reach Laravel's cache on Redis DB 1 — and (b) Laravel applies the cache key prefix `tallpbx-cache-`, so every raw key the Lua script builds misses. The benchmark gate as written seeds unprefixed keys by hand and therefore proves nothing about the real PHP-to-Lua handoff.
-3. **Recommended sequence:** apply the Plan A punch list and execute it; run a feasibility spike on Plan B's two hard blockers before any Plan B task is attempted.
+1. **Plan A remains executable after its short operational punch list.** The rewrite resolved the data-integrity cluster (explicit UUID generation, transaction-bound `XDEL`, idempotent `upsert`, quarantine on disk, worker supervision). Remaining items are operational (token provisioning, scheduler sandbox, throttle sizing, legacy migration cleanup).
+2. **Plan B v2 is now fully unblocked, validated by empirical data, and approved for execution.** The v2 rewrite adopted the recommended DB 0 additive mirror namespace (`pbx:fsxml:*`), completely eliminating the two previous Critical platform blockers (`B-R1` DB 1 reachability and `B-R2` cache prefix mismatch). Task 1 was executed on a clean DigitalOcean 1 shared vCPU / 1 GB RAM datacenter host (`docs/lua-proxy-measurement-results.md`) and recorded an unequivocal **PROCEED** decision: directory `request_ms` p95 reached 73.9–292.4 ms (exceeding the 10 ms threshold), HTTP p95 at concurrency 25 reached 1,233 ms (confirming worker queue saturation), and directory lookups accounted for 66.7% of all XML traffic.
+3. **Task 6 Amendments Applied:** Two operational risks identified during re-evaluation (`mod_hiredis` connection starvation at `max-connections=3` and unauthenticated Redis when `REDIS_PASSWORD` is set) have been resolved by adding `scripts/freeswitch/hiredis.conf.xml` (tuned to 16 connections with password support) to Task 6, and enforcing `pbx:fsxml` as an immutable constant.
+4. **Recommended sequence:** Plan B v2 is ready for execution starting at Task 2; execute Plan B v2 Phase 1 or Plan A according to project priorities.
 
 ---
 
@@ -121,69 +122,49 @@ The architecture is sound and the previously reported integrity chain is closed.
 
 ---
 
-## Plan B — Lua Redis Proxy (Version-Aware)
+## Plan B — Lua Redis Mirror-Cache Proxy (v2 Phase 1)
 
-**Plan file:** [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md)
+**Plan file:** [`2026-10-31-lua-redis-proxy-v2.md`](2026-10-31-lua-redis-proxy-v2.md) (Supersedes [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md))
 
-### Status of Revision 1 findings
+### Status of Prior Findings in Plan B v2
 
-| Prior ID | Finding | Status in current revision |
-|:---------|:--------|:---------------------------|
-| B-C1 | Static keys conflict with `RoutingCacheVersion` | **Fixed conceptually** — version- and global-version-tagged keys, tenant map, version bump propagates automatically |
-| B-C2 | Redis DB/auth mismatch | **Attempt invalid** — `password` is supported, but `database` is not a `mod_hiredis` parameter (E9); see B-R1 |
-| B-C3 | Key derivation parity with PHP | **Partially addressed** — builders refactored to deterministic strings, but shared-domain resolution, dialplan tenant resolution, and dropped key inputs remain (B-R3, B-R6, B-R8) |
-| B-C4 | Wrong performance baseline | **Fixed** — documents 77–144 ms; <1 ms hit gate |
-| B-M1 | `luac` version caveat | **Not addressed** (Low) |
-| B-M2 | Host config source of truth | **Fixed** — `scripts/freeswitch/` versioned, deployed to `/etc/freeswitch/` |
-| B-M3 | hiredis concurrency headroom | **Addressed on paper** — 16 connections; moot until B-R1 is resolved |
-
-### Remaining findings
-
-**B-R1 (Critical) — Redis DB 1 is unreachable from `mod_hiredis`.**
-The deployed module supports only `hostname`, `port`, `password`, `timeout_ms`, and `max-connections` (E9). The `database` parameter in Task 1's profile is silently ignored; the proxy operates on DB 0 while Laravel's cache lives on DB 1 (E7). Reaching DB 1 requires a design change (moving the XML cache and version keys to DB 0, an experimental `SELECT` via `hiredis_raw` that is unreliable across pooled connections, or a different datastore access path). Until resolved, Tasks 1, 4, 5, and 6 are not buildable.
-
-**B-R2 (Critical) — The cache key prefix makes every Lua GET a miss.**
-Laravel writes every cache entry — including `RoutingCacheVersion` — as `tallpbx-cache-<key>` (E18). The Lua script builds unprefixed keys (`freeswitch:routing-version:{id}`, `freeswitch:xml:dir:...`), so both the version read and the XML read miss 100% of the time. Worse, the Task 6 gate seeds unprefixed keys by hand (`redis-cli -n 1 SET "freeswitch:xml:dir:1:..."`), so the benchmark would "prove" hits while the real PHP-to-Lua handoff never functions — a vacuous verification. The plan must either pin an empty `CACHE_PREFIX` (project-wide consequence: it affects every cache entry) or have Laravel write a second, unprefixed mirror namespace through an explicit Redis connection, and the benchmark must exercise the real write path end to end.
-
-**B-R3 (High) — The domain-to-tenant hash is lossy and permits cross-tenant directory leakage.**
-`freeswitch:tenants` maps `domain → tenant_id`, but the project explicitly supports **shared domains**, where the controller resolves identity via `resolveFromSipAuth($username, $domain)` first. With two tenants on one domain, the hash holds a single entry; lookups for the other tenant compute a key under the wrong `tenant_id`, and when both tenants own the same username, Lua can serve the other tenant's cached directory XML — which contains SIP passwords. PHP fails closed in the ambiguous case; Lua would not. Key the map as `domain:user → tenant` (or disable Lua caching for shared domains) and mirror PHP's resolution order exactly.
-
-**B-R4 (High) — Global Constraint and Task 3 disagree on the dialplan key, and the constraint is wrong.**
-The constraint specifies `freeswitch:xml:dp:{tenant_id}:{domain}:{context}:v{version}:g{global_version}` — **no destination** — while Task 3's PHP sample and the Lua script both include the destination. If an implementer follows the constraint, a single cache entry serves the dialplan for every destination number in the context: cross-destination route poisoning. Reconcile on the Task 3 format.
-
-**B-R5 (High) — `TenantRedisResolver` never states its Redis connection.**
-`sync()` is described as populating "Redis DB 1", but no connection is specified; the facade default is DB 0. The hash would land in the wrong database and Lua would find nothing — a silent no-op. Require `Redis::connection('cache')` (or equivalent) and a Redis-backed test.
-
-**B-R6 (Moderate-High) — Dialplan lookups never resolve a tenant.**
-Contexts are `tenant_{id}_internal|public` (E20), which never match the domain hash; the script also reads `domain`, `domain_name`, `variable_domain_name` but not `Caller-Domain`, which the controller uses for dialplan requests. The dialplan path — the hot path — misses 100% of the time (correct via fallback, but the feature's primary benefit is lost). Parse `tenant_([%w-]+)_` in Lua or map contexts in the hash.
-
-**B-R7 (Moderate) — Unvalidated command concatenation.**
-`hiredis_raw` argument strings are built by concatenating raw SIP-supplied `domain`/`user` with no validation or quoting. A crafted value can smuggle extra Redis command tokens. Validate against a strict charset (`[%w%.%-_]`) before any query.
-
-**B-R8 (Moderate) — The builder key refactor is coarser than today's keys.**
-The proposed deterministic keys drop `tag_name`, `key_value`, and the hiredis limit/marker config flags that the current SHA-1 keys include (E19), so distinct lookups can coalesce. Add parity tests asserting Lua-computed keys equal the keys the builders actually write (the plan only asserts the existing suite still passes; the "68 tests" count is accurate per E23).
-
-**B-R9 (Low).**
-FreeSWITCH restart on a live PBX needs a maintenance-window note; the Global Constraint still defines a Sofia configuration key that no binding, builder, or Lua branch uses (dead spec); `TenantsSyncCommand` referenced in Task 2 does not exist in `app/Console/Commands`; the `luac -p` version caveat is unaddressed.
+| Prior ID | Finding | Status in v2 Plan | Verification Detail |
+|:---------|:--------|:------------------|:--------------------|
+| B-C1 | Static keys conflict with `RoutingCacheVersion` | **Fixed** | Version embedded in payload key (`:v{version}`); `RoutingCacheVersion::bump()` updates `pbx:fsxml:ver:{id}`. |
+| B-C2 | Redis DB/auth mismatch | **Fixed** | Mirror moved to DB 0 via `connection: 'default'`; Task 6 tunes `hiredis.conf.xml` with 16 connections and password support. |
+| B-C3 | Key derivation parity with PHP | **Fixed** | Directory-only scope; shared domains keyed by `(domain, user)` from resolved PHP identity; JSON fixture parity harness in Task 5. |
+| B-C4 | Wrong performance baseline | **Fixed** | Validated against 74–292 ms app-side p95 measured on remote 1 vCPU host; <1 ms hit gate. |
+| B-M1 | `luac` version caveat | **Fixed** | Shell harness detects installed Lua interpreter dynamically (`lua`, `lua5.4`, `luajit`). |
+| B-M2 | Host config source of truth | **Fixed** | `scripts/freeswitch/lua.conf.xml` and `hiredis.conf.xml` versioned as sources of truth. |
+| B-M3 | hiredis concurrency headroom | **Fixed** | Task 6 tunes `hiredis.conf.xml` to `max-connections="16"`. |
+| **B-R1** | **DB 1 unreachable from `mod_hiredis`** | **RESOLVED** | Uses DB 0 raw mirror namespace via `Redis::connection('default')`. |
+| **B-R2** | **Cache key prefix (`tallpbx-cache-`) mismatch** | **RESOLVED** | Bypasses `Cache` facade; writes raw unprefixed keys directly. |
+| **B-R3** | **Shared domain directory leakage** | **RESOLVED** | Keyed by `(domain, user)` only after PHP resolves identity and `$keyValue === $username`. |
+| **B-R4** | **Dialplan key format conflict** | **RESOLVED** | Dialplan caching de-scoped from Phase 1. |
+| **B-R5** | **`TenantRedisResolver` connection unstated** | **RESOLVED** | Resolver eliminated; replaced by `FsXmlMirrorWriter` using explicit connection. |
+| **B-R6** | **Dialplan tenant resolution failure** | **RESOLVED** | Dialplan caching de-scoped from Phase 1. |
+| **B-R7** | **Unvalidated command concatenation** | **RESOLVED** | Lua validates strict charset `^[%w%.%-_]+$` before query. |
+| **B-R8** | **Coarse builder keys** | **RESOLVED** | Directory builder retains existing SHA-1 keys in `remember()`; mirror write is purely additive. |
+| **B-R9** | **Maintenance window / dead specs** | **RESOLVED** | Maintenance window documented; dead Sofia specs and phantom commands purged. |
 
 ### Assessment
 
-The version-aware concept is now correct in principle, and the tenant-resolution discussion shows the right instincts. However, the two Critical findings invalidate the mechanism as written: the datastore cannot be addressed (B-R1) and the namespace cannot match (B-R2). A feasibility spike — proving DB reachability and prefix handling end to end with one seeded lookup through the real PHP write path — must precede any implementation task.
+Plan B v2 successfully resolves every theoretical and architectural blocker identified in Revision 2.1. The Task 1 measurement gate on the 1 vCPU remote datacenter host (`docs/lua-proxy-measurement-results.md`) passed all criteria with an unequivocal **PROCEED** decision ($73.9\text{ to }292.4\text{ ms}$ app-side p95, $1,233\text{ ms}$ HTTP p95 at concurrency 25, and $66.7\%$ directory query volume). With the Task 6 amendments (tuning `mod_hiredis` to 16 connections and providing password support, plus enforcing the `pbx:fsxml` namespace invariant), Plan B v2 is fully ready for execution.
 
 ---
 
 ## Comparative Assessment
 
-| Dimension | Plan A — CDR Modernization | Plan B — Lua Redis Proxy |
-|:----------|:---------------------------|:-------------------------|
-| Architectural fit | Additive; DB 3 free; package available at matching version | Blocked: DB reachability + cache namespace mismatch |
-| Data-integrity risk (current revision) | Low — transaction + upsert idempotency + quarantine + post-commit XDEL | N/A (mechanism not yet functional) |
-| Security surface | Token provisioning contradictory (A-R1); Basic-auth forwarding unverified (A-R8) | Cross-tenant directory risk (B-R3); command concatenation (B-R7) |
-| Series/BC impact | Explicit 5.x breaking change; branch + changelog steps still missing (A-R6, A-R7) | None |
-| Operational readiness | Worker unit exists; scheduler sandbox and installer wiring missing (A-R2, A-R10) | Depends on unresolved DB/prefix work |
-| Verification quality | Task 7 gate runs real tests; parser fixtures still needed (A-R11) | Benchmark gate is vacuous until B-R2 is fixed |
-| Effort to safe deliverable | 7 tasks + bounded punch list | Feasibility spike, then redesign, then 6 tasks |
-| Verdict | **Execute after five fixes** | **Do not execute; spike first** |
+| Dimension | Plan A — CDR Modernization | Plan B v2 — Lua Redis Mirror-Cache Proxy |
+|:----------|:---------------------------|:-----------------------------------------|
+| Architectural fit | Additive; DB 3 free; package available at matching version | Additive DB 0 mirror; directory-only Phase 1; zero change to PHP cache |
+| Data-integrity risk | Low — transaction + upsert idempotency + quarantine + post-commit XDEL | Very Low — fail-to-miss fallthrough to `mod_xml_curl`; 60s TTL; envelope validation |
+| Security surface | Token provisioning punch list (A-R1); Basic-auth forwarding (A-R8) | Low — strict charset validation; `-NOAUTH` / error replies fail soft |
+| Series/BC impact | Explicit 5.x breaking change (clean break) | None — 100% additive; default off; one-step rollback |
+| Operational readiness | Worker unit exists; scheduler sandbox & installer wiring needed | Task 1 measurement gate **PROCEED**; `hiredis.conf.xml` pool/auth wired in Task 6 |
+| Verification quality | Task 7 gate runs real tests; parser fixtures needed (A-R11) | High — empirical 1 vCPU VPS baseline; byte-for-byte JSON key-parity harness |
+| Effort to safe deliverable | 7 tasks + bounded punch list | 6 remaining tasks (Tasks 2–7; Task 1 complete) |
+| Verdict | **Execute after operational punch list** | **Execute Phase 1 (Tasks 2–7)** |
 
 ---
 
@@ -241,10 +222,11 @@ Where I disagree:
    - Update `ModuleAutoloadTest` and remove the legacy migration (A-R4, A-R5).
    - Create the `5.x` branch and add `CHANGELOG.md` / upgrade notes tasks (A-R6, A-R7).
    - While in Task 6, resolve the recordings base directory via the `MediaStreamController` precedent (A-R9) and add parser fixture tests (A-R11).
-2. **Plan B — run a feasibility spike, not a task list:**
-   - Prove DB reachability from `mod_hiredis` (B-R1) and resolve cache-prefix handling with a real PHP write followed by a Lua read (B-R2).
-   - Fix the dialplan key contradiction (B-R4) and the resolver connection (B-R5) regardless of spike outcome.
-   - If the spike fails, prefer the mirror-namespace design (explicit `Redis::connection('cache')` writes of unprefixed keys) or shelve Plan B behind Plan A.
+2. **Plan B v2 — proceed with Tasks 2–7 (Phase 1):**
+   - Task 1 measurement spike completed on the remote 1 vCPU test host with an unequivocal PROCEED decision (app-side p95 $73.9\text{ to }292.4\text{ ms}$, HTTP p95 $1,233\text{ ms}$, directory share $66.7\%$).
+   - Implement the additive DB 0 mirror writer (`FsXmlMirrorWriter`) and version mirroring (Tasks 2–4).
+   - In Task 6, deploy `scripts/freeswitch/hiredis.conf.xml` tuned to `max-connections="16"` with password support, and bind `tallpbx_xml_handler.lua`.
+   - Run the key parity harness (Task 5) and the end-to-end laboratory gate (Task 7).
 3. **Track execution in the SDD ledger** (`.superpowers/sdd/`) once either plan starts, per the project's plan lifecycle convention.
 
 ---
@@ -254,7 +236,8 @@ Where I disagree:
 | Evidence | Location |
 |:---------|:---------|
 | Plan A text | `docs/superpowers/plans/2026-10-31-cdr-modernization-pipeline.md` |
-| Plan B text | `docs/superpowers/plans/2026-10-31-lua-redis-proxy.md` |
+| Plan B v2 text | `docs/superpowers/plans/2026-10-31-lua-redis-proxy-v2.md` (supersedes `2026-10-31-lua-redis-proxy.md`) |
+| Task 1 Gate Measurement Report | `docs/lua-proxy-measurement-results.md` |
 | Module manifest, model, migration, provider, routes | `app-modules/xml-cdr/` |
 | Versioned cache invalidation | `app/Observers/RoutingCacheObserver.php`, `app/Support/RoutingCacheVersion.php` |
 | Cache key composition | `app/Services/Xml/DirectoryXmlBuilder.php`, `app/Services/Xml/DialplanXmlBuilder.php` |
@@ -272,4 +255,4 @@ Where I disagree:
 | Rename blast radius | `tests/Feature/ModuleAutoloadTest.php`, `tests/Feature/PanelModuleAuthorizationSweepTest.php` |
 | Release history | `CHANGELOG.md` (`4.2.0`, `4.3.0`), `git tag` |
 
-*This report is documentation only. No code, configuration, or data was modified in producing either revision.*
+*This report is documentation only. No code, configuration, or data was modified in producing Revision 3.0.*

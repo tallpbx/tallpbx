@@ -14,7 +14,7 @@
 
 - **Additive only**: existing PHP cache keys, TTLs, and invalidation semantics are unchanged. `tests/Feature/Http/XmlHandlerControllerTest.php` must pass without modifying any existing test.
 - **Raw Redis writes only**: mirror writes use `Redis::connection(config('freeswitch.lua_proxy.connection'))` with direct `SET`/`GET`/`EXISTS` commands. Never the `Cache` facade — that is what reintroduces the `tallpbx-cache-` prefix and the DB 1 mismatch.
-- **Namespace**: default `pbx:fsxml`, overridable via `FS_LUA_PROXY_NAMESPACE`.
+- **Namespace invariant**: strictly fixed as `pbx:fsxml` across both PHP (`FsXmlMirrorKeys::NAMESPACE`) and Lua (`local ns = "pbx:fsxml"`). Making the namespace an environment variable introduces silent key-drift risk where PHP and Lua query different keys; treating it as an immutable constant ensures byte-for-byte contract parity.
 - **Version-in-key is mandatory**: every payload key embeds the tenant's current `RoutingCacheVersion`. Lua never falls back to a default version — a missing version key is a miss.
 - **Fail-to-miss, never fail-to-stale**: any missing key, Redis error string, invalid charset, or malformed value makes Lua return `nil` so FreeSWITCH uses `mod_xml_curl`.
 - **Zero XML business logic in Lua**: the script may only build keys from request headers, read Redis, and validate the reply envelope (`<document`).
@@ -133,11 +133,10 @@ In `config/freeswitch.php`, add beside `xml_handler`:
 'lua_proxy' => [
     'enabled' => filter_var(env('FS_LUA_PROXY_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     'connection' => env('FS_LUA_PROXY_CONNECTION', 'default'),
-    'namespace' => env('FS_LUA_PROXY_NAMESPACE', 'pbx:fsxml'),
 ],
 ```
 
-In `.env.example`, add `FS_LUA_PROXY_ENABLED=false`, `FS_LUA_PROXY_CONNECTION=default`, `FS_LUA_PROXY_NAMESPACE=pbx:fsxml`.
+In `.env.example`, add `FS_LUA_PROXY_ENABLED=false` and `FS_LUA_PROXY_CONNECTION=default`. (Note: `pbx:fsxml` namespace is defined as a fixed constant in `FsXmlMirrorKeys::NAMESPACE` to prevent key drift).
 
 - [ ] **Step 2: Write the failing key-builder test**
 
@@ -150,7 +149,9 @@ declare(strict_types=1);
 
 use App\Services\Xml\FsXmlMirrorKeys;
 
-beforeEach(fn () => config(['freeswitch.lua_proxy.namespace' => 'pbx:fsxml']));
+test('defines fixed pbx:fsxml namespace constant', function () {
+    expect(FsXmlMirrorKeys::NAMESPACE)->toBe('pbx:fsxml');
+});
 
 test('builds namespaced version keys for tenant and global revisions', function () {
     expect(FsXmlMirrorKeys::version(7))->toBe('pbx:fsxml:ver:7')
@@ -175,7 +176,7 @@ Expected: FAIL (class not found).
 
 - [ ] **Step 4: Implement `FsXmlMirrorKeys`**
 
-All methods are `public static`; each prefixes `config('freeswitch.lua_proxy.namespace', 'pbx:fsxml')` to the formats above. Add a class-level PHPDoc explaining that these key strings are a contract shared byte-for-byte with `scripts/freeswitch/tallpbx_xml_handler.lua`.
+Declare `public const NAMESPACE = 'pbx:fsxml';`. All methods are `public static`; each prefixes `self::NAMESPACE` to the formats above. Add a class-level PHPDoc explaining that these key strings are an immutable contract shared byte-for-byte with `scripts/freeswitch/tallpbx_xml_handler.lua`.
 
 - [ ] **Step 5: Write the failing writer test**
 
@@ -244,7 +245,7 @@ use App\Services\Xml\FsXmlMirrorKeys;
 use App\Support\RoutingCacheVersion;
 
 beforeEach(function () {
-    config(['freeswitch.lua_proxy.enabled' => true, 'freeswitch.lua_proxy.namespace' => 'pbx:fsxml']);
+    config(['freeswitch.lua_proxy.enabled' => true]);
     Redis::connection('default')->del(FsXmlMirrorKeys::version(42), FsXmlMirrorKeys::globalVersion());
 });
 
@@ -442,39 +443,72 @@ git commit -m "feat(freeswitch): add version-aware directory cache lua proxy wit
 
 ---
 
-### Task 6: Bind the Lua Handler, Load Order, and Rollback Runbook
+### Task 6: Bind the Lua Handler, Hiredis Connection Pool Tuning, Load Order, and Rollback Runbook
 
 **Files:**
 - Create: `scripts/freeswitch/lua.conf.xml` (source of truth)
+- Create: `scripts/freeswitch/hiredis.conf.xml` (tuned profile with 16 connections & auth support)
 - Deploy: `/etc/freeswitch/autoload_configs/lua.conf.xml`
+- Deploy: `/etc/freeswitch/autoload_configs/hiredis.conf.xml`
 - Modify: `/etc/freeswitch/autoload_configs/modules.conf.xml` (load order only)
 - Modify: `docs/operations.md` (rollback procedure)
 
 **Interfaces:**
 - FreeSWITCH configuration: `<param name="xml-handler-script" value="tallpbx_xml_handler.lua"/>`, `<param name="xml-handler-bindings" value="directory"/>`
+- FreeSWITCH hiredis profile `default`: `max-connections="16"`, `timeout_ms="500"`, optional `password` parameter
 - Load order: `<load module="mod_lua"/>` before `<load module="mod_xml_curl"/>`
 
-- [ ] **Step 1: Add the bindings template**
+- [ ] **Step 1: Add the hiredis configuration template with tuned connection pool**
+
+Create `scripts/freeswitch/hiredis.conf.xml` to tune the default profile for high concurrency (bumping from 3 to 16 connections so 3 sequential queries per lookup under concurrency 25+ do not exhaust the pool):
+
+```xml
+<configuration name="hiredis.conf" description="mod_hiredis">
+  <profiles>
+    <profile name="default">
+      <connections>
+        <connection name="primary">
+          <param name="hostname" value="127.0.0.1"/>
+          <param name="port" value="6379"/>
+          <param name="timeout_ms" value="500"/>
+          <param name="max-connections" value="16"/>
+          <!-- If REDIS_PASSWORD is configured in .env, uncomment and supply: -->
+          <!-- <param name="password" value="{REDIS_PASSWORD}"/> -->
+        </connection>
+      </connections>
+      <params>
+        <param name="ignore-connect-fail" value="true"/>
+        <param name="ignore-error" value="true"/>
+        <param name="delete-when-zero" value="true"/>
+      </params>
+    </profile>
+  </profiles>
+</configuration>
+```
+
+Deploy to `/etc/freeswitch/autoload_configs/hiredis.conf.xml` (`chown freeswitch:tallpbx-media`, `chmod 644`). If `.env` defines a non-empty `REDIS_PASSWORD`, ensure the password param is uncommented and populated so `mod_hiredis` does not receive `-NOAUTH`.
+
+- [ ] **Step 2: Add the Lua bindings template**
 
 Create `scripts/freeswitch/lua.conf.xml` containing the two handler parameters inside `<settings>`, preserving the existing comments. Deploy to `/etc/freeswitch/autoload_configs/lua.conf.xml` (copy on lab; installer wiring is a separate task) and copy the script to `/etc/freeswitch/scripts/`, `chown freeswitch:tallpbx-media`, `chmod 644`.
 
-- [ ] **Step 2: Verify module order**
+- [ ] **Step 3: Verify module order**
 
 In `/etc/freeswitch/autoload_configs/modules.conf.xml`, confirm `mod_lua` loads before `mod_xml_curl`. Do not reorder other modules.
 
-- [ ] **Step 3: Restart FreeSWITCH during a maintenance window**
+- [ ] **Step 4: Restart FreeSWITCH during a maintenance window**
 
-Run `sudo systemctl restart freeswitch` and confirm clean boot with no Lua-parse errors in `/var/log/freeswitch/freeswitch.log`.
+Run `sudo systemctl restart freeswitch` and confirm clean boot with no Lua-parse errors in `/var/log/freeswitch/freeswitch.log`. Verify `hiredis` connection: `fs_cli -x "hiredis_raw default PING"` returns `+PONG`.
 
-- [ ] **Step 4: Document the rollback runbook**
+- [ ] **Step 5: Document the rollback runbook**
 
-Add a "Rollback: Lua XML Cache Proxy" subsection to `docs/operations.md`: comment out the two `xml-handler-*` parameters, `systemctl restart freeswitch`, verify `fs_cli -x "find_user_xml id <ext> <domain>"` returns the user, and confirm `storage/logs/laravel.log` shows new xml-handler requests. Note that `FS_LUA_PROXY_ENABLED=false` stops mirror writes but is not the kill-switch — removing the bindings is.
+Add a "Rollback: Lua XML Cache Proxy" subsection to `docs/operations.md`: comment out the two `xml-handler-*` parameters in `lua.conf.xml`, `systemctl restart freeswitch`, verify `fs_cli -x "find_user_xml id <ext> <domain>"` returns the user, and confirm `storage/logs/laravel.log` shows new xml-handler requests. Note that `FS_LUA_PROXY_ENABLED=false` stops mirror writes but is not the kill-switch — removing the bindings is.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/freeswitch/lua.conf.xml docs/operations.md
-git commit -m "chore(freeswitch): bind lua directory cache handler and document rollback"
+git add scripts/freeswitch/lua.conf.xml scripts/freeswitch/hiredis.conf.xml docs/operations.md
+git commit -m "chore(freeswitch): bind lua directory cache handler with 16 hiredis connections and document rollback"
 ```
 
 ---
@@ -523,7 +557,7 @@ Repeat the Task 1 load run and append hits/misses latency to the measurement doc
 
 - [ ] **Step 9: Update the changelog**
 
-Add an `### Added` entry under `[Unreleased]`: optional default-off Lua directory cache proxy, with the note that enabling requires the `lua.conf.xml` bindings and a FreeSWITCH restart, and that rollback is binding removal.
+Add an `### Added` entry under `[Unreleased]`: optional default-off Lua directory cache proxy, with the note that enabling requires the `lua.conf.xml` bindings, tuned `hiredis.conf.xml`, and a FreeSWITCH restart, and that rollback is binding removal.
 
 - [ ] **Step 10: Final verification and commit**
 
@@ -541,7 +575,7 @@ git commit -m "docs(changelog): record lua directory cache proxy lab results"
 - **Dialplan proxying (phase 2).** Revisit only if Phase 1 sustains ≥ 90 % hit ratio and the deployment target still exceeds 60 req/s. Phase 2 requires: tenant derivation from `tenant_{id}_internal|public`, destination and global version in the key, and every dialplan input (gateways, time conditions, ring groups, IVRs, scanner signatures, limiters, markers) represented in the version or the key.
 - **Configuration / `sofia.conf` proxying** — low lookup volume, no measured benefit.
 - **`mod_hiredis` database selection** — not supported by the installed module; the mirror lives in DB 0 by design.
-- **Installer wiring** for `lua.conf.xml` — deferred until the feature is KEEP-enabled on reference deployments.
+- **Installer wiring** for `lua.conf.xml` and `hiredis.conf.xml` — deferred until the feature is KEEP-enabled on reference deployments.
 
 ## Risks and Guards
 
@@ -552,4 +586,7 @@ git commit -m "docs(changelog): record lua directory cache proxy lab results"
 | Cross-tenant key collision on shared domains | Tenant from PHP's resolved identity map; no domain-only fallback; Task 7 Step 5 |
 | Malformed cached value reaches the XML parser | `<document` envelope check; Task 5 fixtures |
 | Lua fault breaks registration | Whole body in `pcall`; automatic `nil`; binding rollback runbook |
+| mod_hiredis connection starvation under burst load | `hiredis.conf.xml` tuned to 16 connections in Task 6 Step 1 |
+| Unauthenticated Redis with REDIS_PASSWORD | Password parameter documented in `hiredis.conf.xml`; `-NOAUTH` fails soft to `mod_xml_curl` |
+| Namespace drift between PHP and Lua | `pbx:fsxml` fixed as immutable constant `FsXmlMirrorKeys::NAMESPACE` |
 | Unbounded experiment | Feature flag default off; Task 1 gate; Task 7 keep/disable decision |
