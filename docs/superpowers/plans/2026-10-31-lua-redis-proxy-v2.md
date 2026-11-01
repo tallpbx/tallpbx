@@ -43,11 +43,13 @@
 - Consumes: the existing `LogXmlHandlerTiming` middleware (`config('freeswitch.xml_handler.log_timing')`)
 - Produces: a Gate Decision (PROCEED / DEFER) recorded in the committed test report
 
-- [ ] **Step 1: Provision and verify the remote 1 vCPU host**
+> **Gate outcome (2026-11-01): PROCEED** — all 1 vCPU tier criteria passed; see [lua-proxy-measurement-results.md](../../lua-proxy-measurement-results.md).
+
+- [x] **Step 1: Provision and verify the remote 1 vCPU host**
 
 Provision a datacenter VPS with 1 shared vCPU, 1 GB RAM, 2 GB swap, Debian 13, and a public IPv4 address. Install TallPBX by running the documented one-line installer **interactively** as an end user, following the remote test-server conventions in `docs/load-testing-guide.md#provisioning-a-remote-test-server` — answer the prompts and enter the SignalWire PAT at the prompt, never pre-seeded. Verify: PHP-FPM runs `pm = static` with 5 workers, swap is active, and the full default `nftables` firewall is enabled (benchmark parity with `docs/load-testing-results.md`).
 
-- [ ] **Step 2: Capture the clean HTTP baseline with timing off**
+- [x] **Step 2: Capture the clean HTTP baseline with timing off**
 
 Seed the load tenant:
 
@@ -63,7 +65,7 @@ PBX_URL="http://<public-ip>/api/v1/xml-handler" TENANT="load-test-beta" TOKEN="$
 
 That sweep must run on the PBX host because it edits `.env` cache TTLs and flushes Redis DB 1 locally. Count `section=directory` requests versus total xml-handler requests in the nginx access log to obtain the directory share. Keep `FS_XML_HANDLER_LOG_TIMING` off for this pass so the timing listener does not pollute the throughput numbers.
 
-- [ ] **Step 3: Capture the app-side pass and record the committed test report**
+- [x] **Step 3: Capture the app-side pass and record the committed test report** (executed with the `--timing` header harness rather than log parsing)
 
 Set `FS_XML_HANDLER_LOG_TIMING=true` in `.env`, run `tpbx optimize:clear`, repeat `25x1` and `100x5`, then extract the `XML Handler timing.` entries (`elapsed_ms`, `db_query_count`) and build the table below.
 
@@ -81,18 +83,18 @@ Create `docs/lua-proxy-measurement-results.md` as a standalone report for future
 | app-side p99 (ms) | | |
 | queries per lookup | | |
 
-- [ ] **Step 4: Apply the gate**
+- [x] **Step 4: Apply the gate**
 
 Revert `FS_XML_HANDLER_LOG_TIMING=false` and run `tpbx optimize:clear` before recording the decision. The selected measurement target is a remote datacenter host at 1 shared vCPU / 1 GB RAM, so the 4 vCPU throughput ceiling does not apply. Record exactly one decision, citing the measured numbers:
 - **PROCEED (1 vCPU tier)** if hit-path app-side p95 ≥ 10 ms **and** HTTP p95 at concurrency 25 ≥ 500 ms **and** directory lookups account for ≥ 1/3 of xml-handler volume.
 - **PROCEED (reference tier)** if a 4 vCPU host were measured instead: hit-path app-side p95 ≥ 10 ms **and** sustained XML throughput ≥ 60 req/s.
 - **DEFER** if hit-path p95 < 5 ms, or the directory share is below 1/3.
 
-- [ ] **Step 5: Stop on DEFER**
+- [x] **Step 5: Stop on DEFER** (not applicable — gate passed)
 
 If the decision is DEFER, close the plan here and record why. Do not start Task 2.
 
-- [ ] **Step 6: Commit the test report**
+- [x] **Step 6: Commit the test report** (committed as `73345ad`)
 
 ```bash
 git add docs/lua-proxy-measurement-results.md
