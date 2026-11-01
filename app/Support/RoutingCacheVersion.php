@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Services\Xml\FsXmlMirrorWriter;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
- * Tracks routing-data revisions so the dialplan caches invalidate on
- * translation or tenant-limit changes.
+ * Tracks routing-data revisions so the dialplan and directory caches
+ * invalidate on translation, gateway, or tenant-limit changes.
  *
- * The dialplan cache keys embed a per-tenant version number. Every write
- * through the NumberTranslationService or TenantLimitService bumps it, so
- * the next dialplan request misses the cache and rebuilds with the new
- * rules. Reads are plain cache gets — never database queries — so cached
- * dialplan responses stay query-free (the smoke suite's contract).
+ * The cache keys embed a per-tenant version number. Every write through the
+ * services that change routing data bumps it, so the next XML request misses
+ * the cache and rebuilds with the new rules. Reads are plain cache gets —
+ * never database queries — so cached XML responses stay query-free.
+ *
+ * Each bump is also mirrored into the raw Redis namespace read by the
+ * optional FreeSWITCH Lua handler. That mirror write is best-effort: if
+ * Redis is unavailable, the bump still succeeds and the Lua proxy simply
+ * misses until Redis returns.
  */
 class RoutingCacheVersion
 {
@@ -52,6 +58,12 @@ class RoutingCacheVersion
     /**
      * Bump the revision after a routing-data write.
      *
+     * A flushed cache store forgets the revision while mirrored payload keys
+     * in Redis DB 0 survive (`tpbx optimize:clear` flushes DB 1 only). When
+     * the store has no key, seed from the higher of the store and mirror
+     * values so the next revision can never collide with documents that are
+     * still readable by the Lua handler.
+     *
      * Some stores (notably the database store) cannot increment a missing
      * key and return a non-integer; fall back to seeding the key so the
      * invalidation never silently degrades to TTL-only.
@@ -59,10 +71,17 @@ class RoutingCacheVersion
     public static function bump(int $tenantId): void
     {
         $store = self::store();
+        $key = self::key($tenantId);
+        $writer = self::mirrorWriter();
 
-        if (! is_int($store->increment(self::key($tenantId)))) {
-            $store->put(self::key($tenantId), static::get($tenantId) + 1);
+        if (! $store->has($key)) {
+            $mirrorVersion = $writer?->readVersion($tenantId) ?? 0;
+            $store->put($key, max(static::get($tenantId), $mirrorVersion) + 1);
+        } elseif (! is_int($store->increment($key))) {
+            $store->put($key, static::get($tenantId) + 1);
         }
+
+        self::mirror($writer, fn (FsXmlMirrorWriter $mirror) => $mirror->writeVersion($tenantId, static::get($tenantId)));
     }
 
     /**
@@ -72,9 +91,45 @@ class RoutingCacheVersion
     public static function bumpGlobal(): void
     {
         $store = self::store();
+        $key = self::globalKey();
+        $writer = self::mirrorWriter();
 
-        if (! is_int($store->increment(self::globalKey()))) {
-            $store->put(self::globalKey(), static::getGlobal() + 1);
+        if (! $store->has($key)) {
+            $mirrorVersion = $writer?->readGlobalVersion() ?? 0;
+            $store->put($key, max(static::getGlobal(), $mirrorVersion) + 1);
+        } elseif (! is_int($store->increment($key))) {
+            $store->put($key, static::getGlobal() + 1);
+        }
+
+        self::mirror($writer, fn (FsXmlMirrorWriter $mirror) => $mirror->writeGlobalVersion(static::getGlobal()));
+    }
+
+    /**
+     * Resolve the optional Lua mirror writer, if the feature is enabled.
+     */
+    private static function mirrorWriter(): ?FsXmlMirrorWriter
+    {
+        $writer = app(FsXmlMirrorWriter::class);
+
+        return $writer->enabled() ? $writer : null;
+    }
+
+    /**
+     * Run one mirror write. Never throws: a mirror failure may cost cache
+     * hits, but it must not fail the write that caused it.
+     */
+    private static function mirror(?FsXmlMirrorWriter $writer, callable $write): void
+    {
+        if ($writer === null) {
+            return;
+        }
+
+        try {
+            $write($writer);
+        } catch (\Throwable $e) {
+            Log::debug('Routing cache version mirror failed.', [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
