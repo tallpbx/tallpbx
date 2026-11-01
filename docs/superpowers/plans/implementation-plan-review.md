@@ -1,11 +1,11 @@
 # Implementation Plan Review — CDR Modernization vs. Lua Redis Proxy
 
-**Revision:** 3.2 (adds the Redis topology evaluation and mirror document sizing for Plan B, and CDR durability findings A-R13/A-R14/A-R15; withdraws the earlier separate-instance recommendation)
+**Revision:** 3.3 (adds the sequencing decision: make the PHP miss path fast before building the Lua hit path, with the Task 1 gate re-derived afterwards)
 **Date:** 2026-11-01
 **Branch reviewed:** `5.x`
 **Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents, combined with live measurement report analysis (`docs/lua-proxy-measurement-results.md`) and runtime inspection of the Laravel Redis connection manager and FreeSWITCH 1.11.4 `find_user_xml`.
 
-> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluated `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`. Revision 3.1 records the resolution of four runtime blockers discovered during live protocol inspection (`V2-C1` unprefixed `lua_proxy` Redis connection, `V2-C2` dual-mode `domain`/`user` tag lookup support, `V2-H1` cold-start version key seeding in `DirectoryXmlBuilder`, and `V2-M1` cache-flush monotonic increment in `RoutingCacheVersion`), and marks `A-R6`/`A-R7` completed on `5.x`. Revision 3.2 records the Redis topology evaluation for the mirror — one instance, with documented split triggers — and withdraws the earlier recommendation to run the mirror on a second `redis-server` before general availability. It also adds three CDR durability findings: the accepted-then-crash loss window (`A-R13`), overcommit-induced write rejection (`A-R14`), and the appliance-sync `flushall()` (`A-R15`).
+> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluated `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`. Revision 3.1 records the resolution of four runtime blockers discovered during live protocol inspection (`V2-C1` unprefixed `lua_proxy` Redis connection, `V2-C2` dual-mode `domain`/`user` tag lookup support, `V2-H1` cold-start version key seeding in `DirectoryXmlBuilder`, and `V2-M1` cache-flush monotonic increment in `RoutingCacheVersion`), and marks `A-R6`/`A-R7` completed on `5.x`. Revision 3.2 records the Redis topology evaluation for the mirror — one instance, with documented split triggers — and withdraws the earlier recommendation to run the mirror on a second `redis-server` before general availability. It also adds three CDR durability findings: the accepted-then-crash loss window (`A-R13`), overcommit-induced write rejection (`A-R14`), and the appliance-sync `flushall()` (`A-R15`). Revision 3.3 records the sequencing decision: a fast front controller for the XML handler precedes Plan B's Tasks 2–7, the Task 1 gate is re-derived afterwards rather than inherited, and "additive" is clarified as additive-in-behaviour rather than zero-touch.
 
 ## Plans Under Review
 
@@ -19,13 +19,13 @@
 ## Executive Summary
 
 1. **Plan A remains executable after its short operational punch list.** The rewrite resolved the data-integrity cluster (explicit UUID generation, transaction-bound `XDEL`, idempotent `upsert`, quarantine on disk, worker supervision). Branching and upgrade documentation (`A-R6`, `A-R7`) have been completed on the `5.x` series branch. Remaining items are operational (token provisioning, scheduler sandbox, throttle sizing, legacy migration cleanup).
-2. **Plan B v2 is now fully unblocked, validated by empirical data, hardened against live runtime edge cases, and approved for execution.** The v2 rewrite adopted the recommended DB 0 additive mirror namespace (`pbx:fsxml:*`), completely eliminating the two previous Critical platform blockers (`B-R1` DB 1 reachability and `B-R2` cache prefix mismatch). Task 1 was executed on a clean DigitalOcean 1 shared vCPU / 1 GB RAM datacenter host (`docs/lua-proxy-measurement-results.md`) and recorded an unequivocal **PROCEED** decision: directory `request_ms` p95 reached 73.9–292.4 ms (exceeding the 10 ms threshold), HTTP p95 at concurrency 25 reached 1,233 ms (confirming worker queue saturation), and directory lookups accounted for 66.7% of all XML traffic.
+2. **Plan B v2 is now fully unblocked, validated by empirical data, hardened against live runtime edge cases, and approved as a design.** The v2 rewrite adopted the recommended DB 0 additive mirror namespace (`pbx:fsxml:*`), completely eliminating the two previous Critical platform blockers (`B-R1` DB 1 reachability and `B-R2` cache prefix mismatch). Task 1 was executed on a clean DigitalOcean 1 shared vCPU / 1 GB RAM datacenter host (`docs/lua-proxy-measurement-results.md`) and recorded an unequivocal **PROCEED** decision: directory `request_ms` p95 reached 73.9–292.4 ms (exceeding the 10 ms threshold), HTTP p95 at concurrency 25 reached 1,233 ms (confirming worker queue saturation), and directory lookups accounted for 66.7% of all XML traffic. Revision 3.3 changes the start order: Tasks 2–7 wait behind a fast front controller for the PHP miss path (AO-B7), and the Task 1 gate is re-derived afterwards rather than inherited (AO-B8).
 3. **Runtime Hardening Applied (Revision 3.1):** Live inspection of Laravel's Redis manager and FreeSWITCH 1.11.4's XML search runtime identified and resolved four critical execution blockers:
    - `V2-C1`: Laravel's default Redis prefix (`tallpbx-database-`) bypassed by adding a dedicated unprefixed `'lua_proxy'` connection (`'prefix' => ''`).
    - `V2-C2`: FreeSWITCH's native `switch_xml_locate_user()` shape (`tag_name="domain"`) and synthetic benchmark shape (`tag_name="user"`) both supported in mirror writer and Lua handler.
    - `V2-H1`: `DirectoryXmlBuilder` seeds `pbx:fsxml:ver:{tenantId}` on initial warm-up, preventing 100% cold-start misses.
    - `V2-M1`: `RoutingCacheVersion::bump()` reads DB 0's mirror version to ensure monotonic increments even after cache flush (`tpbx optimize:clear`).
-4. **Recommended sequence:** Plan B v2 is fully ready for execution starting at Task 2; execute Plan B v2 Phase 1 or Plan A according to project priorities.
+4. **Recommended sequence:** apply Plan A's punch list; then build the fast front controller for the XML miss path and re-measure the ceiling (AO-B7, AO-B8); then decide on Plan B Phase 1 using a hit ratio measured at realistic call inter-arrival rather than a synthetic burst.
 
 ---
 
@@ -66,6 +66,7 @@
 | E31 | `ApplianceSyncHostCommand` calls `Redis::flushall()` across all databases; `run-cache-sweep.sh` flushes DB 1 only | `app/Console/Commands/ApplianceSyncHostCommand.php:114`, `scripts/run-cache-sweep.sh:85` |
 | E32 | `Illuminate\Cache\RedisStore::serialize()` stores every non-numeric value as a PHP `serialize()` string (`s:799:"<document…";`); only finite numbers bypass serialization | `vendor/laravel/framework/src/Illuminate/Cache/RedisStore.php:505-527` |
 | E33 | Measured command costs on the installed host: `GET` 2.43 µs/call over 46,678 calls, `SETEX` 10.6 µs, `DEL` 3.8 µs, `FLUSHALL` 6,589 µs across a single call. `SLOWLOG LEN` is 0 at a 10,000 µs threshold, `LATENCY LATEST` is empty, and `evicted_keys` / `rejected_connections` are 0 | `redis-cli INFO commandstats`, `SLOWLOG LEN`, `LATENCY LATEST` on the installed host |
+| E34 | Per-request boot composition: 60 `app-modules` directories, each with a `ModuleServiceProvider` (60 providers registered and booted on every request); cached `routes-v7.php` is 274 KB; `config.php`, `services.php`, and `packages.php` are cached; opcache is enabled with no per-pool overrides | `ls app-modules/*/src/Providers/ModuleServiceProvider.php`, `bootstrap/cache/`, `php -i` on the installed host |
 
 Severity scale: **Critical** (breaks data, security, or the shipped series contract), **High** (feature cannot work or corrupts behavior as written), **Moderate** (correctness or operational gap requiring plan edits), **Low** (polish/consistency).
 
@@ -181,7 +182,7 @@ Live inspection of the running Laravel Redis connection manager and FreeSWITCH 1
 
 ### Assessment
 
-Plan B v2 successfully resolves every theoretical and architectural blocker identified in Revision 2.1. The Task 1 measurement gate on the 1 vCPU remote datacenter host (`docs/lua-proxy-measurement-results.md`) passed all criteria with an unequivocal **PROCEED** decision ($73.9\text{ to }292.4\text{ ms}$ app-side p95, $1,233\text{ ms}$ HTTP p95 at concurrency 25, and $66.7\%$ directory query volume). With the Task 6 amendments (tuning `mod_hiredis` to 16 connections and providing password support, plus enforcing the `pbx:fsxml` namespace invariant), Plan B v2 is fully ready for execution.
+Plan B v2 successfully resolves every theoretical and architectural blocker identified in Revision 2.1. The Task 1 measurement gate on the 1 vCPU remote datacenter host (`docs/lua-proxy-measurement-results.md`) passed all criteria with an unequivocal **PROCEED** decision ($73.9\text{ to }292.4\text{ ms}$ app-side p95, $1,233\text{ ms}$ HTTP p95 at concurrency 25, and $66.7\%$ directory query volume). With the Task 6 amendments (tuning `mod_hiredis` to 16 connections and providing password support, plus enforcing the `pbx:fsxml` namespace invariant), Plan B v2 is design-ready; its start order is set by the Revision 3.3 sequencing decision (AO-B7, AO-B8).
 
 ---
 
@@ -261,6 +262,22 @@ Two qualifications belong with that table. The only burst that produces an obser
 
 Re-evaluate the topology — without changing it — if sustained XML throughput reaches roughly 500 req/s, if `SLOWLOG LEN` becomes non-zero, or if `LATENCY LATEST` returns any event. Split into a second instance if `used_memory` exceeds roughly 70 % of `maxmemory`, if `evicted_keys` grows, if mirror keyspace exceeds roughly 25 % of the cap, if `SLOWLOG` or `LATENCY` entries correlate with large-value `GET`s, if a Redis restart, flush, or `MISCONF` visibly affects the panel, or if mirrored documents consistently exceed ~256 KB.
 
+#### Sequencing: make the PHP miss path fast before building the Lua hit path
+
+The Lua proxy's value is measured against a **55 ms** miss path. That number is not the cost of generating XML — it is the cost of booting the full application. E34 records what that boot contains: **60 module service providers** registered and booted on every request, plus a **274 KB** cached route table, none of which a directory lookup needs.
+
+That makes a cheaper first step available, and it changes the order Plan B assumes.
+
+| ID | Note | Rationale |
+|:---|:------|:----------|
+| AO-B7 | Build a fast front controller for the XML handler **before** Tasks 2–7 | A second entry point that boots the container with roughly four providers instead of sixty, leaves `mod_xml_curl` → nginx → PHP-FPM unchanged, and resolves the existing `XmlHandlerController` rather than copying it. Estimated 12–20 ms per lookup instead of ~55, so about 3.5× the ceiling on the same hardware, reversible by deleting one nginx location block |
+| AO-B8 | Re-derive the Task 1 gate after the front controller lands | The PROCEED decision was computed against a 55 ms miss path. At 15 ms the economics of a 1 ms in-process hit change, so the gate is re-run rather than inherited. Keep the mirror's design work (keys, writer, version mirroring) — only its justification is provisional |
+| AO-B9 | Read "additive" as additive-in-behaviour, not zero-touch | The plan edits six existing source and configuration files (`DirectoryXmlBuilder`, `RoutingCacheVersion`, `config/database.php`, `config/freeswitch.php`, `.env.example`, FreeSWITCH `modules.conf.xml`) plus two documentation files. Every write is gated by `FS_LUA_PROXY_ENABLED=false`, so backing out is safe, but the fast bootstrap must register `FsXmlMirrorWriter`'s Redis connection once the flag is on. A byte-equality test proves a correct document, not a written mirror, so assert the mirror key exists as well |
+
+Order of work: profile the boot with `microtime` marks around each bootstrapper (abandon the approach if the providers are not the dominant cost) → build the front controller → verify against a byte-equality corpus covering directory, dialplan, configuration, and phrases across single-tenant, shared-domain, and unresolved-tenant cases → re-measure the ceiling → decide on Lua.
+
+The front controller's acceptance criterion is the byte-equality corpus, not code review: if a provider the handler transitively needs is omitted, the result is a **wrong document**, not a slow one.
+
 ### Verdict summary
 
 | Decision | Opinion |
@@ -268,6 +285,7 @@ Re-evaluate the topology — without changing it — if sustained XML throughput
 | Redis Stream + micro-batch + disk spool for CDR ingestion | **Endorsed** — correct consistency model and the right isolation from the XML hot path; add consumer-group readiness (AO-A1), stream alerts (AO-A2), and a retention policy (AO-A3) |
 | Lua Redis proxy for XML | **Goal endorsed, sequencing and shape rejected** — revisit after Plan A, scope to directory first (AO-B3), and require a one-`GET` mirror design with no Lua-side resolution (AO-B2) |
 | Redis topology for the mirror | **Single instance (DB 0 on 6379)** — no measured bottleneck; keep host, port, and database configurable and act only on a documented trigger (AO-B5, AO-B6) |
+| Sequencing of Plan B | **Front controller first, Lua second** — the proxy's justification rests on a 55 ms miss path that the front controller reduces to roughly 15 ms, so the gate is re-derived afterwards (AO-B7, AO-B8) |
 
 ---
 
@@ -281,7 +299,14 @@ Re-evaluate the topology — without changing it — if sustained XML throughput
    - *Completed on 5.x:* `5.x` series branch created (A-R6) and `CHANGELOG.md` / `INSTALL.md` upgrade notes completed (A-R7).
    - While in Task 6, resolve the recordings base directory via the `MediaStreamController` precedent (A-R9) and add parser fixture tests (A-R11).
    - Add A-R13 to A-R15 to the punch list: choose the CDR durability mechanism (AOF `everysec` or explicit `XLEN` alerting), set `vm.overcommit_memory=1` in the installer, and scope `appliance:sync-host`'s flush instead of calling `flushall()`.
-2. **Plan B v2 — proceed with Tasks 2–7 (Phase 1):**
+2. **Before Plan B Tasks 2–7 — make the PHP miss path fast (AO-B7):**
+   - Profile the boot with `microtime` marks around each bootstrapper and confirm the 60 module providers are the dominant cost (E34). If they are not, stop and re-evaluate before writing code.
+   - Add a fast front controller: new `public/xml-handler.php`, one nginx `location = /api/v1/xml-handler`, roughly four providers registered instead of sixty, and the existing `XmlHandlerController` resolved from the container rather than reimplemented. Timing, throttle, and token middleware still apply.
+   - Keep the tenant-resolution logic in one place. Do not build a raw-PHP path that duplicates it — returning another tenant's SIP credentials is worse than returning a slow answer.
+   - Set `opcache.validate_timestamps=0` and reload PHP-FPM from the updater so deploys still take effect.
+   - Accept only on a byte-equality corpus: directory (`user` and `domain`), dialplan, configuration, and phrases, across single-tenant, shared-domain, and unresolved-tenant requests.
+   - Re-measure the ceiling and re-derive the Task 1 gate before starting Lua (AO-B8).
+3. **Plan B v2 — proceed with Tasks 2–7 (Phase 1):**
    - Task 1 measurement spike completed on the remote 1 vCPU test host with an unequivocal PROCEED decision (app-side p95 $73.9\text{ to }292.4\text{ ms}$, HTTP p95 $1,233\text{ ms}$, directory share $66.7\%$).
    - Execute Tasks 2–4 incorporating the Revision 3.1 hardening:
      - Unprefixed `'lua_proxy'` connection (`'prefix' => ''`) in `config/database.php` (resolves `V2-C1`).
@@ -291,7 +316,7 @@ Re-evaluate the topology — without changing it — if sustained XML throughput
    - In Task 6, deploy `scripts/freeswitch/hiredis.conf.xml` tuned to `max-connections="16"` with password support, and bind `tallpbx_xml_handler.lua`.
    - Run the key parity harness (Task 5) and the end-to-end laboratory gate (Task 7).
    - Keep the mirror in DB 0 of the main instance (AO-B5). Make the `lua_proxy` connection env-driven (`FS_REDIS_HOST` / `FS_REDIS_PORT` / `FS_REDIS_DB`), cap mirrored document size, and flush the mirror keyspace in `run-cache-sweep.sh` before the cold tier (AO-B6).
-3. **Track execution in the SDD ledger** (`.superpowers/sdd/`) once either plan starts, per the project's plan lifecycle convention.
+4. **Track execution in the SDD ledger** (`.superpowers/sdd/`) once either plan starts, per the project's plan lifecycle convention.
 
 ---
 
@@ -320,4 +345,4 @@ Re-evaluate the topology — without changing it — if sustained XML throughput
 | Rename blast radius | `tests/Feature/ModuleAutoloadTest.php`, `tests/Feature/PanelModuleAuthorizationSweepTest.php` |
 | Release history | `CHANGELOG.md` (`4.2.0`, `4.3.0`), `git tag` |
 
-*This report is documentation only. No code, configuration, or data was modified in producing Revision 3.2.*
+*This report is documentation only. No code, configuration, or data was modified in producing Revision 3.3.*
