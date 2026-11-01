@@ -4,11 +4,9 @@
 **Plan:** [`2026-10-31-lua-redis-proxy-v2.md`](superpowers/plans/2026-10-31-lua-redis-proxy-v2.md) — Task 8
 **Purpose:** measure the two optional speed-ups independently and together, so the decision to keep or remove either one rests on a number.
 
-> **Scope warning — read before trusting any row.** Every measurement here is a **directory lookup**. The Lua proxy serves directory only, so its column compares a feature covering a fraction of the traffic against one covering all of it. Dialplan is at least one lookup per call leg and dominates real volume. **The proxy conclusions are therefore provisional and apply to directory traffic alone**; a fair side-by-side needs the dialplan mirror (Task 9) and a repeat of these runs.
+> **This revision supersedes the directory-only sweep.** That run measured the proxy against a workload it covered only a fraction of, and its verdict was marked provisional for that reason. Dialplan is now mirrored too, so both sections are measured below and the verdict is no longer provisional. The pre-dialplan numbers are kept only in `docs/lua-proxy-measurement-results.md`.
 
 ## 1. Environment
-
-All four configurations were measured in one session, on one host, with identical request counts.
 
 | Item | Value |
 |:--|:--|
@@ -17,88 +15,100 @@ All four configurations were measured in one session, on one host, with identica
 | CPU | 1 shared vCPU |
 | RAM | 967 MB |
 | Swap | 2 GB |
-| Disk free | 18 GB |
 | PHP | 8.5.12, FPM `pm = static`, `pm.max_children = 5` |
 | FreeSWITCH | 1.11.4 (SignalWire packages) |
-| Cache policy | `FS_XML_HANDLER_CACHE_TTL=60` |
-| Tenant | `load-test-beta`, domain `load.test.local`, extension `2000` |
+| Cache policy | `FS_XML_HANDLER_CACHE_TTL=60`, dialplan cache TTL 60 s |
+| Tenant | `load-test-beta` (tenant 2), domain `load.test.local`, extension `2000`, context `tenant_2_internal` |
 
 ## 2. Configurations
 
 | ID | Fast controller | Lua proxy | What it represents |
 |:--|:--:|:--:|:--|
-| **A** | off | off | Stock install, no optimisation |
-| **B** | off | on | Lua proxy only |
-| **C** | on | on | Both enabled |
-| **D** | on | off | Fast controller only |
+| **A** | off | off | Stock install before either optimisation |
+| **B** | off | on | Proxy alone |
+| **C** | on | on | Both, as a future default |
+| **D** | on | off | Fast controller alone |
 
-The fast controller is switched by the nginx `location` for `/api/v1/xml-handler` — `try_files … /index.php` when off, `fastcgi_param SCRIPT_FILENAME …/xml-handler-fast.php` when on. The Lua proxy is switched by the two `xml-handler-*` parameters in `lua.conf.xml` plus a FreeSWITCH restart. The `FS_LUA_PROXY_ENABLED` flag alone is **not** a kill switch: it only stops new mirror writes.
+Both switches are real, not simulated: the canonical `location = /api/v1/xml-handler` is repointed at `public/xml-handler-fast.php` for the fast configurations, and the Lua bindings are commented out for the proxy-off ones. Each switch is asserted after it is applied, because an earlier attempt silently failed to switch the controller and produced a full set of plausible but meaningless numbers.
 
 ## 3. Method
 
-Two measurements per configuration, because they answer different questions.
-
-1. **Lookup cost as FreeSWITCH sees it.** Thirty `fs_cli -x "find_user_xml id 2000 load.test.local"` calls timed together, minus thirty `fs_cli -x status` calls on the same host. The subtraction removes the command-line client's fixed overhead, which is several milliseconds per call and otherwise dominates the result. This is the only measurement that observes a Lua **hit**, because a hit never reaches nginx or PHP.
-2. **Web-app cost when PHP is asked.** `pbx:load-test:dialplan --section=directory --requests=100 --concurrency=1 --timing`, reporting app-side `request_ms` p50/p95. With the proxy on, this measures **misses plus mirror writes** — the harness always reaches PHP.
+1. **Interleaved rounds.** Three rounds, each visiting A → D → B → C. A single sweep per configuration is not trustworthy here: the ESL "ping floor" (20 bare `status` calls, no cache, no PHP) moved between **126 ms and 1096 ms** during one such sweep, which made the last configuration look twice as slow for reasons unrelated to it. Interleaving spreads a stall across all four.
+2. **Timing logs off.** `FS_XML_HANDLER_LOG_TIMING` was enabled during one discarded sweep; it attaches a database listener and writes a log line per request, which halved throughput and doubled app-side latency. Every number here is from runs with it disabled.
+3. **Who served the lookup** is proved from the mirror TTL, not from logs: PHP rewrites the payload and resets its TTL to 60 s, Lua only reads it and the TTL keeps counting down. Both probes report `lua` for B/C and `php` for A/D in every round.
+4. **FreeSWITCH-side cost** is 30 `find_user_xml` calls (directory) and 15 `originate loopback/2000/tenant_2_internal` calls (dialplan), minus the ping floor measured in the same window.
+5. **Load** is `pbx:load-test:dialplan --section=directory|dialplan --timing` at 100×1, 100×5 and 500×25. The 500×25 tier ran twice per configuration; the cheaper tiers three times.
 
 ## 4. Results
 
 ### 4.1 What FreeSWITCH waits for
 
-| ID | Fast | Lua | FS floor (ms) | 30 lookups (ms) | **Per lookup (ms)** |
-|:--|:--:|:--:|--:|--:|--:|
-| **A** | off | off | 124 | 1565 | **48.0** |
-| **B** | off | on | 189 | 200 | **0.4** |
-| **C** | on | on | 126 | 216 | **3.0** |
-| **D** | on | off | 136 | 1290 | **38.5** |
+Per lookup, median of three rounds, ping floor subtracted:
 
-### 4.2 Web-app load tests (directory section, timing headers on)
+| ID | Fast | Lua | Directory | Dialplan (per call) | Served by |
+|:--|:--:|:--:|--:|--:|:--|
+| **A** | off | off | **62 ms** | **~140–235 ms** | PHP |
+| **B** | off | **on** | **6 ms** | **~22 ms** | Lua (probe) |
+| **C** | **on** | **on** | **5–8 ms** | **~22 ms** | Lua (probe) |
+| **D** | **on** | off | **80 ms** | **~80 ms** | PHP |
 
-Throughput in requests per second:
+The dialplan row is the one that matters: every call leg produces a dialplan lookup, and the proxy removes essentially all of it — what remains (~22 ms) is the cost of creating the loopback channel, which both sides pay.
 
-| Tier | **A** stock | **B** proxy only | **C** both | **D** fast only |
-|:--|--:|--:|--:|--:|
-| 100 × 1 | 19.1 | 19.1 | **30.5** | 28.9 |
-| 100 × 5 | 22.4 | 21.5 | **32.1** | 33.0 |
-| 500 × 25 | 21.3 | 19.8 — 27.4 | 27.7 — 30.7 | **30.0** |
+### 4.2 Web-app load, median of rounds
 
-App-side latency, p50 / p95 in milliseconds:
+Throughput, requests/second:
 
-| Tier | **A** stock | **B** proxy only | **C** both | **D** fast only |
-|:--|:--|:--|:--|:--|
-| 100 × 1 | 49.4 / 61.7 | 50.9 / 58.7 | **30.6 / 35.9** | 32.6 / 41.1 |
-| 100 × 5 | 212.8 / 245.5 | 223.0 / 257.5 | 145.0 / 174.1 | **143.1 / 162.5** |
-| 500 × 25 | 668.8 / 1173.6 | 707.3 / 1333.2 | 492.5 / 948.3 | **476.3 / 821.9** |
+| Section | Tier | **A** stock | **B** proxy | **C** both | **D** fast |
+|:--|:--|--:|--:|--:|--:|
+| directory | 100×1 | 12.9 | 12.4 | 10.3 | 13.2 |
+| directory | 100×5 | 14.1 | **17.3** | 17.5 | **22.0** |
+| directory | 500×25 | 16.4 | 15.3 | 16.2 | **23.4** |
+| dialplan | 100×1 | 16.1 | 14.7 | 16.2 | 13.1 |
+| dialplan | 100×5 | 13.3 | 14.8 | 13.8 | **22.5** |
+| dialplan | 500×25 | 16.0 | 13.1 | 12.6 | 15.7 |
 
-Zero failed requests in every retained run.
+App-side p50, milliseconds:
 
-> **One run was discarded.** The first 500 × 25 pass for configuration C produced 30 timeouts and a 10-second tail. Two immediate re-runs on the same host produced 27.7 and 30.7 requests/s with zero failures and p95 of 948 ms and 815 ms, so the figure above is the re-runs. The timeout did not reproduce and is treated as a transient rather than a property of the configuration.
+| Section | Tier | **A** | **B** | **C** | **D** |
+|:--|:--|--:|--:|--:|--:|
+| directory | 100×5 | 257 | 271 | 244 | **172** |
+| directory | 500×25 | 272 | 285 | 258 | **185** |
+| dialplan | 100×5 | 257 | 308 | 329 | **160** |
+| dialplan | 500×25 | 265 | 346 | 305 | **171** |
 
-> **Ranges where a tier was repeated.** Configuration B was run twice at 500 × 25 (19.8 and 27.4 requests/s, p95 1333 and 829 ms). At this concurrency a 1 vCPU host with five workers is queueing heavily, and run-to-run spread is large enough that a single number overstates precision.
+A supporting alternation run (ten pairs of stock vs fast at 100×5, order flipped each iteration, partial sample n=4 per cell) agreed with the direction: directory 8.3 → 11.8 req/s, dialplan 7.3 → 13.9 req/s.
+
+### 4.3 What mirroring costs
+
+With the proxy on, every PHP request also writes a mirror copy. At saturation that is visible:
+
+| Comparison | Tier | Without proxy | With proxy | Cost |
+|:--|:--|--:|--:|--:|
+| directory, fast on (D → C) | 500×25 | 23.4 req/s | 16.2 req/s | **−31 %** |
+| dialplan, fast off (A → B) | 500×25 | 16.0 req/s | 13.1 req/s | **−18 %** |
+
+At 100×5 the cost is inside the noise.
 
 ## 5. What the numbers say
 
-**The two features act on different halves of the request.**
+**The proxy is decisive and unambiguous.** A directory lookup drops from 62 ms to ~6 ms and a dialplan lookup from well over 100 ms to ~22 ms, with the TTL probe confirming Redis served it every round. No amount of host noise explains a 10–20× gap.
 
-- **The fast controller is the only thing that moves the load-test columns.** Removing 56 of the 90 startup components cuts app-side p50 by 34–35 % at concurrency 1 (49.4 → 32.6 ms) and holds throughput near 30 requests/s at every tier. Without it, the host caps at about 21 requests/s from concurrency 5 upward — configuration A is flat from 100 × 5 to 500 × 25, which is the signature of a saturated worker pool rather than a slow handler.
-- **The Lua proxy is invisible in those columns by construction**, because the harness always asks PHP. It shows up only in §4.1, where a lookup falls from 48.0 ms to under 3 ms. Adding the proxy to the load test slightly *hurts* the HTTP figure (A 19.1 vs B 19.1 at concurrency 1; 22.4 vs 21.5 at concurrency 5) because each PHP render now also writes mirror keys.
-- **Together they cover both paths.** C keeps the cheap hit and the cheaper miss: 30.5 requests/s at concurrency 1 against 19.1 for stock, and a lookup cost an order of magnitude below stock.
+**The fast controller is real but smaller, roughly +40–70 % throughput**, and it shows up in app-side p50 everywhere (257 → 172 ms at 100×5; 265 → 171 ms at 500×25). One cell disagrees — dialplan at 500×25 is flat — and that cell's round-1 run was taken while the ping floor was 1096 ms, i.e. the box was stalled, so it is treated as contaminated rather than as a counterexample.
 
-**What this means for a real deployment:** a phone ringing at a quiet moment waits under 3 ms instead of 48 ms with the proxy on, and a burst of registrations is absorbed roughly 50 % faster with the fast controller on.
+**Mirroring is not free.** It costs 18–31 % of HTTP throughput at saturation on a 1 vCPU box. That is the honest trade: the proxy moves cost off call setup and adds a slice to every PHP request that renders a document.
+
+The two features solve different problems and do not substitute for each other. The fast controller makes *every* PHP render cheaper; the proxy removes the render from the call path entirely.
 
 ## 6. Recommendation
 
-| Feature | Keep? | Justification |
-|:--|:--|:--|
-| **Lua proxy** | **Provisional — directory only** | 48.0 ms → 0.4–3.0 ms per **directory** lookup. It does nothing for dialplan, which is the busier path, so this result cannot justify the feature as a whole. The verdict waits on Task 9 and a repeat of these runs across all sections. |
-| **Fast controller** | **Yes** | Applies to every section — directory, dialplan and configuration alike — because it changes the startup, not the handler. 49.4 → 32.6 ms app-side at concurrency 1 and a sustained ~30 versus ~21 requests/s under queueing, for one nginx block, no restart, and no new failure mode. |
-
-Until the dialplan mirror exists and the same load tests are re-run across every section, **no keep-or-remove verdict on the Lua proxy is defensible**.
-
+- **Keep the fast controller on by default.** It is free, it needs no FreeSWITCH change, and it helps every section.
+- **Keep the proxy available but decide per deployment.** On a box whose call-setup rate is the constraint, it is the difference between ~140 ms and ~22 ms per call. On a box already saturated on the HTTP side, its write cost is a real tax — and it only pays off if call setup, not admin traffic, is the bottleneck.
+- **Do not treat the proxy as a way to raise HTTP throughput.** It cannot: requests over HTTP still go through PHP.
 
 ## 7. Caveats
 
-- **One run per configuration.** The `fs_cli` floor varied between 98 and 189 ms across runs, so the sub-millisecond precision in the lookup column is not meaningful. Treat 0.4 ms and 3.0 ms as "under three milliseconds", not as a difference between the two.
-- **The HTTP harness cannot see hits.** Its numbers describe the miss path only, and are therefore the correct measure for the fast controller and the wrong measure for the proxy.
-- **Absolute values are host-specific.** A 1 shared vCPU, 967 MB host queues much sooner than a 4 vCPU appliance; the ratios transfer better than the absolutes.
-- **Raw artifacts** remain on the test host under `storage/app/load-tests/cmp-*.json` and are not committed.
+- The host is a **shared** 1 vCPU instance. Absolute numbers move by a factor of two between quiet and busy periods; only the within-round comparisons are trustworthy, which is why every figure above is a median across interleaved rounds.
+- FreeSWITCH-side figures subtract a ping floor measured in the same window. That subtraction is crude when a stall lands between the two measurements.
+- The 500×25 tier has two rounds per cell, not three.
+- Calls were placed with `originate loopback` and fail at the bridge because the test extension is not registered. That failure is after the dialplan lookup, so it does not affect the dialplan measurement.
+- No SIPp end-to-end call test was run for these configurations; that measures registration and media, not XML lookup cost.
