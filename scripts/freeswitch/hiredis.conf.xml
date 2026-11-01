@@ -1,0 +1,33 @@
+<configuration name="hiredis.conf" description="mod_hiredis">
+  <profiles>
+    <profile name="default">
+      <connections>
+        <connection name="primary">
+          <!--
+              The optional Lua directory cache performs three sequential GETs
+              per lookup. Keep this endpoint pointed at the same Redis instance
+              and database (DB 0) that Laravel mirrors into; FS_REDIS_HOST,
+              FS_REDIS_PORT, and FS_REDIS_DB move the Laravel side only, so a
+              split deployment must update this file as well.
+          -->
+          <param name="hostname" value="127.0.0.1"/>
+          <param name="port" value="6379"/>
+          <param name="timeout_ms" value="500"/>
+          <!-- 16 connections so a registration burst cannot starve lookups. -->
+          <param name="max-connections" value="16"/>
+          <!--
+              Required when the local redis-server sets a password
+              (REDIS_PASSWORD in /var/www/tallpbx/.env). Without it every
+              lookup receives -NOAUTH and falls through to mod_xml_curl.
+          -->
+          <!-- <param name="password" value="CHANGE_ME"/> -->
+        </connection>
+      </connections>
+      <params>
+        <param name="ignore-connect-fail" value="true"/>
+        <param name="ignore-error" value="true"/>
+        <param name="delete-when-zero" value="true"/>
+      </params>
+    </profile>
+  </profiles>
+</configuration>

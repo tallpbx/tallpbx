@@ -468,6 +468,69 @@ If editing configuration files by hand:
    fs_cli -x "reloadxml"
    ```
 
+## Optional Lua Directory Cache (Phase 1)
+
+TallPBX can answer FreeSWITCH directory lookups from Redis inside FreeSWITCH itself, before `mod_xml_curl` reaches PHP. Laravel mirrors every rendered directory document into Redis DB 0 under the `pbx:fsxml` namespace, and a `mod_lua` search binding reads it with at most three `GET`s. The feature is **off by default** and is limited to directory lookups; dialplan and configuration lookups always use `mod_xml_curl`.
+
+Nothing calls this path when the bindings are absent, so a stock install behaves exactly as before.
+
+### What Mirrors What
+
+| Key | Contents | Lifetime |
+|:--|:--|:--|
+| `pbx:fsxml:tenant:user:<domain>:<user>` | The tenant ID PHP resolved for that identity | Directory cache TTL (60 s default) |
+| `pbx:fsxml:ver:<tenantId>` | Current routing revision for the tenant | Until overwritten |
+| `pbx:fsxml:dir:<tenantId>:<tag>:<domain>:<user>:v<version>` | The rendered directory document | Directory cache TTL (60 s default) |
+
+The revision is part of every payload key, so any panel change that bumps the tenant revision makes the next Lua lookup miss, fall through to `mod_xml_curl`, and re-warm the mirror with fresh credentials.
+
+### Enabling the Lab Proxy
+
+1. Copy the versioned templates into FreeSWITCH:
+   ```bash
+   sudo install -d -o freeswitch -g tallpbx-media -m 755 /etc/freeswitch/scripts
+   sudo install -o freeswitch -g tallpbx-media -m 644 scripts/freeswitch/tallpbx_xml_handler.lua /etc/freeswitch/scripts/
+   sudo install -o freeswitch -g tallpbx-media -m 644 scripts/freeswitch/lua.conf.xml /etc/freeswitch/autoload_configs/lua.conf.xml
+   sudo install -o freeswitch -g tallpbx-media -m 644 scripts/freeswitch/hiredis.conf.xml /etc/freeswitch/autoload_configs/hiredis.conf.xml
+   ```
+2. In `/etc/freeswitch/autoload_configs/modules.conf.xml`, move `<load module="mod_lua"/>` **above** `<load module="mod_xml_curl"/>` and leave every other module in place. FreeSWITCH appends XML search bindings and tries them in load order, so the earlier module is asked first — with the stock order the Lua handler is never consulted.
+3. If Redis requires a password (`REDIS_PASSWORD` in `/var/www/tallpbx/.env`), uncomment the `password` parameter in `hiredis.conf.xml` and set the same value.
+4. Set `FS_LUA_PROXY_ENABLED=true` in `/var/www/tallpbx/.env`, then run `tpbx optimize:clear`.
+5. Restart FreeSWITCH in a maintenance window: `sudo systemctl restart freeswitch`.
+
+### Verifying
+
+```bash
+# The Lua handler must be able to reach Redis.
+fs_cli -x "hiredis_raw default PING"        # expect +PONG (shown as PONG)
+
+# Warm one lookup, then confirm the mirror keys exist in DB 0.
+fs_cli -x "find_user_xml id <extension> <domain>"
+redis-cli -n 0 GET pbx:fsxml:tenant:user:<domain>:<extension>
+redis-cli -n 0 GET pbx:fsxml:ver:<tenantId>
+
+# A second lookup for the same identity must not add an /api/v1/xml-handler
+# request to the nginx access log.
+```
+
+### Rollback: Lua XML Cache Proxy
+
+Removing the bindings is the kill-switch. Setting `FS_LUA_PROXY_ENABLED=false` only stops new mirror writes; FreeSWITCH keeps reading whatever is still in Redis until the TTL expires, so it is not a rollback by itself.
+
+1. Comment out `xml-handler-script` and `xml-handler-bindings` in `/etc/freeswitch/autoload_configs/lua.conf.xml`.
+2. Restart FreeSWITCH: `sudo systemctl restart freeswitch`.
+3. Confirm directory lookups work through PHP again:
+   ```bash
+   fs_cli -x "find_user_xml id <extension> <domain>"
+   tail -f /var/www/tallpbx/storage/logs/laravel.log   # new xml-handler requests appear
+   ```
+4. Optionally delete the mirror keys; they expire on their own within the directory cache TTL:
+   ```bash
+   redis-cli -n 0 --scan --pattern 'pbx:fsxml:dir:*' | xargs -r redis-cli -n 0 DEL
+   ```
+
+No database migration, `.env` rollback, or PHP change is required — the mirror is additive storage and the PHP path is unchanged.
+
 ## TLS Certificate Management & HTTPS/WSS Lifecycle
 
 TallPBX provides a unified, UI-driven Certificate Manager under the main navigation (**HTTPS & TLS Certificates**, route `/panel/certificates`), allowing administrators to issue, import, generate, and deploy SSL/TLS certificates without CLI commands.
