@@ -1,11 +1,11 @@
 # Implementation Plan Review — CDR Modernization vs. Lua Redis Proxy
 
-**Revision:** 3.0 (re-evaluation of Plan B v2 against live 1 vCPU datacenter measurements; all Plan B blockers resolved)
+**Revision:** 3.1 (re-evaluation of Plan B v2 with live runtime verification; resolution of connection prefix, directory lookup shape, and cold-start version seeding; marked A-R6/A-R7 completed on 5.x)
 **Date:** 2026-11-01
 **Branch reviewed:** `5.x`
-**Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents, combined with live measurement report analysis (`docs/lua-proxy-measurement-results.md`).
+**Method:** Static review of both plans against the live codebase, the installed FreeSWITCH modules and configuration, `composer.json`, `.env`, `config/cache.php`, the CHANGELOG, and the project's benchmark documents, combined with live measurement report analysis (`docs/lua-proxy-measurement-results.md`) and runtime inspection of the Laravel Redis connection manager and FreeSWITCH 1.11.4 `find_user_xml`.
 
-> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluates `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`.
+> **Revision history:** Revision 1 reviewed the original drafts of both plans. Revision 2.1 evaluated the initial version-aware rewrites. Revision 3.0 evaluated `2026-10-31-lua-redis-proxy-v2.md` against empirical data from the 1 shared vCPU / 1 GB RAM measurement spike (`docs/lua-proxy-measurement-results.md`), certifying the resolution of prior Critical blockers `B-R1` and `B-R2`. Revision 3.1 records the resolution of four runtime blockers discovered during live protocol inspection (`V2-C1` unprefixed `lua_proxy` Redis connection, `V2-C2` dual-mode `domain`/`user` tag lookup support, `V2-H1` cold-start version key seeding in `DirectoryXmlBuilder`, and `V2-M1` cache-flush monotonic increment in `RoutingCacheVersion`), and marks `A-R6`/`A-R7` completed on `5.x`.
 
 ## Plans Under Review
 
@@ -18,10 +18,14 @@
 
 ## Executive Summary
 
-1. **Plan A remains executable after its short operational punch list.** The rewrite resolved the data-integrity cluster (explicit UUID generation, transaction-bound `XDEL`, idempotent `upsert`, quarantine on disk, worker supervision). Remaining items are operational (token provisioning, scheduler sandbox, throttle sizing, legacy migration cleanup).
-2. **Plan B v2 is now fully unblocked, validated by empirical data, and approved for execution.** The v2 rewrite adopted the recommended DB 0 additive mirror namespace (`pbx:fsxml:*`), completely eliminating the two previous Critical platform blockers (`B-R1` DB 1 reachability and `B-R2` cache prefix mismatch). Task 1 was executed on a clean DigitalOcean 1 shared vCPU / 1 GB RAM datacenter host (`docs/lua-proxy-measurement-results.md`) and recorded an unequivocal **PROCEED** decision: directory `request_ms` p95 reached 73.9–292.4 ms (exceeding the 10 ms threshold), HTTP p95 at concurrency 25 reached 1,233 ms (confirming worker queue saturation), and directory lookups accounted for 66.7% of all XML traffic.
-3. **Task 6 Amendments Applied:** Two operational risks identified during re-evaluation (`mod_hiredis` connection starvation at `max-connections=3` and unauthenticated Redis when `REDIS_PASSWORD` is set) have been resolved by adding `scripts/freeswitch/hiredis.conf.xml` (tuned to 16 connections with password support) to Task 6, and enforcing `pbx:fsxml` as an immutable constant.
-4. **Recommended sequence:** Plan B v2 is ready for execution starting at Task 2; execute Plan B v2 Phase 1 or Plan A according to project priorities.
+1. **Plan A remains executable after its short operational punch list.** The rewrite resolved the data-integrity cluster (explicit UUID generation, transaction-bound `XDEL`, idempotent `upsert`, quarantine on disk, worker supervision). Branching and upgrade documentation (`A-R6`, `A-R7`) have been completed on the `5.x` series branch. Remaining items are operational (token provisioning, scheduler sandbox, throttle sizing, legacy migration cleanup).
+2. **Plan B v2 is now fully unblocked, validated by empirical data, hardened against live runtime edge cases, and approved for execution.** The v2 rewrite adopted the recommended DB 0 additive mirror namespace (`pbx:fsxml:*`), completely eliminating the two previous Critical platform blockers (`B-R1` DB 1 reachability and `B-R2` cache prefix mismatch). Task 1 was executed on a clean DigitalOcean 1 shared vCPU / 1 GB RAM datacenter host (`docs/lua-proxy-measurement-results.md`) and recorded an unequivocal **PROCEED** decision: directory `request_ms` p95 reached 73.9–292.4 ms (exceeding the 10 ms threshold), HTTP p95 at concurrency 25 reached 1,233 ms (confirming worker queue saturation), and directory lookups accounted for 66.7% of all XML traffic.
+3. **Runtime Hardening Applied (Revision 3.1):** Live inspection of Laravel's Redis manager and FreeSWITCH 1.11.4's XML search runtime identified and resolved four critical execution blockers:
+   - `V2-C1`: Laravel's default Redis prefix (`tallpbx-database-`) bypassed by adding a dedicated unprefixed `'lua_proxy'` connection (`'prefix' => ''`).
+   - `V2-C2`: FreeSWITCH's native `switch_xml_locate_user()` shape (`tag_name="domain"`) and synthetic benchmark shape (`tag_name="user"`) both supported in mirror writer and Lua handler.
+   - `V2-H1`: `DirectoryXmlBuilder` seeds `pbx:fsxml:ver:{tenantId}` on initial warm-up, preventing 100% cold-start misses.
+   - `V2-M1`: `RoutingCacheVersion::bump()` reads DB 0's mirror version to ensure monotonic increments even after cache flush (`tpbx optimize:clear`).
+4. **Recommended sequence:** Plan B v2 is fully ready for execution starting at Task 2; execute Plan B v2 Phase 1 or Plan A according to project priorities.
 
 ---
 
@@ -29,7 +33,7 @@
 
 | # | Fact | Evidence |
 |:--|:-----|:---------|
-| E1 | Branch is `4.x`; latest tag `v4.3.0` (2026-10-31). The `xml-cdr` module, `xml_cdr` table, and `xml-cdr.*` permissions are shipped in the 4.x series | `git branch --show-current`, `git tag`, `CHANGELOG.md` |
+| E1 | Branch is `5.x` (active development series; tracking `origin/5.x`); previous tag `v4.3.0` (2026-10-31). The `xml-cdr` module, `xml_cdr` table, and `xml-cdr.*` permissions are shipped in the 4.x series; 5.x introduces breaking modernization requiring fresh install | `git branch --show-current`, `git tag`, `CHANGELOG.md` |
 | E2 | Laravel `^13.8` / PHP `^8.5` | `composer.json` |
 | E3 | `app-modules/xml-cdr/` contains model (`xml_cdr` table, `HasUuids`, `BelongsToTenant`), Livewire list/detail, services, factory, migration, routes, 2 tests | module tree |
 | E4 | Route names already `panel.cdr.index` / `panel.cdr.detail`; permission prefix `xml-cdr.*`; provider documents that a mismatched prefix disables action authorization | `app-modules/xml-cdr/routes/web.php`, `src/Providers/ModuleServiceProvider.php` |
@@ -68,7 +72,7 @@ Severity scale: **Critical** (breaks data, security, or the shipped series contr
 | Prior ID | Finding | Status in current revision |
 |:---------|:--------|:---------------------------|
 | A-C1 | `migrate:fresh` destroys the database | **Fixed** — now `tpbx migrate` (Task 1, Step 5) |
-| A-C2 | Breaking 4.x rename with no migration path | **Mostly fixed** — explicitly reframed as a 5.x breaking clean break; `module:sync --only-local` + `AdminSeeder` added; permission set renamed to `cdr.*`. Residual: no branch step, no changelog, legacy migration not removed (A-R5, A-R6, A-R7) |
+| A-C2 | Breaking 4.x rename with no migration path | **Fixed** — explicitly reframed as a 5.x breaking clean break requiring fresh install; `5.x` series branch created; `module:sync --only-local` + `AdminSeeder` added; permission set renamed to `cdr.*`. Remaining punch list: legacy migration removal (A-R5) |
 | A-C3 | Bulk insert breaks UUID primaries | **Fixed** — `Str::orderedUuid()` assigned per row (Review Focus #1, parser contract) |
 | A-C4 | No transaction; silent drops; duplicate window | **Fixed** — `DB::transaction` around `upsert`, `XDEL` only after commit, malformed payloads quarantined to disk, idempotency via unique `(call_uuid, leg)` |
 | A-C5 | Unauthenticated ingestion endpoint | **Partially fixed** — `hash_equals`, fail-closed, Basic auth, `throttle:1200,1`. Residual: token provisioning trio is contradictory and ships a public secret (A-R1); throttle too low for reference CPS (A-R3) |
@@ -95,11 +99,11 @@ Documented ceiling is 15–20 calls/sec on 4 vCPU; two legs per call means 1,800
 **A-R5 (Moderate) — Legacy migration is never removed.**
 The Files list only creates the new `cdrs` migration. The old `2026_07_06_000012_create_xml_cdr_table.php` travels with the directory `mv`, so fresh 5.x installs create both `xml_cdr` and `cdrs`. Add an explicit removal step and verify registry ghost-row pruning after `module:sync`.
 
-**A-R6 (Moderate) — "5.x Series" has no branch step.**
-The active branch is `4.x`. The plan declares a 5.x breaking release but never creates the `5.x` branch or states where the commits land. Under the project's branching policy this step is mandatory before Task 1.
+**A-R6 (Resolved on 5.x) — "5.x Series" branch step completed.**
+The `5.x` series branch has been created, designated as the active development branch, and published to `origin/5.x` (`git branch --show-current` returns `5.x`).
 
-**A-R7 (Moderate) — No changelog or upgrade documentation task.**
-AGENTS.md mandates `CHANGELOG.md` entries for features and explicit upgrade notes for breaking changes (migrations, new apt packages, FreeSWITCH reloads, `.env` additions such as `REDIS_CDR_DB` and `FREESWITCH_CDR_TOKEN`). No task touches `CHANGELOG.md` or `INSTALL.md`.
+**A-R7 (Resolved on 5.x) — Changelog and upgrade documentation completed.**
+`CHANGELOG.md`, `INSTALL.md`, `README.md`, and `AGENTS.md` have been updated with explicit notices that the 5.x major series release represents a breaking modernization requiring a fresh install with no in-place migrations from 4.x.
 
 **A-R8 (Moderate) — Basic auth depends on nginx forwarding `Authorization`.**
 The controller verifies Basic credentials, but PHP-FPM only receives `HTTP_AUTHORIZATION` when nginx passes it. The existing xml-handler's `?token=` fallback suggests this area has bitten before. Add an explicit verification step against the installed nginx configuration.
@@ -132,20 +136,31 @@ The architecture is sound and the previously reported integrity chain is closed.
 |:---------|:--------|:------------------|:--------------------|
 | B-C1 | Static keys conflict with `RoutingCacheVersion` | **Fixed** | Version embedded in payload key (`:v{version}`); `RoutingCacheVersion::bump()` updates `pbx:fsxml:ver:{id}`. |
 | B-C2 | Redis DB/auth mismatch | **Fixed** | Mirror moved to DB 0 via `connection: 'default'`; Task 6 tunes `hiredis.conf.xml` with 16 connections and password support. |
-| B-C3 | Key derivation parity with PHP | **Fixed** | Directory-only scope; shared domains keyed by `(domain, user)` from resolved PHP identity; JSON fixture parity harness in Task 5. |
+| B-C3 | Key derivation parity with PHP | **Fixed** | Directory-only scope supporting both native FreeSWITCH `domain` lookups (`tag_name=domain`, `key_value=domain`) and synthetic `user` lookups (`tag_name=user`, `key_value=user`); shared domains keyed by `(domain, user)` from resolved PHP identity; JSON fixture parity harness in Task 5 (`V2-C2`). |
 | B-C4 | Wrong performance baseline | **Fixed** | Validated against 74–292 ms app-side p95 measured on remote 1 vCPU host; <1 ms hit gate. |
 | B-M1 | `luac` version caveat | **Fixed** | Shell harness detects installed Lua interpreter dynamically (`lua`, `lua5.4`, `luajit`). |
 | B-M2 | Host config source of truth | **Fixed** | `scripts/freeswitch/lua.conf.xml` and `hiredis.conf.xml` versioned as sources of truth. |
 | B-M3 | hiredis concurrency headroom | **Fixed** | Task 6 tunes `hiredis.conf.xml` to `max-connections="16"`. |
-| **B-R1** | **DB 1 unreachable from `mod_hiredis`** | **RESOLVED** | Uses DB 0 raw mirror namespace via `Redis::connection('default')`. |
-| **B-R2** | **Cache key prefix (`tallpbx-cache-`) mismatch** | **RESOLVED** | Bypasses `Cache` facade; writes raw unprefixed keys directly. |
-| **B-R3** | **Shared domain directory leakage** | **RESOLVED** | Keyed by `(domain, user)` only after PHP resolves identity and `$keyValue === $username`. |
+| **B-R1** | **DB 1 unreachable from `mod_hiredis`** | **RESOLVED** | Uses DB 0 raw mirror namespace via `Redis::connection('lua_proxy')`. |
+| **B-R2** | **Cache key prefix (`tallpbx-cache-` & `tallpbx-database-`) mismatch** | **RESOLVED** | Bypasses `Cache` facade AND configures dedicated `'lua_proxy'` connection with explicit `'prefix' => ''` to eliminate phpredis's default `tallpbx-database-` prefix (`V2-C1`). |
+| **B-R3** | **Shared domain directory leakage** | **RESOLVED** | Keyed by `(domain, user)` only after PHP resolves identity and matching tag scope. |
 | **B-R4** | **Dialplan key format conflict** | **RESOLVED** | Dialplan caching de-scoped from Phase 1. |
-| **B-R5** | **`TenantRedisResolver` connection unstated** | **RESOLVED** | Resolver eliminated; replaced by `FsXmlMirrorWriter` using explicit connection. |
+| **B-R5** | **`TenantRedisResolver` connection unstated** | **RESOLVED** | Resolver eliminated; replaced by `FsXmlMirrorWriter` using explicit `'lua_proxy'` connection. |
 | **B-R6** | **Dialplan tenant resolution failure** | **RESOLVED** | Dialplan caching de-scoped from Phase 1. |
 | **B-R7** | **Unvalidated command concatenation** | **RESOLVED** | Lua validates strict charset `^[%w%.%-_]+$` before query. |
 | **B-R8** | **Coarse builder keys** | **RESOLVED** | Directory builder retains existing SHA-1 keys in `remember()`; mirror write is purely additive. |
 | **B-R9** | **Maintenance window / dead specs** | **RESOLVED** | Maintenance window documented; dead Sofia specs and phantom commands purged. |
+
+### Runtime Verification Findings & Plan B v2 Hardening (Revision 3.1)
+
+Live inspection of the running Laravel Redis connection manager and FreeSWITCH 1.11.4 `find_user_xml` identified four runtime blockers that would have resulted in 100% cache misses or stale data. All four have been resolved in the amended v2 plan:
+
+| Finding ID | Severity | Description | Status | Verification & Resolution Detail |
+|:---|:---|:---|:---|:---|
+| **V2-C1** | **Critical** | `Redis::connection('default')` retains global prefix `tallpbx-database-`, causing 100% Lua miss | **Fixed** | `config/database.php#L152` sets default option `'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME')).'-database-')`. Bypassing the `Cache` facade removed `tallpbx-cache-`, but `phpredis` still prepended `tallpbx-database-` to all keys on `'default'`. Resolved in Task 2 by adding dedicated connection `'lua_proxy'` with `'database' => env('REDIS_DB', '0')` and explicit `'prefix' => ''`. Asserted `getOption(\Redis::OPT_PREFIX) === null` in `FsXmlMirrorWriterTest`. |
+| **V2-C2** | **Critical** | FreeSWITCH `switch_xml_locate_user()` sends `tag_name="domain"` and `key_value="<domain>"`, failing the v2 plan's `tag_name == "user"` guard | **Fixed** | FreeSWITCH directory lookups send `tag_name="domain"`, `key_value="<domain>"`, and username in params (`user` or `sip_auth_username`), and require the `<domain name="...">` XML wrapper emitted by `DirectoryXmlBuilder.php#L61-L103`. The v2 plan's `tag_name == "user"` guard only matched synthetic benchmark commands. Resolved in Tasks 2, 4, and 5 by supporting both `domain` and `user` tag lookups in `shouldMirror()`, Lua script, and embedding `{tagName}` in the directory key (`pbx:fsxml:dir:{tenantId}:{tagName}:{domain}:{user}:v{version}`). |
+| **V2-H1** | **High** | Version key `pbx:fsxml:ver:{tenantId}` unseeded on cold start, causing Lua to miss all lookups until an administrative save/bump | **Fixed** | On fresh installs or cold boots, `RoutingCacheVersion::get($tenantId)` returns 0, but no key was written to DB 0 until `RoutingCacheVersion::bump()` ran. Resolved in Task 4 by adding `writeVersion($tenantIdInt, $version)` inside `DirectoryXmlBuilder::buildCachedDirectoryXml()` during initial mirror warming so the version key is populated on the first lookup. |
+| **V2-M1** | **Moderate** | Cache clear (`tpbx optimize:clear`) flushes DB 1, which could cause version reset while DB 0 mirror keys persist | **Fixed** | `tpbx optimize:clear` flushes DB 1, resetting `RoutingCacheVersion` to 0. A subsequent bump could set version to 1 while pre-existing `:v1` mirror keys remain in DB 0. Resolved in Task 3 by checking if DB 1 key is missing and seeding from `max(storeVer, mirrorVer) + 1` to guarantee monotonic progression across cache flushes. |
 
 ### Assessment
 
@@ -215,16 +230,20 @@ Where I disagree:
 
 ## Recommendations
 
-1. **Plan A — apply the punch list before Task 1:**
+1. **Plan A — apply the remaining punch list before Task 1:**
    - Installer-generated token; no literal defaults in `config/freeswitch.php`, `.env.example`, or the FreeSWITCH template (A-R1).
    - Add `/var/log/freeswitch/json_cdr` to the scheduler unit's `ReadWritePaths` (A-R2).
    - Raise or externalize the ingestion throttle (A-R3).
    - Update `ModuleAutoloadTest` and remove the legacy migration (A-R4, A-R5).
-   - Create the `5.x` branch and add `CHANGELOG.md` / upgrade notes tasks (A-R6, A-R7).
+   - *Completed on 5.x:* `5.x` series branch created (A-R6) and `CHANGELOG.md` / `INSTALL.md` upgrade notes completed (A-R7).
    - While in Task 6, resolve the recordings base directory via the `MediaStreamController` precedent (A-R9) and add parser fixture tests (A-R11).
 2. **Plan B v2 — proceed with Tasks 2–7 (Phase 1):**
    - Task 1 measurement spike completed on the remote 1 vCPU test host with an unequivocal PROCEED decision (app-side p95 $73.9\text{ to }292.4\text{ ms}$, HTTP p95 $1,233\text{ ms}$, directory share $66.7\%$).
-   - Implement the additive DB 0 mirror writer (`FsXmlMirrorWriter`) and version mirroring (Tasks 2–4).
+   - Execute Tasks 2–4 incorporating the Revision 3.1 hardening:
+     - Unprefixed `'lua_proxy'` connection (`'prefix' => ''`) in `config/database.php` (resolves `V2-C1`).
+     - Dual-mode `domain` and `user` tag lookup support in `shouldMirror()`, Lua script, and `{tagName}` key builder (resolves `V2-C2`).
+     - Version key seeding on initial warm-up in `DirectoryXmlBuilder` (resolves `V2-H1`).
+     - Monotonic version progression across cache flushes in `RoutingCacheVersion::bump()` (resolves `V2-M1`).
    - In Task 6, deploy `scripts/freeswitch/hiredis.conf.xml` tuned to `max-connections="16"` with password support, and bind `tallpbx_xml_handler.lua`.
    - Run the key parity harness (Task 5) and the end-to-end laboratory gate (Task 7).
 3. **Track execution in the SDD ledger** (`.superpowers/sdd/`) once either plan starts, per the project's plan lifecycle convention.

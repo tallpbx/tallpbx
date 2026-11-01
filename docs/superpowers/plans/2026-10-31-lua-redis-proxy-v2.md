@@ -4,22 +4,22 @@
 
 **Goal:** Add an optional, default-off in-process Lua directory-XML cache in FreeSWITCH that serves Laravel-rendered directory XML from Redis in under 1 ms on cache hits, with automatic version-based invalidation, fail-to-miss fallback to `mod_xml_curl`, and a one-step rollback — and only after a measurement spike proves the economics.
 
-**Architecture:** A strictly additive mirror layer. Laravel keeps its existing versioned cache untouched and additionally writes raw, unprefixed keys (`pbx:fsxml:*`) into Redis DB 0 via `Redis::connection('default')`, bypassing the `Cache` facade so neither the `tallpbx-cache-` prefix nor Redis DB 1 selection matters. `RoutingCacheVersion::bump()` mirrors the new revision so the version is embedded in every payload key; a version change therefore makes the next Lua lookup miss and fall through to `mod_xml_curl`, which rebuilds and re-warms the mirror. The Lua script performs at most three `GET`s (tenant map → version → payload), contains no XML logic, and returns `nil` on any doubt. Phase 1 covers directory lookups only; dialplan is explicitly out of scope until Phase 1 data justifies it.
+**Architecture:** A strictly additive mirror layer. Laravel keeps its existing versioned cache untouched and additionally writes raw, unprefixed keys (`pbx:fsxml:*`) into Redis DB 0 via dedicated connection `Redis::connection(config('freeswitch.lua_proxy.connection', 'lua_proxy'))`, bypassing the `Cache` facade and overriding Laravel's default database prefix (`tallpbx-database-`) with `'prefix' => ''` so keys match Lua's raw queries byte-for-byte. `RoutingCacheVersion::bump()` mirrors the new revision so the version is embedded in every payload key; a version change therefore makes the next Lua lookup miss and fall through to `mod_xml_curl`, which rebuilds and re-warms the mirror. The Lua script performs at most three `GET`s (tenant map → version → payload), contains no XML logic, and returns `nil` on any doubt. Phase 1 covers directory lookups only (supporting both native FreeSWITCH `domain` lookups and synthetic `user` lookups); dialplan is explicitly out of scope until Phase 1 data justifies it.
 
-**Tech Stack:** FreeSWITCH v1.11 (`mod_lua`, `mod_hiredis`, `mod_xml_curl`), Redis 7 (DB 0 mirror), Lua 5.x, Laravel 13 / PHP 8.5, Pest.
+**Tech Stack:** FreeSWITCH v1.11 (`mod_lua`, `mod_hiredis`, `mod_xml_curl`), Redis 7 (DB 0 mirror via unprefixed `lua_proxy` connection), Lua 5.x, Laravel 13 / PHP 8.5, Pest.
 
-**Spec:** [`implementation-plan-review.md`](implementation-plan-review.md) (Revision 2.1 — findings B-R1…B-R9 and opinions AO-B1…AO-B4). Supersedes [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md).
+**Spec:** [`implementation-plan-review.md`](implementation-plan-review.md) (Revision 3.1 — findings B-R1…B-R9, V2-C1…V2-M1, and opinions AO-B1…AO-B4). Supersedes [`2026-10-31-lua-redis-proxy.md`](2026-10-31-lua-redis-proxy.md).
 
 ## Global Constraints
 
 - **Additive only**: existing PHP cache keys, TTLs, and invalidation semantics are unchanged. `tests/Feature/Http/XmlHandlerControllerTest.php` must pass without modifying any existing test.
-- **Raw Redis writes only**: mirror writes use `Redis::connection(config('freeswitch.lua_proxy.connection'))` with direct `SET`/`GET`/`EXISTS` commands. Never the `Cache` facade — that is what reintroduces the `tallpbx-cache-` prefix and the DB 1 mismatch.
+- **Raw Redis writes only via unprefixed connection**: mirror writes use `Redis::connection(config('freeswitch.lua_proxy.connection', 'lua_proxy'))` (configured with `'prefix' => ''` and `'database' => env('REDIS_DB', '0')`) with direct `SET`/`GET`/`EXISTS` commands. Never the `Cache` facade and never the default connection with its `tallpbx-database-` prefix — that is what causes key mismatches between PHP and Lua.
 - **Namespace invariant**: strictly fixed as `pbx:fsxml` across both PHP (`FsXmlMirrorKeys::NAMESPACE`) and Lua (`local ns = "pbx:fsxml"`). Making the namespace an environment variable introduces silent key-drift risk where PHP and Lua query different keys; treating it as an immutable constant ensures byte-for-byte contract parity.
-- **Version-in-key is mandatory**: every payload key embeds the tenant's current `RoutingCacheVersion`. Lua never falls back to a default version — a missing version key is a miss.
+- **Version-in-key is mandatory**: every payload key embeds the tenant's current `RoutingCacheVersion`. Lua never falls back to a default version — a missing version key is a miss. Version keys are seeded on first warm-up in `DirectoryXmlBuilder` and monotonically advanced across cache flushes in `RoutingCacheVersion::bump()`.
 - **Fail-to-miss, never fail-to-stale**: any missing key, Redis error string, invalid charset, or malformed value makes Lua return `nil` so FreeSWITCH uses `mod_xml_curl`.
 - **Zero XML business logic in Lua**: the script may only build keys from request headers, read Redis, and validate the reply envelope (`<document`).
 - **Feature flag default off**: `FS_LUA_PROXY_ENABLED=false`. Enabling is a deliberate lab/staging step, never part of a routine deploy.
-- **Directory-only scope**: `section == "directory"`, `tag_name == "user"`, and `key_value == resolved user`. Everything else always falls through.
+- **Directory-only scope**: `section == "directory"` and either `tag_name == "domain"` (`key_value == domain`) or `tag_name == "user"` (`key_value == user`). Everything else always falls through.
 - **Measured before built**: Task 1's numeric gate must pass before Task 2 starts.
 - **Verification discipline**: `./vendor/bin/pint --dirty` and targeted Pest only; `tpbx optimize:clear` after any PHP/config change.
 
@@ -106,8 +106,9 @@ git commit -m "docs(load-test): add lua proxy v2 measurement report and gate dec
 ### Task 2: Mirror Key Builder & Writer Service
 
 **Files:**
-- Modify: `config/freeswitch.php` (add `lua_proxy` block beside `xml_handler`)
-- Modify: `.env.example` (add the three new variables)
+- Modify: `config/database.php` (add dedicated `'lua_proxy'` connection under `'redis'` with `'database' => env('REDIS_DB', '0')` and `'prefix' => ''`)
+- Modify: `config/freeswitch.php` (add `lua_proxy` block beside `xml_handler` with `'connection' => env('FS_LUA_PROXY_CONNECTION', 'lua_proxy')`)
+- Modify: `.env.example` (add `FS_LUA_PROXY_ENABLED=false` and `FS_LUA_PROXY_CONNECTION=lua_proxy`)
 - Create: `app/Services/Xml/FsXmlMirrorKeys.php`
 - Create: `app/Services/Xml/FsXmlMirrorWriter.php`
 - Test: `tests/Unit/Services/FsXmlMirrorKeysTest.php`
@@ -118,25 +119,42 @@ git commit -m "docs(load-test): add lua proxy v2 measurement report and gate dec
   - `FsXmlMirrorKeys::version(int $tenantId): string` → `pbx:fsxml:ver:{tenantId}`
   - `FsXmlMirrorKeys::globalVersion(): string` → `pbx:fsxml:ver:global`
   - `FsXmlMirrorKeys::tenantLookup(string $domain, string $user): string` → `pbx:fsxml:tenant:user:{domain}:{user}`
-  - `FsXmlMirrorKeys::directory(int $tenantId, string $domain, string $user, int $version): string` → `pbx:fsxml:dir:{tenantId}:{domain}:{user}:v{version}`
+  - `FsXmlMirrorKeys::directory(int $tenantId, string $tagName, string $domain, string $user, int $version): string` → `pbx:fsxml:dir:{tenantId}:{tagName}:{domain}:{user}:v{version}`
   - `FsXmlMirrorWriter::enabled(): bool`
   - `FsXmlMirrorWriter::writeTenantLookup(string $domain, string $user, int $tenantId): void`
-  - `FsXmlMirrorWriter::writeDirectory(int $tenantId, string $domain, string $user, int $version, string $xml): void`
+  - `FsXmlMirrorWriter::writeDirectory(int $tenantId, string $tagName, string $domain, string $user, int $version, string $xml): void`
   - `FsXmlMirrorWriter::writeVersion(int $tenantId, int $version): void`
   - `FsXmlMirrorWriter::writeGlobalVersion(int $version): void`
 
-- [ ] **Step 1: Add the configuration block**
+- [ ] **Step 1: Add the configuration blocks**
+
+In `config/database.php`, add under `'redis'` connections (ensuring an explicit empty `'prefix'` so phpredis does not prepend `tallpbx-database-` to raw mirror keys):
+
+```php
+'lua_proxy' => [
+    'url' => env('REDIS_URL'),
+    'host' => env('REDIS_HOST', '127.0.0.1'),
+    'username' => env('REDIS_USERNAME'),
+    'password' => env('REDIS_PASSWORD'),
+    'port' => env('REDIS_PORT', '6379'),
+    'database' => env('REDIS_DB', '0'),
+    'prefix' => '',
+    'max_retries' => env('REDIS_MAX_RETRIES', 3),
+    'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+    'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+],
+```
 
 In `config/freeswitch.php`, add beside `xml_handler`:
 
 ```php
 'lua_proxy' => [
     'enabled' => filter_var(env('FS_LUA_PROXY_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
-    'connection' => env('FS_LUA_PROXY_CONNECTION', 'default'),
+    'connection' => env('FS_LUA_PROXY_CONNECTION', 'lua_proxy'),
 ],
 ```
 
-In `.env.example`, add `FS_LUA_PROXY_ENABLED=false` and `FS_LUA_PROXY_CONNECTION=default`. (Note: `pbx:fsxml` namespace is defined as a fixed constant in `FsXmlMirrorKeys::NAMESPACE` to prevent key drift).
+In `.env.example`, add `FS_LUA_PROXY_ENABLED=false` and `FS_LUA_PROXY_CONNECTION=lua_proxy`. (Note: `pbx:fsxml` namespace is defined as a fixed constant in `FsXmlMirrorKeys::NAMESPACE` to prevent key drift).
 
 - [ ] **Step 2: Write the failing key-builder test**
 
@@ -163,9 +181,11 @@ test('builds tenant lookup key from domain and user', function () {
         ->toBe('pbx:fsxml:tenant:user:a.com:1001');
 });
 
-test('builds directory payload key embedding tenant and routing version', function () {
-    expect(FsXmlMirrorKeys::directory(7, 'a.com', '1001', 3))
-        ->toBe('pbx:fsxml:dir:7:a.com:1001:v3');
+test('builds directory payload key embedding tenant, tag name, domain, user, and routing version', function () {
+    expect(FsXmlMirrorKeys::directory(7, 'domain', 'a.com', '1001', 3))
+        ->toBe('pbx:fsxml:dir:7:domain:a.com:1001:v3')
+        ->and(FsXmlMirrorKeys::directory(7, 'user', 'a.com', '1001', 3))
+        ->toBe('pbx:fsxml:dir:7:user:a.com:1001:v3');
 });
 ```
 
@@ -180,21 +200,27 @@ Declare `public const NAMESPACE = 'pbx:fsxml';`. All methods are `public static`
 
 - [ ] **Step 5: Write the failing writer test**
 
-`tests/Feature/Services/FsXmlMirrorWriterTest.php` — set `config(['freeswitch.lua_proxy.enabled' => true, 'freeswitch.lua_proxy.connection' => 'default', 'freeswitch.xml_handler.directory_cache_ttl' => 60])` in `beforeEach`, and delete the exact keys written in `afterEach` (never `FLUSHDB`):
+`tests/Feature/Services/FsXmlMirrorWriterTest.php` — set `config(['freeswitch.lua_proxy.enabled' => true, 'freeswitch.lua_proxy.connection' => 'lua_proxy', 'freeswitch.xml_handler.directory_cache_ttl' => 60])` in `beforeEach`, and delete the exact keys written in `afterEach` (never `FLUSHDB`):
 
 ```php
-test('writes directory payload with ttl and tenant lookup via raw redis', function () {
-    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7);
-    app(FsXmlMirrorWriter::class)->writeDirectory(7, 'a.com', '1001', 3, '<document type="freeswitch/xml"/>');
+test('uses dedicated lua_proxy connection with empty redis prefix', function () {
+    $conn = Redis::connection(config('freeswitch.lua_proxy.connection'));
+    expect($conn->client()->getOption(\Redis::OPT_PREFIX))->toBeNull();
+});
 
-    expect(Redis::connection('default')->get(FsXmlMirrorKeys::tenantLookup('a.com', '1001')))->toBe('7')
-        ->and(Redis::connection('default')->ttl(FsXmlMirrorKeys::directory(7, 'a.com', '1001', 3)))->toBeGreaterThan(0);
+test('writes directory payload with ttl and tenant lookup via raw redis without prefix', function () {
+    app(FsXmlMirrorWriter::class)->writeTenantLookup('a.com', '1001', 7);
+    app(FsXmlMirrorWriter::class)->writeDirectory(7, 'domain', 'a.com', '1001', 3, '<document type="freeswitch/xml"/>');
+
+    $conn = Redis::connection('lua_proxy');
+    expect($conn->get(FsXmlMirrorKeys::tenantLookup('a.com', '1001')))->toBe('7')
+        ->and($conn->ttl(FsXmlMirrorKeys::directory(7, 'domain', 'a.com', '1001', 3)))->toBeGreaterThan(0);
 });
 
 test('writes nothing when the feature flag is disabled', function () {
     config(['freeswitch.lua_proxy.enabled' => false]);
     app(FsXmlMirrorWriter::class)->writeTenantLookup('b.com', '2001', 9);
-    expect(Redis::connection('default')->exists(FsXmlMirrorKeys::tenantLookup('b.com', '2001')))->toBe(0);
+    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup('b.com', '2001')))->toBe(0);
 });
 
 test('does not throw when the redis connection fails', function () {
@@ -210,7 +236,7 @@ Expected: FAIL (class not found).
 
 - [ ] **Step 7: Implement `FsXmlMirrorWriter`**
 
-Constructor reads the enabled flag and connection name from config. Every public write method returns early when disabled, wraps its Redis call in `try { … } catch (\Throwable $e) { Log::debug('Lua proxy mirror write failed', ['error' => $e->getMessage()]); }`, and never rethrows. Payload and tenant-lookup writes use `SET … EX (int) config('freeswitch.xml_handler.directory_cache_ttl')`; version writes use `SET` without expiry.
+Constructor reads the enabled flag and connection name from config (defaulting to `'lua_proxy'`). Every public write method returns early when disabled, wraps its Redis call in `try { … } catch (\Throwable $e) { Log::debug('Lua proxy mirror write failed', ['error' => $e->getMessage()]); }`, and never rethrows. Payload and tenant-lookup writes use `SET … EX (int) config('freeswitch.xml_handler.directory_cache_ttl')`; version writes use `SET` without expiry.
 
 - [ ] **Step 8: Run the tests to verify they pass**
 
@@ -220,8 +246,8 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add config/freeswitch.php .env.example app/Services/Xml/FsXmlMirrorKeys.php app/Services/Xml/FsXmlMirrorWriter.php tests/Unit/Services/FsXmlMirrorKeysTest.php tests/Feature/Services/FsXmlMirrorWriterTest.php
-git commit -m "feat(xml): add lua proxy mirror key builder and fail-soft writer"
+git add config/database.php config/freeswitch.php .env.example app/Services/Xml/FsXmlMirrorKeys.php app/Services/Xml/FsXmlMirrorWriter.php tests/Unit/Services/FsXmlMirrorKeysTest.php tests/Feature/Services/FsXmlMirrorWriterTest.php
+git commit -m "feat(xml): add lua proxy mirror key builder and fail-soft writer with unprefixed connection"
 ```
 
 ---
@@ -245,20 +271,33 @@ use App\Services\Xml\FsXmlMirrorKeys;
 use App\Support\RoutingCacheVersion;
 
 beforeEach(function () {
-    config(['freeswitch.lua_proxy.enabled' => true]);
-    Redis::connection('default')->del(FsXmlMirrorKeys::version(42), FsXmlMirrorKeys::globalVersion());
+    config(['freeswitch.lua_proxy.enabled' => true, 'freeswitch.lua_proxy.connection' => 'lua_proxy']);
+    Redis::connection('lua_proxy')->del(FsXmlMirrorKeys::version(42), FsXmlMirrorKeys::globalVersion());
 });
 
 test('mirrors the tenant revision into the lua namespace on bump', function () {
     RoutingCacheVersion::bump(42);
-    expect(Redis::connection('default')->get(FsXmlMirrorKeys::version(42)))
+    expect(Redis::connection('lua_proxy')->get(FsXmlMirrorKeys::version(42)))
         ->toBe((string) RoutingCacheVersion::get(42));
 });
 
 test('mirrors the global revision on global bump', function () {
     RoutingCacheVersion::bumpGlobal();
-    expect(Redis::connection('default')->get(FsXmlMirrorKeys::globalVersion()))
+    expect(Redis::connection('lua_proxy')->get(FsXmlMirrorKeys::globalVersion()))
         ->toBe((string) RoutingCacheVersion::getGlobal());
+});
+
+test('advances monotonically when cache store was cleared but mirror key exists', function () {
+    // Simulate pre-existing mirror key at version 5 in DB 0
+    Redis::connection('lua_proxy')->set(FsXmlMirrorKeys::version(42), '5');
+    // Simulate DB 1 cache clear
+    Cache::forget(RoutingCacheVersion::key(42));
+
+    RoutingCacheVersion::bump(42);
+
+    // Version must advance to at least 6, not reset to 1
+    expect((int) RoutingCacheVersion::get(42))->toBeGreaterThanOrEqual(6)
+        ->and((int) Redis::connection('lua_proxy')->get(FsXmlMirrorKeys::version(42)))->toBeGreaterThanOrEqual(6);
 });
 
 test('a bump still succeeds when the mirror writer throws', function () {
@@ -272,9 +311,14 @@ test('a bump still succeeds when the mirror writer throws', function () {
 Run: `./vendor/bin/pest tests/Feature/Support/RoutingCacheVersionMirrorTest.php`
 Expected: FAIL (mirror key never written).
 
-- [ ] **Step 3: Implement the mirror call**
+- [ ] **Step 3: Implement the mirror call and cache-clear monotonicity guard**
 
-In `bump(int $tenantId)`, capture the resulting revision from the existing increment/seed logic into `$next`, then call `app(FsXmlMirrorWriter::class)->writeVersion($tenantId, $next);` inside a `try/catch (\Throwable)` that logs at debug level. Apply the same pattern to `bumpGlobal()` with `writeGlobalVersion((int) static::getGlobal())` after the store update. Update the class PHPDoc to state that the mirror write is best-effort and must never break a caller.
+In `bump(int $tenantId)`:
+1. Check if the store has `self::key($tenantId)`. If missing (e.g. after `tpbx optimize:clear` or `cache:clear`), check if the mirror writer is enabled and read the existing version from DB 0 (`GET pbx:fsxml:ver:{tenantId}`). Seed the store with `max(static::get($tenantId), (int)$mirrorVer) + 1` to ensure monotonic progression across cache flushes.
+2. Otherwise, use `increment()` (with the existing fallback to `put()`).
+3. Call `app(FsXmlMirrorWriter::class)->writeVersion($tenantId, (int) static::get($tenantId));` inside a `try/catch (\Throwable)` that logs at debug level.
+4. Apply the same pattern to `bumpGlobal()` with `writeGlobalVersion((int) static::getGlobal())` after the store update.
+5. Update the class PHPDoc to state that the mirror write is best-effort and must never break a caller.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -298,41 +342,60 @@ git commit -m "feat(xml): mirror routing revisions into lua proxy namespace on b
 
 **Interfaces:**
 - Consumes: `FsXmlMirrorWriter` methods from Task 2, `FsXmlMirrorKeys` for assertions
-- Produces: populated `pbx:fsxml:tenant:user:*` and `pbx:fsxml:dir:*` keys for every eligible directory lookup
+- Produces: populated `pbx:fsxml:tenant:user:*`, `pbx:fsxml:ver:*`, and `pbx:fsxml:dir:*` keys for every eligible directory lookup
 
 - [ ] **Step 1: Write the failing test**
 
 `tests/Feature/Services/DirectoryXmlMirrorTest.php` — reuse the tenant/SIP-account fixture setup from `tests/Feature/Http/XmlHandlerControllerTest.php`. Enable the flag, set the tenant via `TenantManager`, and clear exact mirror keys in `afterEach`:
 
 ```php
-test('mirrors directory xml and tenant lookup for user lookups', function () {
+test('mirrors directory xml, tenant lookup, and seeds version for real FreeSWITCH domain tag lookups', function () {
     [$tenantId, $domain, $user] = $this->makeDirectoryFixture(); // helper: tenant + sip account, tenant set on TenantManager
+    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+
+    $version = (int) \App\Support\RoutingCacheVersion::get($tenantId);
+    $conn = Redis::connection('lua_proxy');
+    expect($conn->get(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe((string) $tenantId)
+        ->and($conn->get(FsXmlMirrorKeys::version($tenantId)))->toBe((string) $version)
+        ->and($conn->get(FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, $version)))->toContain('<document');
+});
+
+test('mirrors directory xml and tenant lookup for synthetic user tag lookups', function () {
+    [$tenantId, $domain, $user] = $this->makeDirectoryFixture();
     app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('user', $domain, $user, $user);
 
     $version = (int) \App\Support\RoutingCacheVersion::get($tenantId);
-    expect(Redis::connection('default')->get(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe((string) $tenantId)
-        ->and(Redis::connection('default')->get(FsXmlMirrorKeys::directory($tenantId, $domain, $user, $version)))->toContain('<document');
+    $conn = Redis::connection('lua_proxy');
+    expect($conn->get(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe((string) $tenantId)
+        ->and($conn->get(FsXmlMirrorKeys::directory($tenantId, 'user', $domain, $user, $version)))->toContain('<document');
 });
 
-test('does not mirror when key value differs from the username', function () {
+test('does not mirror when key value differs from expected tag scope', function () {
     [$tenantId, $domain, $user] = $this->makeDirectoryFixture();
+    // For domain tag, keyValue must match domain; mismatch should not mirror
+    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, 'other.com');
+    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
+
+    // For user tag, keyValue must match username; mismatch should not mirror
     app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('user', $domain, $user, '9999');
-    expect(Redis::connection('default')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
+    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
 });
 
 test('does not mirror when directory caching is disabled', function () {
     config(['freeswitch.xml_handler.directory_cache_ttl' => 0]);
     [$tenantId, $domain, $user] = $this->makeDirectoryFixture();
-    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('user', $domain, $user, $user);
-    expect(Redis::connection('default')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
+    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+    expect(Redis::connection('lua_proxy')->exists(FsXmlMirrorKeys::tenantLookup($domain, $user)))->toBe(0);
 });
 
-test('mirrors with the current routing version embedded in the key', function () {
+test('seeds version key on cold start without waiting for administrative bump', function () {
     [$tenantId, $domain, $user] = $this->makeDirectoryFixture();
-    \App\Support\RoutingCacheVersion::bump($tenantId);
-    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('user', $domain, $user, $user);
-    $version = (int) \App\Support\RoutingCacheVersion::get($tenantId);
-    expect(Redis::connection('default')->exists(FsXmlMirrorKeys::directory($tenantId, $domain, $user, $version)))->toBe(1);
+    Redis::connection('lua_proxy')->del(FsXmlMirrorKeys::version($tenantId));
+
+    app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+
+    expect(Redis::connection('lua_proxy')->get(FsXmlMirrorKeys::version($tenantId)))
+        ->toBe((string) \App\Support\RoutingCacheVersion::get($tenantId));
 });
 ```
 
@@ -343,7 +406,18 @@ Expected: FAIL (no mirror keys written).
 
 - [ ] **Step 3: Implement the mirror write in `buildCachedDirectoryXml()`**
 
-After the existing `$xml = $cache->remember(...)` result (or after the uncached build when TTL is active — mirror only when `$ttl > 0`), add an eligibility guard: feature enabled, `$tagName === 'user'`, `$domain !== ''`, `$username !== ''`, `$keyValue === $username`. When eligible, call `writeTenantLookup($domain, $username, $tenantId)` and `writeDirectory($tenantId, $domain, $username, (int) RoutingCacheVersion::get($tenantId), $xml)`. The mirror write runs on every eligible request (idempotent `SET`), so the mirror warms after deploy without a migration step. Extract the guard into a private `shouldMirror(string $tagName, string $domain, string $username, string $keyValue, int $ttl): bool` with a PHPDoc explaining the `key_value === username` rule.
+After the existing `$xml = $cache->remember(...)` result (or after the uncached build when TTL is active — mirror only when `$ttl > 0`), add an eligibility guard: feature enabled, `$domain !== ''`, `$username !== ''`, and matching tag scope:
+- `$tagName === 'domain' && $keyValue === $domain` (FreeSWITCH's native `switch_xml_locate_user()` shape)
+- `$tagName === 'user' && $keyValue === $username` (synthetic benchmark shape)
+
+When eligible:
+1. Fetch `$tenantIdInt = (int) $tenantId;` and `$version = (int) RoutingCacheVersion::get($tenantIdInt);`
+2. Obtain `$writer = app(FsXmlMirrorWriter::class);`
+3. Call `$writer->writeVersion($tenantIdInt, $version);` (seeds `pbx:fsxml:ver:{tenantId}` on cold start so Lua never misses due to an unseeded version key)
+4. Call `$writer->writeTenantLookup($domain, $username, $tenantIdInt);`
+5. Call `$writer->writeDirectory($tenantIdInt, $tagName, $domain, $username, $version, $xml);`
+
+Extract the guard into a private `shouldMirror(string $tagName, string $domain, string $username, string $keyValue, int $ttl): bool` with a PHPDoc documenting both lookup modes.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -377,20 +451,27 @@ git commit -m "feat(xml): mirror rendered directory xml into the lua cache names
 `scripts/freeswitch/tallpbx_xml_handler.lua`:
 
 ```lua
--- TallPBX version-aware directory XML cache proxy (phase 1: directory user lookups only).
+-- TallPBX version-aware directory XML cache proxy (phase 1: directory domain and user lookups).
 -- Contract: key strings must match App\Services\Xml\FsXmlMirrorKeys byte-for-byte.
 -- Any doubt returns nil so FreeSWITCH falls through to mod_xml_curl.
 
 local function proxy() -- returns xml string or nil
     if not XML_REQUEST or XML_REQUEST["section"] ~= "directory" then return nil end
-    if XML_REQUEST["tag_name"] ~= "user" then return nil end
+    local tag_name = XML_REQUEST["tag_name"] or ""
+    if tag_name ~= "domain" and tag_name ~= "user" then return nil end
 
     local key_value = XML_REQUEST["key_value"] or ""
     local user = (params and (params:getHeader("sip_auth_username") or params:getHeader("user"))) or ""
     local domain = (params and (params:getHeader("domain") or params:getHeader("domain_name")
         or params:getHeader("variable_domain_name"))) or ""
 
-    if user == "" or domain == "" or key_value ~= user then return nil end
+    if user == "" or domain == "" then return nil end
+    if tag_name == "domain" then
+        if key_value ~= domain then return nil end
+    elseif tag_name == "user" then
+        if key_value ~= user then return nil end
+    end
+
     if not domain:match("^[%w%.%-_]+$") or not user:match("^[%w%.%-_]+$") then return nil end
 
     local api = freeswitch.API()
@@ -402,7 +483,7 @@ local function proxy() -- returns xml string or nil
     local version = api:execute("hiredis_raw", "default GET " .. ns .. ":ver:" .. tenant)
     if not version or version == "" or version == "(nil)" or version:sub(1, 1) == "-" then return nil end
 
-    local payload_key = ns .. ":dir:" .. tenant .. ":" .. domain .. ":" .. user .. ":v" .. version
+    local payload_key = ns .. ":dir:" .. tenant .. ":" .. tag_name .. ":" .. domain .. ":" .. user .. ":v" .. version
     TALLPBX_DEBUG_KEYS = { tenant = ns .. ":tenant:user:" .. domain .. ":" .. user,
                            version = ns .. ":ver:" .. tenant, payload = payload_key }
 
@@ -418,7 +499,7 @@ if ok and result then XML_STRING = result else XML_STRING = nil end
 
 - [ ] **Step 2: Write the shared fixtures**
 
-`tests/fixtures/freeswitch/lua_key_fixtures.json` — cases covering: standard hit, missing tenant map, missing version, `-NOAUTH` error reply, truncated payload, foreign non-XML value, `key_value` mismatch, invalid charset. Each case carries `domain`, `user`, `key_value`, `tenant_id`, `version`, Redis replies, and expected `XML_STRING` (string or null) plus expected `TALLPBX_DEBUG_KEYS`.
+`tests/fixtures/freeswitch/lua_key_fixtures.json` — cases covering: standard domain tag hit (`tag_name=domain`, `key_value=domain`), synthetic user tag hit (`tag_name=user`, `key_value=user`), missing tenant map, missing version, `-NOAUTH` error reply, truncated payload, foreign non-XML value, `key_value` mismatch in both tag modes, invalid charset. Each case carries `tag_name`, `domain`, `user`, `key_value`, `tenant_id`, `version`, Redis replies, and expected `XML_STRING` (string or null) plus expected `TALLPBX_DEBUG_KEYS`.
 
 - [ ] **Step 3: Write the parity harness and the PHP fixture test**
 
@@ -525,7 +606,7 @@ git commit -m "chore(freeswitch): bind lua directory cache handler with 16 hired
 
 - [ ] **Step 1: Enable and warm**
 
-Set `FS_LUA_PROXY_ENABLED=true`, run `tpbx optimize:clear`, trigger one `fs_cli -x "find_user_xml id <ext> <domain>"`, then confirm in DB 0: `redis-cli -n 0 GET pbx:fsxml:tenant:user:<domain>:<ext>`, `GET pbx:fsxml:ver:<tenantId>`, and `GET pbx:fsxml:dir:<tenantId>:<domain>:<ext>:v<version>` all exist.
+Set `FS_LUA_PROXY_ENABLED=true`, run `tpbx optimize:clear`, trigger one `fs_cli -x "find_user_xml id <ext> <domain>"`, then confirm in DB 0: `redis-cli -n 0 GET pbx:fsxml:tenant:user:<domain>:<ext>`, `GET pbx:fsxml:ver:<tenantId>`, and `GET pbx:fsxml:dir:<tenantId>:domain:<domain>:<ext>:v<version>` all exist.
 
 - [ ] **Step 2: Prove Lua served the lookup**
 
