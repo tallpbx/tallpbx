@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Models\TenantDomain;
 use App\Support\RoutingCacheVersion;
 use Illuminate\Database\Eloquent\Model;
 use Modules\CallCenters\Models\Queue;
@@ -11,6 +12,7 @@ use Modules\Dialplans\Models\Dialplan;
 use Modules\Extensions\Models\Extension;
 use Modules\IvrMenus\Models\IvrMenu;
 use Modules\RingGroups\Models\RingGroup;
+use Modules\SipAccounts\Models\SipAccount;
 
 /**
  * Observer that bumps the tenant's RoutingCacheVersion whenever any
@@ -69,6 +71,27 @@ class RoutingCacheObserver
                 RoutingCacheVersion::bump($originalTenantId);
             }
         }
+
+        // The tenant revision cannot cover an ownership change: the cached
+        // identity answer is "which tenant owns this username", and it is read
+        // before any tenant is known. The global revision is the only epoch
+        // that can move for every tenant at once, so an account or domain
+        // write moves it and every cached identity answer becomes unreachable.
+        if ($this->affectsIdentityOwnership($model)) {
+            RoutingCacheVersion::bumpGlobal();
+        }
+    }
+
+    /**
+     * Whether a write to this model can change which tenant owns an identity.
+     *
+     * Only SIP accounts (username, domain, mode, enabled state) and tenant
+     * domains (realm and owning tenant) decide that answer. Every other
+     * observed model changes routing output inside one known tenant.
+     */
+    protected function affectsIdentityOwnership(Model $model): bool
+    {
+        return $model instanceof SipAccount || $model instanceof TenantDomain;
     }
 
     /**

@@ -24,6 +24,7 @@ use App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
 use App\Listeners\BroadcastTelephonyOnFreeSwitchEvent;
 use App\Models\Admin;
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Models\User;
 use App\Observers\DashboardStatsObserver;
 use App\Observers\RoutingCacheObserver;
@@ -390,6 +391,10 @@ class AppServiceProvider extends ServiceProvider
             Extension::class,
             ExtensionSetting::class,
             SipAccount::class,
+            // A tenant domain decides which tenant a SIP realm belongs to, so
+            // a rename or reassignment has to invalidate identity answers and
+            // the directory document of both tenants involved.
+            TenantDomain::class,
             RingGroup::class,
             RingGroupExtension::class,
             InboundRoute::class,

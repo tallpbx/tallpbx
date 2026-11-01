@@ -434,6 +434,72 @@ it('fails closed when same username exists in two tenants sharing the same domai
     expect($identity)->toBeNull();
 });
 
+it('drops a cached username identity when the account moves to another tenant', function () {
+    config(['freeswitch.xml_handler.directory_cache_ttl' => 60]);
+
+    // Tenant A owns moved-user@ownership.example.com and the answer is cached.
+    $tenantA = Tenant::factory()->create();
+    $domainA = TenantDomain::factory()->create([
+        'tenant_id' => $tenantA->id,
+        'domain' => 'ownership.example.com',
+        'enabled' => true,
+    ]);
+    $account = SipAccount::factory()->domainUsername('moved_user', $domainA->id)->create([
+        'tenant_id' => $tenantA->id,
+        'enabled' => true,
+    ]);
+
+    $resolver = app(TenantIdentityResolverInterface::class);
+    $before = $resolver->resolveFromUsername('moved_user', 'ownership.example.com');
+
+    expect($before)->not->toBeNull()
+        ->and($before->tenantId)->toBe((string) $tenantA->id);
+
+    // An administrator re-homes the account. The identity answer the cache
+    // holds is now wrong, so the next lookup must not return it.
+    $tenantB = Tenant::factory()->create();
+    $domainB = TenantDomain::factory()->create([
+        'tenant_id' => $tenantB->id,
+        'domain' => 'ownership.example.com',
+        'enabled' => true,
+    ]);
+    $account->update([
+        'tenant_id' => $tenantB->id,
+        'tenant_domain_id' => $domainB->id,
+    ]);
+
+    $after = $resolver->resolveFromUsername('moved_user', 'ownership.example.com');
+
+    expect($after)->not->toBeNull()
+        ->and($after->tenantId)->toBe((string) $tenantB->id);
+});
+
+it('drops a cached domain identity when the domain moves to another tenant', function () {
+    config(['freeswitch.xml_handler.directory_cache_ttl' => 60]);
+
+    $tenantA = Tenant::factory()->create();
+    $domain = TenantDomain::factory()->create([
+        'tenant_id' => $tenantA->id,
+        'domain' => 'moved-domain.example.com',
+        'enabled' => true,
+    ]);
+
+    $resolver = app(TenantIdentityResolverInterface::class);
+    $before = $resolver->resolveFromDomain('moved-domain.example.com');
+
+    expect($before)->not->toBeNull()
+        ->and($before->tenantId)->toBe((string) $tenantA->id);
+
+    // The domain is reassigned to a different tenant.
+    $tenantB = Tenant::factory()->create();
+    $domain->update(['tenant_id' => $tenantB->id]);
+
+    $after = $resolver->resolveFromDomain('moved-domain.example.com');
+
+    expect($after)->not->toBeNull()
+        ->and($after->tenantId)->toBe((string) $tenantB->id);
+});
+
 it('caches sip auth identity resolution for repeated FreeSWITCH directory lookups', function () {
     config(['freeswitch.xml_handler.directory_cache_ttl' => 60]);
 

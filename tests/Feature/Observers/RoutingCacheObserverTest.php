@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Services\DialplanContext;
 use App\Services\DialplanXmlCollector;
 use App\Services\TenantManager;
@@ -10,6 +11,7 @@ use App\Services\Xml\DirectoryXmlBuilder;
 use App\Support\RoutingCacheVersion;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
 use Modules\Emergency\Models\Emergency;
@@ -420,4 +422,38 @@ it('immediately invalidates cached public dialplans across all tenants on custom
 
     $this->get('/api/v1/xml-handler?'.$queryA)->assertOk()->assertSee('CustomBot99');
     $this->get('/api/v1/xml-handler?'.$queryB)->assertOk()->assertSee('CustomBot99');
+});
+
+it('bumps the global identity epoch when a sip account changes', function (): void {
+    $tenant = Tenant::factory()->create();
+    $domain = TenantDomain::factory()->create(['tenant_id' => $tenant->id]);
+
+    // The domain write above already moved the epoch; measure from there.
+    $before = RoutingCacheVersion::getGlobal();
+
+    // Creating an account can make a username resolve for the first time.
+    $account = SipAccount::factory()->domainUsername('epoch_user', $domain->id)->create([
+        'tenant_id' => $tenant->id,
+    ]);
+    expect(RoutingCacheVersion::getGlobal())->toBe($before + 1);
+
+    // Renaming it changes which identity the username maps to.
+    $account->update(['auth_username' => 'epoch_user_renamed']);
+    expect(RoutingCacheVersion::getGlobal())->toBe($before + 2);
+});
+
+it('bumps the global identity epoch when a tenant domain changes', function (): void {
+    $tenant = Tenant::factory()->create();
+    $before = RoutingCacheVersion::getGlobal();
+
+    // A new domain makes a whole realm resolvable for the first time.
+    $domain = TenantDomain::factory()->create(['tenant_id' => $tenant->id]);
+    expect(RoutingCacheVersion::getGlobal())->toBe($before + 1);
+
+    // Renaming it moves every username that used the old realm.
+    $domain->update(['domain' => 'renamed-epoch-'.Str::lower(Str::random(8)).'.test']);
+    expect(RoutingCacheVersion::getGlobal())->toBe($before + 2);
+
+    $domain->delete();
+    expect(RoutingCacheVersion::getGlobal())->toBe($before + 3);
 });

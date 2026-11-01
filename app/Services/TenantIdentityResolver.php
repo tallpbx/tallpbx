@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\TenantDomain;
+use App\Support\RoutingCacheVersion;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -252,10 +253,18 @@ class TenantIdentityResolver implements TenantIdentityResolverInterface
     /**
      * Build a stable cache key without exposing raw SIP usernames in Redis.
      *
+     * The global routing revision is appended as the identity epoch. It moves
+     * whenever a SIP account or tenant domain is created, changed, or removed,
+     * which is exactly when a cached answer of "which tenant owns this
+     * identity" can become wrong. A per-tenant revision cannot be used here:
+     * this lookup is what determines the tenant in the first place.
+     *
      * @param  array<int, string>  $parts
      */
     private function cacheKey(string $type, array $parts): string
     {
+        $parts[] = (string) RoutingCacheVersion::getGlobal();
+
         return 'freeswitch:tenant-identity:'.$type.':'.sha1(implode('|', $parts));
     }
 
