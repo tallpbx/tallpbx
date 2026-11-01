@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Active Series Branch Transition**: Transitioned active development and default branch references across project documentation, installer scripts, and agent skills from `4.x` to `5.x`.
 - **Breaking Changes & Fresh Install Policy**: Declared `5.x` as a breaking major release line. The `5.x` branch is explicitly not backwards compatible with the `4.x` branch and requires a fresh install rather than an in-place upgrade. Earlier major release lines (`4.x`, `3.x`, `2.0`, `1.1`) continue maintenance on their respective branches.
+- **Load-Test App-Side Metrics & Directory Scenarios**: `pbx:load-test:dialplan` now accepts `--section=dialplan|directory|mixed` and `--timing`, recording app-side `request_ms`/`handler_ms`, database-query counts, and per-section p50/p95 in the JSON report (`schema_version: 2`). The cache sweep adds a `directory-mixed` tier with an app-side p95 column. Timing headers are opt-in (`FS_XML_HANDLER_TIMING_HEADERS=true` plus the `X-TallPBX-Timing: 1` request header) and disabled by default.
 
 ### Fixed
 

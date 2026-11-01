@@ -27,7 +27,16 @@ class LogXmlHandlerTiming
         $queryCount = 0;
         $queryTimeMs = 0.0;
 
-        if ((bool) config('freeswitch.xml_handler.log_timing', false)) {
+        $logEnabled = (bool) config('freeswitch.xml_handler.log_timing', false);
+
+        // Headers are opt-in twice over: the config flag must be enabled AND
+        // the caller must request them, so internal cost data never leaks by
+        // accident on the public xml-handler endpoint.
+        $headersEnabled = (bool) config('freeswitch.xml_handler.timing_headers', false)
+            && $request->header('X-TallPBX-Timing') === '1';
+
+        // Query counting feeds both the log line and the DB-Queries header.
+        if ($logEnabled || $headersEnabled) {
             DB::listen(function (QueryExecuted $query) use (&$queryCount, &$queryTimeMs): void {
                 $queryCount++;
                 $queryTimeMs += (float) $query->time;
@@ -36,8 +45,14 @@ class LogXmlHandlerTiming
 
         $response = $next($request);
 
-        if ((bool) config('freeswitch.xml_handler.log_timing', false)) {
-            $this->logTiming($request, $response, $startedAt, $queryCount, $queryTimeMs);
+        $elapsedMs = $this->elapsedMs($startedAt);
+
+        if ($logEnabled) {
+            $this->logTiming($request, $response, $elapsedMs, $queryCount, $queryTimeMs);
+        }
+
+        if ($headersEnabled) {
+            $this->applyTimingHeaders($response, $elapsedMs, $queryCount);
         }
 
         return $response;
@@ -49,11 +64,10 @@ class LogXmlHandlerTiming
     private function logTiming(
         Request $request,
         Response $response,
-        float $startedAt,
+        float $elapsedMs,
         int $queryCount,
         float $queryTimeMs
     ): void {
-        $elapsedMs = round((microtime(true) - $startedAt) * 1000, 2);
         $dbTimeMs = round($queryTimeMs, 2);
 
         Log::info('XML Handler timing.', [
@@ -74,5 +88,30 @@ class LogXmlHandlerTiming
             'method' => $request->method(),
             'ip' => $request->ip(),
         ]);
+    }
+
+    /**
+     * Measure wall time since a start timestamp in milliseconds.
+     */
+    private function elapsedMs(float $startedAt): float
+    {
+        return round((microtime(true) - $startedAt) * 1000, 2);
+    }
+
+    /**
+     * Attach opt-in app-side timing headers to an XML handler response.
+     */
+    private function applyTimingHeaders(Response $response, float $elapsedMs, int $queryCount): void
+    {
+        $response->headers->set('X-TallPBX-Handler-Ms', number_format($elapsedMs, 2, '.', ''));
+        $response->headers->set('X-TallPBX-DB-Queries', (string) $queryCount);
+
+        // Request time includes framework boot, which the middleware window
+        // does not cover. Omit it when the entry point did not define the
+        // bootstrap timestamp (for example, in unit tests).
+        if (defined('LARAVEL_START')) {
+            $requestMs = max(0.0, round((microtime(true) - LARAVEL_START) * 1000, 2));
+            $response->headers->set('X-TallPBX-Request-Ms', number_format($requestMs, 2, '.', ''));
+        }
     }
 }

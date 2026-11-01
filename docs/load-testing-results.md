@@ -169,7 +169,13 @@ This centralized reference defines all testing notation, metrics, and scenario t
 | **Fastest (Min)** | Minimum latency | The quickest response recorded (best-case memory/cache hit). |
 | **Slowest (Max)** | Maximum latency | The single slowest response recorded (worst-case queueing or disk read). |
 | **Jitter (`std_dev`)** | Standard deviation | How much response times fluctuated. Low = consistent; High = erratic. |
+| **App-Side Request Time (`request_ms`)** | End-to-end Laravel request time | Time from `LARAVEL_START` to response, including framework boot. The metric used to judge in-process caching value. Recorded only for runs using `--timing`. |
+| **Handler Time (`handler_ms`)** | XML handler pipeline time | Time inside the XML handler middleware window, excluding framework boot. |
+| **App-Side p95** | Tail of `request_ms` | Per-section tail latency reported in `timing.by_section` (dialplan vs. directory). |
 | **Redis Hit Rate** | Keyspace efficiency | Percentage of lookups served directly from Redis RAM without querying MariaDB (`INFO stats`). |
+
+> [!NOTE]
+> Artifacts captured before 2026-11 contain client-side latency only. App-side fields (`schema_version: 2`) appear in reports produced with `--timing`.
 
 ### Cache Profiles & Telephony Scenarios
 

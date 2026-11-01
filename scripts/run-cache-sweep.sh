@@ -31,17 +31,19 @@ echo " Interface:  $NETWORK_INTERFACE"
 echo " Artifacts:  $OUTPUT_DIR"
 echo "=========================================================="
 
-# Define the 4 standard sweep tiers under current defaults (60s since v4.2.0).
-# Format: num | label | dialplan_ttl | contributor_ttl | scenario | requests | concurrency
+# Define the 4 standard dialplan sweep tiers under current defaults (60s since v4.2.0)
+# plus a directory-mixed tier that records app-side timing. Format:
+# num | label | dialplan_ttl | contributor_ttl | scenario | requests | concurrency | section | extra-flag
 declare -a RUNS=(
-  "1|cold-baseline|0|0|mixed|100|5"
-  "2|dialplan-cache-off|0|60|mixed|100|5"
-  "3|prod-baseline-60|60|60|mixed|100|5"
-  "4|memory-hit-ceiling|60|60|cache-hit|100|5"
+  "1|cold-baseline|0|0|mixed|100|5|dialplan|"
+  "2|dialplan-cache-off|0|60|mixed|100|5|dialplan|"
+  "3|prod-baseline-60|60|60|mixed|100|5|dialplan|"
+  "4|memory-hit-ceiling|60|60|cache-hit|100|5|dialplan|"
+  "5|directory-mixed|60|60|mixed|100|5|mixed|--timing"
 )
 
-printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s\n" "Run" "Operational Mode" "Dialplan TTL" "Contrib TTL" "Directory TTL" "ACL TTL" "Req/sec" "Avg (ms)" "Hit Rate"
-printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s\n" "----" "----------------------" "------------" "-----------" "-------------" "-------" "----------" "----------" "----------"
+printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s %-10s\n" "Run" "Operational Mode" "Dialplan TTL" "Contrib TTL" "Directory TTL" "ACL TTL" "Req/sec" "Avg (ms)" "App p95" "Hit Rate"
+printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s %-10s\n" "----" "----------------------" "------------" "-----------" "-------------" "-------" "----------" "----------" "----------" "----------"
 
 # Snapshot the granular TTL lines the sweep will modify so the operator's exact
 # values (including commented-out lines) can be restored afterward.
@@ -71,7 +73,7 @@ restore_defaults() {
 trap restore_defaults EXIT
 
 for item in "${RUNS[@]}"; do
-  IFS="|" read -r num name d_ttl c_ttl scenario reqs conc <<< "$item"
+  IFS="|" read -r num name d_ttl c_ttl scenario reqs conc section timing <<< "$item"
 
   # Update cache settings in .env for this run (uncomments if currently commented)
   sed -i "s/^#\? \?FS_XML_HANDLER_DIALPLAN_CACHE_TTL=.*/FS_XML_HANDLER_DIALPLAN_CACHE_TTL=$d_ttl/" .env
@@ -88,16 +90,23 @@ for item in "${RUNS[@]}"; do
 
   # Execute the dialplan load test command
   REPORT="$OUTPUT_DIR/run${num}-${name}.json"
-  php artisan pbx:load-test:dialplan \
-    --tenant="$TENANT" \
-    --url="$PBX_URL" \
-    --scenario="$scenario" \
-    --requests="$reqs" \
-    --concurrency="$conc" \
-    --token="$TOKEN" \
-    --interface="$NETWORK_INTERFACE" \
-    --label="cache-sweep-${name}" \
-    --report="$REPORT" > /dev/null 2>&1 || true
+  # Build an argument array so the optional --timing flag never becomes an
+  # empty positional argument under set -u.
+  CMD=(php artisan pbx:load-test:dialplan
+    --tenant="$TENANT"
+    --url="$PBX_URL"
+    --scenario="$scenario"
+    --section="$section"
+    --requests="$reqs"
+    --concurrency="$conc"
+    --token="$TOKEN"
+    --interface="$NETWORK_INTERFACE"
+    --label="cache-sweep-${name}"
+    --report="$REPORT")
+  if [ -n "${timing:-}" ]; then
+    CMD+=("$timing")
+  fi
+  "${CMD[@]}" > /dev/null 2>&1 || true
 
   # Capture Redis stats after the run
   H_POST=$(redis-cli info stats | awk -F: '/keyspace_hits/ {print $2}' | tr -d '\r')
@@ -113,9 +122,12 @@ for item in "${RUNS[@]}"; do
   # Extract throughput and average latency from the generated report
   RPS="N/A"
   AVG="N/A"
+  APP_P95="N/A"
   if [ -f "$REPORT" ]; then
     RPS=$(grep '"requests_per_second"' "$REPORT" | head -n 1 | awk -F': ' '{print $2}' | tr -d ',')
     AVG=$(grep '"average"' "$REPORT" | head -n 1 | awk -F': ' '{print $2}' | tr -d ',')
+    # App-side p95 comes from the timing block (present only with --timing).
+    APP_P95=$(php -r '$j=json_decode(file_get_contents($argv[1]),true); echo $j["timing"]["request_ms"]["p95"] ?? "N/A";' "$REPORT" 2>/dev/null || echo "N/A")
   fi
 
   DIR_VAL="$(grep -E '^#? ?FS_XML_HANDLER_DIRECTORY_CACHE_TTL=' .env | cut -d= -f2 | tr -d ' ' || true)"
@@ -123,7 +135,7 @@ for item in "${RUNS[@]}"; do
   ACL_VAL="$(grep -E '^#? ?FS_XML_HANDLER_ACL_CACHE_TTL=' .env | cut -d= -f2 | tr -d ' ' || true)"
   ACL_TTL="${ACL_VAL:-60}s"
 
-  printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$DIR_TTL" "$ACL_TTL" "$RPS" "${AVG}ms" "$RATE"
+  printf "%-4s %-22s %-14s %-14s %-14s %-10s %-10s %-10s %-10s %-10s\n" "$num" "$name" "${d_ttl}s" "${c_ttl}s" "$DIR_TTL" "$ACL_TTL" "$RPS" "${AVG}ms" "$APP_P95" "$RATE"
 done
 
 echo "=========================================================="

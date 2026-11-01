@@ -114,8 +114,15 @@ tpbx pbx:load-test:seed \
 # 2. Run XML routing throughput test (100 requests, 5 concurrency)
 tpbx pbx:load-test:dialplan \
   --tenant=load-test-beta --url=http://127.0.0.1/api/v1/xml-handler \
-  --scenario=mixed --requests=100 --concurrency=5 \
+  --scenario=mixed --section=dialplan --requests=100 --concurrency=5 \
   --token="$FS_XML_HANDLER_TOKEN"
+
+# 2b. Directory lookups or a realistic call mix, with app-side timing
+#     (requires FS_XML_HANDLER_TIMING_HEADERS=true on the PBX)
+tpbx pbx:load-test:dialplan \
+  --tenant=load-test-beta --url=http://127.0.0.1/api/v1/xml-handler \
+  --section=mixed --scenario=internal --requests=300 --concurrency=5 \
+  --timing --token="$FS_XML_HANDLER_TOKEN"
 
 # 3. Run SIPp end-to-end validation suite from the load generator
 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> scripts/pbx-sipp-validate.sh
@@ -132,6 +139,19 @@ When evaluating benchmark output:
 - **Median Latency (`p50`)**: The middle response time. Accurately reveals what a typical caller experiences, unaffected by rare one-off startup spikes.
 - **Tail Latency (`p95` & `p99`)**: Identifies how the slowest 5% and 1% of calls behaved under peak concurrency, exposing buffer stalls or worker starvation.
 - **Fastest (Min) & Slowest (Max)**: The absolute best-case (pre-warmed cache hit) and worst-case (cold miss or queue wait) latencies recorded during the run.
+
+### App-Side Metrics
+
+`--timing` asks the XML handler for two opt-in response headers and records them in the report's additive `timing` block:
+
+- **`handler_ms`** — time inside the XML handler pipeline as measured by the timing middleware. Excludes framework boot.
+- **`request_ms`** — time since `LARAVEL_START`, including framework boot and route resolution. Use this number when judging whether in-process caching (for example a FreeSWITCH Lua cache) would remove meaningful work.
+- **`db_queries`** — average and maximum database queries per lookup.
+- **`by_section`** — per-section counts and `request_ms` p50/p95 (dialplan vs. directory).
+
+Timing headers are opt-in twice: set `FS_XML_HANDLER_TIMING_HEADERS=true` on the PBX **and** pass `--timing` (which sends `X-TallPBX-Timing: 1`). Never enable the flag on production appliances.
+
+`--section` selects which XML section the run exercises: `dialplan` (default), `directory` (REGISTER/INVITE auth lookups), or `mixed` (two directory lookups per dialplan lookup, mirroring a real call flow). The report records `target.section` and `target.section_counts`.
 
 > [!TIP]
 > For complete statistical definitions, formulas, and real-world PBX examples, consult the centralized **[Metrics & Statistics Reference in docs/load-testing-results.md](load-testing-results.md#performance-metrics--statistics)**.

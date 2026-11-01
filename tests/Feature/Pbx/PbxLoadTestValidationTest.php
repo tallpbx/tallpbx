@@ -73,6 +73,16 @@ describe('pbx load test scripts and scenarios', function (): void {
             ->and($script)->not->toContain('p50');
     });
 
+    it('includes a directory-mixed tier that captures app-side timing', function (): void {
+        $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+
+        expect($script)->toContain('directory-mixed')
+            ->and($script)->toContain('--section=')
+            ->and($script)->toContain('--timing')
+            ->and($script)->toContain('App p95')
+            ->and($script)->toContain('timing"]["request_ms"]["p95"]');
+    });
+
     it('keeps the SIPp end-to-end validation runner syntactically valid', function (): void {
         $script = base_path('scripts/pbx-sipp-validate.sh');
         $process = new Process(['bash', '-n', $script], base_path());
@@ -528,5 +538,133 @@ describe('pbx dialplan load test command', function (): void {
 
         File::delete($absoluteReport);
         File::delete($doubledReport);
+    });
+
+    it('sends directory auth lookups when section is directory', function (): void {
+        $this->artisan('pbx:load-test:seed', [
+            '--tenant' => 'load-test-directory',
+            '--domain' => 'dir-load.test',
+            '--extensions' => '4',
+            '--start' => '4400',
+            '--output' => PBX_LOAD_TEST_CSV_PATH,
+        ])->assertSuccessful();
+
+        Http::fake(fn () => Http::response(
+            '<document type="freeswitch/xml"><section name="directory"></section></document>',
+            200,
+        ));
+
+        $this->artisan('pbx:load-test:dialplan', [
+            '--tenant' => 'load-test-directory',
+            '--url' => 'https://pbx.test/api/v1/xml-handler',
+            '--section' => 'directory',
+            '--requests' => '3',
+            '--concurrency' => '1',
+            '--report' => PBX_LOAD_TEST_REPORT_PATH,
+        ])->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'section=directory')
+            && str_contains($request->url(), 'tag_name=user')
+            && str_contains($request->url(), 'key_name=name')
+            && str_contains($request->url(), 'key_value=4400')
+            && str_contains($request->url(), 'sip_auth_username=4400')
+            && str_contains($request->url(), 'domain=dir-load.test'));
+
+        $report = json_decode((string) file_get_contents(base_path(PBX_LOAD_TEST_REPORT_PATH)), true);
+
+        expect($report['successful_responses'])->toBe(3)
+            ->and($report['target']['section'])->toBe('directory');
+    });
+
+    it('mixes two directory lookups per dialplan lookup in mixed section mode', function (): void {
+        $this->artisan('pbx:load-test:seed', [
+            '--tenant' => 'load-test-section-mixed',
+            '--domain' => 'mixed-load.test',
+            '--extensions' => '4',
+            '--start' => '4500',
+            '--output' => PBX_LOAD_TEST_CSV_PATH,
+        ])->assertSuccessful();
+
+        Http::fake(function (Request $request) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+            if (($query['section'] ?? '') === 'directory') {
+                return Http::response('<document type="freeswitch/xml"><section name="directory"></section></document>', 200);
+            }
+
+            // Echo the requested context so the dialplan validator matches.
+            $context = $query['Caller-Context'] ?? 'missing';
+
+            return Http::response(
+                '<document type="freeswitch/xml"><section name="dialplan"><context name="'.$context.'"></context></section></document>',
+                200,
+            );
+        });
+
+        $this->artisan('pbx:load-test:dialplan', [
+            '--tenant' => 'load-test-section-mixed',
+            '--url' => 'https://pbx.test/api/v1/xml-handler',
+            '--section' => 'mixed',
+            '--scenario' => 'internal',
+            '--requests' => '6',
+            '--concurrency' => '1',
+            '--report' => PBX_LOAD_TEST_REPORT_PATH,
+        ])->assertSuccessful();
+
+        $report = json_decode((string) file_get_contents(base_path(PBX_LOAD_TEST_REPORT_PATH)), true);
+
+        expect($report['target']['section'])->toBe('mixed')
+            ->and($report['target']['section_counts'])->toBe(['directory' => 4, 'dialplan' => 2])
+            ->and($report['target']['scenario_counts'])->toBe(['internal' => 2]);
+    });
+
+    it('records app-side timing headers when the timing flag is used', function (): void {
+        $this->artisan('pbx:load-test:seed', [
+            '--tenant' => 'load-test-timing',
+            '--domain' => 'timing-load.test',
+            '--extensions' => '4',
+            '--start' => '4600',
+            '--output' => PBX_LOAD_TEST_CSV_PATH,
+        ])->assertSuccessful();
+
+        Http::fake(function (Request $request) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $context = $query['Caller-Context'] ?? 'missing';
+
+            return Http::response(
+                '<document type="freeswitch/xml"><section name="dialplan"><context name="'.$context.'"></context></section></document>',
+                200,
+                [
+                    'X-TallPBX-Handler-Ms' => '4.20',
+                    'X-TallPBX-Request-Ms' => '31.50',
+                    'X-TallPBX-DB-Queries' => '2',
+                ],
+            );
+        });
+
+        $this->artisan('pbx:load-test:dialplan', [
+            '--tenant' => 'load-test-timing',
+            '--url' => 'https://pbx.test/api/v1/xml-handler',
+            '--scenario' => 'internal',
+            '--requests' => '3',
+            '--concurrency' => '1',
+            '--timing' => true,
+            '--report' => PBX_LOAD_TEST_REPORT_PATH,
+        ])->assertSuccessful();
+
+        Http::assertSent(fn (Request $request): bool => $request->hasHeader('X-TallPBX-Timing', '1'));
+
+        $report = json_decode((string) file_get_contents(base_path(PBX_LOAD_TEST_REPORT_PATH)), true);
+
+        expect($report['schema_version'])->toBe(2)
+            ->and($report['timing']['enabled'])->toBeTrue()
+            ->and($report['timing']['request_ms']['p95'])->toBe(31.5)
+            ->and($report['timing']['handler_ms']['p50'])->toBe(4.2)
+            ->and($report['timing']['db_queries']['max'])->toBe(2)
+            ->and($report['timing']['by_section']['dialplan']['count'])->toBe(3)
+            ->and(array_keys($report['latency_ms']))->toBe([
+                'sample_count', 'missing_count', 'average', 'min', 'max',
+                'p50', 'p90', 'p95', 'p99', 'std_dev', 'raw_samples',
+            ]);
     });
 });

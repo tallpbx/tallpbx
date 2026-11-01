@@ -342,6 +342,19 @@ return [
 
         /*
         |--------------------------------------------------------------------------
+        | Timing Response Headers (Load-Test Harness)
+        |--------------------------------------------------------------------------
+        |
+        | When enabled, XML handler responses include app-side timing headers,
+        | but only for callers that explicitly send "X-TallPBX-Timing: 1".
+        | This lets the load-test harness record Laravel-side latency without
+        | parsing log files. Keep this disabled on production appliances.
+        |
+        */
+        'timing_headers' => filter_var(env('FS_XML_HANDLER_TIMING_HEADERS', false), FILTER_VALIDATE_BOOLEAN),
+
+        /*
+        |--------------------------------------------------------------------------
         | FreeSWITCH XML Handler Caching
         |--------------------------------------------------------------------------
         |

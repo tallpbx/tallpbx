@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Services\DialplanContext;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -30,6 +31,9 @@ use Modules\Extensions\Models\Extension;
     {--requests=100 : Total dialplan XML requests to send}
     {--concurrency=10 : Maximum concurrent XML handler requests}
     {--scenario=mixed : Scenario: internal, inbound, outbound, mixed, or cache-hit}
+    {--section=dialplan : Section mode: dialplan, directory, or mixed}
+    {--domain= : Domain used for directory lookups; defaults to the first SIP domain of the tenant}
+    {--timing : Request and record app-side timing headers}
     {--timeout=10 : Per-request timeout in seconds}
     {--token= : Optional XML handler bearer token}
     {--label= : Optional human-readable label stored in the JSON report}
@@ -70,6 +74,19 @@ class PbxDialplanLoadTestCommand extends Command
         $concurrency = $this->integerOption('concurrency', minimum: 1, maximum: 1000);
         $timeout = $this->integerOption('timeout', minimum: 1, maximum: 300);
         $scenario = $this->scenarioOption();
+        $section = $this->sectionOption();
+        $timing = (bool) $this->option('timing');
+
+        // Directory lookups need the SIP domain; dialplan-only runs keep working
+        // on tenants without one, so resolve it lazily.
+        $domain = $section === 'dialplan' ? '' : $this->resolveDomain($tenant);
+
+        if ($section !== 'dialplan' && $domain === null) {
+            $this->components->error('No SIP domain found for directory lookups. Seed the tenant or pass --domain.');
+
+            return self::FAILURE;
+        }
+
         $url = $this->xmlHandlerUrl();
         $token = $this->option('token');
         $label = $this->nullableStringOption('label');
@@ -82,7 +99,9 @@ class PbxDialplanLoadTestCommand extends Command
         $queries = $this->buildQueries(
             requestCount: $requestCount,
             scenario: $scenario,
+            section: $section,
             tenantId: (string) $tenant->id,
+            domain: (string) $domain,
             extensions: $extensions,
             dialplanContext: $dialplanContext,
         );
@@ -91,16 +110,21 @@ class PbxDialplanLoadTestCommand extends Command
         $this->components->twoColumnDetail('Endpoint', $url);
         $this->components->twoColumnDetail('Tenant', "{$tenant->slug} ({$tenant->id})");
         $this->components->twoColumnDetail('Scenario', $scenario);
+        $this->components->twoColumnDetail('Section', $section);
         $this->components->twoColumnDetail('Requests', (string) $requestCount);
         $this->components->twoColumnDetail('Concurrency', (string) $concurrency);
 
         $started = hrtime(true);
-        $results = $this->sendRequests($url, $queries, $concurrency, $timeout, is_string($token) && $token !== '' ? $token : null);
+        $results = $this->sendRequests($url, $queries, $concurrency, $timeout, is_string($token) && $token !== '' ? $token : null, $timing);
         $elapsedMs = (hrtime(true) - $started) / 1_000_000;
 
         $report = $this->buildReport(
             tenant: $tenant,
             scenario: $scenario,
+            section: $section,
+            sectionCounts: $this->sectionCounts($queries),
+            scenarioCounts: $this->scenarioCounts($queries, $scenario),
+            timingEnabled: $timing,
             url: $url,
             requestCount: $requestCount,
             concurrency: $concurrency,
@@ -125,6 +149,10 @@ class PbxDialplanLoadTestCommand extends Command
             ['Report', $this->resolveReportPath($reportPath)],
         ];
 
+        if ($report['timing']['enabled']) {
+            $tableRows[] = ['App-side p95 ms', (string) ($report['timing']['request_ms']['p95'] ?? 'n/a')];
+        }
+
         if (isset($report['environment']['redis']['used_memory_human'])) {
             $redisInfo = $report['environment']['redis'];
             $maxMem = $redisInfo['maxmemory_human'] ?? 'uncapped';
@@ -143,10 +171,10 @@ class PbxDialplanLoadTestCommand extends Command
     /**
      * Send XML handler requests in concurrent chunks.
      *
-     * @param  array<int, array<string, string>>  $queries
-     * @return array<int, array{ok: bool, status: int|null, milliseconds: float|null, error: string|null}>
+     * @param  array<int, array{section: string, params: array<string, string>}>  $queries
+     * @return array<int, array{ok: bool, status: int|null, milliseconds: float|null, error: string|null, section: string, handler_ms: float|null, request_ms: float|null, db_queries: int|null}>
      */
-    private function sendRequests(string $url, array $queries, int $concurrency, int $timeout, ?string $token): array
+    private function sendRequests(string $url, array $queries, int $concurrency, int $timeout, ?string $token, bool $timing = false): array
     {
         $results = [];
 
@@ -154,10 +182,10 @@ class PbxDialplanLoadTestCommand extends Command
             $timings = [];
 
             try {
-                $responses = Http::pool(function (Pool $pool) use ($chunk, $url, $timeout, $token, &$timings): array {
+                $responses = Http::pool(function (Pool $pool) use ($chunk, $url, $timeout, $token, $timing, &$timings): array {
                     $requests = [];
 
-                    foreach ($chunk as $key => $query) {
+                    foreach ($chunk as $key => $item) {
                         $pending = $pool->as((string) $key)
                             ->timeout($timeout)
                             ->accept('application/xml')
@@ -174,25 +202,34 @@ class PbxDialplanLoadTestCommand extends Command
                             $pending = $pending->withToken($token);
                         }
 
-                        $requests[] = $pending->get($url, $query);
+                        // Opt-in: only ask for timing headers when the run wants them.
+                        if ($timing) {
+                            $pending = $pending->withHeaders(['X-TallPBX-Timing' => '1']);
+                        }
+
+                        $requests[] = $pending->get($url, $item['params']);
                     }
 
                     return $requests;
                 }, concurrency: $concurrency);
             } catch (ConnectionException $exception) {
-                foreach (array_keys($chunk) as $key) {
+                foreach ($chunk as $key => $item) {
                     $results[$key] = [
                         'ok' => false,
                         'status' => null,
                         'milliseconds' => null,
                         'error' => $exception->getMessage(),
+                        'section' => $item['section'],
+                        'handler_ms' => null,
+                        'request_ms' => null,
+                        'db_queries' => null,
                     ];
                 }
 
                 continue;
             }
 
-            foreach ($chunk as $key => $query) {
+            foreach ($chunk as $key => $item) {
                 $response = $responses[(string) $key] ?? null;
 
                 if (! $response instanceof Response) {
@@ -201,21 +238,26 @@ class PbxDialplanLoadTestCommand extends Command
                         'status' => null,
                         'milliseconds' => $timings[$key] ?? null,
                         'error' => 'No response returned by HTTP pool.',
+                        'section' => $item['section'],
+                        'handler_ms' => null,
+                        'request_ms' => null,
+                        'db_queries' => null,
                     ];
 
                     continue;
                 }
 
-                $body = $response->body();
-                $ok = $response->successful()
-                    && str_contains($body, '<section name="dialplan">')
-                    && str_contains($body, '<context name="'.$query['Caller-Context'].'">');
+                $ok = $this->responseMatchesSection($item['section'], $item['params'], $response);
 
                 $results[$key] = [
                     'ok' => $ok,
                     'status' => $response->status(),
                     'milliseconds' => $timings[$key] ?? null,
                     'error' => $ok ? null : 'Unexpected XML handler response.',
+                    'section' => $item['section'],
+                    'handler_ms' => $this->floatHeader($response, 'X-TallPBX-Handler-Ms'),
+                    'request_ms' => $this->floatHeader($response, 'X-TallPBX-Request-Ms'),
+                    'db_queries' => $this->intHeader($response, 'X-TallPBX-DB-Queries'),
                 ];
             }
         }
@@ -226,22 +268,94 @@ class PbxDialplanLoadTestCommand extends Command
     }
 
     /**
-     * Build a complete set of XML handler dialplan query parameters.
+     * Read a numeric timing header as a float, or null when absent.
+     */
+    private function floatHeader(Response $response, string $name): ?float
+    {
+        $value = $response->header($name);
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    /**
+     * Read a numeric count header as an integer, or null when absent.
+     */
+    private function intHeader(Response $response, string $name): ?int
+    {
+        $value = $response->header($name);
+
+        return is_numeric($value) ? (int) $value : null;
+    }
+
+    /**
+     * Determine whether a response carries the XML expected for its section.
+     *
+     * @param  array<string, string>  $params
+     */
+    private function responseMatchesSection(string $section, array $params, Response $response): bool
+    {
+        if (! $response->successful()) {
+            return false;
+        }
+
+        $body = $response->body();
+
+        if ($section === 'directory') {
+            return str_contains($body, '<section name="directory">');
+        }
+
+        $context = $params['Caller-Context'] ?? '';
+
+        return str_contains($body, '<section name="dialplan">')
+            && str_contains($body, '<context name="'.$context.'">');
+    }
+
+    /**
+     * Build a complete set of XML handler query parameters.
      *
      * @param  array<int, string>  $extensions
-     * @return array<int, array<string, string>>
+     * @return array<int, array{section: string, params: array<string, string>}>
      */
-    private function buildQueries(int $requestCount, string $scenario, string $tenantId, array $extensions, DialplanContext $dialplanContext): array
+    private function buildQueries(int $requestCount, string $scenario, string $section, string $tenantId, string $domain, array $extensions, DialplanContext $dialplanContext): array
     {
         $queries = [];
+        $dialplanIndex = 0;
 
         for ($index = 0; $index < $requestCount; $index++) {
+            // Mixed mode mirrors a real call flow: two directory auth lookups
+            // (caller authentication and destination location) per dialplan
+            // lookup.
+            $selectedSection = match ($section) {
+                'directory' => 'directory',
+                'mixed' => ($index % 3 < 2) ? 'directory' : 'dialplan',
+                default => 'dialplan',
+            };
+
+            if ($selectedSection === 'directory') {
+                $user = $extensions[$index % count($extensions)];
+
+                $queries[] = [
+                    'section' => 'directory',
+                    'params' => [
+                        'section' => 'directory',
+                        'tag_name' => 'user',
+                        'key_name' => 'name',
+                        'key_value' => $user,
+                        'domain' => $domain,
+                        'sip_auth_username' => $user,
+                        'user' => $user,
+                    ],
+                ];
+
+                continue;
+            }
+
             $selectedScenario = $scenario === 'mixed'
-                ? ['internal', 'inbound', 'outbound'][$index % 3]
+                ? ['internal', 'inbound', 'outbound'][$dialplanIndex % 3]
                 : $scenario;
 
-            $caller = $extensions[$index % count($extensions)];
-            $destination = $extensions[($index + 1) % count($extensions)];
+            $caller = $extensions[$dialplanIndex % count($extensions)];
+            $destination = $extensions[($dialplanIndex + 1) % count($extensions)];
             $context = $dialplanContext->internal($tenantId);
 
             if ($selectedScenario === 'cache-hit') {
@@ -257,10 +371,15 @@ class PbxDialplanLoadTestCommand extends Command
 
             $queries[] = [
                 'section' => 'dialplan',
-                'Caller-Context' => $context,
-                'Caller-Destination-Number' => $destination,
-                'Caller-Caller-ID-Number' => $caller,
+                'params' => [
+                    'section' => 'dialplan',
+                    'Caller-Context' => $context,
+                    'Caller-Destination-Number' => $destination,
+                    'Caller-Caller-ID-Number' => $caller,
+                ],
             ];
+
+            $dialplanIndex++;
         }
 
         return $queries;
@@ -269,37 +388,18 @@ class PbxDialplanLoadTestCommand extends Command
     /**
      * Build the JSON-serializable load test report.
      *
-     * @param  array<int, array{ok: bool, status: int|null, milliseconds: float|null, error: string|null}>  $results
+     * @param  array<int, array{ok: bool, status: int|null, milliseconds: float|null, error: string|null, section: string, handler_ms: float|null, request_ms: float|null, db_queries: int|null}>  $results
      * @return array<string, mixed>
      */
-    private function buildReport(Tenant $tenant, string $scenario, string $url, int $requestCount, int $concurrency, int $timeout, ?string $label, array $thresholds, float $elapsedMs, array $results): array
+    private function buildReport(Tenant $tenant, string $scenario, string $section, array $sectionCounts, array $scenarioCounts, bool $timingEnabled, string $url, int $requestCount, int $concurrency, int $timeout, ?string $label, array $thresholds, float $elapsedMs, array $results): array
     {
         $successful = collect($results)->where('ok', true)->count();
         $failed = count($results) - $successful;
         $successRate = $requestCount > 0 ? round(($successful / $requestCount) * 100, 3) : 0.0;
         $failureRate = $requestCount > 0 ? round(($failed / $requestCount) * 100, 3) : 0.0;
-        $latencies = collect($results)
-            ->pluck('milliseconds')
-            ->filter(fn (?float $value): bool => $value !== null)
-            ->map(fn (float $value): float => round($value, 3))
-            ->sort()
-            ->values()
-            ->all();
-        $latencySummary = [
-            'sample_count' => count($latencies),
-            // Requests that never reported a transfer time (timeouts or connection errors).
-            'missing_count' => max(0, count($results) - count($latencies)),
-            'average' => $latencies === [] ? null : round(array_sum($latencies) / count($latencies), 3),
-            'min' => $latencies === [] ? null : min($latencies),
-            'max' => $latencies === [] ? null : max($latencies),
-            'p50' => $this->percentile($latencies, 50),
-            'p90' => $this->percentile($latencies, 90),
-            'p95' => $this->percentile($latencies, 95),
-            'p99' => $this->percentile($latencies, 99),
-            'std_dev' => $this->standardDeviation($latencies),
-            'raw_samples' => $latencies,
-        ];
+        $latencySummary = $this->summarizeValues(collect($results)->pluck('milliseconds')->all());
         $thresholdResults = $this->thresholdResults($failureRate, $latencySummary, $thresholds);
+        $timing = $this->timingSummary($results, $timingEnabled);
 
         return [
             'run' => [
@@ -309,6 +409,8 @@ class PbxDialplanLoadTestCommand extends Command
                 'git_dirty' => $this->gitDirty(),
             ],
             'generated_at' => now()->toIso8601String(),
+            // Schema 2 adds the additive timing block for app-side metrics.
+            'schema_version' => 2,
             'tenant_slug' => $tenant->slug,
             'tenant_id' => $tenant->id,
             'scenario' => $scenario,
@@ -318,7 +420,9 @@ class PbxDialplanLoadTestCommand extends Command
                 'concurrency' => $concurrency,
                 'timeout_seconds' => $timeout,
                 'network_interface' => $this->nullableStringOption('interface'),
-                'scenario_counts' => $this->scenarioCounts($scenario, $requestCount),
+                'scenario_counts' => $scenarioCounts,
+                'section' => $section,
+                'section_counts' => $sectionCounts,
             ],
             'environment' => $this->environmentSnapshot(),
             'total_requests' => $requestCount,
@@ -330,6 +434,7 @@ class PbxDialplanLoadTestCommand extends Command
             'elapsed_seconds' => round($elapsedMs / 1000, 3),
             'requests_per_second' => $elapsedMs > 0 ? round($requestCount / ($elapsedMs / 1000), 3) : 0.0,
             'latency_ms' => $latencySummary,
+            'timing' => $timing,
             'thresholds' => $thresholds,
             'threshold_results' => $thresholdResults,
             'passed' => $thresholdResults === [],
@@ -345,20 +450,96 @@ class PbxDialplanLoadTestCommand extends Command
     }
 
     /**
-     * Count which scenario types are expected in the request batch.
+     * Summarize millisecond samples into the report latency shape.
      *
+     * @param  array<int, float|null>  $samples
+     * @return array{sample_count: int, missing_count: int, average: float|null, min: float|null, max: float|null, p50: float|null, p90: float|null, p95: float|null, p99: float|null, std_dev: float|null, raw_samples: array<int, float>}
+     */
+    private function summarizeValues(array $samples): array
+    {
+        $latencies = collect($samples)
+            ->filter(fn (?float $value): bool => $value !== null)
+            ->map(fn (float $value): float => round($value, 3))
+            ->sort()
+            ->values()
+            ->all();
+
+        return [
+            'sample_count' => count($latencies),
+            // Samples that never reported a value (timeouts, connection errors,
+            // or runs without the timing headers enabled).
+            'missing_count' => max(0, count($samples) - count($latencies)),
+            'average' => $latencies === [] ? null : round(array_sum($latencies) / count($latencies), 3),
+            'min' => $latencies === [] ? null : min($latencies),
+            'max' => $latencies === [] ? null : max($latencies),
+            'p50' => $this->percentile($latencies, 50),
+            'p90' => $this->percentile($latencies, 90),
+            'p95' => $this->percentile($latencies, 95),
+            'p99' => $this->percentile($latencies, 99),
+            'std_dev' => $this->standardDeviation($latencies),
+            'raw_samples' => $latencies,
+        ];
+    }
+
+    /**
+     * Build the additive app-side timing block for the report.
+     *
+     * @param  array<int, array{ok: bool, status: int|null, milliseconds: float|null, error: string|null, section: string, handler_ms: float|null, request_ms: float|null, db_queries: int|null}>  $results
+     * @return array<string, mixed>
+     */
+    private function timingSummary(array $results, bool $enabled): array
+    {
+        $dbQueries = collect($results)
+            ->pluck('db_queries')
+            ->filter(fn (?int $value): bool => $value !== null);
+
+        // Per-section request_ms summaries separate directory work from
+        // dialplan work without splitting the run into two commands.
+        $bySection = [];
+        foreach (collect($results)->groupBy('section') as $sectionName => $group) {
+            $summary = $this->summarizeValues($group->pluck('request_ms')->all());
+            $bySection[$sectionName] = [
+                'count' => $group->count(),
+                'p50' => $summary['p50'],
+                'p95' => $summary['p95'],
+            ];
+        }
+
+        return [
+            'enabled' => $enabled,
+            'request_ms' => $this->summarizeValues(collect($results)->pluck('request_ms')->all()),
+            'handler_ms' => $this->summarizeValues(collect($results)->pluck('handler_ms')->all()),
+            'db_queries' => [
+                'average' => $dbQueries->isEmpty() ? null : round((float) $dbQueries->avg(), 3),
+                'max' => $dbQueries->isEmpty() ? null : (int) $dbQueries->max(),
+            ],
+            'by_section' => $bySection,
+        ];
+    }
+
+    /**
+     * Count which scenario types appear in the generated dialplan queries.
+     *
+     * @param  array<int, array{section: string, params: array<string, string>}>  $queries
      * @return array<string, int>
      */
-    private function scenarioCounts(string $scenario, int $requestCount): array
+    private function scenarioCounts(array $queries, string $scenario): array
     {
+        // Directory requests carry no dialplan scenario, so mixed-section
+        // reports must count only the dialplan lookups.
+        $dialplanCount = count(array_filter(
+            $queries,
+            fn (array $query): bool => $query['section'] === 'dialplan',
+        ));
+
         if ($scenario !== 'mixed') {
-            return [$scenario => $requestCount];
+            return [$scenario => $dialplanCount];
         }
 
         $counts = ['internal' => 0, 'inbound' => 0, 'outbound' => 0];
         $scenarios = array_keys($counts);
 
-        for ($index = 0; $index < $requestCount; $index++) {
+        for ($index = 0; $index < $dialplanCount; $index++) {
             $counts[$scenarios[$index % count($scenarios)]]++;
         }
 
@@ -666,6 +847,56 @@ class PbxDialplanLoadTestCommand extends Command
         }
 
         return $value;
+    }
+
+    /**
+     * Count queries per section so reports stay diff-stable.
+     *
+     * @param  array<int, array{section: string, params: array<string, string>}>  $queries
+     * @return array<string, int>
+     */
+    private function sectionCounts(array $queries): array
+    {
+        // Fixed order: directory first, dialplan second. Empty sections are
+        // omitted so dialplan-only reports keep a single-entry map.
+        $counts = ['directory' => 0, 'dialplan' => 0];
+
+        foreach ($queries as $query) {
+            $counts[$query['section']]++;
+        }
+
+        return array_filter($counts, fn (int $count): bool => $count > 0);
+    }
+
+    /**
+     * Resolve the SIP domain used for directory lookups.
+     */
+    private function resolveDomain(Tenant $tenant): ?string
+    {
+        $domain = $this->option('domain');
+
+        if (is_string($domain) && trim($domain) !== '') {
+            return trim($domain);
+        }
+
+        $tenantDomain = TenantDomain::where('tenant_id', $tenant->id)->value('domain');
+
+        return is_string($tenantDomain) && $tenantDomain !== '' ? $tenantDomain : null;
+    }
+
+    /**
+     * Resolve and validate the section option.
+     */
+    private function sectionOption(): string
+    {
+        $section = $this->stringOption('section');
+        $allowed = ['dialplan', 'directory', 'mixed'];
+
+        if (! in_array($section, $allowed, true)) {
+            throw new \InvalidArgumentException('The [section] option must be one of: '.implode(', ', $allowed).'.');
+        }
+
+        return $section;
     }
 
     /**
