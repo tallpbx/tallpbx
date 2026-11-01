@@ -148,8 +148,11 @@ final class XmlHandlerFastBootstrap
      */
     private static function boot(?Container $previous, Request $request): Application
     {
+        // A path relative to this file, not base_path(): helpers that resolve
+        // the application cannot work before the application is created, which
+        // is exactly the state a real front controller starts in.
         /** @var Application $app */
-        $app = require base_path('bootstrap/app.php');
+        $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 
         // The HTTP kernel binds the request before providers boot; the URL
         // generator and view sharing resolve it lazily, so it must exist first.
@@ -227,9 +230,13 @@ final class XmlHandlerFastBootstrap
         // identical to the one in routes/api.php.
         $router->aliasMiddleware('throttle', ThrottleRequests::class);
 
+        // Register the route at the path the request actually arrived on. The
+        // front controller is mounted wherever nginx points SCRIPT_FILENAME,
+        // which is not necessarily the canonical route path, and the handler
+        // does not depend on the URL it was reached through.
         $router->match(
             ['get', 'post'],
-            (string) config('freeswitch.xml_handler.path', '/api/v1/xml-handler'),
+            '/'.ltrim($request->path(), '/'),
             [XmlHandlerController::class, 'handle'],
         )
             ->middleware([LogXmlHandlerTiming::class, 'throttle:xml-handler'])

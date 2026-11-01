@@ -106,6 +106,27 @@ it('returns byte-identical XML for a dialplan with a ring group contributor', fu
     expect($fast->getContent())->toBe($normal->getContent());
 });
 
+it('serves the same XML when mounted at a different path', function (): void {
+    $canonical = '/api/v1/xml-handler?'.http_build_query([
+        'section' => 'directory',
+        'tag_name' => 'domain',
+        'domain' => 'example.com',
+        'key_value' => 'example.com',
+    ]);
+
+    $normal = $this->get($canonical);
+    $normal->assertOk();
+
+    // The front controller is mounted wherever nginx points SCRIPT_FILENAME,
+    // which is not necessarily the canonical route path. The handler must not
+    // depend on the URL it was reached through.
+    $mounted = str_replace('/api/v1/xml-handler', '/xml-handler-fast', $canonical);
+
+    $fast = XmlHandlerFastBootstrap::handle(Request::create($mounted, 'GET'));
+
+    expect($fast->getContent())->toBe($normal->getContent());
+});
+
 /**
  * Create a tenant with a SIP domain and one registered SIP account.
  *
