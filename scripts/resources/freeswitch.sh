@@ -19,6 +19,9 @@ cd "$(dirname "$0")"
 . ./config.sh
 . ./colors.sh
 . ./environment.sh
+# Helpers for the optional Lua directory cache. Kept in their own file so the
+# module-order and password decisions can be tested against fixtures.
+. ./freeswitch-lua-proxy.sh
 
 # Find the active FreeSWITCH configuration directory for either package or
 # source installations, falling back to the package location on fresh systems.
@@ -435,10 +438,6 @@ configure_lua_directory_cache() {
     local source_dir="${app_dir}/scripts/freeswitch"
     local installed_hiredis=""
     local redis_password_param=""
-    local escaped_password_param=""
-    local lua_line=""
-    local xml_curl_line=""
-    local temp_file=""
 
     conf_dir="$(freeswitch_conf_dir)"
     modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
@@ -454,40 +453,22 @@ configure_lua_directory_cache() {
     mkdir -p "$scripts_dir"
     install -m 0644 "${source_dir}/tallpbx_xml_handler.lua" "${scripts_dir}/tallpbx_xml_handler.lua"
 
-    # Carry an operator-supplied Redis password into the replacement profile.
-    # Dropping it would leave every lookup failing with -NOAUTH, which stops
-    # the cache at runtime without any visible error.
-    if [ -f "$installed_hiredis" ]; then
-        # Match only an active parameter: the template ships the same element
-        # commented out, and carrying that over would embed a comment inside
-        # the replacement's own comment.
-        redis_password_param="$(grep -oE '^[[:space:]]*<param name="password" value="[^"]*"[[:space:]]*/>' "$installed_hiredis" | head -1 | sed 's/^[[:space:]]*//' || true)"
-    fi
+    # Decide the password before the template overwrites the existing profile.
+    # The helper only inherits one when the old profile was already local, and
+    # otherwise reads the application's own REDIS_PASSWORD, so the Debian
+    # sample for 172.18.101.101 is never carried onto 127.0.0.1.
+    redis_password_param="$(tallpbx_resolve_hiredis_password "$installed_hiredis" "${app_dir}/.env")"
 
     install -m 0644 "${source_dir}/lua.conf.xml" "${conf_dir}/autoload_configs/lua.conf.xml"
     install -m 0644 "${source_dir}/hiredis.conf.xml" "$installed_hiredis"
 
-    if [ -n "$redis_password_param" ]; then
-        escaped_password_param="$(printf '%s' "$redis_password_param" | sed 's/[&|]/\\&/g')"
-        sed -i "s|.*CHANGE_ME.*|          ${escaped_password_param}|" "$installed_hiredis"
-    fi
+    # Leaves the parameter commented out when there is no real password.
+    tallpbx_apply_hiredis_password "$installed_hiredis" "$redis_password_param"
 
     # mod_lua must load before mod_xml_curl. FreeSWITCH appends XML search
     # bindings and tries them in load order, so a later module is never asked.
     ensure_freeswitch_module_enabled "$modules_conf" "mod_lua" "<!-- Languages -->"
-
-    lua_line="$(grep -n '<load module="mod_lua"/>' "$modules_conf" | head -1 | cut -d: -f1)"
-    xml_curl_line="$(grep -n '<load module="mod_xml_curl"/>' "$modules_conf" | head -1 | cut -d: -f1)"
-
-    if [ -n "$lua_line" ] && [ -n "$xml_curl_line" ] && [ "$lua_line" -gt "$xml_curl_line" ]; then
-        temp_file="$(mktemp)"
-        awk '
-            /<load module="mod_lua"\/>/ { held = $0; next }
-            /<load module="mod_xml_curl"\/>/ && !placed { if (held != "") print held; placed = 1 }
-            { print }
-        ' "$modules_conf" > "$temp_file"
-        mv "$temp_file" "$modules_conf"
-    fi
+    tallpbx_move_mod_lua_before_xml_curl "$modules_conf"
 
     chown freeswitch:freeswitch "$modules_conf" "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
     chmod 0644 "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true

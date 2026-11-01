@@ -24,10 +24,113 @@ it('deploys the optional lua directory cache without enabling it', function (): 
 });
 
 it('preserves an operator supplied hiredis password across installer re-runs', function (): void {
-    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch-lua-proxy.sh'));
 
     // Only an active parameter may be carried over; the template ships the
     // same element commented out, which must not be mistaken for a value.
     expect($script)->toContain('^[[:space:]]*<param name="password" value="[^"]*"')
         ->and($script)->toContain('CHANGE_ME');
+});
+
+/**
+ * Run one helper from the Lua proxy script against a fixture file.
+ *
+ * @param  string  $command  Shell snippet naming the helper and its arguments
+ */
+function runLuaProxyHelper(string $command): string
+{
+    $script = base_path('scripts/resources/freeswitch-lua-proxy.sh');
+
+    return (string) shell_exec(sprintf('bash -c %s 2>&1', escapeshellarg('. "'.$script.'"; '.$command)));
+}
+
+/**
+ * Create a throwaway file and return its path, registering cleanup.
+ */
+function tempFixture(string $contents): string
+{
+    $path = sys_get_temp_dir().'/luaproxy-'.uniqid().'.xml';
+    file_put_contents($path, $contents);
+
+    return $path;
+}
+
+it('moves mod_lua ahead of mod_xml_curl without losing the line', function (): void {
+    // The stock Debian order loads mod_xml_curl first, which is exactly the
+    // case the old inline rewrite got wrong: it held the mod_lua line and
+    // never printed it, so the module silently stopped loading.
+    $file = tempFixture(<<<'XML'
+<configuration name="modules.conf" description="Modules">
+  <modules>
+    <load module="mod_console"/>
+    <load module="mod_xml_curl"/>
+    <load module="mod_sofia"/>
+    <load module="mod_lua"/>
+    <load module="mod_dptools"/>
+  </modules>
+</configuration>
+XML);
+
+    runLuaProxyHelper('tallpbx_move_mod_lua_before_xml_curl '.escapeshellarg($file));
+
+    $contents = (string) file_get_contents($file);
+    $lua = strpos($contents, '<load module="mod_lua"/>');
+    $curl = strpos($contents, '<load module="mod_xml_curl"/>');
+
+    expect($lua)->not->toBeFalse()
+        ->and($curl)->not->toBeFalse()
+        ->and($lua)->toBeLessThan($curl)
+        // Exactly one copy, and no neighbouring module lost on the way.
+        ->and(substr_count($contents, '<load module="mod_lua"/>'))->toBe(1)
+        ->and(substr_count($contents, '<load module="mod_xml_curl"/>'))->toBe(1)
+        ->and($contents)->toContain('mod_console')
+        ->and($contents)->toContain('mod_dptools');
+
+    unlink($file);
+});
+
+it('refuses to carry a password meant for another host', function (): void {
+    // The Debian package ships a sample profile pointing at 172.18.101.101
+    // with the password "redis". Carried onto 127.0.0.1 it produces -NOAUTH
+    // on every lookup, and the cache fails silently for ever.
+    $installed = tempFixture(<<<'XML'
+<configuration name="hiredis.conf">
+  <connections>
+    <connection name="primary">
+      <param name="hostname" value="172.18.101.101"/>
+      <param name="password" value="redis"/>
+      <param name="port" value="6379"/>
+    </connection>
+  </connections>
+</configuration>
+XML);
+    $env = tempFixture("REDIS_PASSWORD=null\n");
+
+    $resolved = trim(runLuaProxyHelper('tallpbx_resolve_hiredis_password '.escapeshellarg($installed).' '.escapeshellarg($env)));
+
+    expect($resolved)->toBe('');
+
+    unlink($installed);
+    unlink($env);
+});
+
+it('uses the application redis password when one is configured', function (): void {
+    $installed = tempFixture(<<<'XML'
+<configuration name="hiredis.conf">
+  <connections>
+    <connection name="primary">
+      <param name="hostname" value="127.0.0.1"/>
+      <param name="port" value="6379"/>
+    </connection>
+  </connections>
+</configuration>
+XML);
+    $env = tempFixture("REDIS_PASSWORD=secret-value\n");
+
+    $resolved = trim(runLuaProxyHelper('tallpbx_resolve_hiredis_password '.escapeshellarg($installed).' '.escapeshellarg($env)));
+
+    expect($resolved)->toBe('secret-value');
+
+    unlink($installed);
+    unlink($env);
 });
