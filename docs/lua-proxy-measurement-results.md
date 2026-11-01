@@ -120,10 +120,23 @@ Proceed with Phase 1 of the v2 plan (Tasks 2–7): mirror namespace, version mir
 | Lua serves the hit | second `find_user_xml` | 0 xml-handler requests; output byte-identical to the PHP-rendered document |
 | Immediate invalidation | revision bump, then two lookups | first lookup missed to PHP, second hit; payload key moved from `:v0` to `:v1` |
 | Content freshness | extension edit (observer bump), lookup, revert | the edited value appeared in the mirrored document on the very next lookup; the revert propagated the same way |
+| Credential freshness (SIP layer) | rotate a load-test SIP password, then SIPp REGISTER with the new and old passwords | new password: 401 challenge → **200 OK** with exactly 1 PHP request (bump → miss → rebuild); old password: 401 → **403 Forbidden** with **0 PHP requests**, so Lua served the current credential |
 | Multi-tenant isolation | same extension number on two tenants | distinct tenant maps and payload keys; documents carry `tenant_id` 2 and 7 |
 | Corrupt payload | overwrite a payload with `<document` | lookup served by `mod_xml_curl`, document correct, mirror re-warmed |
 | Rollback | comment the two bindings, restart | every lookup returned to PHP; restoring the bindings restored hits |
 | Cost, Lua vs PHP | 20 sequential `find_user_xml` per path (about 74 ms of `fs_cli` overhead per call) | **PHP 322 ms average, 20 PHP requests** vs **Lua 53 ms average, 0 PHP requests** |
+| Lookup cost, repeated run | 30 `find_user_xml` lookups versus 30 bare `status` calls (both through `fs_cli`) | lookups averaged 60 ms against a 38 ms event-socket floor, i.e. about 22 ms per cached lookup, 0 PHP requests |
+
+### App-side load run (Task 1 harness, proxy enabled)
+
+The Task 1 harness measures the PHP miss path, not the in-process hit, so these numbers bound the fallback cost with mirroring active. Directory section, tenant `acme`, two tiers, request timing headers enabled:
+
+| Tier | Success | Throughput | `request_ms` p50 | `request_ms` p95 | `handler_ms` p50 | `handler_ms` p95 | DB queries (avg) |
+|:--|:--|:--|:--|:--|:--|:--|:--|
+| 25 x 1 | 25/25 | 3.55 req/s | 265.7 ms | 425.3 ms | 19.4 ms | 53.4 ms | 0.56 |
+| 100 x 5 | 100/100 | 8.77 req/s | 416.2 ms | 598.2 ms | 24.5 ms | 93.2 ms | 0 |
+
+As in §6, most of the request time is framework boot and worker queueing, not XML generation — the surface the in-process hit removes. The mirror writes add three Redis `SET`s and two reads per lookup, which is negligible beside the boot cost.
 
 **Decision: KEEP on the reference appliance.** The feature stays off by default for fresh installs (`FS_LUA_PROXY_ENABLED=false`); this host is enabled deliberately as the reference deployment.
 
