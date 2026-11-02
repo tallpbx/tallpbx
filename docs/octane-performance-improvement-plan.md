@@ -1,12 +1,12 @@
-# Octane & FrankenPHP Performance Improvement Plan
+# Octane & RoadRunner Performance Improvement Plan (Lean Telephony XML Worker)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Eliminate the PHP-FPM process-boot bottleneck for FreeSWITCH dynamic XML by running the XML Handler endpoint under a persistent resident Laravel worker (FrankenPHP via Laravel Octane) on `127.0.0.1:8090`, dropping lookup latency from ~80–200 ms to <3 ms and raising single-core throughput from ~20 req/s to 2,500+ req/s while retaining 100% of existing Laravel modular dialplan contributors and tests.
+**Goal:** Eliminate the PHP-FPM process-boot bottleneck for FreeSWITCH dynamic XML by running the XML Handler endpoint under a persistent resident, lean Laravel worker (RoadRunner via Laravel Octane) on `127.0.0.1:8090`, dropping lookup latency from ~80–200 ms to <3 ms and raising single-core throughput from ~20 req/s to 2,500+ req/s while retaining 100% of existing Laravel modular dialplan contributors and tests.
 
-**Architecture:** A persistent, resident PHP engine boots Laravel once in memory and listens for FreeSWITCH `mod_xml_curl` HTTP requests on loopback port 8090. Redis (DB 1) provides sub-millisecond cache hits with atomic lock thundering-herd protection. On cache misses, pre-connected PDO connections query MariaDB in ~2 ms using existing `DirectoryXmlBuilder` and `DialplanXmlBuilder` services. A dedicated post-request listener strictly clears tenant state to guarantee cross-tenant isolation. The fast controller and the `mod_hiredis` + Lua proxy are completely disabled (while preserving their code for rollback safety).
+**Architecture:** A persistent, resident PHP engine powered by RoadRunner boots a lean Laravel worker in memory and listens for FreeSWITCH `mod_xml_curl` HTTP requests on loopback port 8090. Unlike full-stack web serving, this worker runs in a strictly scoped, lean telephony context—omitting session, CSRF, Livewire, and Blade overhead. Redis (DB 1) provides sub-millisecond cache hits with atomic lock thundering-herd protection. On cache misses, pre-connected PDO connections query MariaDB in ~2 ms using existing `DirectoryXmlBuilder` and `DialplanXmlBuilder` services. A dedicated post-request listener strictly clears tenant state to guarantee cross-tenant isolation. The fast controller and the `mod_hiredis` + Lua proxy are completely disabled (while preserving their code for rollback safety). Standard administrative web traffic remains on PHP-FPM/Nginx.
 
-**Tech Stack:** Laravel 13, Laravel Octane 2.x, FrankenPHP, FreeSWITCH 1.11 (`mod_xml_curl`), Redis 7, MariaDB 11, Pest.
+**Tech Stack:** Laravel 13, Laravel Octane 2.x, RoadRunner (Go supervisor + standard Debian PHP 8.5 CLI), FreeSWITCH 1.11 (`mod_xml_curl`), Redis 7, MariaDB 11, Pest.
 
 **Spec:** Direct investigation report and architectural spec formulated in conversation `04069f8f-6f41-484a-b8e5-96fbd63d85a9`.
 
@@ -27,13 +27,16 @@
    - **Mirroring Overhead**: Mirroring XML payloads on PHP requests imposed an 18% to 31% throughput penalty on PHP-FPM during saturation.
    - **Thundering Herds on Misses**: Any cache miss, cold start, or unmapped context dropped out of Lua and slammed directly into PHP-FPM, which still collapsed under concurrency.
 
-4. **FrankenPHP / Octane is the Superior, Robust Tradeoff**:
-   Running the FreeSWITCH XML Handler under a persistent resident worker engine (FrankenPHP via Laravel Octane) represents a far better architectural tradeoff:
+4. **RoadRunner & Octane as a Lean Telephony Worker is the Superior Tradeoff**:
+   Running the FreeSWITCH XML Handler under a persistent resident worker engine (RoadRunner via Laravel Octane) represents a far better architectural tradeoff than full-stack web servers or in-process C/Lua modules:
+   - **Lean Telephony Scoping (Not Full Stack)**: The worker is configured strictly for stateless telephony XML generation (~65 MB RAM per worker). Web sessions, cookie encryption, CSRF verification, Livewire, and Blade template rendering remain completely isolated to PHP-FPM and Nginx (ports 80/443).
+   - **Process Isolation via Binary IPC Pipes**: RoadRunner isolates PHP in child worker processes communicating via binary IPC pipes with a Go process supervisor. If a PHP worker encounters a fatal error or segfaults, only that child worker is recycled by RoadRunner without crashing the supervisor or the host web server (unlike CGO shared-memory crashes).
+   - **Standard Debian PHP Toolchain**: RoadRunner executes Debian's standard `/usr/bin/php` (PHP 8.5.12) with standard APT extensions (`php8.5-mysql`, `php8.5-redis`), eliminating third-party bundled CGO PHP binaries and ensuring seamless security updates via `apt upgrade`.
    - **Raw Performance Without Boot Overhead**: The framework, database connection pool, and modular contributors stay resident in memory. Cache hits return in <1 ms; cache misses render in ~2 ms.
    - **No Lua Code to Maintain**: Eliminates the custom Lua proxy script, `mod_hiredis` dependency, and cross-language epoch synchronization.
    - **Protects the Database via Redis**: Standard Redis caching handles high-volume lookups with atomic locking to prevent cache stampedes.
    - **Preserves 100% of Laravel Architecture**: All existing Eloquent models, tenant isolation rules, modular `DialplanXmlContributor` plugins, and Pest test suites continue to function without rewriting business logic into Lua or C.
-   - **Net Reduction in System Fragility**: By replacing two disjoint systems (PHP-FPM + custom Lua/hiredis bridge) with a single, high-concurrency resident PHP daemon, the overall system becomes drastically simpler and more robust.
+   - **Net Memory Savings**: Because the persistent worker handles 100% of high-concurrency telephony queries, the main PHP-FPM pool can be reduced from 12 static workers (540 MB) to 3 workers (120 MB). Combined with 2–4 lean RoadRunner workers (130–260 MB), the overall server memory footprint drops by ~200–350 MB RAM while dramatically boosting throughput.
 
 ---
 
@@ -43,6 +46,7 @@
 - **Zero regression in generated XML**: The XML returned by the persistent worker must be byte-for-byte identical to the XML generated by the current `XmlHandlerController`.
 - **Strict tenant isolation**: In a resident environment where the container is not rebuilt per request, `TenantManager::clear()` must be executed deterministically on every request completion to ensure no tenant identity leaks across call legs.
 - **Fail-safe fallback**: If the persistent worker service is stopped or restarting, Nginx or FreeSWITCH must fail gracefully without dropping calls or causing endless timeouts.
+- **Lean Telephony Worker vs. Full-Stack Separation**: The persistent Octane daemon is strictly a lean telephony micro-worker, NOT a full-stack web application server. Administrative panel operations (`/panel`), user sessions, Livewire reactivity, and Blade views remain on standard PHP-FPM behind Nginx. The Octane worker serves only the FreeSWITCH loopback endpoints (`/api/v1/xml-handler`), avoiding session serialization, cookie decryption, and frontend view pipeline overhead.
 - **Administrative panel isolation**: The administrative web UI (`/panel`, Livewire, Blade) continues running on standard PHP-FPM and Nginx (ports 80/443). The persistent worker is dedicated exclusively to telephony runtime requests.
 - **Verification discipline**: All code changes must pass `./vendor/bin/pint --dirty` and targeted Pest tests before staging.
 
@@ -53,36 +57,42 @@
 1. **State Leakage Across Requests**: A tenant ID or authenticated user resolved in request $N$ persists into request $N+1$ on the same worker process.
 2. **Database & Redis Connection Drift**: Long-lived worker connections timing out or entering broken transaction states after idle periods.
 3. **Thundering Herd During Registrations**: Simultaneous registration requests from hundreds of phones forcing concurrent redundant XML builds instead of waiting on a shared lock.
-4. **Service Crash Recovery**: FrankenPHP worker crashing under unexpected fatal errors; systemd must auto-restart with zero human intervention.
+4. **Service Crash Recovery**: Worker crashing under unexpected fatal errors; RoadRunner automatically recycles the dead PHP worker via binary IPC, and systemd supervises the top-level daemon with auto-restart.
 5. **Cache Invalidation Latency**: An extension password or dialplan routing change in the UI must immediately invalidate the persistent worker's Redis cache entry so calls route immediately.
 
 ---
 
-### Task 1: Octane & FrankenPHP Integration & Minimal Proof of Concept
+### Task 1: Octane & RoadRunner Integration (Lean Worker Setup) & Minimal Proof of Concept
 
 **Files:**
 - Modify: `composer.json`
+- Create: `.rr.yaml`
 - Modify: `config/octane.php`
 - Modify: `config/freeswitch.php`
 - Test: `tests/Feature/Http/XmlHandlerOctaneParityTest.php`
 
 **Interfaces:**
 - Consumes: `App\Http\Controllers\Api\XmlHandlerController::handle(Request $request): Response`
-- Produces: Persistent HTTP listener on `127.0.0.1:8090/api/v1/xml-handler`
+- Produces: Persistent HTTP listener on `127.0.0.1:8090/api/v1/xml-handler` (lean worker)
 
 - [ ] **Step 1: Write parity test comparing XML output**
 
 Write `tests/Feature/Http/XmlHandlerOctaneParityTest.php` asserting that directory and dialplan requests handled through standard container dispatch produce identical XML strings for a seeded tenant.
 
-- [ ] **Step 2: Require `laravel/octane`**
+- [ ] **Step 2: Require `laravel/octane` and install RoadRunner**
 
-Run: `COMPOSER_ALLOW_SUPERUSER=1 composer require laravel/octane`
+Run: `COMPOSER_ALLOW_SUPERUSER=1 composer require laravel/octane spiral/roadrunner-cli`
 Verify package is resolved cleanly for Laravel 13 and PHP 8.5.
 
-- [ ] **Step 3: Publish and configure Octane**
+- [ ] **Step 3: Publish and configure Octane with RoadRunner**
 
-Run: `php artisan octane:install --server=frankenphp`
-Configure `config/octane.php` to set FrankenPHP as default server, disable unnecessary listeners, and register request boundary cleaners.
+Run: `php artisan octane:install --server=roadrunner`
+Configure `.rr.yaml` and `config/octane.php`:
+- Bind HTTP listener strictly to loopback: `127.0.0.1:8090`.
+- Configure worker command to use standard Debian `/usr/bin/php`.
+- Tune worker pool for lean telephony: `num_workers: 2` (or `4` based on CPU cores), `max_jobs: 10000`, `allocate_timeout: 60s`.
+- Disable unnecessary listeners (session warming, frontend assets) to maintain a lean worker footprint.
+- Register request boundary cleaners.
 
 - [ ] **Step 4: Verify Octane starts in test mode**
 
@@ -93,8 +103,8 @@ Run: `php artisan octane:status` and verify runtime capability.
 ```bash
 ./vendor/bin/pint --dirty
 ./vendor/bin/pest tests/Feature/Http/XmlHandlerOctaneParityTest.php
-git add composer.json composer.lock config/octane.php tests/Feature/Http/XmlHandlerOctaneParityTest.php
-git commit -m "feat(octane): install and configure laravel octane with frankenphp"
+git add composer.json composer.lock config/octane.php .rr.yaml tests/Feature/Http/XmlHandlerOctaneParityTest.php
+git commit -m "feat(octane): install and configure laravel octane with roadrunner lean worker"
 ```
 
 ---
@@ -213,7 +223,7 @@ git commit -m "perf(xml): add atomic cache locking and streamline redis caching 
 Create `scripts/resources/systemd/tallpbx-xml-worker.service`:
 ```ini
 [Unit]
-Description=TallPBX FreeSWITCH XML Persistent Worker (FrankenPHP)
+Description=TallPBX FreeSWITCH XML Persistent Lean Worker (Octane/RoadRunner)
 After=network.target redis-server.service mariadb.service
 Wants=redis-server.service mariadb.service
 
@@ -222,7 +232,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/tallpbx
-ExecStart=/usr/bin/php /var/www/tallpbx/artisan octane:start --server=frankenphp --host=127.0.0.1 --port=8090 --workers=auto --max-requests=10000
+ExecStart=/usr/bin/php /var/www/tallpbx/artisan octane:start --server=roadrunner --host=127.0.0.1 --port=8090 --workers=auto --max-requests=10000
 Restart=always
 RestartSec=3
 LimitNOFILE=65535
@@ -326,7 +336,7 @@ Confirm:
 - [ ] **Step 4: Record benchmark results and update CHANGELOG.md**
 
 Update `CHANGELOG.md` under `[Unreleased]`:
-- `### Added`: Persistent FrankenPHP Octane XML worker service on port 8090.
+- `### Added`: Persistent RoadRunner Octane lean XML worker service on port 8090.
 - `### Changed`: FreeSWITCH `mod_xml_curl` gateway target repointed to persistent worker.
 - `### Changed`: Disabled Lua proxy bindings and fast controller routing (code retained for rollback safety).
 ```
