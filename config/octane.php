@@ -1,5 +1,7 @@
 <?php
 
+use App\Listeners\Octane\ClearTenantContext;
+use App\Listeners\Octane\VerifyCleanDatabaseState;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\Events\RequestHandled;
 use Laravel\Octane\Events\RequestReceived;
@@ -87,7 +89,8 @@ return [
         RequestReceived::class => [
             ...Octane::prepareApplicationForNextOperation(),
             ...Octane::prepareApplicationForNextRequest(),
-            //
+            ClearTenantContext::class,
+            VerifyCleanDatabaseState::class,
         ],
 
         RequestHandled::class => [
@@ -96,6 +99,8 @@ return [
 
         RequestTerminated::class => [
             // FlushUploadedFiles::class,
+            ClearTenantContext::class,
+            VerifyCleanDatabaseState::class,
         ],
 
         TaskReceived::class => [
@@ -119,6 +124,8 @@ return [
         OperationTerminated::class => [
             FlushOnce::class,
             FlushTemporaryContainerInstances::class,
+            ClearTenantContext::class,
+            VerifyCleanDatabaseState::class,
             // DisconnectFromDatabases::class,
             // CollectGarbage::class,
         ],
