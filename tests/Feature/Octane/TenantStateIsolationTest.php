@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Listeners\Octane\ClearTenantContext;
 use App\Listeners\Octane\VerifyCleanDatabaseState;
 use App\Services\TenantManager;
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Connection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -173,4 +176,62 @@ it('handles event object cleanly in VerifyCleanDatabaseState', function (): void
 
     $listener->handle($fakeEvent);
     expect(DB::transactionLevel())->toBe(0);
+});
+
+it('does not instantiate TenantManager if it was never resolved on the container', function (): void {
+    $container = new Container;
+    $container->singleton(TenantManager::class, fn () => new TenantManager);
+
+    expect($container->resolved(TenantManager::class))->toBeFalse();
+
+    $listener = new ClearTenantContext;
+    $fakeEvent = (object) ['app' => $container];
+
+    $listener->handle($fakeEvent);
+
+    expect($container->resolved(TenantManager::class))->toBeFalse();
+});
+
+it('forces connection disconnect if rollback throws an exception', function (): void {
+    $listener = new VerifyCleanDatabaseState;
+
+    $mockConnection = Mockery::mock(Connection::class);
+    $mockConnection->shouldReceive('transactionLevel')->andReturn(1);
+    $mockConnection->shouldReceive('rollBack')->andThrow(new RuntimeException('Deadlock during rollback'));
+    $mockConnection->shouldReceive('disconnect')->once();
+
+    $mockDb = Mockery::mock();
+    $mockDb->shouldReceive('getConnections')->andReturn(['tainted_conn' => $mockConnection]);
+
+    $mockContainer = Mockery::mock(Application::class);
+    $mockContainer->shouldReceive('resolved')->with('db')->andReturn(true);
+    $mockContainer->shouldReceive('make')->with('db')->andReturn($mockDb);
+
+    $fakeEvent = (object) [
+        'app' => $mockContainer,
+    ];
+
+    $listener->handle($fakeEvent);
+});
+
+it('forces connection disconnect if rollback fails to reduce transaction level', function (): void {
+    $listener = new VerifyCleanDatabaseState;
+
+    $mockConnection = Mockery::mock(Connection::class);
+    $mockConnection->shouldReceive('transactionLevel')->andReturn(1);
+    $mockConnection->shouldReceive('rollBack')->andReturnNull();
+    $mockConnection->shouldReceive('disconnect')->once();
+
+    $mockDb = Mockery::mock();
+    $mockDb->shouldReceive('getConnections')->andReturn(['stubborn_conn' => $mockConnection]);
+
+    $mockContainer = Mockery::mock(Application::class);
+    $mockContainer->shouldReceive('resolved')->with('db')->andReturn(true);
+    $mockContainer->shouldReceive('make')->with('db')->andReturn($mockDb);
+
+    $fakeEvent = (object) [
+        'app' => $mockContainer,
+    ];
+
+    $listener->handle($fakeEvent);
 });

@@ -17,17 +17,18 @@ class ClearTenantContext
 
         if (is_object($event)) {
             if (isset($event->sandbox)) {
-                $containers[] = $event->sandbox;
+                $containers[spl_object_id($event->sandbox)] = $event->sandbox;
             }
             if (isset($event->app)) {
-                $containers[] = $event->app;
+                $containers[spl_object_id($event->app)] = $event->app;
             }
         }
 
-        $containers[] = app();
+        $globalApp = app();
+        $containers[spl_object_id($globalApp)] = $globalApp;
 
-        foreach (array_unique($containers, SORT_REGULAR) as $container) {
-            if ($container->bound(TenantManager::class)) {
+        foreach ($containers as $container) {
+            if (method_exists($container, 'resolved') && $container->resolved(TenantManager::class)) {
                 $container->make(TenantManager::class)->clear();
             }
         }

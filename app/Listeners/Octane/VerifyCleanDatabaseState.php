@@ -18,17 +18,18 @@ class VerifyCleanDatabaseState
 
         if (is_object($event)) {
             if (isset($event->sandbox)) {
-                $containers[] = $event->sandbox;
+                $containers[spl_object_id($event->sandbox)] = $event->sandbox;
             }
             if (isset($event->app)) {
-                $containers[] = $event->app;
+                $containers[spl_object_id($event->app)] = $event->app;
             }
         }
 
-        $containers[] = app();
+        $globalApp = app();
+        $containers[spl_object_id($globalApp)] = $globalApp;
 
-        foreach (array_unique($containers, SORT_REGULAR) as $container) {
-            if (! $container->resolved('db')) {
+        foreach ($containers as $container) {
+            if (! method_exists($container, 'resolved') || ! $container->resolved('db')) {
                 continue;
             }
 
@@ -53,6 +54,18 @@ class VerifyCleanDatabaseState
 
                         if ($connection->transactionLevel() >= $level) {
                             break;
+                        }
+                    }
+
+                    if ($connection->transactionLevel() > 0) {
+                        Log::warning("Octane: Forcing disconnect on tainted connection [{$name}] due to remaining transaction level [{$connection->transactionLevel()}].");
+
+                        try {
+                            $connection->disconnect();
+                        } catch (Throwable $e) {
+                            Log::error("Octane: Exception while disconnecting tainted connection [{$name}]: {$e->getMessage()}", [
+                                'exception' => $e,
+                            ]);
                         }
                     }
                 }
