@@ -243,6 +243,13 @@ if ! grep -q "^FS_XML_HANDLER_TOKEN=" .env 2>/dev/null; then
 elif [ -z "$(grep -E '^FS_XML_HANDLER_TOKEN=' .env | tail -1 | cut -d= -f2- | sed 's/^\"//; s/\"$//')" ]; then
     sed -i "s/^FS_XML_HANDLER_TOKEN=.*/FS_XML_HANDLER_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')/" .env
 fi
+# Call record ingestion token for mod_json_cdr, provisioned the same way so a
+# fresh install and an installer re-run both end with a usable secret.
+if ! grep -q "^FREESWITCH_CDR_TOKEN=" .env 2>/dev/null; then
+    echo "FREESWITCH_CDR_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')" >> .env
+elif [ -z "$(grep -E '^FREESWITCH_CDR_TOKEN=' .env | tail -1 | cut -d= -f2- | sed 's/^\"//; s/\"$//')" ]; then
+    sed -i "s/^FREESWITCH_CDR_TOKEN=.*/FREESWITCH_CDR_TOKEN=$(php -r 'echo bin2hex(random_bytes(32));')/" .env
+fi
 if ! grep -q "^PBX_DEFAULT_SIP_PASSWORD=" .env 2>/dev/null; then
     echo "PBX_DEFAULT_SIP_PASSWORD=$(php -r 'echo bin2hex(random_bytes(12));')" >> .env
 elif [ -z "$(grep -E '^PBX_DEFAULT_SIP_PASSWORD=' .env | tail -1 | cut -d= -f2- | sed 's/^\"//; s/\"$//')" ]; then

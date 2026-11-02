@@ -22,6 +22,8 @@ cd "$(dirname "$0")"
 # Helpers for the optional Lua directory cache. Kept in their own file so the
 # module-order and password decisions can be tested against fixtures.
 . ./freeswitch-lua-proxy.sh
+# Helpers for the JSON CDR gateway (mod_json_cdr) and its failure spool.
+. ./freeswitch-json-cdr.sh
 
 # Find the active FreeSWITCH configuration directory for either package or
 # source installations, falling back to the package location on fresh systems.
@@ -474,6 +476,47 @@ configure_lua_directory_cache() {
     chmod 0644 "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
 }
 
+# Install and configure mod_json_cdr, which posts one JSON call record per
+# call leg to the TallPBX ingestion endpoint.
+configure_json_cdr() {
+    local app_dir="/var/www/tallpbx"
+    local env_file="${app_dir}/.env"
+    local conf_dir=""
+    local modules_conf=""
+    local cdr_token=""
+
+    conf_dir="$(freeswitch_conf_dir)"
+    modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
+
+    # The module ships as its own package; apt skips it when already present.
+    apt_get_with_lock_wait install -y freeswitch-mod-json-cdr
+
+    # Failure spool first so the module never starts without its fallback.
+    ensure_json_cdr_spool_dirs
+
+    ensure_freeswitch_module_enabled "$modules_conf" "mod_json_cdr" "<!-- XML Interfaces -->"
+
+    if [ ! -f "$env_file" ]; then
+        warning "Laravel .env not found; json_cdr.conf.xml will be configured after the TALL step"
+        return 0
+    fi
+
+    cdr_token="$(grep -E '^FREESWITCH_CDR_TOKEN=' "$env_file" | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')"
+
+    if [ -z "$cdr_token" ]; then
+        warning "FREESWITCH_CDR_TOKEN is empty; skipping json_cdr.conf.xml generation"
+        return 0
+    fi
+
+    verbose "Configuring FreeSWITCH mod_json_cdr"
+    mkdir -p "${conf_dir}/autoload_configs"
+    if ! render_json_cdr_config "${app_dir}/scripts/freeswitch/json_cdr.conf.xml" \
+        "${conf_dir}/autoload_configs/json_cdr.conf.xml" "$cdr_token"; then
+        warning "Could not render json_cdr.conf.xml"
+        return 0
+    fi
+}
+
 if [ "${1:-}" = "--configure-only" ]; then
     configure_tallpbx_media_root
     configure_freeswitch_systemd_dependencies
@@ -481,6 +524,7 @@ if [ "${1:-}" = "--configure-only" ]; then
     configure_freeswitch_sound_defaults
     configure_dynamic_xml
     configure_lua_directory_cache
+    configure_json_cdr
     systemctl daemon-reload 2>/dev/null || true
     exit 0
 fi
@@ -967,6 +1011,7 @@ configure_freeswitch_switch_defaults
 configure_freeswitch_sound_defaults
 configure_dynamic_xml
 configure_lua_directory_cache
+configure_json_cdr
 set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALLED_METHOD "$freeswitch_install_method"
 
 verbose "FreeSWITCH installation complete"

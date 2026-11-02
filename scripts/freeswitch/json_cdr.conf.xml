@@ -1,0 +1,35 @@
+<include>
+    <!-- Call detail records: mod_json_cdr posts one JSON document per call leg
+         to the TallPBX ingestion endpoint over loopback.
+
+         Verified against the FreeSWITCH module reference:
+         - encode=false posts the raw JSON document (application/json).
+         - encode-values=false keeps string values readable instead of
+           percent-encoded inside the JSON.
+         - No log-dir is set, so successful posts never touch disk; only
+           deliveries that exhaust their retries reach err-log-dir, where
+           `tpbx cdr:drain-spool` reconciles them.
+         - The module appends ?uuid=<uuid> to the URL itself, so the shared
+           secret travels in the Basic auth header, not the query string.
+         - The token placeholder is replaced by the installer; never commit a
+           literal token here. -->
+    <configuration name="json_cdr.conf" description="JSON CDR Gateway">
+        <settings>
+            <param name="url" value="http://127.0.0.1/api/v1/cdr"/>
+            <param name="cred" value="tallpbx:__TALLPBX_CDR_TOKEN__"/>
+            <param name="auth-scheme" value="basic"/>
+            <param name="encode" value="false"/>
+            <param name="encode-values" value="false"/>
+            <!-- Bound the request so a stuck endpoint cannot block call
+                 teardown for longer than the retry budget. -->
+            <param name="timeout" value="5"/>
+            <param name="retries" value="3"/>
+            <param name="delay" value="1"/>
+            <!-- Both halves of every call are recorded and correlated by the
+                 ingestion worker. -->
+            <param name="log-b-leg" value="true"/>
+            <param name="log-errors-to-disk" value="true"/>
+            <param name="err-log-dir" value="/var/log/freeswitch/json_cdr/failed"/>
+        </settings>
+    </configuration>
+</include>
