@@ -47,6 +47,7 @@
 - **Strict tenant isolation**: In a resident environment where the container is not rebuilt per request, `TenantManager::clear()` must be executed deterministically on every request completion to ensure no tenant identity leaks across call legs.
 - **Fail-safe fallback**: If the persistent worker service is stopped or restarting, Nginx or FreeSWITCH must fail gracefully without dropping calls or causing endless timeouts.
 - **Lean Telephony Worker vs. Full-Stack Separation**: The persistent Octane daemon is strictly a lean telephony micro-worker, NOT a full-stack web application server. Administrative panel operations (`/panel`), user sessions, Livewire reactivity, and Blade views remain on standard PHP-FPM behind Nginx. The Octane worker serves only the FreeSWITCH loopback endpoints (`/api/v1/xml-handler`), avoiding session serialization, cookie decryption, and frontend view pipeline overhead.
+- **Lean Telephony Provider Allowlist**: The lean worker must NOT register the 40+ administrative panel modules, Livewire view renderers, Boost dev tools, or Reverb WebSocket providers. It must strictly load the empirically proven allowlist from `XmlHandlerFastBootstrap::PROVIDERS` (9 core framework providers + 23 telephony module providers) when operating under `TALLPBX_WORKER_ROLE=telephony`.
 - **Administrative panel isolation**: The administrative web UI (`/panel`, Livewire, Blade) continues running on standard PHP-FPM and Nginx (ports 80/443). The persistent worker is dedicated exclusively to telephony runtime requests.
 - **Verification discipline**: All code changes must pass `./vendor/bin/pint --dirty` and targeted Pest tests before staging.
 
@@ -66,6 +67,8 @@
 
 **Files:**
 - Modify: `composer.json`
+- Create: `app/Support/TelephonyWorkerProviders.php`
+- Modify: `app/Providers/ModuleServiceProvider.php`
 - Create: `.rr.yaml`
 - Modify: `config/octane.php`
 - Modify: `config/freeswitch.php`
@@ -77,34 +80,101 @@
 
 - [ ] **Step 1: Write parity test comparing XML output**
 
-Write `tests/Feature/Http/XmlHandlerOctaneParityTest.php` asserting that directory and dialplan requests handled through standard container dispatch produce identical XML strings for a seeded tenant.
+Write `tests/Feature/Http/XmlHandlerOctaneParityTest.php` asserting that directory and dialplan requests handled through standard container dispatch produce identical XML strings for a seeded tenant. Mirror the test cases established in `tests/Feature/Http/XmlHandlerFastPathTest.php` (domain directory lookup, not-found user lookup, dialplan with ring group/extensions/bridges) to guarantee byte-for-byte fidelity under the lean provider subset.
 
 - [ ] **Step 2: Require `laravel/octane` and install RoadRunner**
 
 Run: `COMPOSER_ALLOW_SUPERUSER=1 composer require laravel/octane spiral/roadrunner-cli`
 Verify package is resolved cleanly for Laravel 13 and PHP 8.5.
 
-- [ ] **Step 3: Publish and configure Octane with RoadRunner**
+- [ ] **Step 3: Define Telephony Provider Allowlist (`app/Support/TelephonyWorkerProviders.php`)**
+
+Extract the empirically tested telephony provider allowlist from `app/Support/XmlHandlerFastBootstrap.php` into a dedicated support class:
+```php
+namespace App\Support;
+
+final class TelephonyWorkerProviders
+{
+    /**
+     * Module providers required to render FreeSWITCH XML (directory, dialplan, sofia).
+     * Excludes all 40+ panel modules, billing, audit logs, and web UI modules.
+     */
+    public const MODULE_PROVIDERS = [
+        \Modules\NumberTranslations\Providers\ModuleServiceProvider::class,
+        \Modules\SipProfiles\Providers\ModuleServiceProvider::class,
+        \Modules\FileStores\Providers\ModuleServiceProvider::class,
+        \Modules\Gateways\Providers\ModuleServiceProvider::class,
+        \Modules\Extensions\Providers\ModuleServiceProvider::class,
+        \Modules\Bridges\Providers\ModuleServiceProvider::class,
+        \Modules\CallBlocks\Providers\ModuleServiceProvider::class,
+        \Modules\CallCenters\Providers\ModuleServiceProvider::class,
+        \Modules\CallFlows\Providers\ModuleServiceProvider::class,
+        \Modules\CallForwards\Providers\ModuleServiceProvider::class,
+        \Modules\ConferenceCenters\Providers\ModuleServiceProvider::class,
+        \Modules\Conferences\Providers\ModuleServiceProvider::class,
+        \Modules\Emergency\Providers\ModuleServiceProvider::class,
+        \Modules\FeatureCodes\Providers\ModuleServiceProvider::class,
+        \Modules\FollowMe\Providers\ModuleServiceProvider::class,
+        \Modules\HotDesking\Providers\ModuleServiceProvider::class,
+        \Modules\InboundRoutes\Providers\ModuleServiceProvider::class,
+        \Modules\IvrMenus\Providers\ModuleServiceProvider::class,
+        \Modules\OutboundRoutes\Providers\ModuleServiceProvider::class,
+        \Modules\PinNumbers\Providers\ModuleServiceProvider::class,
+        \Modules\RingGroups\Providers\ModuleServiceProvider::class,
+        \Modules\Security\Providers\ModuleServiceProvider::class,
+        \Modules\TimeConditions\Providers\ModuleServiceProvider::class,
+        \Modules\Voicemails\Providers\ModuleServiceProvider::class,
+    ];
+}
+```
+
+- [ ] **Step 4: Gate Module Provider Registration in `ModuleServiceProvider`**
+
+In `app/Providers/ModuleServiceProvider.php`, check the worker role during `register()`. When `env('TALLPBX_WORKER_ROLE') === 'telephony'`, filter discovered module providers against `TelephonyWorkerProviders::MODULE_PROVIDERS`:
+```php
+$isTelephonyWorker = env('TALLPBX_WORKER_ROLE') === 'telephony';
+
+foreach ($modules as $name => $manifest) {
+    if (($manifest['enabled'] ?? true) === false) {
+        continue;
+    }
+
+    foreach (self::providersFor($manifest) as $providerClass) {
+        if ($isTelephonyWorker && ! in_array($providerClass, TelephonyWorkerProviders::MODULE_PROVIDERS, true)) {
+            continue;
+        }
+
+        if (class_exists($providerClass)) {
+            $this->app->register($providerClass);
+        }
+    }
+}
+```
+This reduces active providers from ~90 to 24 in the resident worker, preventing the 40+ panel modules from ever entering worker memory.
+
+- [ ] **Step 5: Publish and configure Octane with RoadRunner**
 
 Run: `php artisan octane:install --server=roadrunner`
 Configure `.rr.yaml` and `config/octane.php`:
 - Bind HTTP listener strictly to loopback: `127.0.0.1:8090`.
+- In `.rr.yaml`, inject `env: { TALLPBX_WORKER_ROLE: "telephony" }` so all RoadRunner worker processes boot with the lean provider filter.
 - Configure worker command to use standard Debian `/usr/bin/php`.
 - Tune worker pool for lean telephony: `num_workers: 2` (or `4` based on CPU cores), `max_jobs: 10000`, `allocate_timeout: 60s`.
 - Disable unnecessary listeners (session warming, frontend assets) to maintain a lean worker footprint.
 - Register request boundary cleaners.
 
-- [ ] **Step 4: Verify Octane starts in test mode**
+- [ ] **Step 6: Verify Octane starts in test mode and confirm lean footprint**
 
 Run: `php artisan octane:status` and verify runtime capability.
+Verify memory usage: worker RSS should stay ~65 MB (not 180+ MB).
 
-- [ ] **Step 5: Run tests and commit**
+- [ ] **Step 7: Run tests and commit**
 
 ```bash
 ./vendor/bin/pint --dirty
 ./vendor/bin/pest tests/Feature/Http/XmlHandlerOctaneParityTest.php
-git add composer.json composer.lock config/octane.php .rr.yaml tests/Feature/Http/XmlHandlerOctaneParityTest.php
-git commit -m "feat(octane): install and configure laravel octane with roadrunner lean worker"
+git add composer.json composer.lock app/Support/TelephonyWorkerProviders.php app/Providers/ModuleServiceProvider.php config/octane.php .rr.yaml tests/Feature/Http/XmlHandlerOctaneParityTest.php
+git commit -m "feat(octane): install roadrunner and enforce lean telephony provider allowlist"
 ```
 
 ---
@@ -232,6 +302,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/tallpbx
+Environment="TALLPBX_WORKER_ROLE=telephony"
 ExecStart=/usr/bin/php /var/www/tallpbx/artisan octane:start --server=roadrunner --host=127.0.0.1 --port=8090 --workers=auto --max-requests=10000
 Restart=always
 RestartSec=3
