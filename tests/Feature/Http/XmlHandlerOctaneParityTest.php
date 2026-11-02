@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Facade;
-use Modules\Admin\Providers\ModuleServiceProvider;
+use Modules\Admin\Providers\ModuleServiceProvider as AdminModuleServiceProvider;
+use Modules\Backups\Providers\ModuleServiceProvider as BackupsModuleServiceProvider;
 use Modules\Extensions\Models\Extension;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Models\RingGroupExtension;
@@ -114,8 +115,8 @@ it('filters registered module providers when TALLPBX_WORKER_ROLE is telephony', 
             expect($loadedProviders)->toContain($provider);
         }
 
-        expect($loadedProviders)->not->toContain(ModuleServiceProvider::class)
-            ->not->toContain(Modules\Backups\Providers\ModuleServiceProvider::class);
+        expect($loadedProviders)->not->toContain(AdminModuleServiceProvider::class)
+            ->not->toContain(BackupsModuleServiceProvider::class);
     } finally {
         if ($previousRole === false) {
             putenv('TALLPBX_WORKER_ROLE');

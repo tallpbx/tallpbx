@@ -66,7 +66,7 @@ All benchmarks executed via `tpbx pbx:load-test:dialplan` using synthetic load t
 | **App-Side `handler_ms` (p95)** | **28.4 ms** | **26.2 ms** | **187.0 ms** | **204.5 ms** | **42.8 ms** |
 | **Database Queries (Cached)** | **0** | **0** | **0 (hits)** | **0 (hits)** | **0** |
 
-*Note: Client-side latency includes CLI Guzzle `Http::pool` chunking and TCP connection overhead per batch; app-side `handler_ms` reflects the internal processing window within the persistent worker.*
+*Note: Client-side latency includes CLI Guzzle `Http::pool` chunking and TCP connection overhead per batch; app-side `handler_ms` reflects the internal processing window within the persistent worker. The theoretical 2,500 req/s target represents low-level socket/C-client concurrency (e.g. `sipp` / `wrk`) while the documented benchmarks reflect application-side handler performance measured via PHP CLI Guzzle batching.*
 
 ---
 

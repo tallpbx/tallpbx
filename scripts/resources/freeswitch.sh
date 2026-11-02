@@ -412,6 +412,14 @@ configure_dynamic_xml() {
         verbose "Installing TallPBX XML persistent lean worker systemd service"
         cp "$systemd_service" /etc/systemd/system/tallpbx-xml-worker.service
         chmod 0644 /etc/systemd/system/tallpbx-xml-worker.service 2>/dev/null || true
+        if [ ! -x "${app_dir}/rr" ] && ! command -v rr >/dev/null 2>&1; then
+            verbose "Downloading RoadRunner binary via vendor/bin/rr"
+            "${app_dir}/vendor/bin/rr" get -s -l "${app_dir}" 2>/dev/null || true
+        fi
+        if [ -f "${app_dir}/rr" ]; then
+            chown root:www-data "${app_dir}/rr" 2>/dev/null || true
+            chmod 0755 "${app_dir}/rr" 2>/dev/null || true
+        fi
         if [ -f "${app_dir}/.rr.yaml" ]; then
             chown root:www-data "${app_dir}/.rr.yaml" 2>/dev/null || true
             chmod 0664 "${app_dir}/.rr.yaml" 2>/dev/null || true
@@ -428,8 +436,12 @@ configure_dynamic_xml() {
     cat > "$xml_curl_conf" <<XML
 <configuration name="xml_curl.conf" description="cURL XML Gateway">
   <bindings>
-    <binding name="tallpbx">
+    <binding name="tallpbx-octane">
       <param name="gateway-url" value="${gateway_url}" bindings="directory|dialplan|configuration"/>
+      <param name="timeout" value="3"/>
+    </binding>
+    <binding name="tallpbx-fallback">
+      <param name="gateway-url" value="http://127.0.0.1${xml_path}?token=${xml_token}" bindings="directory|dialplan|configuration"/>
       <param name="timeout" value="5"/>
     </binding>
   </bindings>

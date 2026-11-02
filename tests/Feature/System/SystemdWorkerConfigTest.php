@@ -37,10 +37,13 @@ it('configures FreeSWITCH to query the persistent lean worker on port 8090 and i
 
     expect($script)->toContain('gateway_url="http://127.0.0.1:8090${xml_path}?token=${xml_token}"')
         ->and($script)->not->toContain('gateway_url="http://127.0.0.1${xml_path}?token=${xml_token}"')
+        ->and($script)->toContain('"${app_dir}/vendor/bin/rr" get -s -l "${app_dir}"')
         ->and($script)->toContain('tallpbx-xml-worker.service')
         ->and($script)->toContain('/etc/systemd/system/tallpbx-xml-worker.service')
         ->and($script)->toContain('systemctl enable tallpbx-xml-worker')
-        ->and($script)->toContain('systemctl daemon-reload');
+        ->and($script)->toContain('systemctl daemon-reload')
+        ->and($script)->toContain('<binding name="tallpbx-octane">')
+        ->and($script)->toContain('<binding name="tallpbx-fallback">');
 });
 
 it('configures xml_curl.conf.xml with the octane roadrunner worker url on port 8090', function (): void {
@@ -54,5 +57,8 @@ it('configures xml_curl.conf.xml with the octane roadrunner worker url on port 8
 
     expect($xml)->toContain('http://127.0.0.1:8090')
         ->and($xml)->toContain('bindings="directory|dialplan|configuration"')
+        ->and($xml)->toContain('<binding name="tallpbx-octane">')
+        ->and($xml)->toContain('name="timeout" value="3"')
+        ->and($xml)->toContain('<binding name="tallpbx-fallback">')
         ->and($xml)->toContain('name="timeout" value="5"');
 });
