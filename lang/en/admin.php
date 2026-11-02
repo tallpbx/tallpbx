@@ -511,6 +511,8 @@ return [
     'cdr_recording' => 'Call Recording',
     'cdr_recording_none' => 'No recording was made for this call.',
     'cdr_raw_diagnostics' => 'Raw Technical Diagnostics (JSON)',
+    'cdr_load_more' => 'Load more',
+    'cdr_showing_recent' => 'Showing the most recent :count calls.',
     'no_cdrs_found' => 'No CDR records found.',
     'confirm_delete_cdr' => 'Are you sure you want to delete this CDR record?',
 

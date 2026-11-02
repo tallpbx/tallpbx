@@ -80,4 +80,14 @@
             cancel-action="cancelCdrDeletion"
         />
     @endif
+
+    @if ($hasMore)
+        <div class="flex items-center gap-3 mt-4">
+            <button type="button" wire:click="loadMore" wire:loading.attr="disabled" wire:target="loadMore" class="btn btn-outline btn-sm">
+                <span wire:loading wire:target="loadMore" class="loading loading-spinner loading-xs"></span>
+                {{ __('admin.cdr_load_more') }}
+            </button>
+            <p class="text-xs text-base-content/60">{{ __('admin.cdr_showing_recent', ['count' => $limit]) }}</p>
+        </div>
+    @endif
 </div>

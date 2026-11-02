@@ -73,3 +73,33 @@ it('explains a missing recording on the detail page', function () {
         ->assertSee('No recording was made')
         ->assertDontSee('<audio');
 });
+
+it('pages through records with a load more control', function () {
+    Cdr::factory()->count(30)->create();
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(CdrList::class);
+
+    // The first screen shows the most recent page only — an unbounded list
+    // would grow with every call the worker digests.
+    $component->assertViewHas('records', fn ($records) => $records->count() === 25)
+        ->assertSet('hasMore', true)
+        ->assertSee('Load more')
+        ->assertSee('Showing the most recent 25 calls');
+
+    $component->call('loadMore')
+        ->assertViewHas('records', fn ($records) => $records->count() === 30)
+        ->assertSet('hasMore', false)
+        ->assertDontSee('Load more');
+});
+
+it('resets the page window when the leg filter changes', function () {
+    Cdr::factory()->count(30)->create(['leg' => 'a']);
+    Cdr::factory()->count(5)->create(['leg' => 'b']);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(CdrList::class)
+        ->call('loadMore')
+        ->set('legFilter', 'a')
+        ->assertViewHas('records', fn ($records) => $records->count() === 25)
+        ->assertSet('limit', 25);
+});

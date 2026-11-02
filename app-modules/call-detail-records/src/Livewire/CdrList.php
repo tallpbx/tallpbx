@@ -16,11 +16,20 @@ use Modules\CallDetailRecords\Services\CdrService;
 #[Layout('layouts.app')]
 class CdrList extends BaseListComponent
 {
+    /** Rows loaded per page; "load more" adds another page. */
+    private const PAGE_SIZE = 25;
+
     /** @var Collection<int, Cdr> */
     public Collection $records;
 
     /** Which call side to show: all, a, or b. */
     public string $legFilter = 'all';
+
+    /** How many rows are currently on screen. */
+    public int $limit = self::PAGE_SIZE;
+
+    /** Whether older records exist beyond the current window. */
+    public bool $hasMore = false;
 
     public ?string $pendingDeletionId = null;
 
@@ -45,10 +54,20 @@ class CdrList extends BaseListComponent
     }
 
     /**
-     * Reload the list when the leg filter changes.
+     * Reload the list and reset the window when the leg filter changes.
      */
     public function updatedLegFilter(): void
     {
+        $this->limit = self::PAGE_SIZE;
+        $this->loadRecords();
+    }
+
+    /**
+     * Show another page of older records.
+     */
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE_SIZE;
         $this->loadRecords();
     }
 
@@ -58,11 +77,17 @@ class CdrList extends BaseListComponent
      */
     private function loadRecords(): void
     {
-        $this->records = Cdr::withoutGlobalScope('tenant')
+        // One extra row tells us whether a further page exists without a
+        // second COUNT query over a table the worker keeps growing.
+        $rows = Cdr::withoutGlobalScope('tenant')
             ->when(! $this->isAdminGuard(), fn ($q) => $q->where('tenant_id', app(TenantManager::class)->getTenantId()))
             ->when($this->legFilter !== 'all', fn ($q) => $q->where('leg', $this->legFilter))
             ->orderBy('start_stamp', 'desc')
+            ->limit($this->limit + 1)
             ->get();
+
+        $this->hasMore = $rows->count() > $this->limit;
+        $this->records = $rows->take($this->limit);
     }
 
     /** Open the shared confirmation modal for a call detail record. */

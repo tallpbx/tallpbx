@@ -513,6 +513,8 @@ return [
     'cdr_recording' => 'Grabación de Llamada',
     'cdr_recording_none' => 'No se grabó esta llamada.',
     'cdr_raw_diagnostics' => 'Diagnóstico Técnico (JSON)',
+    'cdr_load_more' => 'Cargar más',
+    'cdr_showing_recent' => 'Mostrando las :count llamadas más recientes.',
     'no_cdrs_found' => 'No se encontraron registros CDR.',
     'confirm_delete_cdr' => '¿Está seguro de que desea eliminar este registro CDR?',
     'fs_not_connected' => 'FreeSWITCH no está conectado. Los datos en vivo no están disponibles.',
