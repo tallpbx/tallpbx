@@ -344,49 +344,29 @@ Code and docs committed separately on `5.x`.
 - View: `cdr-detail.blade.php` features `<audio controls>` player and Alpine collapsible JSON diagnostics
 - Route: `GET /panel/cdr/{cdrId}/recording` (secure stream with auth guard and path traversal check)
 
-- [ ] **Step 1: Write test for CdrRecordingController secure streaming**
+- [x] **Step 1: Write tests for recording streaming and the UI**
 
-Create test verifying:
-1. Valid tenant admin can stream audio for their call recording.
-2. Cross-tenant access is rejected with HTTP 403.
-3. Path traversal attacks (e.g. `../../etc/passwd`) are rejected with HTTP 404.
+`app-modules/call-detail-records/tests/CdrRecordingTest.php` (6) and `CdrUiTest.php` (4), written first and watched fail. Cross-tenant access answers **404, not 403** — the module's convention is that a foreign record id is invisible rather than acknowledged.
 
-- [ ] **Step 2: Implement `CdrRecordingController`**
+- [x] **Step 2: Implement `CdrRecordingController`**
 
-Create `app-modules/call-detail-records/src/Http/Controllers/CdrRecordingController.php`:
-- Verify user has permission `call-detail-records.view`.
-- Verify `$cdr->tenant_id === auth()->user()->tenant_id` (or super-admin).
-- Canonicalize path: `$realPath = realpath($cdr->record_path)`. Verify it begins with allowed recording directory.
-- Stream file using `response()->file($realPath, ['Content-Type' => 'audio/wav'])`.
+Route `GET /panel/cdr/{cdrId}/recording` (`panel.cdr.recording`) behind `admin.can:call-detail-records.view`. The controller re-applies tenant scope (admins see all) and resolves the stored path the A-R9 way: join relative paths to `media-storage.store_root`, canonicalize with `realpath()`, and require the result inside `store_root` / `spool_root` before `response()->file()` streams it with an audio content type and `nosniff`. Traversal attempts, absolute paths outside the roots, and missing files all answer 404.
 
-- [ ] **Step 3: Update `CdrList` Livewire component and Blade view**
+- [x] **Step 3: Leg filtering and the recording shortcut in `CdrList`**
 
-In `app-modules/call-detail-records/src/Livewire/CdrList.php`:
-- Add `$legFilter = 'all'` (options: `all`, `a`, `b`).
-- Apply query scope: `when($this->legFilter !== 'all', fn($q) => $q->where('leg', $this->legFilter))`.
-In `cdr-list.blade.php`:
-- Add leg filter select input matching DaisyUI conventions.
-- Display Leg badge (`badge-xs font-mono`) in table row.
-- Display audio play icon if `record_path` is present.
+`$legFilter` (all/a/b) with an `updatedLegFilter` reload hook, a `select select-bordered select-sm` toolbar matching peer form conventions, a `badge badge-xs font-mono` leg column, and a playback shortcut per recorded row — a plain anchor without `wire:navigate`, following the fax-inbox media-link precedent so playback hits the file URL directly.
 
-- [ ] **Step 4: Update `CdrDetail` with Audio Player and JSON Diagnostics**
+- [x] **Step 4: Audio player and raw diagnostics in `CdrDetail`**
 
-In `app-modules/call-detail-records/resources/views/cdr-detail.blade.php`:
-- Add Audio Recording card with `<audio controls preload="none">` streaming from route `panel.cdr.recording`.
-- Add "Raw Technical Diagnostics (JSON)" card with an Alpine collapsible tree showing formatted `json_data`.
+An Audio Recording card with `<audio controls preload="none">` (or a plain-language explanation when unrecorded) and a "Raw Technical Diagnostics (JSON)" card using the `collapse collapse-arrow` pattern from the modules list, showing the pretty-printed payload. Leg and Linked Leg fields join the detail grid. The view is wrapped in one root element, as Livewire requires.
 
-- [ ] **Step 5: Run UI tests and verify**
+- [x] **Step 5: Run UI tests and verify**
 
-Run: `./vendor/bin/pest app-modules/call-detail-records/tests/`
-Expected: PASS.
+`./vendor/bin/pest app-modules/call-detail-records/tests/` — 25 passed. Translation keys added to `admin.*` in `en`, `es`, and `fr` to keep root dictionary parity. The recording route answers 302 unauthenticated on the reference host.
 
-- [ ] **Step 6: Commit UI enhancements**
+- [x] **Step 6: Commit UI enhancements**
 
-```bash
-git add app-modules/call-detail-records/
-git commit -m "feat(cdr): add leg filtering, secure recording streaming, and raw json diagnostics"
-```
-
+Code and docs committed separately on `5.x`.
 ---
 
 ### Task 7: Full Pipeline Integration & SIPp End-to-End Verification Gate
