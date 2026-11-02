@@ -294,71 +294,37 @@ Live on the reference host: `tpbx cdr:work --once` digested 5 entries — 2 rows
 **Files:**
 - Create: `scripts/tallpbx-cdr-worker.service`
 - Create: `app/Console/Commands/CdrDrainSpoolCommand.php`
+- Create: `app/Services/Cdr/CdrBatchWriter.php` (shared transactional upsert for digest and drain)
+- Modify: `app/Services/Cdr/CdrRedisIngest.php` (digest now delegates to the batch writer)
 - Modify: `routes/console.php` (schedule drain every 5 minutes)
+- Modify: `scripts/tallpbx-scheduler.service` (spool whitelist — A-R2)
+- Modify: `scripts/resources/tall.sh` (deploy + enable the worker unit — A-R10)
 - Test: `tests/Feature/Commands/CdrDrainSpoolCommandTest.php`
+- Test: `tests/Feature/InstallerJsonCdrTest.php` (unit and wiring assertions)
 
 **Interfaces:**
 - Systemd: `systemctl status tallpbx-cdr-worker`
-- Console: `tpbx cdr:drain-spool [--spool-dir=...]`
+- Console: `tpbx cdr:drain-spool [--spool-dir=] [--quarantine-dir=] [--batch=100] [--grace=2]`
 
-- [ ] **Step 1: Create systemd service unit**
+- [x] **Step 1: Create systemd service unit**
 
-Create `scripts/tallpbx-cdr-worker.service`:
-```ini
-[Unit]
-Description=TallPBX CDR Stream Ingestion Worker
-Wants=network-online.target redis.service
-After=network.target network-online.target redis.service mariadb.service
-StartLimitIntervalSec=60
-StartLimitBurst=5
+`scripts/tallpbx-cdr-worker.service` mirrors the queue unit's shape (`User=www-data`, `Restart=always`, `ProtectSystem=strict`, journal logging) with `NoNewPrivileges=yes` added (A-R12 — unlike the scheduler, this worker never elevates privileges). `ReadWritePaths` covers `storage/`, `bootstrap/cache/`, and the CDR spool tree. The installer deploys and enables the unit alongside the queue and scheduler services (A-R10).
 
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/var/www/tallpbx
-ExecStart=/usr/bin/php /var/www/tallpbx/artisan cdr:work --chunk=100 --sleep=250000 --memory=512
-Restart=always
-RestartSec=3
-EnvironmentFile=-/var/www/tallpbx/.env
+- [x] **Step 2: Implement `CdrDrainSpoolCommand`**
 
-# Sandbox hardening matching tallpbx-queue.service
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/www/tallpbx/storage /var/log/freeswitch/json_cdr
-PrivateTmp=true
+Scans the failure spool, skips files younger than `--grace` seconds (a fresh file may still be mid-write), batches up to `--batch` files, and runs them through the same parser and transactional batch writer as the stream digest. Each file is removed only after its row commits or its payload lands in quarantine — an interrupted drain retries instead of losing records. The batch writer was extracted so the digest and the drain can never diverge on upsert semantics.
 
-[Install]
-WantedBy=multi-user.target
-```
+- [x] **Step 3: Register in scheduler**
 
-- [ ] **Step 2: Implement `CdrDrainSpoolCommand`**
+`Schedule::command('cdr:drain-spool')->everyFiveMinutes()->withoutOverlapping();`. The scheduler's `ProtectSystem=strict` sandbox now whitelists `/var/log/freeswitch/json_cdr` (A-R2) — without it the scheduled drain would appear healthy while files piled up.
 
-Create `app/Console/Commands/CdrDrainSpoolCommand.php`:
-- Scans `/var/log/freeswitch/json_cdr/failed/*.json`.
-- Safely skips open/locked files.
-- Batches up to 100 files at a time.
-- Parses with `CdrPayloadParser` (generating ordered UUIDs).
-- Executes `Cdr::upsert()` inside a transaction and deletes (`unlink`) processed files.
+- [x] **Step 4: Run tests to verify**
 
-- [ ] **Step 3: Register in scheduler**
+`tests/Feature/Commands/CdrDrainSpoolCommandTest.php` — 6 passed (drain, quarantine, domain-less quarantine, grace skip, failed-quarantine retention, empty spool). Installer assertions cover the unit, the `tall.sh` wiring, and the scheduler whitelist. **Live on the reference host**: the enabled worker digested a seeded stream entry into `cdrs` within 4 seconds, and `tpbx cdr:drain-spool` drained a planted spool file into a `cdrs` row and removed it.
 
-In `routes/console.php`:
-```php
-Schedule::command('cdr:drain-spool')->everyFiveMinutes()->withoutOverlapping();
-```
+- [x] **Step 5: Commit**
 
-- [ ] **Step 4: Run test to verify**
-
-Run: `./vendor/bin/pest tests/Feature/Commands/CdrDrainSpoolCommandTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add scripts/tallpbx-cdr-worker.service app/Console/Commands/CdrDrainSpoolCommand.php routes/console.php tests/
-git commit -m "feat(cdr): add systemd worker supervision unit and failover spool drainer"
-```
+Code and docs committed separately on `5.x`.
 
 ---
 
