@@ -357,10 +357,24 @@ class DialplanXmlBuilder
             ? Cache::store($cacheStore)
             : Cache::driver();
 
+        $cacheKey = $this->standardDialplanCacheKey($tenantId, $context);
+        $lockKey = "lock:{$cacheKey}";
+
         return $cache->remember(
-            $this->standardDialplanCacheKey($tenantId, $context),
+            $cacheKey,
             $ttl,
-            fn (): array => $this->buildStandardDialplanXml($tenantId, $context),
+            function () use ($cache, $cacheKey, $lockKey, $tenantId, $context): array {
+                return Cache::lock($lockKey, 5)->block(3, function () use ($cache, $cacheKey, $tenantId, $context): array {
+                    if ($cache->has($cacheKey)) {
+                        /** @var array{xml: string, has_dialplans: bool} $cached */
+                        $cached = $cache->get($cacheKey);
+
+                        return $cached;
+                    }
+
+                    return $this->buildStandardDialplanXml($tenantId, $context);
+                });
+            },
         );
     }
 
@@ -409,10 +423,21 @@ class DialplanXmlBuilder
         $version = (int) RoutingCacheVersion::get((int) $tenantId);
         $epoch = (int) RoutingCacheVersion::getGlobal();
 
+        $cacheKey = $this->dialplanCacheKey((string) $tenantId, $context, $destination, $version, $epoch);
+        $lockKey = "lock:{$cacheKey}";
+
         $xml = $cache->remember(
-            $this->dialplanCacheKey((string) $tenantId, $context, $destination, $version, $epoch),
+            $cacheKey,
             $ttl,
-            fn (): string => $this->buildDialplanXml($context, $destination, $callerId),
+            function () use ($cache, $cacheKey, $lockKey, $context, $destination, $callerId): string {
+                return Cache::lock($lockKey, 5)->block(3, function () use ($cache, $cacheKey, $context, $destination, $callerId): string {
+                    if ($cache->has($cacheKey)) {
+                        return (string) $cache->get($cacheKey);
+                    }
+
+                    return $this->buildDialplanXml($context, $destination, $callerId);
+                });
+            },
         );
 
         $this->mirrorDialplanXml($context, $destination, $ttl, (int) $tenantId, $version, $epoch, $xml);

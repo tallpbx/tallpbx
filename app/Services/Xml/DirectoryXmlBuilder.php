@@ -166,10 +166,21 @@ class DirectoryXmlBuilder
         $version = (int) RoutingCacheVersion::get($tenantIdInt);
         $epoch = (int) RoutingCacheVersion::getGlobal();
 
+        $cacheKey = $this->directoryCacheKey((string) $tenantId, $tagName, $domain, $username, $keyValue, $version);
+        $lockKey = "lock:{$cacheKey}";
+
         $xml = $cache->remember(
-            $this->directoryCacheKey((string) $tenantId, $tagName, $domain, $username, $keyValue, $version),
+            $cacheKey,
             $ttl,
-            fn (): string => $this->buildDirectoryXml($tagName, $domain, $username, $keyValue),
+            function () use ($cache, $cacheKey, $lockKey, $tagName, $domain, $username, $keyValue): string {
+                return Cache::lock($lockKey, 5)->block(3, function () use ($cache, $cacheKey, $tagName, $domain, $username, $keyValue): string {
+                    if ($cache->has($cacheKey)) {
+                        return (string) $cache->get($cacheKey);
+                    }
+
+                    return $this->buildDirectoryXml($tagName, $domain, $username, $keyValue);
+                });
+            },
         );
 
         $this->mirrorDirectoryXml($tagName, $domain, $username, $keyValue, $ttl, $tenantIdInt, $version, $epoch, $xml);

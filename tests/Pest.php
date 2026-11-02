@@ -52,7 +52,7 @@ pest()->extend(TestCase::class)
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Unit/Services/PermissionServiceTest.php');
+    ->in('Unit/Services/PermissionServiceTest.php', 'Unit/Services/XmlBuilderCacheLockTest.php');
 
 /*
 |--------------------------------------------------------------------------
