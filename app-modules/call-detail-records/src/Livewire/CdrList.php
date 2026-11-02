@@ -19,6 +19,9 @@ class CdrList extends BaseListComponent
     /** @var Collection<int, Cdr> */
     public Collection $records;
 
+    /** Which call side to show: all, a, or b. */
+    public string $legFilter = 'all';
+
     public ?string $pendingDeletionId = null;
 
     public string $pendingDeletionName = '';
@@ -42,6 +45,14 @@ class CdrList extends BaseListComponent
     }
 
     /**
+     * Reload the list when the leg filter changes.
+     */
+    public function updatedLegFilter(): void
+    {
+        $this->loadRecords();
+    }
+
+    /**
      * Fetch call detail records newest first. Administrators see every
      * tenant's records; tenant users only see their own.
      */
@@ -49,6 +60,7 @@ class CdrList extends BaseListComponent
     {
         $this->records = Cdr::withoutGlobalScope('tenant')
             ->when(! $this->isAdminGuard(), fn ($q) => $q->where('tenant_id', app(TenantManager::class)->getTenantId()))
+            ->when($this->legFilter !== 'all', fn ($q) => $q->where('leg', $this->legFilter))
             ->orderBy('start_stamp', 'desc')
             ->get();
     }
