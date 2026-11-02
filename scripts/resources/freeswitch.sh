@@ -485,7 +485,7 @@ configure_lua_directory_cache() {
 
     # Ensure lua.conf.xml has xml-handler bindings disabled in favor of persistent Octane worker
     if [ -f "${conf_dir}/autoload_configs/lua.conf.xml" ]; then
-        sed -i 's|<param name="xml-handler-bindings" value="directory,dialplan"/>|<!-- <param name="xml-handler-bindings" value="directory,dialplan"/> -->|g' "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
+        sed -i -E 's|^([[:space:]]*)<param name="xml-handler-bindings"([^>]*)/>|\1<!-- <param name="xml-handler-bindings"\2/> -->|' "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
     fi
 
     # mod_lua must load before mod_xml_curl. FreeSWITCH appends XML search

@@ -134,3 +134,45 @@ XML);
     unlink($installed);
     unlink($env);
 });
+
+it('ensures lua.conf.xml template and installed configuration parse as well-formed XML', function (): void {
+    $templatePath = base_path('scripts/freeswitch/lua.conf.xml');
+    expect(file_exists($templatePath))->toBeTrue();
+
+    $templateXml = simplexml_load_file($templatePath);
+    expect($templateXml)->not->toBeFalse();
+
+    $installedPath = '/etc/freeswitch/autoload_configs/lua.conf.xml';
+    if (file_exists($installedPath)) {
+        $installedXml = simplexml_load_file($installedPath);
+        expect($installedXml)->not->toBeFalse();
+    }
+});
+
+it('comments out xml-handler-bindings without nesting comments or invalidating XML', function (): void {
+    $fixture = tempFixture(<<<'XML'
+<configuration name="lua.conf" description="LUA Configuration">
+  <settings>
+    <param name="xml-handler-script" value="/etc/freeswitch/scripts/tallpbx_xml_handler.lua"/>
+    <param name="xml-handler-bindings" value="directory,dialplan"/>
+  </settings>
+</configuration>
+XML);
+
+    shell_exec("sed -i -E 's|^([[:space:]]*)<param name=\"xml-handler-bindings\"([^>]*)/>|\\1<!-- <param name=\"xml-handler-bindings\"\\2/> -->|' ".escapeshellarg($fixture));
+
+    $firstRun = (string) file_get_contents($fixture);
+    expect($firstRun)->toContain('<!-- <param name="xml-handler-bindings"')
+        ->and(simplexml_load_string($firstRun))->not->toBeFalse();
+
+    // Re-running against already commented line must be idempotent and never nest comments
+    shell_exec("sed -i -E 's|^([[:space:]]*)<param name=\"xml-handler-bindings\"([^>]*)/>|\\1<!-- <param name=\"xml-handler-bindings\"\\2/> -->|' ".escapeshellarg($fixture));
+
+    $secondRun = (string) file_get_contents($fixture);
+    expect($secondRun)->toBe($firstRun)
+        ->and($secondRun)->not->toContain('<!-- <!--')
+        ->and($secondRun)->not->toContain('--> -->')
+        ->and(simplexml_load_string($secondRun))->not->toBeFalse();
+
+    unlink($fixture);
+});
