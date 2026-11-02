@@ -452,7 +452,8 @@ return [
     | Lua XML Proxy
     |--------------------------------------------------------------------------
     |
-    | Optional, default-off in-process directory cache served by mod_lua.
+    | Optional in-process directory cache served by mod_lua (disabled in favor
+    | of the persistent Octane worker). Defaults to false.
     | Laravel mirrors every rendered directory document into Redis under the
     | fixed pbx:fsxml namespace, and FreeSWITCH answers from that mirror
     | before it calls mod_xml_curl. The flag below controls the mirror writes

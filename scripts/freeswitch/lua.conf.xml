@@ -35,8 +35,10 @@
 
         Rollback: comment out the two params below and restart FreeSWITCH.
     -->
+    <!-- xml-handler disabled in favor of persistent Octane worker
     <param name="xml-handler-script" value="/etc/freeswitch/scripts/tallpbx_xml_handler.lua"/>
     <param name="xml-handler-bindings" value="directory,dialplan"/>
+    -->
 
     <!--
         The following options identifies a lua script that is launched

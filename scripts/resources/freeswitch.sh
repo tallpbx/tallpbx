@@ -483,12 +483,18 @@ configure_lua_directory_cache() {
     # Leaves the parameter commented out when there is no real password.
     tallpbx_apply_hiredis_password "$installed_hiredis" "$redis_password_param"
 
+    # Ensure lua.conf.xml has xml-handler bindings disabled in favor of persistent Octane worker
+    if [ -f "${conf_dir}/autoload_configs/lua.conf.xml" ]; then
+        sed -i 's|<param name="xml-handler-bindings" value="directory,dialplan"/>|<!-- <param name="xml-handler-bindings" value="directory,dialplan"/> -->|g' "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
+    fi
+
     # mod_lua must load before mod_xml_curl. FreeSWITCH appends XML search
     # bindings and tries them in load order, so a later module is never asked.
     ensure_freeswitch_module_enabled "$modules_conf" "mod_lua" "<!-- Languages -->"
     tallpbx_move_mod_lua_before_xml_curl "$modules_conf"
 
-    chown freeswitch:freeswitch "$modules_conf" "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
+    chown freeswitch:freeswitch "$modules_conf" "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
+    chmod 0640 "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
     chmod 0644 "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
 }
 

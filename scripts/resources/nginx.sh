@@ -69,15 +69,10 @@ server {
     # FreeSWITCH fetches its XML here with the shared token in the query
     # string; disable logging for this path so the token never lands in
     # the access log (the application logs handler activity itself).
-    # The XML handler runs through a minimal bootstrap that loads ~34 service
-    # providers instead of ~90 (public/xml-handler-fast.php), and falls back to
-    # the full application on any error. Rollback: replace this block with
-    #   location = /api/v1/xml-handler { access_log off; try_files \$uri /index.php?\$query_string; }
+    # Forward XML requests to standard index.php (fallback for Octane port 8090).
     location = /api/v1/xml-handler {
         access_log off;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
-        fastcgi_pass unix:/var/run/php/php$php_version-fpm.sock;
+        try_files \$uri /index.php?\$query_string;
     }
 
     error_page 404 /index.php;
