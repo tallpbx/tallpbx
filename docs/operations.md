@@ -15,6 +15,7 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `tallpbx-queue` | Background jobs (recordings, media, mail) |
 | `tallpbx-scheduler` | Scheduled tasks and sweeps |
 | `tallpbx-reverb` | Real-time WebSocket server |
+| `tallpbx-cdr-worker` | Call detail record processor (see [Call Detail Records](#call-detail-records-cdr-pipeline)) |
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
@@ -609,6 +610,87 @@ Removing the bindings is the kill-switch. Setting `FS_LUA_PROXY_ENABLED=false` o
    ```
 
 No database migration, `.env` rollback, or PHP change is required — the mirror is additive storage and the PHP path is unchanged.
+
+## Call Detail Records (CDR) Pipeline
+
+FreeSWITCH reports one JSON document per call leg at hangup. TallPBX buffers each document in Redis and writes it to MariaDB in the background, so a slow database never delays call teardown and a restart does not lose accepted records.
+
+### How a Record Travels
+
+1. `mod_json_cdr` posts the raw JSON to `http://127.0.0.1/api/v1/cdr` with Basic credentials (`tallpbx:<token>`), retrying three times over roughly four seconds.
+2. The endpoint checks the token and appends the document to the Redis stream `pbx:cdr:stream` on database 3. No database work happens on this path.
+3. `tallpbx-cdr-worker` runs `tpbx cdr:work`, which parses each entry, stores one row per call leg, and removes the entry only after the database commit. A crash therefore replays rather than loses records.
+4. If every delivery attempt fails, FreeSWITCH writes the record to its failure spool instead, and the scheduler runs `tpbx cdr:drain-spool` every five minutes to reconcile it.
+
+### Where Things Live
+
+| What | Where |
+| --- | --- |
+| Ingestion token (`tallpbx:<token>`) | `FREESWITCH_CDR_TOKEN` in `/var/www/tallpbx/.env`, mirrored into `/etc/freeswitch/autoload_configs/json_cdr.conf.xml` |
+| Stream buffer | Redis database 3 (`REDIS_CDR_DB`), stream `pbx:cdr:stream` |
+| Failure spool | `/var/log/freeswitch/json_cdr/failed/` |
+| Quarantine | `/var/log/freeswitch/json_cdr/quarantine/` |
+| Stored records | MariaDB table `cdrs`, one row per call leg, keyed by `(call_uuid, leg)` |
+| Panel view | `/panel/cdr` — filter by leg, play recordings, expand the raw JSON |
+
+### Checking the Pipeline Is Healthy
+
+```bash
+systemctl status tallpbx-cdr-worker        # the processor should be active (running)
+journalctl -u tallpbx-cdr-worker -n 50     # recent digest activity and failures
+redis-cli -n 3 XLEN pbx:cdr:stream         # entries awaiting digestion; 0 is normal
+tpbx cdr:work --once                       # digest one batch now; prints how many records it stored
+ls /var/log/freeswitch/json_cdr/failed/ | wc -l   # 0 is normal; nonzero means deliveries failed
+```
+
+A steadily growing `XLEN` means the worker is not keeping up. The worker logs a `CDR stream backlog` warning above 1,000 pending entries (adjust with `--warn-pending`). Because Redis append-only persistence is enabled by the installer, undigested entries survive a reboot — but a growing backlog still deserves attention.
+
+### When the Worker Stops
+
+```bash
+sudo systemctl restart tallpbx-cdr-worker
+```
+
+Records that arrived while it was down are digested as soon as it returns; nothing needs re-importing. If the worker cannot start, run `tpbx cdr:work --once` in the foreground to see the error, then check `journalctl -u tallpbx-cdr-worker`.
+
+### Failure Spool and Quarantine
+
+The drain command reads `*.json` files from the failure spool, stores them through the same parser as the live stream, and removes each file only after its row is committed:
+
+```bash
+tpbx cdr:drain-spool                 # one batch of up to 100 files, skipping files younger than 2 seconds
+tpbx cdr:drain-spool --batch=500     # larger batch after a long outage
+```
+
+Records land in `quarantine/` instead of the database when the payload cannot be parsed, has no call UUID, or names a domain that no tenant owns. Each file is the untouched payload:
+
+```bash
+ls -l /var/log/freeswitch/json_cdr/quarantine/
+```
+
+After correcting the cause (for example, assigning the domain to a tenant), move a corrected file back into `failed/` and the next drain imports it. Reviewed quarantine files can be deleted; they are only kept for diagnosis. Sizing is modest — roughly 10 KB per call leg — and the spool only fills while deliveries are failing.
+
+### Rotating the Ingestion Token
+
+1. Generate a new secret and save it as `FREESWITCH_CDR_TOKEN` in `/var/www/tallpbx/.env`.
+2. Re-render the FreeSWITCH side and reload the module:
+   ```bash
+   tpbx optimize:clear
+   bash scripts/resources/freeswitch.sh --configure-only
+   fs_cli -x "unload mod_json_cdr"
+   fs_cli -x "load mod_json_cdr"
+   ```
+3. Send one test delivery with the new credentials and confirm `redis-cli -n 3 XLEN pbx:cdr:stream` returns to 0.
+
+### Turning Collection Off Temporarily
+
+Comment out `<load module="mod_json_cdr"/>` in `/etc/freeswitch/autoload_configs/modules.conf.xml`, then run `fs_cli -x "unload mod_json_cdr"`. Calls keep working; only new records stop. Records already stored stay visible in `/panel/cdr`.
+
+### Tuning
+
+* **High call volume:** the endpoint accepts 6,000 requests per minute per IP by default (two legs per call). Raise `FREESWITCH_CDR_THROTTLE_LIMIT` for more than roughly 20 calls per second, then run `tpbx optimize:clear`.
+* **Redis memory:** the stream shares the instance's memory cap. A large backlog plus the cache can approach the limit; draining the stream or raising `maxmemory` in `/etc/redis/redis.conf` is the remedy.
+* **Recording playback:** recordings must sit under the media roots (`media-storage.store_root` / `spool_root`, by default `/var/lib/tallpbx/media`). The panel refuses to stream any path outside those roots.
 
 ## TLS Certificate Management & HTTPS/WSS Lifecycle
 
