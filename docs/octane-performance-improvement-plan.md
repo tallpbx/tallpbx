@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Eliminate the PHP-FPM process-boot bottleneck for FreeSWITCH dynamic XML by running the XML Handler endpoint under a persistent resident Laravel worker (FrankenPHP via Laravel Octane) on `127.0.0.1:8080`, dropping lookup latency from ~80–200 ms to <3 ms and raising single-core throughput from ~20 req/s to 2,500+ req/s while retaining 100% of existing Laravel modular dialplan contributors and tests.
+**Goal:** Eliminate the PHP-FPM process-boot bottleneck for FreeSWITCH dynamic XML by running the XML Handler endpoint under a persistent resident Laravel worker (FrankenPHP via Laravel Octane) on `127.0.0.1:8090`, dropping lookup latency from ~80–200 ms to <3 ms and raising single-core throughput from ~20 req/s to 2,500+ req/s while retaining 100% of existing Laravel modular dialplan contributors and tests.
 
-**Architecture:** A persistent, resident PHP engine boots Laravel once in memory and listens for FreeSWITCH `mod_xml_curl` HTTP requests on loopback port 8080. Redis (DB 1) provides sub-millisecond cache hits with atomic lock thundering-herd protection. On cache misses, pre-connected PDO connections query MariaDB in ~2 ms using existing `DirectoryXmlBuilder` and `DialplanXmlBuilder` services. A dedicated post-request listener strictly clears tenant state to guarantee cross-tenant isolation. The fast controller and the `mod_hiredis` + Lua proxy are completely disabled (while preserving their code for rollback safety).
+**Architecture:** A persistent, resident PHP engine boots Laravel once in memory and listens for FreeSWITCH `mod_xml_curl` HTTP requests on loopback port 8090. Redis (DB 1) provides sub-millisecond cache hits with atomic lock thundering-herd protection. On cache misses, pre-connected PDO connections query MariaDB in ~2 ms using existing `DirectoryXmlBuilder` and `DialplanXmlBuilder` services. A dedicated post-request listener strictly clears tenant state to guarantee cross-tenant isolation. The fast controller and the `mod_hiredis` + Lua proxy are completely disabled (while preserving their code for rollback safety).
 
 **Tech Stack:** Laravel 13, Laravel Octane 2.x, FrankenPHP, FreeSWITCH 1.11 (`mod_xml_curl`), Redis 7, MariaDB 11, Pest.
 
@@ -68,7 +68,7 @@
 
 **Interfaces:**
 - Consumes: `App\Http\Controllers\Api\XmlHandlerController::handle(Request $request): Response`
-- Produces: Persistent HTTP listener on `127.0.0.1:8080/api/v1/xml-handler`
+- Produces: Persistent HTTP listener on `127.0.0.1:8090/api/v1/xml-handler`
 
 - [ ] **Step 1: Write parity test comparing XML output**
 
@@ -206,7 +206,7 @@ git commit -m "perf(xml): add atomic cache locking and streamline redis caching 
 
 **Interfaces:**
 - Consumes: Systemd unit `/etc/systemd/system/tallpbx-xml-worker.service`
-- Produces: FreeSWITCH routing requests to `http://127.0.0.1:8080/api/v1/xml-handler`
+- Produces: FreeSWITCH routing requests to `http://127.0.0.1:8090/api/v1/xml-handler`
 
 - [ ] **Step 1: Create systemd service unit**
 
@@ -222,7 +222,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/tallpbx
-ExecStart=/usr/bin/php /var/www/tallpbx/artisan octane:start --server=frankenphp --host=127.0.0.1 --port=8080 --workers=auto --max-requests=10000
+ExecStart=/usr/bin/php /var/www/tallpbx/artisan octane:start --server=frankenphp --host=127.0.0.1 --port=8090 --workers=auto --max-requests=10000
 Restart=always
 RestartSec=3
 LimitNOFILE=65535
@@ -233,7 +233,7 @@ WantedBy=multi-user.target
 
 - [ ] **Step 2: Update `scripts/resources/freeswitch.sh`**
 
-Update the installer/resource script to configure `xml_curl.conf.xml` pointing to `http://127.0.0.1:8080/api/v1/xml-handler` and enable the systemd unit.
+Update the installer/resource script to configure `xml_curl.conf.xml` pointing to `http://127.0.0.1:8090/api/v1/xml-handler` and enable the systemd unit.
 
 - [ ] **Step 3: Commit**
 
@@ -274,7 +274,7 @@ In `config/freeswitch.php`, ensure `lua_proxy.enabled` defaults to `false`. Mirr
 
 - [ ] **Step 3: Repoint Nginx away from `xml-handler-fast.php`**
 
-In `scripts/resources/nginx.sh`, remove the dedicated `location = /api/v1/xml-handler` pointing to `public/xml-handler-fast.php`. Nginx will forward XML requests to standard `index.php` (for fallback) or directly proxy to the Octane port `127.0.0.1:8080`.
+In `scripts/resources/nginx.sh`, remove the dedicated `location = /api/v1/xml-handler` pointing to `public/xml-handler-fast.php`. Nginx will forward XML requests to standard `index.php` (for fallback) or directly proxy to the Octane port `127.0.0.1:8090`.
 
 - [ ] **Step 4: Verify existing tests pass with features disabled**
 
@@ -317,7 +317,7 @@ Run:
 
 - [ ] **Step 3: Execute SIP load benchmark**
 
-Run: `tpbx pbx:load-test:dialplan --timing` at `100x5` and `500x25` concurrency against `http://127.0.0.1:8080/api/v1/xml-handler`.
+Run: `tpbx pbx:load-test:dialplan --timing` at `100x5` and `500x25` concurrency against `http://127.0.0.1:8090/api/v1/xml-handler`.
 Confirm:
 - Median response time is < 3 ms.
 - Zero worker starvation / timeout errors.
@@ -326,6 +326,6 @@ Confirm:
 - [ ] **Step 4: Record benchmark results and update CHANGELOG.md**
 
 Update `CHANGELOG.md` under `[Unreleased]`:
-- `### Added`: Persistent FrankenPHP Octane XML worker service on port 8080.
+- `### Added`: Persistent FrankenPHP Octane XML worker service on port 8090.
 - `### Changed`: FreeSWITCH `mod_xml_curl` gateway target repointed to persistent worker.
 - `### Changed`: Disabled Lua proxy bindings and fast controller routing (code retained for rollback safety).
