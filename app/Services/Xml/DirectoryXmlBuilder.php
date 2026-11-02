@@ -172,13 +172,20 @@ class DirectoryXmlBuilder
         $xml = $cache->remember(
             $cacheKey,
             $ttl,
-            function () use ($cache, $cacheKey, $lockKey, $tagName, $domain, $username, $keyValue): string {
-                return Cache::lock($lockKey, 5)->block(3, function () use ($cache, $cacheKey, $tagName, $domain, $username, $keyValue): string {
+            function () use ($cache, $cacheKey, $lockKey, $ttl, $tagName, $domain, $username, $keyValue): string {
+                $lock = is_callable([$cache, 'lock'])
+                    ? $cache->lock($lockKey, 5)
+                    : Cache::lock($lockKey, 5);
+
+                return $lock->block(3, function () use ($cache, $cacheKey, $ttl, $tagName, $domain, $username, $keyValue): string {
                     if ($cache->has($cacheKey)) {
                         return (string) $cache->get($cacheKey);
                     }
 
-                    return $this->buildDirectoryXml($tagName, $domain, $username, $keyValue);
+                    $built = $this->buildDirectoryXml($tagName, $domain, $username, $keyValue);
+                    $cache->put($cacheKey, $built, $ttl);
+
+                    return $built;
                 });
             },
         );

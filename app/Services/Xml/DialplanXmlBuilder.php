@@ -363,8 +363,12 @@ class DialplanXmlBuilder
         return $cache->remember(
             $cacheKey,
             $ttl,
-            function () use ($cache, $cacheKey, $lockKey, $tenantId, $context): array {
-                return Cache::lock($lockKey, 5)->block(3, function () use ($cache, $cacheKey, $tenantId, $context): array {
+            function () use ($cache, $cacheKey, $lockKey, $ttl, $tenantId, $context): array {
+                $lock = is_callable([$cache, 'lock'])
+                    ? $cache->lock($lockKey, 5)
+                    : Cache::lock($lockKey, 5);
+
+                return $lock->block(3, function () use ($cache, $cacheKey, $ttl, $tenantId, $context): array {
                     if ($cache->has($cacheKey)) {
                         /** @var array{xml: string, has_dialplans: bool} $cached */
                         $cached = $cache->get($cacheKey);
@@ -372,7 +376,10 @@ class DialplanXmlBuilder
                         return $cached;
                     }
 
-                    return $this->buildStandardDialplanXml($tenantId, $context);
+                    $built = $this->buildStandardDialplanXml($tenantId, $context);
+                    $cache->put($cacheKey, $built, $ttl);
+
+                    return $built;
                 });
             },
         );
@@ -429,13 +436,20 @@ class DialplanXmlBuilder
         $xml = $cache->remember(
             $cacheKey,
             $ttl,
-            function () use ($cache, $cacheKey, $lockKey, $context, $destination, $callerId): string {
-                return Cache::lock($lockKey, 5)->block(3, function () use ($cache, $cacheKey, $context, $destination, $callerId): string {
+            function () use ($cache, $cacheKey, $lockKey, $ttl, $context, $destination, $callerId): string {
+                $lock = is_callable([$cache, 'lock'])
+                    ? $cache->lock($lockKey, 5)
+                    : Cache::lock($lockKey, 5);
+
+                return $lock->block(3, function () use ($cache, $cacheKey, $ttl, $context, $destination, $callerId): string {
                     if ($cache->has($cacheKey)) {
                         return (string) $cache->get($cacheKey);
                     }
 
-                    return $this->buildDialplanXml($context, $destination, $callerId);
+                    $built = $this->buildDialplanXml($context, $destination, $callerId);
+                    $cache->put($cacheKey, $built, $ttl);
+
+                    return $built;
                 });
             },
         );
