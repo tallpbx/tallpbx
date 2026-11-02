@@ -252,127 +252,41 @@ Code and docs committed separately on `5.x` (`feat(cdr)` ingestion endpoint, the
 
 **Files:**
 - Create: `app/Services/Cdr/CdrPayloadParser.php`
-- Modify: `app/Services/Cdr/CdrRedisIngest.php` (add `digest()` method)
+- Modify: `app/Services/Cdr/CdrRedisIngest.php` (add `digest()`, the lock, and a testable connection seam)
 - Create: `app/Console/Commands/CdrWorkCommand.php`
-- Test: `tests/Unit/Services/CdrPayloadParserTest.php`
+- Test: `tests/Feature/Services/CdrPayloadParserTest.php`
+- Test: `tests/Feature/Services/CdrRedisIngestDigestTest.php`
 - Test: `tests/Feature/Commands/CdrWorkCommandTest.php`
+- Fixtures: `tests/Fixtures/cdr/{a,b}-leg.json` (captured from a real bridged call)
 
 **Interfaces:**
-- `CdrPayloadParser::parse(string $rawJson): ?array` (must include `'id' => (string) Str::orderedUuid()`)
-- `CdrRedisIngest::digest(int $chunkSize = 100): int` (transactional insert + `XDEL` on commit)
+- `CdrPayloadParser::parse(string $rawJson): ?array` (includes `'id' => (string) Str::orderedUuid()`)
+- `CdrPayloadParser::quarantine(string $entryId, string $rawJson): bool`
+- `CdrRedisIngest::digest(int $chunkSize = 100): int` (transactional upsert + `XDEL` only after commit)
 
-- [ ] **Step 1: Write test for `CdrPayloadParserTest`**
+- [x] **Step 1: Write tests for `CdrPayloadParser`**
 
-Create `tests/Unit/Services/CdrPayloadParserTest.php`:
-- Assert parsed row contains an explicit non-null UUID string in `id`.
-- Assert `call_uuid`, `b_leg_uuid`, `leg`, `caller_id`, `destination`, `duration`, `billsec`, `record_path`, `tenant_id`, and `json_data` are properly mapped.
-- Assert malformed JSON returns null without throwing uncaught exceptions.
+Real fixtures replace guessed field names (A-R11): `tests/Fixtures/cdr/{a,b}-leg.json` were captured on the reference host from a bridged call (`null` endpoints, `bridge()`), sanitized for the repository. Tests assert the full mapping, the explicit non-null UUID in `id`, and that malformed / uuid-less / unattributable payloads return null and quarantine.
 
-- [ ] **Step 2: Implement `CdrPayloadParser`**
+- [x] **Step 2: Implement `CdrPayloadParser`**
 
-Create `app/Services/Cdr/CdrPayloadParser.php`:
-- Parse JSON with `json_decode(..., true, 512, JSON_THROW_ON_ERROR)`. Catch `JsonException` and quarantine.
-- Extract `variables.uuid` as `call_uuid`.
-- Extract `variables.bridge_uuid` or `variables.signal_bond` as `b_leg_uuid`.
-- Determine leg: `'b'` if bridged leg or filename prefix, otherwise `'a'`.
-- Resolve tenant: lookup `Tenant::where('domain', $domain)->value('id')` with cache.
-- Extract `record_path` from `variables.record_path` or `variables.record_name`.
-- Explicitly generate ordered UUID: `'id' => (string) Str::orderedUuid()`.
-- Store entire payload in `json_data`.
+Mapping as verified against the captured payloads: `variables.uuid` → `call_uuid`; `bridge_uuid`/`signal_bond` → `b_leg_uuid`; the a-side is identified by `last_bridge_role=originator`, `originated_legs`, or `last_app=bridge` (a bridged call has exactly one of those on its originating leg), and a bonded payload without them is the b-side. Caller identity comes from `callflow[0].caller_profile`; stamps from the `*_epoch` variables; `record_path`/`record_name` are combined. The tenant comes from `variables.domain_name` through an **uncached** `TenantDomain` lookup — a cached answer could outlive a domain moving between tenants and misattribute records. Anything unmappable returns null and is quarantined by the digest cycle, never inserted.
 
-- [ ] **Step 3: Implement atomic `digest()` in `CdrRedisIngest`**
+- [x] **Step 3: Implement atomic `digest()` in `CdrRedisIngest`**
 
-In `app/Services/Cdr/CdrRedisIngest.php`:
-```php
-public function digest(int $chunkSize = 100): int
-{
-    $entries = Redis::connection('cdr')->xrange(self::STREAM_KEY, '-', '+', $chunkSize);
-    if (empty($entries)) {
-        return 0;
-    }
+Shipped with three hardening additions over the original sketch: a `Cache::lock` (`pbx:cdr:digest-lock`) so only one worker digests at a time, explicit `created_at`/`updated_at` in every batch row (upsert adds no timestamps), and `json_data` kept as a JSON string (upsert bypasses Eloquent casts). Stream entries are deleted only after the MariaDB transaction commits or the quarantine copy lands — a failed transaction keeps every entry, so a crash between commit and `XDEL` is a replay, never data loss.
 
-    $batch = [];
-    $processedIds = [];
+- [x] **Step 4: Implement `CdrWorkCommand` (`tpbx cdr:work`)**
 
-    foreach ($entries as $id => $fields) {
-        $raw = $fields['data'] ?? '';
-        $parsed = CdrPayloadParser::parse($raw);
+`--chunk`, `--sleep`, `--memory`, `--once`, and `--warn-pending` options; SIGTERM/SIGINT finish the current cycle before exit so a shutdown cannot cut a batch in half. The backlog warning is `getPendingCount()`'s consumer (closing the A-R12 monitoring gap): above the threshold the count is logged and printed at most once a minute while idle.
 
-        if ($parsed) {
-            $batch[] = $parsed;
-            $processedIds[] = $id;
-        } else {
-            // Quarantine malformed JSON rather than dropping
-            CdrPayloadParser::quarantine($id, $raw);
-            $processedIds[] = $id;
-        }
-    }
+- [x] **Step 5: Run tests to verify**
 
-    if (!empty($batch)) {
-        DB::transaction(function () use ($batch) {
-            Cdr::upsert(
-                $batch,
-                ['call_uuid', 'leg'],
-                ['duration', 'billsec', 'hangup_cause', 'end_stamp', 'record_path', 'json_data', 'updated_at']
-            );
-        });
-    }
+`tests/Feature/Services/CdrPayloadParserTest.php` (6 passed), `tests/Feature/Services/CdrRedisIngestDigestTest.php` (5 passed), and `tests/Feature/Commands/CdrWorkCommandTest.php` (3 passed) — all written first and watched fail. The digest suite also proves the two failure paths: a broken MariaDB transaction leaves every stream entry in place, and an unwritable quarantine directory keeps the unparseable entry instead of dropping it.
 
-    // Only delete stream IDs after MariaDB transaction commits successfully
-    if (!empty($processedIds)) {
-        Redis::connection('cdr')->xdel(self::STREAM_KEY, $processedIds);
-    }
+- [x] **Step 6: Commit and live-verify**
 
-    return count($processedIds);
-}
-```
-
-- [ ] **Step 4: Implement `CdrWorkCommand` (`tpbx cdr:work`)**
-
-Create `app/Console/Commands/CdrWorkCommand.php`:
-```php
-public function handle(CdrRedisIngest $ingest): int
-{
-    $chunk = (int) $this->option('chunk');
-    $sleep = (int) $this->option('sleep');
-    $memory = (int) $this->option('memory');
-    $once = (bool) $this->option('once');
-
-    while (true) {
-        $processed = $ingest->digest($chunk);
-
-        if ($once) {
-            break;
-        }
-
-        if ($processed === 0) {
-            usleep($sleep); // 250ms pause when idle
-        } else {
-            usleep(1000); // 1ms cooperative yield under high load
-        }
-
-        if (memory_get_usage(true) / 1024 / 1024 >= $memory) {
-            $this->components->warn('Memory limit reached. Cycling worker.');
-            break;
-        }
-    }
-
-    return self::SUCCESS;
-}
-```
-
-- [ ] **Step 5: Run tests to verify**
-
-Run: `./vendor/bin/pest tests/Unit/Services/CdrPayloadParserTest.php tests/Feature/Commands/CdrWorkCommandTest.php`
-Expected: PASS.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add app/Services/Cdr/CdrPayloadParser.php app/Services/Cdr/CdrRedisIngest.php app/Console/Commands/CdrWorkCommand.php tests/
-git commit -m "feat(cdr): implement stream worker with ordered uuid and transaction isolation"
-```
-
+Live on the reference host: `tpbx cdr:work --once` digested 5 entries — 2 rows in `cdrs` (legs a and b, ordered UUIDs, bidirectional `b_leg_uuid` links, correct caller/destination/duration/billsec/hangup_cause) and 3 quarantined payloads (2 without a resolvable domain, 1 malformed), leaving `pbx:cdr:stream` empty.
 ---
 
 ### Task 5: Worker Supervision Unit & Failover Disk Spool Drainer
