@@ -37,7 +37,10 @@ SyslogIdentifier=tallpbx-scheduler
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/www/tallpbx/bootstrap/cache /etc/tallpbx
+# /var/log/freeswitch/json_cdr holds the CDR failure spool and quarantine
+# that cdr:drain-spool reconciles from the schedule; without it the sandbox
+# would block both the quarantine copy and the unlink of drained files.
+ReadWritePaths=/var/www/tallpbx/storage /var/lib/tallpbx/media /var/www/tallpbx/bootstrap/cache /etc/tallpbx /var/log/freeswitch/json_cdr
 ReadOnlyPaths=/var/www/tallpbx
 
 # Environment (adjust APP_ENV as needed)

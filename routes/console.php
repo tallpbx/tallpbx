@@ -70,6 +70,13 @@ Schedule::command('broadcast:reconcile-outcomes')
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
+// Reconcile call records that exhausted their delivery retries into MariaDB.
+// The scheduler's sandbox must be able to write the CDR spool and quarantine
+// directories (see tallpbx-scheduler.service).
+Schedule::command('cdr:drain-spool')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 Schedule::command('security:verify')
     ->everyFiveMinutes()
     ->withoutOverlapping();

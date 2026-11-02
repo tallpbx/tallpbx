@@ -121,3 +121,33 @@ it('forwards the authorization header to php-fpm', function (): void {
     // name rather than the dollar form.
     expect($script)->toContain('fastcgi_param HTTP_AUTHORIZATION');
 });
+
+it('supervises the cdr worker with a sandboxed systemd unit', function (): void {
+    $unit = (string) file_get_contents(base_path('scripts/tallpbx-cdr-worker.service'));
+    $tall = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+
+    expect($unit)->toContain('ExecStart=/usr/bin/php artisan cdr:work')
+        ->and($unit)->toContain('Restart=always')
+        ->and($unit)->toContain('User=www-data')
+        // The worker never elevates privileges, unlike the scheduler.
+        ->and($unit)->toContain('NoNewPrivileges=yes')
+        ->and($unit)->toContain('ProtectSystem=strict')
+        ->and($unit)->toContain('/var/log/freeswitch/json_cdr')
+        // The installer deploys and enables the unit alongside the queue
+        // and scheduler services.
+        ->and($tall)->toContain('tallpbx-cdr-worker.service /etc/systemd/system/')
+        ->and($tall)->toContain('systemctl enable tallpbx-cdr-worker');
+});
+
+it('lets the scheduler reach the spool and runs the drain from the schedule', function (): void {
+    // A-R2: the scheduler's ProtectSystem=strict sandbox must whitelist the
+    // spool tree, or drain-spool appears healthy while files pile up.
+    $scheduler = (string) file_get_contents(base_path('scripts/tallpbx-scheduler.service'));
+    $console = (string) file_get_contents(base_path('routes/console.php'));
+
+    expect($scheduler)->toContain('ReadWritePaths=')
+        ->and($scheduler)->toMatch('/ReadWritePaths=[^\n]*\/var\/log\/freeswitch\/json_cdr/')
+        ->and($console)->toContain("Schedule::command('cdr:drain-spool')")
+        ->and($console)->toContain('everyFiveMinutes()')
+        ->and($console)->toContain('withoutOverlapping()');
+});

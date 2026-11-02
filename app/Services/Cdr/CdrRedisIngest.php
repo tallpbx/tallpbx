@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Cdr;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
-use Modules\CallDetailRecords\Models\Cdr;
 use Throwable;
 
 /**
@@ -30,9 +28,9 @@ class CdrRedisIngest
     public const LOCK_NAME = 'pbx:cdr:digest-lock';
 
     /**
-     * Create the buffer with its parser.
+     * Create the buffer with its parser and batch writer.
      */
-    public function __construct(private readonly CdrPayloadParser $parser) {}
+    public function __construct(private readonly CdrPayloadParser $parser, private readonly CdrBatchWriter $writer) {}
 
     /**
      * Append one raw payload and return its stream entry id.
@@ -93,19 +91,9 @@ class CdrRedisIngest
                 $processedIds[] = (string) $entryId;
             }
 
-            if ($batch !== []) {
-                DB::transaction(function () use ($batch): void {
-                    Cdr::upsert(
-                        $batch,
-                        ['call_uuid', 'leg'],
-                        [
-                            'tenant_id', 'b_leg_uuid', 'caller_id', 'caller_id_name', 'destination',
-                            'duration', 'billsec', 'hangup_cause', 'direction', 'record_path',
-                            'start_stamp', 'answer_stamp', 'end_stamp', 'json_data', 'updated_at',
-                        ],
-                    );
-                });
-            }
+            // One transaction for the batch; a failure keeps every entry so
+            // the next cycle retries the same records.
+            $this->writer->write($batch);
 
             // Deleting only after the commit is what makes a crash between
             // commit and XDEL a replay instead of data loss.

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\Cdr\CdrBatchWriter;
 use App\Services\Cdr\CdrPayloadParser;
 use App\Services\Cdr\CdrRedisIngest;
 
@@ -23,7 +24,7 @@ class CdrWorkSpy extends CdrRedisIngest
 
     public function __construct(public int $digestReturns = 0, public int $pendingReturns = 0)
     {
-        parent::__construct(new CdrPayloadParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid()));
+        parent::__construct(new CdrPayloadParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid()), new CdrBatchWriter);
     }
 
     /**

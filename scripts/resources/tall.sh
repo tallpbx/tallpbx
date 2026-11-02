@@ -404,6 +404,9 @@ fi
 if [ -f /var/www/tallpbx/scripts/tallpbx-scheduler.service ]; then
     cp /var/www/tallpbx/scripts/tallpbx-scheduler.service /etc/systemd/system/
 fi
+if [ -f /var/www/tallpbx/scripts/tallpbx-cdr-worker.service ]; then
+    cp /var/www/tallpbx/scripts/tallpbx-cdr-worker.service /etc/systemd/system/
+fi
 if [ -f /var/www/tallpbx/scripts/tallpbx-reverb.service ]; then
     cp /var/www/tallpbx/scripts/tallpbx-reverb.service /etc/systemd/system/
 fi
@@ -421,6 +424,8 @@ systemctl enable tallpbx-queue 2>/dev/null || true
 systemctl restart tallpbx-queue 2>/dev/null || true
 systemctl enable tallpbx-scheduler 2>/dev/null || true
 systemctl restart tallpbx-scheduler 2>/dev/null || true
+systemctl enable tallpbx-cdr-worker 2>/dev/null || true
+systemctl restart tallpbx-cdr-worker 2>/dev/null || true
 systemctl enable tallpbx-reverb 2>/dev/null || true
 systemctl restart tallpbx-reverb 2>/dev/null || true
 

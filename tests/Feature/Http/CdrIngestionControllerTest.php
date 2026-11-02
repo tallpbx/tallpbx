@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\Cdr\CdrBatchWriter;
 use App\Services\Cdr\CdrPayloadParser;
 use App\Services\Cdr\CdrRedisIngest;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class CdrIngestSpy extends CdrRedisIngest
      */
     public function __construct()
     {
-        parent::__construct(new CdrPayloadParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid()));
+        parent::__construct(new CdrPayloadParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid()), new CdrBatchWriter);
     }
 
     /**

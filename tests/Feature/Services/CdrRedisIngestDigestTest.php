@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Tenant;
 use App\Models\TenantDomain;
+use App\Services\Cdr\CdrBatchWriter;
 use App\Services\Cdr\CdrPayloadParser;
 use App\Services\Cdr\CdrRedisIngest;
 use Illuminate\Database\QueryException;
@@ -74,7 +75,7 @@ class TestableCdrIngest extends CdrRedisIngest
 {
     public function __construct(CdrPayloadParser $parser, public FakeCdrStream $stream)
     {
-        parent::__construct($parser);
+        parent::__construct($parser, new CdrBatchWriter);
     }
 
     /**
