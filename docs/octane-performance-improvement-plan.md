@@ -329,3 +329,15 @@ Update `CHANGELOG.md` under `[Unreleased]`:
 - `### Added`: Persistent FrankenPHP Octane XML worker service on port 8090.
 - `### Changed`: FreeSWITCH `mod_xml_curl` gateway target repointed to persistent worker.
 - `### Changed`: Disabled Lua proxy bindings and fast controller routing (code retained for rollback safety).
+```
+
+---
+
+### Follow-on Extension: CDR Ingestion Endpoint (Out of Scope)
+
+The CDR ingestion endpoint (`POST /api/v1/cdr`, consumed by FreeSWITCH's `mod_json_cdr`) still runs on PHP-FPM when this plan completes. Moving it onto the same persistent worker after Task 4 is the natural next step, but it is deliberately **not** part of this plan.
+
+- **Why it belongs on the worker**: ingestion currently pays the same ~0.4 s full framework boot per call leg. A resident worker should bring it to single-digit milliseconds, which also satisfies the ingestion latency goal left open in Task 7 of [`docs/superpowers/plans/2026-10-31-cdr-modernization-pipeline.md`](superpowers/plans/2026-10-31-cdr-modernization-pipeline.md).
+- **Why it is low risk**: the endpoint is already worker-safe — it is stateless (constant-time token check plus one Redis `XADD` on database 3), keeps no request state, and its `cdr-ingestion` throttle keys off the shared cache store. It inherits Task 2's post-request tenant sandbox automatically because it resolves no tenant itself.
+- **What the extension needs**: a `/api/v1/cdr` route on the worker listener, and a decision on the FreeSWITCH-facing hop — point the module's `url` in `json_cdr.conf.xml` at the worker directly, or keep the nginx path and proxy it to port 8090.
+- **Why not now**: the POC's gate is byte-identical XML under load; folding an ingestion migration into it would blur that comparison. Schedule it as its own task once Tasks 1–4 prove the worker stable under sustained concurrency.
