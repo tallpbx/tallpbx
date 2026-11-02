@@ -258,6 +258,19 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinutes($decayMinutes, $limit)->by($request->ip() ?? '127.0.0.1');
         });
 
+        // CDR ingestion: one HTTP post per call leg (two per call), so the
+        // default ceiling matches the xml handler rather than the panel's.
+        RateLimiter::for('cdr-ingestion', function (Request $request) {
+            if (! config('freeswitch.cdr.throttle_enabled', true)) {
+                return Limit::none();
+            }
+
+            $limit = (int) config('freeswitch.cdr.throttle_limit', 6000);
+            $decayMinutes = (int) config('freeswitch.cdr.throttle_decay_minutes', 1);
+
+            return Limit::perMinutes($decayMinutes, $limit)->by($request->ip() ?? '127.0.0.1');
+        });
+
         Event::listen([
             ChannelCreate::class,
             ChannelAnswer::class,

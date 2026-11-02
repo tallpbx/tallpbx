@@ -425,6 +425,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | CDR Ingestion
+    |--------------------------------------------------------------------------
+    |
+    | The shared secret mod_json_cdr presents as Basic credentials
+    | (tallpbx:<token>), and the throttle applied to the ingestion endpoint.
+    | The endpoint receives one post per call leg — two per call — so the
+    | default ceiling matches the xml handler: 15–20 calls/sec is
+    | 1,800–2,400 posts per minute. No default token: the endpoint fails
+    | closed until the installer provisions one.
+    |
+    */
+    'cdr' => [
+        'token' => env('FREESWITCH_CDR_TOKEN'),
+        'throttle_enabled' => filter_var(env('FREESWITCH_CDR_THROTTLE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'throttle_limit' => (int) env('FREESWITCH_CDR_THROTTLE_LIMIT', 6000),
+        'throttle_decay_minutes' => (int) env('FREESWITCH_CDR_THROTTLE_DECAY_MINUTES', 1),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Lua XML Proxy
     |--------------------------------------------------------------------------
     |

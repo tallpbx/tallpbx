@@ -192,6 +192,26 @@ return [
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
         ],
 
+        // Isolated, unprefixed connection for the CDR stream. Accepted call
+        // records wait here between FreeSWITCH's HTTP hand-off and the
+        // worker's MariaDB commit, so this database stays separate from the
+        // queue (DB 0), cache (DB 1), and sessions (DB 2). The empty prefix
+        // keeps the stream key exactly "pbx:cdr:stream" for operational
+        // tooling, mirroring the lua_proxy connection.
+        'cdr' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_CDR_DB', '3'),
+            'prefix' => '',
+            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
+            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
         // Raw, unprefixed connection for the optional Lua XML mirror. The
         // FreeSWITCH Lua handler reads keys byte-for-byte, so this connection
         // must never inherit Laravel's app prefix. FS_REDIS_* lets the mirror
