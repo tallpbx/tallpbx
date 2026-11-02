@@ -1,0 +1,18 @@
+[Unit]
+Description=TallPBX FreeSWITCH XML Persistent Lean Worker (Octane/RoadRunner)
+After=network.target redis-server.service mariadb.service
+Wants=redis-server.service mariadb.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/tallpbx
+Environment="TALLPBX_WORKER_ROLE=telephony"
+ExecStart=/usr/bin/php /var/www/tallpbx/artisan octane:start --server=roadrunner --host=127.0.0.1 --port=8090 --workers=auto --max-requests=10000
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

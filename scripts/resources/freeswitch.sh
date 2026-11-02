@@ -402,10 +402,26 @@ configure_dynamic_xml() {
         return 0
     fi
 
-    # FreeSWITCH and Nginx run locally on the same host. Always use local loopback (127.0.0.1)
+    # FreeSWITCH and the persistent XML worker run locally on the same host. Always use local loopback (127.0.0.1:8090)
     # for the cURL XML gateway. This ensures zero-latency internal lookups, avoids external
-    # network and firewall dependencies, and prevents startup hangs if public IPs change.
-    gateway_url="http://127.0.0.1${xml_path}?token=${xml_token}"
+    # network and firewall dependencies, and routes directly to the persistent Octane/RoadRunner lean worker.
+    gateway_url="http://127.0.0.1:8090${xml_path}?token=${xml_token}"
+
+    local systemd_service="${app_dir}/scripts/resources/systemd/tallpbx-xml-worker.service"
+    if [ -f "$systemd_service" ] && [ -d "/etc/systemd/system" ]; then
+        verbose "Installing TallPBX XML persistent lean worker systemd service"
+        cp "$systemd_service" /etc/systemd/system/tallpbx-xml-worker.service
+        chmod 0644 /etc/systemd/system/tallpbx-xml-worker.service 2>/dev/null || true
+        if [ -f "${app_dir}/.rr.yaml" ]; then
+            chown root:www-data "${app_dir}/.rr.yaml" 2>/dev/null || true
+            chmod 0664 "${app_dir}/.rr.yaml" 2>/dev/null || true
+        fi
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl daemon-reload 2>/dev/null || true
+            systemctl enable tallpbx-xml-worker 2>/dev/null || true
+            systemctl restart tallpbx-xml-worker 2>/dev/null || systemctl start tallpbx-xml-worker 2>/dev/null || true
+        fi
+    fi
 
     verbose "Configuring FreeSWITCH mod_xml_curl"
     mkdir -p "${conf_dir}/autoload_configs"
