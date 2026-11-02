@@ -18,8 +18,7 @@ return new class extends Migration
         'call_recordings',
         'media_assets',
         'voicemail_messages',
-        'xml_cdr',
-        'xml_cdrs',
+        'cdrs',
     ];
 
     /**

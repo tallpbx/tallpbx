@@ -84,7 +84,7 @@ test('all module directories resolve to the expected namespace prefix', function
 })->with([
     ['sip-accounts', 'Modules\\SipAccounts\\'],
     ['call-forwards', 'Modules\\CallForwards\\'],
-    ['xml-cdr', 'Modules\\XmlCdr\\'],
+    ['call-detail-records', 'Modules\\CallDetailRecords\\'],
     ['sip-profiles', 'Modules\\SipProfiles\\'],
     ['conference-centers', 'Modules\\ConferenceCenters\\'],
     ['call-center-active', 'Modules\\CallCenterActive\\'],

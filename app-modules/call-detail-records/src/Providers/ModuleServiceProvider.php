@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modules\XmlCdr\Providers;
+namespace Modules\CallDetailRecords\Providers;
 
 /**
- * Service provider for the xml-cdr module.
+ * Service provider for the call-detail-records module.
  */
 class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
 {
@@ -15,7 +15,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      */
     protected function moduleName(): string
     {
-        return 'xml-cdr';
+        return 'call-detail-records';
     }
 
     /**
@@ -23,7 +23,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
      */
     protected function moduleNamespace(): string
     {
-        return 'Modules\XmlCdr';
+        return 'Modules\CallDetailRecords';
     }
 
     /**
@@ -42,7 +42,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
                 'key' => 'admin.cdr',
                 'label' => 'admin.cdr',
                 'route' => 'panel.cdr.index',
-                'permission' => 'xml-cdr.view',
+                'permission' => 'call-detail-records.view',
                 'icon' => 'heroicon-o-document-text',
                 'parent' => 'pbx.monitoring',
                 'guard' => 'admin',
@@ -52,23 +52,23 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     }
 
     /**
-     * Register permissions for the xml-cdr module.
+     * Register permissions for the call-detail-records module.
      *
      * These permissions control access to viewing, creating,
      * editing, and deleting records.
      *
      * Permission names MUST use the module name as their prefix
-     * (xml-cdr.*): the Livewire action-permission resolver derives the
-     * module slug from the component namespace, so a mismatched prefix
-     * such as cdr.* would silently disable action authorization.
+     * (call-detail-records.*): the Livewire action-permission resolver derives
+     * the module slug from the component namespace, so a shorter or renamed
+     * prefix silently disables action authorization.
      *
      * @return array<string, string>
      */
     protected function permissions(): array
     {
         return [
-            'xml-cdr.view' => 'View CDR records',
-            'xml-cdr.delete' => 'Delete CDR records',
+            'call-detail-records.view' => 'View CDR records',
+            'call-detail-records.delete' => 'Delete CDR records',
         ];
     }
 }

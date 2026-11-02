@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Modules\XmlCdr\Livewire;
+namespace Modules\CallDetailRecords\Livewire;
 
 use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use Illuminate\Database\Eloquent\Collection;
-use Modules\XmlCdr\Models\Cdr;
-use Modules\XmlCdr\Services\CdrService;
+use Modules\CallDetailRecords\Models\Cdr;
+use Modules\CallDetailRecords\Services\CdrService;
 
 /**
  * Livewire component listing call detail records with a delete action.

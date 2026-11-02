@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Modules\XmlCdr\Livewire;
+namespace Modules\CallDetailRecords\Livewire;
 
 use App\Services\TenantManager;
 use App\Support\PanelActor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Modules\XmlCdr\Models\Cdr;
+use Modules\CallDetailRecords\Models\Cdr;
 
 /**
  * Livewire component showing one call detail record in full.
@@ -39,7 +39,7 @@ class CdrDetail extends Component
             ->when(! $this->isAdminGuard(), fn ($q) => $q->where('tenant_id', app(TenantManager::class)->getTenantId()))
             ->findOrFail($this->cdrId);
 
-        return view('xml-cdr::cdr-detail', ['cdr' => $cdr]);
+        return view('call-detail-records::cdr-detail', ['cdr' => $cdr]);
     }
 
     /**

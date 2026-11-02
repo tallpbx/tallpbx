@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  *     at least one declared ability for its actions. The shared Livewire
  *     action-permission resolver fails open (no requirement) when a
  *     module's permission names do not match the module namespace — the
- *     xml-cdr bug class — and this test fails whenever that mismatch
+ *     xml-cdr-era bug class — and this test fails whenever that mismatch
  *     reappears.
  *
  *  2. Every permission-gated panel index route must refuse an

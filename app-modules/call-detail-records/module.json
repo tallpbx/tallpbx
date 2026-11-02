@@ -1,16 +1,16 @@
 {
     "$schema": "../../resources/schemas/module.json",
-    "name": "xml-cdr",
+    "name": "call-detail-records",
     "version": "1.0.0",
-    "namespace": "Modules\\XmlCdr",
-    "display_name": "XML CDR",
+    "namespace": "Modules\\CallDetailRecords",
+    "display_name": "Call Detail Records",
     "category": "monitoring",
     "description": "Call detail record management for FreeSWITCH",
     "required": false,
     "protected": false,
     "priority": 400,
     "providers": [
-        "Modules\\XmlCdr\\Providers\\ModuleServiceProvider"
+        "Modules\\CallDetailRecords\\Providers\\ModuleServiceProvider"
     ],
     "requirements": {
         "php": ">=8.5",

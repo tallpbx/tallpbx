@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modules\XmlCdr\Services;
+namespace Modules\CallDetailRecords\Services;
 
 use App\Support\CrudService;
-use Modules\XmlCdr\Models\Cdr;
+use Modules\CallDetailRecords\Models\Cdr;
 
 /**
  * CRUD service for the Cdr model.

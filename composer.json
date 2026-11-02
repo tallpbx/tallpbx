@@ -55,6 +55,7 @@
             "Modules\\CallBroadcast\\": "app-modules/call-broadcast/src/",
             "Modules\\CallCenterActive\\": "app-modules/call-center-active/src/",
             "Modules\\CallCenters\\": "app-modules/call-centers/src/",
+            "Modules\\CallDetailRecords\\": "app-modules/call-detail-records/src/",
             "Modules\\CallFlows\\": "app-modules/call-flows/src/",
             "Modules\\CallForwards\\": "app-modules/call-forwards/src/",
             "Modules\\CallRecordings\\": "app-modules/call-recordings/src/",
@@ -102,8 +103,7 @@
             "Modules\\TimeConditions\\": "app-modules/time-conditions/src/",
             "Modules\\Transcribe\\": "app-modules/transcribe/src/",
             "Modules\\VoicemailMessages\\": "app-modules/voicemail-messages/src/",
-            "Modules\\Voicemails\\": "app-modules/voicemails/src/",
-            "Modules\\XmlCdr\\": "app-modules/xml-cdr/src/"
+            "Modules\\Voicemails\\": "app-modules/voicemails/src/"
         }
     },
     "autoload-dev": {

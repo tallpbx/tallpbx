@@ -18,7 +18,7 @@ new class extends Component {
 
     public bool $isAdmin = false;
 
-    /** @var BaseCollection<int, \Modules\XmlCdr\Models\Cdr> */
+    /** @var BaseCollection<int, \Modules\CallDetailRecords\Models\Cdr> */
     public BaseCollection $recentCdrs;
 
     public function boot(FreeSwitchServiceInterface $fs = null): void
@@ -74,9 +74,9 @@ new class extends Component {
             return new BaseCollection();
         }
 
-        if (class_exists(\Modules\XmlCdr\Models\Cdr::class)) {
+        if (class_exists(\Modules\CallDetailRecords\Models\Cdr::class)) {
             try {
-                return \Modules\XmlCdr\Models\Cdr::withoutGlobalScope('tenant')
+                return \Modules\CallDetailRecords\Models\Cdr::withoutGlobalScope('tenant')
                     ->orderBy('start_stamp', 'desc')
                     ->take(5)
                     ->get();

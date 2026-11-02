@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\XmlCdr\Models;
+namespace Modules\CallDetailRecords\Models;
 
 use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -18,11 +18,13 @@ class Cdr extends Model
     use HasFactory;
     use HasUuids;
 
-    protected $table = 'xml_cdr';
+    protected $table = 'cdrs';
 
     protected $fillable = [
         'tenant_id',
         'call_uuid',
+        'b_leg_uuid',
+        'leg',
         'caller_id',
         'caller_id_name',
         'destination',
@@ -30,9 +32,11 @@ class Cdr extends Model
         'billsec',
         'hangup_cause',
         'direction',
+        'record_path',
         'start_stamp',
         'answer_stamp',
         'end_stamp',
+        'json_data',
     ];
 
     /**
@@ -46,6 +50,7 @@ class Cdr extends Model
             'start_stamp' => 'datetime',
             'answer_stamp' => 'datetime',
             'end_stamp' => 'datetime',
+            'json_data' => 'array',
         ];
     }
 }
