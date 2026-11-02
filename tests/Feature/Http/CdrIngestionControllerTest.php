@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\Cdr\CdrPayloadParser;
 use App\Services\Cdr\CdrRedisIngest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -25,6 +26,14 @@ class CdrIngestSpy extends CdrRedisIngest
     public array $ingested = [];
 
     public ?RuntimeException $failure = null;
+
+    /**
+     * Create the spy with a parser that quarantines into a throwaway path.
+     */
+    public function __construct()
+    {
+        parent::__construct(new CdrPayloadParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid()));
+    }
 
     /**
      * Record the payload, or throw the injected failure.

@@ -441,6 +441,8 @@ return [
         'throttle_enabled' => filter_var(env('FREESWITCH_CDR_THROTTLE_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
         'throttle_limit' => (int) env('FREESWITCH_CDR_THROTTLE_LIMIT', 6000),
         'throttle_decay_minutes' => (int) env('FREESWITCH_CDR_THROTTLE_DECAY_MINUTES', 1),
+        // Where unparseable payloads are preserved for review.
+        'quarantine_dir' => env('FREESWITCH_CDR_QUARANTINE_DIR', '/var/log/freeswitch/json_cdr/quarantine'),
     ],
 
     /*

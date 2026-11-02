@@ -197,3 +197,20 @@ function grantTenantUserPermissions(Tenant $tenant, array $permissions = [], ?Us
 
     return $user;
 }
+
+/**
+ * Load one captured mod_json_cdr payload with channel variables overlaid.
+ *
+ * The fixtures come from a real bridged call captured on the reference host,
+ * so parser and digest tests run against the exact variable names and shapes
+ * mod_json_cdr produces.
+ *
+ * @param  array<string, mixed>  $variableOverrides
+ */
+function cdrFixture(string $leg, array $variableOverrides = []): string
+{
+    $payload = json_decode((string) file_get_contents(base_path("tests/Fixtures/cdr/{$leg}-leg.json")), true);
+    $payload['variables'] = array_merge($payload['variables'], $variableOverrides);
+
+    return (string) json_encode($payload, JSON_UNESCAPED_SLASHES);
+}
