@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Services\Modules\ModuleManifestLoader;
 use App\Support\CustomModuleAutoloader;
+use App\Support\TelephonyWorkerProviders;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -39,6 +40,8 @@ class ModuleServiceProvider extends ServiceProvider
 
         $this->app->singleton('modules.manifest', fn (): array => $modules);
 
+        $isTelephonyWorker = env('TALLPBX_WORKER_ROLE') === 'telephony';
+
         foreach ($modules as $name => $manifest) {
             // Fail-soft propagation: modules disabled at boot by the dependency
             // check keep out of the registration path entirely (plan §1.7.6).
@@ -47,6 +50,10 @@ class ModuleServiceProvider extends ServiceProvider
             }
 
             foreach (self::providersFor($manifest) as $providerClass) {
+                if ($isTelephonyWorker && ! in_array($providerClass, TelephonyWorkerProviders::MODULE_PROVIDERS, true)) {
+                    continue;
+                }
+
                 if (class_exists($providerClass)) {
                     $this->app->register($providerClass);
                 }
