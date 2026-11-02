@@ -14,6 +14,8 @@ cd "$(dirname "$0")"
 . ./config.sh
 . ./colors.sh
 . ./environment.sh
+# Durability helpers for the Redis instance that buffers CDR stream entries.
+. ./redis-durability.sh
 
 verbose "Installing PHP $php_version"
 
@@ -93,8 +95,26 @@ configure_redis() {
 }
 
 configure_redis
+
+# The CDR pipeline accepts a call record with HTTP 200 before it reaches
+# MariaDB, so Redis holds the only copy until the worker commits it. Enable
+# append-only persistence and the kernel setting its snapshot fork depends on.
+configure_redis_durability /etc/redis/redis.conf
+configure_redis_overcommit /etc/sysctl.d/99-tallpbx-redis.conf
+apply_redis_overcommit /etc/sysctl.d/99-tallpbx-redis.conf
+
 systemctl enable redis-server
 systemctl restart redis-server
+
+# Warn loudly when the running host disagrees with the configuration just
+# written: without these settings a restart can discard undigested records.
+if ! verify_redis_overcommit; then
+    warning "vm.overcommit_memory is not 1; Redis may refuse writes after a failed snapshot"
+fi
+
+if ! verify_redis_appendonly; then
+    warning "Redis append-only persistence is not active; undigested CDR records can be lost on restart"
+fi
 
 # Tune PHP-FPM worker pool sizing based on available physical memory.
 # FreeSWITCH invokes HTTP XML handlers for call lookups (extensions, routes, voicemail).
