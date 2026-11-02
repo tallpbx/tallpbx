@@ -204,9 +204,10 @@ The deployed `cred` only authenticates when nginx passes the header: the nginx t
 ### Task 3: Ingestion API Endpoint with Token Verification & Redis DB 3 Stream Buffer
 
 **Files:**
-- Modify: `config/database.php` (add `'cdr'` connection targeting Redis DB 3)
-- Modify: `config/freeswitch.php` (add `'cdr_token'`)
-- Modify: `.env.example` (add `REDIS_CDR_DB=3`)
+- Modify: `config/database.php` (add the `'cdr'` connection: DB 3, `prefix => ''`)
+- Modify: `config/freeswitch.php` (add the `'cdr'` block: token + throttle)
+- Modify: `.env.example` (`REDIS_CDR_DB=3`, `FREESWITCH_CDR_TOKEN=`, `FREESWITCH_CDR_THROTTLE_*`)
+- Modify: `app/Providers/AppServiceProvider.php` (`RateLimiter::for('cdr-ingestion')`)
 - Create: `app/Services/Cdr/CdrRedisIngest.php`
 - Create: `app/Http/Controllers/Api/CdrIngestionController.php`
 - Modify: `routes/api.php`
@@ -214,94 +215,36 @@ The deployed `cred` only authenticates when nginx passes the header: the nginx t
 
 **Interfaces:**
 - Produces: `CdrRedisIngest::ingest(string $rawJson): string` (stream message ID)
-- Produces: `CdrRedisIngest::digest(int $chunkSize = 100): int`
-- Redis Connection: `config('database.redis.cdr')` $\rightarrow$ DB 3, Stream: `pbx:cdr:stream`
+- Produces: `CdrRedisIngest::getPendingCount(): int` (health/monitoring consumer lands with Task 4)
+- Redis Connection: `config('database.redis.cdr')` $\rightarrow$ DB 3, unprefixed, Stream: `pbx:cdr:stream`
 
-- [ ] **Step 1: Add `'cdr'` connection in `config/database.php`, `.env.example`, and token in `config/freeswitch.php`**
+- [x] **Step 1: Add the `'cdr'` connection, `.env.example` keys, and the token block**
 
-In `.env.example`:
-```dotenv
-REDIS_CDR_DB=3
-FREESWITCH_CDR_TOKEN=
-```
+The connection carries `prefix => ''` (like `lua_proxy`) so the stream key stays literally `pbx:cdr:stream`, and uses the same `decorrelated_jitter` backoff default as the other connections. `config/freeswitch.php` gains a `'cdr'` block whose token has **no default** — the endpoint fails closed until the installer provisions one — plus throttle keys (A-R1, A-R3).
 
-In `config/database.php`:
-```php
-'cdr' => [
-    'url' => env('REDIS_URL'),
-    'host' => env('REDIS_HOST', '127.0.0.1'),
-    'username' => env('REDIS_USERNAME'),
-    'password' => env('REDIS_PASSWORD'),
-    'port' => env('REDIS_PORT', '6379'),
-    'database' => env('REDIS_CDR_DB', '3'),
-    'max_retries' => 3,
-],
-```
-In `config/freeswitch.php`:
-```php
-'cdr_token' => env('FREESWITCH_CDR_TOKEN', '1315715055ea76869a894ee4af86e178b89169027c4ac620e9dd084f2f4bff87'),
-```
+- [x] **Step 2: Write test for CdrIngestionController**
 
-- [ ] **Step 2: Write test for CdrIngestionController**
+`tests/Feature/Http/CdrIngestionControllerTest.php` (RED before implementation): valid Basic/Bearer/query token buffers the payload and answers 200; missing, mismatched, wrong-username, or unconfigured tokens answer 401; a buffer failure answers 503; an empty body answers 422; the connection is DB 3 with an empty prefix; the `cdr-ingestion` limiter defaults to 6,000/min per IP; the route carries `throttle:cdr-ingestion`.
 
-Create `tests/Feature/Http/CdrIngestionControllerTest.php`:
-- Verify valid Basic Auth / Bearer / query token pushes to Redis stream on DB 3 and returns HTTP 200.
-- Verify invalid or missing token returns HTTP 401.
-- Verify Redis connection failure returns HTTP 503 so FreeSWITCH triggers disk failover.
+- [x] **Step 3: Implement `CdrRedisIngest`**
 
-- [ ] **Step 3: Implement `CdrRedisIngest`**
+`ingest()` appends the untouched payload under the `data` field; `getPendingCount()` reports `XLEN` for the Task 4 health consumer.
 
-Create `app/Services/Cdr/CdrRedisIngest.php`:
-```php
-namespace App\Services\Cdr;
+- [x] **Step 4: Implement `CdrIngestionController`**
 
-use Illuminate\Support\Facades\Redis;
+Timing-safe `hash_equals()` with fail-closed on an empty configured token; the token is accepted from Basic credentials (`tallpbx:<token>`, the transport mod_json_cdr uses), a Bearer header, or the query string. The body is read raw, with the `cdr=<url-encoded>` form decoded as a fallback. On a Redis exception the endpoint logs and answers 503 so FreeSWITCH spools to disk.
 
-class CdrRedisIngest
-{
-    public const STREAM_KEY = 'pbx:cdr:stream';
+- [x] **Step 5: Register route and limiter**
 
-    public function ingest(string $rawJson): string
-    {
-        return Redis::connection('cdr')->xadd(self::STREAM_KEY, '*', [
-            'data' => $rawJson,
-        ]);
-    }
+`Route::post('/v1/cdr', ...)->middleware('throttle:cdr-ingestion')->name('api.v1.cdr.store')`. The named limiter is env-configurable (`FREESWITCH_CDR_THROTTLE_*`) and defaults to 6,000/min per IP — aligned with the xml handler, since two legs per call at the documented 15–20 calls/sec ceiling is 1,800–2,400 posts/min (A-R3 resolved).
 
-    public function getPendingCount(): int
-    {
-        return (int) Redis::connection('cdr')->xlen(self::STREAM_KEY);
-    }
-}
-```
+- [x] **Step 6: Run tests and verify**
 
-- [ ] **Step 4: Implement `CdrIngestionController`**
+`./vendor/bin/pest tests/Feature/Http/CdrIngestionControllerTest.php` — 12 passed. Live verification on the reference host: a real POST with the provisioned Basic token through nginx answered 200 and produced stream entry `1793580217323-0` on DB 3 containing the exact raw payload; a tokenless POST answered 401 (also proving nginx forwards `HTTP_AUTHORIZATION`, A-R8). The test entry was deleted afterwards.
 
-Create `app/Http/Controllers/Api/CdrIngestionController.php`:
-- Check timing-safe token using `hash_equals()`. Fail closed if token is empty.
-- Read `$request->getContent()` (supporting both raw JSON and fallback `cdr` input).
-- Push to `CdrRedisIngest`.
-- On Redis exception, log error and return `response()->json(['error' => 'Ingest unavailable'], 503)`.
+- [x] **Step 7: Commit**
 
-- [ ] **Step 5: Register route in `routes/api.php`**
-
-```php
-Route::post('/v1/cdr', [CdrIngestionController::class, 'store'])
-    ->middleware('throttle:1200,1')
-    ->name('api.v1.cdr.store');
-```
-
-- [ ] **Step 6: Run tests and verify**
-
-Run: `./vendor/bin/pest tests/Feature/Http/CdrIngestionControllerTest.php`
-Expected: PASS.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add config/database.php config/freeswitch.php app/Services/Cdr/CdrRedisIngest.php app/Http/Controllers/Api/CdrIngestionController.php routes/api.php tests/
-git commit -m "feat(cdr): add secure redis stream ingestion controller on db 3 with 503 failover"
-```
+Code and docs committed separately on `5.x` (`feat(cdr)` ingestion endpoint, then the plan/changelog update).
 
 ---
 
