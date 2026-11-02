@@ -73,6 +73,9 @@ class FakeCdrStream
  */
 class TestableCdrIngest extends CdrRedisIngest
 {
+    /**
+     * Wire the digest cycle to the in-memory stream.
+     */
     public function __construct(CdrPayloadParser $parser, public FakeCdrStream $stream)
     {
         parent::__construct($parser, new CdrBatchWriter);
@@ -160,6 +163,9 @@ it('keeps every entry when the MariaDB transaction fails', function () {
     // A row that cannot be inserted aborts the whole batch transaction.
     $parser = new class('') extends CdrPayloadParser
     {
+        /**
+         * Return a row that cannot be inserted, to abort the batch transaction.
+         */
         public function parse(string $rawJson): ?array
         {
             return [

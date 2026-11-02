@@ -50,6 +50,10 @@ const ALLOWED_SHARED_KERNEL_MODULE_DEPENDENCIES = [
     'app/Services/TenantEslScoping.php' => 'Core ESL event tenant resolution across PBX entities',
     'app/Services/TenantIdentityResolver.php' => 'SIP account identity resolver for multi-tenant context identification',
     'app/Observers/RoutingCacheObserver.php' => 'Core routing cache invalidation observer clearing cached dialplan XML',
+
+    // 6. Call Detail Record Pipeline (stream digest and spool drain share one
+    // transactional commit path into the module's cdrs table)
+    'app/Services/Cdr/CdrBatchWriter.php' => 'Shared CDR commit path used by the stream digest and the spool drain',
 ];
 
 it('forbids direct instantiation and creation of FileStore and MediaAsset outside Modules\FileStores', function (): void {

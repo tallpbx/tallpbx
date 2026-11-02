@@ -22,6 +22,9 @@ class CdrWorkSpy extends CdrRedisIngest
 
     public int $chunkUsed = 0;
 
+    /**
+     * Create the spy with a throwaway parser and the real batch writer.
+     */
     public function __construct(public int $digestReturns = 0, public int $pendingReturns = 0)
     {
         parent::__construct(new CdrPayloadParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid()), new CdrBatchWriter);
