@@ -23,12 +23,15 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
   - [2 vCPU / 2 GB RAM (Dual-Core)](#2-vcpu--2-gb-ram-dual-core)
   - [2 vCPU Dedicated / 8 GB RAM (Dedicated Compute Node)](#2-vcpu-dedicated--8-gb-ram-dedicated-compute-node)
   - [4 vCPU / 16 GB RAM (Dedicated Cloud Node)](#4-vcpu--16-gb-ram-dedicated-cloud-node)
+  - [Persistent Octane Worker (4-core Reference Appliance)](#persistent-octane-worker-4-core-reference-appliance)
+  - [XML Serving Configurations: Four-Way Comparison (1 vCPU)](#xml-serving-configurations-four-way-comparison-1-vcpu)
 - [Live Call Capacity & Telephony Feature Validation (SIP Signaling)](#live-call-capacity--telephony-feature-validation-sip-signaling)
   - [End-to-End Functional Feature Validation (All Tiers)](#end-to-end-functional-feature-validation-all-tiers)
   - [1 vCPU / 1 GB RAM Live Call Capacity](#1-vcpu--1-gb-ram-live-call-capacity)
   - [1 vCPU / 2 GB RAM Live Call Capacity](#1-vcpu--2-gb-ram-live-call-capacity)
   - [2 vCPU / 2 GB RAM Live Call Capacity](#2-vcpu--2-gb-ram-live-call-capacity)
   - [4 vCPU / 16 GB RAM Live Call Capacity](#4-vcpu--16-gb-ram-live-call-capacity)
+  - [Cross-Architecture Call Capacity (Octane vs Lua vs Fast Controller)](#cross-architecture-call-capacity-octane-vs-lua-vs-fast-controller)
 
 ---
 
@@ -362,6 +365,152 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 *Artifacts: `storage/app/load-tests/capacity/datacenter-4c16g-dedicated-20260924T220942Z/` and `cache-sweep-20260924-221059/`.*
 
+### Persistent Octane Worker (4-core Reference Appliance)
+
+> **Provisional figures.** This is the first measurement of the production XML path — FreeSWITCH posting to the resident RoadRunner worker on `127.0.0.1:8090`. The baseline row is queued for re-measurement alongside the rest of this document; treat the multipliers as indicative until then.
+
+- **Host**: appliance server (`fspbx1`), 4 cores, 4 GB RAM, 2 GB swap, Debian 13, Linux 6.12 amd64.
+- **Stack**: PHP 8.5.12 CLI under RoadRunner (`rr` 2024.3) + Laravel Octane 2.x; FreeSWITCH 1.11.4; MariaDB 11; Redis 7 (cache DB 1, CDR stream DB 3).
+- **Worker**: `tallpbx-xml-worker.service`, started with `TALLPBX_WORKER_ROLE=telephony`, listening only on `127.0.0.1:8090`; four auto-scaled workers held roughly 162 MB resident.
+- **Baseline**: nginx + PHP-FPM **static pool, 12 workers**, same host, same tenant and request counts.
+- **Load**: `tpbx pbx:load-test:dialplan`, tenant `load-test-vbox` (100 extensions).
+
+#### Worker HTTP Throughput
+
+| Metric | 100×5 Cache-Hit | 500×25 Cache-Hit | 100×5 Mixed | 500×25 Mixed | 100×5 Directory |
+|:--|--:|--:|--:|--:|--:|
+| **Total Requests** | 100 | 500 | 100 | 500 | 100 |
+| **Successful Responses** | 100 | 500 | 100 | 500 | 100 |
+| **Failed / Timeouts** | 0 | 0 | 0 | 0 | 0 |
+| **Elapsed Time** | 2.95 s | 7.50 s | 4.55 s | 11.26 s | 5.16 s |
+| **Client Throughput** | **33.9 req/s** | **66.6 req/s** | **22.0 req/s** | **44.4 req/s** | **19.4 req/s** |
+| **Client Latency (Min)** | 19.5 ms | 33.7 ms | 29.7 ms | 24.5 ms | 57.8 ms |
+| **Client Latency (p50)** | 58.2 ms | 180.7 ms | 67.5 ms | 224.4 ms | 165.2 ms |
+| **Client Latency (Avg)** | 88.9 ms | 193.1 ms | 104.8 ms | 277.4 ms | 172.3 ms |
+| **App-Side `handler_ms` (p50)** | **10.8 ms** | **10.2 ms** | **12.0 ms** | **10.6 ms** | **14.2 ms** |
+| **App-Side `handler_ms` (p95)** | **28.4 ms** | **26.2 ms** | **187.0 ms** | **204.5 ms** | **42.8 ms** |
+| **Database Queries (Cached)** | **0** | **0** | **0 (hits)** | **0 (hits)** | **0** |
+
+*Client latency includes CLI Guzzle `Http::pool` batching and per-batch TCP overhead; app-side `handler_ms` is the processing window inside the resident worker. The 2,500 req/s target in the design notes describes low-level socket concurrency (`sipp` / `wrk`), not this PHP CLI harness, and has not been demonstrated.*
+
+#### Worker vs PHP-FPM (Same Host)
+
+| Metric | PHP-FPM, 12 static workers | Octane worker | Delta |
+|:--|--:|--:|:--|
+| **Elapsed Time (100 reqs)** | 9.13 s | 2.95 s | **3.1× faster elapsed** |
+| **Throughput (100×5)** | 10.95 req/s | 33.91 req/s | **+210 % throughput (+3.1×)** |
+| **Client Latency (Min)** | 169.99 ms | 19.47 ms | **8.7× faster response** |
+| **Client Latency (p50)** | 347.17 ms | 58.15 ms | **6.0× lower latency** |
+| **Client Latency (Avg)** | 355.48 ms | 88.85 ms | **4.0× lower latency** |
+| **App-side p95** | 436.95 ms (`request_ms`) | 28.38 ms (`handler_ms`) | ~400 ms of boot removed — directional only, the two columns measure different windows |
+| **Throughput under saturation (500×25)** | 3.59 req/s (worker starvation) | 66.65 req/s (0 errors) | **18.5× throughput under load** |
+
+The worker removes the per-request boot, so the gap widens under saturation: 66.65 req/s with zero failures at concurrency 25 against 3.59 req/s for the static pool. The 100×5 baseline was captured before the pool tuning recorded in the 1 vCPU tiers above and is being re-measured; until then the 3.1× multiplier is provisional.
+
+Cache hits recorded `X-TallPBX-DB-Queries: 0`, and atomic cache locks serialize a cold-key stampede into one build. Tenant isolation is enforced by `ClearTenantContext` and `VerifyCleanDatabaseState` on request and operation termination; byte parity is asserted by `XmlHandlerOctaneParityTest`, with `TenantStateIsolationTest` covering cross-tenant cleanup. Verification run: 97 tests / 379 assertions, Pint clean, and a live `find_user_xml` answered 200 from the worker.
+
+### XML Serving Configurations: Four-Way Comparison (1 vCPU)
+
+> **Measured 2026-11-01, before the persistent worker became the primary path.** The fast front controller and the Lua proxy are now disabled in favour of the RoadRunner worker (see above); this section is the reference data for those two optional paths and for the request-cost baseline they were built to remove.
+
+**Purpose:** measure the two optional speed-ups independently and together, so a decision to keep or remove either one rests on a number. **Supersedes** the earlier directory-only sweep: the pre-dialplan run reached the same gate decision — app-side p95 73.9–292.4 ms, HTTP p95 1,233 ms at concurrency 25, directory share 66.7 % (PROCEED) — and its full report was retired once this comparison replaced it.
+
+**Provenance:** Lua proxy v2 plan, Task 8 (the plan document was removed after completion; recover it from git history if needed).
+
+**Environment**
+
+| Item | Value |
+|:--|:--|
+| Host | Datacenter test server (`x.x.x.145`; public address obfuscated per project convention) |
+| OS | Debian GNU/Linux 13 (trixie), amd64 |
+| CPU / RAM / Swap | 1 shared vCPU, 967 MB, 2 GB swap |
+| PHP | 8.5.12, FPM `pm = static`, `pm.max_children = 5` |
+| FreeSWITCH | 1.11.4 (SignalWire packages) |
+| Cache policy | `FS_XML_HANDLER_CACHE_TTL=60`, dialplan cache TTL 60 s |
+| Tenant | `load-test-beta` (tenant 2), domain `load.test.local`, extension `2000`, context `tenant_2_internal` |
+
+**Configurations**
+
+| ID | Fast controller | Lua proxy | What it represents |
+|:--|:--:|:--:|:--|
+| **A** | off | off | Stock install before either optimisation |
+| **B** | off | on | Proxy alone |
+| **C** | on | on | Both, as a future default |
+| **D** | on | off | Fast controller alone |
+
+Both switches are real, not simulated: the canonical `location = /api/v1/xml-handler` is repointed at `public/xml-handler-fast.php` for the fast configurations, and the Lua bindings are commented out for the proxy-off ones. Each switch is asserted after it is applied, because an earlier attempt silently failed to switch the controller and produced a full set of plausible but meaningless numbers.
+
+**Method**
+
+1. **Interleaved rounds.** Three rounds, each visiting A → D → B → C. A single sweep per configuration is not trustworthy here: the ESL "ping floor" (20 bare `status` calls, no cache, no PHP) moved between 126 ms and 1,096 ms during one such sweep, which made the last configuration look twice as slow for reasons unrelated to it. Interleaving spreads a stall across all four.
+2. **Timing logs off.** `FS_XML_HANDLER_LOG_TIMING` was enabled during one discarded sweep; it attaches a database listener and writes a log line per request, which halved throughput and doubled app-side latency. Every number here is from runs with it disabled.
+3. **Who served the lookup** is proved from the mirror TTL, not from logs: PHP rewrites the payload and resets its TTL to 60 s, Lua only reads it and the TTL keeps counting down. Both probes report `lua` for B/C and `php` for A/D in every round.
+4. **FreeSWITCH-side cost** is 30 `find_user_xml` calls (directory) and 15 `originate loopback/2000/tenant_2_internal` calls (dialplan), minus the ping floor measured in the same window.
+5. **Load** is `pbx:load-test:dialplan --section=directory|dialplan --timing` at 100×1, 100×5 and 500×25. The 500×25 tier ran twice per configuration; the cheaper tiers three times.
+
+**What FreeSWITCH waits for** — per lookup, median of three rounds, ping floor subtracted:
+
+| ID | Fast | Lua | Directory | Dialplan (per call) | Served by |
+|:--|:--:|:--:|--:|--:|:--|
+| **A** | off | off | **62 ms** | **~140–235 ms** | PHP |
+| **B** | off | **on** | **6 ms** | **~22 ms** | Lua (probe) |
+| **C** | **on** | **on** | **5–8 ms** | **~22 ms** | Lua (probe) |
+| **D** | **on** | off | **80 ms** | **~80 ms** | PHP |
+
+The dialplan row is the one that matters: every call leg produces a dialplan lookup, and the proxy removes essentially all of it — what remains (~22 ms) is the cost of creating the loopback channel, which both sides pay.
+
+**Web-app load** — median of rounds. Throughput, requests/second:
+
+| Section | Tier | **A** stock | **B** proxy | **C** both | **D** fast |
+|:--|:--|--:|--:|--:|--:|
+| directory | 100×1 | 12.9 | 12.4 | 10.3 | 13.2 |
+| directory | 100×5 | 14.1 | **17.3** | 17.5 | **22.0** |
+| directory | 500×25 | 16.4 | 15.3 | 16.2 | **23.4** |
+| dialplan | 100×1 | 16.1 | 14.7 | 16.2 | 13.1 |
+| dialplan | 100×5 | 13.3 | 14.8 | 13.8 | **22.5** |
+| dialplan | 500×25 | 16.0 | 13.1 | 12.6 | 15.7 |
+
+App-side p50, milliseconds:
+
+| Section | Tier | **A** | **B** | **C** | **D** |
+|:--|:--|--:|--:|--:|--:|
+| directory | 100×5 | 257 | 271 | 244 | **172** |
+| directory | 500×25 | 272 | 285 | 258 | **185** |
+| dialplan | 100×5 | 257 | 308 | 329 | **160** |
+| dialplan | 500×25 | 265 | 346 | 305 | **171** |
+
+A supporting alternation run (ten pairs of stock vs fast at 100×5, order flipped each iteration, partial sample n=4 per cell) agreed with the direction: directory 8.3 → 11.8 req/s, dialplan 7.3 → 13.9 req/s.
+
+**What mirroring costs.** With the proxy on, every PHP request also writes a mirror copy. At saturation that is visible:
+
+| Comparison | Tier | Without proxy | With proxy | Cost |
+|:--|:--|--:|--:|--:|
+| directory, fast on (D → C) | 500×25 | 23.4 req/s | 16.2 req/s | **−31 %** |
+| dialplan, fast off (A → B) | 500×25 | 16.0 req/s | 13.1 req/s | **−18 %** |
+
+At 100×5 the cost is inside the noise.
+
+**What the numbers say.**
+
+- **The proxy is decisive and unambiguous.** A directory lookup drops from 62 ms to ~6 ms and a dialplan lookup from well over 100 ms to ~22 ms, with the TTL probe confirming Redis served it every round. No amount of host noise explains a 10–20× gap.
+- **The fast controller is real but smaller, roughly +40–70 % throughput**, and it shows up in app-side p50 everywhere (257 → 172 ms at 100×5; 265 → 171 ms at 500×25). One cell disagrees — dialplan at 500×25 is flat — and that cell's round-1 run was taken while the ping floor was 1,096 ms, i.e. the box was stalled, so it is treated as contaminated rather than as a counterexample.
+- **Mirroring is not free.** It costs 18–31 % of HTTP throughput at saturation on a 1 vCPU box. That is the honest trade: the proxy moves cost off call setup and adds a slice to every PHP request that renders a document.
+- The two features solve different problems and do not substitute for each other. The fast controller makes *every* PHP render cheaper; the proxy removes the render from the call path entirely.
+
+**Recommendation.**
+
+- **Keep the fast controller on by default.** It is free, it needs no FreeSWITCH change, and it helps every section.
+- **Keep the proxy available but decide per deployment.** On a box whose call-setup rate is the constraint, it is the difference between ~140 ms and ~22 ms per call. On a box already saturated on the HTTP side, its write cost is a real tax — and it only pays off if call setup, not admin traffic, is the bottleneck.
+- **Do not treat the proxy as a way to raise HTTP throughput.** It cannot: requests over HTTP still go through PHP.
+
+**Caveats.**
+
+- The host is a **shared** 1 vCPU instance. Absolute numbers move by a factor of two between quiet and busy periods; only the within-round comparisons are trustworthy, which is why every figure above is a median across interleaved rounds.
+- FreeSWITCH-side figures subtract a ping floor measured in the same window. That subtraction is crude when a stall lands between the two measurements.
+- The 500×25 tier has two rounds per cell, not three.
+- Calls were placed with `originate loopback` and fail at the bridge because the test extension is not registered. That failure is after the dialplan lookup, so it does not affect the dialplan measurement.
+- No SIPp end-to-end call test was run for these configurations; that measures registration and media, not XML lookup cost.
+
 ---
 
 ## Live Call Capacity & Telephony Feature Validation (SIP Signaling)
@@ -476,3 +625,26 @@ Sustained extension-to-extension capacity tests on 4 dedicated CPU cores with 24
 - **Production Recommendation**: Plan production capacity at **15–20 calls/sec** sustained (supporting 200–400 active concurrent extensions), with headroom to absorb bursts up to **30 calls/sec** with zero call drops.
 
 *Artifacts: `storage/app/load-tests/capacity/datacenter-4c16g-sipp-20260924T2211Z/`.*
+
+### Cross-Architecture Call Capacity (Octane vs Lua vs Fast Controller)
+
+**Date:** 2026-11-02 — **Test harness:** dedicated SIPp load generator (`x.x.x.148`) running `uac-extension-capacity.xml` against a remote 1 vCPU / 1 GB RAM PBX host (`x.x.x.89`). Call duration: 5 seconds. Tested under the standard Debian dynamic PHP-FPM pool (`pm = dynamic`, `max_children = 5`).
+
+While the XML throughput benchmarks above measure raw handler performance, this section records full-stack telephony performance: SIP registration, INVITE/200 OK SDP negotiation, bi-directional RTP media flow, CDR generation, ESL event streaming (`freeswitch:listen`), and WebSocket broadcasting (`reverb:start`).
+
+| Architecture | Peak Sustained Rate | 3 CPS Ladder | 5 CPS Ladder | 8 CPS Ladder | 10 CPS Burst | Call Setup Median (p50) | Failure Mode / Bottleneck |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Octane Lean Worker**<br>*(Port 8090, 1 worker, RAM DB)* | **6.23 CPS** | **100%** (180/180) | **100%** (300/300) | **94.8%** (455/480) | **99.3%** (596/600) | **82 – 118 ms** | Total 1 vCPU exhaustion (33% ESL, 33% FS, 25% Reverb, 8% softirq) |
+| **Lua Proxy Only**<br>*(In-process Lua + Redis)* | **4.60 CPS** | **100%** (39/39) | **100%** (66/66) | **94.8%** (95/100) | **83.6%** (94/111) | **56 – 60 ms** | In-process Lua thread contention and Redis connection limits under concurrency |
+| **Fast Controller + Lua Proxy**<br>*(Lua cached + Fast fallback)* | **3.30 CPS** | **100%** (33/33) | **100%** (66/66) | **100%** (105/105) | **73.5%** (91/122) | **56 – 504 ms** | CPU context switching overhead between Lua interpreter and FPM fallbacks |
+| **Fast Controller Only**<br>*(xml-handler-fast.php via FPM)* | **~1.5 CPS** | **Failed / Stalled** | Not viable | Not viable | Not viable | **> 3,200 ms** | Worker pool exhaustion (`pm.max_children = 5` queueing past 5s curl timeout) |
+
+**Failure domain isolation (the admin-lockout factor).** In any FPM-backed architecture (stock FPM or fast controller), a burst of inbound calls sends multiple sequential HTTP queries per call (directory, dialplan, configuration). On a default dynamic pool (`pm.max_children = 5`), two simultaneous inbound calls saturate all five worker processes; subsequent calls queue, call setup latency spikes past 3.3 seconds (audible dead air before ringing), and administrators logging into the panel receive `HTTP 504 Gateway Timeout`. Octane runs as a dedicated daemon on port 8090, so telephony surges never touch PHP-FPM (port 80) and the administrative panel stays responsive at maximum call load.
+
+**The truth about the 10 CPS ceiling on 1 vCPU.** PHP XML parsing is not the bottleneck: whether XML was served by Octane in 1.78 ms or by Lua in 6 ms directly from Redis RAM, the system hit a hard ceiling between 6 and 10 CPS. At 10 CPS (50 concurrent active calls) CPU utilisation was 100% (0.0% idle), split between `freeswitch:listen` (33%: deserialising hundreds of ESL JSON events per second into Laravel and MariaDB), the FreeSWITCH core (33%: Sofia SIP UDP processing, timer loops, RTP allocations, state machines), `reverb:start` (25%: broadcasting live channel state over WebSockets), and kernel network processing (8–16%: UDP software interrupts). Static XML files would not solve this, because static files still require the same SIP signalling, RTP streaming, ESL events, and WebSockets.
+
+**Multi-core scaling horizon.** A 1 vCPU server maxes out at ~6.2–10 CPS because telephony and PHP daemons share one core. Separating FreeSWITCH from Laravel on **2 vCPUs** unlocks **15–20 CPS**; on **4 vCPUs** Octane scales to **30–60+ CPS** with only four worker threads (~250 MB RAM), where PHP-FPM would require 24–32 workers (~1.2 GB RAM).
+
+For hardware sizing, compute isolation architecture, and ESL event pruning instructions, see [telephony-capacity-scaling-guide.md](telephony-capacity-scaling-guide.md).
+
+*Artifacts for the XML-side four-way comparison: `storage/app/load-tests/` on the test host (`task1-*.json`, `cache-sweep-*`); the SIP-capacity artifacts are listed with each live-call tier above.*

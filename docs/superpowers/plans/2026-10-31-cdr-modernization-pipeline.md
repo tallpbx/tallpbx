@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Prerequisite before the "zero data loss" goal below holds:** findings **A-R13**, **A-R14** and **A-R15** in [`implementation-plan-review.md`](implementation-plan-review.md) are unresolved, and no task in this plan covers them — the accepted-then-crashed record window (AOF is off), `vm.overcommit_memory = 0` turning a failed snapshot into refused writes, and `appliance:sync-host` calling `flushall()` across every database.
+> **Durability prerequisites (resolved):** the three gaps this plan does not close itself — the accepted-then-crashed record window, `vm.overcommit_memory`, and `appliance:sync-host` flushing every database — are implemented in `scripts/resources/redis-durability.sh` and `ApplianceSyncHostCommand`, and documented in [architecture](../../architecture.md) §17.4.
 
 **Goal:** Implement a production-grade, zero-data-loss Call Detail Record (CDR) ingestion pipeline for TallPBX 5.x using FreeSWITCH `mod_json_cdr`, Pulse-style Redis Stream buffering on isolated Database 3, atomic micro-batch digestion into MariaDB (`cdrs`), disk failover reconciliation, secure audio recording playback, and raw JSON technical diagnostics, with a clean module rename to `app-modules/call-detail-records` and table `cdrs`.
 

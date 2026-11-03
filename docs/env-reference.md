@@ -132,6 +132,7 @@ See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path
 | `FS_XML_HANDLER_THROTTLE_ENABLED` | `boolean` | `true` | `freeswitch.xml_handler.throttle_enabled` | Enables rate limiting on `/api/v1/xml-handler` to protect against token brute forcing and denial of service. |
 | `FS_XML_HANDLER_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.xml_handler.throttle_limit` | Maximum allowed XML curl requests per minute per IP address. |
 | `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle_decay_minutes` | Decay window in minutes for XML handler rate limiting. |
+| `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` by `scripts/resources/systemd/tallpbx-xml-worker.service`. While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
 
 ---
 

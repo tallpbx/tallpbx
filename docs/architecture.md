@@ -366,7 +366,11 @@ TallPBX decouples cache freshness from cache expiration:
 
 In v4.2.0, the default `FS_XML_HANDLER_CACHE_TTL` was raised from 5 seconds to 60 seconds because versioned cache invalidation guarantees instant freshness on writes. For configuration details and environment variables, refer to [Environment Reference Guide §2.2](env-reference.md#22-telephony-xml-handler--dynamic-dialplan-engine); for benchmark methodologies and production tuning guidance, see the load-testing documentation ([Load Testing Results](load-testing-results.md) and [Load Testing Guide](load-testing-guide.md)).
 
+**Identity answers need their own epoch.** The cached answer to *which tenant owns this username* — `TenantIdentity` in DB 1, and the Lua mirror's identity map — cannot embed a tenant revision, because that answer is what selects the tenant. It carried only a 60-second TTL, so a SIP account or tenant domain moved to another tenant could keep resolving to its previous owner until the TTL expired: a cross-tenant boundary rather than a stale document. Both keys now embed the **global routing revision as an identity epoch** (`…:e<epoch>`); `RoutingCacheObserver` bumps the global revision on every `SipAccount` and `TenantDomain` write, and a missing or non-numeric epoch is a miss, never a default. The accepted cost is that the global revision also salts dialplan keys, so an account or domain edit invalidates each tenant's dialplan once on its next request. `TenantIdentityResolverTest` covers account and domain re-homing, `RoutingCacheObserverTest` covers the bumps, and `DirectoryXmlMirrorTest` covers the epoch-keyed mirror and its refusal to publish when the epoch moves mid-render.
+
 #### 5. Request Flow & Invalidation Sequence
+
+In a fresh install the handler runs inside the resident worker (§7.5.7) and FreeSWITCH reaches it on loopback port 8090. The nginx hop shown below is the fallback binding.
 
 ```mermaid
 sequenceDiagram
@@ -404,7 +408,7 @@ sequenceDiagram
 
 #### 6. In-Process XML Cache (FreeSWITCH Lua + Redis Mirror)
 
-> **Status:** approved design for TallPBX 5.x, not yet enabled. It ships behind `FS_LUA_PROXY_ENABLED=false` and Phase 1 covers directory lookups only. Until it is switched on, every lookup follows the path in §7.5.5. Rationale and evidence: [implementation plan review](superpowers/plans/implementation-plan-review.md) and [measurement report](lua-proxy-measurement-results.md).
+> **Status:** shipped in 5.x and off by default (`FS_LUA_PROXY_ENABLED=false`). It covers directory and dialplan lookups; configuration, phrase, and ACL lookups always fall through. Current appliances run with the bindings removed because the persistent Octane worker (§7.5.7) is the primary path, and the proxy stays available as a reversible option — enablement and rollback are documented in [operations](operations.md) → Optional Lua XML Cache. While the bindings are off, every lookup follows §7.5.5. Evidence: [four-way comparison](load-testing-results.md#xml-serving-configurations-four-way-comparison-1-vcpu).
 
 **The bottleneck it removes.** A cache hit still costs a full HTTP round trip through nginx, a PHP-FPM worker, and a Laravel boot before Redis is even asked. On the reference 1 shared vCPU host a directory lookup measured roughly 55 ms app-side at concurrency 1, of which only ~11 ms was XML assembly — the other ~44 ms was framework boot and dispatch. Because each lookup holds a worker for that entire window, the pool saturates at about 26 XML requests per second and the tail stretches to roughly 1,000 ms at concurrency 25. The XML is not the expensive part; reaching it is.
 
@@ -428,9 +432,11 @@ flowchart TD
 
 | Mirror key | Purpose | Expiry |
 | :--- | :--- | :--- |
-| `pbx:fsxml:tenant:user:{domain}:{user}` | Resolves which tenant owns a SIP identity, so shared domains stay unambiguous | 60 s |
+| `pbx:fsxml:tenant:user:{domain}:{user}:e{epoch}` | Resolves which tenant owns a SIP identity, so shared domains stay unambiguous. The epoch is the global routing revision, so an account or domain moved to another tenant cannot keep resolving to the previous owner | 60 s |
 | `pbx:fsxml:ver:{tenantId}` | The tenant's current routing version, mirrored from `RoutingCacheVersion` | none |
+| `pbx:fsxml:ver:global` | The global routing revision, used as the identity epoch and as part of the dialplan key | none |
 | `pbx:fsxml:dir:{tenantId}:{tag}:{domain}:{user}:v{version}` | The rendered directory document itself, as raw XML | 60 s |
+| `pbx:fsxml:dp:{tenantId}:{context}:{destination}:v{version}:e{epoch}` | The rendered dialplan document for one context and destination, as raw XML | 60 s |
 
 Three properties keep the mirror safe:
 
@@ -438,7 +444,30 @@ Three properties keep the mirror safe:
 - **There is still only one invalidation mechanism.** The version is embedded in the mirror key and comes from the same `RoutingCacheVersion::bump()` described in §7.5.4, so a panel edit bypasses both stores at the same instant. The 60-second TTL exists only to bound memory.
 - **Failure means miss, never stale.** A missing key, a Redis error, or a malformed value makes the script return nil, and FreeSWITCH falls through to `mod_xml_curl` — today's path. A Redis outage costs response time; it never fails a registration or a call.
 
-The economics of a hit are three `GET` commands (about 7 µs of Redis work) replacing the roughly 55 ms of PHP that the lookup would otherwise consume. Redis itself is not a constraint at these volumes: at the measured 26 requests per second it uses well under 1 % of a single core, and pressure would appear only in the tens of thousands of requests per second.
+The economics of a hit are three or four `GET` commands (well under 10 µs of Redis work) replacing the roughly 55 ms of PHP that the lookup would otherwise consume. A directory hit reads the identity epoch, the identity map, the tenant version, and the payload; a dialplan hit reads the epoch, the tenant version, and the payload, because the tenant is carried inside the context name (`tenant_{id}_internal`). Redis itself is not a constraint at these volumes: at the measured 26 requests per second it uses well under 1 % of a single core, and pressure would appear only in the tens of thousands of requests per second.
+
+#### 7. Persistent Telephony XML Worker (Octane / RoadRunner)
+
+> **Status:** the primary serving path on fresh installs. FreeSWITCH posts to `http://127.0.0.1:8090/api/v1/xml-handler` and a resident RoadRunner worker answers without booting the framework per request. Operating instructions are in [operations](operations.md) → Telephony XML Worker; measurements are in [load-testing results](load-testing-results.md#persistent-octane-worker-4-core-reference-appliance).
+
+**The cost it removes.** Under PHP-FPM every lookup pays Composer autoloading, provider registration, and container construction before Redis is asked — roughly 44 ms of a ~55 ms hit on the reference 1 vCPU host (§7.5.6). The worker keeps the framework, Eloquent connections, and module contributors in memory, so the same lookup only runs the controller. Measured on the 4-core reference appliance (baseline: PHP-FPM with 12 static workers on the same host): 33.9 requests/second at 100×5 and 66.6 requests/second at 500×25 with zero failed requests, against 10.95 and 3.59 requests/second for the pool. Those figures come from a CLI harness that adds per-batch connection overhead, so they understate an in-process client; the 2,500 req/s design target was not demonstrated.
+
+**How FreeSWITCH reaches it.** The installer writes two `mod_xml_curl` bindings, both authenticated with the same token:
+
+| Binding | Target | Timeout | Role |
+| :--- | :--- | :--- | :--- |
+| `tallpbx-octane` | `http://127.0.0.1:8090/api/v1/xml-handler` | 3 s | Primary — the resident worker |
+| `tallpbx-fallback` | `http://127.0.0.1/api/v1/xml-handler` (nginx → PHP-FPM) | 5 s | Used while the worker is down, restarting, or crash-looping |
+
+The second binding is what makes a restart safe: lookups degrade to the PHP path instead of failing registrations.
+
+**Lean scope.** The systemd unit starts `octane:start --server=roadrunner` with `TALLPBX_WORKER_ROLE=telephony`. `ModuleServiceProvider` then registers only `App\Support\TelephonyWorkerProviders` — 24 telephony module providers instead of all 60 — so panel, Livewire, Reverb, and billing code never enters worker memory. The panel keeps its own PHP-FPM workers, so call volume cannot starve the administrative UI.
+
+**Tenant isolation without a per-request container.** Because the container survives between requests, `config/octane.php` registers `ClearTenantContext` and `VerifyCleanDatabaseState` on request and operation termination. They clear `TenantManager` and roll back connections left inside a transaction, so a tenant resolved on one call leg cannot leak into the next on the same worker.
+
+**Correctness is unchanged.** The worker resolves the same `XmlHandlerController` and builders, reads and writes the same Redis DB 1 keys, and honours the same `RoutingCacheVersion` bumps (§7.5.4) and 60-second TTL. Both builders wrap their miss path in `Cache::lock(...)->block(3)`, so a registration stampede produces one XML build and the other requests wait for it instead of issuing duplicate queries. `tests/Feature/Http/XmlHandlerOctaneParityTest.php` asserts byte-identical documents against standard dispatch, and `tests/Feature/Octane/TenantStateIsolationTest.php` covers the cross-tenant cleanup.
+
+**Rollback posture.** The fast front controller and the Lua mirror remain in the codebase, disabled, so a deployment can return to the nginx path without a code change (operations → Fast XML Handler Path, and → Optional Lua XML Cache).
 
 ---
 
@@ -849,7 +878,7 @@ After recovery, re-apply from the Security Center (or `tpbx security:apply`) so 
 
 ## 17. CDR Ingestion: `mod_json_cdr` → Redis Stream → MariaDB
 
-> **Status:** approved design for TallPBX 5.x, not yet deployed. `mod_json_cdr` is not installed on current appliances (the `freeswitch-mod-json-cdr` package is available at the matching 1.11.4 version), `/api/v1/cdr` and `tpbx cdr:work` do not exist yet, and the `xml-cdr` module is still a placeholder. This section documents the target architecture and the durability rules it has to satisfy. Sources: [pipeline plan](superpowers/plans/2026-10-31-cdr-modernization-pipeline.md) and findings A-R13–A-R15 in the [implementation plan review](superpowers/plans/implementation-plan-review.md).
+> **Status:** deployed in TallPBX 5.x. The installer adds `freeswitch-mod-json-cdr`; `/api/v1/cdr` accepts posts; `tpbx cdr:work` runs under `tallpbx-cdr-worker.service`; and `tpbx cdr:drain-spool` reconciles the failure spool every five minutes. The owning module is `app-modules/call-detail-records` with table `cdrs` (the 5.x rename of `xml-cdr` / `xml_cdr`). This section documents the architecture and the durability rules the pipeline obeys; operating instructions are in [operations](operations.md) → Call Detail Records (CDR) Pipeline, and the build record remains in the [pipeline plan](superpowers/plans/2026-10-31-cdr-modernization-pipeline.md).
 
 ### 17.1 Why records are not written synchronously
 
@@ -899,19 +928,27 @@ The pipeline is built around one uncomfortable fact: **the disk spool only ever 
 | `cdr:work` dead or crash-looping | Endpoint keeps answering 200 | Nothing, by design — the stream is the buffer | **The largest hazard.** A reboot then discards everything accumulated since the last snapshot, and `XLEN` / stream-age alerting is the only thing that surfaces it |
 | MariaDB unavailable | Worker transaction fails | Entries stay in the stream, because `XDEL` runs only after a successful commit | Stream growth; same alerting requirement |
 | Malformed JSON | 200 (it was already accepted) | The worker quarantines it instead of dropping it | Manual triage, never silent loss |
-| `appliance:sync-host` runs `Redis::flushall()` | Not involved | Nothing | **Known gap (A-R15).** A full-instance flush discards undigested entries with no spool copy |
+| `appliance:sync-host` runs after a host or IP change | Not involved | Only the cache store (DB 1) and the compiled caches are flushed; DB 2 sessions and DB 3 stream entries are untouched | None |
 
 ### 17.4 The rule that makes the accepted window acceptable
 
 The exposure is not "how much is Redis holding" but "how long passes between `XADD` and the MariaDB commit". Two mechanisms keep that window small:
 
 - **A short digestion interval.** With a 250 ms idle poll and `XDEL` after commit, a healthy worker leaves roughly a fraction of a second of records in Redis. A crash in that window costs a handful of CDRs.
-- **Append-only persistence on the instance holding DB 3.** AOF with `appendfsync everysec` is the only mechanism that preserves undigested entries across a reboot, bounding the loss to about one second. Installed appliances currently run `appendonly no` with save points `3600 1  300 100  60 10000`, so this is required work, not existing behaviour (A-R13). Shortening the poll interval shrinks the healthy-window exposure but does nothing when the worker itself is dead — which is why both mechanisms are listed.
+- **Append-only persistence on the instance holding DB 3.** AOF with `appendfsync everysec` is the only mechanism that preserves undigested entries across a reboot, bounding the loss to about one second. The installer enables it and fails verification when it is off (`scripts/resources/redis-durability.sh`, called from `scripts/resources/php.sh`). Shortening the poll interval shrinks the healthy-window exposure but does nothing when the worker itself is dead — which is why both mechanisms are listed.
 
 Two supporting rules belong with them:
 
 - **Do not relax `stop-writes-on-bgsave-error`.** A refused write becomes a 503, a 503 becomes a spool file, and a spool file is recoverable. A falsely accepted write is unrecoverable.
-- **Set `vm.overcommit_memory=1` (A-R14).** Under the default heuristic a `fork()` for `BGSAVE` can fail even when memory is free; with write-stopping enabled that failure turns into `MISCONF`, every write is refused, and the spool starts filling for a reason nobody expects.
+- **Set `vm.overcommit_memory=1`.** Under the default heuristic a `fork()` for `BGSAVE` can fail even when memory is free; with write-stopping enabled that failure turns into `MISCONF`, every write is refused, and the spool starts filling for a reason nobody expects. The installer writes and verifies this setting in the same durability script.
+
+### 17.5 Open follow-ups
+
+Three decisions remain open. They are design work, not defects in the shipped pipeline:
+
+- **Consumer groups before parallelising digestion.** Digestion is a single-consumer `XRANGE` + `XDEL` loop, which is correct for one worker per host. A second worker needs `XREADGROUP` / `XACK` / `XAUTOCLAIM` with visibility timeouts; two `XRANGE` consumers would double-process entries and lean on the unique index instead of a delivery protocol.
+- **Stream-length alerting.** `getPendingCount()` has exactly one consumer: the worker's own `--warn-pending` log line. `XLEN` and stream age need an external signal (monitoring probe or scheduled alert), because the failure it catches — a dead worker while the endpoint still answers 200 — produces no error anywhere else.
+- **Retention policy for `cdrs`.** Rows and their `json_data` payload grow without bound, and no pruning command or configuration exists. Retention is a data-lifecycle decision (billing, compliance, disk budget) and is deliberately not automated yet.
 
 ---
 

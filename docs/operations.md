@@ -16,6 +16,7 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `tallpbx-scheduler` | Scheduled tasks and sweeps |
 | `tallpbx-reverb` | Real-time WebSocket server |
 | `tallpbx-cdr-worker` | Call detail record processor (see [Call Detail Records](#call-detail-records-cdr-pipeline)) |
+| `tallpbx-xml-worker` | Persistent XML worker serving FreeSWITCH lookups (see [Telephony XML Worker](#telephony-xml-worker-octane--roadrunner)) |
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
@@ -469,9 +470,54 @@ If editing configuration files by hand:
    fs_cli -x "reloadxml"
    ```
 
+## Telephony XML Worker (Octane / RoadRunner)
+
+FreeSWITCH's directory, dialplan, and configuration lookups are answered by a resident RoadRunner worker on `127.0.0.1:8090` rather than by PHP-FPM. The worker keeps the framework and the telephony modules in memory, so a lookup does not pay a process boot, and the administrative panel keeps its own PHP-FPM workers no matter how busy the phones are.
+
+`scripts/resources/freeswitch.sh` installs and enables the unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions the `rr` binary, and writes both `mod_xml_curl` bindings: the worker first (3 s timeout), then nginx/PHP-FPM (5 s) as the fallback.
+
+### Check It
+
+```bash
+systemctl status tallpbx-xml-worker
+ss -ltnp | grep 8090
+journalctl -u tallpbx-xml-worker -n 50 --no-pager
+grep -A3 'binding name="tallpbx-octane"' /etc/freeswitch/autoload_configs/xml_curl.conf.xml
+```
+
+A live lookup should appear in the journal as a 200:
+
+```bash
+fs_cli -x "find_user_xml id <extension> <domain>"
+```
+
+### Restart It After a Deployment
+
+```bash
+sudo systemctl restart tallpbx-xml-worker
+```
+
+The worker holds compiled PHP in memory, so a code deployment (`git pull`, `composer install`, `tpbx migrate`) needs this restart; `tpbx optimize:clear` alone does not reload it. While it restarts, FreeSWITCH uses the nginx fallback binding, so registrations and calls continue on the PHP path.
+
+### Roll Back to PHP-FPM
+
+```bash
+sudo systemctl disable --now tallpbx-xml-worker
+```
+
+Then remove the `tallpbx-octane` binding from `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and run `fs_cli -x reloadxml`. Every lookup now takes the nginx path. The fast front controller (below) and the Lua cache remain available as separate, independent switches.
+
+### Tuning Notes
+
+- Worker count, port, job recycling, and the per-worker memory cap live in `.rr.yaml`; the unit starts with `--workers=auto` and `--max-requests=10000`.
+- Measured on the 4-core reference host: four workers held roughly 162 MB resident (~40 MB each).
+- The worker serves only `/api/v1/xml-handler`. `/panel`, sessions, Livewire, and Reverb stay on PHP-FPM.
+
 ## Fast XML Handler Path
 
-A normal request boots the whole application — roughly 90 service providers, including every module — even though a directory lookup needs almost none of that. Fresh installs therefore point `/api/v1/xml-handler` at `public/xml-handler-fast.php`, which boots a small allowlist instead. The controller, the XML builders, and the cache are unchanged, so the response is byte-identical.
+A normal request boots the whole application — roughly 90 service providers, including every module — even though a directory lookup needs almost none of that. The fast front controller (`public/xml-handler-fast.php`) boots a small allowlist instead; the controller, the XML builders, and the cache are unchanged, so the response is byte-identical.
+
+**It is not enabled on fresh installs.** FreeSWITCH posts to the resident worker described above, and nginx serves `/api/v1/xml-handler` through the normal `index.php` path as the fallback binding. The fast path remains available as an optional latency improvement for that PHP fallback.
 
 Measured on the 1 vCPU reference host: app-side p50 39.88 → 27.86 ms and throughput 22.9 → 33.1 requests/second at concurrency 1.
 
