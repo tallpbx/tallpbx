@@ -19,6 +19,7 @@ Operational manual for benchmarking, stress testing, and validating telephony pe
   - [Network Reachability & WireGuard (NAT Traversal)](#network-reachability--wireguard-nat-traversal)
   - [Required PBX Runtime State](#required-pbx-runtime-state)
   - [Provisioning a Remote Test Server](#provisioning-a-remote-test-server)
+- [Automated Refresh Harness (Matrix Runner)](#automated-refresh-harness-matrix-runner)
 - [Seed Data Generation](#seed-data-generation)
 - [Executing Test 1: Dynamic Dialplan XML Throughput](#executing-test-1-dynamic-dialplan-xml-throughput)
   - [Running the Test](#running-the-test)
@@ -246,6 +247,59 @@ wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/<branch>/scripts/boot
   features twice on different hosts produces numbers that cannot be compared.
   A fresh host is only needed when the point of the exercise is validating the
   installer itself.
+
+---
+
+## Automated Refresh Harness (Matrix Runner)
+
+The two test sections below describe each measurement one command at a time. That is the right level of detail for understanding a result and for a single spot check. A capacity **refresh** runs those same commands across many tiers and configurations, and needs three guarantees they do not provide on their own: that a configuration switch actually took effect, that the environment of every run is recorded, and that the host is put back the way it was afterwards. Four small pieces of tooling provide them, and none of them measure anything new — every cell calls the commands documented in this guide.
+
+| Piece | Purpose |
+| :--- | :--- |
+| `config/load-test-matrix.php` | One declarative list of hardware tiers, XML-serving variants, load profiles, cache policies, SIPp scenarios and the call-per-second ladder. |
+| `tpbx pbx:load-test:manifest` | Writes a machine-readable snapshot of the host a run happened on: build SHA, host sizing, PHP-FPM pool, FreeSWITCH runtime database mode, XML serving path, cache TTLs, firewall state and a redacted `.env`. |
+| `scripts/load-test/lib/switch.sh` | Applies one configuration switch and then reads the value back. A setting that did not take effect prints `SWITCH-FAILED` and stops that cell instead of producing a plausible but meaningless number. |
+| `scripts/load-test-matrix.sh` | Lists, dry-runs and executes the cells, records each report in its own directory, and restores the documented baseline from a teardown trap. |
+
+### Listing and dry-running
+
+```bash
+# Every tier x variant x phase the matrix contains
+bash scripts/load-test-matrix.sh --list
+
+# Exactly what one variant would run, without running it
+bash scripts/load-test-matrix.sh --dry-run --tier=h1-1c1g --variant=v-octane --phase=xml
+```
+
+### Running a tier
+
+```bash
+PBX_HOST=<PBX_IP> bash scripts/load-test-matrix.sh --tier=h1-1c1g --repeats=3
+```
+
+One invocation drives one tier, because each tier is a fresh install on its own host. Before the first cell the runner refuses to continue when the host has not deployed the branch, when the host sizing does not match the tier in the matrix, or when any required switch fails its assertion. Artifacts land under `storage/app/load-tests/<series>/<tier>/<variant>/`, one JSON report per repetition, with `manifest.json` beside the tier directory.
+
+### Environment variables
+
+These reuse the same names as the SIPp runner below, so one vocabulary covers both.
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `PBX_HOST` | `local` | SSH target of the PBX under test; `local` runs the cells in place. |
+| `TENANT` / `DOMAIN` | `load-test-beta` / `load.test.local` | Tenant seeded once per tier. |
+| `EXTENSIONS` / `START` | `20` / `2000` | Size and range of the generated extensions. |
+| `PASSWORD` | `LoadTest1234` | SIP password for the generated accounts; keep it alphanumeric (see best practice 2). |
+| `PBX_URL` | `http://127.0.0.1/api/v1/xml-handler` | Endpoint the XML load client calls. |
+| `PBX_XML_TOKEN` | *(empty)* | XML handler token, when authentication is enabled. |
+| `SERIES` | `refresh-YYYYMMDD` | Artifact directory name. |
+| `REPEATS` / `CPS` | `3` / `5` | Repetitions per cell and the offered call rate for SIP cells. |
+
+### Remote access
+
+SSH access to the test hosts uses the operator's own credentials. Host-specific details — key names, key paths, and administrator credentials — are deliberately kept out of this repository, as required by [Provisioning a Remote Test Server](#provisioning-a-remote-test-server). The runner only needs `PBX_HOST`; it uses the ambient SSH configuration.
+
+> [!IMPORTANT]
+> A capacity series requires the load generator to be **unconstrained**: no firewall, no traffic shaping, and unconstrained socket limits, so the generator never becomes the bottleneck. Best practice 4 above (whitelisting the PBX on the generator's firewall) applies only to functional runs on a generator that must keep a firewall. The refresh plan treats an active generator firewall as a failed precondition.
 
 ---
 
