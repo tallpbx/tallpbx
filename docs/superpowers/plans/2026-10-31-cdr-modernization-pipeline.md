@@ -153,7 +153,7 @@ tpbx db:seed --class=AdminSeeder
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app-modules/call-detail-records/
@@ -380,4 +380,129 @@ Code and docs committed separately on `5.x`.
 5. **Panel — PASS via component tests.** `CdrUiTest` proves leg badges, the leg filter, the recording shortcut, the audio player, and the collapsible diagnostics; the recording route answers 302 unauthenticated and 404 for traversal/cross-tenant paths.
 6. **Style — PASS.** Scoped Pint over all 59 touched PHP files is clean.
 
-**Suite status:** targeted CDR suites are green (75 tests across 11 files). The full parallel suite (3334 tests) reported 8 failures, two of which were this work's and are now fixed (missing PHPDoc on test helpers; `CdrBatchWriter` added to the documented shared-kernel allowlist). The remaining 7 are pre-existing in other work streams and reproduce without this branch's CDR changes: `DialplanXmlMirrorTest` (4, parallel-only shared-Redis interference; passes standalone), `ModuleArchitectureTest` (1, `XmlHandlerFastBootstrap` provider import from commit `de084fe`), `BootstrapInstallerTest` (2, expects `4.x` while the branch documents `5.x`, commit `6c8d465`).
+**Suite status (re-verified 2026-11-03):** the targeted CDR suites are green — **78 tests across the eleven CDR test files** (ingestion endpoint 12, payload parser 6, digest 5, worker command 3, spool drainer 6, installer wiring 8, module schema and behaviour 12, panel UI 6, recording playback 6, action permissions 7, CSV export 7), plus `tests/Feature/ModuleAutoloadTest.php` (10 tests) which asserts the `call-detail-records → Modules\CallDetailRecords\` PSR-4 mapping. Scoped Pint over the CDR files is clean.
+
+The plan's earlier note about pre-existing failures elsewhere in the suite is **superseded**; the current state was re-measured rather than assumed. The full parallel suite was run twice on 2026-11-03 and reported **5 failures** and then **7 failures**; the count moves because `DialplanXmlMirrorTest` is sensitive to how many workers run at once.
+
+| Suite | State recorded in the original gate | Actual state on 2026-11-03 | Cause |
+|:--|:--|:--|:--|
+| `tests/Feature/BootstrapInstallerTest.php` | 2 failing (expected `4.x`, branch documents `5.x`) | **9 passed** | Already fixed upstream — `ab97fea test(installer): assert the 5.x bootstrap defaults and install guide` |
+| `tests/Feature/Services/DialplanXmlMirrorTest.php` | 4 failing (parallel-only shared-Redis interference) | **Flaky in the full parallel run — 2 to 4 failures per run; 8 passed when the file is run on its own** | Shared-Redis interference between parallel workers. Unchanged by this work: the failing assertions read and write the same Lua mirror keys on Redis DB 3 |
+| `tests/Feature/Architecture/ModuleArchitectureTest.php` | 1 failing (`XmlHandlerFastBootstrap` provider import from `de084fe`) | **2 failing**, different root cause | Both are Octane-workstream issues, neither is CDR: (1) `app/Support/XmlHandlerFastBootstrap.php` and `app/Support/TelephonyWorkerProviders.php` import `Modules\NumberTranslations\Providers\ModuleServiceProvider` outside the documented shared-kernel allowlist; (2) the FreeSWITCH domain listener list now also contains `ClearTenantContext.php` and `VerifyCleanDatabaseState.php` |
+| `tests/Feature/CodeDocumentationTest.php` | not recorded in the original gate | **1 failing** | Three Octane files declare a type without a PHPDoc comment: `app/Listeners/Octane/ClearTenantContext.php`, `app/Listeners/Octane/VerifyCleanDatabaseState.php`, `app/Support/TelephonyWorkerProviders.php`. None of them is a CDR file |
+
+**None of the remaining failures are caused by the CDR pipeline.** Every failing assertion names a file outside `app-modules/call-detail-records/`, `lang/`, or this plan. The CDR work introduces no shared-kernel violation either: `app/Services/Cdr/CdrBatchWriter.php` is allowlisted in `tests/Feature/Architecture/ModuleArchitectureTest.php` with the justification "Shared CDR commit path used by the stream digest and the spool drain".
+
+---
+
+### Task 8: Export Permission and CSV Export
+
+**Files:**
+- Modify: `app-modules/call-detail-records/src/Providers/ModuleServiceProvider.php` (register `call-detail-records.export`)
+- Modify: `app-modules/call-detail-records/src/Livewire/CdrList.php` (the export action and the shared query)
+- Modify: `app-modules/call-detail-records/resources/views/cdr-list.blade.php` (the export button)
+- Modify: `lang/{en,es,fr}/admin.php` (translation keys)
+- Test: `app-modules/call-detail-records/tests/CdrExportTest.php`
+- Test: `app-modules/call-detail-records/tests/CdrActionPermissionTest.php` (the denial and the positive control)
+
+**Interfaces:**
+- Permission: `call-detail-records.export` — "Export CDR records"
+- Action: `CdrList::exportCdrs()` — a streamed CSV download
+- Download name: `call-detail-records-YYYY-MM-DD.csv`
+
+- [x] **Step 1: Write the failing tests first**
+
+Seven tests in `CdrExportTest.php` (permission registered, the action's ability resolution, the download itself, tenant isolation, the leg filter, the spreadsheet-formula guard, and the button visibility) plus two in `CdrActionPermissionTest.php` (a viewing-only user is refused through the Livewire update endpoint; a user holding the export permission is allowed). All nine failed before the implementation existed.
+
+- [x] **Step 2: Register the permission and map the action onto it**
+
+`permissions()` gains `call-detail-records.export`. The component declares `livewireActionAbilities()` returning `['exportCdrs' => [['call-detail-records.export']]]`. Without that override the shared resolver would treat an unknown action as a plain interaction and demand only the view permission — but a CSV file leaves the panel and lands on the operator's own disk, where the tenant's access controls no longer apply, so it needs its own grant.
+
+- [x] **Step 3: Implement the export**
+
+`exportCdrs()` returns a `StreamedResponse` produced by `response()->streamDownload()`. Rows are read page by page with `lazy()`, so a large export never loads the table into memory, and the export is capped at 25,000 rows with a truncation notice. The list and the export share one private `scopedQuery()`, so they cannot drift apart on tenant scope or the leg filter — an export can never hand a tenant a record its own list would hide.
+
+- [x] **Step 4: Guard the cells against spreadsheet formulas**
+
+A caller display name is attacker-controlled. A spreadsheet runs a cell that starts with `=`, `+`, `-` or `@`, so those leading characters are defused with an apostrophe, which the spreadsheet reads as "this cell is plain text".
+
+- [x] **Step 5: Add the button and the translations**
+
+The button is a `btn btn-outline btn-sm` in the leg-filter toolbar, shown only when `PanelActor::can('call-detail-records.export')` is true, with the house loading pattern (`wire:loading.attr="disabled"`, `wire:loading.class="opacity-70 pointer-events-none"`, inline `loading loading-spinner loading-xs`). Translation keys `admin.cdr_export` and `admin.cdr_export_truncated` are added to `en`, `es` and `fr`, keeping the root dictionary parity-complete (548 keys in each locale).
+
+- [x] **Step 6: Verify**
+
+`./vendor/bin/pest app-modules/call-detail-records/tests/CdrExportTest.php` — 7 passed. `CdrActionPermissionTest.php` — 7 passed.
+
+---
+
+### Task 9: Listing Index Aligned With The Panel Query
+
+**Files:**
+- Modify: `app-modules/call-detail-records/database/migrations/2026_11_01_000001_create_cdrs_table.php`
+- Create: `app-modules/call-detail-records/database/migrations/2026_11_03_000001_align_cdrs_listing_index_with_the_panel_query.php`
+- Modify: `app-modules/call-detail-records/src/Livewire/CdrList.php` (a deterministic tiebreaker)
+- Test: `app-modules/call-detail-records/tests/CdrTest.php`
+
+**Interfaces:**
+- Index: `cdrs_tenant_id_start_stamp_index` on `['tenant_id', 'start_stamp']`
+
+- [x] **Step 1: Find the mismatch**
+
+The panel lists a tenant's records newest first by `start_stamp`, and the dashboard shows the same five most recent records. The original index was built on `created_at` — the moment the worker stored the row — so the database sorted every panel page in memory. `EXPLAIN` confirmed it: `Using where; Using filesort`, with `cdrs_tenant_id_created_at_index` chosen only because it matched the tenant filter.
+
+- [x] **Step 2: Write the failing test first**
+
+`CdrTest.php` asserts the table carries `cdrs_tenant_id_start_stamp_index` over exactly `['tenant_id', 'start_stamp']`, and that `cdrs_tenant_id_created_at_index` is gone.
+
+- [x] **Step 3: Fix the schema**
+
+The create migration now defines `cdrs_tenant_id_start_stamp_index` directly, so a fresh install never builds the wrong index. A second migration reconciles a host that already ran the earlier version.
+
+**The second migration is deliberately two statements, not one.** The tenant foreign key borrows an index that starts with the tenant column, and the old composite index happened to be the one it borrowed. Dropping it while nothing else covers that column is refused by the database:
+
+```
+SQLSTATE[HY000]: General error: 1553 Cannot drop index 'cdrs_tenant_id_created_at_index':
+needed in a foreign key constraint
+```
+
+Laravel emits the drop *before* the add inside a single `Schema::table()` blueprint, so the combined form fails. The replacement index is therefore created first and the old one removed afterwards, in a second statement. The sequence was proven on a disposable MariaDB database before touching the live host, including a full `up()` → `down()` → `up()` round trip, and the `ON DELETE CASCADE` foreign key survives the swap untouched.
+
+- [x] **Step 4: Make the ordering total**
+
+`scopedQuery()` orders by `start_stamp` and then by `id`. Two calls that started in the same second now have a fixed order, which the paged export depends on and which lets the index serve the sort.
+
+- [x] **Step 5: Verify**
+
+`EXPLAIN SELECT * FROM cdrs WHERE tenant_id = 1 ORDER BY start_stamp DESC, id DESC LIMIT 26` on the live host now reports `Using where` with `key: cdrs_tenant_id_start_stamp_index` — the filesort is gone.
+
+---
+
+### Task 10: CDR CPU Cost Under Load — Measurement Deferred to the Load-Testing Series
+
+**No code changes are made in this plan for this item.** Moving the CDR ingestion endpoint onto the persistent RoadRunner worker is **not** part of the CDR pipeline work, and the endpoint stays on PHP-FPM for now.
+
+The decision is not "should we build it" but "is it worth moving". That question is answered by measurement, and the measurement is already specified in the load-testing refresh plan:
+
+- [`docs/load-testing-refresh-implementation-plan.md`](../../load-testing-refresh-implementation-plan.md) §1.8 "CDR pipeline at higher call volumes — is it a bottleneck?" compares the two transports (`cdr-fpm` today, `cdr-octane` on port 8090) and defines the gate.
+- The same document's Task 9 "CDR pipeline transport benchmarks" is the executable version: the capacity-cost ladder (pipeline **off** vs `cdr-fpm` vs `cdr-octane`), the ingestion rate ladder, digestion throughput, and the backpressure drill.
+
+**What this plan adds is the question the measurement must answer.** The deciding metric is the CPU the CDR pipeline costs while the server is already under call load:
+
+| Measurement | Where it is defined | What it decides |
+|:--|:--|:--|
+| CPU attribution per subsystem during the CPS ladder | §1.8 "Capacity cost of the pipeline"; Task 8 Step 2 | How much of a core the pipeline takes at each offered call rate |
+| **CDR-related CPU as a share of a core** | §1.8 "Bottleneck threshold" — the pipeline's ceiling is the CPS at which **CDR-related CPU exceeds 15 % of a core** | Whether the endpoint is a meaningful capacity cost at all |
+| CPU seconds per 100 calls, split between `mod_json_cdr`, the ingestion endpoint and `cdr:work` | §1.8 "Per-call cost" | Whether the cost sits in the endpoint (a transport problem) or in digestion and MariaDB writes (a pipeline problem) |
+| XML `p95` with `cdr-fpm` versus `cdr-octane` at the same call rate | §1.8 "Coupling check" | Whether the CDR endpoint competes with the XML hot path inside the shared FPM pool |
+| Ingestion `p50/p95/p99` and success rate per transport | §1.8 "Ingestion rate ladder"; Task 9 Step 3 | Whether the endpoint's own tail latency justifies a separate worker |
+
+**How the answer is read.** The load-testing series classifies the transport at its Stage A gate:
+
+- **Keep as-is (`cdr-fpm`)** if the off-versus-on capacity delta is inside the noise, the backlog does not grow, and nothing is lost. The pipeline is not the bottleneck and no architectural change is warranted.
+- **Optional (`cdr-octane`)** if the pipeline measurably caps capacity or ingestion tail **and** moving the endpoint raises the call ceiling by ≥10 % (or removes measured FPM contention), with XML `p95` no worse than +5 %. The rollback is one line: the URL in `json_cdr.conf.xml` plus `fs_cli -x "reload mod_json_cdr"`.
+- **Not worth changing** if `cdr-octane` shows no gain or worsens the XML tail latency.
+
+**Why the pipeline is not simply moved now.** The endpoint already answers in one Redis append and no database work, so its own cost is small; the open question is whether the framework boot cost (~0.4 s measured, not the <0.5 ms target in the Global Constraints) matters *while the server is under load*, when the FPM pool is contended. That is exactly what the §1.8 ladder measures. Moving the endpoint before the measurement would guess at the answer and change the variable under test.
+
+**Prerequisite already satisfied.** The RoadRunner worker loads `routes/api.php`, so the `cdr-octane` transport exists today; the switch is the URL in `json_cdr.conf.xml`. The series proves it under load and verifies the route is genuinely served by the worker rather than falling through to FPM.
