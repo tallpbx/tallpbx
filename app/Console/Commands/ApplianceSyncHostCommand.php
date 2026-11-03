@@ -79,10 +79,33 @@ class ApplianceSyncHostCommand extends Command
         } else {
             foreach ($oldIps as $oldIp) {
                 $this->components->task("Migrating records from {$oldIp} to {$newIp}", function () use ($oldIp, $newIp): void {
-                    // Update tenant_domains
-                    DB::table('tenant_domains')
+                    // Reconcile the realms row by row. A snapshot restore
+                    // usually leaves the tenant already owning the new address,
+                    // so a blanket UPDATE collides with the
+                    // (domain, purpose, tenant) unique key and aborts the
+                    // installer. Move what is free and drop what is now a
+                    // duplicate, so a re-run converges instead of failing.
+                    $staleDomains = DB::table('tenant_domains')
                         ->where('domain', $oldIp)
-                        ->update(['domain' => $newIp]);
+                        ->get(['id', 'tenant_id', 'purpose']);
+
+                    foreach ($staleDomains as $staleDomain) {
+                        $targetExists = DB::table('tenant_domains')
+                            ->where('domain', $newIp)
+                            ->where('tenant_id', $staleDomain->tenant_id)
+                            ->where('purpose', $staleDomain->purpose)
+                            ->exists();
+
+                        if ($targetExists) {
+                            DB::table('tenant_domains')->where('id', $staleDomain->id)->delete();
+
+                            continue;
+                        }
+
+                        DB::table('tenant_domains')
+                            ->where('id', $staleDomain->id)
+                            ->update(['domain' => $newIp]);
+                    }
 
                     // Update inbound_routes action_data
                     DB::table('inbound_routes')
