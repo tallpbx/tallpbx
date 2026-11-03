@@ -241,8 +241,9 @@ class CdrList extends BaseListComponent
         $cdr = Cdr::withoutGlobalScope('tenant')->findOrFail($id);
         $this->assertCanAccessTenantRecord($cdr);
         $this->pendingDeletionId = $cdr->id;
-        // Prefer the FreeSWITCH call UUID; both columns are nullable, so fall back to an empty name.
-        $this->pendingDeletionName = $cdr->call_uuid ?? $cdr->destination ?? '';
+        // The call reference number identifies the record and the column is
+        // required, so it is always there. The destination is not.
+        $this->pendingDeletionName = $cdr->call_uuid ?? '';
     }
 
     /** Close the CDR confirmation modal without deleting anything. */

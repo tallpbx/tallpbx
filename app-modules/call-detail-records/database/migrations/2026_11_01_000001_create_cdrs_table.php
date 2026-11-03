@@ -16,7 +16,12 @@ return new class extends Migration
         Schema::create('cdrs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->string('call_uuid')->nullable()->index();
+
+            // The call reference number is required. The (call_uuid, leg) pair
+            // is the deduplication key, and a database treats two blanks as
+            // two different values, so a blank would slip past the unique key
+            // and the row could never be replayed safely.
+            $table->string('call_uuid')->index();
 
             // The B-leg records which A-leg bridged it, so both halves of a
             // call can be shown together.
