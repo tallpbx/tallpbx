@@ -615,11 +615,40 @@ teardown_tier() {
     return "$exit_code"
 }
 
+# Build a short readiness probe for the XML handler.
+readiness_command() {
+    printf 'cd %q && php artisan pbx:load-test:dialplan --tenant=%q --url=%q --requests=%q --concurrency=%q --scenario=%q --section=%q --report=%q' \
+        "$REMOTE_APP_DIR" "$LOAD_TENANT" "$PBX_URL" 5 1 internal dialplan "/tmp/tallpbx-readiness.json"
+}
+
+# Wait until the XML handler answers after a switch change.
+#
+# Reloading PHP-FPM or nginx leaves a brief window where the next request is
+# answered with 502. That failure belongs to the switch, not to the
+# measurement, so the runner waits it out instead of recording a fake result.
+wait_for_xml_ready() {
+    local attempt
+
+    for attempt in $(seq 1 15); do
+        if run_on_pbx "$(readiness_command)" >/dev/null 2>&1; then
+            return 0
+        fi
+
+        sleep 2
+    done
+
+    return 1
+}
+
 # Run the XML battery for one variant: every profile x TTL x section x repeat.
 run_xml_phase() {
-    local variant="$1" profile_id ttl_id section repeat label
+    local variant="$1" profile_id ttl_id section repeat label cell_log
 
     apply_variant "$TIER" "$variant"
+
+    if ! wait_for_xml_ready; then
+        printf 'XML-HANDLER-NOT-READY after applying %s\n' "$variant" >&2
+    fi
 
     while IFS= read -r section; do
         while IFS= read -r profile_id; do
@@ -641,8 +670,12 @@ run_xml_phase() {
 
                 for repeat in $(seq 1 "$REPEATS"); do
                     label="${TIER}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}"
+                    cell_log="${ARTIFACT_ROOT}/${TIER}/logs/${label//\//_}.log"
+                    mkdir -p "$(dirname "$cell_log")"
 
-                    if ! run_on_pbx "$(xml_command "$TIER" "$variant" "$profile_id" "$ttl_id" "$section" "$repeat")" > /dev/null 2>&1; then
+                    # Keep the command output: a silent cell is a failed cell
+                    # nobody can diagnose.
+                    if ! run_on_pbx "$(xml_command "$TIER" "$variant" "$profile_id" "$ttl_id" "$section" "$repeat")" > "$cell_log" 2>&1; then
                         cell_failed "$label"
                     fi
                 done

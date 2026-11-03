@@ -89,6 +89,14 @@ class PbxDialplanLoadTestCommand extends Command
 
         $url = $this->xmlHandlerUrl();
         $token = $this->option('token');
+
+        // A run started on the PBX itself can reuse the configured handler
+        // token, so the secret never has to travel on a command line or
+        // through an orchestrator variable.
+        if (! is_string($token) || $token === '') {
+            $token = (string) config('freeswitch.xml_handler.token', '');
+        }
+
         $label = $this->nullableStringOption('label');
         $thresholds = [
             'max_failure_rate_percent' => $this->floatOption('max-failure-rate', minimum: 0, maximum: 100),
