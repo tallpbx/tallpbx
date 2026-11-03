@@ -124,13 +124,13 @@ configure_freeswitch_switch_defaults() {
     local log_level="${FS_LOG_LEVEL:-}"
 
     if [ -z "$log_level" ] && [ -f "$env_file" ]; then
-        log_level="$(grep -E '^FS_LOG_LEVEL=' "$env_file" | head -n1 | cut -d'=' -f2- | tr -d '\"'\'')"
+        log_level="$(grep -E '^FS_LOG_LEVEL=' "$env_file" | head -n1 | cut -d'=' -f2- | tr -d "\"'")"
     fi
     log_level="${log_level:-notice}"
 
     if [ -f "$env_file" ]; then
         local env_sps
-        env_sps="$(grep -E '^FS_SESSIONS_PER_SECOND=' "$env_file" | head -n1 | cut -d'=' -f2- | tr -d '\"'\'')"
+        env_sps="$(grep -E '^FS_SESSIONS_PER_SECOND=' "$env_file" | head -n1 | cut -d'=' -f2- | tr -d "\"'")"
         if [ -n "$env_sps" ]; then
             sessions_per_second="$env_sps"
         fi
