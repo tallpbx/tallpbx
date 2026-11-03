@@ -642,10 +642,11 @@ apply_lua_bindings() {
     snapshot_env
 
     if [ "$state" = "on" ]; then
-        sed -i -E 's|^([[:space:]]*)<!--[[:space:]]*(<param name="xml-handler-(script|bindings)"[^>]*/>)[[:space:]]*-->|\1\2|' "$FS_LUA_CONF"
+        # The pattern contains an alternation, so the delimiter must not be a pipe.
+        sed -i -E 's#^([[:space:]]*)<!--[[:space:]]*(<param name="xml-handler-(script|bindings)"[^>]*/>)[[:space:]]*-->#\1\2#' "$FS_LUA_CONF"
         env_set FS_LUA_PROXY_ENABLED true
     else
-        sed -i -E 's|^([[:space:]]*)(<param name="xml-handler-(script|bindings)"[^>]*/>)|\1<!-- \2 -->|' "$FS_LUA_CONF"
+        sed -i -E 's#^([[:space:]]*)(<param name="xml-handler-(script|bindings)"[^>]*/>)#\1<!-- \2 -->#' "$FS_LUA_CONF"
         env_set FS_LUA_PROXY_ENABLED false
     fi
 

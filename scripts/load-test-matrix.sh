@@ -343,8 +343,10 @@ run_on_pbx() {
         return
     fi
 
+    # -n keeps ssh from draining the stdin of the `while read` loops that
+    # call this function; without it the first cell silently ends the loop.
     # shellcheck disable=SC2086
-    ssh $SSH_OPTS -p "$SSH_PORT" "$PBX_HOST" "$command"
+    ssh -n $SSH_OPTS -p "$SSH_PORT" "$PBX_HOST" "$command"
 }
 
 # Invoke one switch helper on the PBX and fail the cell when it reports a mismatch.
@@ -370,16 +372,16 @@ apply_variant() {
         case "$requirement" in
             fpm:*)
                 mode="${requirement#fpm:}"
-                switch_call apply_fpm_profile "$mode" "$(tier_fpm_children "$tier" "$mode")"
+                switch_call apply_fpm_profile "$mode" "$(tier_fpm_children "$tier" "$mode")" || return 1
                 ;;
             xml-path:*)
-                switch_call apply_xml_path "${requirement#xml-path:}"
+                switch_call apply_xml_path "${requirement#xml-path:}" || return 1
                 ;;
             lua:*)
-                switch_call apply_lua_bindings "${requirement#lua:}"
+                switch_call apply_lua_bindings "${requirement#lua:}" || return 1
                 ;;
             octane:*)
-                switch_call apply_octane_binding "${requirement#octane:}"
+                switch_call apply_octane_binding "${requirement#octane:}" || return 1
                 ;;
             *)
                 printf 'UNKNOWN-REQUIREMENT %s\n' "$requirement" >&2
@@ -742,6 +744,9 @@ execute_cells() {
 
     mkdir -p "${ARTIFACT_ROOT}/${TIER}"
     trap teardown_tier EXIT INT TERM
+
+    # A failure list from an earlier run would misreport this one.
+    : > "${ARTIFACT_ROOT}/${TIER}/failures.log"
 
     if ! preflight_remote; then
         printf 'Preflight failed; no measurement was taken on %s.\n' "$TIER" >&2
