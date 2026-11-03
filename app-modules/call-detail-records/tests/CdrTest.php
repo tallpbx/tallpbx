@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Admin;
 use App\Models\Tenant;
 use App\Services\TenantManager;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Modules\CallDetailRecords\Livewire\CdrDetail;
 use Modules\CallDetailRecords\Livewire\CdrList;
@@ -141,4 +142,17 @@ it('treats a record without a leg value as the a-side', function () {
     $cdr = Cdr::factory()->create();
 
     expect($cdr->fresh()->leg)->toBe('a');
+});
+
+it('indexes the columns the panel listing sorts by', function () {
+    // The panel lists a tenant's records newest first by the moment the call
+    // started, so the index must carry the same columns the query orders by.
+    // An index on any other pair leaves the database sorting every page in
+    // memory.
+    $index = collect(Schema::getIndexes('cdrs'))
+        ->firstWhere('name', 'cdrs_tenant_id_start_stamp_index');
+
+    expect($index)->not->toBeNull()
+        ->and($index['columns'])->toBe(['tenant_id', 'start_stamp'])
+        ->and(Schema::hasIndex('cdrs', 'cdrs_tenant_id_created_at_index'))->toBeFalse();
 });

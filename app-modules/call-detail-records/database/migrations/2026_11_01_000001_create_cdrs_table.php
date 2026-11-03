@@ -48,9 +48,12 @@ return new class extends Migration
 
             $table->unique(['call_uuid', 'leg'], 'cdrs_call_uuid_leg_unique');
 
-            // The panel lists a tenant's records newest first; this composite
-            // index serves that ordering without a filesort.
-            $table->index(['tenant_id', 'created_at']);
+            // The panel lists a tenant's records newest first by the moment the
+            // call started, and the dashboard shows the same five most recent
+            // records. This composite index carries the columns both queries
+            // order by, so the database reads the rows in order instead of
+            // sorting every page in memory.
+            $table->index(['tenant_id', 'start_stamp'], 'cdrs_tenant_id_start_stamp_index');
         });
     }
 
