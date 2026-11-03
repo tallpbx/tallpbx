@@ -17,7 +17,7 @@
 - **5.x Series Modernization (Breaking Clean Break)**: The module directory is `app-modules/call-detail-records`, root namespace `Modules\CallDetailRecords`, database table `cdrs`, and permissions `call-detail-records.*` (`call-detail-records.view`, `call-detail-records.delete`, `call-detail-records.export`). Legacy `xml-cdr` references are cleanly migrated without carrying legacy tech debt.
 - **Naming (confirmed)**: The module, directory, namespace, and permission prefix are `call-detail-records` / `Modules\CallDetailRecords` / `call-detail-records.*`. Console commands stay `cdr:*`, the model stays `Cdr`, the table stays `cdrs`, and the panel route stays `/panel/cdr`, so menu keys, routes, and translations are unchanged.
 - **Dedicated Redis DB 3**: CDR stream ingestion must strictly target isolated Redis Database 3 (`REDIS_CDR_DB=3`), completely segregated from general background queues (DB 0) and application routing cache (DB 1).
-- **Dual-Leg Recording & Idempotency**: Both A-leg and B-leg must be preserved, tagged with `leg = 'a'` and `leg = 'b'`, correlated via `b_leg_uuid`, and deduplicated via a unique composite index on `['call_uuid', 'leg']`.
+- **Dual-Leg Recording & Idempotency**: Both A-leg and B-leg must be preserved, tagged with `leg = 'a'` and `leg = 'b'`, correlated via `b_leg_uuid`, and deduplicated via a unique composite index on `['call_uuid', 'leg']`. The `call_uuid` column is **required**: a database treats two blanks as two different values, so a blank would slip past that unique key and the row could never be replayed safely.
 - **Zero-Loss Disk Fallback**: FreeSWITCH `json_cdr.conf.xml` must configure `err-log-dir` to `/var/log/freeswitch/json_cdr/failed` with `encode="false"` (raw JSON body). On Redis backpressure or HTTP 503, FreeSWITCH spools to disk, drained safely by `tpbx cdr:drain-spool`.
 - **Atomic Digestion Guarantee**: Stream entries must only be deleted via `XDEL` *after* the MariaDB transaction commit succeeds. Malformed JSON payloads must be quarantined to `/var/log/freeswitch/json_cdr/quarantine/`, never silently dropped.
 - **Timing-Safe Ingestion Authentication**: `POST /api/v1/cdr` must enforce timing-safe token verification (`hash_equals`) and fail closed if unconfigured, with strict rate limiting.
@@ -48,7 +48,7 @@
 - Table: `cdrs`
   - `id` (uuid, primary)
   - `tenant_id` (foreignId, indexed)
-  - `call_uuid` (string, indexed)
+  - `call_uuid` (string, required, indexed)
   - `b_leg_uuid` (string, nullable, indexed)
   - `leg` (char(1), default 'a', indexed)
   - `caller_id` (string, nullable)
@@ -98,7 +98,7 @@ return new class extends Migration
         Schema::create('cdrs', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->string('call_uuid')->nullable()->index();
+            $table->string('call_uuid')->index();
             $table->string('b_leg_uuid')->nullable()->index();
             $table->char('leg', 1)->default('a')->index();
             $table->string('caller_id')->nullable();
@@ -380,7 +380,7 @@ Code and docs committed separately on `5.x`.
 5. **Panel — PASS via component tests.** `CdrUiTest` proves leg badges, the leg filter, the recording shortcut, the audio player, and the collapsible diagnostics; the recording route answers 302 unauthenticated and 404 for traversal/cross-tenant paths.
 6. **Style — PASS.** Scoped Pint over all 59 touched PHP files is clean.
 
-**Suite status (re-verified 2026-11-03):** the targeted CDR suites are green — **78 tests across the eleven CDR test files** (ingestion endpoint 12, payload parser 6, digest 5, worker command 3, spool drainer 6, installer wiring 8, module schema and behaviour 12, panel UI 6, recording playback 6, action permissions 7, CSV export 7), plus `tests/Feature/ModuleAutoloadTest.php` (10 tests) which asserts the `call-detail-records → Modules\CallDetailRecords\` PSR-4 mapping. Scoped Pint over the CDR files is clean.
+**Suite status (re-verified 2026-11-03):** the targeted CDR suites are green — **81 tests across the eleven CDR test files** (ingestion endpoint 12, payload parser 6, digest 5, worker command 3, spool drainer 6, installer wiring 8, module schema and behaviour 15, panel UI 6, recording playback 6, action permissions 7, CSV export 7), plus `tests/Feature/ModuleAutoloadTest.php` (10 tests) which asserts the `call-detail-records → Modules\CallDetailRecords\` PSR-4 mapping. Scoped Pint over the CDR files is clean.
 
 The plan's earlier note about pre-existing failures elsewhere in the suite is **superseded**; the current state was re-measured rather than assumed. The full parallel suite was run twice on 2026-11-03 and reported **5 failures** and then **7 failures**; the count moves because `DialplanXmlMirrorTest` is sensitive to how many workers run at once.
 
@@ -390,6 +390,7 @@ The plan's earlier note about pre-existing failures elsewhere in the suite is **
 | `tests/Feature/Services/DialplanXmlMirrorTest.php` | 4 failing (parallel-only shared-Redis interference) | **Flaky in the full parallel run — 2 to 4 failures per run; 8 passed when the file is run on its own** | Shared-Redis interference between parallel workers. Unchanged by this work: the failing assertions read and write the same Lua mirror keys on Redis DB 3 |
 | `tests/Feature/Architecture/ModuleArchitectureTest.php` | 1 failing (`XmlHandlerFastBootstrap` provider import from `de084fe`) | **2 failing**, different root cause | Both are Octane-workstream issues, neither is CDR: (1) `app/Support/XmlHandlerFastBootstrap.php` and `app/Support/TelephonyWorkerProviders.php` import `Modules\NumberTranslations\Providers\ModuleServiceProvider` outside the documented shared-kernel allowlist; (2) the FreeSWITCH domain listener list now also contains `ClearTenantContext.php` and `VerifyCleanDatabaseState.php` |
 | `tests/Feature/CodeDocumentationTest.php` | not recorded in the original gate | **1 failing** | Three Octane files declare a type without a PHPDoc comment: `app/Listeners/Octane/ClearTenantContext.php`, `app/Listeners/Octane/VerifyCleanDatabaseState.php`, `app/Support/TelephonyWorkerProviders.php`. None of them is a CDR file |
+| `tests/Feature/Pbx/Services/PbxRoutingServicesTest.php` | not recorded in the original gate | **Intermittent** | A parallel-worker race: `tests/Feature/Seeders/DatabaseSeederTest.php` deletes the whole `custom-modules/demo-webhook` fixture tree in its `afterEach`, while another worker is inside `ModuleServiceProvider::detectRootTranslationCollisions()`. That method guards the *root* dictionary with `file_exists()` but requires the *module* dictionary unguarded, so a file that vanished between the `glob()` and the `require` fatals with "Failed to open stream". Reproduced deterministically with a fixture whose first language file deletes its sibling, and it needs no CDR code at all |
 
 **None of the remaining failures are caused by the CDR pipeline.** Every failing assertion names a file outside `app-modules/call-detail-records/`, `lang/`, or this plan. The CDR work introduces no shared-kernel violation either: `app/Services/Cdr/CdrBatchWriter.php` is allowlisted in `tests/Feature/Architecture/ModuleArchitectureTest.php` with the justification "Shared CDR commit path used by the stream digest and the spool drain".
 
@@ -478,7 +479,47 @@ Laravel emits the drop *before* the add inside a single `Schema::table()` bluepr
 
 ---
 
-### Task 10: CDR CPU Cost Under Load — Measurement Deferred to the Load-Testing Series
+### Task 10: Required Call Reference Number
+
+**Files:**
+- Modify: `app-modules/call-detail-records/database/migrations/2026_11_01_000001_create_cdrs_table.php`
+- Create: `app-modules/call-detail-records/database/migrations/2026_11_03_000002_require_cdrs_call_uuid.php`
+- Modify: `app-modules/call-detail-records/src/Livewire/CdrList.php` (the deletion confirmation name)
+- Test: `app-modules/call-detail-records/tests/CdrTest.php`
+
+**Interfaces:**
+- Column: `cdrs.call_uuid` — `varchar(255) NOT NULL`
+- Migration: `2026_11_03_000002_require_cdrs_call_uuid`
+
+- [x] **Step 1: Find the loophole**
+
+The `(call_uuid, leg)` pair is what stops a replayed record from being stored twice. A database treats two blanks as two different values, so a blank call reference number slipped past that unique key: the upsert's conflict target never fired, and the row could never be replayed safely. Proven directly against MariaDB — inserting two rows with a blank reference number and the same leg was accepted.
+
+The parser has always refused a payload without a call reference number and quarantined it instead, and `CdrBatchWriter` is the only writer of `cdrs` rows in the codebase, so the pipeline cannot produce such a row. The guarantee was nevertheless resting on one code path rather than on the schema.
+
+- [x] **Step 2: Write the failing tests first**
+
+Two tests in `CdrTest.php`: the column must not be nullable, and storing a record without a reference number must be refused by the database. With the schema changes removed, both failed — the second with `Exception "Illuminate\Database\QueryException" not thrown`, which is the loophole itself.
+
+- [x] **Step 3: Make the column required**
+
+The create migration now defines `call_uuid` without the blank allowance, so a fresh install never builds the nullable column. A second migration reconciles a host that already ran the earlier version.
+
+**The migration refuses to continue if a record already carries a blank reference number.** Such a record can never be deduplicated, so it is a hazard rather than a record, and clearing it is an operator's decision — the migration does not remove call history on its own. The project's own migration safety guard independently forbids a data-removing statement in a migration's `up()`, so refusing is the only behaviour the guard permits.
+
+The migration was proven on a disposable MariaDB database: `up()` with a blank record present refuses and leaves the column and the history untouched; `up()` with none present tightens the column and keeps every index and the `ON DELETE CASCADE` foreign key; a blank insert is then refused with error 1048 and a duplicate `(call_uuid, leg)` with error 1062; `down()` restores the blank allowance; and `up()` twice is idempotent.
+
+- [x] **Step 4: Simplify the deletion confirmation**
+
+The confirmation modal fell back through `call_uuid ?? destination ?? ''` because both columns were nullable. The call reference number is now required and always identifies the record, so the chain collapses to `call_uuid ?? ''`, and the matching test now covers the case that can still happen — a record with no destination.
+
+- [x] **Step 5: Verify**
+
+`CdrTest.php` — 15 passed. The reconciliation path is covered by a test that loosens the column deliberately, drives the migration against it, and proves the indexes carrying the deduplication key survive the tightening.
+
+---
+
+### Task 11: CDR CPU Cost Under Load — Measurement Deferred to the Load-Testing Series
 
 **No code changes are made in this plan for this item.** Moving the CDR ingestion endpoint onto the persistent RoadRunner worker is **not** part of the CDR pipeline work, and the endpoint stays on PHP-FPM for now.
 
