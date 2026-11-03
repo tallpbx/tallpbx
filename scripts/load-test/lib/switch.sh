@@ -240,32 +240,53 @@ assert_fpm_profile() {
 # FreeSWITCH log level
 # ------------------------------------------------------------------------------
 
-# Read the log level FreeSWITCH is currently using.
-fs_loglevel() {
-    fs_cli -x "fsctl loglevel" 2>/dev/null \
-        | tr -d '\r' \
-        | grep -Eo 'debug|info|notice|warning|err|crit|alert|emerg' \
-        | tail -n 1 || true
+# Path of the FreeSWITCH file log the log-level probe reads.
+FS_LOG_FILE="${FS_LOG_FILE:-/var/log/freeswitch/freeswitch.log}"
+
+# Map a level to the next more verbose one.
+#
+# Proving a ceiling needs two probes: a line at the requested level must
+# appear, and a line one step more verbose must not.
+fs_next_verbose_level() {
+    case "$1" in
+        alert) printf 'crit' ;;
+        crit) printf 'err' ;;
+        err) printf 'warning' ;;
+        warning) printf 'notice' ;;
+        notice) printf 'info' ;;
+        info) printf 'debug' ;;
+        *) printf '' ;;
+    esac
 }
 
-# Apply a runtime FreeSWITCH log level and assert the daemon accepted it.
+# Write one probe line at a level and report whether the file log kept it.
+#
+# `fsctl loglevel` reports DISABLE on FreeSWITCH 1.11.4 even while logging is
+# working, so parsing it produces a false failure. Emitting a known line and
+# looking for it is the only trustworthy read-back.
+fs_log_probe() {
+    local level="$1" marker="$2"
+
+    fs_cli -x "log ${level} ${marker}" >/dev/null 2>&1 || return 1
+    sleep 1
+
+    grep -q "${marker}" "$FS_LOG_FILE" 2>/dev/null
+}
+
+# Apply a runtime FreeSWITCH log level and prove it with a probe pair.
 apply_fs_loglevel() {
-    local level="${1:-}" current
+    local level="${1:-}"
 
     case "$level" in
-        debug | info | notice) ;;
+        debug | info | notice | warning | err | crit | alert) ;;
         *)
-            fail_switch "fs log level must be debug, info or notice (got '${level}')"
+            fail_switch "fs log level must be one of debug, info, notice, warning, err, crit, alert (got '${level}')"
             return 1
             ;;
     esac
 
-    # Only the first observation is the baseline; later applies must not
-    # overwrite it with an intermediate value.
-    if [ ! -f "${STATE_DIR}/fs-loglevel.baseline" ]; then
-        current="$(fs_loglevel)"
-        printf '%s' "$current" > "${STATE_DIR}/fs-loglevel.baseline"
-    fi
+    # The runtime level cannot be read back reliably, so the baseline is the
+    # level the application declares in .env; restore_baseline re-applies it.
 
     if ! fs_cli -x "fsctl loglevel ${level}" >/dev/null 2>&1; then
         fail_switch "fsctl loglevel ${level} was rejected by FreeSWITCH"
@@ -276,23 +297,35 @@ apply_fs_loglevel() {
     assert_fs_loglevel "$level"
 }
 
-# Prove the daemon reports the requested log level.
+# Prove the level is live: the requested level reaches the log, the next one up does not.
 assert_fs_loglevel() {
-    local level="${1:-}" current
+    local level="${1:-}" next stamp keep_marker drop_marker
 
     if ! command -v fs_cli >/dev/null 2>&1; then
         fail_switch "fs_cli is not installed"
         return 1
     fi
 
-    current="$(fs_loglevel)"
+    stamp="TALLPBX-LOGPROBE-$$-$(date +%s)"
+    keep_marker="${stamp}-${level}-KEEP"
 
-    if [ "$current" != "$level" ]; then
-        fail_switch "fs log level expected ${level} but daemon reports ${current:-unset}"
+    if ! fs_log_probe "$level" "$keep_marker"; then
+        fail_switch "fs log level ${level} produced no line in ${FS_LOG_FILE}"
         return 1
     fi
 
-    log "asserted FreeSWITCH log level ${level}"
+    next="$(fs_next_verbose_level "$level")"
+
+    if [ -n "$next" ]; then
+        drop_marker="${stamp}-${next}-DROP"
+
+        if fs_log_probe "$next" "$drop_marker"; then
+            fail_switch "fs log level ${level} still passes ${next} lines"
+            return 1
+        fi
+    fi
+
+    log "asserted FreeSWITCH log level ${level} (probe pair)"
 }
 
 # ------------------------------------------------------------------------------
@@ -992,9 +1025,10 @@ restore_baseline() {
         done < "${STATE_DIR}/nginx-files.list"
     fi
 
-    if [ -f "${STATE_DIR}/fs-loglevel.baseline" ]; then
-        level="$(cat "${STATE_DIR}/fs-loglevel.baseline")"
-        [ -n "$level" ] && fs_cli -x "fsctl loglevel ${level}" >/dev/null 2>&1 || true
+    level="$(env_get FS_LOG_LEVEL)"
+
+    if [ -n "$level" ]; then
+        fs_cli -x "fsctl loglevel ${level}" >/dev/null 2>&1 || true
     fi
 
     if [ -f "${STATE_DIR}/fs-db-mode.baseline" ]; then
@@ -1025,7 +1059,7 @@ usage() {
 Usage: switch.sh <command> [arguments]
 
   apply_fpm_profile <static|dynamic> <children>   assert_fpm_profile <static|dynamic> <children>
-  apply_fs_loglevel <debug|info|notice>           assert_fs_loglevel <debug|info|notice>
+  apply_fs_loglevel <debug|info|notice|warning|err|crit|alert>   assert_fs_loglevel <level>
   apply_fs_db_mode <disk|tmpfs>                   assert_fs_db_mode <disk|tmpfs>
   apply_xml_path <stock|fast>                     assert_xml_path <stock|fast>
   apply_lua_bindings <on|off>                     assert_lua_bindings <on|off>
