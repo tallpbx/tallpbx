@@ -1,12 +1,15 @@
 # Load-Testing Refresh & Results Rewrite Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Task 0 Steps 1–3 (cloud VPS provisioning, SignalWire PAT entry, network/WireGuard peering) are **Operator Preconditions** requiring human infrastructure access. Tasks 1–14 (harness development, automated test execution, manifest collection, data analysis, and documentation rewrite) are the **Automated Agentic Pipeline** executing via `superpowers:subagent-driven-development` or `superpowers:executing-plans`. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **Prerequisite:** the implementation steps in [`docs/telephony-capacity-scaling-guide.md`](telephony-capacity-scaling-guide.md) (Phases 1–5: ESL event filtering, tmpfs FreeSWITCH DB, production log levels, Octane worker sizing, dual `mod_xml_curl` binding) must be in place before Task 1 runs. This plan measures the platform those changes produce; it does not implement them.
 
 **Goal:** Re-run the TallPBX performance suite in two stages. **Stage A** runs the full matrix on the three shared tiers (1 vCPU/1 GB, 1 vCPU/2 GB, 2 vCPU/2 GB) and ends at a decision gate that classifies every optimisation as **default**, **optional**, or **no longer considered**. **Stage B** then tests only the surviving configuration on the dedicated tiers (2 vCPU/8 GB, 4 vCPU/16 GB) to confirm the decision scales. The data then rewrites `docs/load-testing-results.md` and drives the disposition of the optional code paths. The series has three outputs, not one: comparable performance statistics per configuration, the bottleneck that first saturates on each tier, and for each bottleneck the remediation options with their measured or estimated gain and cost.
 
-**Architecture:** A declarative matrix (`config/load-test-matrix.php`) feeds an orchestrating runner (`scripts/load-test-matrix.sh`) that provisions nothing itself but drives the existing seed, XML load-test, cache-sweep and SIPp harnesses. Every switch (PHP-FPM pool, FS log level, FS runtime DB, XML path, cache TTL) is symmetric — apply, assert, run, restore — and every run writes a manifest plus raw artifacts under `storage/app/load-tests/<series>/`. The Stage A gate freezes the configuration set that Stage B is allowed to run; the results document is then rewritten from the decision matrix, not by hand-editing old tables.
+**Architecture (Two-Host Orchestration Model):**
+- **Load Generator Host (Orchestrator):** Runs `scripts/load-test-matrix.sh` locally on the dedicated load generator (WSL or separate VM). The generator executes SIPp (`tools/sipp/*.xml`, `scripts/pbx-sipp-validate.sh`) and XML HTTP benchmarks (`tpbx pbx:load-test:dialplan`), ensuring client-side test generation never consumes PBX CPU cycles or creates socket binding collisions.
+- **PBX Server Under Test (Target):** Receives remote SSH orchestration commands from the generator runner. Symmetric switch helpers (`scripts/load-test/lib/switch.sh`) and manifest collection (`tpbx pbx:load-test:manifest`) run on the PBX via SSH (`ssh root@$PBX_HOST`).
+- **Declarative Matrix:** Driven by `config/load-test-matrix.php`. Every switch (PHP-FPM pool, FS log level, FS runtime DB, XML path, cache TTL) is symmetric — apply, assert, run, restore — and every run writes a manifest plus raw artifacts under `storage/app/load-tests/<series>/`. The Stage A gate freezes the configuration set that Stage B is allowed to run; the results document is rewritten from the decision matrix, not by hand-editing old tables.
 
 **Tech Stack:** Laravel 13 / PHP 8.5, Pest, Bash, SIPp (`tools/sipp/*.xml`), FreeSWITCH 1.11.4, MariaDB 11, Redis 7, PHP-FPM, RoadRunner/Octane, `nftables`.
 
@@ -14,7 +17,12 @@
 
 ## Global Constraints
 
-- **Full default firewall in every run.** The complete default `nftables` ruleset (geo-blocking, pre-filters, default-drop) stays active. Never create, probe, or flush live `nftables` state to "make a test easier".
+- **Firewall boundary: PBX only (generator completely unconstrained).** Only the TallPBX server under test runs a firewall (the complete default `nftables` ruleset: geo-blocking, pre-filters, default-drop active; never create, probe, or flush live `nftables` state on the PBX to "make a test easier"). The load generator host (running SIPp / orchestrator) must have **no firewall enabled** (`ufw disable`, `nft flush ruleset`, or default policy `INPUT ACCEPT` with zero active filtering rules). Unsolicited inbound UDP packets for UAS listeners and media flows (ports 5066, 5088, 5090, RTP 6000+) bridged from FreeSWITCH must never encounter packet filtering, stateful connection tracking (`conntrack`), or drops on the generator.
+- **Zero result-influencing configurations on generator (generator neutrality).** The load generator must be a neutral, unconstrained traffic source with no local configurations that could shape, throttle, or distort benchmark results:
+  - **No traffic shaping:** No `tc`, `qdisc`, artificial bandwidth capping, or rate limiting on the generator network interfaces.
+  - **No port/process contention:** No background telephony stacks (FreeSWITCH, Asterisk), proxy daemons, or database instances running on the generator that could compete for CPU, memory, or SIP/RTP socket ports.
+  - **Sufficient system limits:** Sockets and file descriptors must be unconstrained (`ulimit -n >= 65535`, `net.core.rmem_max >= 16M`) so the generator itself never drops packets or saturates sockets before the PBX under test.
+  - This generator neutrality gate is asserted before any test series begins.
 - **No unasserted switches.** After any switch (FPM pool, log level, XML path, TTL, tmpfs), the runner reads the value back and fails the cell if it did not change. The 2026-11-01 four-way run produced meaningless numbers from one silently failed switch.
 - **Fresh install per hardware tier.** One installer run per tier, interactive, SignalWire PAT entered at the prompt; no tier inherits a previous tier's `.env`, caches, or database.
 - **Reproducible builds only.** Every manifest records branch, `git rev-parse HEAD`, PHP/FreeSWITCH/Redis/MariaDB versions, kernel, hardware, FPM profile, FS log level, FS DB mode, XML path, cache TTLs, and a redacted `.env` snapshot.
@@ -79,9 +87,10 @@ All six variants below are exercised on every Stage A tier. After the Task 10 ga
 - Cache-TTL profiles: `0/0` cold, `0/60` dialplan off, `60/60` production, `60/60 cache-hit`, `30/30` extended retention, and an uncached-DB pass (TTL `0` everywhere).
 - **Failure ramp:** increase total requests at fixed concurrency until the error rate exceeds 1 % or `p99` exceeds 5 s; record the last healthy step and the first failing step.
 
-### 1.4 SIPp call profiles (Stage A: every variant; Stage B: final configuration)
+### 1.4 SIPp call profiles (Stage A: primary vs optional variants; Stage B: final configuration)
 
 - **Feature validation (14 scenarios):** `register`, `uac-extension`, `uac-extension-capacity`, `uac-outbound`, `uac-call-block`, `uac-call-forward`, `uac-conference`, `uac-emergency`, `uac-follow-me`, `uac-ring-group`, `uac-time-condition`, `uac-voicemail`, `uac-media-client-hangup`, `uac-media-server-hangup` (`tools/sipp/*.xml`).
+  - **Pruned execution rule (avoiding redundant runs):** Because dialplan XML output is identical regardless of serving transport, full 14-scenario functional parity is run **only** on primary supported variants (`v-octane` and `v-stock-static`). Optional/legacy variants (`v-lua-stock`, `v-lua-fast`, `v-fast`) are evaluated purely on XML throughput and the `uac-extension-capacity` CPS ladder, eliminating >200 redundant scenario passes.
 - **Capacity ladder:** `2, 3, 5, 8, 10, 15, 20, 25, 30, 40` offered CPS, 5-second calls. Stop the ladder after three consecutive steps with completion < 95 %, then repeat the last passing and first failing step three times.
 - **Every step records:** offered vs achieved CPS, attempts, completions, failure cause (`403`, `503`, timeout, `USER_NOT_REGISTERED`, socket error), setup `p50/p95/max`, peak concurrency, and the CPU split (ESL listener, FreeSWITCH core, Reverb, MariaDB, Redis, softirq).
 
@@ -132,15 +141,15 @@ Both transports hit the same `CdrIngestionController`, the same `throttle:cdr-in
 - **Capacity cost of the pipeline (primary test).** Run the CPS ladder three times — CDR pipeline **off**, **on with `cdr-fpm`**, **on with `cdr-octane`** — and compare maximum sustainable CPS (completion ≥ 95 %), call-setup `p50/p95`, XML `p95`, and CPU attribution. The off-versus-on delta is the pipeline's capacity cost at that tier.
 - **Bottleneck threshold.** Record the offered CPS at which any of these first appears: XML `p95` +10 %, call-setup `p95` +20 %, ingestion error >1 %, stream backlog growing across two consecutive minutes, digest lag >5 s, or CDR-related CPU >15 % of a core. That CPS is the pipeline's ceiling on the tier.
 - **Per-call cost.** CPU seconds, Redis operations and MariaDB writes per 100 calls, split between FreeSWITCH `mod_json_cdr`, the ingestion endpoint and `cdr:work`.
-- **Ingestion rate ladder.** Synthetic valid posts at 100, 600, 1,200, 2,400, 6,000 and 12,000 per minute per transport, measuring `p50/p95/p99`, success rate, `429`/`503`, `XLEN` growth and spool files; push until errors exceed 1 %.
-- **Digestion throughput.** `tpbx cdr:work --once` drain rate (entries/second) and post-to-row lag at each ladder step.
+- **Ingestion rate ladder.** Synthetic valid posts at 100, 600, 1,200, 2,400, 6,000 and 12,000 per minute per transport, measuring `p50/p95/p99`, success rate, `429`/`503`, `XLEN` growth and spool files; push until errors exceed 1 %. *Note:* The application-level rate limiter (`throttle:cdr-ingestion`, default 6,000/min) must be temporarily relaxed or disabled (`FREESWITCH_CDR_THROTTLE_ENABLED=false` in `.env`) during the 12,000/min burst step to isolate raw transport/worker capacity from artificial HTTP 429 throttling; assert and restore baseline limits immediately after the run.
+- **Digestion throughput.** Stop the background daemon (`systemctl stop tallpbx-cdr-worker`) so it does not compete for consumer group entries on Redis DB 3; benchmark `tpbx cdr:work --once` drain rate (entries/second) and post-to-row lag at each ladder step; restart the daemon during cell teardown.
 - **Coupling check.** XML `p95` with `cdr-fpm` versus `cdr-octane` at the same call rate — does moving ingestion onto the worker hurt the XML hot path?
 - **Backpressure drill at volume.** During a sustained call burst, point the transport at a closed port for 10 seconds; confirm every record lands in the spool; restore; run `tpbx cdr:drain-spool`; confirm row count equals accepted posts plus spooled posts, with no loss and no duplicates.
 
 **Decision added to the gate:**
 
 - **Keep as-is (`cdr-fpm`, default)** if the off-versus-on delta at the tier's recommended CPS is inside the noise, the backlog does not grow, and no data is lost — the pipeline is not the bottleneck.
-- **Optional (`cdr-octane`)** if the pipeline measurably caps capacity or ingestion tail, and moving the endpoint raises the call ceiling by ≥10 % (or removes measured FPM contention), with XML `p95` no worse than +5 % and a one-line rollback (URL change plus `reloadxml`).
+- **Optional (`cdr-octane`)** if the pipeline measurably caps capacity or ingestion tail, and moving the endpoint raises the call ceiling by ≥10 % (or removes measured FPM contention), with XML `p95` no worse than +5 % and a one-line rollback (URL change plus `fs_cli -x "reload mod_json_cdr"`).
 - **Not worth changing** if `cdr-octane` shows no gain or worsens XML tail latency. If the bottleneck is the pipeline itself rather than its transport (digest rate, MariaDB writes, throttle), record it as a finding for a separate remediation plan — do not change it inside this series.
 
 **Test-data hygiene:** posts use a `loadtest-` prefixed `call_uuid` against the seeded tenant and are deleted after each cell (`DELETE FROM cdrs WHERE call_uuid LIKE 'loadtest-%'`); drill quarantine files are removed; `XLEN` must be 0 before the next cell starts.
@@ -203,6 +212,34 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8090/api/v1/cd
 
 Expected: `401` — the route is reachable on the worker and the token is enforced. A `404` means the worker is not loading `routes/api.php`; drop the `cdr-octane` variant before Stage A starts rather than testing an endpoint that does not exist.
 
+- [ ] **Step 5: Verify host firewall boundary and generator neutrality**
+
+Only the TallPBX server under test runs security infrastructure. The generator must be completely unconstrained and free of any configuration that could influence results:
+
+```bash
+# 1. On PBX under test: confirm full production nftables ruleset is active
+nft list ruleset | grep -q 'table inet tallpbx_filter' && echo "OK: PBX firewall active"
+
+# 2. On Load Generator: confirm NO firewall, NO traffic shaping, and unconstrained socket limits
+ssh -p 2222 root@192.168.1.65 '
+  echo "--- Checking Generator Host Neutrality ---"
+  # Assert NO firewall (nftables, iptables, ufw)
+  if nft list ruleset 2>/dev/null | grep -q "table"; then echo "FAIL: nftables active on generator"; exit 1; fi
+  if iptables -L -n 2>/dev/null | grep -qE "DROP|REJECT"; then echo "FAIL: iptables filter rules on generator"; exit 1; fi
+  if ufw status 2>/dev/null | grep -q "Status: active"; then echo "FAIL: ufw active on generator"; exit 1; fi
+  echo "OK: Generator has no firewall enabled"
+
+  # Assert NO traffic shaping / qdisc limits
+  tc qdisc show | grep -vE "fq_codel|noqueue|pfifo_fast" && echo "WARN: non-standard qdisc detected" || echo "OK: No artificial traffic shaping"
+
+  # Assert clean socket limits
+  FD_LIMIT=$(ulimit -n)
+  if [ "$FD_LIMIT" -lt 65535 ]; then echo "WARN: Generator ulimit -n ($FD_LIMIT) < 65535"; fi
+'
+```
+
+Expected: PBX firewall is fully active and enforcing; generator reports zero firewall tables/rules, no filtering or traffic shaping, and unconstrained socket limits.
+
 ## 5. Phase 1 — Harness
 
 ### Task 1: Declarative matrix
@@ -240,7 +277,7 @@ test('keeps the capacity ladder ascending and complete', function (): void {
 });
 
 test('lists every SIPp scenario that ships in tools/sipp', function (): void {
-    $files = collect(glob(base_path('tools/sipp/uac-*.xml')))
+    $files = collect(glob(base_path('tools/sipp/{uac-*,register}.xml'), GLOB_BRACE))
         ->map(fn (string $path): string => basename($path, '.xml'))
         ->sort()->values()->all();
 
@@ -290,7 +327,7 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 - Create: `tests/Feature/Pbx/LoadTestSwitchScriptTest.php`
 
 **Interfaces:**
-- Produces shell functions: `apply_fpm_profile <static|dynamic> <children>`, `assert_fpm_profile <static|dynamic> <children>`, `apply_fs_loglevel <debug|info|notice>`, `assert_fs_loglevel`, `apply_fs_db_mode <disk|tmpfs>`, `assert_fs_db_mode`, `apply_xml_path <stock|fast>`, `assert_xml_path`, `apply_lua_bindings <on|off>`, `assert_lua_bindings`, `apply_ttl <dialplan> <contributor>`, `assert_ttl`, `restore_baseline`, plus `apply_cdr_transport <fpm|octane>` / `assert_cdr_transport` (rewrite the `url` in `/etc/freeswitch/autoload_configs/json_cdr.conf.xml`, `fs_cli -x reloadxml`, then probe the endpoint).
+- Produces shell functions: `apply_fpm_profile <static|dynamic> <children>`, `assert_fpm_profile <static|dynamic> <children>`, `apply_fs_loglevel <debug|info|notice>`, `assert_fs_loglevel`, `apply_fs_db_mode <disk|tmpfs>`, `assert_fs_db_mode`, `apply_xml_path <stock|fast>`, `assert_xml_path`, `apply_lua_bindings <on|off>`, `assert_lua_bindings`, `apply_ttl <dialplan> <contributor>`, `assert_ttl`, `restore_baseline`, plus `apply_cdr_transport <fpm|octane>` / `assert_cdr_transport` (rewrite the `url` in `/etc/freeswitch/autoload_configs/json_cdr.conf.xml`, reload the module via `fs_cli -x "reload mod_json_cdr"`, then probe the endpoint). Runs on the PBX host under test via root privileges or bounded sudo.
 
 - [ ] **Step 1: Write the failing script test** asserting each `apply_*` has a matching `assert_*`, that `restore_baseline` is called from a teardown trap, and that no function edits `nftables`.
 - [ ] **Step 2: Run it — expect FAIL.**
@@ -311,7 +348,7 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 
 - [ ] **Step 1: Write the failing test** asserting `--list` prints every tier × variant × phase, `--dry-run` prints the exact `pbx:load-test:dialplan` / `pbx-sipp-validate.sh` command per cell without executing, and an unknown `--tier` exits non-zero.
 - [ ] **Step 2: Run it — expect FAIL.**
-- [ ] **Step 3: Implement the runner.** It reads the config, creates the series directory, writes the manifest, applies the cell's switch, asserts it, seeds the tenant once per tier, runs the requested profiles, restores the baseline, and fails the cell (not the series) on switch or run error.
+- [ ] **Step 3: Implement the runner.** Executed from the unconstrained load generator host, it reads the matrix config, creates the series directory, invokes PBX switches and asserts them remotely over SSH, seeds the tenant once per tier, runs client-side XML and SIPp profiles locally, restores baseline configuration on the PBX, and fails the cell (not the series) on switch or run error.
 - [ ] **Step 4: Verify `--dry-run` against the matrix and `bash -n`.**
 - [ ] **Step 5: Commit** `feat(load-test): add matrix runner with assertable cells and artifact layout`.
 
@@ -339,7 +376,7 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 **Stage A**
 
 - [ ] **Step 1: Re-register endpoints** (`tools/sipp/register.xml`, `Expires: 3600`) before each variant.
-- [ ] **Step 2: For every Stage A variant, run the 14 feature scenarios** (`bash scripts/pbx-sipp-validate.sh`), recording pass/fail per scenario.
+- [ ] **Step 2: Run the 14 feature scenarios** (`bash scripts/pbx-sipp-validate.sh`) on the primary supported variants (`v-octane`, `v-stock-static`), recording pass/fail per scenario. For optional/legacy variants (`v-lua-*`, `v-fast`), validate routing via the single `uac-extension-capacity` scenario to avoid redundant feature runs across identical dialplan output.
 - [ ] **Step 3: Run the ladder from §1.4** for every Stage A variant; stop per the rule, then repeat the boundary step three times.
 - [ ] **Step 4: Record the exact failure cause per failing step** (SIP code, FreeSWITCH log line, worker/queue state).
 
@@ -374,8 +411,8 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 
 - [ ] **Step 1: Capacity-cost ladder.** On each Stage A tier, run the CPS ladder three times — pipeline **off**, `cdr-fpm`, `cdr-octane` — recording max sustainable CPS, call-setup `p50/p95`, XML `p95`, and CPU attribution.
 - [ ] **Step 2: Bottleneck threshold.** Record the offered CPS at which the §1.8 threshold first appears, per transport.
-- [ ] **Step 3: Ingestion rate ladder.** Synthetic posts at 100/600/1,200/2,400/6,000/12,000 per minute per transport; record `p50/p95/p99`, error classes, `XLEN`, spool files.
-- [ ] **Step 4: Digestion throughput.** `tpbx cdr:work --once` drain rate and post-to-row lag at each ladder step.
+- [ ] **Step 3: Ingestion rate ladder.** Synthetic posts at 100/600/1,200/2,400/6,000/12,000 per minute per transport (relaxing `FREESWITCH_CDR_THROTTLE_ENABLED=false` during the 12,000 burst step to test raw transport/worker capacity without artificial HTTP 429 throttling); record `p50/p95/p99`, error classes, `XLEN`, spool files.
+- [ ] **Step 4: Digestion throughput.** Stop the background daemon (`systemctl stop tallpbx-cdr-worker`) so it does not compete for consumer group entries on Redis DB 3; benchmark `tpbx cdr:work --once` drain rate and post-to-row lag at each ladder step; restart the daemon in teardown.
 - [ ] **Step 5: Backpressure drill.** Closed-port burst during a call run, confirm the spool captures every record, restore, `tpbx cdr:drain-spool`, reconcile accepted = digested + spooled + still-queued with zero loss and zero duplicates.
 - [ ] **Step 6: Reconcile and clean up** — `DELETE FROM cdrs WHERE call_uuid LIKE 'loadtest-%'`, remove drill quarantine files, confirm `XLEN` is 0 before the next cell.
 
@@ -450,7 +487,7 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 
 - [ ] **Step 1: Record the decision summary** in the reproduction section of the new results document and in `CHANGELOG.md`.
 - [ ] **Step 2: Produce the removal list** for the separate disposition plan (do not delete code here).
-- [ ] **Step 3: Delete this plan file** after the results document is merged, and note in `CHANGELOG.md` that the refresh plan was retired (git history retains it).
+- [ ] **Step 3: Retain this plan file as the authoritative execution specification** for future benchmark series (or archive under `docs/operations/`), noting in `CHANGELOG.md` that the refresh execution cycle completed.
 
 ## 8. Risks and guards
 
@@ -461,7 +498,7 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 | Stale numbers inherited | Every tier re-baselined; pre-refresh SHA recorded; no figure copied forward |
 | Cross-cell contamination | `restore_baseline` trap + teardown assertion; log level, FPM pool, tmpfs, bindings, TTLs |
 | Invalid failure boundary | Exact cause taxonomy per step; three attempts at the boundary |
-| Firewall/lockout | Full default ruleset stays active; no `nft` mutation outside the application pipeline |
+| Firewall boundary & generator neutrality | Only the TallPBX server under test runs a firewall (full default ruleset active); generator is verified completely unconstrained (no firewall, no traffic shaping, unconstrained socket limits) |
 | Artifact loss | Manifest + raw files per cell under `storage/app/load-tests/<series>/`; index in Appendix A |
 | Test-series cost | Funnel: 3 repeats on all Stage A XML profiles and ramps; Stage B limited to the frozen configuration; ablations on the 3 shared tiers only |
 | Stage B tests an eliminated variant | The runner reads `stage-a-decision.md` and refuses any variant id not in the frozen set on a B tier |
