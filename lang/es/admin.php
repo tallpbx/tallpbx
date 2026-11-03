@@ -515,6 +515,8 @@ return [
     'cdr_raw_diagnostics' => 'Diagnóstico Técnico (JSON)',
     'cdr_load_more' => 'Cargar más',
     'cdr_showing_recent' => 'Mostrando las :count llamadas más recientes.',
+    'cdr_export' => 'Exportar CSV',
+    'cdr_export_truncated' => 'La exportación se limitó a :exported de :total registros. Filtre más y exporte de nuevo para llegar al resto.',
     'no_cdrs_found' => 'No se encontraron registros CDR.',
     'confirm_delete_cdr' => '¿Está seguro de que desea eliminar este registro CDR?',
     'fs_not_connected' => 'FreeSWITCH no está conectado. Los datos en vivo no están disponibles.',

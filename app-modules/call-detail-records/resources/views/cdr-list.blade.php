@@ -12,6 +12,22 @@
             <option value="a">{{ __('admin.cdr_leg_a') }}</option>
             <option value="b">{{ __('admin.cdr_leg_b') }}</option>
         </select>
+
+        {{-- Exporting needs its own permission: the CSV file leaves the panel
+             and lands on the operator's disk, outside the tenant's controls. --}}
+        @if (\App\Support\PanelActor::can('call-detail-records.export'))
+            <button
+                type="button"
+                wire:click="exportCdrs"
+                wire:loading.attr="disabled"
+                wire:loading.class="opacity-70 pointer-events-none"
+                wire:target="exportCdrs"
+                class="btn btn-outline btn-sm ml-auto"
+            >
+                <span wire:loading wire:target="exportCdrs" class="loading loading-spinner loading-xs"></span>
+                {{ __('admin.cdr_export') }}
+            </button>
+        @endif
     </div>
 
     <div class="card bg-base-100 border border-base-300">

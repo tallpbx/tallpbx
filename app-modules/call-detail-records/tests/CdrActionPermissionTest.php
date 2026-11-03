@@ -143,6 +143,44 @@ it('lets a user with the delete permission delete through the update endpoint', 
     $this->assertDatabaseMissing('cdrs', ['id' => $cdr->id]);
 });
 
+it('resolves the export ability for the exportCdrs action from the call-detail-records namespaced permission', function () {
+    $abilities = app(LivewireActionPermissions::class)->abilitiesFor(CdrList::class, 'exportCdrs');
+
+    expect($abilities)->toBe([['call-detail-records.export']]);
+});
+
+it('blocks a viewing-only user from exporting through the update endpoint', function () {
+    $user = grantTenantUserPermissions($this->tenant, ['call-detail-records.view']);
+    Cdr::factory()->create(['tenant_id' => $this->tenant->id]);
+
+    $page = $this->actingAs($user, 'web')->get('/panel/cdr')->assertOk();
+    $snapshot = cdrListSnapshot($page->getContent());
+
+    postCdrUpdate([[
+        'snapshot' => $snapshot,
+        'calls' => [
+            ['method' => 'exportCdrs', 'params' => []],
+        ],
+    ]])->assertForbidden();
+});
+
+it('lets a user with the export permission export through the update endpoint', function () {
+    $user = grantTenantUserPermissions($this->tenant, ['call-detail-records.view', 'call-detail-records.export']);
+    Cdr::factory()->create(['tenant_id' => $this->tenant->id]);
+
+    $page = $this->actingAs($user, 'web')->get('/panel/cdr')->assertOk();
+    $snapshot = cdrListSnapshot($page->getContent());
+
+    // Positive control: proves the harness genuinely reaches the export
+    // action, so the blocked assertion above is a real denial gate.
+    postCdrUpdate([[
+        'snapshot' => $snapshot,
+        'calls' => [
+            ['method' => 'exportCdrs', 'params' => []],
+        ],
+    ]])->assertSuccessful();
+});
+
 it('hides another tenant\'s call detail record from the deletion confirmation', function () {
     $otherTenant = Tenant::factory()->create();
     $user = grantTenantUserPermissions($this->tenant, ['call-detail-records.view', 'call-detail-records.delete']);

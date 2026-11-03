@@ -54,8 +54,10 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     /**
      * Register permissions for the call-detail-records module.
      *
-     * These permissions control access to viewing, creating,
-     * editing, and deleting records.
+     * These permissions control access to viewing, exporting, and deleting
+     * records. Exporting is separate from viewing because the CSV file leaves
+     * the panel and lands on the operator's own disk, where the tenant's
+     * access controls no longer apply.
      *
      * Permission names MUST use the module name as their prefix
      * (call-detail-records.*): the Livewire action-permission resolver derives
@@ -68,6 +70,7 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
     {
         return [
             'call-detail-records.view' => 'View CDR records',
+            'call-detail-records.export' => 'Export CDR records',
             'call-detail-records.delete' => 'Delete CDR records',
         ];
     }

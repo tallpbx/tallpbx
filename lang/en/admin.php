@@ -513,6 +513,8 @@ return [
     'cdr_raw_diagnostics' => 'Raw Technical Diagnostics (JSON)',
     'cdr_load_more' => 'Load more',
     'cdr_showing_recent' => 'Showing the most recent :count calls.',
+    'cdr_export' => 'Export CSV',
+    'cdr_export_truncated' => 'The export was limited to :exported of :total records. Narrow the filter and export again to reach the rest.',
     'no_cdrs_found' => 'No CDR records found.',
     'confirm_delete_cdr' => 'Are you sure you want to delete this CDR record?',
 
