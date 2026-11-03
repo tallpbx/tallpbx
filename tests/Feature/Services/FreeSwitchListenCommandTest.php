@@ -330,10 +330,11 @@ it('subscribes to essential events by default when starting freeswitch:listen', 
     $mock->shouldReceive('connect')->once()->andReturn(true);
     $mock->shouldReceive('subscribeToEvents')->once()->withArgs(function ($events): bool {
         return is_array($events)
-            && count($events) === 9
+            && count($events) === 10
             && in_array('CHANNEL_CREATE', $events, true)
             && in_array('CHANNEL_ANSWER', $events, true)
             && in_array('CHANNEL_HANGUP_COMPLETE', $events, true)
+            && in_array('HEARTBEAT', $events, true)
             && in_array('SOFIA_REGISTER', $events, true)
             && ! in_array('CHANNEL_EXECUTE', $events, true);
     });
@@ -353,24 +354,27 @@ it('subscribes to essential events by default when starting freeswitch:listen', 
 
 it('allows overriding subscription profile via --profile option', function () {
     $mock = Mockery::mock(FreeSwitchServiceInterface::class);
-    $mock->shouldReceive('connect')->once()->andReturn(true);
-    $mock->shouldReceive('subscribeToEvents')->once()->withArgs(function ($events): bool {
+    $mock->shouldReceive('connect')->twice()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->twice()->withArgs(function ($events): bool {
         return is_array($events)
             && count($events) === 25
             && in_array('CHANNEL_EXECUTE', $events, true)
             && in_array('CHANNEL_STATE', $events, true);
     });
-    $mock->shouldReceive('isConnected')->once()->andReturn(true);
-    $mock->shouldReceive('recvEvent')->once()->andReturn([
+    $mock->shouldReceive('isConnected')->twice()->andReturn(true);
+    $mock->shouldReceive('recvEvent')->twice()->andReturn([
         'event_name' => 'HEARTBEAT',
         'headers' => ['Event-Name' => 'HEARTBEAT'],
         'body' => '',
     ]);
-    $mock->shouldReceive('disconnect')->once();
+    $mock->shouldReceive('disconnect')->twice();
 
     app()->instance(FreeSwitchServiceInterface::class, $mock);
 
     $this->artisan('freeswitch:listen', ['--once' => true, '--profile' => 'full'])
+        ->assertSuccessful();
+
+    $this->artisan('freeswitch:listen', ['--once' => true, '--profile' => 'all'])
         ->assertSuccessful();
 });
 

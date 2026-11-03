@@ -9,6 +9,49 @@ declare(strict_types=1);
  * the mod_xml_curl XML Handler API configuration, and the
  * SIP server hostname used for device provisioning templates.
  */
+$eventProfiles = [
+    'essential' => [
+        'CHANNEL_CREATE',
+        'CHANNEL_ANSWER',
+        'CHANNEL_HANGUP_COMPLETE',
+        'CHANNEL_BRIDGE',
+        'CHANNEL_UNBRIDGE',
+        'RECORD_STOP',
+        'CUSTOM',
+        'HEARTBEAT',
+        'SOFIA_REGISTER',
+        'SOFIA_EXPIRE',
+    ],
+    'full' => [
+        'CHANNEL_CREATE',
+        'CHANNEL_DESTROY',
+        'CHANNEL_ANSWER',
+        'CHANNEL_HANGUP',
+        'CHANNEL_HANGUP_COMPLETE',
+        'CHANNEL_BRIDGE',
+        'CHANNEL_UNBRIDGE',
+        'CHANNEL_OUTGOING',
+        'CHANNEL_PROGRESS',
+        'CHANNEL_PROGRESS_MEDIA',
+        'CHANNEL_EXECUTE',
+        'CHANNEL_EXECUTE_COMPLETE',
+        'CHANNEL_STATE',
+        'CALL_UPDATE',
+        'RECORD_START',
+        'RECORD_STOP',
+        'CUSTOM',
+        'HEARTBEAT',
+        'DTMF',
+        'CODEC',
+        'BACKGROUND_JOB',
+        'SESSION_HEARTBEAT',
+        'PRESENCE_IN',
+        'SOFIA_EXPIRE',
+        'SOFIA_REGISTER',
+    ],
+];
+$eventProfiles['all'] = $eventProfiles['full'];
+
 return [
 
     /*
@@ -123,9 +166,9 @@ return [
     | CPU under heavy call volume (>10 CPS).
     |
     | Profiles:
-    |   - essential (default): 9 essential call lifecycle, recording, and registration
-    |     events. Recovers 20-25% CPU overhead on the freeswitch:listen daemon.
-    |   - full: All 25 event types including detailed execution and state steps.
+    |   - essential (default): 10 essential call lifecycle, keepalive, recording, and
+    |     registration events. Recovers 20-25% CPU overhead on the freeswitch:listen daemon.
+    |   - full (or all): All 25 event types including detailed execution and state steps.
     |
     | The active profile can be overridden via FS_ESL_EVENT_PROFILE or with an
     | explicit comma-separated list of event names via FS_ESL_SUBSCRIBE.
@@ -133,89 +176,11 @@ return [
     */
     'event_profile' => env('FS_ESL_EVENT_PROFILE', 'essential'),
 
-    'event_profiles' => [
-        'essential' => [
-            'CHANNEL_CREATE',
-            'CHANNEL_ANSWER',
-            'CHANNEL_HANGUP_COMPLETE',
-            'CHANNEL_BRIDGE',
-            'CHANNEL_UNBRIDGE',
-            'RECORD_STOP',
-            'CUSTOM',
-            'SOFIA_REGISTER',
-            'SOFIA_EXPIRE',
-        ],
-        'full' => [
-            'CHANNEL_CREATE',
-            'CHANNEL_DESTROY',
-            'CHANNEL_ANSWER',
-            'CHANNEL_HANGUP',
-            'CHANNEL_HANGUP_COMPLETE',
-            'CHANNEL_BRIDGE',
-            'CHANNEL_UNBRIDGE',
-            'CHANNEL_OUTGOING',
-            'CHANNEL_PROGRESS',
-            'CHANNEL_PROGRESS_MEDIA',
-            'CHANNEL_EXECUTE',
-            'CHANNEL_EXECUTE_COMPLETE',
-            'CHANNEL_STATE',
-            'CALL_UPDATE',
-            'RECORD_START',
-            'RECORD_STOP',
-            'CUSTOM',
-            'HEARTBEAT',
-            'DTMF',
-            'CODEC',
-            'BACKGROUND_JOB',
-            'SESSION_HEARTBEAT',
-            'PRESENCE_IN',
-            'SOFIA_EXPIRE',
-            'SOFIA_REGISTER',
-        ],
-    ],
+    'event_profiles' => $eventProfiles,
 
     'subscribe' => env('FS_ESL_SUBSCRIBE') !== null && env('FS_ESL_SUBSCRIBE') !== ''
         ? array_values(array_filter(array_map('trim', explode(',', (string) env('FS_ESL_SUBSCRIBE')))))
-        : match (env('FS_ESL_EVENT_PROFILE', 'essential')) {
-            'full', 'all' => [
-                'CHANNEL_CREATE',
-                'CHANNEL_DESTROY',
-                'CHANNEL_ANSWER',
-                'CHANNEL_HANGUP',
-                'CHANNEL_HANGUP_COMPLETE',
-                'CHANNEL_BRIDGE',
-                'CHANNEL_UNBRIDGE',
-                'CHANNEL_OUTGOING',
-                'CHANNEL_PROGRESS',
-                'CHANNEL_PROGRESS_MEDIA',
-                'CHANNEL_EXECUTE',
-                'CHANNEL_EXECUTE_COMPLETE',
-                'CHANNEL_STATE',
-                'CALL_UPDATE',
-                'RECORD_START',
-                'RECORD_STOP',
-                'CUSTOM',
-                'HEARTBEAT',
-                'DTMF',
-                'CODEC',
-                'BACKGROUND_JOB',
-                'SESSION_HEARTBEAT',
-                'PRESENCE_IN',
-                'SOFIA_EXPIRE',
-                'SOFIA_REGISTER',
-            ],
-            default => [
-                'CHANNEL_CREATE',
-                'CHANNEL_ANSWER',
-                'CHANNEL_HANGUP_COMPLETE',
-                'CHANNEL_BRIDGE',
-                'CHANNEL_UNBRIDGE',
-                'RECORD_STOP',
-                'CUSTOM',
-                'SOFIA_REGISTER',
-                'SOFIA_EXPIRE',
-            ],
-        },
+        : ($eventProfiles[env('FS_ESL_EVENT_PROFILE', 'essential')] ?? $eventProfiles['essential']),
 
     /*
     |--------------------------------------------------------------------------

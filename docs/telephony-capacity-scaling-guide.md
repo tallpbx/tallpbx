@@ -106,7 +106,7 @@ During peak call rates, `CHANNEL_EXECUTE`, `CHANNEL_EXECUTE_COMPLETE`, `CHANNEL_
 **Default Implementation**: The `essential` event filtering profile is active by default in `config/freeswitch.php`:
 ```php
 'subscribe' => [
-    // Essential call lifecycle events
+    // Essential call lifecycle and keepalive events
     'CHANNEL_CREATE',
     'CHANNEL_ANSWER',
     'CHANNEL_HANGUP_COMPLETE',
@@ -114,6 +114,7 @@ During peak call rates, `CHANNEL_EXECUTE`, `CHANNEL_EXECUTE_COMPLETE`, `CHANNEL_
     'CHANNEL_UNBRIDGE',
     'RECORD_STOP',
     'CUSTOM',
+    'HEARTBEAT',
     'SOFIA_REGISTER',
     'SOFIA_EXPIRE',
 ],
@@ -121,8 +122,8 @@ During peak call rates, `CHANNEL_EXECUTE`, `CHANNEL_EXECUTE_COMPLETE`, `CHANNEL_
 
 #### Configuration & Command-Line Controls:
 1. **Environment Profile Selection**:
-   - `FS_ESL_EVENT_PROFILE=essential` (default): Subscribes to the 9 essential call lifecycle and registration events.
-   - `FS_ESL_EVENT_PROFILE=full`: Re-enables all 25 event types.
+   - `FS_ESL_EVENT_PROFILE=essential` (default): Subscribes to the 10 essential call lifecycle, keepalive, and registration events.
+   - `FS_ESL_EVENT_PROFILE=full`: Re-enables all 25 event types (alias: `all`).
 2. **Custom Event Lists**:
    - `FS_ESL_SUBSCRIBE=CHANNEL_CREATE,CHANNEL_ANSWER,CHANNEL_HANGUP_COMPLETE`: Explicit comma-separated override.
 3. **CLI Options**:
@@ -134,7 +135,7 @@ During peak call rates, `CHANNEL_EXECUTE`, `CHANNEL_EXECUTE_COMPLETE`, `CHANNEL_
 When multiple channel events occur in rapid succession, [`BroadcastDashboardStatsOnFreeSwitchEvent`](../app/Listeners/BroadcastDashboardStatsOnFreeSwitchEvent.php) and [`BroadcastTelephonyOnFreeSwitchEvent`](../app/Listeners/BroadcastTelephonyOnFreeSwitchEvent.php) debounce outgoing `ShouldBroadcastNow` events using an in-memory sliding window:
 - `FS_BROADCAST_THROTTLE_MS=500` (default: 500 ms, configured in `.env` and `config/freeswitch.php`).
 - **Real-World Load Discipline**: Real-world load testing and production telephony keep broadcasting fully active (`BROADCAST_CONNECTION=reverb`) so WebSockets and panel dashboards accurately reflect live call state.
-- **Debounce Efficiency**: Caps Reverb HTTP POST dispatches and browser UI refresh loops to at most 2/sec per tenant/scope, cutting over 90% of redundant Reverb CPU overhead during call bursts without dropping updates or muting notifications.
+- **Debounce Efficiency**: Caps Reverb HTTP POST dispatches and browser UI refresh loops to at most 2/sec per tenant/scope, cutting over 90% of redundant Reverb CPU overhead during call bursts.
 - Set `FS_BROADCAST_THROTTLE_MS=0` only if un-throttled immediate per-event dispatch is explicitly required.
 
 *Impact*: Reduces ESL event packet processing by **over 60%**, dropping `freeswitch:listen` CPU usage from **33% down to under 8%**, while debouncing Reverb broadcasts so full real-world notification traffic runs smoothly under sustained load.
@@ -160,7 +161,7 @@ tmpfs /var/lib/freeswitch/db tmpfs defaults,noatime,nosuid,nodev,noexec,mode=077
 FreeSWITCH's stock configuration defaults to verbose debug logging (`<param name="loglevel" value="debug"/>`). Under 10 CPS, debug logging generates gigabytes of text per day and consumes 15% to 20% of CPU time formatting log strings and waiting on disk flush.
 
 #### Implemented Configuration:
-1. **Application Defaults ([`config/freeswitch.php`](config/freeswitch.php))**:
+1. **Application Defaults ([`config/freeswitch.php`](../config/freeswitch.php))**:
    - `FS_LOG_LEVEL=notice` is configured by default in `.env`, `.env.example`, and `config/freeswitch.php`.
    - The dynamic `mod_xml_curl` handler renders `<param name="loglevel" value="notice"/>` for `switch.conf`.
 2. **Static Core Switch Configuration (`/etc/freeswitch/autoload_configs/switch.conf.xml`)**:
@@ -169,7 +170,7 @@ FreeSWITCH's stock configuration defaults to verbose debug logging (`<param name
    ```
 3. **File Logging Mapping (`/etc/freeswitch/autoload_configs/logfile.conf.xml`)**:
    ```xml
-   <map name="all" value="console,info,notice,warning,err,crit,alert"/>
+   <map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>
    ```
 4. **Live Switch & Verification**:
    ```bash

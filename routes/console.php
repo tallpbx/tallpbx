@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Console\Commands\FreeSwitchListenCommand;
 use App\Console\Commands\MakeModuleCommand;
 use App\Console\Commands\ModuleCacheCommand;
 use App\Console\Commands\ModuleClearCommand;
@@ -54,16 +53,6 @@ Artisan::command('make:module {name} {--display-name=} {--description=} {--categ
         '--category' => $this->option('category'),
     ]);
 })->purpose('Scaffold a new module');
-
-Artisan::command('freeswitch:listen {--once} {--timeout=0} {--buffer-size=} {--profile=} {--events=}', function () {
-    return $this->call(FreeSwitchListenCommand::class, array_filter([
-        '--once' => $this->option('once'),
-        '--timeout' => $this->option('timeout'),
-        '--buffer-size' => $this->option('buffer-size'),
-        '--profile' => $this->option('profile'),
-        '--events' => $this->option('events'),
-    ], fn ($v) => $v !== null && $v !== false));
-})->purpose('Listen for FreeSWITCH ESL events and dispatch as Laravel events');
 
 Schedule::command('media:reconcile --retry-failed --delete-orphans')
     ->daily()

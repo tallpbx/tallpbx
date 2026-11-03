@@ -118,7 +118,23 @@ load_required_freeswitch_modules() {
 configure_freeswitch_switch_defaults() {
     local conf_dir=""
     local switch_conf=""
+    local app_dir="/var/www/tallpbx"
+    local env_file="${app_dir}/.env"
     local sessions_per_second="60"
+    local log_level="${FS_LOG_LEVEL:-}"
+
+    if [ -z "$log_level" ] && [ -f "$env_file" ]; then
+        log_level="$(grep -E '^FS_LOG_LEVEL=' "$env_file" | head -n1 | cut -d'=' -f2- | tr -d '\"'\'')"
+    fi
+    log_level="${log_level:-notice}"
+
+    if [ -f "$env_file" ]; then
+        local env_sps
+        env_sps="$(grep -E '^FS_SESSIONS_PER_SECOND=' "$env_file" | head -n1 | cut -d'=' -f2- | tr -d '\"'\'')"
+        if [ -n "$env_sps" ]; then
+            sessions_per_second="$env_sps"
+        fi
+    fi
 
     conf_dir="$(freeswitch_conf_dir)"
     switch_conf="${conf_dir}/autoload_configs/switch.conf.xml"
@@ -129,28 +145,29 @@ configure_freeswitch_switch_defaults() {
     fi
 
     if grep -q 'name="sessions-per-second"' "$switch_conf"; then
-        sed -i 's#<param name="sessions-per-second" value="[^"]*"/>#<param name="sessions-per-second" value="60"/>#' "$switch_conf"
+        sed -i "s#<param name=\"sessions-per-second\" value=\"[^\"]*\"/>#<param name=\"sessions-per-second\" value=\"${sessions_per_second}\"/>#" "$switch_conf"
     else
         sed -i "/<settings>/a\\    <param name=\"sessions-per-second\" value=\"${sessions_per_second}\"/>" "$switch_conf"
     fi
 
     if grep -q 'name="loglevel"' "$switch_conf"; then
-        sed -i 's#<param name="loglevel" value="[^"]*"/>#<param name="loglevel" value="notice"/>#' "$switch_conf"
+        sed -i "s#<param name=\"loglevel\" value=\"[^\"]*\"/>#<param name=\"loglevel\" value=\"${log_level}\"/>#" "$switch_conf"
     else
-        sed -i '/<settings>/a\    <param name="loglevel" value="notice"/>' "$switch_conf"
+        sed -i "/<settings>/a\\    <param name=\"loglevel\" value=\"${log_level}\"/>" "$switch_conf"
     fi
 
     local logfile_conf="${conf_dir}/autoload_configs/logfile.conf.xml"
     if [ -f "$logfile_conf" ]; then
-        sed -i 's#<map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>#<map name="all" value="console,info,notice,warning,err,crit,alert"/>#' "$logfile_conf"
+        # Ensure logfile map retains debug so temporary runtime diagnosis via 'fsctl loglevel debug' works
+        sed -i 's#<map name="all" value="console,info,notice,warning,err,crit,alert"/>#<map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>#' "$logfile_conf"
     fi
 
     if command -v fs_cli >/dev/null 2>&1; then
         fs_cli -x "fsctl sps ${sessions_per_second}" >/dev/null 2>&1 || true
-        fs_cli -x "fsctl loglevel notice" >/dev/null 2>&1 || true
+        fs_cli -x "fsctl loglevel ${log_level}" >/dev/null 2>&1 || true
     fi
 
-    verbose "FreeSWITCH core defaults configured: sessions-per-second=${sessions_per_second}, loglevel=notice"
+    verbose "FreeSWITCH core defaults configured: sessions-per-second=${sessions_per_second}, loglevel=${log_level}"
 }
 
 # Set the default FreeSWITCH sound prompt language in vars.xml.

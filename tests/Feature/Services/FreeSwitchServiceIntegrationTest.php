@@ -224,6 +224,7 @@ it('subscribes to the essential event profile by default', function () {
         ->and($subscribed)->toContain('CHANNEL_UNBRIDGE')
         ->and($subscribed)->toContain('RECORD_STOP')
         ->and($subscribed)->toContain('CUSTOM')
+        ->and($subscribed)->toContain('HEARTBEAT')
         ->and($subscribed)->toContain('SOFIA_REGISTER')
         ->and($subscribed)->toContain('SOFIA_EXPIRE');
 

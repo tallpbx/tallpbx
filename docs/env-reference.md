@@ -95,6 +95,9 @@ The FreeSWITCH telephony subsystem manages real-time call control, SIP signaling
 | `FS_ESL_RECONNECT_INTERVAL`| `integer` | `5` | `freeswitch.esl.reconnect_interval`| Delay in seconds between connection retries when the background ESL event loop listener disconnects. |
 | `FS_ESL_QUEUE_NAME` | `string` | `default` | `freeswitch.esl.queue_name` | Name of the background queue channel utilized for offloading event listeners (e.g. security incident recording, call recordings, voicemail persistence). Default: `default`. |
 | `FS_ESL_BUFFER_SIZE` | `integer` | `1000` | `freeswitch.esl.buffer_size` | In-memory queue buffer capacity for non-blocking ESL event processing in `FreeSwitchListenCommand`, preventing socket drops during high-concurrency event bursts. |
+| `FS_ESL_EVENT_PROFILE` | `string` | `essential` | `freeswitch.event_profile` | Event subscription profile for `freeswitch:listen` (`essential` subscribes to 10 lifecycle/keepalive events; `full` or `all` subscribes to all 25 events). |
+| `FS_ESL_SUBSCRIBE` | `string` | `null` | `freeswitch.subscribe` | Comma-separated list of explicit FreeSWITCH event names to override the active event profile. |
+| `FS_BROADCAST_THROTTLE_MS` | `integer` | `500` | `freeswitch.broadcasting.throttle_ms` | Sliding debounce window in milliseconds for Reverb WebSocket broadcasts (`DashboardStatsUpdated`, `TelephonyUpdated`), preventing event flooding during call bursts. Set to `0` to disable throttling. |
 | `FS_SOFIA_LOG_LEVEL` | `integer` | `0` | `freeswitch.sofia.log_level` | Debug verbosity level for Sofia SIP engine (0–9). Level 0 disables verbose packet logging; higher values log full SIP packet traces to `/var/log/freeswitch/freeswitch.log`. |
 | `FS_SOFIA_AUTO_RESTART` | `boolean` | `true` | `freeswitch.sofia.auto_restart` | Whether to automatically restart Sofia SIP profiles upon runtime reload or configuration mutation. |
 | `FS_SOFIA_DEBUG_PRESENCE` | `boolean` | `false` | `freeswitch.sofia.debug_presence` | Enables detailed debugging logs for BLF (Busy Lamp Field) and SIP SUBSCRIBE/NOTIFY dialog presence. |
@@ -163,7 +166,7 @@ Configures FreeSWITCH's internal state storage engine (Sofia registrations, acti
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `FS_LOG_LEVEL` | `string` | `debug` | `freeswitch.log_level` | FreeSWITCH console log level (`console`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`). |
+| `FS_LOG_LEVEL` | `string` | `notice` | `freeswitch.switch.loglevel` | FreeSWITCH console log level (`console`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`). Use `notice` for production deployments to eliminate disk I/O bottlenecks. |
 | `FS_SESSIONS_PER_SECOND` | `integer` | `60` | `freeswitch.sessions_per_second` | Global call origination rate limit (SPS) enforced in `switch.conf.xml` to prevent CPU starvation. |
 | `FS_HIREDIS_LIMIT_ENABLED` | `boolean` | `false` | `freeswitch.hiredis.limit_enabled` | Enables `mod_hiredis` distributed call concurrency and rate limits across PBX clusters. |
 | `FS_HIREDIS_LIMIT_MAX` | `integer` | `100000` | `freeswitch.hiredis.limit_max` | Maximum total active limits tracked in Hiredis. |

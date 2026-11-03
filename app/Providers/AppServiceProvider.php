@@ -274,6 +274,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen([
             ChannelCreate::class,
             ChannelAnswer::class,
+            ChannelHangupComplete::class,
             ChannelDestroy::class,
             Heartbeat::class,
         ], BroadcastDashboardStatsOnFreeSwitchEvent::class);

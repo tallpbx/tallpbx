@@ -3,6 +3,7 @@
 use App\Events\Dashboard\DashboardStatsUpdated;
 use App\Events\FreeSwitch\ChannelCreate;
 use App\Events\FreeSwitch\ChannelDestroy;
+use App\Events\FreeSwitch\ChannelHangupComplete;
 use App\Listeners\BroadcastDashboardStatsOnFreeSwitchEvent;
 use App\Models\Admin;
 use App\Models\Tenant;
@@ -155,6 +156,25 @@ it('dispatches DashboardStatsUpdated on CHANNEL_DESTROY without dropping events'
     $listener->handle($destroyEvent);
 
     Event::assertDispatchedTimes(DashboardStatsUpdated::class, 2);
+});
+
+it('dispatches DashboardStatsUpdated on CHANNEL_HANGUP_COMPLETE', function () {
+    Event::fake([DashboardStatsUpdated::class]);
+    config(['broadcasting.test_broadcasts' => true]);
+
+    $listener = new BroadcastDashboardStatsOnFreeSwitchEvent;
+
+    $hangupEvent = new ChannelHangupComplete(
+        eventName: 'CHANNEL_HANGUP_COMPLETE',
+        headers: ['Unique-ID' => 'test-uuid-hangup'],
+        body: '',
+    );
+
+    $listener->handle($hangupEvent);
+
+    Event::assertDispatched(DashboardStatsUpdated::class, function ($e) {
+        return $e->source === 'CHANNEL_HANGUP_COMPLETE';
+    });
 });
 
 it('throttles rapid-fire DashboardStatsUpdated dispatches when throttle is enabled', function () {
