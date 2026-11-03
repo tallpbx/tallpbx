@@ -205,7 +205,7 @@ class PbxLoadTestSeedCommand extends Command
         $this->components->twoColumnDetail('Extensions', (string) count($summary['extension_numbers']));
         $this->components->twoColumnDetail('Media fixtures', $includeMediaFixtures ? 'yes' : 'no');
         $this->components->twoColumnDetail('Extended fixtures', $includeExtendedFixtures ? 'yes' : 'no');
-        $this->components->twoColumnDetail('SIPp CSV', base_path($output));
+        $this->components->twoColumnDetail('SIPp CSV', $this->resolveOutputPath($output));
 
         return self::SUCCESS;
     }
@@ -252,13 +252,28 @@ class PbxLoadTestSeedCommand extends Command
     }
 
     /**
+     * Resolve the CSV output path to an absolute one.
+     *
+     * The load-test orchestrator passes an absolute path, while interactive
+     * callers usually pass a path relative to the application root. Prefixing
+     * an absolute path with base_path() again writes the file inside a bogus
+     * <app>/var/www/... tree that the SIPp runner never reads.
+     */
+    private function resolveOutputPath(string $path): string
+    {
+        $path = trim($path);
+
+        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : base_path($path);
+    }
+
+    /**
      * Write a SIPp CSV file with caller/destination credentials.
      *
      * @param  array<int, string>  $extensionNumbers
      */
     private function writeSippCsv(string $path, array $extensionNumbers, string $password, string $domain): void
     {
-        $absolutePath = base_path($path);
+        $absolutePath = $this->resolveOutputPath($path);
         $directory = dirname($absolutePath);
 
         if (! is_dir($directory)) {

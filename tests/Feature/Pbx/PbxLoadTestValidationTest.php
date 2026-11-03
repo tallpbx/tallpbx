@@ -164,6 +164,36 @@ describe('pbx load test seed command', function (): void {
 
     afterEach(function (): void {
         File::delete(base_path(PBX_LOAD_TEST_CSV_PATH));
+
+        // A regression in absolute-path handling writes the CSV into a bogus
+        // <app>/var/www/tallpbx tree; keep it out of the working copy.
+        File::deleteDirectory(base_path('var/www/tallpbx'));
+        @rmdir(base_path('var/www'));
+        @rmdir(base_path('var'));
+    });
+
+    it('writes an absolute CSV path where it was asked, not under the app root', function (): void {
+        $absoluteCsv = base_path('storage/framework/testing/load-tests/absolute-sipp-users.csv');
+        $strayCsv = base_path(ltrim($absoluteCsv, '/'));
+
+        File::delete($absoluteCsv);
+        File::delete($strayCsv);
+
+        $this->artisan('pbx:load-test:seed', [
+            '--tenant' => 'load-test-absolute',
+            '--domain' => 'load-absolute.test',
+            '--extensions' => '2',
+            '--start' => '3200',
+            '--output' => $absoluteCsv,
+        ])->assertSuccessful();
+
+        // The orchestrator passes an absolute path, so prefixing it with
+        // base_path() again would bury the file where the SIPp runner cannot
+        // find it.
+        expect(File::exists($absoluteCsv))->toBeTrue()
+            ->and(File::exists($strayCsv))->toBeFalse();
+
+        File::delete($absoluteCsv);
     });
 
     it('creates repeatable PBX load test data and a SIPp CSV', function (): void {
