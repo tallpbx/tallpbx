@@ -142,6 +142,38 @@ describe('load test matrix runner', function (): void {
             ->toContain('START=3100');
     });
 
+    it('points the Octane variant at the worker and every other variant at nginx', function (): void {
+        $octane = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-octane', '--phase=xml', '--profile=100x5', '--section=dialplan', '--repeats=1'],
+            $this->artifactRoot,
+        );
+        $stock = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-static', '--phase=xml', '--profile=100x5', '--section=dialplan', '--repeats=1'],
+            $this->artifactRoot,
+        );
+
+        expect($octane->isSuccessful())->toBeTrue($octane->getErrorOutput());
+
+        // The worker is a separate HTTP server. Posting to nginx measures
+        // PHP-FPM and would report that number as Octane.
+        expect($octane->getOutput())->toContain('--url=http://127.0.0.1:8090/api/v1/xml-handler')
+            ->and($stock->getOutput())->toContain('--url=http://127.0.0.1/api/v1/xml-handler')
+            ->and($stock->getOutput())->not->toContain('8090');
+    });
+
+    it('measures the FreeSWITCH lookup path alongside every XML cell', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-lua-stock', '--phase=xml', '--profile=100x5', '--section=dialplan', '--repeats=1'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // A Lua hit never reaches nginx or PHP, so the HTTP client cannot
+        // observe it; the FreeSWITCH probe is the only measurement that can.
+        expect($process->getOutput())->toContain('probe_lookup');
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

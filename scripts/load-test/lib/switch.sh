@@ -991,6 +991,81 @@ restore_env() {
 }
 
 # ------------------------------------------------------------------------------
+# Measurement probes
+# ------------------------------------------------------------------------------
+
+# Milliseconds since the epoch, used only to time the lookup probe.
+now_ms() {
+    date +%s%3N
+}
+
+# Measure what FreeSWITCH waits for on one directory lookup.
+#
+# A Lua cache hit is answered inside FreeSWITCH and never reaches nginx or
+# PHP, so an HTTP client cannot observe it. Asking FreeSWITCH itself is the
+# only measurement on that path. `status` is timed the same way and
+# subtracted, because the command-line round trip is fixed and large enough
+# to swamp the lookup it is meant to measure.
+probe_lookup() {
+    local extension="${1:-}" domain="${2:-}" count="${3:-30}"
+    local started index find_ms status_ms net_ms
+
+    if [ -z "$extension" ] || [ -z "$domain" ]; then
+        fail_switch "probe_lookup needs an extension and a domain"
+        return 1
+    fi
+
+    started="$(now_ms)"
+
+    for index in $(seq 1 "$count"); do
+        fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
+    done
+
+    find_ms=$(( $(now_ms) - started ))
+
+    started="$(now_ms)"
+
+    for index in $(seq 1 "$count"); do
+        fs_cli -x "status" >/dev/null 2>&1 || true
+    done
+
+    status_ms=$(( $(now_ms) - started ))
+
+    # The subtraction removes the CLI overhead; never report a negative cost.
+    net_ms=$(( find_ms - status_ms ))
+    [ "$net_ms" -lt 0 ] && net_ms=0
+
+    printf 'lookup_count=%s find_user_ms=%s status_ms=%s net_ms=%s lua_bindings=%s\n' \
+        "$count" "$find_ms" "$status_ms" "$net_ms" "$(lua_bindings_state)"
+}
+
+# Make the Lua pair agree again after a restore.
+#
+# The baseline is defined by the bindings in lua.conf.xml; the .env mirror
+# flag follows them. A snapshot can capture the two disagreeing (flag on,
+# bindings commented), and restoring that faithfully leaves Laravel writing
+# a Redis mirror FreeSWITCH never reads: cost with no benefit, and a cell
+# that looks configured but measures as if the feature were off.
+coherent_baseline() {
+    local bindings flag
+
+    bindings="$(lua_bindings_state)"
+    flag="$(env_get FS_LUA_PROXY_ENABLED)"
+
+    if [ "$bindings" = "off" ] && [ "${flag,,}" = "true" ]; then
+        env_set FS_LUA_PROXY_ENABLED false
+        log "baseline-corrected FS_LUA_PROXY_ENABLED true -> false (bindings are commented)"
+
+        return 0
+    fi
+
+    if [ "$bindings" = "on" ] && [ "${flag,,}" != "true" ]; then
+        env_set FS_LUA_PROXY_ENABLED true
+        log "baseline-corrected FS_LUA_PROXY_ENABLED ${flag:-unset} -> true (bindings are active)"
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Baseline restoration
 # ------------------------------------------------------------------------------
 
@@ -1025,6 +1100,10 @@ restore_baseline() {
             fi
         done < "${STATE_DIR}/nginx-files.list"
     fi
+
+    # The flag and the bindings are one setting in two places, so the pair is
+    # reconciled before the baseline is declared restored.
+    coherent_baseline
 
     level="$(env_get FS_LOG_LEVEL)"
 
@@ -1096,6 +1175,8 @@ main() {
         assert_ttl | assert-ttl) assert_ttl "$@" ;;
         apply_cdr_transport | apply-cdr-transport) apply_cdr_transport "$@" ;;
         assert_cdr_transport | assert-cdr-transport) assert_cdr_transport "$@" ;;
+        probe_lookup | probe-lookup) probe_lookup "$@" ;;
+        coherent_baseline | coherent-baseline) coherent_baseline ;;
         restore_baseline | restore-baseline) restore_baseline ;;
         '' | -h | --help | help)
             usage

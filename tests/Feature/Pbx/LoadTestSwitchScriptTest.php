@@ -77,6 +77,28 @@ describe('load test switch helpers', function (): void {
             ->and($script)->toContain('trap - EXIT INT TERM');
     });
 
+    it('corrects a half-applied Lua pair before declaring the baseline restored', function (): void {
+        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+
+        preg_match('/^restore_baseline\(\) \{.*?^\}/ms', $script, $match);
+
+        // The bindings are the baseline; the .env flag follows them. A restore
+        // that reproduced a captured mismatch left Laravel writing a Redis
+        // mirror FreeSWITCH never read.
+        expect($match[0] ?? '')->toContain('coherent_baseline')
+            ->and($script)->toContain('baseline-corrected');
+    });
+
+    it('measures a FreeSWITCH lookup with the CLI overhead subtracted', function (): void {
+        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+
+        // A Lua hit never reaches nginx or PHP, so the HTTP client cannot see
+        // it. find_user_xml is the only probe that asks FreeSWITCH itself.
+        expect($script)->toContain('probe_lookup')
+            ->and($script)->toContain('find_user_xml')
+            ->and($script)->toContain('status');
+    });
+
     it('never mutates live nftables state', function (): void {
         $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
 

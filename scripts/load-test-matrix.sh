@@ -44,6 +44,10 @@ SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o Co
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/var/www/tallpbx}"
 REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load-tests/${SERIES}}"
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
+# The persistent worker is a second HTTP server serving the same route. A cell
+# that applies the Octane binding must be measured against this URL, or it
+# measures PHP-FPM and reports the number as Octane.
+PBX_OCTANE_URL="${PBX_OCTANE_URL:-http://127.0.0.1:8090/api/v1/xml-handler}"
 PBX_XML_TOKEN="${PBX_XML_TOKEN:-}"
 # Load-test data uses the same environment names as scripts/pbx-sipp-validate.sh,
 # so an operator who already knows one tool does not have to learn a second
@@ -349,8 +353,11 @@ run_on_pbx() {
     ssh -n $SSH_OPTS -p "$SSH_PORT" "$PBX_HOST" "$command"
 }
 
-# Invoke one switch helper on the PBX and fail the cell when it reports a mismatch.
-switch_call() {
+# Print the exact remote command for one switch helper call.
+#
+# Execution and --dry-run both go through here, so the printed plan cannot
+# drift away from what the run actually executes.
+switch_command() {
     local command="$1"
     shift
     local quoted="" arg
@@ -359,7 +366,15 @@ switch_call() {
         quoted+=" $(printf '%q' "$arg")"
     done
 
-    run_on_pbx "APP_DIR=$(printf '%q' "$REMOTE_APP_DIR") bash $(printf '%q' "$REMOTE_APP_DIR/scripts/load-test/lib/switch.sh") $(printf '%q' "$command")$quoted"
+    printf 'APP_DIR=%s bash %s %s%s' \
+        "$(printf '%q' "$REMOTE_APP_DIR")" \
+        "$(printf '%q' "$REMOTE_APP_DIR/scripts/load-test/lib/switch.sh")" \
+        "$(printf '%q' "$command")" "$quoted"
+}
+
+# Invoke one switch helper on the PBX and fail the cell when it reports a mismatch.
+switch_call() {
+    run_on_pbx "$(switch_command "$@")"
 }
 
 # Apply every switch a variant requires, asserting each one as it lands.
@@ -395,10 +410,29 @@ apply_variant() {
 # Command construction (shared by --dry-run and execution)
 # ------------------------------------------------------------------------------
 
+# Return the XML handler URL one variant must be measured against.
+#
+# Five variants are served by nginx, so the shared URL is correct for them.
+# The Octane variant switches FreeSWITCH to the persistent worker, which is a
+# different HTTP server on port 8090; posting to nginx would measure the pool
+# instead and mislabel the result.
+xml_url_for_variant() {
+    local variant="$1" requirement
+
+    while IFS= read -r requirement; do
+        if [ "$requirement" = "octane:on" ]; then
+            printf '%s\n' "$PBX_OCTANE_URL"
+            return 0
+        fi
+    done < <(matrix_list variants "$variant" requires)
+
+    printf '%s\n' "$PBX_URL"
+}
+
 # Build the exact dialplan load command for one XML cell.
 xml_command() {
     local tier="$1" variant="$2" profile_id="$3" ttl_id="$4" section="$5" repeat="$6"
-    local requests concurrency scenario dialplan contributor directory acl report label
+    local requests concurrency scenario dialplan contributor directory acl report label url
 
     requests="$(matrix_value xml_profiles "$profile_id" requests)"
     concurrency="$(matrix_value xml_profiles "$profile_id" concurrency)"
@@ -410,13 +444,23 @@ xml_command() {
 
     label="${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
     report="${REMOTE_ARTIFACT_ROOT}/${tier}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
+    url="$(xml_url_for_variant "$variant")"
 
     printf 'cd %q && php artisan pbx:load-test:dialplan --tenant=%q --url=%q --requests=%q --concurrency=%q --scenario=%q --section=%q --label=%q --report=%q' \
-        "$REMOTE_APP_DIR" "$LOAD_TENANT" "$PBX_URL" "$requests" "$concurrency" "$scenario" "$section" "$label" "$report"
+        "$REMOTE_APP_DIR" "$LOAD_TENANT" "$url" "$requests" "$concurrency" "$scenario" "$section" "$label" "$report"
 
     if [ -n "$PBX_XML_TOKEN" ]; then
         printf ' --token=%q' "$PBX_XML_TOKEN"
     fi
+}
+
+# Build the FreeSWITCH lookup probe for one XML cell.
+#
+# The HTTP client asks PHP directly, so it can never see a Lua cache hit: a hit
+# is answered inside FreeSWITCH. Timing find_user_xml (minus the fixed CLI
+# overhead) is the only measurement that covers the path a real call takes.
+probe_command() {
+    switch_command probe_lookup "$LOAD_START" "$LOAD_DOMAIN" "${PROBE_COUNT:-30}"
 }
 
 # Build the exact SIPp validation command for one SIP cell.
@@ -487,6 +531,10 @@ dry_run_cells() {
                                     for repeat in $(seq 1 "$REPEATS"); do
                                         printf '  %s\n' "$(xml_command "$tier" "$variant" "$profile_id" "$ttl_id" "$section" "$repeat")"
                                     done
+
+                                    # Printed next to the cells it describes: the
+                                    # lookup probe is what a real call waits for.
+                                    printf '  %s\n' "$(probe_command)"
                                 done < <(matrix_keys cache_ttl_profiles)
                             done < <(matrix_keys xml_profiles)
                         done
@@ -681,6 +729,15 @@ run_xml_phase() {
                         cell_failed "$label"
                     fi
                 done
+
+                # Time what FreeSWITCH itself waits for under this cache
+                # policy. The HTTP client cannot cover this path.
+                probe_log="${ARTIFACT_ROOT}/${TIER}/${variant}/probe-${profile_id}-${ttl_id}.txt"
+                mkdir -p "$(dirname "$probe_log")"
+
+                if ! run_on_pbx "$(probe_command)" > "$probe_log" 2>&1; then
+                    cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section}-probe"
+                fi
             done < <(matrix_keys cache_ttl_profiles)
         done < <(matrix_keys xml_profiles)
     done < <(selected_sections)
