@@ -156,3 +156,36 @@ it('dispatches DashboardStatsUpdated on CHANNEL_DESTROY without dropping events'
 
     Event::assertDispatchedTimes(DashboardStatsUpdated::class, 2);
 });
+
+it('throttles rapid-fire DashboardStatsUpdated dispatches when throttle is enabled', function () {
+    Event::fake([DashboardStatsUpdated::class]);
+    config(['broadcasting.test_broadcasts' => true]);
+    config(['freeswitch.broadcasting.throttle_ms' => 500]);
+    BroadcastDashboardStatsOnFreeSwitchEvent::resetThrottle();
+
+    $listener = new BroadcastDashboardStatsOnFreeSwitchEvent;
+
+    $event1 = new ChannelCreate(
+        eventName: 'CHANNEL_CREATE',
+        headers: ['Unique-ID' => 'test-uuid-1'],
+        body: '',
+    );
+    $event2 = new ChannelDestroy(
+        eventName: 'CHANNEL_DESTROY',
+        headers: ['Unique-ID' => 'test-uuid-1'],
+        body: '',
+    );
+
+    // Event 1 dispatches immediately
+    $listener->handle($event1);
+    Event::assertDispatchedTimes(DashboardStatsUpdated::class, 1);
+
+    // Event 2 within the 500ms window is throttled
+    $listener->handle($event2);
+    Event::assertDispatchedTimes(DashboardStatsUpdated::class, 1);
+
+    // Reset throttle and verify it dispatches again
+    BroadcastDashboardStatsOnFreeSwitchEvent::resetThrottle();
+    $listener->handle($event2);
+    Event::assertDispatchedTimes(DashboardStatsUpdated::class, 2);
+});

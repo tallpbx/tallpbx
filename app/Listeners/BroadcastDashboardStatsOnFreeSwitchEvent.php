@@ -18,6 +18,19 @@ use Illuminate\Support\Facades\Log;
 class BroadcastDashboardStatsOnFreeSwitchEvent
 {
     /**
+     * Last broadcast timestamp in milliseconds.
+     */
+    private static float $lastBroadcastMs = 0.0;
+
+    /**
+     * Reset throttle state (primarily for testing).
+     */
+    public static function resetThrottle(): void
+    {
+        self::$lastBroadcastMs = 0.0;
+    }
+
+    /**
      * Handle the FreeSWITCH event.
      */
     public function handle(FreeSwitchEvent $event): void
@@ -27,8 +40,17 @@ class BroadcastDashboardStatsOnFreeSwitchEvent
             return;
         }
 
+        $throttleMs = (int) config('freeswitch.broadcasting.throttle_ms', 500);
+
+        $nowMs = microtime(true) * 1000.0;
+
+        if ($throttleMs > 0 && self::$lastBroadcastMs > 0.0 && ($nowMs - self::$lastBroadcastMs) < $throttleMs) {
+            return;
+        }
+
         try {
             DashboardStatsUpdated::dispatch($event->eventName);
+            self::$lastBroadcastMs = $nowMs;
         } catch (\Throwable $e) {
             Log::warning('FreeSWITCH dashboard stats broadcast failed', [
                 'event' => $event->eventName,

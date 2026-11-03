@@ -88,13 +88,15 @@ interface FreeSwitchServiceInterface
     public function subscribe(string $eventType): void;
 
     /**
-     * Subscribe to all configured FreeSWITCH event types.
+     * Subscribe to configured or explicit FreeSWITCH event types.
      *
      * Called by the listener command after connecting. Web requests
      * that only need API access should not call this — it switches
      * the socket into event-streaming mode.
+     *
+     * @param  array<int, string>|null  $eventTypes  Optional list of event names to subscribe to
      */
-    public function subscribeToEvents(): void;
+    public function subscribeToEvents(?array $eventTypes = null): void;
 
     /**
      * Unsubscribe from a FreeSWITCH event type.

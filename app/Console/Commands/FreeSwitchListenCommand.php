@@ -59,7 +59,9 @@ class FreeSwitchListenCommand extends Command
     protected $signature = 'freeswitch:listen
         {--once : Process a single event and exit (useful for testing)}
         {--timeout=0 : Maximum seconds to run before exiting (0 = forever)}
-        {--buffer-size= : Maximum in-memory event buffer capacity before overflow drop}';
+        {--buffer-size= : Maximum in-memory event buffer capacity before overflow drop}
+        {--profile= : Event subscription profile (essential, full)}
+        {--events= : Comma-separated list of FreeSWITCH event types to subscribe to}';
 
     /**
      * The console command description.
@@ -150,9 +152,12 @@ class FreeSwitchListenCommand extends Command
             return self::FAILURE;
         }
 
-        $freeswitch->subscribeToEvents();
+        $eventsToSubscribe = $this->resolveSubscriptionEvents();
+        $freeswitch->subscribeToEvents($eventsToSubscribe);
 
-        $this->components->info('Connected to FreeSWITCH ESL. Listening for events...');
+        $eventCount = count($eventsToSubscribe);
+        $profile = (string) ($this->option('profile') ?: config('freeswitch.event_profile', 'essential'));
+        $this->components->info("Connected to FreeSWITCH ESL. Listening for {$eventCount} event types (profile: {$profile})...");
 
         // ── Event loop ────────────────────────────────────────────
         while (true) {
@@ -179,7 +184,7 @@ class FreeSwitchListenCommand extends Command
                     continue;
                 }
 
-                $freeswitch->subscribeToEvents();
+                $freeswitch->subscribeToEvents($eventsToSubscribe);
 
                 $this->components->info('Reconnected to FreeSWITCH ESL.');
             }
@@ -237,6 +242,31 @@ class FreeSwitchListenCommand extends Command
         $this->components->info('FreeSWITCH Event Listener stopped.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Resolve the list of event types to subscribe to based on CLI options and config.
+     *
+     * @return array<int, string>
+     */
+    public function resolveSubscriptionEvents(): array
+    {
+        $eventsOption = $this->option('events');
+        if (is_string($eventsOption) && trim($eventsOption) !== '') {
+            return array_values(array_filter(array_map('trim', explode(',', $eventsOption))));
+        }
+
+        $profileOption = $this->option('profile');
+        if (is_string($profileOption) && trim($profileOption) !== '') {
+            $profiles = (array) config('freeswitch.event_profiles', []);
+            if (isset($profiles[$profileOption])) {
+                return (array) $profiles[$profileOption];
+            }
+
+            $this->components->warn("Unknown event profile '{$profileOption}'. Falling back to configured events.");
+        }
+
+        return (array) config('freeswitch.subscribe', []);
     }
 
     /**

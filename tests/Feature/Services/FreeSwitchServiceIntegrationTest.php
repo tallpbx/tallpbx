@@ -207,6 +207,49 @@ it('orders the CUSTOM token last and registers the required CUSTOM subclasses', 
         ->and($afterCustom)->toContain('sofia::failed_auth');
 });
 
+it('subscribes to the essential event profile by default', function () {
+    $this->startFakeFreeSwitch();
+    $fs = $this->newFreeSwitchService();
+    $fs->connect();
+
+    $fs->subscribeToEvents();
+
+    $subscribed = $this->fakeSubscribedEvents($fs);
+
+    // Essential events should be present
+    expect($subscribed)->toContain('CHANNEL_CREATE')
+        ->and($subscribed)->toContain('CHANNEL_ANSWER')
+        ->and($subscribed)->toContain('CHANNEL_HANGUP_COMPLETE')
+        ->and($subscribed)->toContain('CHANNEL_BRIDGE')
+        ->and($subscribed)->toContain('CHANNEL_UNBRIDGE')
+        ->and($subscribed)->toContain('RECORD_STOP')
+        ->and($subscribed)->toContain('CUSTOM')
+        ->and($subscribed)->toContain('SOFIA_REGISTER')
+        ->and($subscribed)->toContain('SOFIA_EXPIRE');
+
+    // High-frequency pruned events must NOT be present
+    expect($subscribed)->not->toContain('CHANNEL_EXECUTE')
+        ->and($subscribed)->not->toContain('CHANNEL_STATE')
+        ->and($subscribed)->not->toContain('CALL_UPDATE')
+        ->and($subscribed)->not->toContain('SESSION_HEARTBEAT');
+});
+
+it('subscribes to custom passed event types including custom subclasses', function () {
+    $this->startFakeFreeSwitch();
+    $fs = $this->newFreeSwitchService();
+    $fs->connect();
+
+    $fs->subscribeToEvents(['CHANNEL_CREATE', 'CUSTOM']);
+
+    $subscribed = $this->fakeSubscribedEvents($fs);
+
+    expect($subscribed)->toContain('CHANNEL_CREATE')
+        ->and($subscribed)->toContain('CUSTOM')
+        ->and($subscribed)->toContain('tallpbx::sip_scanner_detected')
+        ->and($subscribed)->toContain('sofia::failed_auth')
+        ->and($subscribed)->not->toContain('SOFIA_REGISTER');
+});
+
 // ═══════════════════════════════════════════════════════════════════
 //  SEND EVENT
 // ═══════════════════════════════════════════════════════════════════

@@ -55,11 +55,14 @@ Artisan::command('make:module {name} {--display-name=} {--description=} {--categ
     ]);
 })->purpose('Scaffold a new module');
 
-Artisan::command('freeswitch:listen {--once} {--timeout=0}', function () {
-    return $this->call(FreeSwitchListenCommand::class, [
+Artisan::command('freeswitch:listen {--once} {--timeout=0} {--buffer-size=} {--profile=} {--events=}', function () {
+    return $this->call(FreeSwitchListenCommand::class, array_filter([
         '--once' => $this->option('once'),
         '--timeout' => $this->option('timeout'),
-    ]);
+        '--buffer-size' => $this->option('buffer-size'),
+        '--profile' => $this->option('profile'),
+        '--events' => $this->option('events'),
+    ], fn ($v) => $v !== null && $v !== false));
 })->purpose('Listen for FreeSWITCH ESL events and dispatch as Laravel events');
 
 Schedule::command('media:reconcile --retry-failed --delete-orphans')

@@ -324,3 +324,72 @@ it('reports hasPendingData as false when FreeSwitchService is disconnected', fun
 
     expect($fs->hasPendingData())->toBeFalse();
 });
+
+it('subscribes to essential events by default when starting freeswitch:listen', function () {
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('connect')->once()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->once()->withArgs(function ($events): bool {
+        return is_array($events)
+            && count($events) === 9
+            && in_array('CHANNEL_CREATE', $events, true)
+            && in_array('CHANNEL_ANSWER', $events, true)
+            && in_array('CHANNEL_HANGUP_COMPLETE', $events, true)
+            && in_array('SOFIA_REGISTER', $events, true)
+            && ! in_array('CHANNEL_EXECUTE', $events, true);
+    });
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')->once()->andReturn([
+        'event_name' => 'HEARTBEAT',
+        'headers' => ['Event-Name' => 'HEARTBEAT'],
+        'body' => '',
+    ]);
+    $mock->shouldReceive('disconnect')->once();
+
+    app()->instance(FreeSwitchServiceInterface::class, $mock);
+
+    $this->artisan('freeswitch:listen', ['--once' => true])
+        ->assertSuccessful();
+});
+
+it('allows overriding subscription profile via --profile option', function () {
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('connect')->once()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->once()->withArgs(function ($events): bool {
+        return is_array($events)
+            && count($events) === 25
+            && in_array('CHANNEL_EXECUTE', $events, true)
+            && in_array('CHANNEL_STATE', $events, true);
+    });
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')->once()->andReturn([
+        'event_name' => 'HEARTBEAT',
+        'headers' => ['Event-Name' => 'HEARTBEAT'],
+        'body' => '',
+    ]);
+    $mock->shouldReceive('disconnect')->once();
+
+    app()->instance(FreeSwitchServiceInterface::class, $mock);
+
+    $this->artisan('freeswitch:listen', ['--once' => true, '--profile' => 'full'])
+        ->assertSuccessful();
+});
+
+it('allows overriding subscription events via --events option', function () {
+    $mock = Mockery::mock(FreeSwitchServiceInterface::class);
+    $mock->shouldReceive('connect')->once()->andReturn(true);
+    $mock->shouldReceive('subscribeToEvents')->once()->withArgs(function ($events): bool {
+        return $events === ['CHANNEL_CREATE', 'CHANNEL_HANGUP_COMPLETE'];
+    });
+    $mock->shouldReceive('isConnected')->once()->andReturn(true);
+    $mock->shouldReceive('recvEvent')->once()->andReturn([
+        'event_name' => 'HEARTBEAT',
+        'headers' => ['Event-Name' => 'HEARTBEAT'],
+        'body' => '',
+    ]);
+    $mock->shouldReceive('disconnect')->once();
+
+    app()->instance(FreeSwitchServiceInterface::class, $mock);
+
+    $this->artisan('freeswitch:listen', ['--once' => true, '--events' => 'CHANNEL_CREATE, CHANNEL_HANGUP_COMPLETE'])
+        ->assertSuccessful();
+});

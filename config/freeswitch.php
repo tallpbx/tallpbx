@@ -115,49 +115,107 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Event Subscriptions
+    | Event Subscription Profiles
     |--------------------------------------------------------------------------
     |
-    | FreeSWITCH event types to subscribe to. The listener command
-    | will subscribe to all events listed here. Common event types:
+    | FreeSWITCH event types to subscribe to. High-frequency state events like
+    | CHANNEL_EXECUTE, CHANNEL_STATE, and SESSION_HEARTBEAT can saturate
+    | CPU under heavy call volume (>10 CPS).
     |
-    |   CHANNEL_CREATE, CHANNEL_DESTROY, CHANNEL_ANSWER,
-    |   CHANNEL_HANGUP, CHANNEL_HANGUP_COMPLETE, CHANNEL_BRIDGE,
-    |   CHANNEL_UNBRIDGE, CHANNEL_OUTGOING, CHANNEL_PROGRESS,
-    |   CHANNEL_PROGRESS_MEDIA, CHANNEL_EXECUTE,
-    |   CHANNEL_EXECUTE_COMPLETE, CHANNEL_STATE,
-    |   CALL_UPDATE, RECORD_START, RECORD_STOP,
-    |   CUSTOM, HEARTBEAT, DTMF, CODEC, BACKGROUND_JOB,
-    |   SESSION_HEARTBEAT, PRESENCE_IN
+    | Profiles:
+    |   - essential (default): 9 essential call lifecycle, recording, and registration
+    |     events. Recovers 20-25% CPU overhead on the freeswitch:listen daemon.
+    |   - full: All 25 event types including detailed execution and state steps.
+    |
+    | The active profile can be overridden via FS_ESL_EVENT_PROFILE or with an
+    | explicit comma-separated list of event names via FS_ESL_SUBSCRIBE.
     |
     */
-    'subscribe' => [
-        'CHANNEL_CREATE',
-        'CHANNEL_DESTROY',
-        'CHANNEL_ANSWER',
-        'CHANNEL_HANGUP',
-        'CHANNEL_HANGUP_COMPLETE',
-        'CHANNEL_BRIDGE',
-        'CHANNEL_UNBRIDGE',
-        'CHANNEL_OUTGOING',
-        'CHANNEL_PROGRESS',
-        'CHANNEL_PROGRESS_MEDIA',
-        'CHANNEL_EXECUTE',
-        'CHANNEL_EXECUTE_COMPLETE',
-        'CHANNEL_STATE',
-        'CALL_UPDATE',
-        'RECORD_START',
-        'RECORD_STOP',
-        'CUSTOM',
-        'HEARTBEAT',
-        'DTMF',
-        'CODEC',
-        'BACKGROUND_JOB',
-        'SESSION_HEARTBEAT',
-        'PRESENCE_IN',
-        'SOFIA_EXPIRE',
-        'SOFIA_REGISTER',
+    'event_profile' => env('FS_ESL_EVENT_PROFILE', 'essential'),
+
+    'event_profiles' => [
+        'essential' => [
+            'CHANNEL_CREATE',
+            'CHANNEL_ANSWER',
+            'CHANNEL_HANGUP_COMPLETE',
+            'CHANNEL_BRIDGE',
+            'CHANNEL_UNBRIDGE',
+            'RECORD_STOP',
+            'CUSTOM',
+            'SOFIA_REGISTER',
+            'SOFIA_EXPIRE',
+        ],
+        'full' => [
+            'CHANNEL_CREATE',
+            'CHANNEL_DESTROY',
+            'CHANNEL_ANSWER',
+            'CHANNEL_HANGUP',
+            'CHANNEL_HANGUP_COMPLETE',
+            'CHANNEL_BRIDGE',
+            'CHANNEL_UNBRIDGE',
+            'CHANNEL_OUTGOING',
+            'CHANNEL_PROGRESS',
+            'CHANNEL_PROGRESS_MEDIA',
+            'CHANNEL_EXECUTE',
+            'CHANNEL_EXECUTE_COMPLETE',
+            'CHANNEL_STATE',
+            'CALL_UPDATE',
+            'RECORD_START',
+            'RECORD_STOP',
+            'CUSTOM',
+            'HEARTBEAT',
+            'DTMF',
+            'CODEC',
+            'BACKGROUND_JOB',
+            'SESSION_HEARTBEAT',
+            'PRESENCE_IN',
+            'SOFIA_EXPIRE',
+            'SOFIA_REGISTER',
+        ],
     ],
+
+    'subscribe' => env('FS_ESL_SUBSCRIBE') !== null && env('FS_ESL_SUBSCRIBE') !== ''
+        ? array_values(array_filter(array_map('trim', explode(',', (string) env('FS_ESL_SUBSCRIBE')))))
+        : match (env('FS_ESL_EVENT_PROFILE', 'essential')) {
+            'full', 'all' => [
+                'CHANNEL_CREATE',
+                'CHANNEL_DESTROY',
+                'CHANNEL_ANSWER',
+                'CHANNEL_HANGUP',
+                'CHANNEL_HANGUP_COMPLETE',
+                'CHANNEL_BRIDGE',
+                'CHANNEL_UNBRIDGE',
+                'CHANNEL_OUTGOING',
+                'CHANNEL_PROGRESS',
+                'CHANNEL_PROGRESS_MEDIA',
+                'CHANNEL_EXECUTE',
+                'CHANNEL_EXECUTE_COMPLETE',
+                'CHANNEL_STATE',
+                'CALL_UPDATE',
+                'RECORD_START',
+                'RECORD_STOP',
+                'CUSTOM',
+                'HEARTBEAT',
+                'DTMF',
+                'CODEC',
+                'BACKGROUND_JOB',
+                'SESSION_HEARTBEAT',
+                'PRESENCE_IN',
+                'SOFIA_EXPIRE',
+                'SOFIA_REGISTER',
+            ],
+            default => [
+                'CHANNEL_CREATE',
+                'CHANNEL_ANSWER',
+                'CHANNEL_HANGUP_COMPLETE',
+                'CHANNEL_BRIDGE',
+                'CHANNEL_UNBRIDGE',
+                'RECORD_STOP',
+                'CUSTOM',
+                'SOFIA_REGISTER',
+                'SOFIA_EXPIRE',
+            ],
+        },
 
     /*
     |--------------------------------------------------------------------------
@@ -216,24 +274,22 @@ return [
     | These values are served through mod_xml_curl for switch.conf.
     |
     | FreeSWITCH log levels, from most chatty to quietest:
-    | - debug: detailed internal call/session state. Best while validating or
-    |   diagnosing SIP behavior, but noisy during load tests.
+    | - debug: detailed internal call/session state. Best while diagnosing
+    |   SIP or dialplan issues, but noisy during load tests and production.
     | - info: normal operational detail without most debug-level internals.
-    | - notice: important normal call lifecycle messages. Useful for cleaner
-    |   capacity comparisons because it reduces log work while preserving call
-    |   progress visibility.
+    | - notice: important normal call lifecycle messages. Default for production
+    |   discipline; reduces log overhead while preserving call progress visibility.
     | - warning: unexpected but non-fatal conditions.
     | - err: errors that should be investigated.
     | - crit: serious failures that may affect service.
     | - alert: urgent conditions requiring immediate attention.
     |
-    | Keep debug as the default while the PBX is still being validated. For
-    | capacity comparison runs, temporarily lower the runtime log level to
-    | notice or warning to reduce log overhead.
+    | Use 'notice' for production deployments to eliminate disk I/O bottlenecks.
+    | Set FS_LOG_LEVEL=debug temporarily when actively diagnosing SIP/dialplan issues.
     |
     */
     'switch' => [
-        'loglevel' => env('FS_LOG_LEVEL', 'debug'),
+        'loglevel' => env('FS_LOG_LEVEL', 'notice'),
         'sessions_per_second' => (int) env('FS_SESSIONS_PER_SECOND', 60),
     ],
 
@@ -466,6 +522,23 @@ return [
         // Redis connection name from config/database.php. It must stay
         // unprefixed, because the Lua script queries raw key names.
         'connection' => env('FS_LUA_PROXY_CONNECTION', 'lua_proxy'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Real-Time Event Broadcasting Throttling
+    |--------------------------------------------------------------------------
+    |
+    | Debounce window in milliseconds for outbound WebSocket broadcasts pushed
+    | to Laravel Reverb during high-volume call traffic. Throttling prevents
+    | synchronous HTTP flooding to Reverb and stops browser Livewire views from
+    | spamming FreeSWITCH with 'show channels' queries on rapid call events.
+    |
+    | Set to 0 to disable throttling (instant dispatch for every event).
+    |
+    */
+    'broadcasting' => [
+        'throttle_ms' => (int) env('FS_BROADCAST_THROTTLE_MS', 500),
     ],
 
 ];

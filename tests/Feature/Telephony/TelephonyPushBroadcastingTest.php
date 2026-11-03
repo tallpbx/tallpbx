@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Telephony;
 
 use App\Events\FreeSwitch\CallCenterEvent;
+use App\Events\FreeSwitch\ChannelAnswer;
 use App\Events\FreeSwitch\ChannelCreate;
 use App\Events\FreeSwitch\ConferenceEvent;
 use App\Events\FreeSwitch\Heartbeat;
@@ -203,6 +204,47 @@ test('BroadcastTelephonyOnFreeSwitchEvent listener dispatches TelephonyUpdated f
     Event::assertDispatched(TelephonyUpdated::class, function (TelephonyUpdated $event) {
         return $event->eventName === 'HEARTBEAT' && $event->tenantId === null;
     });
+});
+
+test('BroadcastTelephonyOnFreeSwitchEvent throttles rapid events per tenant scope', function () {
+    Event::fake([TelephonyUpdated::class]);
+    config(['broadcasting.test_broadcasts' => true]);
+    config(['freeswitch.broadcasting.throttle_ms' => 500]);
+    BroadcastTelephonyOnFreeSwitchEvent::resetThrottle();
+
+    $listener = new BroadcastTelephonyOnFreeSwitchEvent;
+
+    // 1. First event for tenant 10 dispatches immediately
+    $event1Tenant10 = new ChannelCreate(
+        eventName: 'CHANNEL_CREATE',
+        headers: ['Unique-ID' => 'uuid-1', 'variable_tenant_id' => '10'],
+        body: ''
+    );
+    $listener->handle($event1Tenant10);
+    Event::assertDispatchedTimes(TelephonyUpdated::class, 1);
+
+    // 2. Second event for tenant 10 within 500ms is throttled
+    $event2Tenant10 = new ChannelAnswer(
+        eventName: 'CHANNEL_ANSWER',
+        headers: ['Unique-ID' => 'uuid-1', 'variable_tenant_id' => '10'],
+        body: ''
+    );
+    $listener->handle($event2Tenant10);
+    Event::assertDispatchedTimes(TelephonyUpdated::class, 1);
+
+    // 3. Event for different tenant (tenant 20) is NOT throttled (separate scope)
+    $eventTenant20 = new ChannelCreate(
+        eventName: 'CHANNEL_CREATE',
+        headers: ['Unique-ID' => 'uuid-2', 'variable_tenant_id' => '20'],
+        body: ''
+    );
+    $listener->handle($eventTenant20);
+    Event::assertDispatchedTimes(TelephonyUpdated::class, 2);
+
+    // 4. Reset throttle allows tenant 10 to dispatch again
+    BroadcastTelephonyOnFreeSwitchEvent::resetThrottle();
+    $listener->handle($event2Tenant10);
+    Event::assertDispatchedTimes(TelephonyUpdated::class, 3);
 });
 
 test('channel authorization callback grants admins access to global and tenant telephony channels', function () {

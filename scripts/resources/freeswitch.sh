@@ -134,11 +134,23 @@ configure_freeswitch_switch_defaults() {
         sed -i "/<settings>/a\\    <param name=\"sessions-per-second\" value=\"${sessions_per_second}\"/>" "$switch_conf"
     fi
 
-    if command -v fs_cli >/dev/null 2>&1; then
-        fs_cli -x "fsctl sps ${sessions_per_second}" >/dev/null 2>&1 || true
+    if grep -q 'name="loglevel"' "$switch_conf"; then
+        sed -i 's#<param name="loglevel" value="[^"]*"/>#<param name="loglevel" value="notice"/>#' "$switch_conf"
+    else
+        sed -i '/<settings>/a\    <param name="loglevel" value="notice"/>' "$switch_conf"
     fi
 
-    verbose "FreeSWITCH sessions-per-second set to ${sessions_per_second}"
+    local logfile_conf="${conf_dir}/autoload_configs/logfile.conf.xml"
+    if [ -f "$logfile_conf" ]; then
+        sed -i 's#<map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>#<map name="all" value="console,info,notice,warning,err,crit,alert"/>#' "$logfile_conf"
+    fi
+
+    if command -v fs_cli >/dev/null 2>&1; then
+        fs_cli -x "fsctl sps ${sessions_per_second}" >/dev/null 2>&1 || true
+        fs_cli -x "fsctl loglevel notice" >/dev/null 2>&1 || true
+    fi
+
+    verbose "FreeSWITCH core defaults configured: sessions-per-second=${sessions_per_second}, loglevel=notice"
 }
 
 # Set the default FreeSWITCH sound prompt language in vars.xml.

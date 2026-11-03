@@ -155,20 +155,22 @@ class FreeSwitchService implements FreeSwitchServiceInterface
      *
      * Called by the listener command after connecting. Web requests
      * that only need API access do not need to subscribe to events.
+     *
+     * @param  array<int, string>|null  $eventTypes  Optional list of event names to subscribe to
      */
-    public function subscribeToEvents(): void
+    public function subscribeToEvents(?array $eventTypes = null): void
     {
         if (! $this->isConnected()) {
             return;
         }
 
-        $this->writeLine('event plain '.$this->eventSubscriptionArgument());
+        $this->writeLine('event plain '.$this->eventSubscriptionArgument($eventTypes));
 
         // Consume the subscription response
         $this->readUntilBlankLine();
 
         $this->logMessage('info', 'FreeSWITCH ESL subscribed to events.', [
-            'events' => config('freeswitch.subscribe', []),
+            'events' => $eventTypes ?? config('freeswitch.subscribe', []),
             'subclasses' => config('freeswitch.subscribe_subclasses', []),
         ]);
     }

@@ -18,6 +18,21 @@ use Illuminate\Support\Facades\Log;
 class BroadcastTelephonyOnFreeSwitchEvent
 {
     /**
+     * Last broadcast timestamp in milliseconds per scope (tenant ID or 'global').
+     *
+     * @var array<string, float>
+     */
+    private static array $lastBroadcastTimes = [];
+
+    /**
+     * Reset throttle state (primarily for testing).
+     */
+    public static function resetThrottle(): void
+    {
+        self::$lastBroadcastTimes = [];
+    }
+
+    /**
      * Handle the FreeSWITCH event.
      */
     public function handle(FreeSwitchEvent $event): void
@@ -27,10 +42,20 @@ class BroadcastTelephonyOnFreeSwitchEvent
             return;
         }
 
-        try {
-            $tenantId = $this->resolveTenantId($event);
+        $tenantId = $this->resolveTenantId($event);
+        $scopeKey = $tenantId ?? 'global';
 
+        $throttleMs = (int) config('freeswitch.broadcasting.throttle_ms', 500);
+
+        $nowMs = microtime(true) * 1000.0;
+
+        if ($throttleMs > 0 && isset(self::$lastBroadcastTimes[$scopeKey]) && ($nowMs - self::$lastBroadcastTimes[$scopeKey]) < $throttleMs) {
+            return;
+        }
+
+        try {
             TelephonyUpdated::dispatch($tenantId, $event->eventName, $event->callUuid());
+            self::$lastBroadcastTimes[$scopeKey] = $nowMs;
         } catch (\Throwable $e) {
             Log::warning('FreeSWITCH telephony broadcast failed', [
                 'event' => $event->eventName,
