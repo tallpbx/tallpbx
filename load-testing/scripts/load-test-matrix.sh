@@ -526,6 +526,8 @@ ablation_switch_command() {
     case "$1" in
         fs-loglevel) printf 'apply_fs_loglevel' ;;
         fs-db) printf 'apply_fs_db_mode' ;;
+        esl-subscriptions) printf 'apply_esl_profile' ;;
+        broadcast-throttle) printf 'apply_broadcast_throttle' ;;
         *) return 1 ;;
     esac
 }

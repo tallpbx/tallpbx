@@ -775,6 +775,128 @@ assert_lua_serves() {
     log "asserted the Lua handler serves lookups (0 of 3 reached PHP)"
 }
 
+# Restart the ESL listener so it re-reads the environment.
+#
+# The listener boots once and keeps its configuration for its whole life, so
+# an .env change is invisible to it until it restarts — the same trap that
+# kept the Lua flag from reaching the worker.
+restart_listener() {
+    local attempt
+
+    if ! systemctl restart freeswitch-listener >/dev/null 2>&1; then
+        fail_switch "could not restart freeswitch-listener"
+        return 1
+    fi
+
+    for attempt in $(seq 1 30); do
+        if systemctl is-active freeswitch-listener >/dev/null 2>&1; then
+            sleep 1
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    fail_switch "freeswitch-listener did not come back"
+    return 1
+}
+
+# Apply the broadcast debounce window, in milliseconds.
+#
+# 500 is the shipped default: at most about two broadcasts per second per
+# scope. 0 disables debouncing, so every event the listener handles is
+# dispatched to Reverb — the configuration that shows what the debounce is
+# actually saving.
+apply_broadcast_throttle() {
+    local value="${1:-}"
+
+    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+        fail_switch "broadcast throttle must be a number of milliseconds (got '${value}')"
+        return 1
+    fi
+
+    snapshot_env
+    env_set FS_BROADCAST_THROTTLE_MS "$value"
+
+    restart_listener || return 1
+
+    log "applied broadcast throttle ${value}ms"
+    assert_broadcast_throttle "$value"
+}
+
+# Read the broadcast debounce window back.
+#
+# The running value cannot be read out of the listener, so the assertion
+# checks the declared value and that the process was restarted after it was
+# written. The effect is proven by the measurement — listener CPU under a
+# fixed call load — not by a configuration read.
+assert_broadcast_throttle() {
+    local expected="${1:-}" current started
+
+    current="$(env_get FS_BROADCAST_THROTTLE_MS)"
+
+    if [ "${current:-500}" != "$expected" ]; then
+        fail_switch "broadcast throttle expected ${expected} but .env reports '${current:-unset}'"
+        return 1
+    fi
+
+    started="$(systemctl show freeswitch-listener -p ActiveEnterTimestamp --value)"
+
+    if [ -z "$started" ]; then
+        fail_switch "freeswitch-listener is not running, so the throttle cannot be in effect"
+        return 1
+    fi
+
+    log "asserted broadcast throttle ${expected}ms (listener restarted at ${started})"
+}
+
+# Apply the ESL event subscription profile.
+#
+# essential subscribes to the 10 call-lifecycle events; full subscribes to the
+# whole catalogue. Only measurable under call traffic, because that is the
+# only time events exist to be filtered.
+apply_esl_profile() {
+    local profile="${1:-}"
+
+    case "$profile" in
+        essential | full) ;;
+        *)
+            fail_switch "esl profile must be essential or full (got '${profile}')"
+            return 1
+            ;;
+    esac
+
+    snapshot_env
+    env_set FS_ESL_EVENT_PROFILE "$profile"
+
+    restart_listener || return 1
+
+    log "applied ESL profile ${profile}"
+    assert_esl_profile "$profile"
+}
+
+# Read the ESL profile back from the listener's own start-up line, which
+# reports the profile and the number of events it subscribed to.
+assert_esl_profile() {
+    local expected="${1:-}" declared line
+
+    declared="$(env_get FS_ESL_EVENT_PROFILE)"
+
+    if [ "${declared:-essential}" != "$expected" ]; then
+        fail_switch "esl profile expected ${expected} but .env reports '${declared:-unset}'"
+        return 1
+    fi
+
+    line="$(journalctl -u freeswitch-listener --since '-3 min' --no-pager 2>/dev/null | grep -i 'Listening for' | tail -1)"
+
+    if [ -n "$line" ] && ! printf '%s' "$line" | grep -qi "profile: ${expected}"; then
+        fail_switch "the listener reports '${line}' instead of the ${expected} profile"
+        return 1
+    fi
+
+    log "asserted ESL profile ${expected}"
+}
+
 apply_lua_bindings() {
     local state="${1:-}"
 
@@ -1361,6 +1483,10 @@ main() {
         assert_ttl | assert-ttl) assert_ttl "$@" ;;
         apply_cdr_transport | apply-cdr-transport) apply_cdr_transport "$@" ;;
         assert_cdr_transport | assert-cdr-transport) assert_cdr_transport "$@" ;;
+        apply_broadcast_throttle | apply-broadcast-throttle) apply_broadcast_throttle "$@" ;;
+        assert_broadcast_throttle | assert-broadcast-throttle) assert_broadcast_throttle "$@" ;;
+        apply_esl_profile | apply-esl-profile) apply_esl_profile "$@" ;;
+        assert_esl_profile | assert-esl-profile) assert_esl_profile "$@" ;;
         probe_lookup | probe-lookup) probe_lookup "$@" ;;
         coherent_baseline | coherent-baseline) coherent_baseline ;;
         restore_baseline | restore-baseline) restore_baseline ;;

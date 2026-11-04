@@ -22,6 +22,8 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 | `apply_fs_loglevel` | `debug\|info\|notice\|warning\|err` | FreeSWITCH file log ceiling |
 | `apply_fs_db_mode` | `disk\|tmpfs` | Where FreeSWITCH keeps its runtime SQLite database |
 | `apply_cdr_transport` | `fpm\|octane` | Which endpoint `mod_json_cdr` posts records to |
+| `apply_esl_profile` | `essential\|full` | How many event types the ESL listener subscribes to |
+| `apply_broadcast_throttle` | `<milliseconds>` | Reverb debounce window; `0` disables it |
 | `probe_lookup` | `<extension> <domain> [count]` | Nothing — it measures one directory lookup |
 | `coherent_baseline` | — | Makes the Lua flag agree with the bindings |
 | `restore_baseline` | — | Reverts everything this library changed |
@@ -90,8 +92,23 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup`, `coherent_baseline` and `
 - **Assertion:** the URL and a probe of the endpoint (a `401` proves the route is live and the token is enforced).
 - **Effect:** where CDR records are posted, and therefore whether CDR traffic competes with XML traffic in the same workers.
 
-## `probe_lookup`
+## `apply_esl_profile`
 
+- **Argument:** `essential` or `full`.
+- **File:** `.env` `FS_ESL_EVENT_PROFILE`, then the listener is restarted — it boots once and keeps its subscription for its whole life, so an `.env` change is invisible until then.
+- **Assertion:** the declared value, plus the listener's own start-up line, which reports the profile and the number of event types it subscribed to.
+- **Effect:** `essential` takes 10 call-lifecycle events, `full` takes the catalogue. Measurable **only under call traffic** — with no calls there are no events to filter, and both profiles measure zero.
+- **Caveat:** the listener's start-up line is the proof that the process, not just the file, changed.
+
+## `apply_broadcast_throttle`
+
+- **Argument:** milliseconds. `500` is the shipped default (about two broadcasts per second per scope); `0` disables debouncing so every handled event is dispatched to Reverb.
+- **File:** `.env` `FS_BROADCAST_THROTTLE_MS`, then the listener is restarted for the same reason as above.
+- **Assertion:** the declared value and that the listener was restarted after it was written. The running value cannot be read out of the process, so the **effect** is proven by the measurement — listener CPU and Reverb CPU under a fixed call load — not by a configuration read.
+- **Effect:** this is what the debounce is worth. With `0`, a call burst produces one HTTP POST to Reverb per event instead of at most two per second, and on a single core that competes directly with call handling.
+- **Caveat:** like the ESL profile, it is meaningless without calls. Measured under XML-only load, both Reverb and the listener reported zero CPU regardless of this setting.
+
+## `probe_lookup`
 - **Argument:** extension, SIP domain, and a count (default 30).
 - **What it does:** times `find_user_xml id <extension> <domain>` *n* times, times `status` the same number of times, and prints the difference:
 

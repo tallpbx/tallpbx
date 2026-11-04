@@ -308,8 +308,13 @@ return [
         ],
         'esl-subscriptions' => [
             'label' => 'ESL event subscriptions',
-            'values' => ['broad', 'filtered'],
+            'values' => ['essential', 'full'],
             'question' => 'CPU recovered by event filtering',
+        ],
+        'broadcast-throttle' => [
+            'label' => 'Reverb broadcast debounce window',
+            'values' => ['500', '0'],
+            'question' => 'Broadcast cost the debounce hides during call bursts',
         ],
         'reverb' => [
             'label' => 'Reverb broadcasting',
