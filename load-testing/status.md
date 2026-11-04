@@ -91,6 +91,37 @@ CPU attribution over a 20-second window: `esl-listener` **0 ticks**, `reverb` **
 
 Conclusion: neither service consumes measurable CPU during XML-only tests. Both remain at their baseline settings for XML work; the `full` and throttle-off comparisons belong to the SIP phases.
 
+### Host memory state at the end of the variant sweep
+
+```
+              total   used   free  buff/cache  available
+Mem:            967    627    142         341        340
+Swap:          2047    228   1819
+swappiness = 60        vmstat si/so = 0/0 (no active paging)
+```
+
+Resident services, largest first:
+
+| Process | RSS |
+|:--|--:|
+| `reverb:start` | 91.8 MB |
+| `freeswitch:listen` (ESL) | 90.0 MB |
+| `queue:work` | 65.2 MB |
+| `cdr:work` | 60.6 MB |
+| `roadrunner-worker` (Octane) | 59.8 MB |
+| `freeswitch` | 57.0 MB |
+| `schedule:work` | 48.2 MB |
+| 5 × `php-fpm` children | remainder |
+
+**How to read this.** No paging is happening (`si/so` are zero), so the numbers above were measured with every page resident — the earlier ~50 ms lookup was a cold page cache, not sustained swap thrashing. The 228 MB in swap is residue from the clone, not active pressure.
+
+The constraint is headroom, not current pressure: six resident PHP daemons account for roughly 415 MB of 967 MB, leaving about 340 MB available. Two consequences for the work still queued:
+
+1. The `directory` section (next action) runs on PHP-FPM and is not expected to be distorted by memory, provided nothing else is added alongside it.
+2. The `fs-db` ablation (FreeSWITCH runtime database on tmpfs) would take its space from that same 340 MB. On this host it must be measured on its own, not alongside anything else, or it will create the swap pressure it is meant to test for.
+
+Every cell also records `available_ram_mb` and `swap_used_mb` in its JSON, so this can be re-checked per run rather than trusted from a snapshot.
+
 ---
 
 ## Defects found and fixed
@@ -120,7 +151,7 @@ Conclusion: neither service consumes measurable CPU during XML-only tests. Both 
 ## Next actions, in order
 
 1. Explain why `lua:on` does not speed up a directory lookup (mirror unpopulated, or key/DB mismatch) before recording any verdict on the Lua proxy.
-2. Run the `directory` section for the two surviving paths, since `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things.
+2. Run the `directory` section for the two surviving paths, since `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things. Memory headroom is 340 MB with no active paging, so this is expected to be clean; the `fs-db` tmpfs ablation is the one that must run alone.
 3. Run the failure ramp (fixed concurrency, doubling total requests) for `v-octane` and `v-fast` to find where each saturates.
 4. Run the SIP phases for the surviving variants, including the ESL `full` and throttle-`0` ablations.
 5. Decide whether app-side timing (`timing.enabled`) is needed to split worker time from queue time.
