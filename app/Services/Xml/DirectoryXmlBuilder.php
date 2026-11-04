@@ -245,15 +245,12 @@ class DirectoryXmlBuilder
             $writer->writeVersionIfMissing($tenantId, $publishVersion);
         }
 
-        // Lua cannot build an identity map key without the epoch, so a cold
-        // Redis needs it seeded from the read path. The same mirror-wins rule
-        // as above applies after a cache flush.
-        $mirrorEpoch = $writer->readGlobalVersion();
-        $publishEpoch = max($epoch, $mirrorEpoch ?? 0);
-
-        if ($mirrorEpoch === null) {
-            $writer->writeGlobalVersionIfMissing($publishEpoch);
-        }
+        // Lua cannot build an identity map key without the epoch, so the shared
+        // epoch key has to match the epoch this identity is published under.
+        // Publishing through one method keeps the two in step; a read path
+        // that seeded the key and never updated it left the Lua handler
+        // building a key that was never written, and every lookup missed.
+        $publishEpoch = $writer->publishEpoch($epoch);
 
         $writer->writeTenantLookup($domain, $username, $tenantId, $publishEpoch);
         $writer->writeDirectory($tenantId, $tagName, $domain, $username, $publishVersion, $xml);

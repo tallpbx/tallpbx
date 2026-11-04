@@ -517,14 +517,10 @@ class DialplanXmlBuilder
             $writer->writeVersionIfMissing($tenantId, $publishVersion);
         }
 
-        // Lua cannot build a dialplan key without the epoch either, so a cold
-        // Redis needs it seeded by whichever lookup happens first.
-        $mirrorEpoch = $writer->readGlobalVersion();
-        $publishEpoch = max($epoch, $mirrorEpoch ?? 0);
-
-        if ($mirrorEpoch === null) {
-            $writer->writeGlobalVersionIfMissing($publishEpoch);
-        }
+        // Lua cannot build a dialplan key without the epoch either, so the
+        // shared epoch key has to match the epoch this payload is published
+        // under. Publishing through one method keeps the two in step.
+        $publishEpoch = $writer->publishEpoch($epoch);
 
         $writer->writeDialplan($tenantId, $context, $destination, $publishVersion, $publishEpoch, $xml);
     }

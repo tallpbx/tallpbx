@@ -162,6 +162,32 @@ class FsXmlMirrorWriter
     }
 
     /**
+     * Publish the epoch a payload is written under, and keep the shared epoch
+     * key in step with it.
+     *
+     * The Lua handler reads the shared epoch key and builds the identity key
+     * from it. PHP publishes that identity key under its own epoch. When the
+     * two disagree, every Lua lookup misses — silently, because the key
+     * shapes are correct and only the number differs.
+     *
+     * The shared key only ever moves upwards: after a cache flush the
+     * application counts from a lower number, and publishing under the higher
+     * mirror epoch keeps previously written keys reachable. Moving it up can
+     * never roll it back, so an obsolete identity answer stays unreachable.
+     */
+    public function publishEpoch(int $epoch): int
+    {
+        $stored = $this->readGlobalVersion();
+        $published = max($epoch, $stored ?? 0);
+
+        if ($stored !== $published) {
+            $this->writeGlobalVersion($published);
+        }
+
+        return $published;
+    }
+
+    /**
      * Read the mirrored tenant revision, if one exists.
      *
      * Used by RoutingCacheVersion::bump() to keep the revision monotonic
