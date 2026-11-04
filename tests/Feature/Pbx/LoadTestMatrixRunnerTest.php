@@ -18,7 +18,7 @@ use Symfony\Component\Process\Process;
 function matrixRunnerProcess(array $arguments, string $artifactRoot, array $env = []): Process
 {
     $process = new Process(
-        ['bash', base_path('scripts/load-test-matrix.sh'), ...$arguments],
+        ['bash', base_path('load-testing/scripts/load-test-matrix.sh'), ...$arguments],
         base_path(),
         array_merge(
             ['ARTIFACT_ROOT' => $artifactRoot, 'SERIES' => basename($artifactRoot)],
@@ -54,7 +54,7 @@ describe('load test matrix runner', function (): void {
     });
 
     it('is a syntactically valid bash script', function (): void {
-        foreach (['scripts/load-test-matrix.sh', 'scripts/load-test/lib/manifest.sh'] as $script) {
+        foreach (['load-testing/scripts/load-test-matrix.sh', 'load-testing/scripts/lib/manifest.sh'] as $script) {
             $process = new Process(['bash', '-n', base_path($script)], base_path());
             $process->run();
 
@@ -227,7 +227,7 @@ describe('load test matrix runner', function (): void {
     });
 
     it('restores the baseline from a teardown trap and never mutates nftables', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test-matrix.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 
         expect($script)->toContain('trap teardown_tier EXIT INT TERM')
             ->and($script)->toContain('switch_call restore_baseline')

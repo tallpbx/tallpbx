@@ -19,14 +19,14 @@ use Symfony\Component\Process\Process;
 
 describe('load test switch helpers', function (): void {
     it('is a syntactically valid bash script', function (): void {
-        $process = new Process(['bash', '-n', base_path('scripts/load-test/lib/switch.sh')], base_path());
+        $process = new Process(['bash', '-n', base_path('load-testing/scripts/lib/switch.sh')], base_path());
         $process->run();
 
         expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
     });
 
     it('pairs every apply helper with an assert helper', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         preg_match_all('/^([a-z][a-z0-9_]*)\(\) \{/m', $script, $matches);
         $functions = $matches[1];
@@ -46,7 +46,7 @@ describe('load test switch helpers', function (): void {
     });
 
     it('defines every switch named by the refresh plan', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         preg_match_all('/^([a-z][a-z0-9_]*)\(\) \{/m', $script, $matches);
 
@@ -70,7 +70,7 @@ describe('load test switch helpers', function (): void {
     });
 
     it('restores the baseline from a teardown trap', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         expect($script)->toContain('trap restore_baseline EXIT INT TERM')
             // Clearing the trap first keeps a failing restore from recursing.
@@ -78,7 +78,7 @@ describe('load test switch helpers', function (): void {
     });
 
     it('corrects a half-applied Lua pair before declaring the baseline restored', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         preg_match('/^restore_baseline\(\) \{.*?^\}/ms', $script, $match);
 
@@ -90,7 +90,7 @@ describe('load test switch helpers', function (): void {
     });
 
     it('measures a FreeSWITCH lookup with the CLI overhead subtracted', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         // A Lua hit never reaches nginx or PHP, so the HTTP client cannot see
         // it. find_user_xml is the only probe that asks FreeSWITCH itself.
@@ -100,7 +100,7 @@ describe('load test switch helpers', function (): void {
     });
 
     it('never mutates live nftables state', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         foreach (['nft add', 'nft insert', 'nft delete', 'nft flush', 'nft chain', 'nft -f', 'nftables flush'] as $mutation) {
             expect($script)->not->toContain($mutation);
@@ -108,7 +108,7 @@ describe('load test switch helpers', function (): void {
     });
 
     it('reports a failed switch with the marker the runner greps for', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/load-test/lib/switch.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         expect($script)->toContain('SWITCH-FAILED')
             ->and($script)->toContain('set -euo pipefail');

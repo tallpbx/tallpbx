@@ -13,9 +13,9 @@
 # One invocation drives one hardware tier, because each tier is a fresh
 # install on its own host:
 #
-#   PBX_HOST=x.x.x.218 --tier=h1-1c1g bash scripts/load-test-matrix.sh
+#   PBX_HOST=x.x.x.218 --tier=h1-1c1g bash load-testing/scripts/load-test-matrix.sh
 #
-# Every switch goes through scripts/load-test/lib/switch.sh, which asserts the
+# Every switch goes through load-testing/scripts/lib/switch.sh, which asserts the
 # applied value before the cell runs and is reverted by the teardown trap.
 # A failed switch or a failed run fails that cell only; the series continues.
 #
@@ -27,17 +27,18 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The repository root two levels up from load-testing/scripts/.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 # shellcheck source=lib/manifest.sh
-source "${ROOT_DIR}/scripts/load-test/lib/manifest.sh"
+source "${ROOT_DIR}/load-testing/scripts/lib/manifest.sh"
 
 # The three execution phases every tier x variant combination can run.
 PHASES=(xml sip ablation)
 
 SERIES="${SERIES:-refresh-$(date +%Y%m%d)}"
-ARTIFACT_ROOT="${ARTIFACT_ROOT:-${ROOT_DIR}/storage/app/load-tests/${SERIES}}"
+ARTIFACT_ROOT="${ARTIFACT_ROOT:-${ROOT_DIR}/load-testing/results/${SERIES}}"
 PBX_HOST="${PBX_HOST:-local}"
 SSH_PORT="${SSH_PORT:-22}"
 SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10}"
@@ -46,15 +47,12 @@ REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
 # Permanent copy of the raw artifacts.
 #
-# The measurement hosts are disposable, so the series is mirrored outside the
-# application tree where a storage wipe or `git clean` cannot reach it. Set
-# ARCHIVE_ROOT= (empty) to skip the copy when no durable path exists.
+# Results now live inside the repository (load-testing/results), which is the
+# durable copy: it survives the measurement hosts being deleted and travels
+# with a clone. ARCHIVE_ROOT stays available for an extra copy elsewhere, and
+# is empty by default so a run does not write outside the repo.
 if [ -z "${ARCHIVE_ROOT+set}" ]; then
-    if [ -d /srv ] && [ -w /srv ]; then
-        ARCHIVE_ROOT="/srv/tallpbx-load-tests/${SERIES}"
-    else
-        ARCHIVE_ROOT=""
-    fi
+    ARCHIVE_ROOT=""
 fi
 # The persistent worker is a second HTTP server serving the same route. A cell
 # that applies the Octane binding must be measured against this URL, or it
@@ -91,7 +89,9 @@ CPS="${CPS:-5}"
 LIST_MODE=0
 DRY_RUN=0
 
-MATRIX_CACHE="${ARTIFACT_ROOT}/matrix.json"
+# The matrix cache is scratch, not evidence: keeping it beside the results
+# would add an untracked file to a committed directory on every invocation.
+MATRIX_CACHE="${MATRIX_CACHE:-${TMPDIR:-/tmp}/tallpbx-load-matrix-${SERIES}.json}"
 
 # Lookups are memoised: building a dry-run touches every profile field, and one
 # PHP process per field would dominate the runtime.
@@ -250,15 +250,15 @@ Environment:
   PBX_URL                XML handler URL the load client calls
   PBX_XML_TOKEN          XML handler token, when authentication is enabled
   SERIES                 Series directory name (default refresh-YYYYMMDD)
-  ARCHIVE_ROOT           Durable artifact copy (default /srv/tallpbx-load-tests/<series>;
-                         empty skips the copy)
+  ARCHIVE_ROOT           Optional extra copy of the artifacts (empty by default;
+                         load-testing/results is the durable copy)
   TENANT / DOMAIN        Seeded tenant slug and SIP realm
   EXTENSIONS / START     Generated extension count and first number
   PASSWORD               SIP password for the generated accounts
   REPEATS / CPS          Repetitions per cell and offered call rate (also flags)
 
-See docs/load-testing-guide.md -> Automated Refresh Harness for the full
-procedure, artifact layout and the remote-access policy.
+See load-testing/README.md for the full procedure, artifact layout and the
+remote-access policy.
 USAGE
 }
 
@@ -391,7 +391,7 @@ switch_command() {
 
     printf 'APP_DIR=%s bash %s %s%s' \
         "$(printf '%q' "$REMOTE_APP_DIR")" \
-        "$(printf '%q' "$REMOTE_APP_DIR/scripts/load-test/lib/switch.sh")" \
+        "$(printf '%q' "$REMOTE_APP_DIR/load-testing/scripts/lib/switch.sh")" \
         "$(printf '%q' "$command")" "$quoted"
 }
 
@@ -622,7 +622,7 @@ preflight_remote() {
     app_dir="$(printf '%q' "$REMOTE_APP_DIR")"
 
     if ! report="$(run_on_pbx "cd ${app_dir} 2>/dev/null || { echo 'APP-DIR missing'; exit 0; };
-        [ -f scripts/load-test/lib/switch.sh ] || echo 'MISSING scripts/load-test/lib/switch.sh';
+        [ -f load-testing/scripts/lib/switch.sh ] || echo 'MISSING load-testing/scripts/lib/switch.sh';
         [ -f config/load-test-matrix.php ] || echo 'MISSING config/load-test-matrix.php';
         [ -f app/Console/Commands/PbxLoadTestManifestCommand.php ] || echo 'MISSING pbx:load-test:manifest';
         command -v fs_cli >/dev/null || echo 'MISSING fs_cli';
