@@ -220,6 +220,24 @@ describe('cdr gate', function (): void {
         expect($seed)->not->toContain('--reset');
     });
 
+    it('clears the generator of leftover listeners before each cell', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^release_sipp_ports\(\) \{.*?^\}/ms', $script, $match);
+        $release = $match[0] ?? '';
+
+        preg_match('/^sipp_prepare_generator\(\) \{.*?^\}/ms', $script, $prepare);
+        $prepare = $prepare[0] ?? '';
+
+        // Each background UAS lives for `timeout 300`, so the previous cell's
+        // listener is still holding 5066 or 5088 when the next cell starts.
+        // The new UAS then cannot bind, the scenario aborts, and the outbound
+        // calls get no answer - which looks exactly like a routing fault.
+        expect($release)->toContain('5066')
+            ->and($release)->toContain('5088')
+            ->and($prepare)->toContain('release_sipp_ports');
+    });
+
     it('applies the gate to every SIP cell and records the verdict beside it', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 

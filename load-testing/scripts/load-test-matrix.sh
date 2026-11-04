@@ -538,6 +538,33 @@ pull_sipp_artifacts() {
     scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${SIPP_HOST}:${remote_dir}/." "${local_dir}/" >/dev/null 2>&1
 }
 
+# Free the SIPp ports on the generator before a cell starts.
+#
+# Each background UAS the validation script starts lives for `timeout 300`, so
+# the previous cell's listener is still holding 5066 or 5088 when the next
+# cell begins. The new UAS cannot bind, the scenario aborts, and the outbound
+# calls reach nobody - which reads exactly like a routing fault.
+#
+# The pattern is written so it cannot match the command line that runs it.
+release_sipp_ports() {
+    local cleanup
+
+    cleanup="pkill -f 'sipp [-]sf' >/dev/null 2>&1 || true
+for port in 5066 5088; do
+    for attempt in \$(seq 1 20); do
+        ss -lun 2>/dev/null | grep -q \":\${port} \" || break
+        sleep 1
+    done
+done
+for port in 5066 5088; do
+    if ss -lun 2>/dev/null | grep -q \":\${port} \"; then
+        echo \"PORT-BUSY \${port}\"
+    fi
+done"
+
+    run_on_sipp "$cleanup" 2>/dev/null || true
+}
+
 # Give the load generator everything one series needs to run its scenarios.
 #
 # The generator is disposable and may hold any build, so the scenario files and
@@ -553,6 +580,10 @@ sipp_prepare_generator() {
     local seeded
 
     mkdir -p "${ARTIFACT_ROOT}/${TIER}/generator"
+
+    # A leftover listener from the previous cell would make this one fail in a
+    # way that looks like a product fault.
+    release_sipp_ports
 
     if ! seeded="$(run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan pbx:load-test:seed --tenant=$(printf '%q' "$LOAD_TENANT") --domain=$(printf '%q' "$LOAD_DOMAIN") --extensions=$(printf '%q' "$LOAD_EXTENSIONS") --start=$(printf '%q' "$LOAD_START") --password=$(printf '%q' "$LOAD_PASSWORD") --sipp-host=$(printf '%q' "$SIPP_UAS_HOST") --sipp-port=$(printf '%q' "$SIPP_UAS_PORT") --output=$(printf '%q' "$csv_on_pbx")" 2>&1)"; then
         printf 'SIPP-PREPARE-FAILED seeding accounts on %s\n%s\n' "$PBX_HOST" "$seeded" >&2
