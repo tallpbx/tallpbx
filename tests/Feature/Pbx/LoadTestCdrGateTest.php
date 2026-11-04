@@ -238,6 +238,21 @@ describe('cdr gate', function (): void {
             ->and($prepare)->toContain('release_sipp_ports');
     });
 
+    it('judges the cell by the suite summary, not by the transport', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^run_sip_phase\(\) \{.*?^\}/ms', $script, $match);
+        $phase = $match[0] ?? '';
+
+        // The generator's ssh session can drop while a long SIPp step runs.
+        // When that happens the steps may still have passed, and the summary
+        // says so. Judging the cell by the transport would report a failed
+        // measurement for a network hiccup, and would hide a real failure
+        // behind the same message.
+        expect($phase)->toContain('sipp_summary')
+            ->and($script)->toContain('sipp_summary_passed');
+    });
+
     it('applies the gate to every SIP cell and records the verdict beside it', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 

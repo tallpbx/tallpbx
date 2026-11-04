@@ -538,6 +538,28 @@ pull_sipp_artifacts() {
     scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${SIPP_HOST}:${remote_dir}/." "${local_dir}/" >/dev/null 2>&1
 }
 
+# Decide whether every step of a SIP cell passed, from the suite's own summary.
+#
+# The suite writes one line per step, so the summary is the measurement's own
+# account of itself. It is the right thing to judge the cell by: the ssh
+# session that carried the run can drop while a long step is in progress, and
+# a transport failure is not a measurement failure.
+sipp_summary_passed() {
+    local summary="$1"
+
+    if [ ! -f "$summary" ]; then
+        return 1
+    fi
+
+    # Any step that did not pass fails the cell.
+    if grep -qE '^- [^:]+: (failed|aborted)' "$summary"; then
+        return 1
+    fi
+
+    # The suite must have run at least one step.
+    grep -qE '^- [^:]+: passed' "$summary"
+}
+
 # Read the gateway host the load-test tenant's outbound route points at.
 #
 # The gateway lives in the PBX's database, so the query runs on the PBX. The
@@ -1228,13 +1250,24 @@ run_sip_phase() {
         return 1
     fi
 
-    if ! run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1; then
-        cell_failed "$label"
-        already_failed=1
-    fi
+    run_status=0
 
+    run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || run_status=$?
+
+    # The artifacts are pulled before the cell is judged, because the summary
+    # arrives with them and a stale summary would decide the wrong thing.
     pull_sipp_artifacts "$remote_run_dir" "$local_run_dir" \
         || printf 'WARNING: could not pull SIPp artifacts from %s\n' "$SIPP_HOST" >&2
+
+    # The summary is the measurement's own account of itself, so it decides the
+    # cell. The session that carried the run can drop while a long step is in
+    # progress, and a transport failure is not a measurement failure.
+    if ! sipp_summary_passed "${local_run_dir}/summary.md"; then
+        cell_failed "$label"
+        already_failed=1
+    elif [ "$run_status" != "0" ]; then
+        printf 'WARNING: the generator session dropped during %s, but every step passed\n' "$label" >&2
+    fi
 
     # SIPp's tally says how many rows the database must gain, so it is read
     # before the wait: without it there is nothing to wait for.
