@@ -705,6 +705,76 @@ assert_lua_mirror_writable() {
     return 1
 }
 
+# Restart FreeSWITCH so it re-reads the XML handler configuration.
+#
+# mod_lua reads lua.conf.xml when the module loads, so a file edit alone
+# changes nothing: the running module keeps the bindings it booted with. A
+# reload of the module is not reliable on this build, and the harness runs on
+# a host with no live calls, so the restart is the honest mechanism.
+restart_freeswitch() {
+    local attempt
+
+    if ! systemctl restart freeswitch >/dev/null 2>&1; then
+        fail_switch "could not restart freeswitch; the Lua bindings stay inert"
+        return 1
+    fi
+
+    for attempt in $(seq 1 60); do
+        if fs_cli -x "status" >/dev/null 2>&1; then
+            sleep 2
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    fail_switch "freeswitch did not come back after a restart"
+    return 1
+}
+
+# Prove the Lua handler actually serves lookups.
+#
+# Configuration being right is not evidence: the file can list the bindings,
+# the flag can be true and the mirror can be full, while FreeSWITCH still
+# asks PHP. The timing middleware writes one line to the application log for
+# every request PHP handles, so a batch of lookups plus a count of the new
+# lines says who served them: no new lines means FreeSWITCH answered them
+# itself.
+#
+# This requires FS_XML_HANDLER_LOG_TIMING, which apply_lua_bindings turns on
+# while the proxy is enabled. Without it the count would be zero for the wrong
+# reason, so the check refuses to run.
+assert_lua_serves() {
+    local extension="${LUA_MIRROR_EXTENSION:-2000}"
+    local domain="${LUA_MIRROR_DOMAIN:-load.test.local}"
+    local log_file="${APP_DIR}/storage/logs/laravel.log"
+    local timing before after served index
+
+    timing="$(env_get FS_XML_HANDLER_LOG_TIMING)"
+
+    if [ "${timing,,}" != "true" ]; then
+        fail_switch "lookup attribution needs FS_XML_HANDLER_LOG_TIMING=true"
+        return 1
+    fi
+
+    before="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
+
+    for index in 1 2 3; do
+        fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
+    done
+
+    sleep 1
+    after="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
+    served=$(( after - before ))
+
+    if [ "$served" -gt 0 ]; then
+        fail_switch "the Lua handler served none of 3 lookups; ${served} reached PHP"
+        return 1
+    fi
+
+    log "asserted the Lua handler serves lookups (0 of 3 reached PHP)"
+}
+
 apply_lua_bindings() {
     local state="${1:-}"
 
@@ -724,13 +794,29 @@ apply_lua_bindings() {
     snapshot_once lua-conf "$FS_LUA_CONF"
     snapshot_env
 
+    # Captured before the edit: whether FreeSWITCH needs a restart depends on
+    # whether the binding state actually changes.
+    local before_state
+    before_state="$(lua_bindings_state)"
+
     if [ "$state" = "on" ]; then
+        # Attribution is only possible when PHP logs the requests it serves,
+        # so enabling the proxy enables that logging for the duration.
+        env_set FS_XML_HANDLER_LOG_TIMING true
+
         # The pattern contains an alternation, so the delimiter must not be a pipe.
         sed -i -E 's#^([[:space:]]*)<!--[[:space:]]*(<param name="xml-handler-(script|bindings)"[^>]*/>)[[:space:]]*-->#\1\2#' "$FS_LUA_CONF"
         env_set FS_LUA_PROXY_ENABLED true
     else
         sed -i -E 's#^([[:space:]]*)(<param name="xml-handler-(script|bindings)"[^>]*/>)#\1<!-- \2 -->#' "$FS_LUA_CONF"
         env_set FS_LUA_PROXY_ENABLED false
+    fi
+
+    # FreeSWITCH reads lua.conf.xml at module load, so a file edit changes
+    # nothing on its own. Restart only when the state actually changes, so the
+    # Lua-off variants do not pay for a restart they do not need.
+    if [ "$before_state" != "$state" ]; then
+        restart_freeswitch || return 1
     fi
 
     # The flag is read by the persistent worker, which boots once. Restart it
@@ -748,9 +834,10 @@ apply_lua_bindings() {
     assert_lua_bindings "$state" || return 1
 
     # Configuration being correct is not proof that the proxy works. Proving
-    # the mirror can be written is.
+    # the mirror can be written, and that FreeSWITCH answers from it, is.
     if [ "$state" = "on" ]; then
         assert_lua_mirror_writable || return 1
+        assert_lua_serves || return 1
     fi
 }
 
