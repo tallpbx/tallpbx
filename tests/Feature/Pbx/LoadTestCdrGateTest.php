@@ -207,6 +207,19 @@ describe('cdr gate', function (): void {
             ->and($script)->toContain('SIPP_UAS_HOST');
     });
 
+    it('keeps the load-test tenant between runs instead of recreating it', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^seed_tenant\(\) \{.*?^\}/ms', $script, $match);
+        $seed = $match[0] ?? '';
+
+        // `--reset` deletes the tenant and creates a new one, so the tenant id
+        // changes on every invocation. The dialplan context carries that id,
+        // so a registration made against the previous context routes into a
+        // context that no longer exists and every outbound call answers 503.
+        expect($seed)->not->toContain('--reset');
+    });
+
     it('applies the gate to every SIP cell and records the verdict beside it', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 

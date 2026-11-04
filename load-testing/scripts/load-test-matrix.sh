@@ -964,7 +964,11 @@ prepare_tier() {
 seed_tenant() {
     printf 'Seeding the synthetic tenant %s\n' "$LOAD_TENANT" >&2
 
-    run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan pbx:load-test:seed --tenant=$(printf '%q' "$LOAD_TENANT") --domain=$(printf '%q' "$LOAD_DOMAIN") --extensions=$(printf '%q' "$LOAD_EXTENSIONS") --start=$(printf '%q' "$LOAD_START") --password=$(printf '%q' "$LOAD_PASSWORD") --reset --output=$(printf '%q' "$REMOTE_ARTIFACT_ROOT/sipp-users.csv")"
+    # The tenant is created once and then reused. Recreating it on every run
+    # changes its id, and the dialplan context carries that id: a registration
+    # made against the previous context routes into a context that no longer
+    # exists, so every outbound call answers 503.
+    run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan pbx:load-test:seed --tenant=$(printf '%q' "$LOAD_TENANT") --domain=$(printf '%q' "$LOAD_DOMAIN") --extensions=$(printf '%q' "$LOAD_EXTENSIONS") --start=$(printf '%q' "$LOAD_START") --password=$(printf '%q' "$LOAD_PASSWORD") --sipp-host=$(printf '%q' "$SIPP_UAS_HOST") --sipp-port=$(printf '%q' "$SIPP_UAS_PORT") --output=$(printf '%q' "$REMOTE_ARTIFACT_ROOT/sipp-users.csv")"
 }
 
 # Restore the PBX baseline and pull the artifacts back to the generator.
