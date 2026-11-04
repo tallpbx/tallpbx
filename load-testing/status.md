@@ -100,22 +100,26 @@ Swap:          2047    228   1819
 swappiness = 60        vmstat si/so = 0/0 (no active paging)
 ```
 
-Resident services, largest first:
+Resident services, largest first. **RSS** (resident set size) is what each process holds in physical RAM; **PSS** (proportional set size) divides shared pages among the processes sharing them, so the PSS column is the truthful one to add up.
 
-| Process | RSS |
-|:--|--:|
-| `reverb:start` | 91.8 MB |
-| `freeswitch:listen` (ESL) | 90.0 MB |
-| `queue:work` | 65.2 MB |
-| `cdr:work` | 60.6 MB |
-| `roadrunner-worker` (Octane) | 59.8 MB |
-| `freeswitch` | 57.0 MB |
-| `schedule:work` | 48.2 MB |
-| 5 × `php-fpm` children | remainder |
+| Process | RSS | PSS |
+|:--|--:|--:|
+| `reverb:start` | 87.5 MB | 60.5 MB |
+| `freeswitch:listen` (ESL) | 85.9 MB | 58.8 MB |
+| `queue:work` | 65.2 MB | 43.2 MB |
+| `cdr:work` | 60.6 MB | 38.6 MB |
+| `roadrunner-worker` (Octane) | 59.8 MB | 35.9 MB |
+| `php-fpm` worker (busiest of five) | 61.1 MB | 17.9 MB |
+| `php-fpm` worker (typical of the other four) | ~57 MB | ~14.6 MB |
+| `schedule:work` | 47.9 MB | 25.1 MB |
+| `php-fpm` master | 44.7 MB | 9.8 MB |
+| `rr` (RoadRunner supervisor) | 26.4 MB | 26.4 MB |
+
+Summing RSS gives ~768 MB, which exceeds the 627 MB the kernel reports as used: shared pages — the PHP binary and the vendor tree every Laravel process maps in — are counted in full by each process. Summing PSS gives **~375 MB**, the real footprint of these processes.
 
 **How to read this.** No paging is happening (`si/so` are zero), so the numbers above were measured with every page resident — the earlier ~50 ms lookup was a cold page cache, not sustained swap thrashing. The 228 MB in swap is residue from the clone, not active pressure.
 
-The constraint is headroom, not current pressure: six resident PHP daemons account for roughly 415 MB of 967 MB, leaving about 340 MB available. Two consequences for the work still queued:
+The constraint is headroom, not current pressure: the PHP daemons account for roughly 375 MB of 967 MB, leaving about 340 MB available. A useful side observation: each of the five `php-fpm` workers *looks* like 57 MB of RSS but is really about 15 MB of its own, because three quarters of it is shared code. Two consequences for the work still queued:
 
 1. The `directory` section (next action) runs on PHP-FPM and is not expected to be distorted by memory, provided nothing else is added alongside it.
 2. The `fs-db` ablation (FreeSWITCH runtime database on tmpfs) would take its space from that same 340 MB. On this host it must be measured on its own, not alongside anything else, or it will create the swap pressure it is meant to test for.
