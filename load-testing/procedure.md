@@ -1,0 +1,166 @@
+# Procedure
+
+The ordered run. Each step ends with a checkpoint that must pass before the next step; a failed checkpoint is a stop, not something to work around.
+
+Everything in `code font` is a command you run on the orchestrator unless it is prefixed with `ssh "$PBX_HOST"`.
+
+---
+
+## Step 0 — Orchestrator prerequisites
+
+The orchestrator runs the HTTP load client (through the PBX over SSH) and SIPp (locally).
+
+```bash
+php -v            # 8.5
+command -v sipp   # required for the SIP phases
+command -v git
+```
+
+**Checkpoint:** `sipp` and `php` resolve, and `git -C . rev-parse --abbrev-ref HEAD` prints `5.x`.
+
+---
+
+## Step 1 — Host reachability and build parity
+
+```bash
+ssh "$PBX_HOST" 'hostname; nproc; free -m | head -2'
+ssh "$PBX_HOST" 'cd /var/www/tallpbx && git rev-parse --short HEAD && git branch --show-current && git status --porcelain'
+ssh "$SIPP_HOST" 'hostname; nproc; command -v sipp'
+```
+
+**Checkpoint:**
+- The PBX commit equals `origin/5.x` and `git status --porcelain` is empty.
+- The PBX carries `load-testing/scripts/lib/switch.sh`; the runner's preflight refuses to start otherwise.
+- SIPp is installed on the orchestrator, not required on the PBX.
+
+---
+
+## Step 2 — Host baseline
+
+Apply every setting in `remote-setup.md` §3–§11 and keep the proof from each section. At minimum confirm:
+
+```bash
+ssh "$PBX_HOST" 'cd /var/www/tallpbx && \
+  echo "log=$(grep -E "^FS_LOG_LEVEL=" .env)"; \
+  echo "esl=$(grep -E "^FS_ESL_EVENT_PROFILE=" .env)"; \
+  echo "lua_flag=$(grep -E "^FS_LUA_PROXY_ENABLED=" .env)"; \
+  echo "lua_params=$(grep -cE "^[[:space:]]*<param name=\"xml-handler-(script|bindings)\"" /etc/freeswitch/autoload_configs/lua.conf.xml)"; \
+  echo "fpm=$(grep -E "^pm( |\.max_children)" /etc/php/8.5/fpm/pool.d/www.conf | tr "\n" " ")"; \
+  echo "cdr=$(systemctl is-active tallpbx-cdr-worker) mod_json_cdr=$(fs_cli -x "module_exists mod_json_cdr")"'
+```
+
+**Checkpoint:** `log=notice`, `esl=essential`, `lua_flag=false` with `lua_params=0` (or `true` with `2` — never mixed), `fpm= pm = static pm.max_children = 5`, `cdr=active`, `mod_json_cdr=true`.
+
+---
+
+## Step 3 — Seed the tenant
+
+The runner seeds once per tier. To do it by hand:
+
+```bash
+ssh "$PBX_HOST" 'cd /var/www/tallpbx && php artisan pbx:load-test:seed \
+  --tenant=load-test-beta --domain=load.test.local \
+  --extensions=20 --start=2000 --password=LoadTest1234 --reset'
+```
+
+**Checkpoint:** the command reports the tenant, realm, extension count and the SIPp CSV path. Use an alphanumeric password — an unescaped `!` survives a shell differently over SSH and produces a `403` on REGISTER.
+
+---
+
+## Step 4 — Write the manifest
+
+The runner does this automatically at the start of every tier, but it can be run alone:
+
+```bash
+ssh "$PBX_HOST" 'cd /var/www/tallpbx && php artisan pbx:load-test:manifest --output=/tmp/manifest.json'
+```
+
+**Checkpoint:** the JSON carries a 40-character `build.commit`, `build.dirty=false`, host sizing that matches the tier, and no unredacted secret.
+
+---
+
+## Step 5 — Measure the baseline variant first
+
+Always start with the configuration that has had nothing optimised: `v-stock-dynamic`.
+
+```bash
+export PBX_HOST=<pbx-address>
+export SSH_OPTS="-i <identity> -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
+
+bash load-testing/scripts/load-test-matrix.sh \
+  --tier=h1-1c1g --variant=v-stock-dynamic --phase=xml \
+  --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
+```
+
+**Expected output:** one `[switch] applied …` / `[switch] asserted …` pair per switch, one cell per repeat, then `baseline restored`, then `Archived raw artifacts …` if an archive root is configured.
+
+**Checkpoint:**
+- `load-testing/results/<series>/<tier>/failures.log` is empty.
+- Every report in `<tier>/<variant>/` shows `success_rate_percent: 100`.
+- The teardown printed `baseline restored` and, if it corrected a mismatch, `baseline-corrected`.
+- Re-running the host check from Step 2 returns the same values.
+
+---
+
+## Step 6 — Remaining variants
+
+One invocation per variant, each applying its own switches:
+
+```bash
+for variant in v-stock-static v-fast v-octane v-lua-stock v-lua-fast; do
+  bash load-testing/scripts/load-test-matrix.sh \
+    --tier=h1-1c1g --variant="$variant" --phase=xml \
+    --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
+done
+```
+
+**Checkpoint per variant:** same as Step 5, plus the report path proves where the load went — `v-octane` cells are labelled against `127.0.0.1:8090`, every other variant against nginx.
+
+> Repeat noise on a 1 vCPU host is about 10 %. Differences smaller than that between two variants are not findings. Raise `--repeats` before drawing a conclusion from a small gap.
+
+---
+
+## Step 7 — SIP phases
+
+```bash
+bash load-testing/scripts/load-test-matrix.sh \
+  --tier=h1-1c1g --variant=v-stock-static --phase=sip --cps=5
+```
+
+**Checkpoint:** the SIPp log under `<tier>/<variant>/sip-cps<n>/` shows the expected scenarios completing, and `failures.log` stays empty.
+
+This is the only phase where ESL profile, broadcast throttling and CDR transport can change a number, because it is the only phase that produces events.
+
+---
+
+## Step 8 — Keep the results
+
+```bash
+git add load-testing/results/<series>
+git commit -m "chore(load-test): record <series> raw artifacts"
+```
+
+**Checkpoint:** `git status` is clean and the results directory is inside the commit. Results kept only under `storage/` are ignored by git and can be removed by `git clean -fdx`.
+
+---
+
+## Step 9 — When something fails
+
+| Marker | Meaning | Action |
+|:--|:--|:--|
+| `SWITCH-FAILED <detail>` | An `apply_*` did not read back as applied | Fix the host setting in `remote-setup.md`; do not re-run the cell until the assertion passes |
+| `CELL-FAILED <label>` | The cell command exited non-zero | Read `logs/<label>.log`; a `502` means the pool reload window was not waited out |
+| `XML-HANDLER-NOT-READY` | The readiness probe never answered after a switch | Confirm nginx and PHP-FPM are healthy, then re-run the variant |
+| `UNKNOWN-REQUIREMENT` | The matrix names a switch the runner cannot drive | The matrix and `scripts/lib/switch.sh` are out of step — fix the code, not the run |
+| `baseline-corrected …` | The restore found and fixed a mismatched Lua pair | Not an error; it means the previous state was incoherent. Investigate how it got that way |
+| `WARNING: could not pull artifacts` | The `scp` back from the PBX failed | Artifacts still exist on the PBX; copy them before the host is deleted |
+
+A cell failure never aborts the series: the runner records it in `failures.log` and continues. The series is only trustworthy when `failures.log` is empty.
+
+---
+
+## Step 10 — Write the report
+
+A series produces a **new** report file. `docs/load-testing-results.md` is the record of an earlier series and is not rewritten.
+
+Every table in the new report cites the `load-testing/results/<series>/…` path its numbers came from, so any figure can be traced back to a cell file and from there to a manifest.
