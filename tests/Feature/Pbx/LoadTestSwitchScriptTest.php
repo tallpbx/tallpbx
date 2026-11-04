@@ -77,6 +77,32 @@ describe('load test switch helpers', function (): void {
             ->and($script)->toContain('trap - EXIT INT TERM');
     });
 
+    it('restarts the long-lived processes that hold the proxy flag', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        preg_match('/^apply_lua_bindings\(\) \{.*?^\}/ms', $script, $match);
+        $apply = $match[0] ?? '';
+
+        // PHP-FPM re-reads .env on every request, but the persistent worker
+        // boots once and keeps its configuration for its whole life. Editing
+        // .env without restarting it leaves the proxy switched off in the
+        // process that actually serves lookups.
+        expect($apply)->toContain('restart_xml_worker');
+
+        preg_match('/^restart_xml_worker\(\) \{.*?^\}/ms', $script, $helper);
+
+        expect($helper[0] ?? '')->toContain('tallpbx-xml-worker');
+    });
+
+    it('proves the mirror can be written before claiming the proxy is on', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        // The file and the flag can both be correct while the process serving
+        // lookups still refuses to write the mirror. The only assertion that
+        // catches that is a behavioural one.
+        expect($script)->toContain('pbx:fsxml:tenant:user:');
+    });
+
     it('corrects a half-applied Lua pair before declaring the baseline restored', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 

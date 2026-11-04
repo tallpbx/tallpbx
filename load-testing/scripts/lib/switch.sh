@@ -622,6 +622,89 @@ lua_bindings_state() {
 # Both halves must move together: an enabled binding without the mirror flag
 # reads an empty Redis namespace and silently answers nothing, which is
 # exactly the kind of half-applied switch this library exists to prevent.
+
+# Restart the persistent worker so it picks up a changed .env value.
+#
+# PHP-FPM reads .env on every request, but the worker boots once and keeps
+# its configuration for its whole life. Without this restart a flag change is
+# invisible to the process that actually serves the lookups, and the cell
+# measures the old configuration while the files on disk look correct.
+restart_xml_worker() {
+    if ! systemctl is-active tallpbx-xml-worker >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if ! systemctl restart tallpbx-xml-worker >/dev/null 2>&1; then
+        fail_switch "could not restart tallpbx-xml-worker; it still holds the old configuration"
+        return 1
+    fi
+
+    # The worker answers a moment after the unit is active again.
+    local attempt
+
+    for attempt in $(seq 1 15); do
+        if curl -s -o /dev/null -m 2 -X POST "http://127.0.0.1:8090/api/v1/xml-handler" -d "<xml/>"; then
+            break
+        fi
+
+        sleep 1
+    done
+
+    return 0
+}
+
+# Report whether a Redis key pattern currently matches anything.
+#
+# The mirror is read and written by two different clients, so the check has to
+# work whether or not the server requires a password.
+redis_pattern_present() {
+    local pattern="$1" password
+
+    if redis-cli --scan --pattern "$pattern" 2>/dev/null | grep -q .; then
+        return 0
+    fi
+
+    password="$(env_get REDIS_PASSWORD)"
+
+    if [ -z "$password" ]; then
+        return 1
+    fi
+
+    redis-cli -a "$password" --no-auth-warning --scan --pattern "$pattern" 2>/dev/null | grep -q .
+}
+
+# Prove the mirror can actually be written.
+#
+# The file and the flag can both be correct while the process serving lookups
+# still refuses to write the mirror, so only a behavioural check catches it.
+# One lookup is triggered and the identity key the writer must have produced
+# is looked for. The epoch suffix is part of the key, so a prefix is matched.
+assert_lua_mirror_writable() {
+    local extension="${LUA_MIRROR_EXTENSION:-2000}"
+    local domain="${LUA_MIRROR_DOMAIN:-load.test.local}"
+    local pattern="pbx:fsxml:tenant:user:${domain}:${extension}:*"
+    local attempt
+
+    if ! command -v redis-cli >/dev/null 2>&1; then
+        fail_switch "redis-cli is required to prove the Lua mirror is writable"
+        return 1
+    fi
+
+    for attempt in 1 2 3; do
+        fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
+
+        if redis_pattern_present "$pattern"; then
+            log "asserted Lua mirror is writable (${pattern})"
+            return 0
+        fi
+
+        sleep 1
+    done
+
+    fail_switch "the Lua mirror was not written after a lookup (${pattern} matched nothing)"
+    return 1
+}
+
 apply_lua_bindings() {
     local state="${1:-}"
 
@@ -650,13 +733,25 @@ apply_lua_bindings() {
         env_set FS_LUA_PROXY_ENABLED false
     fi
 
-    if ! fs_cli -x "reload mod_lua" >/dev/null 2>&1; then
-        fail_switch "FreeSWITCH rejected 'reload mod_lua'"
-        return 1
+    # The flag is read by the persistent worker, which boots once. Restart it
+    # so the change is real rather than only written to disk.
+    restart_xml_worker || return 1
+
+    # `reload mod_lua` unloads and reloads the module; on this build it can
+    # answer "Already Loaded!" and leave the module unloaded. Loading it when
+    # it is already present is harmless, so ensure it is present instead.
+    if ! fs_cli -x "module_exists mod_lua" 2>/dev/null | grep -q '^true'; then
+        fs_cli -x "load mod_lua" >/dev/null 2>&1 || true
     fi
 
     log "applied Lua XML bindings ${state}"
-    assert_lua_bindings "$state"
+    assert_lua_bindings "$state" || return 1
+
+    # Configuration being correct is not proof that the proxy works. Proving
+    # the mirror can be written is.
+    if [ "$state" = "on" ]; then
+        assert_lua_mirror_writable || return 1
+    fi
 }
 
 # Prove the bindings file, the mirror flag and the module agree.

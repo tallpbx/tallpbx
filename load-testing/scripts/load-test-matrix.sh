@@ -389,8 +389,10 @@ switch_command() {
         quoted+=" $(printf '%q' "$arg")"
     done
 
-    printf 'APP_DIR=%s bash %s %s%s' \
+    printf 'APP_DIR=%s LUA_MIRROR_EXTENSION=%s LUA_MIRROR_DOMAIN=%s bash %s %s%s' \
         "$(printf '%q' "$REMOTE_APP_DIR")" \
+        "$(printf '%q' "$LOAD_START")" \
+        "$(printf '%q' "$LOAD_DOMAIN")" \
         "$(printf '%q' "$REMOTE_APP_DIR/load-testing/scripts/lib/switch.sh")" \
         "$(printf '%q' "$command")" "$quoted"
 }
