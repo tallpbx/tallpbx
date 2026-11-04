@@ -174,6 +174,22 @@ describe('load test matrix runner', function (): void {
         expect($process->getOutput())->toContain('probe_lookup');
     });
 
+    it('restricts the battery to one cache policy when asked', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-static', '--phase=xml', '--profile=100x5', '--section=dialplan', '--ttl=production-60', '--repeats=1'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // Measuring every cache policy for every variant multiplies the run
+        // without answering a new question once the baseline has them.
+        expect($process->getOutput())
+            ->toContain('100x5-production-60-dialplan')
+            ->not->toContain('100x5-cold-dialplan')
+            ->not->toContain('100x5-cache-hit-60-dialplan');
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

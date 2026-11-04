@@ -44,6 +44,18 @@ SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o Co
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/var/www/tallpbx}"
 REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load-tests/${SERIES}}"
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
+# Permanent copy of the raw artifacts.
+#
+# The measurement hosts are disposable, so the series is mirrored outside the
+# application tree where a storage wipe or `git clean` cannot reach it. Set
+# ARCHIVE_ROOT= (empty) to skip the copy when no durable path exists.
+if [ -z "${ARCHIVE_ROOT+set}" ]; then
+    if [ -d /srv ] && [ -w /srv ]; then
+        ARCHIVE_ROOT="/srv/tallpbx-load-tests/${SERIES}"
+    else
+        ARCHIVE_ROOT=""
+    fi
+fi
 # The persistent worker is a second HTTP server serving the same route. A cell
 # that applies the Octane binding must be measured against this URL, or it
 # measures PHP-FPM and reports the number as Octane.
@@ -73,6 +85,7 @@ VARIANT=""
 PHASE=""
 SECTION=""
 PROFILE=""
+TTL=""
 REPEATS="${REPEATS:-3}"
 CPS="${CPS:-5}"
 LIST_MODE=0
@@ -228,6 +241,7 @@ Usage: load-test-matrix.sh [options]
   --phase=<xml|sip|ablation>  Restrict to one phase
   --section=<dialplan|directory|mixed>  Restrict the XML battery to one section
   --profile=<id>         Restrict the XML battery to one load profile (25x1, 100x5, ...)
+  --ttl=<id>             Restrict the XML battery to one cache policy (production-60, ...)
   --repeats=<n>          Repetitions per cell (default 3)
   --cps=<n>              Offered calls per second for the SIP and ablation phases (default 5)
 
@@ -236,6 +250,8 @@ Environment:
   PBX_URL                XML handler URL the load client calls
   PBX_XML_TOKEN          XML handler token, when authentication is enabled
   SERIES                 Series directory name (default refresh-YYYYMMDD)
+  ARCHIVE_ROOT           Durable artifact copy (default /srv/tallpbx-load-tests/<series>;
+                         empty skips the copy)
   TENANT / DOMAIN        Seeded tenant slug and SIP realm
   EXTENSIONS / START     Generated extension count and first number
   PASSWORD               SIP password for the generated accounts
@@ -259,6 +275,7 @@ parse_args() {
             --phase=*) PHASE="${arg#*=}" ;;
             --section=*) SECTION="${arg#*=}" ;;
             --profile=*) PROFILE="${arg#*=}" ;;
+            --ttl=*) TTL="${arg#*=}" ;;
             --repeats=*) REPEATS="${arg#*=}" ;;
             --cps=*) CPS="${arg#*=}" ;;
             -h | --help | help)
@@ -276,10 +293,11 @@ parse_args() {
 
 # Fail fast when a filter names something the matrix does not contain.
 validate_filters() {
-    local tiers variants
+    local tiers variants ttls
 
     tiers="$(matrix_keys tiers)"
     variants="$(matrix_keys variants)"
+    ttls="$(matrix_keys cache_ttl_profiles)"
 
     if [ -n "$TIER" ] && ! grep -qxF "$TIER" <<< "$tiers"; then
         printf 'Unknown tier: %s\n' "$TIER" >&2
@@ -293,6 +311,11 @@ validate_filters() {
 
     if [ -n "$PHASE" ] && [ "$PHASE" != "xml" ] && [ "$PHASE" != "sip" ] && [ "$PHASE" != "ablation" ]; then
         printf 'Unknown phase: %s\n' "$PHASE" >&2
+        return 2
+    fi
+
+    if [ -n "$TTL" ] && ! grep -qxF "$TTL" <<< "$ttls"; then
+        printf 'Unknown cache policy: %s\n' "$TTL" >&2
         return 2
     fi
 
@@ -528,6 +551,8 @@ dry_run_cells() {
                                 [ -z "$PROFILE" ] || [ "$PROFILE" = "$profile_id" ] || continue
 
                                 while IFS= read -r ttl_id; do
+                                    [ -z "$TTL" ] || [ "$TTL" = "$ttl_id" ] || continue
+
                                     for repeat in $(seq 1 "$REPEATS"); do
                                         printf '  %s\n' "$(xml_command "$tier" "$variant" "$profile_id" "$ttl_id" "$section" "$repeat")"
                                     done
@@ -662,6 +687,18 @@ teardown_tier() {
             || printf 'WARNING: could not pull artifacts from %s\n' "$PBX_HOST" >&2
     fi
 
+    # The measurement hosts get deleted at the end of the series, so the only
+    # copy that survives is the one outside the application tree.
+    if [ -n "$ARCHIVE_ROOT" ] && [ -d "${ARTIFACT_ROOT}/${TIER}" ]; then
+        mkdir -p "${ARCHIVE_ROOT}/${TIER}"
+
+        if cp -a "${ARTIFACT_ROOT}/${TIER}/." "${ARCHIVE_ROOT}/${TIER}/" 2>/dev/null; then
+            printf 'Archived raw artifacts to %s/%s\n' "$ARCHIVE_ROOT" "$TIER" >&2
+        else
+            printf 'WARNING: could not archive artifacts to %s\n' "$ARCHIVE_ROOT" >&2
+        fi
+    fi
+
     return "$exit_code"
 }
 
@@ -707,6 +744,8 @@ run_xml_phase() {
             fi
 
             while IFS= read -r ttl_id; do
+                [ -z "$TTL" ] || [ "$TTL" = "$ttl_id" ] || continue
+
                 # Applying the TTL once per profile keeps the cell boundary
                 # explicit even when two profiles share the same values.
                 switch_call apply_ttl \
