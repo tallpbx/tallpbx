@@ -538,6 +538,20 @@ pull_sipp_artifacts() {
     scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${SIPP_HOST}:${remote_dir}/." "${local_dir}/" >/dev/null 2>&1
 }
 
+# Read the gateway host the load-test tenant's outbound route points at.
+#
+# The gateway lives in the PBX's database, so the query runs on the PBX. The
+# generator is a SIPp-only host and has no database client at all.
+pbx_gateway_host() {
+    local sql host
+
+    sql="select g.host from gateways g join tenants t on t.id = g.tenant_id where t.slug = '${LOAD_TENANT}' limit 1"
+
+    host="$(run_on_pbx "mysql -N -e \"${sql}\" $(printf '%q' "$PBX_DB_NAME")" 2>/dev/null | tr -d '[:space:]')"
+
+    printf '%s\n' "$host"
+}
+
 # Free the SIPp ports on the generator before a cell starts.
 #
 # Each background UAS the validation script starts lives for `timeout 300`, so
@@ -634,8 +648,7 @@ sipp_prepare_generator() {
 command -v sipp >/dev/null || echo 'MISSING sipp'
 test -f tools/sipp/uac-extension.xml || echo 'MISSING scenarios'
 test -s storage/app/load-tests/sipp-users.csv || echo 'MISSING sipp-users.csv'
-echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null || echo 0)\"
-echo \"gateway_host=\$(mysql -N -e 'select host from gateways limit 1;' tallpbx 2>/dev/null)\""
+echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null || echo 0)\""
 
     if ! report="$(run_on_sipp "$remote_check" 2>&1)"; then
         printf 'SIPP-PREPARE-FAILED could not inspect %s\n%s\n' "$SIPP_HOST" "$report" >&2
@@ -654,8 +667,13 @@ echo \"gateway_host=\$(mysql -N -e 'select host from gateways limit 1;' tallpbx 
     # The outbound route has to point at the generator. When it does not, every
     # outbound call answers 503 on the PBX and the cell fails on a setup
     # problem that reads like a routing fault.
-    if [ "$SIPP_UAS_HOST" != "127.0.0.1" ] && ! printf '%s' "$report" | grep -q "gateway_host=${SIPP_UAS_HOST}"; then
-        printf 'SIPP-PREPARE-FAILED the outbound gateway does not point at %s\n%s\n' "$SIPP_UAS_HOST" "$report" >&2
+    local gateway_host
+
+    gateway_host="$(pbx_gateway_host)"
+
+    if [ "$SIPP_UAS_HOST" != "127.0.0.1" ] && [ "$gateway_host" != "$SIPP_UAS_HOST" ]; then
+        printf 'SIPP-PREPARE-FAILED the outbound gateway points at %s, not %s\n' \
+            "${gateway_host:-nothing}" "$SIPP_UAS_HOST" >&2
         return 1
     fi
 
