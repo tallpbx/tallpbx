@@ -262,6 +262,68 @@ describe('load test matrix runner', function (): void {
         File::deleteDirectory($fixture);
     });
 
+    it('shows the SIP smoke preflight before the series it guards', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-static', '--phase=sip'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // A six-variant SIP series costs about 30 minutes. A broken chain —
+        // a tenant that cannot register, a gateway that answers 503, a CDR
+        // pipeline that writes nothing — must be found in the first two
+        // minutes, not at minute 30. The preflight places one call of each
+        // shape and checks the records they leave behind.
+        $output = $process->getOutput();
+        $lines = explode("\n", $output);
+
+        $smoke = null;
+        $series = null;
+
+        foreach ($lines as $index => $line) {
+            if (str_contains($line, 'pbx-sipp-validate.sh') && $smoke === null) {
+                $smoke = $index;
+            }
+
+            // The smoke block has its own '===' header, so the series header
+            // is the first one that names a variant rather than 'smoke'.
+            if (str_contains($line, '===') && ! str_contains($line, 'smoke') && $series === null) {
+                $series = $index;
+            }
+        }
+
+        expect($smoke)->not->toBeNull()
+            ->and($series)->not->toBeNull()
+            ->and($smoke)->toBeLessThan($series);
+    });
+
+    it('keeps the SIP smoke preflight to one call of each shape', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-static', '--phase=sip'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // One registration, one extension call, one outbound call: the whole
+        // chain (register, bridge, gateway, CDR) in about two minutes.
+        expect($process->getOutput())
+            ->toContain('REGISTER_COUNT=1')
+            ->toContain('CALLS=1')
+            ->toContain('OUTBOUND_CALLS=1');
+    });
+
+    it('fails the series when the SIP smoke preflight does not pass', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // A broken setup fails the whole series, not one cell: every number
+        // after a failed preflight measures a chain that does not work.
+        expect($script)->toContain('run_sip_smoke')
+            ->toContain('SMOKE-FAILED')
+            ->toContain('return 1');
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

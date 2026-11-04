@@ -840,6 +840,30 @@ sip_command() {
         "$LOAD_PASSWORD" "$CPS" "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
 }
 
+# Where the smoke preflight writes its artifacts.
+#
+# The preflight is a setup check, not a measurement, so it gets its own
+# directory: a later cell must never read its summary as one of the series.
+smoke_run_dir() {
+    if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/sip-smoke"
+        return
+    fi
+
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/sip-smoke"
+}
+
+# Build the smoke preflight command: one registration, one extension call,
+# one outbound call — the whole chain (register, bridge, gateway, CDR) in
+# about two minutes, before any series cell is spent on it.
+smoke_command() {
+    local run_dir="$1"
+
+    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 REGISTER_COUNT=1 CALLS=1 OUTBOUND_CALLS=1 MAX_SIMULTANEOUS=1 OUTBOUND_MAX_SIMULTANEOUS=1 RUN_DIR=%q bash %q' \
+        "$SIPP_APP_DIR" "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" \
+        "$LOAD_PASSWORD" "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
+}
+
 # Map one ablation id to the switch helper that drives it.
 #
 # Knobs without a helper are skipped by the ablation phase instead of being
@@ -885,6 +909,14 @@ list_cells() {
 # Print the exact command for every selected cell without running anything.
 dry_run_cells() {
     local tier variant phase profile_id ttl_id section repeat ablation value run_dir
+
+    # The SIP smoke preflight is printed first because it runs first: a
+    # broken chain is found in two minutes rather than at minute 30 of a
+    # six-variant series.
+    if printf '%s\n' "$(selected_phases)" | grep -qx 'sip'; then
+        printf '=== %s / smoke / preflight\n' "${TIER:-<tier>}"
+        printf '  %s\n' "$(smoke_command "$(smoke_run_dir)")"
+    fi
 
     while IFS= read -r tier; do
         while IFS= read -r variant; do
@@ -1325,6 +1357,75 @@ run_ablation_phase() {
     done < <(matrix_keys ablations)
 }
 
+# Run the SIP smoke preflight before any series cell.
+#
+# One registration, one extension call, one outbound call, then the CDR gate
+# on the rows those calls must have produced. A chain that cannot pass this
+# in two minutes will fail every cell of a 30-minute series for the same
+# reason, so the preflight fails the whole run instead of one cell.
+run_sip_smoke() {
+    local remote_run_dir local_run_dir label before after counts
+    local successful failed
+
+    remote_run_dir="$(smoke_run_dir)"
+    local_run_dir="${ARTIFACT_ROOT}/${TIER}/sip-smoke"
+    label="${TIER}/smoke"
+
+    mkdir -p "$local_run_dir"
+
+    # The generator is prepared exactly as for a measured cell: scenarios,
+    # validation script, credential file, outbound route pointing at the
+    # generator's UAS.
+    if ! sipp_prepare_generator; then
+        printf 'SMOKE-FAILED %s (generator preparation)\n' "$label" >&2
+        return 1
+    fi
+
+    before="$(cdr_row_count)"
+
+    if [ -z "$before" ]; then
+        printf 'SMOKE-FAILED %s (cannot read the CDR row count on %s)\n' "$label" "$PBX_HOST" >&2
+        return 1
+    fi
+
+    printf '%s\n' "$before" > "${local_run_dir}/cdr-before.txt"
+
+    run_on_sipp "$(smoke_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 \
+        || printf 'WARNING: the generator session dropped during %s; judged by the summary\n' "$label" >&2
+
+    pull_sipp_artifacts "$remote_run_dir" "$local_run_dir" \
+        || printf 'WARNING: could not pull SIPp artifacts from %s\n' "$SIPP_HOST" >&2
+
+    # The summary is the run's own account of itself and decides the result.
+    if ! sipp_summary_passed "${local_run_dir}/summary.md"; then
+        printf 'SMOKE-FAILED %s (see %s/summary.md)\n' "$label" "$local_run_dir" >&2
+        return 1
+    fi
+
+    # The CDR gate counts the calls SIPp completed and waits for the rows
+    # those calls must have produced. A cell that completes calls but leaves
+    # no records is a broken pipeline, not a passing smoke.
+    if ! counts="$(bash "${TOOLS_DIR}/cdr-gate.sh" sipp-counts "${local_run_dir}/extension-calls.log" 2>"${local_run_dir}/cdr-gate.err")"; then
+        printf 'SMOKE-FAILED %s (no SIPp tally)\n' "$label" >&2
+        return 1
+    fi
+
+    successful="${counts%% *}"
+    failed="${counts##* }"
+
+    after="$(cdrs_wait_for "$before" "$successful")"
+    printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
+
+    if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
+        --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
+        --label="$label" | tee "${local_run_dir}/cdr-gate.txt"; then
+        printf 'SMOKE-FAILED %s (CDR gate)\n' "$label" >&2
+        return 1
+    fi
+
+    return 0
+}
+
 # Execute the selected cells for the selected tier.
 execute_cells() {
     local variant phase failures=0
@@ -1347,6 +1448,16 @@ execute_cells() {
 
     prepare_tier
     seed_tenant
+
+    # The SIP smoke preflight runs before any series cell: a broken chain is
+    # found in two minutes rather than after the first 30-minute series has
+    # failed for a reason that was visible at setup time.
+    if printf '%s\n' "$(selected_phases)" | grep -qx 'sip'; then
+        if ! run_sip_smoke; then
+            printf 'SIP smoke preflight failed; no series cell was measured on %s.\n' "$TIER" >&2
+            exit 1
+        fi
+    fi
 
     while IFS= read -r variant; do
         while IFS= read -r phase; do
