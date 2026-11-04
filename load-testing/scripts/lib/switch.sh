@@ -806,7 +806,13 @@ restart_listener() {
 # Used to prove a restart produced a *new* record, so an assertion never
 # passes on a line left over from an earlier configuration.
 listener_record_count() {
-    grep -c 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs/laravel.log" 2>/dev/null || printf '0\n'
+    local count
+
+    # grep -c prints 0 and exits non-zero when nothing matches, so the output
+    # is captured rather than appended to a fallback.
+    count="$(grep -c 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs/laravel.log" 2>/dev/null)"
+
+    printf '%s\n' "${count:-0}"
 }
 
 # Read the listener's most recent start-up record.
