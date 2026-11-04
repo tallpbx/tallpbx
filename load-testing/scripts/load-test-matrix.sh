@@ -82,6 +82,33 @@ if [ -z "$SIPP_PBX_HOST" ]; then
     fi
 fi
 
+# The load generator runs SIPp. It is a separate host so that its packets and
+# its CPU never compete with the PBX under test; 'local' keeps a single-host
+# smoke run possible, but a capacity number from it is not publishable because
+# the generator then measures itself.
+SIPP_HOST="${SIPP_HOST:-local}"
+SIPP_SSH_PORT="${SIPP_SSH_PORT:-${SSH_PORT}}"
+if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+    SIPP_APP_DIR="${SIPP_APP_DIR:-${ROOT_DIR}}"
+else
+    SIPP_APP_DIR="${SIPP_APP_DIR:-/var/www/tallpbx}"
+fi
+
+# The base directory of the gate and probe tools that run on this host.
+TOOLS_DIR="${ROOT_DIR}/load-testing/scripts/tools"
+
+# Database the CDR gate counts rows in.
+PBX_DB_NAME="${PBX_DB_NAME:-tallpbx}"
+
+# The CDR pipeline is asynchronous: mod_json_cdr posts each record when a leg
+# ends and the worker digests it afterwards. Reading the count the instant a
+# cell finishes would report a healthy pipeline as lost records, so the gate
+# polls until the count has been unchanged for a few intervals, or the budget
+# runs out.
+CDR_SETTLE_INTERVAL="${CDR_SETTLE_INTERVAL:-3}"
+CDR_SETTLE_STABLE="${CDR_SETTLE_STABLE:-3}"
+CDR_SETTLE_MAX="${CDR_SETTLE_MAX:-60}"
+
 TIER=""
 VARIANT=""
 PHASE=""
@@ -251,6 +278,11 @@ Usage: load-test-matrix.sh [options]
 
 Environment:
   PBX_HOST               SSH target of the PBX under test ('local' runs in place)
+  SIPP_HOST              SSH target of the load generator ('local' runs SIPp in place)
+  PBX_DB_NAME            Database the CDR gate counts rows in (default tallpbx)
+  CDR_SETTLE_INTERVAL    Seconds between CDR row-count polls during the drain
+  CDR_SETTLE_STABLE      Consecutive unchanged polls before a count is trusted
+  CDR_SETTLE_MAX         Longest the gate waits for late records, in seconds
   PBX_URL                XML handler URL the load client calls
   PBX_XML_TOKEN          XML handler token, when authentication is enabled
   SERIES                 Series directory name (default refresh-YYYYMMDD)
@@ -378,6 +410,187 @@ run_on_pbx() {
     # call this function; without it the first cell silently ends the loop.
     # shellcheck disable=SC2086
     ssh -n $SSH_OPTS -p "$SSH_PORT" "$PBX_HOST" "$command"
+}
+
+# Run one command on the load generator.
+#
+# SIPp belongs there rather than on the PBX: the PBX has to reach the
+# generator's UAS and RTP ports, and a generator sharing the PBX's CPU would
+# be measuring itself. 'local' runs the command in this shell.
+run_on_sipp() {
+    local command="$1"
+
+    if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+        bash -c "$command"
+        return
+    fi
+
+    # -n keeps ssh from draining stdin, the same trap that silently ended the
+    # runner's read loops once already.
+    # shellcheck disable=SC2086
+    ssh -n $SSH_OPTS -p "$SIPP_SSH_PORT" "$SIPP_HOST" "$command"
+}
+
+# Count the CDR rows the PBX currently holds.
+#
+# Prints an empty string when the database cannot be read, which the SIP phase
+# treats as a blocking failure: a cell whose records cannot be counted has not
+# been verified, whatever its SIPp output says.
+cdr_row_count() {
+    local count
+
+    count="$(run_on_pbx "mysql -N -e 'select count(*) from cdrs;' $(printf '%q' "$PBX_DB_NAME")" 2>/dev/null | tr -cd '0-9')"
+
+    printf '%s\n' "$count"
+}
+
+# Wait until the CDR row count stops moving, then print it.
+#
+# A record is posted when a leg ends and digested by the worker afterwards, so
+# a cell that just finished still has records in flight. Polling until the
+# count is stable separates "late" from "lost".
+cdrs_settled_count() {
+    local previous="$1" current="$1" stable=0 elapsed=0 count
+
+    while [ "$elapsed" -lt "$CDR_SETTLE_MAX" ]; do
+        sleep "$CDR_SETTLE_INTERVAL"
+        elapsed=$((elapsed + CDR_SETTLE_INTERVAL))
+
+        count="$(cdr_row_count)"
+
+        if [ -z "$count" ]; then
+            continue
+        fi
+
+        if [ "$count" = "$current" ]; then
+            stable=$((stable + 1))
+
+            if [ "$stable" -ge "$CDR_SETTLE_STABLE" ]; then
+                printf '%s\n' "$count"
+                return 0
+            fi
+        else
+            stable=0
+            current="$count"
+        fi
+    done
+
+    printf '%s\n' "$current"
+}
+
+# Where one SIP cell writes its artifacts.
+#
+# On a separate generator that is the generator's own directory, which the
+# runner copies back afterwards; on a single-host run it is the artifact
+# directory itself.
+sip_run_dir() {
+    local tier="$1" variant="$2"
+
+    if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+        printf '%s\n' "${ARTIFACT_ROOT}/${tier}/${variant}/sip-cps${CPS}"
+        return
+    fi
+
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${tier}/${variant}/sip-cps${CPS}"
+}
+
+# Copy one SIP cell's artifacts from the generator back to this host.
+#
+# The verdict is read from the copied files, not from the generator, so a
+# generator that is cleaned up or deleted cannot take the evidence with it.
+pull_sipp_artifacts() {
+    local remote_dir="$1" local_dir="$2"
+
+    if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+        return 0
+    fi
+
+    # shellcheck disable=SC2086
+    scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${SIPP_HOST}:${remote_dir}/." "${local_dir}/" >/dev/null 2>&1
+}
+
+# Give the load generator everything one series needs to run its scenarios.
+#
+# The generator is disposable and may hold any build, so the scenario files and
+# the validation script are copied from the checkout under test rather than
+# trusted to be current there. The credential file is regenerated on the PBX
+# and copied across, which also keeps it in step with the tenant being
+# measured: a stale CSV authenticates extensions that no longer exist, and
+# every call then fails with a registration error that looks like a PBX fault.
+sipp_prepare_generator() {
+    local csv_on_pbx="${REMOTE_APP_DIR}/storage/app/load-tests/${SERIES}/sipp-users.csv"
+    local csv_local="${ARTIFACT_ROOT}/${TIER}/generator/sipp-users.csv"
+    local sync_log="${ARTIFACT_ROOT}/${TIER}/generator/sync.log"
+    local seeded
+
+    mkdir -p "${ARTIFACT_ROOT}/${TIER}/generator"
+
+    if ! seeded="$(run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan pbx:load-test:seed --tenant=$(printf '%q' "$LOAD_TENANT") --domain=$(printf '%q' "$LOAD_DOMAIN") --extensions=$(printf '%q' "$LOAD_EXTENSIONS") --start=$(printf '%q' "$LOAD_START") --password=$(printf '%q' "$LOAD_PASSWORD") --output=$(printf '%q' "$csv_on_pbx")" 2>&1)"; then
+        printf 'SIPP-PREPARE-FAILED seeding accounts on %s\n%s\n' "$PBX_HOST" "$seeded" >&2
+        return 1
+    fi
+
+    printf '%s\n' "$seeded" > "${ARTIFACT_ROOT}/${TIER}/generator/seed.log"
+
+    if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+        return 0
+    fi
+
+    : > "$sync_log"
+
+    if ! run_on_sipp "mkdir -p $(printf '%q' "${SIPP_APP_DIR}/tools") $(printf '%q' "${SIPP_APP_DIR}/scripts") $(printf '%q' "${SIPP_APP_DIR}/storage/app/load-tests")" >> "$sync_log" 2>&1; then
+        printf 'SIPP-PREPARE-FAILED could not create the generator directories; see %s\n' "$sync_log" >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC2086
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${ROOT_DIR}/tools/sipp" "${SIPP_HOST}:${SIPP_APP_DIR}/tools/" >> "$sync_log" 2>&1; then
+        printf 'SIPP-PREPARE-FAILED could not copy the SIPp scenarios; see %s\n' "$sync_log" >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC2086
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" "${ROOT_DIR}/scripts/pbx-sipp-validate.sh" "${SIPP_HOST}:${SIPP_APP_DIR}/scripts/pbx-sipp-validate.sh" >> "$sync_log" 2>&1; then
+        printf 'SIPP-PREPARE-FAILED could not copy the validation script; see %s\n' "$sync_log" >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC2086
+    if ! scp $SSH_OPTS -P "$SSH_PORT" "${PBX_HOST}:${csv_on_pbx}" "$csv_local" >> "$sync_log" 2>&1; then
+        printf 'SIPP-PREPARE-FAILED could not fetch the credential file from %s; see %s\n' "$PBX_HOST" "$sync_log" >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC2086
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" "$csv_local" "${SIPP_HOST}:${SIPP_APP_DIR}/storage/app/load-tests/sipp-users.csv" >> "$sync_log" 2>&1; then
+        printf 'SIPP-PREPARE-FAILED could not deliver the credential file to %s; see %s\n' "$SIPP_HOST" "$sync_log" >&2
+        return 1
+    fi
+
+    # Prove the generator can actually run before a cell is spent on it.
+    local remote_check report
+
+    remote_check="cd $(printf '%q' "$SIPP_APP_DIR") || exit 1
+command -v sipp >/dev/null || echo 'MISSING sipp'
+test -f tools/sipp/uac-extension.xml || echo 'MISSING scenarios'
+test -s storage/app/load-tests/sipp-users.csv || echo 'MISSING sipp-users.csv'
+echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null || echo 0)\""
+
+    if ! report="$(run_on_sipp "$remote_check" 2>&1)"; then
+        printf 'SIPP-PREPARE-FAILED could not inspect %s\n%s\n' "$SIPP_HOST" "$report" >&2
+        return 1
+    fi
+
+    printf '%s\n' "$report" >> "$sync_log"
+
+    case "$report" in
+        *MISSING*)
+            printf 'SIPP-PREPARE-FAILED generator is not ready\n%s\n' "$report" >&2
+            return 1
+            ;;
+    esac
+
+    return 0
 }
 
 # Print the exact remote command for one switch helper call.
@@ -513,9 +726,9 @@ probe_command() {
 sip_command() {
     local run_dir="$1"
 
-    printf 'PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q RUN_DIR=%q bash %q' \
-        "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" "$LOAD_PASSWORD" "$CPS" "$run_dir" \
-        "${ROOT_DIR}/scripts/pbx-sipp-validate.sh"
+    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q RUN_DIR=%q bash %q' \
+        "$SIPP_APP_DIR" "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" \
+        "$LOAD_PASSWORD" "$CPS" "$run_dir" "${SIPP_APP_DIR}/scripts/pbx-sipp-validate.sh"
 }
 
 # Map one ablation id to the switch helper that drives it.
@@ -596,8 +809,7 @@ dry_run_cells() {
                         done
                         ;;
                     sip)
-                        run_dir="${ARTIFACT_ROOT}/${tier}/${variant}/sip-cps${CPS}"
-                        printf '  %s\n' "$(sip_command "$run_dir")"
+                        printf '  %s\n' "$(sip_command "$(sip_run_dir "$tier" "$variant")")"
                         ;;
                     ablation)
                         while IFS= read -r ablation; do
@@ -858,18 +1070,72 @@ run_xml_phase() {
 }
 
 # Run the SIPp feature validation and one capacity step for one variant.
+#
+# Three things make the result trustworthy: the run happens on the generator,
+# whose artifacts are copied back before anything is read, and the CDR gate
+# compares the calls SIPp completed with the rows the database gained. Without
+# that gate a cell can report every call answered while the pipeline recorded
+# none of them.
 run_sip_phase() {
-    local variant="$1" run_dir label
+    local variant="$1" remote_run_dir local_run_dir label before after counts
+    local successful failed already_failed=0
 
     apply_variant "$TIER" "$variant"
 
-    run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-cps${CPS}"
-    mkdir -p "$run_dir"
+    remote_run_dir="$(sip_run_dir "$TIER" "$variant")"
+    local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-cps${CPS}"
     label="${TIER}/${variant}/sip-cps${CPS}"
 
-    if ! bash -c "$(sip_command "$run_dir")" > "${run_dir}/sipp.log" 2>&1; then
-        cell_failed "$label"
+    mkdir -p "$local_run_dir"
+
+    # The generator is prepared once per tier: scenarios, validation script and
+    # a credential file that matches the tenant being measured.
+    if [ ! -f "${ARTIFACT_ROOT}/${TIER}/generator/prepared" ]; then
+        if ! sipp_prepare_generator; then
+            cell_failed "${TIER}/generator"
+            return 1
+        fi
+
+        : > "${ARTIFACT_ROOT}/${TIER}/generator/prepared"
     fi
+
+    before="$(cdr_row_count)"
+    printf '%s\n' "$before" > "${local_run_dir}/cdr-before.txt"
+
+    if [ -z "$before" ]; then
+        printf 'CDR-UNAVAILABLE cannot read the CDR row count on %s\n' "$PBX_HOST" >&2
+        cell_failed "${label}-cdr"
+        return 1
+    fi
+
+    if ! run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1; then
+        cell_failed "$label"
+        already_failed=1
+    fi
+
+    pull_sipp_artifacts "$remote_run_dir" "$local_run_dir" \
+        || printf 'WARNING: could not pull SIPp artifacts from %s\n' "$SIPP_HOST" >&2
+
+    after="$(cdrs_settled_count "$before")"
+    printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
+
+    if ! counts="$(bash "${TOOLS_DIR}/cdr-gate.sh" sipp-counts "${local_run_dir}/extension-calls.log" 2>"${local_run_dir}/cdr-gate.err")"; then
+        printf 'CDR-GATE FAILED label=%s reason=no-tally\n' "$label" | tee "${local_run_dir}/cdr-gate.txt" >&2
+        cell_failed "${label}-cdr"
+        return 1
+    fi
+
+    successful="${counts%% *}"
+    failed="${counts##* }"
+
+    if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
+        --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
+        --label="$label" | tee "${local_run_dir}/cdr-gate.txt"; then
+        cell_failed "${label}-cdr"
+        return 1
+    fi
+
+    return "$already_failed"
 }
 
 # Run the single-knob ablations the switch library can drive.
