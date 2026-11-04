@@ -45,8 +45,10 @@ done
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT_DIR" || exit 1
 
-ARTIFACT_ROOT="${ARTIFACT_ROOT:-${ROOT_DIR}/load-testing/results/${SERIES}}"
-SUMMARY="${ARTIFACT_ROOT}/validation/"
+# The base results directory. Each round gets its own directory inside it, so
+# the rounds never overwrite one another.
+BASE_RESULTS="${ROOT_DIR}/load-testing/results"
+SUMMARY="${BASE_RESULTS}/${SERIES}-validation/"
 
 mkdir -p "$SUMMARY"
 
@@ -63,7 +65,7 @@ while [ "$round" -le "$ROUNDS" ]; do
 
         round_series="${SERIES}-validate-r${round}"
 
-        if SERIES="$round_series" ARTIFACT_ROOT="$ARTIFACT_ROOT" \
+        if SERIES="$round_series" ARTIFACT_ROOT="${BASE_RESULTS}/${round_series}" \
             bash load-testing/scripts/load-test-matrix.sh \
             --tier="$TIER" --variant="$variant" --phase=xml \
             --profile="$PROFILE" --ttl="$TTL" --section="$SECTION" --repeats=1 \
@@ -80,18 +82,19 @@ done
 printf '\n== Reading the results ==\n'
 
 php -r '
-$summary = $argv[1];
+$base = $argv[1];
 $tier = $argv[2];
 $variants = array_filter(explode(",", $argv[3]));
 $rounds = (int) $argv[4];
 $profile = $argv[5];
 $ttl = $argv[6];
 $section = $argv[7];
+$series = $argv[8];
 
 $rows = [];
 foreach ($variants as $variant) {
     for ($round = 1; $round <= $rounds; $round++) {
-        $file = sprintf("%s%s-validate-r%d/%s/%s-%s-%s-r1.json", $summary, $argv[8], $round, $tier, $variant, $profile, $ttl, $section);
+        $file = sprintf("%s/%s-validate-r%d/%s/%s/%s-%s-%s-r1.json", $base, $series, $round, $tier, $variant, $profile, $ttl, $section);
         if (! is_file($file)) { printf("   %-16s round %d: MISSING\n", $variant, $round); continue; }
         $j = json_decode((string) file_get_contents($file), true);
         $rows[$variant][$round] = [
@@ -119,26 +122,33 @@ echo "\n";
 $worst = 0.0;
 foreach ($spreads as $spread) { if ($spread > $worst) { $worst = $spread; } }
 
-if (count($variants) === 2) {
-    $a = $variants[0];
-    $b = $variants[1];
-    $meanA = array_sum(array_column($rows[$a] ?? [], "rps")) / max(1, count($rows[$a] ?? []));
-    $meanB = array_sum(array_column($rows[$b] ?? [], "rps")) / max(1, count($rows[$b] ?? []));
-    $gap = $meanA > 0 ? abs($meanA - $meanB) / min($meanA, $meanB) * 100 : 0;
+// Every variant is compared against the first one, which is the baseline the
+// matrix names first. A gap inside the noise band means the harness cannot
+// tell the two apart, so the difference is not a finding.
+$baseline = $variants[0];
+$baselineMean = array_sum(array_column($rows[$baseline] ?? [], "rps")) / max(1, count($rows[$baseline] ?? []));
 
-    printf("   separation between %s and %s: %.1f%%\n", $a, $b, $gap);
-    printf("   widest within-configuration spread: %.1f%%\n", $worst);
+printf("   noise band (widest within-configuration spread): %.1f%%\n", $worst);
+printf("   baseline for comparison: %s (%.1f rps)\n\n", $baseline, $baselineMean);
+
+foreach ($variants as $variant) {
+    if ($variant === $baseline) { continue; }
+
+    $mean = array_sum(array_column($rows[$variant] ?? [], "rps")) / max(1, count($rows[$variant] ?? []));
+    $gap = $baselineMean > 0 ? abs($mean - $baselineMean) / $baselineMean * 100 : 0;
 
     if ($gap > $worst * 2) {
-        printf("\n   VERDICT: the gap is larger than twice the noise band, so the difference is real.\n");
+        $verdict = "REAL       (gap is more than twice the noise band)";
     } elseif ($gap > $worst) {
-        printf("\n   VERDICT: the gap exceeds the noise band, but only just. Treat it as provisional.\n");
+        $verdict = "PROVISIONAL(gap exceeds the noise band, but only just)";
     } else {
-        printf("\n   VERDICT: the gap is inside the noise band. These two configurations are indistinguishable on this tier.\n");
+        $verdict = "NO DIFFERENCE (gap is inside the noise band)";
     }
+
+    printf("   %-16s %6.1f rps   vs baseline %+6.1f%%   %s\n", $variant, $mean, $gap, $verdict);
 }
 
-printf("\n   Noise band for this tier and profile: %.1f%%. Differences below that are not findings.\n", $worst);
-' "$SUMMARY" "$TIER" "$VARIANTS" "$ROUNDS" "$PROFILE" "$TTL" "$SECTION" "$SERIES"
+printf("\n   Differences below %.1f%% are not findings on this tier.\n", $worst);
+' "$BASE_RESULTS" "$TIER" "$VARIANTS" "$ROUNDS" "$PROFILE" "$TTL" "$SECTION" "$SERIES"
 
-printf '\n   Raw rounds are under %s%s-validate-r<n>/\n' "$ARTIFACT_ROOT" "$SERIES"
+printf '\n   Raw rounds are under %s/%s-validate-r<n>/\n' "$BASE_RESULTS" "$SERIES"

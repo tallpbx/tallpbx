@@ -47,59 +47,74 @@ All cells: 100 requests, concurrency 5, dialplan section, 100 % HTTP 200, `failu
 
 Caching is worth roughly 26 % end to end on this tier (20.7 best cached against 13.5 worst uncached). The order is monotonic — no inversion.
 
-### Variant comparison at `production-60`, 3 repeats each
+### Variant comparison — interleaved series, 3 rounds
 
-| Variant | rps (mean) | p50 ms | p95 ms | vs baseline |
-|:--|--:|--:|--:|:--|
-| `v-octane` | **175.6** | 11–26 | 19–74 | **×8.8** |
-| `v-fast` | 30.4 | 151–156 | 163–183 | **+53 %** |
-| `v-lua-fast` | 29.7 | 154 | 186 | +49 % |
-| `v-stock-dynamic` | 19.9 | 229–241 | 249–278 | baseline |
-| `v-stock-static` | 19.4 | 237–242 | 281–300 | −3 % |
-| `v-lua-stock` | 19.5 | 240 | 275 | −2 % |
+Rounds interleave every variant, so host drift hits all six equally. Each cell is preceded by two warm-up passes and its report is verified before the number is used.
 
-All cells: 100 % HTTP 200, `failures.log` empty.
+| Variant | rps (round 1 / 2 / 3) | mean | vs baseline |
+|:--|:--|--:|:--|
+| `v-octane` | 159.9 / 160.9 / 184.8 | **168.5** | **+970 %** |
+| `v-fast` | 22.4 / 26.7 / 27.5 | 25.5 | **+62 %** |
+| `v-lua-fast` | 21.6 / 26.6 / 28.1 | 25.4 | **+61.5 %** |
+| `v-stock-static` | 16.2 / 18.4 / 18.0 | 17.6 | +11.5 % |
+| `v-lua-stock` | 16.2 / 16.6 / 17.6 | 16.8 | +6.8 % |
+| `v-stock-dynamic` | 16.5 / 16.9 / 13.8 | 15.7 | baseline |
 
-**What the numbers say**
+All cells: 100 % HTTP 200, every report verified, `failures.log` empty.
 
-1. **The persistent worker is in a different class.** 175.6 rps against 19.9, with p50 falling from ~235 ms to 11–26 ms. This is far outside the noise band and it is the number the earlier series was reaching for. It only exists because the runner now posts Octane cells at `:8090`; the six earlier cells that posted to nginx measured PHP-FPM and were discarded.
-2. **The fast controller is worth about half again** on stock pools: 30.4 against 19.9, p50 down from ~235 to ~153 ms. Also outside the noise band.
-3. **Pool mode is not a lever on this tier.** Static 19.4 against dynamic 19.9 is inside the noise band, consistent with a 5-child pool serving 5 concurrent clients.
-4. **The Lua proxy produces no gain even when it is genuinely enabled.** `v-lua-stock` 19.5 against 19.4; `v-lua-fast` 29.7 against 30.4. The first run of these two variants is void — see the defect below. The second run had the proxy truly on, and it still matched the stock path exactly.
+**Measured noise band: 25.6 %** — much wider than the 1.8 % the two-variant validation run produced. The cause is known and is a harness artefact, not measurement noise: every variant restarted the persistent worker, and the Lua variants restarted FreeSWITCH, putting a boot transient inside the cell that followed. Both now restart only when the Lua state actually changes (`c44d87e`) and two warm-up passes absorb what remains. The verdicts below survive the wide band — the two "real" results clear it by 2.4×, and Octane by 38× — but a re-run would tighten it.
 
-### The Lua proxy: two defects, one of them in product code
+### What each optimisation actually buys
 
-**Defect 1 (harness, fixed).** `apply_lua_bindings` wrote `FS_LUA_PROXY_ENABLED` to `.env` and cleared the config cache, but never restarted the processes that hold configuration in memory. PHP-FPM re-reads `.env` on every request; the persistent worker boots once and keeps its configuration for its whole life. The proxy was therefore **off in the process that served the lookups**, the mirror was never written, and the first run of both Lua variants measured the stock path. The switch now restarts `tallpbx-xml-worker`, and enabling the proxy must prove an identity key appeared in Redis before the cell may run.
+The two serving paths answer two different questions, and each optimisation only shows up on its own path.
 
-**Defect 2 (product, open).** With the worker restarted, PHP writes the mirror correctly:
+| Path | Lever | Effect | Evidence |
+|:--|:--|:--|:--|
+| HTTP request into PHP | **fast controller** | **+45 to +51 %** | `v-stock-static` 17.6 → `v-fast` 25.5; `v-lua-stock` 16.8 → `v-lua-fast` 25.4 |
+| HTTP request into PHP | Lua proxy | **0 %** | `v-fast` 25.5 vs `v-lua-fast` 25.4; `v-stock-static` 17.6 vs `v-lua-stock` 16.8 |
+| FreeSWITCH directory lookup | **Lua proxy** | **~40× faster** | probe: ~63 ms per lookup without Lua, ~1.5 ms with it |
+| FreeSWITCH directory lookup | fast controller | 0 | `v-lua-stock` 1.5 ms ≈ `v-lua-fast` 1.3 ms |
+| Either path | Octane worker | **+970 % on HTTP** | 168.5 rps against 15.7 |
+
+Two consequences that were stated wrongly at first and are now settled by the data:
+
+1. **The fast controller is the whole gain on the HTTP path.** Lua adds nothing there because a Lua hit never reaches PHP — the client posts straight to PHP, so the proxy is not in its path.
+2. **The Lua proxy is the whole gain on the FreeSWITCH path.** In front of the fast controller and in front of the stock path it produces the same ~1.5 ms lookup, because it answers before either PHP path is consulted.
+
+### The Lua proxy: three defects, all fixed
+
+| # | Defect | Where | Effect |
+|:--|:--|:--|:--|
+| 1 | The switch never restarted the persistent worker | harness | The flag lived in `.env` but the process serving lookups kept `false` |
+| 2 | The shared epoch key was seeded once and never updated | **product** | The handler built `…:e85` while PHP wrote `…:e210`; every lookup missed |
+| 3 | `mod_lua` was never told to re-read `lua.conf.xml` | harness | The bindings stayed inert in the running module |
+
+The product fix (`e3cd54e`) publishes the epoch through one method that keeps the shared key in step and only ever moves it upwards. The harness fixes (`62661ed`, `c44d87e`) restart FreeSWITCH when the binding state changes and prove the result behaviourally.
+
+**Verified end to end**, by counting how many lookups reach PHP:
 
 ```
-ttl=59  len=14026  pbx:fsxml:dir:17:domain:load.test.local:2000:v98
-ttl=59  len=2      pbx:fsxml:tenant:user:load.test.local:2000:e210
+proxy off : 10 lookups -> 10 PHP requests   PHP served every one
+proxy on  : 10 lookups ->  0 PHP requests   FreeSWITCH served every one
 ```
 
-but the epoch embedded in the identity key (`e210`) does not match the shared epoch key the Lua handler reads:
+`apply_lua_bindings on` now refuses to pass unless the mirror is writable *and* the handler demonstrably serves, so this cannot silently regress into a measurement again.
 
-```
-pbx:fsxml:ver:global = 85
-```
+### FreeSWITCH lookup probe — the measurement that sees Lua
 
-`DirectoryXmlBuilder` publishes the identity key under `max($epoch, $mirrorEpoch)`, but `ver:global` is only *seeded* (`writeGlobalVersionIfMissing`) and never updated, so it still holds the older 85. The Lua handler reads 85, builds `…:e85`, and never finds the `…:e210` PHP wrote. **Every Lua lookup misses.** The mirror keys are structurally identical, but the epoch value disagrees, so the proxy cannot serve a single hit.
+Per lookup, from the interleaved rounds:
 
-The cost of that miss is visible in the probe: with the proxy off, a FreeSWITCH directory lookup costs about 6.5 ms; with it on, the same lookup costs 35–52 ms, because every lookup pays for the Lua path *and* the PHP fallback.
+| Variant | probe, 30 lookups (r1 / r2 / r3) | per lookup |
+|:--|:--|--:|
+| `v-stock-static` | 2031 / 1906 / 1720 ms | **~63 ms** |
+| `v-octane` | 2078 / 1592 / 1660 ms | **~59 ms** |
+| `v-fast` | 132 / 1032 / 1060 ms | 4–35 ms, unstable |
+| **`v-lua-stock`** | 55 / 38 / 39 ms | **~1.5 ms** |
+| **`v-lua-fast`** | 38 / 40 / 13 ms | **~1.3 ms** |
 
-**Consequence for the series.** The Lua proxy cannot be classified as "optional" or "no longer considered" from these numbers, because the numbers describe a proxy that always misses. The honest statement today is: *with the epoch mismatch present, the proxy is pure overhead on this tier.* Fixing defect 2 is a product change, and it is a separate decision from measuring it.
+The no-Lua numbers are ~60 ms because FreeSWITCH's first gateway is the Octane worker on `:8090`, so every lookup pays a worker round trip. With the proxy on, Redis answers first and that round trip disappears.
 
-### FreeSWITCH lookup probe — two clear regimes
-
-| When | net_ms for 30 lookups | Per lookup |
-|:--|--:|--:|
-| During the first baseline sweep (cold page cache, fresh clone) | 1486–1732 | ~50 ms |
-| During the variant sweep (warm cache) | 173–215 | ~6–7 ms |
-
-With `lua_bindings=on` the probe read 202 ms and 215 ms, against 196 ms for stock static with the bindings off. **Turning the Lua proxy on did not make a directory lookup faster.** No Lua script errors were logged today, and `mod_lua` is loaded before `mod_xml_curl`, so the binding is live; the likely explanations are an unpopulated Redis mirror or a key/DB mismatch between what Laravel writes and what the handler reads. That needs the mirror-TTL attribution described in D5 before any conclusion about the proxy is drawn.
-
-The 50 ms to 6 ms difference also answers part of the earlier open question: the first sweep was measuring a cold SQLite page cache, not a property of the lookup path.
+An earlier note here claimed Lua gave "no gain" and later that it paid off "only in front of the fast controller". Both were artefacts: the first from measuring a proxy that never served, the second from reading an HTTP table that cannot see the proxy at all. The table above is the first valid Lua measurement in the series.
 
 ### Service monitoring during the XML runs (sanity check)
 
@@ -188,8 +203,11 @@ Every cell also records `available_ram_mb` and `swap_used_mb` in its JSON, so th
 
 ## Next actions, in order
 
-1. Explain why `lua:on` does not speed up a directory lookup (mirror unpopulated, or key/DB mismatch) before recording any verdict on the Lua proxy.
-2. Run the `directory` section for the two surviving paths, since `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things. Memory headroom is 340 MB with no active paging, so this is expected to be clean; the `fs-db` tmpfs ablation is the one that must run alone.
-3. Run the failure ramp (fixed concurrency, doubling total requests) for `v-octane` and `v-fast` to find where each saturates.
-4. Run the SIP phases for the surviving variants, including the ESL `full` and throttle-`0` ablations.
+1. **Task 6 — the SIP phases.** Register the endpoints, run the 14 feature scenarios and a call-rate ladder per variant, and add the CDR check that is currently missing: count `cdrs` rows before and after a SIP cell and fail the cell when call legs happened but no record landed. The XML phases prove the CDR pipeline was *not* disturbed (0 rows, verified); nothing yet proves a call is recorded.
+2. **The ESL `full` and throttle-`0` ablations**, which belong to the SIP phase because that is the only phase that produces events.
+3. Run the `directory` section for the surviving paths — `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things.
+4. Run the failure ramp (fixed concurrency, doubling total requests) for `v-octane` and `v-fast` to find where each saturates.
 5. Decide whether app-side timing (`timing.enabled`) is needed to split worker time from queue time.
+6. Re-run the interleaved series once with the restart fix in place (`c44d87e`) to tighten the 25.6 % band before the results are published.
+
+Two things are deliberately *not* on this list: a special re-run to re-validate the Lua proxy (the behavioural gate now proves it on every enable), and any further cache-policy sweep (settled by D6).

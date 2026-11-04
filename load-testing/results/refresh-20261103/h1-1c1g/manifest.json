@@ -1,7 +1,7 @@
 {
     "build": {
         "branch": "5.x",
-        "commit": "02ff39270f32aa9e6041da065787192a6e7a2a59",
+        "commit": "20dddfbefcf03f2d2979b453a40a3ae5356f9096",
         "dirty": false
     },
     "host": {
@@ -11,9 +11,9 @@
         "architecture": "x86_64",
         "cpu_cores": 1,
         "memory_mb": 967,
-        "available_mb": 202,
+        "available_mb": 213,
         "swap_total_mb": 2048,
-        "swap_free_mb": 1885
+        "swap_free_mb": 1862
     },
     "runtime": {
         "php_version": "8.5.12",
@@ -189,7 +189,7 @@
         "nftables_active": true,
         "tallpbx_table_present": true,
         "rule_count": 0,
-        "ruleset_sha256": "3cb63fd04e43b39a2bdd37ebebf7cc69634b5c682b886520589e074394b3eee3"
+        "ruleset_sha256": "08192a6496999545bf349a3fd2314953232be86b553127265afbf1c6f9bbe375"
     },
-    "recorded_at": "2026-11-04T02:17:30+00:00"
+    "recorded_at": "2026-11-04T03:16:09+00:00"
 }
