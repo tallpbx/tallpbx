@@ -783,10 +783,16 @@ assert_lua_serves() {
 restart_listener() {
     local attempt
 
-    if ! systemctl restart freeswitch-listener >/dev/null 2>&1; then
-        fail_switch "could not restart freeswitch-listener"
-        return 1
-    fi
+    # Back-to-back restarts of the same unit can fail while systemd is still
+    # starting the previous one, so the restart is attempted a few times
+    # before the cell is failed.
+    for attempt in 1 2 3; do
+        if systemctl restart freeswitch-listener >/dev/null 2>&1; then
+            break
+        fi
+
+        sleep 3
+    done
 
     for attempt in $(seq 1 30); do
         if systemctl is-active freeswitch-listener >/dev/null 2>&1; then
