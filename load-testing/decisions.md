@@ -188,6 +188,40 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 ---
 
+## D15 — The SIP realm comes from the host, not from the harness
+
+**Decision:** The realm a tenant is seeded on is read from the PBX's own `FS_DEFAULT_SIP_REALM` unless the operator sets `DOMAIN` or `LOAD_DOMAIN` explicitly.
+
+**Why:** FreeSWITCH resolves a registering user under the realm its profile names. A tenant seeded on any other realm cannot register at all, and the failure looks like a credential problem — 401/403 on the second REGISTER, with the directory reporting `Can't find user [2019@<appliance address>]`. The realm the host serves is a property of the host, so the harness reads it instead of assuming one.
+
+**Rejected:** hard-coding `load.test.local`, which is what the guide said and which no host served.
+
+**Status:** settled.
+
+---
+
+## D16 — A SIP cell is judged by the records its calls leave
+
+**Decision:** Every SIP cell counts `cdrs` rows before and after, waits for the rows the completed calls require, and fails the cell when a completed call left no record, fewer records than calls, or when the cell placed no calls at all.
+
+**Why:** the XML phases can only prove the CDR pipeline was left undisturbed. Nothing proved that a call was recorded, so a cell could report every call answered while the worker was dead — the failure would only surface when someone looked for a bill.
+
+**Also:** the wait is driven by the outcome, not by the count looking stable. The pipeline does not necessarily start writing while the cell is still running, so three unchanged samples read as "settled" before the worker had done anything.
+
+**Status:** settled.
+
+---
+
+## D17 — Registration is warmed and sent once
+
+**Decision:** The runner prefetches every extension's directory entry before a SIP cell, and the REGISTER scenario sends its request once rather than retransmitting it.
+
+**Why:** a cold directory lookup on this tier costs about 1.1 s against 72 ms warm. A client's default retransmit timer is 500 ms, so the request was sent twice and the server answered the second copy with a challenge of its own — which the scenario cannot place, so the step failed for a reason unrelated to what it measures. Registration is setup for the capacity measurement rather than part of it.
+
+**Status:** settled.
+
+---
+
 ## Open questions
 
 | Question | Why it matters |
@@ -196,3 +230,4 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 | Should the manifest be timestamped per invocation? | It is overwritten each run, so a tier measured across several invocations keeps only the last one |
 | Can the probe prove *who served* a lookup rather than what is configured? | Answered for the first time: with the proxy genuinely enabled the lookup got **slower** (6.5 ms to 35–52 ms) because every lookup misses the mirror and pays for both paths. The mirror epoch mismatch is the open defect |
 | Should app-side timing be enabled for XML cells? | `timing.enabled` is `false`, so no request/handler split exists |
+| Does the rendered tenant profile actually reach FreeSWITCH? | The profile row now names the tenant realm, but the running profile still resolved registrations under the appliance realm. The reconciliation between the rendered configuration and the boot file is a product gap, not a harness one |

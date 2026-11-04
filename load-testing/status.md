@@ -20,7 +20,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 | 3 — Switch helpers | Complete; every `apply_*` has an `assert_*` |
 | 4 — Matrix runner | Complete, including per-variant URL, lookup probe, `--ttl` filter and archive step |
 | 5 — XML battery | **In progress.** All six variants measured at `production-60` with 3 repeats; the baseline also has the full six-policy sweep. Not yet measured: the failure ramp, the directory section, and the other load profiles |
-| 6 — SIPp validation and ladder | Not started |
+| 6 — SIPp validation and ladder | **In progress.** The first cell passes end to end (20 registrations, 15 calls, 0 failures, CDR gate ok). The CDR gate the plan asked for now exists and is applied to every SIP cell. The other five variants and the call-rate ladder are still to run |
 | 7 — Ablations | Not started (design exists: `fs-loglevel`, `fs-db`, plus the proposed ESL and throttle ablations) |
 | 8 — Saturation profiling | Not started |
 | 9 — CDR transport benchmarks | Not started |
@@ -177,6 +177,47 @@ Every cell also records `available_ram_mb` and `swap_used_mb` in its JSON, so th
 
 ---
 
+### Task 6 — SIP phase: the first cell
+
+The XML phase measures document lookups. The SIP phase measures calls: endpoints register, calls are placed, and every completed call has to leave a record behind.
+
+| Step | Result |
+|:--|:--|
+| `register` | 20 registrations, **20 successful**, 0 failed |
+| `extension-calls` | 10 calls, **10 successful**, 0 failed |
+| `outbound-calls` | 5 calls through the gateway, **5 successful**, 0 failed |
+| CDR gate | **ok** — 25 new `cdrs` rows for the cell |
+
+The 25 rows are 20 from the bridged extension calls (two legs each) and 5 from the outbound calls, which are recorded on the originating leg only. The gate compares the rows against the calls SIPp completed and fails the cell when a call leaves nothing behind.
+
+This is the first cell of the SIP phase. One cell is a working measurement, not a comparison: the other five variants have to run through the same three steps before the phase says anything about the serving paths.
+
+### The SIP realm: why a tenant could not register at all
+
+Every endpoint of every tenant failed to register with 401/403, which reads like a credentials problem and is not one.
+
+```
+[WARNING] sofia_reg.c: Can't find user [2019@162.243.62.138] from 107.170.3.55
+```
+
+FreeSWITCH resolves a registering user under the realm its profile names, and the tenant profiles carried the appliance-wide `$${domain}` — the box's own address. The directory has no users under that realm, so the lookup missed every time.
+
+Two fixes, one in the product and one in the harness:
+
+- **Product:** a tenant's SIP profile now names the tenant's own realm, and omits the keys entirely when the tenant has none, so the client's own domain survives (`203cfef`).
+- **Harness:** the realm now comes from the host's own `FS_DEFAULT_SIP_REALM` rather than a hard-coded default, because a tenant seeded on a realm the PBX does not serve cannot register (`42899ed`).
+
+The same burst that failed for every user now completes with zero failures.
+
+### A cold directory lookup costs more than a client's retransmit timer
+
+| Lookup | Cost |
+|:--|--:|
+| First lookup for an extension (cold) | **1131 ms** |
+| The same lookup warm | **72 ms** |
+
+SIPp retransmits a REGISTER after 500 ms. A cold lookup outlasts that, the request is sent twice, and FreeSWITCH answers the retransmission with a challenge of its own — which the scenario cannot place, so the step failed for a reason unrelated to what it measures. The scenario now sends the REGISTER once, and the runner warms the directory before registering.
+
 ## Defects found and fixed
 
 ### Product code
@@ -186,6 +227,7 @@ Every cell also records `available_ram_mb` and `swap_used_mb` in its JSON, so th
 | `scripts/resources/freeswitch.sh` had an unterminated quote | The whole FreeSWITCH resource step aborted, so `mod_json_cdr` was never provisioned and no CDR ever reached the table |
 | `appliance:sync-host` used a blanket `UPDATE` on `tenant_domains` | A cloned host collided with the unique key and aborted the installer; now reconciles row by row |
 | `pbx:load-test:seed` prefixed every `--output` with `base_path()` | An absolute path was written into a bogus `<app>/var/www/…` tree, and the working copy was left dirty enough to block the installer |
+| Tenant SIP profiles forced the appliance-wide `$${domain}` | Every endpoint of every tenant answered 401/403 on registration, because the directory has no users under the appliance realm |
 
 ### Harness
 
@@ -198,12 +240,17 @@ Every cell also records `available_ram_mb` and `swap_used_mb` in its JSON, so th
 | Restore left `FS_LUA_PROXY_ENABLED=true` with bindings commented | A half-applied pair that fills a mirror nothing reads; now reconciled on every restore |
 | Matrix cache written into the artifact root | Every invocation, including `--list`, added an untracked file to a committed directory |
 | Test runs archived into the real archive root | Pest output appeared beside measured data; the archive default now requires an unoverridden artifact root |
+| SIPp ran against the local CSV instead of the credential file | A registration without an `Authorization` header draws a second challenge; the diagnostic trail pointed at credentials instead of at the missing column |
+| The seeded outbound gateway pointed at `127.0.0.1` | Every outbound call answered 503 before a packet reached the generator |
+| The CDR wait looked for a stable row count | The pipeline had not started writing, so three identical samples read as settled; the wait is now driven by the rows the completed calls require |
+| The SIP realm was hard-coded to `load.test.local` | A tenant seeded on a realm the PBX does not serve cannot register at all |
+| The REGISTER was retransmitted after 500 ms | A cold lookup (1131 ms) drew a second challenge the scenario could not place |
 
 ---
 
 ## Next actions, in order
 
-1. **Task 6 — the SIP phases.** Register the endpoints, run the 14 feature scenarios and a call-rate ladder per variant, and add the CDR check that is currently missing: count `cdrs` rows before and after a SIP cell and fail the cell when call legs happened but no record landed. The XML phases prove the CDR pipeline was *not* disturbed (0 rows, verified); nothing yet proves a call is recorded.
+1. **Task 6 — the SIP phases.** The CDR gate the plan asked for now exists and is applied to every SIP cell: it counts `cdrs` rows before and after, waits for the rows the completed calls require, and fails the cell when a call leaves nothing behind. The first cell passes end to end. What remains is the comparison: the other five variants through the same three steps, then the 14 feature scenarios on the two primary variants and the call-rate ladder.
 2. **The ESL `full` and throttle-`0` ablations**, which belong to the SIP phase because that is the only phase that produces events.
 3. Run the `directory` section for the surviving paths — `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things.
 4. Run the failure ramp (fixed concurrency, doubling total requests) for `v-octane` and `v-fast` to find where each saturates.
