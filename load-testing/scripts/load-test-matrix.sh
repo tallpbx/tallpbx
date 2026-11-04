@@ -37,6 +37,10 @@ source "${ROOT_DIR}/load-testing/scripts/lib/manifest.sh"
 # The three execution phases every tier x variant combination can run.
 PHASES=(xml sip ablation)
 
+# The profile used to warm a variant up before anything is measured. The
+# matrix labels it "Warm-up" for exactly this purpose.
+WARMUP_PROFILE="25x1"
+
 SERIES="${SERIES:-refresh-$(date +%Y%m%d)}"
 ARTIFACT_ROOT="${ARTIFACT_ROOT:-${ROOT_DIR}/load-testing/results/${SERIES}}"
 PBX_HOST="${PBX_HOST:-local}"
@@ -479,6 +483,23 @@ xml_command() {
     fi
 }
 
+# Build the command that checks one cell report against what the matrix asked
+# for: the counters must add up, every successful response must have a
+# latency sample, and the run must have been measured against the server that
+# variant uses.
+verify_command() {
+    local tier="$1" variant="$2" profile_id="$3" ttl_id="$4" section="$5" repeat="$6"
+    local report label requests url
+
+    report="${REMOTE_ARTIFACT_ROOT}/${tier}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
+    label="${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
+    requests="$(matrix_value xml_profiles "$profile_id" requests)"
+    url="$(xml_url_for_variant "$variant")"
+
+    printf 'cd %q && php artisan pbx:load-test:verify %q --expect-endpoint=%q --expect-label=%q --expect-requests=%q' \
+        "$REMOTE_APP_DIR" "$report" "$url" "$label" "$requests"
+}
+
 # Build the FreeSWITCH lookup probe for one XML cell.
 #
 # The HTTP client asks PHP directly, so it can never see a Lua cache hit: a hit
@@ -548,6 +569,12 @@ dry_run_cells() {
 
                 case "$phase" in
                     xml)
+                        # The warm-up cell is printed first because it runs
+                        # first: the first requests after a switch are always
+                        # slower, and measuring them would understate the
+                        # variant.
+                        printf '  %s\n' "$(xml_command "$tier" "$variant" "$WARMUP_PROFILE" "$(warmup_ttl)" "$(selected_sections | head -n1)" 0)"
+
                         for section in $(selected_sections); do
                             while IFS= read -r profile_id; do
                                 [ -z "$PROFILE" ] || [ "$PROFILE" = "$profile_id" ] || continue
@@ -595,6 +622,19 @@ selected_sections() {
     fi
 
     matrix_list_sections
+}
+
+# The cache policy a warm-up cell runs under.
+#
+# It uses the policy the run is measuring, so the warm-up exercises the same
+# cache configuration the measured cells will.
+warmup_ttl() {
+    if [ -n "$TTL" ]; then
+        printf '%s\n' "$TTL"
+        return
+    fi
+
+    matrix_keys cache_ttl_profiles | head -n1
 }
 
 # List the XML sections declared in the matrix.
@@ -739,6 +779,27 @@ run_xml_phase() {
         printf 'XML-HANDLER-NOT-READY after applying %s\n' "$variant" >&2
     fi
 
+    # Warm-up cell: the first requests after a switch are always slower,
+    # because the pool has just restarted and the worker has just booted.
+    # Measuring that as a repeat understates the variant, so a small warm-up
+    # cell runs first and is kept as evidence under its own name rather than
+    # counted as a measurement.
+    warmup_ttl_id="$(warmup_ttl)"
+    warmup_section="$(selected_sections | head -n1)"
+    warmup_log="${ARTIFACT_ROOT}/${TIER}/logs/${TIER}_${variant}_warmup.log"
+
+    mkdir -p "$(dirname "$warmup_log")"
+
+    switch_call apply_ttl \
+        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" dialplan)" \
+        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" contributor)" \
+        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" directory)" \
+        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" acl)" >/dev/null 2>&1 || true
+
+    if ! run_on_pbx "$(xml_command "$TIER" "$variant" "$WARMUP_PROFILE" "$warmup_ttl_id" "$warmup_section" 0)" > "$warmup_log" 2>&1; then
+        printf 'WARMUP-FAILED %s/%s\n' "$TIER" "$variant" >&2
+    fi
+
     while IFS= read -r section; do
         while IFS= read -r profile_id; do
             if [ -n "$PROFILE" ] && [ "$PROFILE" != "$profile_id" ]; then
@@ -768,6 +829,14 @@ run_xml_phase() {
                     # nobody can diagnose.
                     if ! run_on_pbx "$(xml_command "$TIER" "$variant" "$profile_id" "$ttl_id" "$section" "$repeat")" > "$cell_log" 2>&1; then
                         cell_failed "$label"
+                        continue
+                    fi
+
+                    # A cell that ran is not automatically a cell that measured
+                    # what it claimed. The report is checked against the
+                    # matrix before its numbers may be used.
+                    if ! run_on_pbx "$(verify_command "$TIER" "$variant" "$profile_id" "$ttl_id" "$section" "$repeat")" >> "$cell_log" 2>&1; then
+                        cell_failed "$label (report failed verification)"
                     fi
                 done
 

@@ -190,6 +190,38 @@ describe('load test matrix runner', function (): void {
             ->not->toContain('100x5-cache-hit-60-dialplan');
     });
 
+    it('runs a warm-up cell before the measured ones', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-octane', '--phase=xml', '--profile=100x5', '--ttl=production-60', '--section=dialplan', '--repeats=1'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // The first requests after a switch are always slower: the pool has
+        // restarted and the worker has booted. Measuring that as a repeat
+        // understates the variant, so a warm-up cell runs first and is kept
+        // as evidence rather than counted as a measurement.
+        $lines = array_values(array_filter(explode("\n", $process->getOutput())));
+
+        $warmup = null;
+        $measured = null;
+
+        foreach ($lines as $index => $line) {
+            if (str_contains($line, '25x1') && $warmup === null) {
+                $warmup = $index;
+            }
+
+            if (str_contains($line, '100x5-production-60') && $measured === null) {
+                $measured = $index;
+            }
+        }
+
+        expect($warmup)->not->toBeNull()
+            ->and($measured)->not->toBeNull()
+            ->and($warmup)->toBeLessThan($measured);
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 
