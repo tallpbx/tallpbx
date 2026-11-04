@@ -101,18 +101,29 @@ With `lua_bindings=on` the probe read 202 ms and 215 ms, against 196 ms for stoc
 
 The 50 ms to 6 ms difference also answers part of the earlier open question: the first sweep was measuring a cold SQLite page cache, not a property of the lookup path.
 
-### ESL listener and Reverb under XML-only load
+### Service monitoring during the XML runs (sanity check)
 
-Alternating runs of the same cell, warm-up discarded:
+The XML handler tests produce no SIP events, so the ESL listener and Reverb should be idle throughout. That is an assumption worth checking rather than asserting, because a service quietly burning CPU on every measurement would put a floor under the whole tier and make every comparison meaningless.
 
-| Condition | rps | p50 ms |
-|:--|:--|--:|
-| Both services running | 20.4 / 20.1 | 237 / 238 |
-| Both services stopped | 20.0 / 19.3 | 238 / 243 |
+The whole monitored run — `v-stock-static` and `v-octane`, three repeats each, 131 samples at two-second intervals — was sampled on the host:
 
-CPU attribution over a 20-second window: `esl-listener` **0 ticks**, `reverb` **0 ticks**, `php-fpm` 29.75 % of one core, `freeswitch` 1.40 %, `mariadb` 0.85 %, `redis` 0.80 %, `octane-worker` 1.20 %.
+| Class | CPU average | CPU peak | RAM held (start → end) | RAM attributed (peak) |
+|:--|--:|--:|:--|--:|
+| `php-fpm` | 7.49 % | 109 % | 334.6 → 112.4 MB | 86.1 MB |
+| `freeswitch` | 2.20 % | 16 % | 58.5 → 62.9 MB | 124.3 MB |
+| `octane-worker` | 1.47 % | 2 % | 85.9 → 86.0 MB | 58.2 MB |
+| `redis` | 0.69 % | 2.5 % | 12.1 → 11.8 MB | 5.1 MB |
+| `cdr-worker` | 0.16 % | 1 % | 60.6 → 60.6 MB | 39.1 MB |
+| `scheduler` | 0.11 % | 0.5 % | 46.7 → 46.7 MB | 24.2 MB |
+| `queue-worker` | 0.07 % | 1 % | 71.4 → 70.0 MB | 48.1 MB |
+| **`esl-listener`** | **0.02 %** | **0.5 %** | **80.5 → 80.4 MB** | 53.1 MB |
+| **`reverb`** | **0.02 %** | **0.5 %** | **84.2 → 83.7 MB** | 56.8 MB |
 
-Conclusion: neither service consumes measurable CPU during XML-only tests. Both remain at their baseline settings for XML work; the `full` and throttle-off comparisons belong to the SIP phases.
+**Verdict: both services are idle, and their memory does not move.** One clock tick in a two-second window is 0.5 % of a core, so the peak of 0.5 % is a single 10 ms slice — the listener and Reverb did no measurable work during the entire run. Their resident memory was flat to within a megabyte across 262 seconds of continuous load, so neither leaks nor grows a cache while the XML handler serves.
+
+The `php-fpm` peak above 100 % is expected: the figure sums all five workers, so more than one core means the pool was saturated across several workers at once. `freeswitch` peaks at 16 % while serving lookups for the Octane variant.
+
+The raw samples and the script that produced them are in `monitoring/` beside the tier artifacts.
 
 ### Host memory state at the end of the variant sweep
 

@@ -255,13 +255,21 @@ The manifest is rewritten at the start of every invocation. A tier measured acro
 
 ### `scripts/tools/cpuwatch.sh`
 
-Attributes CPU to each service over a window. It classifies processes by command line, because every PHP service shares the same binary name.
+Attributes CPU and memory to each service. Two modes:
 
 ```bash
-bash load-testing/scripts/tools/cpuwatch.sh 20 "XML cell"
+# One aggregate window
+bash load-testing/scripts/tools/cpuwatch.sh 20 "idle check"
+
+# Repeating samples while a test runs, one CSV row per class per interval
+bash load-testing/scripts/tools/cpuwatch.sh --sample 2 420 "xml-run"
 ```
 
-Output is one line per class — `esl-listener`, `reverb`, `octane-worker`, `cdr-worker`, `queue-worker`, `freeswitch`, `php-fpm`, `mariadb`, `redis` — in ticks and percent of one core. A class reporting `ticks=0` spent no measurable CPU in that window.
+The sampling mode writes `label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb` to stdout, so a run can be watched rather than guessed at: it shows whether a service was idle for the whole run or busy during part of it.
+
+Classes: `esl-listener`, `reverb`, `octane-worker`, `cdr-worker`, `queue-worker`, `scheduler`, `freeswitch`, `php-fpm`, `mariadb`, `redis`.
+
+A class reporting zero CPU is genuinely idle: one clock tick is 10 ms, so a two-second sample cannot hide more than 0.5 % of a core.
 
 ### `scripts/tools/ab-esl-reverb.sh`
 

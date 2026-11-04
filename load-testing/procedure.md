@@ -120,7 +120,33 @@ done
 
 ---
 
-## Step 7 — SIP phases
+## Step 7 — Watch the services while the cells run
+
+The XML tests generate no SIP events, so the ESL listener and Reverb must be idle. That is worth checking rather than assuming: a service quietly consuming CPU would put a floor under every number and make the variant comparison meaningless.
+
+Start the sampler on the PBX, then run the cells, then stop it:
+
+```bash
+ssh "$PBX_HOST" 'nohup bash /root/cpuwatch.sh --sample 2 420 "xml-run" > /root/xml-monitor.csv 2>/dev/null &'
+
+bash load-testing/scripts/load-test-matrix.sh \
+  --tier=h1-1c1g --variant=v-stock-static --phase=xml \
+  --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
+
+scp "$PBX_HOST":/root/xml-monitor.csv load-testing/results/<series>/<tier>/monitoring/
+```
+
+**Acceptance criteria:**
+
+- `esl-listener` and `reverb` average well under 1 % of a core, and their resident memory is flat from the first sample to the last.
+- `php-fpm` shows the load. A figure above 100 % means the pool was saturated across several workers at once, which is expected at this concurrency.
+- Any service that is busy but should be idle is a finding, not a detail — it belongs in the report.
+
+The recorded run is in `monitoring/` beside the tier artifacts.
+
+---
+
+## Step 8 — SIP phases
 
 ```bash
 bash load-testing/scripts/load-test-matrix.sh \
@@ -133,7 +159,7 @@ This is the only phase where ESL profile, broadcast throttling and CDR transport
 
 ---
 
-## Step 8 — Keep the results
+## Step 9 — Keep the results
 
 ```bash
 git add load-testing/results/<series>
@@ -144,7 +170,7 @@ git commit -m "chore(load-test): record <series> raw artifacts"
 
 ---
 
-## Step 9 — When something fails
+## Step 10 — When something fails
 
 | Marker | Meaning | Action |
 |:--|:--|:--|
@@ -159,7 +185,7 @@ A cell failure never aborts the series: the runner records it in `failures.log` 
 
 ---
 
-## Step 10 — Write the report
+## Step 11 — Write the report
 
 A series produces a **new** report file. `docs/load-testing-results.md` is the record of an earlier series and is not rewritten.
 
