@@ -304,9 +304,14 @@ it('verifies that FreeSWITCH domain listeners have been migrated out of app/List
         new RecursiveDirectoryIterator($projectRoot.'/app/Listeners')
     );
 
+    // Only the top level is guarded. A subdirectory holds listeners that belong
+    // to a runtime rather than to a PBX domain — app/Listeners/Octane holds the
+    // worker lifecycle listeners registered in config/octane.php — so walking
+    // the tree recursively would fail this test for reasons unrelated to the
+    // rule it exists to protect: no FreeSWITCH domain listener may live here.
     $appListeners = [];
     foreach ($iterator as $file) {
-        if ($file->isFile() && $file->getExtension() === 'php') {
+        if ($file->isFile() && $file->getExtension() === 'php' && $file->getPath() === $projectRoot.'/app/Listeners') {
             $appListeners[] = $file->getFilename();
         }
     }
