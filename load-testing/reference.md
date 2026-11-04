@@ -52,6 +52,39 @@ An unknown tier, variant, phase or cache policy exits non-zero before anything r
 
 ---
 
+## SIPp runner variables
+
+`scripts/pbx-sipp-validate.sh` runs **on the orchestrator**, not on the PBX. The matrix runner supplies `PBX_HOST`, `TENANT`, `DOMAIN`, `EXTENSIONS`, `START`, `PASSWORD`, `SKIP_SEED=1`, `CALL_RATE` (from `--cps`) and `RUN_DIR`; everything else keeps its default and can be overridden for a hand-run.
+
+| Variable | Default | Meaning |
+|:--|:--|:--|
+| `PBX_HOST` | `127.0.0.1` | SIP target — the PBX under test |
+| `PBX_PORT` | `5060` | SIP port on the PBX |
+| `LOAD_GENERATOR_IP` | first local IPv4 | Address the PBX must be able to reach |
+| `TENANT` / `DOMAIN` | `load-test-beta` / `load.test.local` | Seeded tenant and realm |
+| `EXTENSIONS` / `START` | `20` / `2000` | Accounts to use and the first number |
+| `PASSWORD` | `LoadTest1234` | SIP password for those accounts |
+| `SKIP_SEED` | `0` | `1` reuses accounts that are already seeded |
+| `SIPP_UAS_PORT` | `5088` | Auto-answer UAS port |
+| `UAC_LOCAL_PORT` | `5064` | Caller source port for simple scenarios |
+| `EXTENSION_UAS_LOCAL_PORT` | `5066` | Extension scenario listener |
+| `REGISTER_LOCAL_PORT` | = `EXTENSION_UAS_LOCAL_PORT` | Registration listener |
+| `OUTBOUND_UAC_LOCAL_PORT` | `5068` | Outbound gateway scenario |
+| `EXTENDED_UAS_PORT` | `5090` | Extended scenario UAS |
+| `EXTENDED_UAC_LOCAL_PORT` | `5100` | Base for six extended callers, stepping by 2 |
+| `REGISTER_RATE` | `5` | Registrations per second |
+| `REGISTER_COUNT` | = `EXTENSIONS` | Registrations to send |
+| `EXTENSION_UAS_COUNT` | = `EXTENSIONS` | Extension UAS instances |
+| `CALL_RATE` | `2` | Offered calls per second |
+| `MAX_SIMULTANEOUS` | `5` | Concurrent calls permitted |
+| `CALLS` | `10` | Total calls per scenario |
+| `OUTBOUND_CALL_RATE` | `1` | Gateway round-trip pacing |
+| `RUN_DIR` | — | Where the scenario logs and SIPp statistics are written |
+
+The generator's kernel and socket preparation, the port map in context, and the two pitfalls (stray UAS on rebind, short registration lease) are in [`remote-setup.md` §13](remote-setup.md).
+
+---
+
 ## What one tier invocation does
 
 1. **Preflight** — refuses to continue if the PBX is missing `load-testing/scripts/lib/switch.sh`, the matrix config, the manifest command, `fs_cli` or `nginx`.

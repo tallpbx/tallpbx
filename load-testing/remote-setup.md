@@ -29,6 +29,8 @@ ssh "$PBX_HOST" 'cd /var/www/tallpbx && git rev-parse --short HEAD && git branch
 
 **Expected:** the branch is `5.x`, the commit equals `origin/5.x`, and `git status --porcelain` prints nothing. A dirty tree blocks the installer's own fast-forward, so it must be resolved first.
 
+> If the host was created from a snapshot of another appliance, its address changes and §14 must run before anything is measured.
+
 ---
 
 ## 2. Install and repair (idempotent)
@@ -297,6 +299,100 @@ command -v sipp && tc qdisc show | head -3
 ```
 
 **Expected:** 16777216 / 16777216 / `10000 65000`, `nofile` 65535, **zero** firewall lines, only the default `fq_codel` qdisc, and `sipp` on the path.
+
+### Why each of these exists
+
+| Change | Default on a fresh host | Why it is required |
+|:--|:--|:--|
+| `rmem_max` / `wmem_max` = 16 MB | 208 KB (Debian) | SIPp's socket buffers are capped by the kernel; a small cap makes the generator drop packets under burst instead of the PBX |
+| `ip_local_port_range` = 10000–65000 | 32768–60999 | Hundreds of simultaneous calls need ephemeral ports; the default range exhausts in seconds |
+| `nofile` 65535 | 1024 (or 1024/1048576) | One descriptor per socket; at `1024` SIPp fails to open its own call legs and the run measures the limit, not the PBX |
+| no firewall | host dependent | A generator that filters its own traffic silently caps every variant at the same ceiling |
+| no traffic shaping | `fq_codel` default | Anything else adds latency the PBX did not cause |
+
+Each setting is proven above rather than assumed. A run started without these measures the generator.
+
+### SIPp port map
+
+Every SIPp role binds a fixed port on the generator. They must be free, and they must not collide with anything the generator itself runs (5060 and 5080 are FreeSWITCH's internal and external Sofia profiles, 5088 is the gateway UAS).
+
+| Variable | Port | Used by |
+|:--|--:|:--|
+| `PBX_PORT` | 5060 | The PBX target, not a local bind |
+| `UAC_LOCAL_PORT` | 5064 | Caller-side source for simple scenarios |
+| `EXTENSION_UAS_LOCAL_PORT` / `REGISTER_LOCAL_PORT` | 5066 | Extension and registration scenarios |
+| `OUTBOUND_UAC_LOCAL_PORT` | 5068 | Outbound gateway scenario |
+| `SIPP_UAS_PORT` | 5088 | Auto-answer UAS (gateway-side media) |
+| `EXTENDED_UAS_PORT` | 5090 | Extended scenario UAS |
+| `EXTENDED_UAC_LOCAL_PORT` | 5100, +2, +4, +6, +8, +10 | Six extended scenarios share this base and step upward |
+
+The 5100 base exists precisely so a generator that also runs FreeSWITCH does not collide with 5060, 5080 or 5088.
+
+### Rate and volume variables
+
+| Variable | Default | Meaning |
+|:--|--:|:--|
+| `REGISTER_RATE` | 5 | Registrations per second in the registration scenario |
+| `REGISTER_COUNT` | = `EXTENSIONS` | How many registrations to send |
+| `EXTENSION_UAS_COUNT` | = `EXTENSIONS` | Extension UAS instances |
+| `CALL_RATE` | 2 | Offered calls per second; the matrix runner passes `--cps=<n>` into this |
+| `MAX_SIMULTANEOUS` | 5 | Concurrent calls allowed |
+| `CALLS` | 10 | Total calls per scenario |
+| `OUTBOUND_CALL_RATE` | 1 | Pacing for the gateway round-trip scenario |
+
+### Two pitfalls that produce wrong results rather than errors
+
+1. **A stray background UAS makes the next bind fail with `errno 98`.** Between scenarios, existing UAS processes on 5066 or 5088 must be gone before the next listener starts. A leftover listener keeps answering, so the run appears to succeed while a scenario is served by the wrong process.
+2. **A short registration lease expires mid-suite.** `tools/sipp/register.xml` uses `Expires: 3600` deliberately; a shorter lease produces `SIP;cause=806;text="USER_NOT_REGISTERED"` partway through an extended run, which reads as a PBX fault but is a test-fixture fault.
+
+### The generator is the orchestrator
+
+The SIP phases run `scripts/pbx-sipp-validate.sh` **locally**, with `PBX_HOST` pointing at the PBX. SIPp must therefore be installed on the machine running `load-testing/scripts/load-test-matrix.sh`, not on the PBX. Running SIPp on the PBX measures the measurement.
+
+---
+
+## 14. Snapshot restore onto a new address
+
+A PBX cloned from a snapshot still carries the previous address in three places. Two of them are in `.env`; the third is a database row. Getting this wrong produces a host that looks healthy but whose SIP realm points at a machine that no longer exists.
+
+```bash
+cd /var/www/tallpbx
+grep -E '^(APP_URL|FS_DEFAULT_SIP_REALM)=' .env
+mysql -N -e 'select domain, purpose from tenant_domains;' tallpbx
+```
+
+**Apply**, in this order:
+
+```bash
+# 1. The two .env values.
+sudo sed -i -E "s|^APP_URL=.*|APP_URL=http://${NEW_IP}|" .env
+sudo sed -i -E "s|^FS_DEFAULT_SIP_REALM=.*|FS_DEFAULT_SIP_REALM=${NEW_IP}|" .env
+tpbx optimize:clear
+
+# 2. The realm rows and any audit or CSV references.
+php artisan appliance:sync-host --new-ip="$NEW_IP" --ansi
+```
+
+**Prove:**
+
+```bash
+mysql -N -e 'select domain, purpose from tenant_domains;' tallpbx
+php artisan appliance:sync-host --ansi | grep -E 'Target appliance IP|No stale'
+```
+
+**Expected:** every SIP realm is either the new address or a domain name (`load.test.local` stays), and a second run of `appliance:sync-host` reports `No stale IP realms found to migrate`.
+
+> **Why `FS_DEFAULT_SIP_REALM` must be changed first.** `appliance:sync-host` derives the “correct” address from that setting. Leave it pointing at the old host and the next run migrates the realm **backwards**, undoing the repair. This happened once and cost a debugging cycle; the second run above is the guard against it.
+
+`appliance:sync-host` is idempotent and also rewrites matching `action_data` in the audit log and the generated SIPp CSV, so a plain `LOAD_*` run does not inherit stale addresses.
+
+Finally confirm the host is otherwise unchanged:
+
+```bash
+cd /var/www/tallpbx && git status --porcelain && git rev-parse --short HEAD
+```
+
+**Expected:** an empty status and the commit that equals `origin/5.x`. An unexpected untracked directory usually means a tool wrote to a relative path; find it before running anything.
 
 ---
 
