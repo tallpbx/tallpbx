@@ -179,6 +179,20 @@ describe('cdr gate', function (): void {
             ->and($tally)->toBeLessThan($wait);
     });
 
+    it('prepares the generator for every cell, not only the first', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^run_sip_phase\(\) \{.*?^\}/ms', $script, $match);
+        $phase = $match[0] ?? '';
+
+        // Preparation seeds the tenant, which rewrites the outbound route to
+        // the generator. Skipping it on later cells left the route pointing at
+        // 127.0.0.1 on the PBX, where nothing listens, and every outbound
+        // call answered 503.
+        expect($phase)->toContain('sipp_prepare_generator')
+            ->and($phase)->not->toContain('generator/prepared');
+    });
+
     it('points the seeded outbound gateway at the generator', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 

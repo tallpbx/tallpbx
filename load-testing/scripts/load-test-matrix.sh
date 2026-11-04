@@ -603,7 +603,8 @@ sipp_prepare_generator() {
 command -v sipp >/dev/null || echo 'MISSING sipp'
 test -f tools/sipp/uac-extension.xml || echo 'MISSING scenarios'
 test -s storage/app/load-tests/sipp-users.csv || echo 'MISSING sipp-users.csv'
-echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null || echo 0)\""
+echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null || echo 0)\"
+echo \"gateway_host=\$(mysql -N -e 'select host from gateways limit 1;' tallpbx 2>/dev/null)\""
 
     if ! report="$(run_on_sipp "$remote_check" 2>&1)"; then
         printf 'SIPP-PREPARE-FAILED could not inspect %s\n%s\n' "$SIPP_HOST" "$report" >&2
@@ -618,6 +619,14 @@ echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null ||
             return 1
             ;;
     esac
+
+    # The outbound route has to point at the generator. When it does not, every
+    # outbound call answers 503 on the PBX and the cell fails on a setup
+    # problem that reads like a routing fault.
+    if [ "$SIPP_UAS_HOST" != "127.0.0.1" ] && ! printf '%s' "$report" | grep -q "gateway_host=${SIPP_UAS_HOST}"; then
+        printf 'SIPP-PREPARE-FAILED the outbound gateway does not point at %s\n%s\n' "$SIPP_UAS_HOST" "$report" >&2
+        return 1
+    fi
 
     return 0
 }
@@ -1147,15 +1156,14 @@ run_sip_phase() {
     # The directory lookup is the first thing a registering endpoint waits for.
     warm_directory
 
-    # The generator is prepared once per tier: scenarios, validation script and
-    # a credential file that matches the tenant being measured.
-    if [ ! -f "${ARTIFACT_ROOT}/${TIER}/generator/prepared" ]; then
-        if ! sipp_prepare_generator; then
-            cell_failed "${TIER}/generator"
-            return 1
-        fi
-
-        : > "${ARTIFACT_ROOT}/${TIER}/generator/prepared"
+    # The generator is prepared for every cell: the scenarios, the validation
+    # script and a credential file that matches the tenant being measured.
+    # Preparation also rewrites the outbound route to point at the generator,
+    # and skipping it on a later cell leaves that route pointing at
+    # 127.0.0.1 on the PBX, where nothing listens.
+    if ! sipp_prepare_generator; then
+        cell_failed "${TIER}/generator"
+        return 1
     fi
 
     before="$(cdr_row_count)"
