@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Modules\NumberTranslations\Providers\ModuleServiceProvider;
 
 /**
  * FreeSWITCH Integration Configuration
@@ -481,6 +482,53 @@ return [
     | only; the kill-switch is removing the bindings from lua.conf.xml.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Modules Required to Render FreeSWITCH XML
+    |--------------------------------------------------------------------------
+    |
+    | The persistent worker and the fast XML bootstrap both boot a reduced
+    | container, and both need the same module providers to render directory,
+    | dialplan and sofia configuration documents.
+    |
+    | The list lives here rather than in code so that app/ never imports a
+    | module: the shared kernel must not depend on module internals, which the
+    | architecture tests enforce. Order is preserved — contributors register
+    | while their provider boots, and later providers can override earlier
+    | bindings.
+    |
+    | Adding an entry costs boot time on every lookup. Leaving one out renders
+    | an incomplete document without reporting an error, so the byte-equality
+    | test in tests/Feature/Http/XmlHandlerOctaneParityTest.php is what detects
+    | a missing module.
+    */
+    'xml_module_providers' => [
+        ModuleServiceProvider::class,
+        Modules\SipProfiles\Providers\ModuleServiceProvider::class,
+        Modules\FileStores\Providers\ModuleServiceProvider::class,
+        Modules\Gateways\Providers\ModuleServiceProvider::class,
+        Modules\Extensions\Providers\ModuleServiceProvider::class,
+        Modules\Bridges\Providers\ModuleServiceProvider::class,
+        Modules\CallBlocks\Providers\ModuleServiceProvider::class,
+        Modules\CallCenters\Providers\ModuleServiceProvider::class,
+        Modules\CallFlows\Providers\ModuleServiceProvider::class,
+        Modules\CallForwards\Providers\ModuleServiceProvider::class,
+        Modules\ConferenceCenters\Providers\ModuleServiceProvider::class,
+        Modules\Conferences\Providers\ModuleServiceProvider::class,
+        Modules\Emergency\Providers\ModuleServiceProvider::class,
+        Modules\FeatureCodes\Providers\ModuleServiceProvider::class,
+        Modules\FollowMe\Providers\ModuleServiceProvider::class,
+        Modules\HotDesking\Providers\ModuleServiceProvider::class,
+        Modules\InboundRoutes\Providers\ModuleServiceProvider::class,
+        Modules\IvrMenus\Providers\ModuleServiceProvider::class,
+        Modules\OutboundRoutes\Providers\ModuleServiceProvider::class,
+        Modules\PinNumbers\Providers\ModuleServiceProvider::class,
+        Modules\RingGroups\Providers\ModuleServiceProvider::class,
+        Modules\Security\Providers\ModuleServiceProvider::class,
+        Modules\TimeConditions\Providers\ModuleServiceProvider::class,
+        Modules\Voicemails\Providers\ModuleServiceProvider::class,
+    ],
+
     'lua_proxy' => [
         'enabled' => filter_var(env('FS_LUA_PROXY_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
 

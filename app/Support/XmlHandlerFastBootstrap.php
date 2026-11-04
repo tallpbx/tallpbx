@@ -26,7 +26,6 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Translation\TranslationServiceProvider;
 use Illuminate\View\ViewServiceProvider;
 use Livewire\LivewireServiceProvider;
-use Modules\NumberTranslations\Providers\ModuleServiceProvider;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -51,13 +50,16 @@ final class XmlHandlerFastBootstrap
      * Providers required to render FreeSWITCH XML.
      *
      * Deliberately excludes App\Providers\ModuleServiceProvider (all 60 module
-     * providers), Livewire, Boost, Reverb and the panel-only packages. Adding
-     * an entry here costs boot time; leaving one out risks a wrong document,
-     * which the byte-equality test detects.
+     * providers), Livewire's panel wiring, Boost, Reverb and the panel-only
+     * packages. Adding an entry here costs boot time; leaving one out risks a
+     * wrong document, which the byte-equality test detects.
+     *
+     * The module providers are not listed here: they are read at boot from
+     * `freeswitch.xml_module_providers`, so this class never imports a module.
      *
      * @var list<class-string>
      */
-    private const PROVIDERS = [
+    private const FRAMEWORK_PROVIDERS = [
         FoundationServiceProvider::class,
         DatabaseServiceProvider::class,
         // The seeded directory path resolves the encrypter (SIP password and
@@ -74,49 +76,38 @@ final class XmlHandlerFastBootstrap
         // Bindings for TenantManager, TenantIdentityResolverInterface and the
         // XML builders live here, as does the `xml-handler` rate limiter.
         AppServiceProvider::class,
-        // DialplanXmlBuilder is a constructor dependency of the controller, so
-        // its service graph is built even for directory lookups. This module
-        // binds NumberTranslationServiceInterface, which that graph needs.
-        ModuleServiceProvider::class,
-        // SofiaConfigXmlBuilder (the `configuration` section) needs a SIP
-        // profile service and a media storage service; both are module
-        // bindings, and the builder is constructed for every request.
-        \Modules\SipProfiles\Providers\ModuleServiceProvider::class,
-        \Modules\FileStores\Providers\ModuleServiceProvider::class,
-        // SipProfileService resolves the gateway service while rendering
-        // sofia configuration.
-        \Modules\Gateways\Providers\ModuleServiceProvider::class,
-        // Dialplan contributors are registered as a tagged collection during
-        // provider registration. Without these, dialplan documents render
-        // without their routing rules and nothing reports an error.
-        // Contributors resolve the extension service to expand targets.
-        \Modules\Extensions\Providers\ModuleServiceProvider::class,
-        \Modules\Bridges\Providers\ModuleServiceProvider::class,
-        \Modules\CallBlocks\Providers\ModuleServiceProvider::class,
-        \Modules\CallCenters\Providers\ModuleServiceProvider::class,
-        \Modules\CallFlows\Providers\ModuleServiceProvider::class,
-        \Modules\CallForwards\Providers\ModuleServiceProvider::class,
-        \Modules\ConferenceCenters\Providers\ModuleServiceProvider::class,
-        \Modules\Conferences\Providers\ModuleServiceProvider::class,
-        \Modules\Emergency\Providers\ModuleServiceProvider::class,
-        \Modules\FeatureCodes\Providers\ModuleServiceProvider::class,
-        \Modules\FollowMe\Providers\ModuleServiceProvider::class,
-        \Modules\HotDesking\Providers\ModuleServiceProvider::class,
-        \Modules\InboundRoutes\Providers\ModuleServiceProvider::class,
-        \Modules\IvrMenus\Providers\ModuleServiceProvider::class,
-        \Modules\OutboundRoutes\Providers\ModuleServiceProvider::class,
-        \Modules\PinNumbers\Providers\ModuleServiceProvider::class,
-        \Modules\RingGroups\Providers\ModuleServiceProvider::class,
-        // Security contributes the dialplan guard extensions; omitting it
-        // would serve routing rules without their guard conditions.
-        \Modules\Security\Providers\ModuleServiceProvider::class,
-        \Modules\TimeConditions\Providers\ModuleServiceProvider::class,
-        \Modules\Voicemails\Providers\ModuleServiceProvider::class,
+    ];
+
+    /**
+     * Providers that must be registered after the module providers.
+     *
+     * @var list<class-string>
+     */
+    private const TRAILING_PROVIDERS = [
         // Module providers register their Livewire components while booting,
         // which resolves the component finder. No component renders on the XML
         // path; the provider is here only so that registration does not fail.
         LivewireServiceProvider::class,
     ];
+
+    /**
+     * The provider classes to register, in order.
+     *
+     * The module providers come from configuration rather than from a list in
+     * this file, so the shared kernel never imports a module. They sit between
+     * the framework providers (which bind what the module providers resolve
+     * while booting) and the trailing ones (which resolve what the modules
+     * register).
+     *
+     * @return list<class-string>
+     */
+    private static function providerClasses(Application $app): array
+    {
+        /** @var list<class-string> $modules */
+        $modules = array_values((array) $app->make('config')->get('freeswitch.xml_module_providers', []));
+
+        return [...self::FRAMEWORK_PROVIDERS, ...$modules, ...self::TRAILING_PROVIDERS];
+    }
 
     /**
      * Handle an XML handler request using the minimal container.
@@ -179,7 +170,7 @@ final class XmlHandlerFastBootstrap
         /** @var list<ServiceProvider> $booted */
         $booted = [];
 
-        foreach (self::PROVIDERS as $providerClass) {
+        foreach (self::providerClasses($app) as $providerClass) {
             $booted[] = $app->register($providerClass);
         }
 

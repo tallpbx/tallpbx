@@ -50,7 +50,7 @@ class ModuleServiceProvider extends ServiceProvider
             }
 
             foreach (self::providersFor($manifest) as $providerClass) {
-                if ($isTelephonyWorker && ! in_array($providerClass, TelephonyWorkerProviders::MODULE_PROVIDERS, true)) {
+                if ($isTelephonyWorker && ! in_array($providerClass, TelephonyWorkerProviders::modules(), true)) {
                     continue;
                 }
 

@@ -4,40 +4,31 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use Modules\NumberTranslations\Providers\ModuleServiceProvider;
-
+/**
+ * The module providers the telephony worker registers.
+ *
+ * The list itself lives in configuration (`freeswitch.xml_module_providers`)
+ * so the shared kernel never imports a module: `app/` must not depend on
+ * module internals, which the architecture tests enforce. Both the persistent
+ * worker and the fast XML bootstrap read the same list, because both render
+ * the same documents.
+ */
 final class TelephonyWorkerProviders
 {
     /**
-     * Module providers required to render FreeSWITCH XML (directory, dialplan, sofia).
-     * Excludes all 40+ panel modules, billing, audit logs, and web UI modules.
+     * Module providers required to render FreeSWITCH XML.
      *
-     * @var list<class-string>
+     * Kept as class-name strings on purpose: this class belongs to the shared
+     * kernel, and naming a module here with a `use` statement would make the
+     * kernel depend on that module.
+     *
+     * @return list<class-string>
      */
-    public const MODULE_PROVIDERS = [
-        ModuleServiceProvider::class,
-        \Modules\SipProfiles\Providers\ModuleServiceProvider::class,
-        \Modules\FileStores\Providers\ModuleServiceProvider::class,
-        \Modules\Gateways\Providers\ModuleServiceProvider::class,
-        \Modules\Extensions\Providers\ModuleServiceProvider::class,
-        \Modules\Bridges\Providers\ModuleServiceProvider::class,
-        \Modules\CallBlocks\Providers\ModuleServiceProvider::class,
-        \Modules\CallCenters\Providers\ModuleServiceProvider::class,
-        \Modules\CallFlows\Providers\ModuleServiceProvider::class,
-        \Modules\CallForwards\Providers\ModuleServiceProvider::class,
-        \Modules\ConferenceCenters\Providers\ModuleServiceProvider::class,
-        \Modules\Conferences\Providers\ModuleServiceProvider::class,
-        \Modules\Emergency\Providers\ModuleServiceProvider::class,
-        \Modules\FeatureCodes\Providers\ModuleServiceProvider::class,
-        \Modules\FollowMe\Providers\ModuleServiceProvider::class,
-        \Modules\HotDesking\Providers\ModuleServiceProvider::class,
-        \Modules\InboundRoutes\Providers\ModuleServiceProvider::class,
-        \Modules\IvrMenus\Providers\ModuleServiceProvider::class,
-        \Modules\OutboundRoutes\Providers\ModuleServiceProvider::class,
-        \Modules\PinNumbers\Providers\ModuleServiceProvider::class,
-        \Modules\RingGroups\Providers\ModuleServiceProvider::class,
-        \Modules\Security\Providers\ModuleServiceProvider::class,
-        \Modules\TimeConditions\Providers\ModuleServiceProvider::class,
-        \Modules\Voicemails\Providers\ModuleServiceProvider::class,
-    ];
+    public static function modules(): array
+    {
+        /** @var list<class-string> $providers */
+        $providers = array_values((array) config('freeswitch.xml_module_providers', []));
+
+        return $providers;
+    }
 }

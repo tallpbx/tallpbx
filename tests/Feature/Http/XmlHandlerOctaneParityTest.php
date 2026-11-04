@@ -111,7 +111,7 @@ it('filters registered module providers when TALLPBX_WORKER_ROLE is telephony', 
 
         $loadedProviders = array_keys($app->getLoadedProviders());
 
-        foreach (TelephonyWorkerProviders::MODULE_PROVIDERS as $provider) {
+        foreach (TelephonyWorkerProviders::modules() as $provider) {
             expect($loadedProviders)->toContain($provider);
         }
 
