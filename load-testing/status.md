@@ -53,10 +53,10 @@ Caching is worth roughly 26 % end to end on this tier (20.7 best cached against 
 |:--|--:|--:|--:|:--|
 | `v-octane` | **175.6** | 11–26 | 19–74 | **×8.8** |
 | `v-fast` | 30.4 | 151–156 | 163–183 | **+53 %** |
-| `v-lua-fast` | 30.3 | 150–155 | 162–181 | +52 % |
+| `v-lua-fast` | 29.7 | 154 | 186 | +49 % |
 | `v-stock-dynamic` | 19.9 | 229–241 | 249–278 | baseline |
 | `v-stock-static` | 19.4 | 237–242 | 281–300 | −3 % |
-| `v-lua-stock` | 18.9 | 241–257 | 263–331 | −5 % |
+| `v-lua-stock` | 19.5 | 240 | 275 | −2 % |
 
 All cells: 100 % HTTP 200, `failures.log` empty.
 
@@ -65,7 +65,30 @@ All cells: 100 % HTTP 200, `failures.log` empty.
 1. **The persistent worker is in a different class.** 175.6 rps against 19.9, with p50 falling from ~235 ms to 11–26 ms. This is far outside the noise band and it is the number the earlier series was reaching for. It only exists because the runner now posts Octane cells at `:8090`; the six earlier cells that posted to nginx measured PHP-FPM and were discarded.
 2. **The fast controller is worth about half again** on stock pools: 30.4 against 19.9, p50 down from ~235 to ~153 ms. Also outside the noise band.
 3. **Pool mode is not a lever on this tier.** Static 19.4 against dynamic 19.9 is inside the noise band, consistent with a 5-child pool serving 5 concurrent clients.
-4. **The Lua proxy shows no gain, and that is expected from this driver.** `v-lua-stock` 18.9 against 19.4; `v-lua-fast` 30.3 against 30.4. An HTTP client posts to PHP, so a Lua cache hit is never exercised. These two rows do **not** mean the proxy is worthless — they mean this measurement cannot see it (see D5).
+4. **The Lua proxy produces no gain even when it is genuinely enabled.** `v-lua-stock` 19.5 against 19.4; `v-lua-fast` 29.7 against 30.4. The first run of these two variants is void — see the defect below. The second run had the proxy truly on, and it still matched the stock path exactly.
+
+### The Lua proxy: two defects, one of them in product code
+
+**Defect 1 (harness, fixed).** `apply_lua_bindings` wrote `FS_LUA_PROXY_ENABLED` to `.env` and cleared the config cache, but never restarted the processes that hold configuration in memory. PHP-FPM re-reads `.env` on every request; the persistent worker boots once and keeps its configuration for its whole life. The proxy was therefore **off in the process that served the lookups**, the mirror was never written, and the first run of both Lua variants measured the stock path. The switch now restarts `tallpbx-xml-worker`, and enabling the proxy must prove an identity key appeared in Redis before the cell may run.
+
+**Defect 2 (product, open).** With the worker restarted, PHP writes the mirror correctly:
+
+```
+ttl=59  len=14026  pbx:fsxml:dir:17:domain:load.test.local:2000:v98
+ttl=59  len=2      pbx:fsxml:tenant:user:load.test.local:2000:e210
+```
+
+but the epoch embedded in the identity key (`e210`) does not match the shared epoch key the Lua handler reads:
+
+```
+pbx:fsxml:ver:global = 85
+```
+
+`DirectoryXmlBuilder` publishes the identity key under `max($epoch, $mirrorEpoch)`, but `ver:global` is only *seeded* (`writeGlobalVersionIfMissing`) and never updated, so it still holds the older 85. The Lua handler reads 85, builds `…:e85`, and never finds the `…:e210` PHP wrote. **Every Lua lookup misses.** The mirror keys are structurally identical, but the epoch value disagrees, so the proxy cannot serve a single hit.
+
+The cost of that miss is visible in the probe: with the proxy off, a FreeSWITCH directory lookup costs about 6.5 ms; with it on, the same lookup costs 35–52 ms, because every lookup pays for the Lua path *and* the PHP fallback.
+
+**Consequence for the series.** The Lua proxy cannot be classified as "optional" or "no longer considered" from these numbers, because the numbers describe a proxy that always misses. The honest statement today is: *with the epoch mismatch present, the proxy is pure overhead on this tier.* Fixing defect 2 is a product change, and it is a separate decision from measuring it.
 
 ### FreeSWITCH lookup probe — two clear regimes
 

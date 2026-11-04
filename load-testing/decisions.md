@@ -78,6 +78,8 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 **Status:** settled for timing; attribution still provisional.
 
+> **Finding (2026-11-04):** the proxy was measured with the proxy genuinely enabled and still served no hit, because of an epoch mismatch in product code — PHP publishes the identity key under `max(current, stored)` while `pbx:fsxml:ver:global` is only seeded and never updated, so the Lua handler builds a key that PHP never wrote. The proxy cannot be classified until that is resolved; see `status.md` → *The Lua proxy: two defects*.
+
 ---
 
 ## D6 — Cache TTL is measured once, at the baseline
@@ -192,5 +194,5 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 |:--|:--|
 | Why does a directory lookup cost ~50 ms in the first sweep and ~6 ms in the second? | Answered in part: the first sweep measured a cold page cache on a fresh clone. The remaining question is how much of the 1 vCPU ceiling is swap pressure (228 MB of the 2 GB swap still in use) |
 | Should the manifest be timestamped per invocation? | It is overwritten each run, so a tier measured across several invocations keeps only the last one |
-| Can the probe prove *who served* a lookup rather than what is configured? | The `lua_bindings` field reports configuration only. Turning the proxy on did not speed up a directory lookup, so whether it ever serves a hit is currently unproven |
+| Can the probe prove *who served* a lookup rather than what is configured? | Answered for the first time: with the proxy genuinely enabled the lookup got **slower** (6.5 ms to 35–52 ms) because every lookup misses the mirror and pays for both paths. The mirror epoch mismatch is the open defect |
 | Should app-side timing be enabled for XML cells? | `timing.enabled` is `false`, so no request/handler split exists |
