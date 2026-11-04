@@ -7,8 +7,8 @@
 **Goal:** Re-run the TallPBX performance suite in two stages. **Stage A** runs the full matrix on the three shared tiers (1 vCPU/1 GB, 1 vCPU/2 GB, 2 vCPU/2 GB) and ends at a decision gate that classifies every optimisation as **default**, **optional**, or **no longer considered**. **Stage B** then tests only the surviving configuration on the dedicated tiers (2 vCPU/8 GB, 4 vCPU/16 GB) to confirm the decision scales. The data then rewrites `docs/load-testing-results.md` and drives the disposition of the optional code paths. The series has three outputs, not one: comparable performance statistics per configuration, the bottleneck that first saturates on each tier, and for each bottleneck the remediation options with their measured or estimated gain and cost.
 
 **Architecture (Two-Host Orchestration Model):**
-- **Load Generator Host (Orchestrator):** Runs `scripts/load-test-matrix.sh` locally on the dedicated load generator (WSL or separate VM). The generator executes SIPp (`tools/sipp/*.xml`, `scripts/pbx-sipp-validate.sh`) and XML HTTP benchmarks (`tpbx pbx:load-test:dialplan`), ensuring client-side test generation never consumes PBX CPU cycles or creates socket binding collisions.
-- **PBX Server Under Test (Target):** Receives remote SSH orchestration commands from the generator runner. Symmetric switch helpers (`scripts/load-test/lib/switch.sh`) and manifest collection (`tpbx pbx:load-test:manifest`) run on the PBX via SSH (`ssh root@$PBX_HOST`).
+- **Load Generator Host (Orchestrator):** Runs `load-testing/scripts/load-test-matrix.sh` locally on the dedicated load generator (WSL or separate VM). The generator executes SIPp (`tools/sipp/*.xml`, `scripts/pbx-sipp-validate.sh`) and XML HTTP benchmarks (`tpbx pbx:load-test:dialplan`), ensuring client-side test generation never consumes PBX CPU cycles or creates socket binding collisions.
+- **PBX Server Under Test (Target):** Receives remote SSH orchestration commands from the generator runner. Symmetric switch helpers (`load-testing/scripts/lib/switch.sh`) and manifest collection (`tpbx pbx:load-test:manifest`) run on the PBX via SSH (`ssh root@$PBX_HOST`).
 - **Declarative Matrix:** Driven by `config/load-test-matrix.php`. Every switch (PHP-FPM pool, FS log level, FS runtime DB, XML path, cache TTL) is symmetric — apply, assert, run, restore — and every run writes a manifest plus raw artifacts under `storage/app/load-tests/<series>/`. The Stage A gate freezes the configuration set that Stage B is allowed to run; the results document is rewritten from the decision matrix, not by hand-editing old tables.
 
 **Tech Stack:** Laravel 13 / PHP 8.5, Pest, Bash, SIPp (`tools/sipp/*.xml`), FreeSWITCH 1.11.4, MariaDB 11, Redis 7, PHP-FPM, RoadRunner/Octane, `nftables`.
@@ -178,10 +178,10 @@ The archive sits outside the application tree, so a `git clean`, a redeploy, or 
 | File | Responsibility |
 |:--|:--|
 | `config/load-test-matrix.php` | Declarative tiers, variants, profiles, scenarios, ladder, ablations |
-| `scripts/load-test-matrix.sh` | Orchestrator: filter selection, per-cell apply/assert/run/restore, artifact layout |
-| `scripts/load-test/lib/switch.sh` | Symmetric switch helpers (FPM pool, FS log level, FS DB mode, XML path, TTLs, bindings) with `assert_*` functions |
-| `scripts/load-test/lib/manifest.sh` | Writes `manifest.json`: build, host, configuration, firewall state |
-| `scripts/load-test/lib/collect.sh` | CPU/Redis/MariaDB/network sampling around a run |
+| `load-testing/scripts/load-test-matrix.sh` | Orchestrator: filter selection, per-cell apply/assert/run/restore, artifact layout |
+| `load-testing/scripts/lib/switch.sh` | Symmetric switch helpers (FPM pool, FS log level, FS DB mode, XML path, TTLs, bindings) with `assert_*` functions |
+| `load-testing/scripts/lib/manifest.sh` | Writes `manifest.json`: build, host, configuration, firewall state |
+| `load-testing/scripts/lib/collect.sh` | CPU/Redis/MariaDB/network sampling around a run |
 | `app/Console/Commands/PbxLoadTestManifestCommand.php` | `tpbx pbx:load-test:manifest` — machine-readable environment snapshot used by the scripts and by tests |
 | `tests/Feature/Pbx/LoadTestMatrixConfigTest.php` | Asserts matrix completeness and ladder/SIP-scenario parity with `tools/sipp/` |
 | `tests/Feature/Pbx/LoadTestManifestCommandTest.php` | Asserts the manifest contains every required field and redacts secrets |
@@ -333,7 +333,7 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 ### Task 3: Symmetric switch helpers
 
 **Files:**
-- Create: `scripts/load-test/lib/switch.sh`
+- Create: `load-testing/scripts/lib/switch.sh`
 - Create: `tests/Feature/Pbx/LoadTestSwitchScriptTest.php`
 
 **Interfaces:**
@@ -348,12 +348,12 @@ git commit -m "test(load-test): add declarative refresh matrix with tier and SIP
 ### Task 4: Matrix runner
 
 **Files:**
-- Create: `scripts/load-test-matrix.sh`
-- Create: `scripts/load-test/lib/manifest.sh`
+- Create: `load-testing/scripts/load-test-matrix.sh`
+- Create: `load-testing/scripts/lib/manifest.sh`
 - Create: `tests/Feature/Pbx/LoadTestMatrixRunnerTest.php`
 
 **Interfaces:**
-- Produces: `bash scripts/load-test-matrix.sh --list`, `--dry-run`, `--tier=<id>`, `--variant=<id>`, `--phase=xml|sip|ablation`, `--repeats=<n>`.
+- Produces: `bash load-testing/scripts/load-test-matrix.sh --list`, `--dry-run`, `--tier=<id>`, `--variant=<id>`, `--phase=xml|sip|ablation`, `--repeats=<n>`.
 - Artifact layout: `storage/app/load-tests/<series>/<tier>/<variant>/<profile>-r<n>.json` plus `manifest.json`.
 
 - [ ] **Step 1: Write the failing test** asserting `--list` prints every tier × variant × phase, `--dry-run` prints the exact `pbx:load-test:dialplan` / `pbx-sipp-validate.sh` command per cell without executing, and an unknown `--tier` exits non-zero.

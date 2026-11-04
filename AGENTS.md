@@ -10,6 +10,10 @@
 
 - Follow the project skills under `.agents/skills/` whenever a task matches their scope, and check them at the start of applicable work before writing code. Available skills: `laravel-best-practices` (all Laravel PHP code), `freeswitch-development` (FreeSWITCH/PBX behavior), `livewire-development` (Livewire components, reactivity, and standardized loading animation patterns), `tailwindcss-development` (Tailwind/UI classes), `tallpbx-custom` (TallPBX-specific patterns such as authentication guards, tenant isolation, group permissions, dual-event binding, action progress animation architecture across three patterns, and live-firewall safety/lockout prevention), `testing-best-practices` (Laravel test design, coverage, and review), and `echo-development` (Laravel Echo real-time broadcasting and WebSockets). Applicable skills take precedence over generic habits for matching work.
 
+## Load Testing Harness
+
+All capacity-test documentation and scripts live in [`load-testing/`](load-testing/README.md). Before running, changing, or reasoning about a load test, read `load-testing/README.md` and follow its reading order. Raw results are committed under `load-testing/results/`.
+
 ## CRITICAL — Laravel Boost MCP Priority & Tool Usage
 
 Laravel Boost runs as an active Model Context Protocol (MCP) server for this workspace (`php artisan boost:mcp`). When interacting with this application, **ALWAYS prefer Laravel Boost MCP tools over raw bash commands, Tinker code, or manual file grepping**:

@@ -252,29 +252,31 @@ wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/<branch>/scripts/boot
 
 ## Automated Refresh Harness (Matrix Runner)
 
+> **The harness now has its own home:** [`load-testing/README.md`](../load-testing/README.md) holds the full procedure, the host configuration reference, the switch reference and the scripts. Point agents and operators there. This section remains the short summary.
+
 The two test sections below describe each measurement one command at a time. That is the right level of detail for understanding a result and for a single spot check. A capacity **refresh** runs those same commands across many tiers and configurations, and needs three guarantees they do not provide on their own: that a configuration switch actually took effect, that the environment of every run is recorded, and that the host is put back the way it was afterwards. Four small pieces of tooling provide them, and none of them measure anything new — every cell calls the commands documented in this guide.
 
 | Piece | Purpose |
 | :--- | :--- |
 | `config/load-test-matrix.php` | One declarative list of hardware tiers, XML-serving variants, load profiles, cache policies, SIPp scenarios and the call-per-second ladder. |
 | `tpbx pbx:load-test:manifest` | Writes a machine-readable snapshot of the host a run happened on: build SHA, host sizing, PHP-FPM pool, FreeSWITCH runtime database mode, XML serving path, cache TTLs, firewall state and a redacted `.env`. |
-| `scripts/load-test/lib/switch.sh` | Applies one configuration switch and then reads the value back. A setting that did not take effect prints `SWITCH-FAILED` and stops that cell instead of producing a plausible but meaningless number. |
-| `scripts/load-test-matrix.sh` | Lists, dry-runs and executes the cells, records each report in its own directory, and restores the documented baseline from a teardown trap. |
+| `load-testing/scripts/lib/switch.sh` | Applies one configuration switch and then reads the value back. A setting that did not take effect prints `SWITCH-FAILED` and stops that cell instead of producing a plausible but meaningless number. |
+| `load-testing/scripts/load-test-matrix.sh` | Lists, dry-runs and executes the cells, records each report in its own directory, and restores the documented baseline from a teardown trap. |
 
 ### Listing and dry-running
 
 ```bash
 # Every tier x variant x phase the matrix contains
-bash scripts/load-test-matrix.sh --list
+bash load-testing/scripts/load-test-matrix.sh --list
 
 # Exactly what one variant would run, without running it
-bash scripts/load-test-matrix.sh --dry-run --tier=h1-1c1g --variant=v-octane --phase=xml
+bash load-testing/scripts/load-test-matrix.sh --dry-run --tier=h1-1c1g --variant=v-octane --phase=xml
 ```
 
 ### Running a tier
 
 ```bash
-PBX_HOST=<PBX_IP> bash scripts/load-test-matrix.sh --tier=h1-1c1g --repeats=3
+PBX_HOST=<PBX_IP> bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --repeats=3
 ```
 
 One invocation drives one tier, because each tier is a fresh install on its own host. Before the first cell the runner refuses to continue when the host has not deployed the branch, when the host sizing does not match the tier in the matrix, or when any required switch fails its assertion. Artifacts land under `storage/app/load-tests/<series>/<tier>/<variant>/`, one JSON report per repetition, with `manifest.json` beside the tier directory.
