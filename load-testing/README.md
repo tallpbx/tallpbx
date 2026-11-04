@@ -1,6 +1,8 @@
 # TallPBX Load Testing
 
-Everything needed to reproduce the TallPBX capacity series lives in this directory: the procedure, the host configuration, the switch reference, the scripts, and the raw results.
+Everything needed to reproduce the TallPBX capacity series lives in this directory: the procedure, the host configuration, the switch reference, the scripts, the decisions behind them, and the raw results.
+
+**This directory is the single source of truth for load testing.** If a fact about capacity measurement exists somewhere else in the repository, this directory wins; the older copies are kept for history and are reconciled later.
 
 It is written so that a human operator **or** an AI agent can be pointed at this directory and follow it without reading anyone's earlier session.
 
@@ -11,10 +13,12 @@ It is written so that a human operator **or** an AI agent can be pointed at this
 | Order | File | Why |
 |:--|:--|:--|
 | 1 | `README.md` (this file) | What exists, where results go, and the rules you must not break |
-| 2 | `remote-setup.md` | Every host setting, with the command that applies it and the command that proves it |
-| 3 | `configurations.md` | What each switch physically changes, and what its assertion reads back |
-| 4 | `procedure.md` | The ordered run, with a verification checkpoint after each step |
-| 5 | `reference.md` | Flags, environment variables, artifact layout, JSON fields, failure markers |
+| 2 | `decisions.md` | Why each default is what it is, and which alternative was rejected |
+| 3 | `status.md` | What has actually been measured, what is pending, and what is still open |
+| 4 | `remote-setup.md` | Every host setting, with the command that applies it and the command that proves it |
+| 5 | `configurations.md` | What each switch physically changes, and what its assertion reads back |
+| 6 | `procedure.md` | The ordered run, with a verification checkpoint after each step |
+| 7 | `reference.md` | Flags, environment variables, artifact layout, JSON fields, failure markers |
 
 Read the scripts only when the documents do not answer a question:
 
