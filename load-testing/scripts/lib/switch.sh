@@ -820,8 +820,12 @@ apply_lua_bindings() {
     fi
 
     # The flag is read by the persistent worker, which boots once. Restart it
-    # so the change is real rather than only written to disk.
-    restart_xml_worker || return 1
+    # only when the state actually changes: an unconditional restart would put
+    # a full framework boot in front of every variant, and the transient that
+    # follows lands inside the next cell's measurement.
+    if [ "$before_state" != "$state" ]; then
+        restart_xml_worker || return 1
+    fi
 
     # `reload mod_lua` unloads and reloads the module; on this build it can
     # answer "Already Loaded!" and leave the module unloaded. Loading it when
