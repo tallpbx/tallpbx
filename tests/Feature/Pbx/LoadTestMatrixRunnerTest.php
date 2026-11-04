@@ -324,6 +324,57 @@ describe('load test matrix runner', function (): void {
             ->toContain('return 1');
     });
 
+    it('sizes a ladder rung to a sustained call window', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-octane', '--phase=sip', '--cps=5'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // A capacity rung must offer its rate for a whole window (5 calls per
+        // second for 60 seconds = 300 calls) on the pause-free capacity
+        // scenario. The functional script's 10-call burst finishes in
+        // seconds and cannot measure capacity.
+        expect($process->getOutput())
+            ->toContain('CALLS=300')
+            ->toContain('uac-extension-capacity.xml');
+    });
+
+    it('lets the runner choose the SIPp scenario on the generator', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/pbx-sipp-validate.sh'));
+
+        // The functional scenario holds a 30-second conversation inside every
+        // call; capacity rungs need the pause-free capacity scenario instead.
+        expect($script)->toContain('UAC_SCENARIO="${UAC_SCENARIO:-');
+    });
+
+    it('records one ladder row per rung', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // The stop rule (three consecutive rungs under 95 % completion) is
+        // applied from a per-rung record: offered rate, calls attempted and
+        // calls completed.
+        expect($script)->toContain('ladder.csv');
+    });
+
+    it('runs the SIP smoke preflight once per tier, not per invocation', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // The ladder is many short invocations (one per rate). Paying the
+        // two-minute preflight every time would double the series; its value
+        // is proving the chain once before the tier's first cell.
+        expect($script)->toContain('SMOKE-ALREADY-PASSED');
+    });
+
+    it('fails the cell when its variant switches did not apply', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // A cell measured behind a half-applied switch is a plausible but
+        // meaningless number. Every phase must stop at the switch failure.
+        expect(substr_count($script, 'if ! apply_variant'))->toBe(3);
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

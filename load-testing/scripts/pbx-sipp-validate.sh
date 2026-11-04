@@ -76,7 +76,11 @@ fi
 mkdir -p "${RUN_DIR}"
 
 REGISTER_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/register.xml"
-UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-extension.xml"
+# The scenario the extension-call step drives. The default places a 30-second
+# conversation inside every call; a capacity rung overrides this with the
+# pause-free capacity scenario so its calls last only as long as signalling
+# needs.
+UAC_SCENARIO="${UAC_SCENARIO:-${LOAD_TESTING_DIR}/tools/sipp/uac-extension.xml}"
 OUTBOUND_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-outbound.xml"
 UAS_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uas-auto-answer.xml"
 MEDIA_CLIENT_HANGUP_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-media-client-hangup.xml"

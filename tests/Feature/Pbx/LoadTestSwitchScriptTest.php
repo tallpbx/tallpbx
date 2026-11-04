@@ -103,6 +103,21 @@ describe('load test switch helpers', function (): void {
         expect($script)->toContain('pbx:fsxml:tenant:user:');
     });
 
+    it('warms a cold Lua mirror before judging the serve probe', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        preg_match('/^assert_lua_serves\(\) \{.*?^\}/ms', $script, $match);
+        $assert = $match[0] ?? '';
+
+        // Enabling the proxy restarts FreeSWITCH and the worker. For the first
+        // lookups afterwards the mirror is cold, so they legitimately reach
+        // PHP while the entry is written — and a probe run at that moment
+        // fails a working proxy for being cold. The probe warms the entry and
+        // retries before it is allowed to fail the switch.
+        expect($assert)->toContain('warm')
+            ->and($assert)->toContain('for attempt in');
+    });
+
     it('corrects a half-applied Lua pair before declaring the baseline restored', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 

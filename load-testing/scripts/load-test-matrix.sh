@@ -130,6 +130,10 @@ PROFILE=""
 TTL=""
 REPEATS="${REPEATS:-3}"
 CPS="${CPS:-5}"
+# Seconds of offered calls per capacity rung. At the offered rate this is how
+# long a rung sustains load: 5 calls/second for 60 seconds = 300 calls. A
+# ten-call burst finishes in seconds and says nothing about capacity.
+LADDER_SECONDS="${LADDER_SECONDS:-60}"
 LIST_MODE=0
 DRY_RUN=0
 
@@ -304,6 +308,7 @@ Environment:
   EXTENSIONS / START     Generated extension count and first number
   PASSWORD               SIP password for the generated accounts
   REPEATS / CPS          Repetitions per cell and offered call rate (also flags)
+  LADDER_SECONDS         Seconds of offered calls per capacity rung (default 60)
 
 See load-testing/README.md for the full procedure, artifact layout and the
 remote-access policy.
@@ -832,12 +837,20 @@ probe_command() {
 }
 
 # Build the exact SIPp validation command for one SIP cell.
+#
+# A capacity rung must offer its rate for a whole window, so the call count is
+# derived from the rate; the functional script's fixed ten calls would finish
+# in seconds. The rung uses the pause-free capacity scenario, and keeps one
+# outbound call as a gateway canary.
 sip_command() {
     local run_dir="$1"
+    local calls=$((CPS * LADDER_SECONDS))
 
-    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q RUN_DIR=%q bash %q' \
+    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q CALLS=%q MAX_SIMULTANEOUS=%q OUTBOUND_CALLS=1 UAC_SCENARIO=%q RUN_DIR=%q bash %q' \
         "$SIPP_APP_DIR" "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" \
-        "$LOAD_PASSWORD" "$CPS" "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
+        "$LOAD_PASSWORD" "$CPS" "$calls" "$calls" \
+        "${SIPP_APP_DIR}/load-testing/tools/sipp/uac-extension-capacity.xml" \
+        "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
 }
 
 # Where the smoke preflight writes its artifacts.
@@ -1140,7 +1153,12 @@ wait_for_xml_ready() {
 run_xml_phase() {
     local variant="$1" profile_id ttl_id section repeat label cell_log
 
-    apply_variant "$TIER" "$variant"
+    # A cell measured behind a half-applied switch is a plausible but
+    # meaningless number, so a failed switch fails the cell instead.
+    if ! apply_variant "$TIER" "$variant"; then
+        cell_failed "${TIER}/${variant}/xml (variant switches)"
+        return 1
+    fi
 
     if ! wait_for_xml_ready; then
         printf 'XML-HANDLER-NOT-READY after applying %s\n' "$variant" >&2
@@ -1249,10 +1267,16 @@ warm_directory() {
 # that gate a cell can report every call answered while the pipeline recorded
 # none of them.
 run_sip_phase() {
-    local variant="$1" remote_run_dir local_run_dir label before after counts
+    local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file
     local successful failed already_failed=0
 
-    apply_variant "$TIER" "$variant"
+    # A cell measured behind a half-applied switch is a plausible but
+    # meaningless number, so a failed switch fails the cell instead. This is
+    # how the Lua round that could not serve lookups is kept out of the data.
+    if ! apply_variant "$TIER" "$variant"; then
+        cell_failed "${TIER}/${variant}/sip-cps${CPS} (variant switches)"
+        return 1
+    fi
 
     remote_run_dir="$(sip_run_dir "$TIER" "$variant")"
     local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-cps${CPS}"
@@ -1312,6 +1336,17 @@ run_sip_phase() {
     successful="${counts%% *}"
     failed="${counts##* }"
 
+    # One row per rung: the stop rule (three consecutive rungs under 95 %
+    # completion) is applied from this record, not from memory.
+    ladder_file="${ARTIFACT_ROOT}/${TIER}/${variant}/ladder.csv"
+    mkdir -p "$(dirname "$ladder_file")"
+
+    if [ ! -f "$ladder_file" ]; then
+        printf 'recorded_at,cps,successful,failed,label\n' > "$ladder_file"
+    fi
+
+    printf '%s,%s,%s,%s,%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" >> "$ladder_file"
+
     after="$(cdrs_wait_for "$before" "$successful")"
     printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
 
@@ -1332,7 +1367,10 @@ run_sip_phase() {
 run_ablation_phase() {
     local variant="$1" ablation value repeat label helper
 
-    apply_variant "$TIER" "$variant"
+    if ! apply_variant "$TIER" "$variant"; then
+        cell_failed "${TIER}/${variant}/ablation (variant switches)"
+        return 1
+    fi
 
     while IFS= read -r ablation; do
         while IFS= read -r value; do
@@ -1451,9 +1489,15 @@ execute_cells() {
 
     # The SIP smoke preflight runs before any series cell: a broken chain is
     # found in two minutes rather than after the first 30-minute series has
-    # failed for a reason that was visible at setup time.
+    # failed for a reason that was visible at setup time. It is paid once per
+    # tier — the ladder is many short invocations, and its passing record is
+    # what tells later invocations the chain was already proven.
     if printf '%s\n' "$(selected_phases)" | grep -qx 'sip'; then
-        if ! run_sip_smoke; then
+        smoke_gate="${ARTIFACT_ROOT}/${TIER}/sip-smoke/cdr-gate.txt"
+
+        if [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
+            printf 'SMOKE-ALREADY-PASSED %s (see %s)\n' "$TIER" "$smoke_gate" >&2
+        elif ! run_sip_smoke; then
             printf 'SIP smoke preflight failed; no series cell was measured on %s.\n' "$TIER" >&2
             exit 1
         fi

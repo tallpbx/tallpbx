@@ -744,11 +744,17 @@ restart_freeswitch() {
 # This requires FS_XML_HANDLER_LOG_TIMING, which apply_lua_bindings turns on
 # while the proxy is enabled. Without it the count would be zero for the wrong
 # reason, so the check refuses to run.
+#
+# The probe warms the mirror first. Enabling the proxy restarts FreeSWITCH and
+# the persistent worker, and for the first lookups afterwards the entry is
+# cold: they legitimately reach PHP while the proxy writes it. Judging on a
+# cold start fails a working proxy for being cold, so warming and retrying is
+# what makes this assertion honest in both directions.
 assert_lua_serves() {
     local extension="${LUA_MIRROR_EXTENSION:-2000}"
     local domain="${LUA_MIRROR_DOMAIN:-load.test.local}"
     local log_file="${APP_DIR}/storage/logs/laravel.log"
-    local timing before after served index
+    local timing before after served index attempt
 
     timing="$(env_get FS_XML_HANDLER_LOG_TIMING)"
 
@@ -757,22 +763,34 @@ assert_lua_serves() {
         return 1
     fi
 
-    before="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
-
+    # Warm the entry so the measured batch is not paying the cold start.
     for index in 1 2 3; do
         fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
     done
 
     sleep 1
-    after="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
-    served=$(( after - before ))
 
-    if [ "$served" -gt 0 ]; then
-        fail_switch "the Lua handler served none of 3 lookups; ${served} reached PHP"
-        return 1
-    fi
+    for attempt in 1 2 3; do
+        before="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
 
-    log "asserted the Lua handler serves lookups (0 of 3 reached PHP)"
+        for index in 1 2 3; do
+            fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
+        done
+
+        sleep 1
+        after="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
+        served=$(( after - before ))
+
+        if [ "$served" -eq 0 ]; then
+            log "asserted the Lua handler serves lookups (0 of 3 reached PHP)"
+            return 0
+        fi
+
+        sleep 2
+    done
+
+    fail_switch "the Lua handler served none of 3 lookups after warming; ${served} reached PHP"
+    return 1
 }
 
 # Restart the ESL listener so it re-reads the environment.
