@@ -1,0 +1,1 @@
+timeout 300 sipp x.x.x.138:5060 -sf /var/www/tallpbx/load-testing/tools/sipp/uac-outbound.xml -inf /var/www/tallpbx/storage/app/load-tests/refresh-20261103/h1-1c1g/v-stock-dynamic/sip-cps2/sipp-users-auth.csv -i x.x.x.55 -p 5068 -r 1 -l 2 -m 5 -trace_err -trace_counts -trace_stat -trace_rtt -rtt_freq 1 -fd 5 
