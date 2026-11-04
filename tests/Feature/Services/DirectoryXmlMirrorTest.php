@@ -8,6 +8,7 @@ use App\Services\TenantManager;
 use App\Services\Xml\DirectoryXmlBuilder;
 use App\Services\Xml\FsXmlMirrorKeys;
 use App\Support\RoutingCacheVersion;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use Modules\SipAccounts\Models\SipAccount;
@@ -137,6 +138,27 @@ test('seeds version key on cold start without waiting for administrative bump', 
 
     expect(Redis::connection('lua_proxy')->get(FsXmlMirrorKeys::version($tenantId)))
         ->toBe((string) RoutingCacheVersion::get($tenantId));
+});
+
+test('advances a lagging version key so the Lua handshake matches the published payload', function () {
+    [$tenantId, $domain, $user] = ($this->makeDirectoryFixture)();
+
+    // Simulate the enable transition: routing revisions accumulated while the
+    // Lua proxy was off, so the mirrored key lags behind the cache store. The
+    // writer publishes under the store revision; if the handshake key is not
+    // moved with it, the Lua handler keeps building a payload key that never
+    // exists and every lookup falls through to PHP.
+    $conn = Redis::connection('lua_proxy');
+    $conn->set(FsXmlMirrorKeys::version($tenantId), '7');
+    Cache::put(RoutingCacheVersion::key($tenantId), 9);
+
+    $xml = app(DirectoryXmlBuilder::class)->buildCachedDirectoryXml('domain', $domain, $user, $domain);
+
+    $this->mirrorKeys[] = FsXmlMirrorKeys::version($tenantId);
+    $this->mirrorKeys[] = FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 9);
+
+    expect($conn->get(FsXmlMirrorKeys::version($tenantId)))->toBe('9')
+        ->and($conn->get(FsXmlMirrorKeys::directory($tenantId, 'domain', $domain, $user, 9)))->toBe($xml);
 });
 
 test('refreshes the mirror when the document is served from the php cache', function () {

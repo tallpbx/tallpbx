@@ -506,16 +506,11 @@ class DialplanXmlBuilder
         $writer = app(FsXmlMirrorWriter::class);
 
         // After a cache flush the store restarts at 0 while the mirror keeps
-        // the last revision and its payload keys. Publishing under the higher
-        // mirror revision keeps Lua hitting instead of missing indefinitely.
-        $mirrorVersion = $writer->readVersion($tenantId);
-        $publishVersion = max($version, $mirrorVersion ?? 0);
-
-        // Seed the version key on a genuine cold start only. Never overwrite
-        // it: RoutingCacheVersion::bump() owns the monotonic token.
-        if ($mirrorVersion === null) {
-            $writer->writeVersionIfMissing($tenantId, $publishVersion);
-        }
+        // the last revision and its payload keys, and revisions that ran
+        // while the proxy was off only moved the store. Publishing through
+        // one method advances the mirrored key to the revision the payload is
+        // actually written under, so the Lua handshake cannot lag behind.
+        $publishVersion = $writer->publishVersion($tenantId, $version);
 
         // Lua cannot build a dialplan key without the epoch either, so the
         // shared epoch key has to match the epoch this payload is published

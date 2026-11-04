@@ -199,6 +199,34 @@ class FsXmlMirrorWriter
     }
 
     /**
+     * Publish the tenant routing revision a payload is written under, and
+     * keep the mirrored version key in step with it.
+     *
+     * The Lua handler reads the mirrored key and builds the payload key from
+     * it, while PHP publishes payloads under the cache store's revision.
+     * When the two disagree every Lua lookup misses silently: the key shapes
+     * are correct and only the number differs.
+     *
+     * They disagree whenever revisions accumulated while the proxy was off,
+     * because RoutingCacheVersion::bump() only mirrors the key while the
+     * feature is enabled. Publishing through this method advances the key
+     * to the revision actually used, so enabling the proxy heals itself on
+     * the first request. The key only ever moves upwards: a stalled read
+     * path can never roll it back and make an obsolete document readable.
+     */
+    public function publishVersion(int $tenantId, int $version): int
+    {
+        $stored = $this->readVersion($tenantId);
+        $published = max($version, $stored ?? 0);
+
+        if ($stored !== $published) {
+            $this->writeVersion($tenantId, $published);
+        }
+
+        return $published;
+    }
+
+    /**
      * Read the mirrored global revision, if one exists.
      */
     public function readGlobalVersion(): ?int
