@@ -2,7 +2,7 @@
 set -uo pipefail
 cd /var/www/tallpbx || exit 1
 export SSH_OPTS="-i /root/.ssh/ppx2-client.rsa -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
-export PBX_HOST=162.243.62.138
+export PBX_HOST=x.x.x.138
 
 for v in v-stock-static v-octane; do
     echo "===== ${v} ====="

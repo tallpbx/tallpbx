@@ -31,7 +31,7 @@ const PBX_LOAD_TEST_REPORT_PATH = 'storage/framework/testing/load-tests/load-val
 
 describe('pbx load test scripts and scenarios', function (): void {
     it('keeps the cache sweep runner syntactically valid', function (): void {
-        $script = base_path('scripts/run-cache-sweep.sh');
+        $script = base_path('load-testing/scripts/run-cache-sweep.sh');
         $process = new Process(['bash', '-n', $script], base_path());
         $process->run();
 
@@ -39,7 +39,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('defines the 4 standard cache sweep tiers in the runner', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('cold-baseline')
             ->and($script)->toContain('dialplan-cache-off')
@@ -49,7 +49,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('inspects Redis stats and calculates keyspace hit rates', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('redis-cli info stats')
             ->and($script)->toContain('keyspace_hits')
@@ -58,7 +58,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('safely restores production cache defaults on exit', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('trap restore_defaults EXIT')
             ->and($script)->toContain('SNAPSHOT_DIALPLAN')
@@ -66,7 +66,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('formats output with average latency instead of percentiles', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('Avg (ms)')
             ->and($script)->toContain('"average"')
@@ -74,7 +74,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('includes a directory-mixed tier that captures app-side timing', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/run-cache-sweep.sh'));
 
         expect($script)->toContain('directory-mixed')
             ->and($script)->toContain('--section=')
@@ -84,7 +84,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('keeps the SIPp end-to-end validation runner syntactically valid', function (): void {
-        $script = base_path('scripts/pbx-sipp-validate.sh');
+        $script = base_path('load-testing/scripts/pbx-sipp-validate.sh');
         $process = new Process(['bash', '-n', $script], base_path());
         $process->run();
 
@@ -92,7 +92,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('documents the expected SIPp scenarios in the validation runner', function (): void {
-        $script = (string) file_get_contents(base_path('scripts/pbx-sipp-validate.sh'));
+        $script = (string) file_get_contents(base_path('load-testing/scripts/pbx-sipp-validate.sh'));
 
         expect($script)->toContain('tools/sipp/register.xml')
             ->and($script)->toContain('tools/sipp/uac-extension.xml')
@@ -111,7 +111,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('keeps custom SIPp XML scenarios well formed', function (string $scenario): void {
-        $path = base_path("tools/sipp/{$scenario}");
+        $path = base_path("load-testing/tools/sipp/{$scenario}");
         $document = simplexml_load_file($path);
 
         expect($document)->not->toBeFalse();
@@ -136,7 +136,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     ]);
 
     it('measures end-to-end call setup time in the capacity scenario', function (): void {
-        $scenario = (string) file_get_contents(base_path('tools/sipp/uac-extension-capacity.xml'));
+        $scenario = (string) file_get_contents(base_path('load-testing/tools/sipp/uac-extension-capacity.xml'));
 
         expect($scenario)->toContain('start_rtd="setup"')
             ->and($scenario)->toContain('rtd="setup"')
@@ -144,7 +144,7 @@ describe('pbx load test scripts and scenarios', function (): void {
     });
 
     it('keeps the capacity destination duration configurable', function (): void {
-        $scenario = (string) file_get_contents(base_path('tools/sipp/uas-auto-answer-capacity.xml'));
+        $scenario = (string) file_get_contents(base_path('load-testing/tools/sipp/uas-auto-answer-capacity.xml'));
 
         expect($scenario)->toContain('<pause/>')
             ->and($scenario)->toContain('<recv request="BYE"/>');

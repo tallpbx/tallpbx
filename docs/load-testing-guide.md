@@ -45,7 +45,7 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 
 1. **Obfuscate Public IP Addresses**: In all test reports, public documentation, and committed logs, obfuscate public IP addresses to show only the last octet (e.g. `x.x.x.200` or `...YYY`).
 2. **Avoid Special Characters in Remote Passwords**: When seeding a remote PBX over SSH (`tpbx pbx:load-test:seed` or `tallpbx`, which wrap native `artisan pbx:load-test:seed`), avoid unescaped shell metacharacters (such as `!`) in the password argument (e.g., use alphanumeric `LoadTest1234`). In this guide, `tpbx` is used. Unescaped exclamation points are stripped by Bash history expansion, causing credential mismatches that result in `403 Forbidden` on SIP REGISTER.
-3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `storage/app/load-tests/sipp-users.csv` on the PBX filesystem. Before running `scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the load generator, copy the CSV to the generator host:
+3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `storage/app/load-tests/sipp-users.csv` on the PBX filesystem. Before running `load-testing/scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the load generator, copy the CSV to the generator host:
    ```bash
    scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv
    ```
@@ -58,7 +58,7 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 6. **Terminate Background UAS Listeners Between Runs**: In multi-scenario scripts, clean up background UAS processes before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` socket binding collisions.
 7. **Allocate Dedicated Client Ports on Shared Hosts**: When the load generator host also runs FreeSWITCH, SIPp UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). Use local ports 5100+ (`EXTENDED_UAC_LOCAL_PORT=5100`).
 8. **Tune PHP-FPM Worker Pools**: Debian's default dynamic pool (`pm.max_children = 5`) saturates at concurrency 25, creating worker starvation and latency spikes. TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` to `pm = static` across all profiles (`pm.max_children = 5` for 1GB VPS, `6` for 2GB, `12` for 4GB, `24` for 8GB+), eliminating dynamic process-fork latency during burst call arrivals.
-9. **Set Long Registration Leases**: The SIP registration scenario (`tools/sipp/register.xml`) must use a 1-hour lease (`Expires: 3600`) so registrations do not expire mid-test.
+9. **Set Long Registration Leases**: The SIP registration scenario (`load-testing/tools/sipp/register.xml`) must use a 1-hour lease (`Expires: 3600`) so registrations do not expire mid-test.
 
 ---
 
@@ -80,7 +80,7 @@ SIPp Caller ---> FreeSWITCH (Sofia) ---> Laravel XML ---> FreeSWITCH Bridge --->
 | :--- | :--- | :--- |
 | **Primary Metric** | Completed XML responses per second (`req/sec`) | Successfully answered calls per second (`calls/sec`) |
 | **Target Subsystems** | Nginx, PHP-FPM, Laravel, MariaDB, Redis | FreeSWITCH, Sofia SIP, ESL, RTP media, plus Laravel XML |
-| **Tool** | `tpbx pbx:load-test:dialplan` | `scripts/pbx-sipp-validate.sh` (SIPp) |
+| **Tool** | `tpbx pbx:load-test:dialplan` | `load-testing/scripts/pbx-sipp-validate.sh` (SIPp) |
 | **Key Question Answered** | How fast can Laravel generate call-routing instructions under concurrency? | How many real phone calls can the PBX connect, maintain, and tear down per second? |
 | **What It Does Not Measure** | SIP signaling, codec negotiation, RTP audio quality, or FreeSWITCH channel limits | Pure database/routing speed in isolation |
 
@@ -128,7 +128,7 @@ tpbx pbx:load-test:dialplan \
   --timing --token="$FS_XML_HANDLER_TOKEN"
 
 # 3. Run SIPp end-to-end validation suite from the load generator
-PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> scripts/pbx-sipp-validate.sh
+PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
 ```
 
 ---
@@ -258,7 +258,7 @@ The two test sections below describe each measurement one command at a time. Tha
 
 | Piece | Purpose |
 | :--- | :--- |
-| `config/load-test-matrix.php` | One declarative list of hardware tiers, XML-serving variants, load profiles, cache policies, SIPp scenarios and the call-per-second ladder. |
+| `load-testing/matrix.php` | One declarative list of hardware tiers, XML-serving variants, load profiles, cache policies, SIPp scenarios and the call-per-second ladder. |
 | `tpbx pbx:load-test:manifest` | Writes a machine-readable snapshot of the host a run happened on: build SHA, host sizing, PHP-FPM pool, FreeSWITCH runtime database mode, XML serving path, cache TTLs, firewall state and a redacted `.env`. |
 | `load-testing/scripts/lib/switch.sh` | Applies one configuration switch and then reads the value back. A setting that did not take effect prints `SWITCH-FAILED` and stops that cell instead of producing a plausible but meaningless number. |
 | `load-testing/scripts/load-test-matrix.sh` | Lists, dry-runs and executes the cells, records each report in its own directory, and restores the documented baseline from a teardown trap. |
@@ -407,7 +407,7 @@ FS_SESSIONS_PER_SECOND=60
 To benchmark all 4 standard cache tiers on your host and measure exact Redis keyspace hit rates:
 
 ```bash
-bash scripts/run-cache-sweep.sh
+bash load-testing/scripts/run-cache-sweep.sh
 ```
 
 The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache off, Production baseline 60s, and Memory hit ceiling) and automatically restores the exact `.env` TTL values captured before the sweep upon completion — including when interrupted mid-run.
@@ -497,13 +497,13 @@ Execute the validation suite from the load generator host:
 
 ```bash
 # Basic run: Registration, internal extension calls, and outbound routing
-PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> scripts/pbx-sipp-validate.sh
+PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
 
 # Media flow run: Adds call recording (*732), music on hold, and IVR announcements
-MEDIA_FLOW=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> scripts/pbx-sipp-validate.sh
+MEDIA_FLOW=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
 
 # Extended parity run: Adds ring groups, voicemail, conferences, forwarding, etc.
-EXTENDED=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> scripts/pbx-sipp-validate.sh
+EXTENDED=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
 ```
 
 A successful run exits `0` and creates a detailed artifact directory under `storage/app/load-tests/sipp-e2e-*` containing `summary.md`, CSV timings, and error logs.
@@ -594,12 +594,12 @@ The `internal` profile must report `RUNNING`.
 
 ```bash
 # Start background UAS listener on port 5066
-sipp -sf tools/sipp/uas-auto-answer-capacity.xml -i <GEN_IP> -p 5066 -m 1 <PBX_IP> &
+sipp -sf load-testing/tools/sipp/uas-auto-answer-capacity.xml -i <GEN_IP> -p 5066 -m 1 <PBX_IP> &
 uas_pid=$!
 sleep 1
 
 # Fire a single test call
-sipp <PBX_IP> -sf tools/sipp/uac-extension-capacity.xml \
+sipp <PBX_IP> -sf load-testing/tools/sipp/uac-extension-capacity.xml \
   -inf storage/app/load-tests/sipp-users-auth.csv \
   -i <GEN_IP> -p 5158 -r 1 -m 1 -l 1
 

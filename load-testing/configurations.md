@@ -147,6 +147,6 @@ This exists because a snapshot can capture the two disagreeing, and restoring th
 | `v-lua-fast` | `static 5` | **fast** | **on** | off |
 | `v-octane` | `static 5` | stock | off | **on** |
 
-`config/load-test-matrix.php` is the authority; the runner reads the `requires` list per variant and applies each entry in order.
+`load-testing/matrix.php` is the authority; the runner reads the `requires` list per variant and applies each entry in order.
 
 > `v-octane` applies `fpm:static` for consistency, but FPM is not in the XML path for that variant — the cell posts to `:8090`. Treat the pool setting as inert there.

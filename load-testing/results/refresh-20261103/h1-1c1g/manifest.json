@@ -1,7 +1,7 @@
 {
     "build": {
         "branch": "5.x",
-        "commit": "20dddfbefcf03f2d2979b453a40a3ae5356f9096",
+        "commit": "bd9263b728254f18c656b3b99da92c42ceab5bb7",
         "dirty": false
     },
     "host": {
@@ -11,9 +11,9 @@
         "architecture": "x86_64",
         "cpu_cores": 1,
         "memory_mb": 967,
-        "available_mb": 213,
+        "available_mb": 278,
         "swap_total_mb": 2048,
-        "swap_free_mb": 1862
+        "swap_free_mb": 1814
     },
     "runtime": {
         "php_version": "8.5.12",
@@ -25,7 +25,7 @@
     },
     "configuration": {
         "app_env": "production",
-        "app_url": "http://162.243.62.138",
+        "app_url": "http://x.x.x.138",
         "cache_store": "redis",
         "queue_connection": "database",
         "session_driver": "redis",
@@ -80,7 +80,7 @@
             "APP_LOCALE": "en",
             "APP_MAINTENANCE_DRIVER": "file",
             "APP_NAME": "TallPBX",
-            "APP_URL": "http://162.243.62.138",
+            "APP_URL": "http://x.x.x.138",
             "AUTH_REGISTRATION_ENABLED": "false",
             "AWS_ACCESS_KEY_ID": "",
             "AWS_BUCKET": "",
@@ -101,6 +101,7 @@
             "FSPBX_DEVELOPMENT_MODE": "false",
             "FSPBX_FREESWITCH_INSTALL_METHOD": "packages",
             "FS_AUTO_CREATE_SCHEMAS": "true",
+            "FS_BROADCAST_THROTTLE_MS": "500",
             "FS_CORE_NON_SQLITE_DB_REQUIRED": "false",
             "FS_DB_DRIVER": "sqlite",
             "FS_DB_HOST": "127.0.0.1",
@@ -109,7 +110,7 @@
             "FS_DB_PASSWORD": "[redacted]",
             "FS_DB_PORT": "3306",
             "FS_DB_USERNAME": "freeswitch",
-            "FS_DEFAULT_SIP_REALM": "162.243.62.138",
+            "FS_DEFAULT_SIP_REALM": "x.x.x.138",
             "FS_ESL_BUFFER_SIZE": "1000",
             "FS_ESL_EVENT_PROFILE": "essential",
             "FS_ESL_HOST": "127.0.0.1",
@@ -134,6 +135,7 @@
             "FS_XML_HANDLER_CACHE_STORE": "redis",
             "FS_XML_HANDLER_CACHE_TTL": "60",
             "FS_XML_HANDLER_LOG_REQUESTS": "false",
+            "FS_XML_HANDLER_LOG_TIMING": "true",
             "FS_XML_HANDLER_PATH": "[redacted]",
             "FS_XML_HANDLER_THROTTLE_DECAY_MINUTES": "1",
             "FS_XML_HANDLER_THROTTLE_ENABLED": "true",
@@ -189,7 +191,7 @@
         "nftables_active": true,
         "tallpbx_table_present": true,
         "rule_count": 0,
-        "ruleset_sha256": "08192a6496999545bf349a3fd2314953232be86b553127265afbf1c6f9bbe375"
+        "ruleset_sha256": "99ca7d4b7f1d2c4a6772f4306fc0840c9b38cb89f93c906021f16d7b907be916"
     },
-    "recorded_at": "2026-11-04T03:16:09+00:00"
+    "recorded_at": "2026-11-04T07:15:17+00:00"
 }

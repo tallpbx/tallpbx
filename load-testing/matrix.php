@@ -9,10 +9,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | Single declarative source for the two-stage refresh series documented in
-    | docs/load-testing-refresh-implementation-plan.md. The orchestrator
-    | (scripts/load-test-matrix.sh) and its tests read every tier, serving
-    | variant, load profile, cache policy and SIPp scenario from here, so a
-    | cell can never be skipped by ad-hoc shell logic.
+    | docs/load-testing-refresh-implementation-plan.md. The runner
+    | (load-testing/scripts/load-test-matrix.sh) and its tests read every tier,
+    | serving variant, load profile, cache policy and SIPp scenario from here,
+    | so a cell can never be skipped by ad-hoc shell logic.
     |
     | Stage A measures every variant on the shared-CPU tiers and ends at the
     | decision gate (Task 10). Stage B re-runs only the configuration frozen

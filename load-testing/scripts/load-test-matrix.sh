@@ -153,16 +153,16 @@ MATRIX_LOADED=0
 # ------------------------------------------------------------------------------
 
 # Dump the declarative matrix to JSON once per series so later reads are cheap.
+#
+# The matrix is a plain PHP array in the test tooling, not an application
+# configuration, so it is read directly rather than through the framework's
+# configuration repository.
 matrix_cache() {
     if [ ! -f "$MATRIX_CACHE" ]; then
         mkdir -p "$(dirname "$MATRIX_CACHE")"
         php -r '
-            $root = $argv[1];
-            require $root."/vendor/autoload.php";
-            $app = require $root."/bootstrap/app.php";
-            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-            echo json_encode(config("load-test-matrix"), JSON_THROW_ON_ERROR);
-        ' "$ROOT_DIR" > "$MATRIX_CACHE"
+            echo json_encode(require $argv[1], JSON_THROW_ON_ERROR);
+        ' "${ROOT_DIR}/load-testing/matrix.php" > "$MATRIX_CACHE"
     fi
 
     printf '%s' "$MATRIX_CACHE"
@@ -640,13 +640,13 @@ sipp_prepare_generator() {
     fi
 
     # shellcheck disable=SC2086
-    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${ROOT_DIR}/tools/sipp" "${SIPP_HOST}:${SIPP_APP_DIR}/tools/" >> "$sync_log" 2>&1; then
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${ROOT_DIR}/load-testing/tools/sipp" "${SIPP_HOST}:${SIPP_APP_DIR}/tools/" >> "$sync_log" 2>&1; then
         printf 'SIPP-PREPARE-FAILED could not copy the SIPp scenarios; see %s\n' "$sync_log" >&2
         return 1
     fi
 
     # shellcheck disable=SC2086
-    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" "${ROOT_DIR}/scripts/pbx-sipp-validate.sh" "${SIPP_HOST}:${SIPP_APP_DIR}/scripts/pbx-sipp-validate.sh" >> "$sync_log" 2>&1; then
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" "${ROOT_DIR}/load-testing/scripts/pbx-sipp-validate.sh" "${SIPP_HOST}:${SIPP_APP_DIR}/scripts/pbx-sipp-validate.sh" >> "$sync_log" 2>&1; then
         printf 'SIPP-PREPARE-FAILED could not copy the validation script; see %s\n' "$sync_log" >&2
         return 1
     fi
@@ -668,7 +668,7 @@ sipp_prepare_generator() {
 
     remote_check="cd $(printf '%q' "$SIPP_APP_DIR") || exit 1
 command -v sipp >/dev/null || echo 'MISSING sipp'
-test -f tools/sipp/uac-extension.xml || echo 'MISSING scenarios'
+test -f load-testing/tools/sipp/uac-extension.xml || echo 'MISSING scenarios'
 test -s storage/app/load-tests/sipp-users.csv || echo 'MISSING sipp-users.csv'
 echo \"csv_lines=\$(wc -l < storage/app/load-tests/sipp-users.csv 2>/dev/null || echo 0)\""
 
@@ -837,7 +837,7 @@ sip_command() {
 
     printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q RUN_DIR=%q bash %q' \
         "$SIPP_APP_DIR" "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" \
-        "$LOAD_PASSWORD" "$CPS" "$run_dir" "${SIPP_APP_DIR}/scripts/pbx-sipp-validate.sh"
+        "$LOAD_PASSWORD" "$CPS" "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
 }
 
 # Map one ablation id to the switch helper that drives it.
@@ -988,7 +988,7 @@ preflight_remote() {
 
     if ! report="$(run_on_pbx "cd ${app_dir} 2>/dev/null || { echo 'APP-DIR missing'; exit 0; };
         [ -f load-testing/scripts/lib/switch.sh ] || echo 'MISSING load-testing/scripts/lib/switch.sh';
-        [ -f config/load-test-matrix.php ] || echo 'MISSING config/load-test-matrix.php';
+        [ -f load-testing/matrix.php ] || echo 'MISSING load-testing/matrix.php';
         [ -f app/Console/Commands/PbxLoadTestManifestCommand.php ] || echo 'MISSING pbx:load-test:manifest';
         command -v fs_cli >/dev/null || echo 'MISSING fs_cli';
         command -v nginx >/dev/null || echo 'MISSING nginx'" 2>&1)"; then

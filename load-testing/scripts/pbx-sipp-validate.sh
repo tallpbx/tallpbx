@@ -3,7 +3,12 @@ set -euo pipefail
 
 PBX_HOST="${PBX_HOST:-127.0.0.1}"
 PBX_PORT="${PBX_PORT:-5060}"
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The application root: the script lives in load-testing/scripts/, two levels
+# below it. The credential file and the run directory belong to the
+# application's storage, not to the test tooling.
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# The load-testing directory: the SIPp scenarios live beside this script.
+LOAD_TESTING_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOAD_GENERATOR_IP="${LOAD_GENERATOR_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 TENANT="${TENANT:-load-test-beta}"
 DOMAIN="${DOMAIN:-load.test.local}"
@@ -51,11 +56,11 @@ SKIP_SEED="${SKIP_SEED:-0}"
 CSV_PATH="${CSV_PATH:-storage/app/load-tests/sipp-users.csv}"
 RUN_DIR="${RUN_DIR:-storage/app/load-tests/sipp-e2e-$(date +%Y%m%d-%H%M%S)}"
 
-cd "${ROOT_DIR}"
+cd "${APP_DIR}"
 
 # Ensure RUN_DIR is an absolute path so all artifacts are stored in one predictable location.
 if [[ "${RUN_DIR}" != /* ]]; then
-  RUN_DIR="${ROOT_DIR}/${RUN_DIR}"
+  RUN_DIR="${APP_DIR}/${RUN_DIR}"
 fi
 
 if [[ -z "${LOAD_GENERATOR_IP}" ]]; then
@@ -70,22 +75,22 @@ fi
 
 mkdir -p "${RUN_DIR}"
 
-REGISTER_SCENARIO="${ROOT_DIR}/tools/sipp/register.xml"
-UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-extension.xml"
-OUTBOUND_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-outbound.xml"
-UAS_SCENARIO="${ROOT_DIR}/tools/sipp/uas-auto-answer.xml"
-MEDIA_CLIENT_HANGUP_SCENARIO="${ROOT_DIR}/tools/sipp/uac-media-client-hangup.xml"
-MEDIA_SERVER_HANGUP_SCENARIO="${ROOT_DIR}/tools/sipp/uac-media-server-hangup.xml"
+REGISTER_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/register.xml"
+UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-extension.xml"
+OUTBOUND_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-outbound.xml"
+UAS_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uas-auto-answer.xml"
+MEDIA_CLIENT_HANGUP_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-media-client-hangup.xml"
+MEDIA_SERVER_HANGUP_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-media-server-hangup.xml"
 # Extended SIPp scenarios for parity audit modules (gated by EXTENDED=1)
-RING_GROUP_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-ring-group.xml"
-VOICEMAIL_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-voicemail.xml"
-CONFERENCE_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-conference.xml"
-CALL_FORWARD_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-call-forward.xml"
-TIME_CONDITION_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-time-condition.xml"
-FOLLOW_ME_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-follow-me.xml"
-EMERGENCY_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-emergency.xml"
-CALL_BLOCK_UAC_SCENARIO="${ROOT_DIR}/tools/sipp/uac-call-block.xml"
-CSV_ABSOLUTE="${ROOT_DIR}/${CSV_PATH}"
+RING_GROUP_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-ring-group.xml"
+VOICEMAIL_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-voicemail.xml"
+CONFERENCE_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-conference.xml"
+CALL_FORWARD_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-call-forward.xml"
+TIME_CONDITION_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-time-condition.xml"
+FOLLOW_ME_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-follow-me.xml"
+EMERGENCY_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-emergency.xml"
+CALL_BLOCK_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-call-block.xml"
+CSV_ABSOLUTE="${APP_DIR}/${CSV_PATH}"
 AUTH_CSV_ABSOLUTE="${RUN_DIR}/sipp-users-auth.csv"
 
 for required_file in "${REGISTER_SCENARIO}" "${UAC_SCENARIO}" "${OUTBOUND_UAC_SCENARIO}" "${UAS_SCENARIO}" "${MEDIA_CLIENT_HANGUP_SCENARIO}" "${MEDIA_SERVER_HANGUP_SCENARIO}"; do

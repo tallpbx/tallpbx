@@ -298,7 +298,7 @@ bash -n load-testing/scripts/lib/switch.sh
 
 ## Matrix configuration keys
 
-`config/load-test-matrix.php`:
+`load-testing/matrix.php`:
 
 | Key | Contents |
 |:--|:--|

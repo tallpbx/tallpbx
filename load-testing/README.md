@@ -85,7 +85,7 @@ The PBX under test also keeps its own copy under `storage/app/load-tests/<series
 
 | Axis | Options | Where defined |
 |:--|:--|:--|
-| Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `config/load-test-matrix.php` → `tiers` |
+| Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `load-testing/matrix.php` → `tiers` |
 | XML-serving variant | stock dynamic, stock static, fast controller, Lua over stock, Lua over fast, Octane worker | → `variants` |
 | Load profile | 25×1, 100×5, 500×25, 1000×50 | → `xml_profiles` |
 | Cache policy | cold, dialplan-off, production-60, cache-hit-60, uniform-30, uncached | → `cache_ttl_profiles` |

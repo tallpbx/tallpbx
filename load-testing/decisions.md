@@ -222,6 +222,32 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 ---
 
+## D18 — The generator's SIPp ports must be free before every cell
+
+**Decision:** Before each SIP cell the runner terminates any SIPp process left on the generator and waits for ports 5066 and 5088 to be free.
+
+**Why:** each background UAS the validation script starts lives for `timeout 300`, so the previous cell's listener is still holding its port when the next cell begins. The new UAS cannot bind, the scenario either aborts or runs without a responder, and the outbound calls reach nobody. That failure reads exactly like a routing fault: FreeSWITCH answers 503 with cause 41 ("no route") while the dialplan is correct and the bridge action executes.
+
+It cost several runs to trace, because the symptom looks like the product. The evidence that settled it: the generator's UAS log for the one cell that worked shows `Total-calls 5`, while the cells that failed show no listener at all — and a direct capture confirmed the INVITE leaves the PBX and arrives at the generator with nothing listening to answer it.
+
+**Also:** the pattern that terminates the processes is written so it cannot match the command line that runs it (`sipp [-]sf`), because a `pkill` that matches its own shell kills the cleanup instead of the listeners.
+
+**Status:** settled.
+
+---
+
+## D19 — A SIP cell is judged on the legs its calls produced, not on the row count
+
+**Decision:** The CDR gate compares the rows the database gained against the number of completed calls *and* the number of legs each of those calls is expected to produce.
+
+**Why:** the first "successful" outbound cell was a false pass. The calls were answered — 180, then 200, for forty seconds — but by the wrong component: the CDR rows show an a-leg only, with `NORMAL_CLEARING` and no second leg, and FreeSWITCH's own log holds 164 outbound legs and zero answers across the entire session. A row count of 25 against 10 calls satisfied the first version of the gate, because one row per call is enough to look healthy.
+
+A call that is bridged produces a row for each leg. Counting only rows cannot tell "answered locally by something else" from "bridged and recorded", and the difference is the whole point of the phase.
+
+**Status:** settled.
+
+---
+
 ## Open questions
 
 | Question | Why it matters |

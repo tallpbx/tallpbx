@@ -218,6 +218,41 @@ The same burst that failed for every user now completes with zero failures.
 
 SIPp retransmits a REGISTER after 500 ms. A cold lookup outlasts that, the request is sent twice, and FreeSWITCH answers the retransmission with a challenge of its own — which the scenario cannot place, so the step failed for a reason unrelated to what it measures. The scenario now sends the REGISTER once, and the runner warms the directory before registering.
 
+### The outbound step: a false pass, and what it took to find it
+
+The first cell that reported `outbound-calls: passed` was wrong, and the CDR rows are what prove it:
+
+```
+leg=a dest=91555123000 caller=2000 dur=40s bill=40s cause=NORMAL_CLEARING
+```
+
+One row per call, no second leg, and the call lasted exactly as long as the scenario's pause. The calls were answered — 180, then 200 — but by a component that never bridged them out. Across the whole session FreeSWITCH created **164 outbound legs and answered none of them**, while the generator's UAS log for that one working cell shows `Total-calls 5`.
+
+The chain of causes, each one hiding behind the previous:
+
+| # | Cause | How it presented |
+|:--|:--|:--|
+| 1 | The tenant was re-seeded with `--reset` on every invocation, so its id — which the dialplan context carries — changed every time | A registration made against the previous context routed into a context that no longer existed |
+| 2 | The seeded outbound gateway pointed at `127.0.0.1` on the PBX | Every outbound call answered 503, cause 41 — which reads as "no route" |
+| 3 | The dial pattern was stored over-escaped, so the route never matched | The call fell through to another extension that answered it locally — a *false pass* |
+| 4 | The previous cell's background UAS still held ports 5066/5088 (`timeout 300`) | The next cell's UAS could not bind; the calls reached nobody, and the 503 looked identical to cause 2 |
+
+The dialplan itself was never wrong. Proven directly:
+
+```
+Regex (PASS) [outbound_SIPp outbound 9-prefix] destination_number(91555123000) =~ /^9(\d{10})/
+Action bridge(sofia/external/1555123000@x.x.x.55:5088)
+```
+
+and the bridge leaves the box and arrives:
+
+```
+PBX       Out IP 162.243.62.138.5080 > 107.170.3.55.5088: UDP, length 1082
+Generator In  IP 162.243.62.138.5080 > 107.170.3.55.5088: UDP, length 1082
+```
+
+**What this changed in the harness:** the generator's SIPp ports are now cleared before every cell, and the CDR gate is to compare *legs* rather than rows — one row per call looks healthy even when nothing was bridged.
+
 ## Defects found and fixed
 
 ### Product code
@@ -250,11 +285,21 @@ SIPp retransmits a REGISTER after 500 ms. A cold lookup outlasts that, the reque
 
 ## Next actions, in order
 
-1. **Task 6 — the SIP phases.** The CDR gate the plan asked for now exists and is applied to every SIP cell: it counts `cdrs` rows before and after, waits for the rows the completed calls require, and fails the cell when a call leaves nothing behind. The first cell passes end to end. What remains is the comparison: the other five variants through the same three steps, then the 14 feature scenarios on the two primary variants and the call-rate ladder.
-2. **The ESL `full` and throttle-`0` ablations**, which belong to the SIP phase because that is the only phase that produces events.
-3. Run the `directory` section for the surviving paths — `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things.
-4. Run the failure ramp (fixed concurrency, doubling total requests) for `v-octane` and `v-fast` to find where each saturates.
-5. Decide whether app-side timing (`timing.enabled`) is needed to split worker time from queue time.
-6. Re-run the interleaved series once with the restart fix in place (`c44d87e`) to tighten the 25.6 % band before the results are published.
+> **2026-11-04 handoff:** the authoritative resume list now lives at the top of
+> `docs/load-testing-refresh-implementation-plan.md` (→ *CURRENT STATUS*). The short version:
 
-Two things are deliberately *not* on this list: a special re-run to re-validate the Lua proxy (the behavioural gate now proves it on every enable), and any further cache-policy sweep (settled by D6).
+1. `git pull --ff-only origin 5.x` on **both** hosts (`162.243.62.138`, `107.170.3.55`); on the
+   generator also `pkill -f 'sipp [-]sf'` — the validate script and scenario paths moved into
+   `load-testing/` in the consolidation commit.
+2. **Add a fast SIP smoke preflight** to the runner (~2 min: 1 registration + 1 extension call +
+   1 outbound call + CDR check) so a broken chain is found before a 30-minute series starts.
+   (Was mid-TDD at session end; the red test was removed to keep the tree green.)
+3. Run the six-variant SIP series at `--cps=2` — the comparison Task 6 still lacks.
+4. The 14 feature scenarios (`EXTENDED=1`) on surviving variants, then the call-rate ladder.
+5. The ESL `full` and throttle-`0` ablations (switches exist and are output-verified).
+6. The `directory` section for surviving paths, the failure ramp for `v-octane`/`v-fast`, and
+   the app-side timing decision.
+
+Two things are deliberately *not* on this list: a special re-run to re-validate the Lua proxy
+(the behavioural gate now proves it on every enable), and any further cache-policy sweep
+(settled by D6).

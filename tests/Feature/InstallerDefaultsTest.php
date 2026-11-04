@@ -107,7 +107,7 @@ it('encrypts sessions in every install mode and enables secure cookies on HTTPS'
 });
 
 it('isolates cache sweeps to the dedicated cache database without flushing security state or sessions', function (): void {
-    $sweepScript = (string) file_get_contents(base_path('scripts/run-cache-sweep.sh'));
+    $sweepScript = (string) file_get_contents(base_path('load-testing/scripts/run-cache-sweep.sh'));
 
     expect($sweepScript)->toMatch('/redis-cli\s+-n\s+["\']?\$\{REDIS_CACHE_DB:-1\}["\']?\s+flushdb/')
         ->and($sweepScript)->not->toMatch('/^\s*redis-cli\s+flushdb/m');

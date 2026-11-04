@@ -61,7 +61,7 @@ trait WithFakeFreeSwitch
 
         // The fake server is a standalone CLI script, not a test class,
         // so it lives outside the autoloaded tests/ directory.
-        $serverScript = __DIR__.'/../../scripts/testing/FakeFreeSwitchServer.php';
+        $serverScript = __DIR__.'/../Support/FakeFreeSwitchServer.php';
         $escapedPassword = escapeshellarg($this->fakeServerPassword);
         $escapedScenario = escapeshellarg($scenario);
 
