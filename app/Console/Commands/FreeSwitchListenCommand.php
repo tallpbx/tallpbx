@@ -159,6 +159,20 @@ class FreeSwitchListenCommand extends Command
         $profile = (string) ($this->option('profile') ?: config('freeswitch.event_profile', 'essential'));
         $this->components->info("Connected to FreeSWITCH ESL. Listening for {$eventCount} event types (profile: {$profile})...");
 
+        // The daemon's console output is buffered and does not reach the
+        // journal, so the configuration it actually runs with is recorded in
+        // the application log. That record is the only runtime evidence an
+        // operator or a test harness can read: what it subscribed to, and
+        // whether broadcast debouncing is in force.
+        $broadcastThrottleMs = (int) config('freeswitch.broadcasting.throttle_ms', 500);
+
+        Log::info('FreeSWITCH ESL listener started.', [
+            'profile' => $profile,
+            'event_types' => $eventCount,
+            'broadcast_throttle_ms' => $broadcastThrottleMs,
+            'broadcast_debounce' => $broadcastThrottleMs > 0 ? 'enabled' : 'disabled',
+        ]);
+
         // ── Event loop ────────────────────────────────────────────
         while (true) {
             // Check timeout

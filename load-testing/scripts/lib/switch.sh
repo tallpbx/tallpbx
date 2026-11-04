@@ -801,6 +801,23 @@ restart_listener() {
     return 1
 }
 
+# Count the listener start-up records in the application log.
+#
+# Used to prove a restart produced a *new* record, so an assertion never
+# passes on a line left over from an earlier configuration.
+listener_record_count() {
+    grep -c 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs/laravel.log" 2>/dev/null || printf '0\n'
+}
+
+# Read the listener's most recent start-up record.
+#
+# The daemon's console output is buffered and never reaches the journal, so
+# this record is the only runtime evidence of what it actually subscribed to
+# and whether broadcast debouncing is in force.
+listener_last_record() {
+    grep 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs/laravel.log" 2>/dev/null | tail -1
+}
+
 # Apply the broadcast debounce window, in milliseconds.
 #
 # 500 is the shipped default: at most about two broadcasts per second per
@@ -808,7 +825,7 @@ restart_listener() {
 # dispatched to Reverb — the configuration that shows what the debounce is
 # actually saving.
 apply_broadcast_throttle() {
-    local value="${1:-}"
+    local value="${1:-}" before
 
     if ! [[ "$value" =~ ^[0-9]+$ ]]; then
         fail_switch "broadcast throttle must be a number of milliseconds (got '${value}')"
@@ -816,38 +833,41 @@ apply_broadcast_throttle() {
     fi
 
     snapshot_env
+    before="$(listener_record_count)"
     env_set FS_BROADCAST_THROTTLE_MS "$value"
 
     restart_listener || return 1
 
     log "applied broadcast throttle ${value}ms"
-    assert_broadcast_throttle "$value"
+    assert_broadcast_throttle "$value" "$before"
 }
 
-# Read the broadcast debounce window back.
+# Prove the debounce window the listener is actually running with.
 #
-# The running value cannot be read out of the listener, so the assertion
-# checks the declared value and that the process was restarted after it was
-# written. The effect is proven by the measurement — listener CPU under a
-# fixed call load — not by a configuration read.
+# Read from the listener's own start-up record, not from .env: the record is
+# what the process reported after subscribing. A record older than the restart
+# proves nothing, so the caller passes the count observed before restarting.
 assert_broadcast_throttle() {
-    local expected="${1:-}" current started
+    local expected="${1:-}" before="${2:-}" record
 
-    current="$(env_get FS_BROADCAST_THROTTLE_MS)"
-
-    if [ "${current:-500}" != "$expected" ]; then
-        fail_switch "broadcast throttle expected ${expected} but .env reports '${current:-unset}'"
+    if [ -n "$before" ] && [ "$(listener_record_count)" -le "$before" ]; then
+        fail_switch "the listener wrote no new start-up record; the throttle cannot be in effect"
         return 1
     fi
 
-    started="$(systemctl show freeswitch-listener -p ActiveEnterTimestamp --value)"
+    record="$(listener_last_record)"
 
-    if [ -z "$started" ]; then
-        fail_switch "freeswitch-listener is not running, so the throttle cannot be in effect"
+    if [ -z "$record" ]; then
+        fail_switch "the listener has recorded no start-up line; the throttle cannot be proven"
         return 1
     fi
 
-    log "asserted broadcast throttle ${expected}ms (listener restarted at ${started})"
+    if ! printf '%s' "$record" | grep -q "\"broadcast_throttle_ms\":${expected}"; then
+        fail_switch "the listener reports $(printf '%s' "$record" | grep -o '\"broadcast_throttle_ms\":[0-9]*') instead of ${expected}ms"
+        return 1
+    fi
+
+    log "asserted broadcast throttle ${expected}ms from the listener's own start-up record"
 }
 
 # Apply the ESL event subscription profile.
@@ -856,7 +876,7 @@ assert_broadcast_throttle() {
 # whole catalogue. Only measurable under call traffic, because that is the
 # only time events exist to be filtered.
 apply_esl_profile() {
-    local profile="${1:-}"
+    local profile="${1:-}" before
 
     case "$profile" in
         essential | full) ;;
@@ -867,34 +887,43 @@ apply_esl_profile() {
     esac
 
     snapshot_env
+    before="$(listener_record_count)"
     env_set FS_ESL_EVENT_PROFILE "$profile"
 
     restart_listener || return 1
 
     log "applied ESL profile ${profile}"
-    assert_esl_profile "$profile"
+    assert_esl_profile "$profile" "$before"
 }
 
-# Read the ESL profile back from the listener's own start-up line, which
-# reports the profile and the number of events it subscribed to.
+# Prove the profile the listener is actually running with.
+#
+# Read from the listener's start-up record, which also carries how many event
+# types it subscribed to — a count the configuration alone cannot prove.
 assert_esl_profile() {
-    local expected="${1:-}" declared line
+    local expected="${1:-}" before="${2:-}" record
 
-    declared="$(env_get FS_ESL_EVENT_PROFILE)"
-
-    if [ "${declared:-essential}" != "$expected" ]; then
-        fail_switch "esl profile expected ${expected} but .env reports '${declared:-unset}'"
+    if [ -n "$before" ] && [ "$(listener_record_count)" -le "$before" ]; then
+        fail_switch "the listener wrote no new start-up record; the profile cannot be in effect"
         return 1
     fi
 
-    line="$(journalctl -u freeswitch-listener --since '-3 min' --no-pager 2>/dev/null | grep -i 'Listening for' | tail -1)"
+    record="$(listener_last_record)"
 
-    if [ -n "$line" ] && ! printf '%s' "$line" | grep -qi "profile: ${expected}"; then
-        fail_switch "the listener reports '${line}' instead of the ${expected} profile"
+    if [ -z "$record" ]; then
+        fail_switch "the listener has recorded no start-up line; the profile cannot be proven"
         return 1
     fi
 
-    log "asserted ESL profile ${expected}"
+    if ! printf '%s' "$record" | grep -q "\"profile\":\"${expected}\""; then
+        fail_switch "the listener reports $(printf '%s' "$record" | grep -o '\"profile\":\"[a-z]*\"') instead of ${expected}"
+        return 1
+    fi
+
+    local events
+    events="$(printf '%s' "$record" | grep -o '\"event_types\":[0-9]*' | cut -d: -f2)"
+
+    log "asserted ESL profile ${expected} from the listener's own start-up record (${events:-?} event types)"
 }
 
 apply_lua_bindings() {
