@@ -19,7 +19,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 | 2 — Manifest command | Complete |
 | 3 — Switch helpers | Complete; every `apply_*` has an `assert_*` |
 | 4 — Matrix runner | Complete, including per-variant URL, lookup probe, `--ttl` filter and archive step |
-| 5 — XML battery | **In progress.** Baseline variant fully measured; two further variants at one cache policy; three variants not yet measured |
+| 5 — XML battery | **In progress.** All six variants measured at `production-60` with 3 repeats; the baseline also has the full six-policy sweep. Not yet measured: the failure ramp, the directory section, and the other load profiles |
 | 6 — SIPp validation and ladder | Not started |
 | 7 — Ablations | Not started (design exists: `fs-loglevel`, `fs-db`, plus the proposed ESL and throttle ablations) |
 | 8 — Saturation profiling | Not started |
@@ -47,28 +47,36 @@ All cells: 100 requests, concurrency 5, dialplan section, 100 % HTTP 200, `failu
 
 Caching is worth roughly 26 % end to end on this tier (20.7 best cached against 13.5 worst uncached). The order is monotonic — no inversion.
 
-### Variant comparison at `production-60`, one repeat each
+### Variant comparison at `production-60`, 3 repeats each
 
-| Variant | rps | average ms | p50 ms | p95 ms |
-|:--|--:|--:|--:|--:|
-| `v-stock-dynamic` | 18.8 | 235 | 241 | 278 |
-| `v-stock-static` | 17.9 | 259 | 253 | 304 |
-| `v-fast` | 19.1 | — | 233 | — |
+| Variant | rps (mean) | p50 ms | p95 ms | vs baseline |
+|:--|--:|--:|--:|:--|
+| `v-octane` | **175.6** | 11–26 | 19–74 | **×8.8** |
+| `v-fast` | 30.4 | 151–156 | 163–183 | **+53 %** |
+| `v-lua-fast` | 30.3 | 150–155 | 162–181 | +52 % |
+| `v-stock-dynamic` | 19.9 | 229–241 | 249–278 | baseline |
+| `v-stock-static` | 19.4 | 237–242 | 281–300 | −3 % |
+| `v-lua-stock` | 18.9 | 241–257 | 263–331 | −5 % |
 
-**These are single runs.** The spread between them is inside the ~10 % repeat noise, so no ranking is claimed. The baseline sweep above is the only part measured at three repeats.
+All cells: 100 % HTTP 200, `failures.log` empty.
 
-### FreeSWITCH lookup probe
+**What the numbers say**
 
-| Cache policy | find_user_ms | status_ms | net_ms |
-|:--|--:|--:|--:|
-| `cache-hit-60` | 1594 | 66 | 1528 |
-| `cold` | 1594 | 99 | 1495 |
-| `dialplan-off` | 1604 | 68 | 1536 |
-| `uniform-30` | 1589 | 76 | 1513 |
-| `production-60` | 1548 | 62 | 1486 |
-| `uncached` | 1795 | 63 | 1732 |
+1. **The persistent worker is in a different class.** 175.6 rps against 19.9, with p50 falling from ~235 ms to 11–26 ms. This is far outside the noise band and it is the number the earlier series was reaching for. It only exists because the runner now posts Octane cells at `:8090`; the six earlier cells that posted to nginx measured PHP-FPM and were discarded.
+2. **The fast controller is worth about half again** on stock pools: 30.4 against 19.9, p50 down from ~235 to ~153 ms. Also outside the noise band.
+3. **Pool mode is not a lever on this tier.** Static 19.4 against dynamic 19.9 is inside the noise band, consistent with a 5-child pool serving 5 concurrent clients.
+4. **The Lua proxy shows no gain, and that is expected from this driver.** `v-lua-stock` 18.9 against 19.4; `v-lua-fast` 30.3 against 30.4. An HTTP client posts to PHP, so a Lua cache hit is never exercised. These two rows do **not** mean the proxy is worthless — they mean this measurement cannot see it (see D5).
 
-Roughly 50 ms per directory lookup under load, flat across cache policies (correct — `find_user_xml` does not use the dialplan cache). An idle probe on the same host measured ~11 ms; see the open question below.
+### FreeSWITCH lookup probe — two clear regimes
+
+| When | net_ms for 30 lookups | Per lookup |
+|:--|--:|--:|
+| During the first baseline sweep (cold page cache, fresh clone) | 1486–1732 | ~50 ms |
+| During the variant sweep (warm cache) | 173–215 | ~6–7 ms |
+
+With `lua_bindings=on` the probe read 202 ms and 215 ms, against 196 ms for stock static with the bindings off. **Turning the Lua proxy on did not make a directory lookup faster.** No Lua script errors were logged today, and `mod_lua` is loaded before `mod_xml_curl`, so the binding is live; the likely explanations are an unpopulated Redis mirror or a key/DB mismatch between what Laravel writes and what the handler reads. That needs the mirror-TTL attribution described in D5 before any conclusion about the proxy is drawn.
+
+The 50 ms to 6 ms difference also answers part of the earlier open question: the first sweep was measuring a cold SQLite page cache, not a property of the lookup path.
 
 ### ESL listener and Reverb under XML-only load
 
@@ -111,8 +119,8 @@ Conclusion: neither service consumes measurable CPU during XML-only tests. Both 
 
 ## Next actions, in order
 
-1. Repeat `v-stock-static` and `v-fast` at three repeats so their comparison is worth reading.
-2. Measure `v-octane` at `:8090` — never measured yet.
-3. Measure `v-lua-stock` and `v-lua-fast`, judged from the probe plus SIP, not the HTTP client.
+1. Explain why `lua:on` does not speed up a directory lookup (mirror unpopulated, or key/DB mismatch) before recording any verdict on the Lua proxy.
+2. Run the `directory` section for the two surviving paths, since `find_user_xml` and `pbx:load-test:dialplan --section=directory` measure different things.
+3. Run the failure ramp (fixed concurrency, doubling total requests) for `v-octane` and `v-fast` to find where each saturates.
 4. Run the SIP phases for the surviving variants, including the ESL `full` and throttle-`0` ablations.
-5. Resolve the two open questions that affect interpretation: the 50 ms vs 11 ms lookup gap, and whether app-side timing should be enabled.
+5. Decide whether app-side timing (`timing.enabled`) is needed to split worker time from queue time.

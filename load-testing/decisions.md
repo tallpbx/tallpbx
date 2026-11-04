@@ -190,7 +190,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 | Question | Why it matters |
 |:--|:--|
-| Why does a directory lookup cost ~50 ms under load but ~11 ms idle? | If it is swap pressure, every 1 vCPU number is partly measuring disk |
+| Why does a directory lookup cost ~50 ms in the first sweep and ~6 ms in the second? | Answered in part: the first sweep measured a cold page cache on a fresh clone. The remaining question is how much of the 1 vCPU ceiling is swap pressure (228 MB of the 2 GB swap still in use) |
 | Should the manifest be timestamped per invocation? | It is overwritten each run, so a tier measured across several invocations keeps only the last one |
-| Can the probe prove *who served* a lookup rather than what is configured? | The current `lua_bindings` field reports configuration, not attribution |
+| Can the probe prove *who served* a lookup rather than what is configured? | The `lua_bindings` field reports configuration only. Turning the proxy on did not speed up a directory lookup, so whether it ever serves a hit is currently unproven |
 | Should app-side timing be enabled for XML cells? | `timing.enabled` is `false`, so no request/handler split exists |

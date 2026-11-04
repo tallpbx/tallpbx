@@ -1,1 +1,1 @@
-lookup_count=30 find_user_ms=1744 status_ms=86 net_ms=1658 lua_bindings=off
+lookup_count=30 find_user_ms=283 status_ms=87 net_ms=196 lua_bindings=off
