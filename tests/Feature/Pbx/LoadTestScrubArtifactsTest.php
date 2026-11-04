@@ -1,0 +1,105 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Pbx;
+
+use Illuminate\Support\Facades\File;
+use Symfony\Component\Process\Process;
+
+/*
+|--------------------------------------------------------------------------
+| Artifact Address Scrubber
+|--------------------------------------------------------------------------
+|
+| The measurement hosts are disposable and their addresses are not public
+| knowledge. Every committed artifact has to show them as x.x.x.NNN, so a
+| reader can tell two hosts apart without being able to reach either.
+|
+| These checks pin the scrub: the address is replaced everywhere it appears,
+| the last octet is kept, and other addresses are left alone.
+|
+*/
+
+const SCRUB_SCRIPT = 'load-testing/scripts/tools/scrub-artifacts.sh';
+const SCRUB_SCRATCH = 'storage/framework/testing/load-tests/scrub';
+
+/**
+ * Run the scrubber over a directory.
+ *
+ * @param  array<int, string>  $arguments  Command-line arguments for the tool
+ * @return Process The finished process, for output assertions
+ */
+function scrubProcess(array $arguments): Process
+{
+    $process = new Process(['bash', base_path(SCRUB_SCRIPT), ...$arguments], base_path());
+    $process->run();
+
+    return $process;
+}
+
+describe('artifact address scrubber', function (): void {
+    afterEach(function (): void {
+        File::deleteDirectory(base_path(SCRUB_SCRATCH));
+    });
+
+    it('is a syntactically valid bash script', function (): void {
+        $process = new Process(['bash', '-n', base_path(SCRUB_SCRIPT)], base_path());
+        $process->run();
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+    });
+
+    it('replaces the host address everywhere it appears', function (): void {
+        File::ensureDirectoryExists(base_path(SCRUB_SCRATCH.'/logs'));
+
+        File::put(base_path(SCRUB_SCRATCH.'/logs/register.log'), implode("\n", [
+            'Via: SIP/2.0/UDP 146.190.245.203:5066;branch=z9hG4bK-1',
+            'Call-ID: 1-4022@146.190.245.203',
+            'Contact: <sip:2000@146.190.245.203:5066>',
+            '',
+        ]));
+
+        $process = scrubProcess([base_path(SCRUB_SCRATCH), '146.190.245.203']);
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        $scrubbed = (string) file_get_contents(base_path(SCRUB_SCRATCH.'/logs/register.log'));
+
+        expect($scrubbed)->toContain('x.x.x.203')
+            ->and($scrubbed)->not->toContain('146.190.245.203');
+    });
+
+    it('leaves other addresses and non-address text alone', function (): void {
+        File::ensureDirectoryExists(base_path(SCRUB_SCRATCH));
+
+        File::put(base_path(SCRUB_SCRATCH.'/summary.md'), implode("\n", [
+            '- register: passed',
+            'Generator 137.184.160.16 answered the calls',
+            'PBX 146.190.245.203 registered the extensions',
+            '',
+        ]));
+
+        $process = scrubProcess([base_path(SCRUB_SCRATCH), '146.190.245.203']);
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        $scrubbed = (string) file_get_contents(base_path(SCRUB_SCRATCH.'/summary.md'));
+
+        expect($scrubbed)->toContain('x.x.x.203')
+            ->and($scrubbed)->toContain('137.184.160.16')
+            ->and($scrubbed)->toContain('- register: passed');
+    });
+
+    it('finds the addresses by itself when the caller names none', function (): void {
+        File::ensureDirectoryExists(base_path(SCRUB_SCRATCH));
+
+        File::put(base_path(SCRUB_SCRATCH.'/manifest.json'), '{"host":"162.243.62.138"}');
+
+        $process = scrubProcess([base_path(SCRUB_SCRATCH)]);
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and((string) file_get_contents(base_path(SCRUB_SCRATCH.'/manifest.json')))
+            ->toContain('x.x.x.138');
+    });
+});

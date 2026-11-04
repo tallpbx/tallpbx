@@ -222,6 +222,46 @@ describe('load test matrix runner', function (): void {
             ->and($warmup)->toBeLessThan($measured);
     });
 
+    it('derives the SIP realm from the PBX when the caller gives none', function (): void {
+        $fixture = $this->artifactRoot.'-pbx';
+
+        File::ensureDirectoryExists($fixture);
+        File::put($fixture.'/.env', "APP_URL=http://10.0.0.9\nFS_DEFAULT_SIP_REALM=realm-from-pbx.test\n");
+
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-static', '--phase=sip'],
+            $this->artifactRoot,
+            ['REMOTE_APP_DIR' => $fixture, 'PBX_HOST' => 'local'],
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // FreeSWITCH resolves a tenant user under the realm it serves. When
+        // the host's realm differs from the documented default, seeding the
+        // tenant on the wrong one makes every registration answer 401/403.
+        expect($process->getOutput())->toContain('DOMAIN=realm-from-pbx.test');
+
+        File::deleteDirectory($fixture);
+    });
+
+    it('lets an explicit realm win over the host realm', function (): void {
+        $fixture = $this->artifactRoot.'-pbx';
+
+        File::ensureDirectoryExists($fixture);
+        File::put($fixture.'/.env', "FS_DEFAULT_SIP_REALM=realm-from-pbx.test\n");
+
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-static', '--phase=sip'],
+            $this->artifactRoot,
+            ['REMOTE_APP_DIR' => $fixture, 'PBX_HOST' => 'local', 'DOMAIN' => 'explicit.test'],
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and($process->getOutput())->toContain('DOMAIN=explicit.test');
+
+        File::deleteDirectory($fixture);
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

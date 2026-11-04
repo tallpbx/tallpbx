@@ -148,6 +148,51 @@ describe('cdr gate', function (): void {
             ->and($process->getOutput())->toContain('reason=no-calls');
     });
 
+    it('waits for the rows the calls should have produced, not just for the count to look settled', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^run_sip_phase\(\) \{.*?^\}/ms', $script, $match);
+        $phase = $match[0] ?? '';
+
+        // Measured: the pipeline had not started writing when the first cell
+        // finished, so three identical samples read as "settled" while every
+        // record was still in flight. The wait now knows how many rows the
+        // completed calls require and keeps polling until they arrive.
+        expect($phase)->toContain('cdrs_wait_for')
+            ->and($script)->toContain('cdrs_wait_for()')
+            ->and($phase)->not->toContain('cdrs_settled_count');
+    });
+
+    it('reads the call tallies before waiting on the database', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^run_sip_phase\(\) \{.*?^\}/ms', $script, $match);
+        $phase = $match[0] ?? '';
+
+        // The wait needs to know how many rows to expect, and only SIPp's own
+        // tally can say that.
+        $tally = strpos($phase, 'sipp-counts');
+        $wait = strpos($phase, 'cdrs_wait_for');
+
+        expect($tally)->not->toBeFalse()
+            ->and($wait)->not->toBeFalse()
+            ->and($tally)->toBeLessThan($wait);
+    });
+
+    it('points the seeded outbound gateway at the generator', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^sipp_prepare_generator\(\) \{.*?^\}/ms', $script, $match);
+        $prepare = $match[0] ?? '';
+
+        // The seed defaults the simulated gateway to 127.0.0.1, which on the
+        // PBX is nothing: every outbound call then answers 503 before a single
+        // packet reaches the generator.
+        expect($prepare)->toContain('--sipp-host')
+            ->and($prepare)->toContain('--sipp-port')
+            ->and($script)->toContain('SIPP_UAS_HOST');
+    });
+
     it('applies the gate to every SIP cell and records the verdict beside it', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 
@@ -157,5 +202,19 @@ describe('cdr gate', function (): void {
         expect($phase)->toContain('cdr-gate.sh')
             ->and($phase)->toContain('cdr_row_count')
             ->and($phase)->toContain('cdr-gate.txt');
+    });
+
+    it('warms the directory before registering, because a cold lookup outlasts the retransmit timer', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        preg_match('/^run_sip_phase\(\) \{.*?^\}/ms', $script, $match);
+        $phase = $match[0] ?? '';
+
+        // Measured on the 1 vCPU tier: the first lookup for an extension costs
+        // over a second, while SIPp retransmits after 500 ms. The retransmitted
+        // REGISTER draws a second 401 that the scenario cannot place, so the
+        // step fails on a timing artefact rather than on what it measures.
+        expect($phase)->toContain('warm_directory')
+            ->and($script)->toContain('find_user_xml');
     });
 });

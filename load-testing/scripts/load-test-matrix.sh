@@ -67,7 +67,10 @@ PBX_XML_TOKEN="${PBX_XML_TOKEN:-}"
 # so an operator who already knows one tool does not have to learn a second
 # vocabulary. The LOAD_* names stay available for programmatic callers.
 LOAD_TENANT="${LOAD_TENANT:-${TENANT:-load-test-beta}}"
-LOAD_DOMAIN="${LOAD_DOMAIN:-${DOMAIN:-load.test.local}}"
+# The SIP realm the tenant is seeded on. An empty value means "ask the PBX",
+# because FreeSWITCH resolves a registering user under the realm it serves and
+# a tenant seeded on any other realm answers 401/403 to every endpoint.
+LOAD_DOMAIN="${LOAD_DOMAIN:-${DOMAIN:-}}"
 LOAD_EXTENSIONS="${LOAD_EXTENSIONS:-${EXTENSIONS:-20}}"
 LOAD_START="${LOAD_START:-${START:-2000}}"
 LOAD_PASSWORD="${LOAD_PASSWORD:-${PASSWORD:-LoadTest1234}}"
@@ -94,6 +97,17 @@ else
     SIPP_APP_DIR="${SIPP_APP_DIR:-/var/www/tallpbx}"
 fi
 
+# Where the simulated outbound gateway sends its calls: the UAS the SIPp
+# runner starts on the generator. Without this the seeded route points at
+# 127.0.0.1 on the PBX, where nothing listens, and every outbound call answers
+# 503 before a packet reaches the generator.
+SIPP_UAS_PORT="${SIPP_UAS_PORT:-5088}"
+if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+    SIPP_UAS_HOST="127.0.0.1"
+else
+    SIPP_UAS_HOST="$SIPP_HOST"
+fi
+
 # The base directory of the gate and probe tools that run on this host.
 TOOLS_DIR="${ROOT_DIR}/load-testing/scripts/tools"
 
@@ -103,10 +117,9 @@ PBX_DB_NAME="${PBX_DB_NAME:-tallpbx}"
 # The CDR pipeline is asynchronous: mod_json_cdr posts each record when a leg
 # ends and the worker digests it afterwards. Reading the count the instant a
 # cell finishes would report a healthy pipeline as lost records, so the gate
-# polls until the count has been unchanged for a few intervals, or the budget
-# runs out.
+# keeps polling until the rows the completed calls require have arrived, or
+# the budget runs out.
 CDR_SETTLE_INTERVAL="${CDR_SETTLE_INTERVAL:-3}"
-CDR_SETTLE_STABLE="${CDR_SETTLE_STABLE:-3}"
 CDR_SETTLE_MAX="${CDR_SETTLE_MAX:-60}"
 
 TIER=""
@@ -281,7 +294,6 @@ Environment:
   SIPP_HOST              SSH target of the load generator ('local' runs SIPp in place)
   PBX_DB_NAME            Database the CDR gate counts rows in (default tallpbx)
   CDR_SETTLE_INTERVAL    Seconds between CDR row-count polls during the drain
-  CDR_SETTLE_STABLE      Consecutive unchanged polls before a count is trusted
   CDR_SETTLE_MAX         Longest the gate waits for late records, in seconds
   PBX_URL                XML handler URL the load client calls
   PBX_XML_TOKEN          XML handler token, when authentication is enabled
@@ -431,6 +443,29 @@ run_on_sipp() {
     ssh -n $SSH_OPTS -p "$SIPP_SSH_PORT" "$SIPP_HOST" "$command"
 }
 
+# Resolve the SIP realm the PBX serves registrations under.
+#
+# FreeSWITCH looks a registering endpoint up by the realm in the profile, not
+# by the realm the client wrote in its request. A tenant seeded on a realm the
+# PBX does not serve therefore fails every registration with 401/403, which
+# reads as a credentials problem. The host declares the realm it serves in
+# FS_DEFAULT_SIP_REALM, so that is the default; an explicit DOMAIN or
+# LOAD_DOMAIN still wins, and the documented value is the last resort.
+resolve_load_domain() {
+    if [ -n "$LOAD_DOMAIN" ]; then
+        return 0
+    fi
+
+    local realm
+
+    realm="$(run_on_pbx "grep -E '^FS_DEFAULT_SIP_REALM=' $(printf '%q' "${REMOTE_APP_DIR}/.env") | head -n1 | cut -d= -f2-" 2>/dev/null)"
+    realm="$(printf '%s' "$realm" | tr -d '[:space:]')"
+    realm="${realm//\"/}"
+    realm="${realm//\'/}"
+
+    LOAD_DOMAIN="${realm:-load.test.local}"
+}
+
 # Count the CDR rows the PBX currently holds.
 #
 # Prints an empty string when the database cannot be read, which the SIP phase
@@ -444,38 +479,32 @@ cdr_row_count() {
     printf '%s\n' "$count"
 }
 
-# Wait until the CDR row count stops moving, then print it.
+# Wait for the rows a cell's completed calls should have produced.
 #
-# A record is posted when a leg ends and digested by the worker afterwards, so
-# a cell that just finished still has records in flight. Polling until the
-# count is stable separates "late" from "lost".
-cdrs_settled_count() {
-    local previous="$1" current="$1" stable=0 elapsed=0 count
+# The pipeline is asynchronous and does not necessarily start writing while
+# the cell is still running: on the first real SIP cell the row count sat
+# unchanged for the whole settle window and then jumped by 25. Waiting for a
+# stable count therefore reads "settled" before the worker has done anything.
+# The wait is driven by the outcome instead — poll until the count has risen
+# by at least the number of completed calls, or the budget runs out — and the
+# verdict then decides whether what arrived is enough.
+cdrs_wait_for() {
+    local before="$1" expected="$2" elapsed=0 count=""
 
     while [ "$elapsed" -lt "$CDR_SETTLE_MAX" ]; do
-        sleep "$CDR_SETTLE_INTERVAL"
-        elapsed=$((elapsed + CDR_SETTLE_INTERVAL))
-
         count="$(cdr_row_count)"
 
-        if [ -z "$count" ]; then
-            continue
+        if [ -n "$count" ] && [ $((count - before)) -ge "$expected" ]; then
+            printf '%s\n' "$count"
+            return 0
         fi
 
-        if [ "$count" = "$current" ]; then
-            stable=$((stable + 1))
-
-            if [ "$stable" -ge "$CDR_SETTLE_STABLE" ]; then
-                printf '%s\n' "$count"
-                return 0
-            fi
-        else
-            stable=0
-            current="$count"
-        fi
+        sleep "$CDR_SETTLE_INTERVAL"
+        elapsed=$((elapsed + CDR_SETTLE_INTERVAL))
     done
 
-    printf '%s\n' "$current"
+    # Report what was seen so the verdict can name the shortfall.
+    printf '%s\n' "${count:-$before}"
 }
 
 # Where one SIP cell writes its artifacts.
@@ -525,7 +554,7 @@ sipp_prepare_generator() {
 
     mkdir -p "${ARTIFACT_ROOT}/${TIER}/generator"
 
-    if ! seeded="$(run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan pbx:load-test:seed --tenant=$(printf '%q' "$LOAD_TENANT") --domain=$(printf '%q' "$LOAD_DOMAIN") --extensions=$(printf '%q' "$LOAD_EXTENSIONS") --start=$(printf '%q' "$LOAD_START") --password=$(printf '%q' "$LOAD_PASSWORD") --output=$(printf '%q' "$csv_on_pbx")" 2>&1)"; then
+    if ! seeded="$(run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan pbx:load-test:seed --tenant=$(printf '%q' "$LOAD_TENANT") --domain=$(printf '%q' "$LOAD_DOMAIN") --extensions=$(printf '%q' "$LOAD_EXTENSIONS") --start=$(printf '%q' "$LOAD_START") --password=$(printf '%q' "$LOAD_PASSWORD") --sipp-host=$(printf '%q' "$SIPP_UAS_HOST") --sipp-port=$(printf '%q' "$SIPP_UAS_PORT") --output=$(printf '%q' "$csv_on_pbx")" 2>&1)"; then
         printf 'SIPP-PREPARE-FAILED seeding accounts on %s\n%s\n' "$PBX_HOST" "$seeded" >&2
         return 1
     fi
@@ -943,6 +972,14 @@ teardown_tier() {
             || printf 'WARNING: could not pull artifacts from %s\n' "$PBX_HOST" >&2
     fi
 
+    # The measurement hosts are disposable and their addresses are not public
+    # knowledge, so the committed copy shows them as x.x.x.NNN. The raw
+    # artifacts stay on the host.
+    if [ -d "${ARTIFACT_ROOT}/${TIER}" ]; then
+        bash "${TOOLS_DIR}/scrub-artifacts.sh" "${ARTIFACT_ROOT}/${TIER}" "$PBX_HOST" "$SIPP_HOST" >/dev/null 2>&1 \
+            || printf 'WARNING: could not obfuscate the host addresses in the artifacts\n' >&2
+    fi
+
     # The measurement hosts get deleted at the end of the series, so the only
     # copy that survives is the one outside the application tree.
     if [ -n "$ARCHIVE_ROOT" ] && [ -d "${ARTIFACT_ROOT}/${TIER}" ]; then
@@ -1069,6 +1106,25 @@ run_xml_phase() {
     done < <(selected_sections)
 }
 
+# Prefetch every extension's directory entry before a SIP cell.
+#
+# Measured on the 1 vCPU tier: the first lookup for an extension costs about
+# 1.1 s, while the same lookup warm costs 72 ms. SIPp retransmits a REGISTER
+# after 500 ms, so a cold lookup makes it send the request twice; the second
+# 401 that comes back cannot be placed in the scenario and the step fails for
+# a reason that has nothing to do with what it measures. Warming the entries
+# first costs a few seconds and removes the artefact.
+warm_directory() {
+    local start="$LOAD_START" count="$LOAD_EXTENSIONS" domain="$LOAD_DOMAIN"
+    local warm_command
+
+    warm_command="for i in \$(seq 0 $((count - 1))); do fs_cli -x \"find_user_xml id \$((start + i)) ${domain}\" >/dev/null 2>&1; done"
+
+    if ! run_on_pbx "$warm_command" >/dev/null 2>&1; then
+        printf 'WARNING: could not warm the directory before the SIP cell\n' >&2
+    fi
+}
+
 # Run the SIPp feature validation and one capacity step for one variant.
 #
 # Three things make the result trustworthy: the run happens on the generator,
@@ -1087,6 +1143,9 @@ run_sip_phase() {
     label="${TIER}/${variant}/sip-cps${CPS}"
 
     mkdir -p "$local_run_dir"
+
+    # The directory lookup is the first thing a registering endpoint waits for.
+    warm_directory
 
     # The generator is prepared once per tier: scenarios, validation script and
     # a credential file that matches the tenant being measured.
@@ -1116,9 +1175,8 @@ run_sip_phase() {
     pull_sipp_artifacts "$remote_run_dir" "$local_run_dir" \
         || printf 'WARNING: could not pull SIPp artifacts from %s\n' "$SIPP_HOST" >&2
 
-    after="$(cdrs_settled_count "$before")"
-    printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
-
+    # SIPp's tally says how many rows the database must gain, so it is read
+    # before the wait: without it there is nothing to wait for.
     if ! counts="$(bash "${TOOLS_DIR}/cdr-gate.sh" sipp-counts "${local_run_dir}/extension-calls.log" 2>"${local_run_dir}/cdr-gate.err")"; then
         printf 'CDR-GATE FAILED label=%s reason=no-tally\n' "$label" | tee "${local_run_dir}/cdr-gate.txt" >&2
         cell_failed "${label}-cdr"
@@ -1127,6 +1185,9 @@ run_sip_phase() {
 
     successful="${counts%% *}"
     failed="${counts##* }"
+
+    after="$(cdrs_wait_for "$before" "$successful")"
+    printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
 
     if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
         --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
@@ -1230,6 +1291,9 @@ main() {
         list_cells
         return 0
     fi
+
+    # Everything below prints or runs a cell, and every cell names the realm.
+    resolve_load_domain
 
     if [ "$DRY_RUN" = "1" ]; then
         dry_run_cells
