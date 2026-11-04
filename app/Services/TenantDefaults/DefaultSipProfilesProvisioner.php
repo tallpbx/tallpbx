@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\TenantDefaults;
 
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Services\DialplanContext;
 use Modules\SipProfiles\Models\SipProfile;
 
@@ -29,8 +30,9 @@ final class DefaultSipProfilesProvisioner
     {
         $created = 0;
         $skipped = 0;
+        $realm = $this->sipRealm($tenant);
 
-        foreach ($this->profiles((string) $tenant->id) as $profile) {
+        foreach ($this->profiles((string) $tenant->id, $realm) as $profile) {
             $exists = SipProfile::withoutGlobalScope('tenant')
                 ->where('tenant_id', $tenant->id)
                 ->where('name', $profile['name'])
@@ -57,14 +59,45 @@ final class DefaultSipProfilesProvisioner
     }
 
     /**
+     * Return the realm this tenant's endpoints register under.
+     *
+     * A tenant's SIP domain is the realm its endpoints authenticate against.
+     * Null means the tenant has no realm of its own, in which case the
+     * profile must not force one: the request's own domain is the only
+     * domain the directory can resolve.
+     */
+    private function sipRealm(Tenant $tenant): ?string
+    {
+        $realm = TenantDomain::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('purpose', 'sip_realm')
+            ->orderBy('created_at')
+            ->value('domain');
+
+        return is_string($realm) && $realm !== '' ? $realm : null;
+    }
+
+    /**
      * Return FreeSWITCH-native profile params.
      *
      * @return array<int, array{name: string, description: string, settings: array<string, string>}>
      */
-    private function profiles(string $tenantId): array
+    private function profiles(string $tenantId, ?string $realm): array
     {
         $internalContext = $this->dialplanContext->internal($tenantId);
         $publicContext = $this->dialplanContext->public($tenantId);
+
+        // The registry keeps the appliance-wide `$${domain}` for compatibility
+        // with a single-tenant install. A tenant profile cannot use it: it
+        // resolves to the appliance address, so FreeSWITCH would look every
+        // registration up under a realm the directory has no user for and
+        // answer 401/403 to every endpoint. When the tenant has no realm, the
+        // keys are omitted entirely so the client's own domain survives.
+        $realmSettings = $realm === null ? [] : [
+            'force-register-domain' => $realm,
+            'force-subscription-domain' => $realm,
+            'presence-hosts' => $realm,
+        ];
 
         return [
             [
@@ -84,9 +117,7 @@ final class DefaultSipProfilesProvisioner
                     'auth-calls' => 'true',
                     'manage-presence' => 'true',
                     'manage-shared-appearance' => 'true',
-                    'presence-hosts' => '$${domain}',
-                    'force-register-domain' => '$${domain}',
-                    'force-subscription-domain' => '$${domain}',
+                    ...$realmSettings,
                     'apply-inbound-acl' => 'domains',
                     'nonce-ttl' => '60',
                     'rtp-timeout-sec' => '300',
