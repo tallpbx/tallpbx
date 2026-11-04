@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="ISO-8859-1" ?>
 <scenario name="TallPBX register users">
-  <send retrans="500">
+  <!--
+    The REGISTER is sent once, without retransmission.
+
+    A REGISTER the server answers slowly used to be sent twice: the first
+    request was retransmitted after 500 ms, and FreeSWITCH answered the
+    retransmission with a challenge of its own. The scenario expects one
+    challenge, so the second one desynchronised it and the register step
+    failed for a reason that had nothing to do with what it measures.
+
+    Measured on the 1 vCPU tier: a cold directory lookup costs about 1.1 s,
+    well beyond the default timer. Registration is setup for the capacity
+    measurement rather than part of it, so waiting for one answer is the
+    right trade: a genuinely lost packet is recovered by the scenario
+    timeout instead of by a second request the server would answer anyway.
+  -->
+  <send>
     <![CDATA[
 
 REGISTER sip:[field2] SIP/2.0
@@ -19,7 +34,7 @@ Content-Length: 0
 
   <recv response="401" auth="true"/>
 
-  <send retrans="500">
+  <send>
     <![CDATA[
 
 REGISTER sip:[field2] SIP/2.0
