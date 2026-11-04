@@ -66,6 +66,12 @@ sudo sed -i -E 's|(data="console_loglevel=)info(")|console_loglevel=notice|' /et
 sudo systemctl restart freeswitch
 ```
 
+The level lives in **three** places and they must agree: `switch.conf.xml` and `vars.xml` set it at boot, and `.env` `FS_LOG_LEVEL` declares it to the application. The switch library applies the runtime level with `fsctl loglevel` and restores it from `FS_LOG_LEVEL`, so a mismatch means the first cell after a restore boots at one level and reverts to another.
+
+```bash
+grep -E '^FS_LOG_LEVEL=' /var/www/tallpbx/.env    # expect notice
+```
+
 **Prove** with the marker pair — a line at `notice` must reach the file, a line at `info` must not:
 
 ```bash
@@ -74,6 +80,7 @@ fs_cli -x 'log info PROBE-INFO'
 sleep 2
 grep -c PROBE-NOTICE /var/log/freeswitch/freeswitch.log   # expect 1
 grep -c PROBE-INFO   /var/log/freeswitch/freeswitch.log   # expect 0
+grep -E '^FS_LOG_LEVEL=' /var/www/tallpbx/.env            # expect notice
 ```
 
 > `fs_cli -x "fsctl loglevel"` reports `DISABLE` on FreeSWITCH 1.11.4 even while logging works. Never use it as the assertion.
