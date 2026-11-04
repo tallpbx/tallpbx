@@ -4,6 +4,88 @@ Flags, environment variables, artifact layout, JSON fields, and the mechanics th
 
 ---
 
+## Glossary
+
+Every abbreviation and jargon term used in this directory, in plain language. Nothing here assumes prior knowledge of telephony or kernel internals.
+
+### Memory and the operating system
+
+| Term | Meaning |
+|:--|:--|
+| **RAM** | Physical memory. When it runs out the kernel moves pages to swap |
+| **Swap** | Disk space holding memory pages that were evicted. Being *in* swap is not the same as *actively paging*: the swap I/O counters (`si`/`so`) show whether pages are moving right now |
+| **RSS** (resident set size) | How much RAM one process currently holds. Usable for ranking processes, but **not** for adding them up: pages shared between processes (the PHP binary, the vendor tree) are counted in full by each one |
+| **PSS** (proportional set size) | RSS with shared pages split among their sharers. **The figure to add up** — the sum is the real memory footprint |
+| **VSZ** (virtual size) | Reserved address space, including memory never touched. Always far larger than reality; useful for spotting a 64-bit process reserving a huge arena, useless for capacity |
+| **tmpfs** | A filesystem that lives in RAM. Fast, but it takes its space from the same RAM as everything else |
+| **sysctl** | The kernel's runtime settings, read and written under `/proc/sys`. Socket buffer sizes and the port range live here |
+| **CLI** | Command line — a terminal command rather than a screen or a service |
+| **Daemon** | A background service that runs continuously |
+
+### The web and PHP stack
+
+| Term | Meaning |
+|:--|:--|
+| **PHP** | The language the application is written in |
+| **FPM** (PHP-FPM) | The pool of PHP worker processes that answer HTTP requests. `pm = dynamic` starts and stops workers with load; `pm = static` keeps a fixed number resident |
+| **Laravel** | The application framework. "Booting the framework" is the expensive part of answering a simple request |
+| **nginx** | The web server in front of PHP. It decides which PHP file handles a URL |
+| **Entry file** | The PHP file nginx hands a request to. `index.php` boots the whole framework; `xml-handler-fast.php` skips most of it |
+| **Octane** | A long-lived PHP worker (served by RoadRunner) that keeps the application in memory between requests, so there is no per-request boot |
+| **RoadRunner** | The process supervisor that keeps those Octane workers alive and connects them to port 8090 |
+| **Lua** | A small scripting language embedded in FreeSWITCH. Here it runs a script that answers lookups from Redis without involving PHP |
+| **Redis** | The in-memory key/value store holding cached lookups and the CDR queue |
+| **MariaDB** | The database |
+
+### Telephony
+
+| Term | Meaning |
+|:--|:--|
+| **PBX** (Private Branch Exchange) | The telephony server. This project *is* one |
+| **SIP** | The protocol phones use to register and call |
+| **UAC** (User Agent Client) | The side that **places** a call — in these tests, SIPp |
+| **UAS** (User Agent Server) | The side that **answers** a call — in these tests, also SIPp, on the generator |
+| **FreeSWITCH** | The telephony engine: it handles SIP, media, and asks the application for the XML that describes a user or a route |
+| **Sofia** | FreeSWITCH's SIP module — the part that speaks to the network |
+| **XML handler** (`mod_xml_curl`) | The mechanism by which FreeSWITCH asks the web application for a user or routing definition |
+| **Directory lookup** | "Which user is extension 2000?" — answered from the directory XML |
+| **Dialplan lookup** | "Where does this call go?" — answered from the dialplan XML |
+| **Extension** | A phone account: a number, a password, and a destination |
+| **CDR** (Call Detail Record) | One row per call leg: who called whom, when, for how long, and why it ended |
+| **ACL** (Access Control List) | The rules deciding which sources may talk to a SIP profile |
+
+### Measuring
+
+| Term | Meaning |
+|:--|:--|
+| **rps** (requests per second) | Throughput — how many requests completed per second |
+| **Latency** | How long one request took |
+| **p50 / p95 / p99** | The percentile of that latency: p50 is the middle request, p95 is the request slower than 95 % of them |
+| **CPS** (calls per second) | Offered call rate in the SIP phases |
+| **TTL** (time to live) | How long a cached answer is kept before it is rebuilt |
+| **Profile** | A named load shape, such as `100x5` = 100 requests, 5 at a time |
+| **Variant** | One complete serving configuration (pool mode + entry file + Lua + Octane) |
+| **Tier** | A hardware size the series measures on |
+| **Cell** | One measurement: one variant × profile × cache policy × repeat |
+| **Repeat** | The same cell run again, to see how much the number moves on its own |
+| **Baseline** | The configuration with nothing optimised — the reference every variant is compared against |
+| **Noise band** | The spread between identical repeats. A difference smaller than it is not a finding |
+| **Manifest** | The record of what a run had: build, hardware, configuration |
+| **Scenario** | A kind of request mix, such as `mixed` or `cache-hit` |
+| **Probe** | A small measurement taken alongside a cell, such as the directory-lookup timing |
+
+### Getting at the machines
+
+| Term | Meaning |
+|:--|:--|
+| **SSH** | The protocol used to run commands on another machine |
+| **Key** | The credential file that proves to a server you are allowed in |
+| **nftables** | The kernel firewall. `nft list ruleset` reads it; nothing in this directory is allowed to change it |
+| **Whitelist** | Addresses the firewall lets through |
+| **Token** | The shared secret the XML handler requires; without it a request is refused with `403` |
+
+---
+
 ## Runner flags
 
 ```bash

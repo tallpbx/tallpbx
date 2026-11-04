@@ -100,9 +100,9 @@ Swap:          2047    228   1819
 swappiness = 60        vmstat si/so = 0/0 (no active paging)
 ```
 
-Resident services, largest first. **RSS** (resident set size) is what each process holds in physical RAM; **PSS** (proportional set size) divides shared pages among the processes sharing them, so the PSS column is the truthful one to add up.
+Resident services, largest first. The two columns are **RAM held** (the kernel's `RSS`: what the process has in memory) and **RAM attributed** (`PSS`: the same figure with pages shared between processes split among them, so this is the column to add up). Both terms are defined in [`reference.md` → Glossary](reference.md).
 
-| Process | RSS | PSS |
+| Process | RAM held (RSS) | RAM attributed (PSS) |
 |:--|--:|--:|
 | `reverb:start` | 87.5 MB | 60.5 MB |
 | `freeswitch:listen` (ESL) | 85.9 MB | 58.8 MB |

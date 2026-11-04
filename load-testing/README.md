@@ -18,7 +18,7 @@ It is written so that a human operator **or** an AI agent can be pointed at this
 | 4 | `remote-setup.md` | Every host setting, with the command that applies it and the command that proves it |
 | 5 | `configurations.md` | What each switch physically changes, and what its assertion reads back |
 | 6 | `procedure.md` | The ordered run, with a verification checkpoint after each step |
-| 7 | `reference.md` | Flags, environment variables, artifact layout, JSON fields, failure markers |
+| 7 | `reference.md` | Flags, environment variables, artifact layout, JSON fields, failure markers, and a **glossary** defining every abbreviation used in this directory |
 
 Read the scripts only when the documents do not answer a question:
 
