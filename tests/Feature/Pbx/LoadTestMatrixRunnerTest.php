@@ -375,6 +375,16 @@ describe('load test matrix runner', function (): void {
         expect(substr_count($script, 'if ! apply_variant'))->toBe(3);
     });
 
+    it('keeps long ssh sessions alive instead of hanging for hours', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // A stalled ssh/scp between the orchestrator and a host once froze a
+        // rung for 2.5 hours with no output and no failure. Keepalives turn
+        // a dead peer into a fast error the cell can record.
+        expect($script)->toContain('ServerAliveInterval')
+            ->and($script)->toContain('ServerAliveCountMax');
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

@@ -45,7 +45,9 @@ SERIES="${SERIES:-refresh-$(date +%Y%m%d)}"
 ARTIFACT_ROOT="${ARTIFACT_ROOT:-${ROOT_DIR}/load-testing/results/${SERIES}}"
 PBX_HOST="${PBX_HOST:-local}"
 SSH_PORT="${SSH_PORT:-22}"
-SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10}"
+# Keepalives turn a dead peer into a fast error: a stalled ssh/scp once froze
+# a rung for 2.5 hours with no output and no failure to record.
+SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4}"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/var/www/tallpbx}"
 REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load-tests/${SERIES}}"
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
