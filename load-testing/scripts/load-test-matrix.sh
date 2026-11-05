@@ -900,13 +900,15 @@ smoke_run_dir() {
     printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/sip-smoke"
 }
 
-# Build the smoke preflight command: one registration, one extension call,
-# one outbound call — the whole chain (register, bridge, gateway, CDR) in
-# about two minutes, before any series cell is spent on it.
+# Build the SIP smoke preflight: two registrations (the caller and the callee
+# it calls), one extension call and one outbound call — the whole chain
+# (register, bridge, gateway, CDR) in about two minutes, before any series
+# cell is spent on it. The callee registration is explicit: the smoke must
+# never depend on a registration left behind by an earlier run.
 smoke_command() {
     local run_dir="$1"
 
-    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 REGISTER_COUNT=1 CALLS=1 OUTBOUND_CALLS=1 MAX_SIMULTANEOUS=1 OUTBOUND_MAX_SIMULTANEOUS=1 RUN_DIR=%q bash %q' \
+    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 REGISTER_COUNT=2 CALLS=1 OUTBOUND_CALLS=1 MAX_SIMULTANEOUS=1 OUTBOUND_MAX_SIMULTANEOUS=1 RUN_DIR=%q bash %q' \
         "$SIPP_APP_DIR" "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" \
         "$LOAD_PASSWORD" "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
 }

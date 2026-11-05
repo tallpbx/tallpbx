@@ -306,10 +306,13 @@ describe('load test matrix runner', function (): void {
 
         expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
 
-        // One registration, one extension call, one outbound call: the whole
-        // chain (register, bridge, gateway, CDR) in about two minutes.
+        // Two registrations (the caller and the callee it calls), one
+        // extension call, one outbound call: the whole chain (register,
+        // bridge, gateway, CDR) in about two minutes. The callee row must be
+        // registered here rather than borrowed from an earlier run — without
+        // its registration the call dies with SIP 806 USER_NOT_REGISTERED.
         expect($process->getOutput())
-            ->toContain('REGISTER_COUNT=1')
+            ->toContain('REGISTER_COUNT=2')
             ->toContain('CALLS=1')
             ->toContain('OUTBOUND_CALLS=1');
     });
