@@ -27,7 +27,7 @@ fi
 for cps in 2 3 4 5 6; do
     echo "=== SQLITE RUNG cps=${cps} start $(date -u +%FT%TZ) ==="
 
-    if bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --phase=ablation --variant=v-stock-dynamic --cps="${cps}" --repeats=1 \
+    if bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --phase=ablation --variant=v-stock-dynamic --ablation=fs-db --cps="${cps}" --repeats=1 \
         > "/tmp/sqlite-ladder-cps${cps}.log" 2>&1; then
         echo "=== SQLITE RUNG cps=${cps} ok $(date -u +%FT%TZ) ==="
     else
