@@ -1,0 +1,1 @@
+timeout 300 sipp x.x.x.138:5060 -sf /var/www/tallpbx/load-testing/tools/sipp/uac-extension-capacity.xml -inf /var/www/tallpbx/storage/app/load-tests/refresh-20261105-slimboot-sip-octdbg/h1-1c1g/v-octane/sip-cps8/sipp-users-auth.csv -i x.x.x.55 -p 5064 -r 8 -l 480 -m 480 -trace_err -trace_counts -trace_stat -trace_rtt -rtt_freq 1 -fd 5 
