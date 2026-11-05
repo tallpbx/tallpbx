@@ -40,7 +40,10 @@ class ModuleServiceProvider extends ServiceProvider
 
         $this->app->singleton('modules.manifest', fn (): array => $modules);
 
-        $isTelephonyWorker = env('TALLPBX_WORKER_ROLE') === 'telephony';
+        // One shared gate decides the boot shape for both telephony renderers
+        // (the Octane XML worker and the fast XML controller): each of them
+        // registers only the module providers the XML and CDR paths need.
+        $isTelephonyWorker = TelephonyWorkerProviders::isSlimBoot();
 
         foreach ($modules as $name => $manifest) {
             // Fail-soft propagation: modules disabled at boot by the dependency

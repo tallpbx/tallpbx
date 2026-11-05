@@ -63,6 +63,24 @@ abstract class ModuleServiceProvider extends ServiceProvider
      */
     public function boot(MenuService $menu, PermissionService $permission, ModuleState $modules): void
     {
+        // The telephony renderers (the Octane XML worker and the fast XML
+        // controller) only answer FreeSWITCH lookups and ingest call detail
+        // records, so their boot skips the panel stack — views, translations,
+        // migrations, panel routes, Livewire components, menus, permissions
+        // and console commands — through the one shared gate both renderers
+        // use. Config merges stay (services read module config at render
+        // time) and listeners stay (the telephony write path depends on
+        // them). Panel boots keep the full stack below.
+        if (TelephonyWorkerProviders::isSlimBoot()) {
+            $this->registerConfig();
+
+            if ($modules->isEnabled($this->moduleName())) {
+                $this->registerListeners();
+            }
+
+            return;
+        }
+
         $this->registerViews();
         $this->registerTranslations();
         $this->registerConfig();
