@@ -403,14 +403,19 @@ describe('load test matrix runner', function (): void {
     });
 
     it('attributes CPU to each service during an ablation cell', function (): void {
-        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-octane', '--phase=ablation'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
 
         // The question a one-change-at-a-time test answers is "what did this
         // knob cost?", so every ablation cell samples per-service CPU over its
-        // own window and keeps the sample beside the artifacts.
-        expect($script)->toContain('cpuwatch.sh')
-            ->and($script)->toContain('ablation-')
-            ->and($script)->toContain('cpu.csv');
+        // own window and keeps the sample beside the artifacts — named by the
+        // offered rate so a ladder over several rungs never overwrites the
+        // earlier samples.
+        expect($process->getOutput())->toMatch('/cpuwatch\.sh[^\n]*-cps5-r1-cpu\.csv/');
     });
 
     it('rejects an unknown tier', function (): void {

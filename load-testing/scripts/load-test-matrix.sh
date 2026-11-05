@@ -1008,7 +1008,7 @@ dry_run_cells() {
                                     printf '  [%s] %s\n' "$ablation" "$(ablation_command "$ablation" "$value")"
                                     # Ablation cells place calls and are wrapped in a
                                     # per-service CPU sample, exactly as they run.
-                                    printf '  [%s] %s\n' "$ablation" "$(cpuwatch_command "ablation-${ablation}-${value}" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/ablation-${ablation}-${value}-cpu.csv")"
+                                    printf '  [%s] %s\n' "$ablation" "$(cpuwatch_command "ablation-${ablation}-${value}" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/ablation-${ablation}-${value}-cps${CPS}-r1-cpu.csv")"
                                     printf '  [%s] %s\n' "$ablation" "$(sip_command "$(ablation_run_dir "$variant" "ablation-${ablation}-${value}-cps${CPS}-r1")")"
                                 else
                                     printf '  [%s] SKIPPED (no switch helper for value %s)\n' "$ablation" "$value"
@@ -1450,7 +1450,9 @@ run_ablation_phase() {
                 fi
 
                 # Per-service CPU across the whole cell window, on the PBX.
-                run_on_pbx "$(cpuwatch_command "$cpu_label" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/${cpu_label}-cpu.csv" 360)" >/dev/null 2>&1 \
+                # The sample is named by rate and repeat so a ladder over
+                # several rungs never overwrites the earlier rungs' samples.
+                run_on_pbx "$(cpuwatch_command "$cpu_label" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/${cpu_label}-cps${CPS}-r${repeat}-cpu.csv" 360)" >/dev/null 2>&1 \
                     || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
 
                 run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || true
