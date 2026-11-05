@@ -134,6 +134,7 @@ PHASE=""
 SECTION=""
 PROFILE=""
 TTL=""
+ABLATION_FILTER=""
 REPEATS="${REPEATS:-3}"
 CPS="${CPS:-5}"
 # Seconds of offered calls per capacity rung. At the offered rate this is how
@@ -293,6 +294,7 @@ Usage: load-test-matrix.sh [options]
   --tier=<id>            Restrict to one hardware tier (required to execute)
   --variant=<id>         Restrict to one XML-serving variant
   --phase=<xml|sip|ablation>  Restrict to one phase
+  --ablation=<id>        Restrict the ablation phase to one knob (fs-db, esl-subscriptions, ...)
   --section=<dialplan|directory|mixed>  Restrict the XML battery to one section
   --profile=<id>         Restrict the XML battery to one load profile (25x1, 100x5, ...)
   --ttl=<id>             Restrict the XML battery to one cache policy (production-60, ...)
@@ -335,6 +337,7 @@ parse_args() {
             --section=*) SECTION="${arg#*=}" ;;
             --profile=*) PROFILE="${arg#*=}" ;;
             --ttl=*) TTL="${arg#*=}" ;;
+            --ablation=*) ABLATION_FILTER="${arg#*=}" ;;
             --repeats=*) REPEATS="${arg#*=}" ;;
             --cps=*) CPS="${arg#*=}" ;;
             -h | --help | help)
@@ -1003,6 +1006,12 @@ dry_run_cells() {
                         ;;
                     ablation)
                         while IFS= read -r ablation; do
+                            # Honour --ablation=<id> in the dry run too, so the
+                            # printed plan matches what a real run would do.
+                            if [ -n "$ABLATION_FILTER" ] && [ "$ablation" != "$ABLATION_FILTER" ]; then
+                                continue
+                            fi
+
                             while IFS= read -r value; do
                                 if ablation_command "$ablation" "$value" >/dev/null 2>&1; then
                                     printf '  [%s] %s\n' "$ablation" "$(ablation_command "$ablation" "$value")"
@@ -1418,6 +1427,12 @@ run_ablation_phase() {
 
     while IFS= read -r ablation; do
         while IFS= read -r value; do
+            # A focused run pays only for the knob it asked about; the whole
+            # matrix runs only when no filter was given.
+            if [ -n "$ABLATION_FILTER" ] && [ "$ablation" != "$ABLATION_FILTER" ]; then
+                continue
+            fi
+
             if ! helper="$(ablation_switch_command "$ablation")"; then
                 printf 'ABLATION-SKIPPED %s=%s (no switch helper)\n' "$ablation" "$value" >&2
                 continue

@@ -418,6 +418,23 @@ describe('load test matrix runner', function (): void {
         expect($process->getOutput())->toMatch('/cpuwatch\.sh[^\n]*-cps5-r1-cpu\.csv/');
     });
 
+    it('restricts the ablation phase to one knob on request', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-dynamic', '--phase=ablation', '--ablation=fs-db'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // A single-knob run must not pay for every other knob in the matrix:
+        // the filter is what keeps a disk-vs-tmpfs ladder to minutes instead
+        // of hours of unrelated cells.
+        expect($process->getOutput())
+            ->toContain('fs-db')
+            ->not->toContain('esl-subscriptions')
+            ->not->toContain('broadcast-throttle');
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 
