@@ -851,10 +851,12 @@ probe_command() {
 # pulls it home with everything else; each row is one class and one second, with
 # the share of one CPU core that class used.
 cpuwatch_command() {
-    local label="$1" destination="$2" seconds="${3:-360}"
+    local label="$1" destination="$2" seconds="${3:-360}" directory
 
-    printf 'cd %q && nohup bash %q --sample 1 %q %q > %q 2>&1 &' \
-        "$REMOTE_APP_DIR" "$REMOTE_APP_DIR/load-testing/scripts/tools/cpuwatch.sh" \
+    directory="$(dirname "$destination")"
+
+    printf 'mkdir -p %q && cd %q && nohup bash %q --sample 1 %q %q > %q 2>&1 &' \
+        "$directory" "$REMOTE_APP_DIR" "$REMOTE_APP_DIR/load-testing/scripts/tools/cpuwatch.sh" \
         "$seconds" "$label" "$destination"
 }
 

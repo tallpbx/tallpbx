@@ -416,6 +416,11 @@ describe('load test matrix runner', function (): void {
         // offered rate so a ladder over several rungs never overwrites the
         // earlier samples.
         expect($process->getOutput())->toMatch('/cpuwatch\.sh[^\n]*-cps5-r1-cpu\.csv/');
+
+        // The sample starts before the cell's report creates its directory,
+        // so the launcher must create the destination itself — otherwise the
+        // shell redirect fails and the sample dies silently.
+        expect($process->getOutput())->toMatch('/mkdir -p [^\n]*v-octane[^\n]*cpuwatch\.sh/');
     });
 
     it('restricts the ablation phase to one knob on request', function (): void {
