@@ -385,6 +385,31 @@ describe('load test matrix runner', function (): void {
             ->and($script)->toContain('ServerAliveCountMax');
     });
 
+    it('measures an ablation under call load, not xml load', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-octane', '--phase=ablation'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // The ESL, Reverb and CDR knobs only do work while calls exist, so an
+        // ablation measured with dialplan requests would report zero for the
+        // very cost it is meant to expose. Every ablation cell places calls.
+        expect($process->getOutput())->toContain('pbx-sipp-validate.sh');
+    });
+
+    it('attributes CPU to each service during an ablation cell', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // The question a one-change-at-a-time test answers is "what did this
+        // knob cost?", so every ablation cell samples per-service CPU over its
+        // own window and keeps the sample beside the artifacts.
+        expect($script)->toContain('cpuwatch.sh')
+            ->and($script)->toContain('ablation-')
+            ->and($script)->toContain('cpu.csv');
+    });
+
     it('rejects an unknown tier', function (): void {
         $process = matrixRunnerProcess(['--dry-run', '--tier=h9-99c999'], $this->artifactRoot);
 

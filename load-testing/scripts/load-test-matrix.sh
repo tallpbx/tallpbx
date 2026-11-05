@@ -842,6 +842,34 @@ probe_command() {
     switch_command probe_lookup "$LOAD_START" "$LOAD_DOMAIN" "${PROBE_COUNT:-30}"
 }
 
+# Build the per-service CPU attribution command that wraps an ablation cell.
+#
+# The output lands on the PBX inside the tier's artifact tree, so the teardown
+# pulls it home with everything else; each row is one class and one second, with
+# the share of one CPU core that class used.
+cpuwatch_command() {
+    local label="$1" destination="$2" seconds="${3:-360}"
+
+    printf 'cd %q && nohup bash %q --sample 1 %q %q > %q 2>&1 &' \
+        "$REMOTE_APP_DIR" "$REMOTE_APP_DIR/load-testing/scripts/tools/cpuwatch.sh" \
+        "$seconds" "$label" "$destination"
+}
+
+# Where one ablation cell writes its SIPp artifacts on the generator.
+#
+# Same layout as a ladder cell, with the knob's label in the path so two values
+# of one ablation can never overwrite each other.
+ablation_run_dir() {
+    local variant="$1" label="$2"
+
+    if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
+        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/${variant}/${label}"
+        return
+    fi
+
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/${variant}/${label}"
+}
+
 # Build the exact SIPp validation command for one SIP cell.
 #
 # A capacity rung must offer its rate for a whole window, so the call count is
@@ -976,6 +1004,10 @@ dry_run_cells() {
                             while IFS= read -r value; do
                                 if ablation_command "$ablation" "$value" >/dev/null 2>&1; then
                                     printf '  [%s] %s\n' "$ablation" "$(ablation_command "$ablation" "$value")"
+                                    # Ablation cells place calls and are wrapped in a
+                                    # per-service CPU sample, exactly as they run.
+                                    printf '  [%s] %s\n' "$ablation" "$(cpuwatch_command "ablation-${ablation}-${value}" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/ablation-${ablation}-${value}-cpu.csv")"
+                                    printf '  [%s] %s\n' "$ablation" "$(sip_command "$(ablation_run_dir "$variant" "ablation-${ablation}-${value}-cps${CPS}-r1")")"
                                 else
                                     printf '  [%s] SKIPPED (no switch helper for value %s)\n' "$ablation" "$value"
                                 fi
@@ -1369,10 +1401,13 @@ run_sip_phase() {
 
 # Run the single-knob ablations the switch library can drive.
 #
-# Knobs without an apply helper are reported as skipped rather than silently
-# dropped, so the operator sees which ones still need a manual switch.
+# Every ablation cell is a CALL cell with the knob applied: the ESL, Reverb and
+# CDR knobs do no work during dialplan requests, so an XML cell would measure
+# nothing about the cost they exist to expose. Each cell is wrapped in a
+# per-service CPU sample, and the CDR gate judges the calls it placed.
 run_ablation_phase() {
-    local variant="$1" ablation value repeat label helper
+    local variant="$1" ablation value repeat label helper cpu_label
+    local remote_run_dir local_run_dir before after counts successful failed
 
     if ! apply_variant "$TIER" "$variant"; then
         cell_failed "${TIER}/${variant}/ablation (variant switches)"
@@ -1386,7 +1421,8 @@ run_ablation_phase() {
                 continue
             fi
 
-            label="${TIER}/${variant}/ablation-${ablation}-${value}"
+            cpu_label="ablation-${ablation}-${value}"
+            label="${TIER}/${variant}/${cpu_label}"
 
             if ! switch_call "$helper" "$value"; then
                 cell_failed "$label"
@@ -1394,8 +1430,44 @@ run_ablation_phase() {
             fi
 
             for repeat in $(seq 1 "$REPEATS"); do
-                if ! run_on_pbx "$(xml_command "$TIER" "$variant" "100x5" "production-60" "dialplan" "$repeat")" > /dev/null 2>&1; then
+                remote_run_dir="$(ablation_run_dir "$variant" "${cpu_label}-cps${CPS}-r${repeat}")"
+                local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/${cpu_label}-cps${CPS}-r${repeat}"
+                mkdir -p "$local_run_dir"
+
+                warm_directory
+
+                if ! sipp_prepare_generator; then
+                    cell_failed "${label}-r${repeat} (generator)"
+                    continue
+                fi
+
+                before="$(cdr_row_count)"
+                if [ -z "$before" ]; then
+                    cell_failed "${label}-r${repeat}-cdr"
+                    continue
+                fi
+
+                # Per-service CPU across the whole cell window, on the PBX.
+                run_on_pbx "$(cpuwatch_command "$cpu_label" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/${cpu_label}-cpu.csv" 360)" >/dev/null 2>&1 \
+                    || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
+
+                run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || true
+
+                pull_sipp_artifacts "$remote_run_dir" "$local_run_dir" || true
+
+                if ! sipp_summary_passed "${local_run_dir}/summary.md"; then
                     cell_failed "${label}-r${repeat}"
+                fi
+
+                if counts="$(bash "${TOOLS_DIR}/cdr-gate.sh" sipp-counts "${local_run_dir}/extension-calls.log" 2>"${local_run_dir}/cdr-gate.err")"; then
+                    successful="${counts%% *}"
+                    failed="${counts##* }"
+                    after="$(cdrs_wait_for "$before" "$successful")"
+                    bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
+                        --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
+                        --expect-records="$CDR_EXPECT_RECORDS" \
+                        --label="${label}-r${repeat}" | tee "${local_run_dir}/cdr-gate.txt" \
+                        || cell_failed "${label}-r${repeat}-cdr"
                 fi
             done
         done < <(matrix_list ablations "$ablation" values)
