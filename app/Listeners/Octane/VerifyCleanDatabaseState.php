@@ -7,6 +7,13 @@ namespace App\Listeners\Octane;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+/**
+ * Verify no database work survives an Octane request.
+ *
+ * Runs after every request termination and rolls back or disconnects any
+ * transaction the request left behind, so one request's uncommitted writes
+ * can never surface in the next request the same worker serves.
+ */
 class VerifyCleanDatabaseState
 {
     /**

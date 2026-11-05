@@ -6,6 +6,14 @@ namespace App\Listeners\Octane;
 
 use App\Services\TenantManager;
 
+/**
+ * Reset the active tenant context after every Octane request.
+ *
+ * Octane workers keep the application alive across requests, so a tenant
+ * resolved for one request must never leak into the next. This listener runs
+ * on request termination and clears the tenant identity from every container
+ * involved — the worker's own container and each sandboxed request container.
+ */
 class ClearTenantContext
 {
     /**
