@@ -1,0 +1,6 @@
+recorded_at,cps,successful,failed,label
+2026-11-04T10:53:04Z,2,120,0,h1-1c1g/v-stock-dynamic/sip-cps2
+2026-11-04T11:18:08Z,3,165,14,h1-1c1g/v-stock-dynamic/sip-cps3
+2026-11-04T14:19:28Z,5,89,211,h1-1c1g/v-stock-dynamic/sip-cps5
+2026-11-04T14:41:52Z,8,63,417,h1-1c1g/v-stock-dynamic/sip-cps8
+2026-11-04T15:03:12Z,10,72,528,h1-1c1g/v-stock-dynamic/sip-cps10

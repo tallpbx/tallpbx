@@ -1,0 +1,4 @@
+recorded_at,cps,successful,failed,label
+2026-11-05T05:03:05Z,8,480,0,h1-1c1g/v-lua-stock/sip-cps8
+2026-11-05T07:40:00Z,8,480,0,h1-1c1g/v-lua-stock/sip-cps8
+2026-11-05T07:47:21Z,10,600,0,h1-1c1g/v-lua-stock/sip-cps10

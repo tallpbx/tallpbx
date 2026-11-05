@@ -1,0 +1,10 @@
+recorded_at,cps,successful,failed,label
+2026-11-05T00:27:23Z,2,120,0,h1-1c1g/v-lua-stock/sip-cps2
+2026-11-05T00:39:26Z,3,180,0,h1-1c1g/v-lua-stock/sip-cps3
+2026-11-05T00:51:11Z,5,300,0,h1-1c1g/v-lua-stock/sip-cps5
+2026-11-05T01:02:25Z,8,401,79,h1-1c1g/v-lua-stock/sip-cps8
+2026-11-05T01:13:08Z,10,506,94,h1-1c1g/v-lua-stock/sip-cps10
+2026-11-05T02:17:57Z,8,480,0,h1-1c1g/v-lua-stock/sip-cps8
+2026-11-05T02:25:51Z,10,600,0,h1-1c1g/v-lua-stock/sip-cps10
+2026-11-05T03:12:12Z,8,407,73,h1-1c1g/v-lua-stock/sip-cps8
+2026-11-05T03:20:01Z,10,504,96,h1-1c1g/v-lua-stock/sip-cps10

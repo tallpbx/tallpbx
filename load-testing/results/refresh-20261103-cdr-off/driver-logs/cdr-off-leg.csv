@@ -1,0 +1,7 @@
+transport,variant,cps,successful,failed,module_state
+off,v-octane,8,480,0,true
+off,v-octane,10,600,0,true
+off,v-lua-stock,8,480,0,true
+off,v-lua-stock,10,600,0,true
+off,v-lua-fast,8,480,0,true
+off,v-lua-fast,10,600,0,true

@@ -1,0 +1,10 @@
+recorded_at,cps,successful,failed,label
+2026-11-05T00:33:38Z,2,120,0,h1-1c1g/v-lua-fast/sip-cps2
+2026-11-05T00:45:18Z,3,180,0,h1-1c1g/v-lua-fast/sip-cps3
+2026-11-05T00:57:07Z,5,300,0,h1-1c1g/v-lua-fast/sip-cps5
+2026-11-05T01:07:46Z,8,411,69,h1-1c1g/v-lua-fast/sip-cps8
+2026-11-05T01:22:58Z,10,515,85,h1-1c1g/v-lua-fast/sip-cps10
+2026-11-05T02:33:46Z,8,480,0,h1-1c1g/v-lua-fast/sip-cps8
+2026-11-05T02:41:42Z,10,600,0,h1-1c1g/v-lua-fast/sip-cps10
+2026-11-05T03:28:36Z,8,407,73,h1-1c1g/v-lua-fast/sip-cps8
+2026-11-05T03:36:20Z,10,497,103,h1-1c1g/v-lua-fast/sip-cps10

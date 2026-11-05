@@ -1,0 +1,1 @@
+CDR-GATE ok label=h1-1c1g/v-stock-dynamic/sip-cps10 rows=153 successful=72 failed=528

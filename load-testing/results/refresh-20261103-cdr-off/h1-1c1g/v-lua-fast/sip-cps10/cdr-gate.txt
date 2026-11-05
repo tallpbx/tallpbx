@@ -1,0 +1,1 @@
+CDR-GATE ok label=h1-1c1g/v-lua-fast/sip-cps10 rows=0 successful=600 failed=0 expect-records=0

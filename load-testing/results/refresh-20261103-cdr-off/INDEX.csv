@@ -1,0 +1,7 @@
+series,tier,variant,phase,cdr_transport,cps,attempted,completed,failed,completion_pct,rps,p50_ms,p95_ms,artifact_dir,measured_at,notes
+"refresh-20261103-cdr-off","h1-1c1g","v-lua-fast","sip-ladder","cdr-off",8,480,480,0,100,,,,"refresh-20261103-cdr-off/h1-1c1g/v-lua-fast/sip-cps8",,"mod_json_cdr verified unloaded before the cell; no call detail records written"
+"refresh-20261103-cdr-off","h1-1c1g","v-lua-fast","sip-ladder","cdr-off",10,600,600,0,100,,,,"refresh-20261103-cdr-off/h1-1c1g/v-lua-fast/sip-cps10",,"mod_json_cdr verified unloaded before the cell; no call detail records written"
+"refresh-20261103-cdr-off","h1-1c1g","v-lua-stock","sip-ladder","cdr-off",8,480,480,0,100,,,,"refresh-20261103-cdr-off/h1-1c1g/v-lua-stock/sip-cps8",,"mod_json_cdr verified unloaded before the cell; no call detail records written"
+"refresh-20261103-cdr-off","h1-1c1g","v-lua-stock","sip-ladder","cdr-off",10,600,600,0,100,,,,"refresh-20261103-cdr-off/h1-1c1g/v-lua-stock/sip-cps10",,"mod_json_cdr verified unloaded before the cell; no call detail records written"
+"refresh-20261103-cdr-off","h1-1c1g","v-octane","sip-ladder","cdr-off",8,480,480,0,100,,,,"refresh-20261103-cdr-off/h1-1c1g/v-octane/sip-cps8",,"mod_json_cdr verified unloaded before the cell; no call detail records written"
+"refresh-20261103-cdr-off","h1-1c1g","v-octane","sip-ladder","cdr-off",10,600,600,0,100,,,,"refresh-20261103-cdr-off/h1-1c1g/v-octane/sip-cps10",,"mod_json_cdr verified unloaded before the cell; no call detail records written"

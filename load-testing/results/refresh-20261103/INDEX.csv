@@ -1,0 +1,84 @@
+series,tier,variant,phase,cdr_transport,cps,attempted,completed,failed,completion_pct,rps,p50_ms,p95_ms,artifact_dir,measured_at,notes
+"refresh-20261103","h1-1c1g","v-fast","sip-functional","cdr-fpm",2,10,10,0,100,,,,"refresh-20261103/h1-1c1g/v-fast/sip-functional-cps2",,"functional parity run: 20 registrations, 10 extension calls, 5 outbound, 25 CDR rows"
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-functional","cdr-fpm",2,10,10,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-functional-cps2",,"functional parity run: 20 registrations, 10 extension calls, 5 outbound, 25 CDR rows"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-functional","cdr-fpm",2,10,10,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-functional-cps2",,"functional parity run: 20 registrations, 10 extension calls, 5 outbound, 25 CDR rows"
+"refresh-20261103","h1-1c1g","v-octane","sip-functional","cdr-fpm",2,10,10,0,100,,,,"refresh-20261103/h1-1c1g/v-octane/sip-functional-cps2",,"functional parity run: 20 registrations, 10 extension calls, 5 outbound, 25 CDR rows"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","sip-functional","cdr-fpm",2,10,10,0,100,,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/sip-functional-cps2",,"functional parity run: 20 registrations, 10 extension calls, 5 outbound, 25 CDR rows"
+"refresh-20261103","h1-1c1g","v-stock-static","sip-functional","cdr-fpm",2,10,10,0,100,,,,"refresh-20261103/h1-1c1g/v-stock-static/sip-functional-cps2",,"functional parity run: 20 registrations, 10 extension calls, 5 outbound, 25 CDR rows"
+"refresh-20261103","h1-1c1g","v-fast","sip-ladder","cdr-fpm",2,120,120,0,100,,,,"refresh-20261103/h1-1c1g/v-fast/sip-cps2","2026-11-04T11:02:44Z",
+"refresh-20261103","h1-1c1g","v-fast","sip-ladder","cdr-fpm",3,180,180,0,100,,,,"refresh-20261103/h1-1c1g/v-fast/sip-cps3","2026-11-04T11:26:12Z",
+"refresh-20261103","h1-1c1g","v-fast","sip-ladder","cdr-fpm",5,300,102,198,34,,,,"refresh-20261103/h1-1c1g/v-fast/sip-cps5","2026-11-04T14:29:42Z",
+"refresh-20261103","h1-1c1g","v-fast","sip-ladder","cdr-fpm",8,480,95,385,19.8,,,,"refresh-20261103/h1-1c1g/v-fast/sip-cps8","2026-11-04T14:50:12Z",
+"refresh-20261103","h1-1c1g","v-fast","sip-ladder","cdr-fpm",10,600,61,539,10.2,,,,"refresh-20261103/h1-1c1g/v-fast/sip-cps10","2026-11-04T15:11:27Z",
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-fpm",2,120,120,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps2","2026-11-05T00:33:38Z",
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-fpm",3,180,180,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps3","2026-11-05T00:45:18Z",
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-fpm",5,300,300,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps5","2026-11-05T00:57:07Z",
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-octane",8,480,411,69,85.6,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps8","2026-11-05T01:07:46Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-octane",8,480,480,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps8","2026-11-05T02:33:46Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-octane",10,600,515,85,85.8,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps10","2026-11-05T01:22:58Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-octane",10,600,600,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps10","2026-11-05T02:41:42Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-off-invalid",8,480,407,73,84.8,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps8","2026-11-05T03:28:36Z","INVALID first off-leg attempt (disturbed by unload/reload churn); superseded by refresh-20261103-cdr-off"
+"refresh-20261103","h1-1c1g","v-lua-fast","sip-ladder","cdr-off-invalid",10,600,497,103,82.8,,,,"refresh-20261103/h1-1c1g/v-lua-fast/sip-cps10","2026-11-05T03:36:20Z","INVALID first off-leg attempt (disturbed by unload/reload churn); superseded by refresh-20261103-cdr-off"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-fpm",2,120,120,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps2","2026-11-05T00:27:23Z",
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-fpm",3,180,180,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps3","2026-11-05T00:39:26Z",
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-fpm",5,300,300,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps5","2026-11-05T00:51:11Z",
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-octane",8,480,401,79,83.5,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps8","2026-11-05T01:02:25Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-octane",8,480,480,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps8","2026-11-05T02:17:57Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-octane",10,600,506,94,84.3,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps10","2026-11-05T01:13:08Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-octane",10,600,600,0,100,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps10","2026-11-05T02:25:51Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-off-invalid",8,480,407,73,84.8,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps8","2026-11-05T03:12:12Z","INVALID first off-leg attempt (disturbed by unload/reload churn); superseded by refresh-20261103-cdr-off"
+"refresh-20261103","h1-1c1g","v-lua-stock","sip-ladder","cdr-off-invalid",10,600,504,96,84,,,,"refresh-20261103/h1-1c1g/v-lua-stock/sip-cps10","2026-11-05T03:20:01Z","INVALID first off-leg attempt (disturbed by unload/reload churn); superseded by refresh-20261103-cdr-off"
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-fpm",2,120,120,0,100,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps2","2026-11-04T11:09:07Z",
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-fpm",3,180,180,0,100,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps3","2026-11-04T14:00:44Z",
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-fpm",5,300,300,0,100,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps5","2026-11-04T14:35:41Z",
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-fpm",8,480,480,0,100,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps8","2026-11-04T14:56:02Z",
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-fpm",10,600,426,174,71,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps10","2026-11-04T15:16:27Z",
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-octane",8,480,480,0,100,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps8","2026-11-05T01:59:06Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-octane",10,578,383,195,66.3,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps10","2026-11-05T02:10:06Z","CDR ingestion on the persistent worker"
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-off-invalid",8,474,184,290,38.8,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps8","2026-11-05T02:53:04Z","INVALID first off-leg attempt (disturbed by unload/reload churn); superseded by refresh-20261103-cdr-off"
+"refresh-20261103","h1-1c1g","v-octane","sip-ladder","cdr-off-invalid",10,572,95,477,16.6,,,,"refresh-20261103/h1-1c1g/v-octane/sip-cps10","2026-11-05T03:04:31Z","INVALID first off-leg attempt (disturbed by unload/reload churn); superseded by refresh-20261103-cdr-off"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","sip-ladder","cdr-fpm",2,120,120,0,100,,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/sip-cps2","2026-11-04T10:53:04Z",
+"refresh-20261103","h1-1c1g","v-stock-dynamic","sip-ladder","cdr-fpm",3,179,165,14,92.2,,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/sip-cps3","2026-11-04T11:18:08Z",
+"refresh-20261103","h1-1c1g","v-stock-dynamic","sip-ladder","cdr-fpm",5,300,89,211,29.7,,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/sip-cps5","2026-11-04T14:19:28Z",
+"refresh-20261103","h1-1c1g","v-stock-dynamic","sip-ladder","cdr-fpm",8,480,63,417,13.1,,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/sip-cps8","2026-11-04T14:41:52Z",
+"refresh-20261103","h1-1c1g","v-stock-dynamic","sip-ladder","cdr-fpm",10,600,72,528,12,,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/sip-cps10","2026-11-04T15:03:12Z",
+"refresh-20261103","h1-1c1g","v-stock-static","sip-ladder","cdr-fpm",2,120,120,0,100,,,,"refresh-20261103/h1-1c1g/v-stock-static/sip-cps2","2026-11-04T10:58:13Z",
+"refresh-20261103","h1-1c1g","v-stock-static","sip-ladder","cdr-fpm",3,180,179,1,99.4,,,,"refresh-20261103/h1-1c1g/v-stock-static/sip-cps3","2026-11-04T11:21:59Z",
+"refresh-20261103","h1-1c1g","v-stock-static","sip-ladder","cdr-fpm",5,300,85,215,28.3,,,,"refresh-20261103/h1-1c1g/v-stock-static/sip-cps5","2026-11-04T14:24:55Z",
+"refresh-20261103","h1-1c1g","v-stock-static","sip-ladder","cdr-fpm",8,480,44,436,9.2,,,,"refresh-20261103/h1-1c1g/v-stock-static/sip-cps8","2026-11-04T14:46:00Z",
+"refresh-20261103","h1-1c1g","v-stock-static","sip-ladder","cdr-fpm",10,600,46,554,7.7,,,,"refresh-20261103/h1-1c1g/v-stock-static/sip-cps10","2026-11-04T15:07:38Z",
+"refresh-20261103","h1-1c1g","v-fast","xml",,,100,100,0,100,26.7,,,"refresh-20261103/h1-1c1g/v-fast/100x5-production-60-dialplan-r1.json","2026-11-04T02:43:53+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-fast","xml",,,100,100,0,100,27.2,,,"refresh-20261103/h1-1c1g/v-fast/100x5-production-60-dialplan-r2.json","2026-11-04T02:44:01+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-fast","xml",,,100,100,0,100,28.2,,,"refresh-20261103/h1-1c1g/v-fast/100x5-production-60-dialplan-r3.json","2026-11-04T02:44:09+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-fast","xml",,,25,25,0,100,28.3,,,"refresh-20261103/h1-1c1g/v-fast/25x1-production-60-dialplan-r0.json","2026-11-04T03:16:56+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-lua-fast","xml",,,100,100,0,100,25.3,,,"refresh-20261103/h1-1c1g/v-lua-fast/100x5-production-60-dialplan-r1.json","2026-11-04T02:48:37+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-lua-fast","xml",,,100,100,0,100,26.9,,,"refresh-20261103/h1-1c1g/v-lua-fast/100x5-production-60-dialplan-r2.json","2026-11-04T02:48:45+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-lua-fast","xml",,,100,100,0,100,26.3,,,"refresh-20261103/h1-1c1g/v-lua-fast/100x5-production-60-dialplan-r3.json","2026-11-04T02:48:53+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-lua-stock","xml",,,100,100,0,100,17.2,,,"refresh-20261103/h1-1c1g/v-lua-stock/100x5-production-60-dialplan-r1.json","2026-11-04T02:46:14+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-lua-stock","xml",,,100,100,0,100,18.5,,,"refresh-20261103/h1-1c1g/v-lua-stock/100x5-production-60-dialplan-r2.json","2026-11-04T02:46:24+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-lua-stock","xml",,,100,100,0,100,17.2,,,"refresh-20261103/h1-1c1g/v-lua-stock/100x5-production-60-dialplan-r3.json","2026-11-04T02:46:34+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-octane","xml",,,100,100,0,100,177.9,,,"refresh-20261103/h1-1c1g/v-octane/100x5-production-60-dialplan-r1.json","2026-11-04T02:50:55+00:00","xml battery: mixed via worker"
+"refresh-20261103","h1-1c1g","v-octane","xml",,,100,100,0,100,219.4,,,"refresh-20261103/h1-1c1g/v-octane/100x5-production-60-dialplan-r2.json","2026-11-04T02:50:59+00:00","xml battery: mixed via worker"
+"refresh-20261103","h1-1c1g","v-octane","xml",,,100,100,0,100,118.8,,,"refresh-20261103/h1-1c1g/v-octane/100x5-production-60-dialplan-r3.json","2026-11-04T02:51:04+00:00","xml battery: mixed via worker"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,19.6,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-cache-hit-60-dialplan-r1.json","2026-11-03T23:54:20+00:00","xml battery: cache-hit via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,19.9,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-cache-hit-60-dialplan-r2.json","2026-11-03T23:54:30+00:00","xml battery: cache-hit via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,18.5,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-cache-hit-60-dialplan-r3.json","2026-11-03T23:54:40+00:00","xml battery: cache-hit via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,15.6,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-cold-dialplan-r1.json","2026-11-03T23:52:15+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,15.1,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-cold-dialplan-r2.json","2026-11-03T23:52:26+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,15.6,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-cold-dialplan-r3.json","2026-11-03T23:52:37+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,16.9,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-dialplan-off-dialplan-r1.json","2026-11-03T23:52:59+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,17.1,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-dialplan-off-dialplan-r2.json","2026-11-03T23:53:09+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,18.3,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-dialplan-off-dialplan-r3.json","2026-11-03T23:53:19+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,17.6,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-extended-30-dialplan-r1.json","2026-11-03T23:55:02+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,19.6,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-extended-30-dialplan-r2.json","2026-11-03T23:55:11+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,19.6,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-extended-30-dialplan-r3.json","2026-11-03T23:55:21+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,16.5,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-production-60-dialplan-r1.json","2026-11-04T02:38:59+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,17.8,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-production-60-dialplan-r2.json","2026-11-04T02:39:09+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,18.2,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-production-60-dialplan-r3.json","2026-11-04T02:39:19+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,15.3,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-uncached-db-dialplan-r1.json","2026-11-03T23:55:44+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,15,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-uncached-db-dialplan-r2.json","2026-11-03T23:55:55+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-dynamic","xml",,,100,100,0,100,13.5,,,"refresh-20261103/h1-1c1g/v-stock-dynamic/100x5-uncached-db-dialplan-r3.json","2026-11-03T23:56:07+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-static","xml",,,100,100,0,100,16.1,,,"refresh-20261103/h1-1c1g/v-stock-static/100x5-production-60-dialplan-r1.json","2026-11-04T02:41:26+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-static","xml",,,100,100,0,100,16.8,,,"refresh-20261103/h1-1c1g/v-stock-static/100x5-production-60-dialplan-r2.json","2026-11-04T02:41:37+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-static","xml",,,100,100,0,100,17.3,,,"refresh-20261103/h1-1c1g/v-stock-static/100x5-production-60-dialplan-r3.json","2026-11-04T02:41:47+00:00","xml battery: mixed via nginx"
+"refresh-20261103","h1-1c1g","v-stock-static","xml",,,25,25,0,100,18.4,,,"refresh-20261103/h1-1c1g/v-stock-static/25x1-production-60-dialplan-r0.json","2026-11-04T03:15:19+00:00","xml battery: mixed via nginx"

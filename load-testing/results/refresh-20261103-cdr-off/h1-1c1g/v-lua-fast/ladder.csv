@@ -1,0 +1,3 @@
+recorded_at,cps,successful,failed,label
+2026-11-05T07:54:51Z,8,480,0,h1-1c1g/v-lua-fast/sip-cps8
+2026-11-05T08:02:28Z,10,600,0,h1-1c1g/v-lua-fast/sip-cps10

@@ -1,0 +1,13 @@
+transport,variant,cps,successful,failed
+octane,v-octane,8,480,0
+octane,v-octane,10,383,195
+octane,v-lua-stock,8,480,0
+octane,v-lua-stock,10,600,0
+octane,v-lua-fast,8,480,0
+octane,v-lua-fast,10,600,0
+off,v-octane,8,184,290
+off,v-octane,10,95,477
+off,v-lua-stock,8,407,73
+off,v-lua-stock,10,504,96
+off,v-lua-fast,8,407,73
+off,v-lua-fast,10,497,103
