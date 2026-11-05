@@ -1,0 +1,147 @@
+{
+    "run": {
+        "id": "20261105-110233-qbtma4",
+        "label": "h1-1c1g\/v-octane\/25x1-production-60-dialplan",
+        "git_commit": "5cbc700a7575",
+        "git_dirty": false
+    },
+    "generated_at": "2026-11-05T11:02:33+00:00",
+    "schema_version": 2,
+    "tenant_slug": "load-test-beta",
+    "tenant_id": 64,
+    "scenario": "mixed",
+    "endpoint": "http:\/\/127.0.0.1:8090\/api\/v1\/xml-handler",
+    "target": {
+        "total_requests": 25,
+        "concurrency": 1,
+        "timeout_seconds": 10,
+        "network_interface": null,
+        "scenario_counts": {
+            "internal": 9,
+            "inbound": 8,
+            "outbound": 8
+        },
+        "section": "dialplan",
+        "section_counts": {
+            "dialplan": 25
+        }
+    },
+    "environment": {
+        "hostname": "tallpbx",
+        "os": "Linux 6.12.105+deb13-amd64",
+        "php_version": "8.5.12",
+        "laravel_version": "13.38.0",
+        "app_env": "production",
+        "cache_store": "redis",
+        "session_driver": "redis",
+        "memory_limit": "-1",
+        "cpu_cores": 1,
+        "available_ram_mb": 252,
+        "swap_used_mb": 398,
+        "redis": {
+            "used_memory_human": "1.50M",
+            "used_memory_bytes": 1571752,
+            "used_memory_peak_human": "3.29M",
+            "maxmemory_human": "256.00M",
+            "maxmemory_policy": "volatile-lru",
+            "evicted_keys": 0
+        }
+    },
+    "total_requests": 25,
+    "concurrency": 1,
+    "successful_responses": 25,
+    "failed_responses": 0,
+    "success_rate_percent": 100,
+    "failure_rate_percent": 0,
+    "elapsed_seconds": 0.21,
+    "requests_per_second": 118.979,
+    "latency_ms": {
+        "sample_count": 25,
+        "missing_count": 0,
+        "average": 6.495,
+        "min": 5.101,
+        "max": 8.952,
+        "p50": 6.344,
+        "p90": 8.319,
+        "p95": 8.472,
+        "p99": 8.952,
+        "std_dev": 1.002,
+        "raw_samples": [
+            5.101,
+            5.298,
+            5.355,
+            5.543,
+            5.643,
+            5.829,
+            5.84,
+            5.95,
+            5.976,
+            6.032,
+            6.072,
+            6.335,
+            6.344,
+            6.378,
+            6.382,
+            6.383,
+            6.507,
+            6.754,
+            6.917,
+            6.96,
+            7.409,
+            7.632,
+            8.319,
+            8.472,
+            8.952
+        ]
+    },
+    "timing": {
+        "enabled": false,
+        "request_ms": {
+            "sample_count": 0,
+            "missing_count": 25,
+            "average": null,
+            "min": null,
+            "max": null,
+            "p50": null,
+            "p90": null,
+            "p95": null,
+            "p99": null,
+            "std_dev": null,
+            "raw_samples": []
+        },
+        "handler_ms": {
+            "sample_count": 0,
+            "missing_count": 25,
+            "average": null,
+            "min": null,
+            "max": null,
+            "p50": null,
+            "p90": null,
+            "p95": null,
+            "p99": null,
+            "std_dev": null,
+            "raw_samples": []
+        },
+        "db_queries": {
+            "average": null,
+            "max": null
+        },
+        "by_section": {
+            "dialplan": {
+                "count": 25,
+                "p50": null,
+                "p95": null
+            }
+        }
+    },
+    "thresholds": {
+        "max_failure_rate_percent": 0,
+        "max_average_ms": null
+    },
+    "threshold_results": [],
+    "passed": true,
+    "status_counts": {
+        "200": 25
+    },
+    "sample_failures": []
+}
