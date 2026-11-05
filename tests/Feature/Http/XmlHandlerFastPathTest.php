@@ -5,7 +5,11 @@ declare(strict_types=1);
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Support\XmlHandlerFastBootstrap;
+use Illuminate\Encryption\EncryptionServiceProvider;
 use Illuminate\Http\Request;
+use Illuminate\Translation\TranslationServiceProvider;
+use Illuminate\View\ViewServiceProvider;
+use Livewire\LivewireServiceProvider;
 use Modules\Extensions\Models\Extension;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Models\RingGroupExtension;
@@ -188,4 +192,25 @@ it('returns byte-identical XML for a seeded user entry', function (): void {
     $fast = XmlHandlerFastBootstrap::handle(Request::create($uri, 'GET'));
 
     expect($fast->getContent())->toBe($normal->getContent());
+});
+
+it('boots the fast container without the panel-only providers', function (): void {
+    // The fast path only answers FreeSWITCH lookups, and its module boot runs
+    // through the shared slim gate, so the translation service and Livewire's
+    // panel wiring are pure boot cost there. The byte-equality tests above
+    // prove the documents are unchanged; this pins the boot composition the
+    // speed depends on, so a re-added provider is caught even though it
+    // renders nothing.
+    $providerClasses = new ReflectionMethod(XmlHandlerFastBootstrap::class, 'providerClasses');
+    $providers = $providerClasses->invoke(null);
+
+    expect($providers)
+        ->not->toContain(TranslationServiceProvider::class)
+        ->not->toContain(LivewireServiceProvider::class)
+        // Both stay despite rendering nothing on this path, and the
+        // byte-equality tests proved it: the encrypter is resolved through
+        // the SIP account's encrypted auth_password cast, and the view
+        // factory through the response() helper's ResponseFactory.
+        ->toContain(EncryptionServiceProvider::class)
+        ->toContain(ViewServiceProvider::class);
 });

@@ -23,9 +23,7 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Translation\TranslationServiceProvider;
 use Illuminate\View\ViewServiceProvider;
-use Livewire\LivewireServiceProvider;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -50,28 +48,36 @@ final class XmlHandlerFastBootstrap
      * Providers required to render FreeSWITCH XML.
      *
      * Deliberately excludes App\Providers\ModuleServiceProvider (all 60 module
-     * providers), Livewire's panel wiring, Boost, Reverb and the panel-only
-     * packages. Adding an entry here costs boot time; leaving one out risks a
-     * wrong document, which the byte-equality test detects.
+     * providers), the translation service, Livewire's panel wiring, Boost,
+     * Reverb and the panel-only packages. The module providers boot through
+     * the shared slim gate (TelephonyWorkerProviders::isSlimBoot()), so on
+     * this path they register no views, translations or Livewire components.
+     * Adding an entry here costs boot time; leaving one out risks a wrong
+     * document, which the byte-equality test detects — that is how the
+     * translation and Livewire trims below were verified, and how the view
+     * service was proven to be required despite rendering no views.
      *
-     * The module providers are not listed here: they are read at boot from
-     * `freeswitch.xml_module_providers`, so this class never imports a module.
+     * The module providers are not listed here: they are read at boot through
+     * TelephonyWorkerProviders from `freeswitch.xml_module_providers`, the
+     * same list the persistent worker registers, so this class never imports
+     * a module and the two renderers can never load different sets.
      *
      * @var list<class-string>
      */
     private const FRAMEWORK_PROVIDERS = [
         FoundationServiceProvider::class,
         DatabaseServiceProvider::class,
-        // The seeded directory path resolves the encrypter (SIP password and
-        // voicemail PIN handling) while rendering a user entry.
+        // Stays: the seeded directory path resolves the encrypter while
+        // rendering a user entry, because SIP auth passwords are stored with
+        // an encrypted model cast.
         EncryptionServiceProvider::class,
         CacheServiceProvider::class,
         RedisServiceProvider::class,
         FilesystemServiceProvider::class,
-        TranslationServiceProvider::class,
-        // AppServiceProvider touches the view factory while booting (shared
-        // view data), so the factory must exist even though no view renders
-        // on the XML path.
+        // Stays even though no view renders here: the response() helper
+        // builds the ResponseFactory with the view factory injected, so every
+        // plain XML response resolves this service. Dropping it fails every
+        // request — caught by the byte-equality test before release.
         ViewServiceProvider::class,
         // Bindings for TenantManager, TenantIdentityResolverInterface and the
         // XML builders live here, as does the `xml-handler` rate limiter.
@@ -79,34 +85,19 @@ final class XmlHandlerFastBootstrap
     ];
 
     /**
-     * Providers that must be registered after the module providers.
-     *
-     * @var list<class-string>
-     */
-    private const TRAILING_PROVIDERS = [
-        // Module providers register their Livewire components while booting,
-        // which resolves the component finder. No component renders on the XML
-        // path; the provider is here only so that registration does not fail.
-        LivewireServiceProvider::class,
-    ];
-
-    /**
      * The provider classes to register, in order.
      *
-     * The module providers come from configuration rather than from a list in
-     * this file, so the shared kernel never imports a module. They sit between
-     * the framework providers (which bind what the module providers resolve
-     * while booting) and the trailing ones (which resolve what the modules
-     * register).
+     * The module providers come from TelephonyWorkerProviders rather than
+     * from a list in this file, so the shared kernel never imports a module
+     * and both telephony renderers register the same set. They follow the
+     * framework providers, which bind what the module providers resolve while
+     * booting.
      *
      * @return list<class-string>
      */
-    private static function providerClasses(Application $app): array
+    private static function providerClasses(): array
     {
-        /** @var list<class-string> $modules */
-        $modules = array_values((array) $app->make('config')->get('freeswitch.xml_module_providers', []));
-
-        return [...self::FRAMEWORK_PROVIDERS, ...$modules, ...self::TRAILING_PROVIDERS];
+        return [...self::FRAMEWORK_PROVIDERS, ...TelephonyWorkerProviders::modules()];
     }
 
     /**
@@ -121,14 +112,38 @@ final class XmlHandlerFastBootstrap
     {
         $previousApp = Container::getInstance();
         $previousFacadeApp = Facade::getFacadeApplication();
+        $previousRole = getenv('TALLPBX_WORKER_ROLE');
 
-        $app = self::boot($previousApp, $request);
+        // The one shared slim-boot gate both telephony renderers use: the
+        // persistent worker carries TALLPBX_WORKER_ROLE=telephony in its
+        // systemd unit, and this nested bootstrap sets the flag around its
+        // own boot so module providers skip the panel stack through the same
+        // code path. The flag is restored afterwards — a PHP-FPM worker also
+        // serves later panel requests, and a leaked role would boot those
+        // without their modules.
+        putenv('TALLPBX_WORKER_ROLE=telephony');
+        $_ENV['TALLPBX_WORKER_ROLE'] = 'telephony';
+        $_SERVER['TALLPBX_WORKER_ROLE'] = 'telephony';
 
         try {
+            $app = self::boot($previousApp, $request);
+
             return self::dispatch($app, $request);
         } finally {
+            // Restoring here (including when boot() itself throws) keeps the
+            // shim's fail-open contract: index.php must start from a clean
+            // container and a clean role.
             Container::setInstance($previousApp);
             Facade::setFacadeApplication($previousFacadeApp);
+
+            if ($previousRole === false) {
+                putenv('TALLPBX_WORKER_ROLE');
+                unset($_ENV['TALLPBX_WORKER_ROLE'], $_SERVER['TALLPBX_WORKER_ROLE']);
+            } else {
+                putenv("TALLPBX_WORKER_ROLE={$previousRole}");
+                $_ENV['TALLPBX_WORKER_ROLE'] = $previousRole;
+                $_SERVER['TALLPBX_WORKER_ROLE'] = $previousRole;
+            }
         }
     }
 
@@ -170,7 +185,7 @@ final class XmlHandlerFastBootstrap
         /** @var list<ServiceProvider> $booted */
         $booted = [];
 
-        foreach (self::providerClasses($app) as $providerClass) {
+        foreach (self::providerClasses() as $providerClass) {
             $booted[] = $app->register($providerClass);
         }
 
