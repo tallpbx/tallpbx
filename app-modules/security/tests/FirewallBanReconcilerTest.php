@@ -25,6 +25,65 @@ beforeEach(function (): void {
     $this->app->instance(SecurityConfigGenerator::class, $this->generator);
 });
 
+it('severs the live sessions of a ban it restores to the kernel', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00'));
+
+    SecurityBan::create([
+        'ip_address' => '198.51.100.66',
+        'vector' => 'sip_auth',
+        'reason' => 'Test restored ban must sever live sessions',
+        'attempt_count' => 5,
+        'banned_at' => now()->subMinutes(10),
+        'expires_at' => now()->addMinutes(50),
+        'is_active' => true,
+    ]);
+
+    $this->executor->shouldReceive('status')->andReturn("table inet tallpbx_filter {\n}");
+    $this->executor->shouldReceive('bans')->once()->andReturn([]);
+    $this->executor->shouldReceive('ban')->once()->with('198.51.100.66', 3000)->andReturnTrue();
+
+    // The blocklists sit behind the stateful fast path, so an address that
+    // already holds a flow keeps flowing after it enters the set. Restoring a
+    // ban without flushing its conntrack entries leaves the attacker's
+    // REGISTER stream alive until the entries age out.
+    $this->executor->shouldReceive('flushConntrack')->once()->with('198.51.100.66')->andReturnTrue();
+
+    $reconciler = new FirewallBanReconciler($this->executor, $this->lockoutGuard, $this->generator);
+    $result = $reconciler->reconcile();
+
+    expect($result['added'])->toHaveKey('198.51.100.66', 3000)
+        ->and($result['errors'])->toBeEmpty();
+});
+
+it('audits a failed conntrack flush without failing the reconciliation', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00'));
+
+    SecurityBan::create([
+        'ip_address' => '198.51.100.67',
+        'vector' => 'sip_auth',
+        'reason' => 'Test flush failure is audited',
+        'attempt_count' => 5,
+        'banned_at' => now()->subMinutes(10),
+        'expires_at' => now()->addMinutes(50),
+        'is_active' => true,
+    ]);
+
+    $this->executor->shouldReceive('status')->andReturn("table inet tallpbx_filter {\n}");
+    $this->executor->shouldReceive('bans')->once()->andReturn([]);
+    $this->executor->shouldReceive('ban')->once()->with('198.51.100.67', 3000)->andReturnTrue();
+    $this->executor->shouldReceive('flushConntrack')->once()->with('198.51.100.67')->andReturnFalse();
+
+    $reconciler = new FirewallBanReconciler($this->executor, $this->lockoutGuard, $this->generator);
+    $result = $reconciler->reconcile();
+
+    expect($result['added'])->toHaveKey('198.51.100.67', 3000)
+        ->and($result['errors'])->toBeEmpty();
+
+    // The ban is in force for new flows; the leftover sessions are visible
+    // to the operator instead of failing the reconciliation run.
+    expect(SecurityAuditLog::where('action', 'conntrack_flush_failed')->where('ip_address', '198.51.100.67')->exists())->toBeTrue();
+});
+
 it('restores missing active DB bans in kernel with remaining TTL', function (): void {
     Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00'));
 
@@ -41,6 +100,7 @@ it('restores missing active DB bans in kernel with remaining TTL', function (): 
     $this->executor->shouldReceive('status')->andReturn("table inet tallpbx_filter {\n}");
     $this->executor->shouldReceive('bans')->once()->andReturn([]);
     $this->executor->shouldReceive('ban')->once()->with('198.51.100.55', 3000)->andReturnTrue();
+    $this->executor->shouldReceive('flushConntrack')->andReturnTrue();
 
     $reconciler = new FirewallBanReconciler($this->executor, $this->lockoutGuard, $this->generator);
     $result = $reconciler->reconcile();
@@ -96,6 +156,7 @@ it('re-times bans when TTL skew exceeds threshold', function (): void {
         ],
     ]);
     $this->executor->shouldReceive('ban')->once()->with('198.51.100.77', 3000)->andReturnTrue();
+    $this->executor->shouldReceive('flushConntrack')->andReturnTrue();
 
     $reconciler = new FirewallBanReconciler($this->executor, $this->lockoutGuard, $this->generator);
     $result = $reconciler->reconcile();
@@ -208,6 +269,7 @@ it('enforces MAX_ACTIONS limit to prevent flap loops', function (): void {
     $this->executor->shouldReceive('status')->andReturn("table inet tallpbx_filter {\n}");
     $this->executor->shouldReceive('bans')->once()->andReturn([]);
     $this->executor->shouldReceive('ban')->times(50)->andReturnTrue();
+    $this->executor->shouldReceive('flushConntrack')->andReturnTrue();
 
     $reconciler = new FirewallBanReconciler($this->executor, $this->lockoutGuard, $this->generator);
     $result = $reconciler->reconcile();

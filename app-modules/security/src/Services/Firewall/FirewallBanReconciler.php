@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Security\Services\Firewall;
 
+use Illuminate\Support\Facades\Log;
 use Modules\Security\Contracts\FirewallApplierInterface;
 use Modules\Security\Contracts\SecurityExecutorInterface;
 use Modules\Security\Events\FirewallRulesetUpdated;
@@ -16,6 +17,10 @@ use Modules\Security\Models\SecurityBan;
  * Automatically heals drift between database-active bans and kernel sets (@banned_ips, @banned_ips6)
  * with strict safety rails (minimum TTL threshold to prevent race conditions during expiration,
  * batch action caps to prevent flap loops, and boot recovery for absent kernel tables).
+ *
+ * Every ban it restores or re-times also severs the address's live sessions: the
+ * blocklists sit behind the stateful fast path, so a flow opened before the ban
+ * would keep flowing until its conntrack entry ages out.
  */
 class FirewallBanReconciler
 {
@@ -167,6 +172,8 @@ class FirewallBanReconciler
                             ipAddress: $ip,
                             description: "Automated reconciliation restored missing kernel ban for {$ip} ({$ttl}s)",
                         );
+
+                        $this->flushLiveSessions($ip);
                     } else {
                         $result['errors'][] = "Failed to add kernel ban for {$ip}";
                     }
@@ -193,6 +200,8 @@ class FirewallBanReconciler
                                     ipAddress: $ip,
                                     description: "Automated reconciliation corrected TTL skew for {$ip} (DB: {$remaining}s, Kernel: {$kernelExpires}s)",
                                 );
+
+                                $this->flushLiveSessions($ip);
                             } else {
                                 $result['errors'][] = "Failed to re-time kernel ban for {$ip}";
                             }
@@ -233,5 +242,33 @@ class FirewallBanReconciler
         }
 
         return $result;
+    }
+
+    /**
+     * Sever an address's live kernel sessions after its ban lands.
+     *
+     * The blocklists are evaluated behind the stateful fast path, so an
+     * address that already holds a flow keeps sending packets until its
+     * conntrack entries are deleted. A flush failure never rolls back the
+     * block (new flows are already dropped) but is recorded as a visible
+     * security audit entry so an operator can finish the job by hand.
+     *
+     * @param  string  $ip  IPv4 or IPv6 address whose sessions must be severed
+     */
+    protected function flushLiveSessions(string $ip): void
+    {
+        try {
+            if ($this->executor->flushConntrack($ip)) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::error("Failed to flush conntrack entries for {$ip}: {$e->getMessage()}");
+        }
+
+        SecurityAuditLog::record(
+            action: 'conntrack_flush_failed',
+            ipAddress: $ip,
+            description: "Failed to sever live sessions for {$ip}: the conntrack flush did not run. Existing connections keep flowing until their sessions end; new connections are already blocked.",
+        );
     }
 }
