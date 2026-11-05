@@ -10,6 +10,7 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
 - [Executive Summary & Hardware Sizing Matrix](#executive-summary--hardware-sizing-matrix)
   - [Datacenter Telephony Capacity Comparison](#datacenter-telephony-capacity-comparison)
   - [Dialplan XML Routing Performance Comparison](#dialplan-xml-routing-performance-comparison)
+  - [Slim-Boot Series: Call Setup & XML Lookup Latency (2026-11-05)](#slim-boot-series-call-setup--xml-lookup-latency-2026-11-05)
   - [Production Sizing & Configuration Matrix](#production-sizing--configuration-matrix)
 - [Production Recommendations: XML Caching & PHP-FPM Worker Tuning](#production-recommendations-xml-caching--php-fpm-worker-tuning)
 - [Capacity Planning Rules](#capacity-planning-rules)
@@ -74,6 +75,43 @@ XML throughput and latency across moderate bursts (`100 x 5`: 100 requests at 5 
 3. **Database vs. Cache Scaling**: Redis contributor and dialplan caching shield MariaDB during high-concurrency bursts, keeping average response times under 240 ms on entry hardware and under 70 ms on dedicated instances.
 
 ---
+
+### Slim-Boot Series: Call Setup & XML Lookup Latency (2026-11-05)
+
+Measured on the 1 vCPU / 1 GB tier under the production baseline — ESL profile `essential`, Reverb debounce 500 ms, CDR via PHP-FPM, **full default `nftables` firewall enabled** — to quantify the slim-boot changes (the shared `TALLPBX_WORKER_ROLE` gate and the fast-controller provider trim). Call setup times are SIPp `-trace_rtt` samples of the `setup` step (INVITE → final response), one sample per completed call, aggregated per cell with `load-testing/scripts/tools/rtt-stats.py`.
+
+#### Call setup response time by configuration (ms)
+
+| Cell | Completed | Samples | Average | p50 | p90 | p95 | Max |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **v-fast @ 5 CPS (after trim)** | 276 / 300 | 283 | 145 | 108 | 206 | 375 | 1,064 |
+| v-fast @ 5 CPS (before trim, 2026-11-04) | 102 / 300 | 102 | 4,924 | 4,432 | 9,109 | 9,184 | 9,460 |
+| **v-fast @ 8 CPS (after trim)** | 480 / 480 | 480 | 278 | 128 | 600 | 1,018 | 1,776 |
+| v-octane @ 8 CPS (after trim) | 456 / 478 | 456 | 186 | 84 | 332 | 790 | 1,816 |
+| v-octane @ 8 CPS (before trim, 2026-11-04) | 480 / 480 | 480 | 194 | 104 | 324 | 892 | 1,752 |
+| stock @ 2 CPS — runtime DB on disk | 111 / 120 | 112 | 188 | 176 | 256 | 302 | 580 |
+| stock @ 2 CPS — runtime DB in memory | 120 / 120 | 120 | 193 | 172 | 232 | 301 | 656 |
+| stock @ 3 CPS — disk | 180 / 180 | 180 | 794 | 816 | 1,616 | 1,901 | 2,352 |
+| stock @ 3 CPS — memory | 180 / 180 | 180 | 441 | 274 | 1,074 | 1,136 | 1,340 |
+| stock @ 4 CPS — disk | 174 / 240 | 174 | 4,020 | 3,594 | 7,541 | 8,055 | 8,892 |
+| stock @ 4 CPS — memory | 169 / 240 | 169 | 4,125 | 4,256 | 7,996 | 8,165 | 9,408 |
+| stock @ 5 CPS — disk | 131 / 300 | 131 | 4,406 | 4,476 | 8,316 | 8,526 | 9,120 |
+| stock @ 5 CPS — memory | 164 / 300 | 164 | 4,206 | 4,808 | 7,967 | 8,767 | 9,396 |
+| stock @ 6 CPS — disk | 111 / 360 | 111 | 4,744 | 3,704 | 9,612 | 9,682 | 9,824 |
+| stock @ 6 CPS — memory | 106 / 360 | 106 | 4,117 | 3,460 | 8,166 | 8,830 | 9,808 |
+
+Reading: with the trim, completed setups at 5 CPS fell from ~4.4 s p50 (the old queueing cliff) to ~108 ms — and 2.7× more calls completed. Above 4 CPS the stock path queues in seconds regardless of where its runtime database lives; the 3 CPS disk/memory latency gap (816 vs 274 ms p50) is a single sample and needs repeats before being trusted. Cells with failed calls sample only completed setups, so their tails describe the calls that made it through, not the rejections.
+
+#### XML lookup latency (battery `100 x 5`, median of 3 runs, ms)
+
+| Variant | Code state | Throughput | Average | p50 | p90 | p95 |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: |
+| v-fast | before trim | 30.1 req/sec | 159 | 154 | 166 | 172 |
+| v-fast | after trim | 43.1 req/sec | 110 | 108 | 117 | 120 |
+| v-octane | before trim | 172 req/sec | 16.0 | 14.7 | 25.9 | 27.0 |
+| v-octane | after trim | 187 req/sec | 15.0 | 13.7 | 22.7 | 25.1 |
+
+Latency includes client queueing at concurrency 5, so the figure compares cells, not single-request service time. Percentiles come from each battery run's JSON report; the raw traces behind the call table are kept with their series under `load-testing/results/`.
 
 ### Production Sizing & Configuration Matrix
 
