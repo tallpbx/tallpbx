@@ -138,6 +138,38 @@ describe('cdr gate', function (): void {
             ->and($process->getOutput())->toContain('rows=1');
     });
 
+    it('passes when records are deliberately not expected and none arrived', function (): void {
+        // The "pipeline off" ablation records nothing on purpose. The gate must
+        // still judge the calls themselves, instead of failing a cell whose
+        // whole point was to run without a recording pipeline.
+        $process = cdrGateProcess([
+            'verdict', '--before=5', '--after=5', '--successful=2', '--failed=0',
+            '--expect-records=0', '--label=h1-1c1g/off',
+        ]);
+
+        expect($process->isSuccessful())->toBeTrue($process->getOutput().$process->getErrorOutput());
+    });
+
+    it('still fails a run with no completed calls even without expected records', function (): void {
+        $process = cdrGateProcess([
+            'verdict', '--before=5', '--after=5', '--successful=0', '--failed=2',
+            '--expect-records=0', '--label=h1-1c1g/off',
+        ]);
+
+        expect($process->isSuccessful())->toBeFalse()
+            ->and($process->getOutput())->toContain('reason=no-success');
+    });
+
+    it('still requires records by default', function (): void {
+        $process = cdrGateProcess([
+            'verdict', '--before=5', '--after=5', '--successful=2', '--failed=0',
+            '--label=h1-1c1g/fpm',
+        ]);
+
+        expect($process->isSuccessful())->toBeFalse()
+            ->and($process->getOutput())->toContain('reason=no-records');
+    });
+
     it('fails a cell that never placed a call, because it measured nothing', function (): void {
         $process = cdrGateProcess([
             'verdict', '--before=10', '--after=10', '--successful=0', '--failed=0',

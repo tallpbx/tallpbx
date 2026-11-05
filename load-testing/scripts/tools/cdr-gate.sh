@@ -105,8 +105,12 @@ require_count() {
 # pipeline dropped records, which is a data-integrity failure rather than a
 # slow worker. More rows than calls is expected and fine: a bridged call
 # records both legs, and anything else on the host adds its own.
+#
+# A cell run with the recording pipeline deliberately off (--expect-records=0)
+# must still be judged on its calls: no rows is then the expected outcome, and
+# only the call tallies decide the verdict.
 command_verdict() {
-    local before="" after="" successful="" failed="" label="unknown"
+    local before="" after="" successful="" failed="" label="unknown" expect_records=1
     local rows
 
     for argument in "$@"; do
@@ -115,6 +119,7 @@ command_verdict() {
             --after=*) after="${argument#*=}" ;;
             --successful=*) successful="${argument#*=}" ;;
             --failed=*) failed="${argument#*=}" ;;
+            --expect-records=*) expect_records="${argument#*=}" ;;
             --label=*) label="${argument#*=}" ;;
             *) printf 'cdr-gate: unknown argument "%s"\n' "$argument" >&2; return 2 ;;
         esac
@@ -140,6 +145,14 @@ command_verdict() {
         printf 'CDR-GATE FAILED label=%s reason=no-success rows=%s successful=%s failed=%s\n' \
             "$label" "$rows" "$successful" "$failed"
         return 1
+    fi
+
+    # With the recording pipeline deliberately off, no rows is the expected
+    # outcome and only the call tallies decided the verdict above.
+    if [ "$expect_records" = "0" ]; then
+        printf 'CDR-GATE ok label=%s rows=%s successful=%s failed=%s expect-records=0\n' \
+            "$label" "$rows" "$successful" "$failed"
+        return 0
     fi
 
     if [ "$rows" -eq 0 ]; then

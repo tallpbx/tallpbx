@@ -123,6 +123,10 @@ PBX_DB_NAME="${PBX_DB_NAME:-tallpbx}"
 # the budget runs out.
 CDR_SETTLE_INTERVAL="${CDR_SETTLE_INTERVAL:-3}"
 CDR_SETTLE_MAX="${CDR_SETTLE_MAX:-60}"
+# Whether completed calls are expected to leave database records. A cell run
+# with the recording pipeline deliberately off passes 0, so the gate judges the
+# calls themselves instead of failing a cell whose point was to run unrecorded.
+CDR_EXPECT_RECORDS="${CDR_EXPECT_RECORDS:-1}"
 
 TIER=""
 VARIANT=""
@@ -1354,6 +1358,7 @@ run_sip_phase() {
 
     if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
         --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
+        --expect-records="$CDR_EXPECT_RECORDS" \
         --label="$label" | tee "${local_run_dir}/cdr-gate.txt"; then
         cell_failed "${label}-cdr"
         return 1
@@ -1458,6 +1463,7 @@ run_sip_smoke() {
 
     if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
         --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
+        --expect-records="$CDR_EXPECT_RECORDS" \
         --label="$label" | tee "${local_run_dir}/cdr-gate.txt"; then
         printf 'SMOKE-FAILED %s (CDR gate)\n' "$label" >&2
         return 1
