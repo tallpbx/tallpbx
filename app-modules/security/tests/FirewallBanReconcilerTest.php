@@ -84,6 +84,43 @@ it('audits a failed conntrack flush without failing the reconciliation', functio
     expect(SecurityAuditLog::where('action', 'conntrack_flush_failed')->where('ip_address', '198.51.100.67')->exists())->toBeTrue();
 });
 
+it('severs live sessions of a ban already present in the kernel', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00'));
+
+    SecurityBan::create([
+        'ip_address' => '198.51.100.68',
+        'vector' => 'sip_auth',
+        'reason' => 'Test present ban keeps refreshing its flow',
+        'attempt_count' => 5,
+        'banned_at' => now()->subMinutes(10),
+        'expires_at' => now()->addMinutes(50),
+        'is_active' => true,
+    ]);
+
+    $this->executor->shouldReceive('status')->andReturn("table inet tallpbx_filter {\n}");
+    $this->executor->shouldReceive('bans')->once()->andReturn([
+        '198.51.100.68' => [
+            'ip' => '198.51.100.68',
+            'timeout' => 3000,
+            'expires' => 3000,
+            'family' => 'ipv4',
+        ],
+    ]);
+
+    // A continuously active flow refreshes its conntrack entry on every
+    // packet, so it never ages out. A ban restored in an earlier run and never
+    // flushed therefore stays porous forever; every reconciliation pass has to
+    // sever the sessions of every active ban, not only the ones it adds.
+    $this->executor->shouldReceive('flushConntrack')->once()->with('198.51.100.68')->andReturnTrue();
+
+    $reconciler = new FirewallBanReconciler($this->executor, $this->lockoutGuard, $this->generator);
+    $result = $reconciler->reconcile();
+
+    expect($result['added'])->toBeEmpty()
+        ->and($result['retimed'])->toBeEmpty()
+        ->and($result['errors'])->toBeEmpty();
+});
+
 it('restores missing active DB bans in kernel with remaining TTL', function (): void {
     Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00'));
 

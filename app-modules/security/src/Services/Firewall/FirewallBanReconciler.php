@@ -172,8 +172,6 @@ class FirewallBanReconciler
                             ipAddress: $ip,
                             description: "Automated reconciliation restored missing kernel ban for {$ip} ({$ttl}s)",
                         );
-
-                        $this->flushLiveSessions($ip);
                     } else {
                         $result['errors'][] = "Failed to add kernel ban for {$ip}";
                     }
@@ -200,14 +198,21 @@ class FirewallBanReconciler
                                     ipAddress: $ip,
                                     description: "Automated reconciliation corrected TTL skew for {$ip} (DB: {$remaining}s, Kernel: {$kernelExpires}s)",
                                 );
-
-                                $this->flushLiveSessions($ip);
                             } else {
                                 $result['errors'][] = "Failed to re-time kernel ban for {$ip}";
                             }
                         }
                     }
                 }
+            }
+
+            // A flow that keeps sending refreshes its conntrack entry with
+            // every packet and never ages out on its own. Every pass severs
+            // the sessions of every active ban — including one restored by an
+            // earlier run, before this flush existed — or the ban stays
+            // porous while the attacker keeps transmitting.
+            if (! $dryRun) {
+                $this->flushLiveSessions($ip);
             }
         }
 
