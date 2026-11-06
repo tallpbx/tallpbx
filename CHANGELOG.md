@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [5.0.0] - 2026-11-05
+
+### Added
 - **Load-Test Refresh Harness**: Added the tooling the two-stage capacity refresh needs to stay reproducible. A declarative matrix (`load-testing/matrix.php`) lists every hardware tier, XML-serving variant, load profile, cache policy and SIPp scenario; `tpbx pbx:load-test:manifest` writes a machine-readable snapshot next to each run (build SHA, host sizing, PHP-FPM pool, FreeSWITCH runtime database mode, cache TTLs, firewall state, and a redacted `.env`); `load-testing/scripts/lib/switch.sh` applies each configuration switch and then reads the value back, so a setting that silently did not take effect aborts one measurement cell instead of producing a plausible but meaningless number; and `load-testing/scripts/load-test-matrix.sh` lists, dry-runs and executes the cells, restoring the documented baseline from a teardown trap. Measurement still runs through the existing `pbx:load-test:seed`, `pbx:load-test:dialplan` and `load-testing/scripts/pbx-sipp-validate.sh`, so results stay comparable with earlier series. No migration, service, or `.env` change is required.
 - **Reverb Telephony Broadcast Debouncing & Rate Limiting**: Added in-memory rate limiting and debouncing for real-time WebSocket events (`DashboardStatsUpdated` and `TelephonyUpdated`) in `BroadcastDashboardStatsOnFreeSwitchEvent` and `BroadcastTelephonyOnFreeSwitchEvent`. Configured via `FS_BROADCAST_THROTTLE_MS` (default: 500 ms) in `config/freeswitch.php`, `.env`, and `.env.example`. Prevents synchronous HTTP POST flooding to Reverb on port 8080 during call bursts and stops connected browser Livewire components from generating cascading FreeSWITCH ESL queries (`show channels as json`).
 - **Telephony Capacity Scaling Guide & Architectural Roadmap**: Authored [`docs/telephony-capacity-scaling-guide.md`](docs/telephony-capacity-scaling-guide.md), documenting empirical findings from server-to-server SIPp capacity testing on 1 vCPU cloud hosts, identifying the 10 CPS CPU saturation boundary (33% ESL event parsing, 33% FreeSWITCH SIP/RTP, 25% Reverb WebSockets, 8–16% kernel interrupts), establishing why static XML files do not solve the hardware bottleneck, and laying out a 5-phase optimization roadmap and hardware progression matrix to scale call capacity up to 60–80+ CPS.
