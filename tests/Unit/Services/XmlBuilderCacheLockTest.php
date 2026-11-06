@@ -23,7 +23,6 @@ beforeEach(function () {
         'freeswitch.xml_handler.dialplan_cache_ttl' => 60,
         'freeswitch.xml_handler.dialplan_contributor_cache_ttl' => 60,
         'freeswitch.xml_handler.routing_version_store' => 'array',
-        'freeswitch.lua_proxy.enabled' => false,
     ]);
     Cache::store('array')->flush();
     app(TenantManager::class)->clear();

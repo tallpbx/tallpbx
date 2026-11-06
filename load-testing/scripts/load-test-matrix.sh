@@ -729,10 +729,8 @@ switch_command() {
         quoted+=" $(printf '%q' "$arg")"
     done
 
-    printf 'APP_DIR=%s LUA_MIRROR_EXTENSION=%s LUA_MIRROR_DOMAIN=%s bash %s %s%s' \
+    printf 'APP_DIR=%s bash %s %s%s' \
         "$(printf '%q' "$REMOTE_APP_DIR")" \
-        "$(printf '%q' "$LOAD_START")" \
-        "$(printf '%q' "$LOAD_DOMAIN")" \
         "$(printf '%q' "$REMOTE_APP_DIR/load-testing/scripts/lib/switch.sh")" \
         "$(printf '%q' "$command")" "$quoted"
 }
@@ -756,9 +754,6 @@ apply_variant() {
                 ;;
             xml-path:*)
                 switch_call apply_xml_path "${requirement#xml-path:}" || return 1
-                ;;
-            lua:*)
-                switch_call apply_lua_bindings "${requirement#lua:}" || return 1
                 ;;
             octane:*)
                 switch_call apply_octane_binding "${requirement#octane:}" || return 1
@@ -838,9 +833,9 @@ verify_command() {
 
 # Build the FreeSWITCH lookup probe for one XML cell.
 #
-# The HTTP client asks PHP directly, so it can never see a Lua cache hit: a hit
-# is answered inside FreeSWITCH. Timing find_user_xml (minus the fixed CLI
-# overhead) is the only measurement that covers the path a real call takes.
+# The HTTP client asks PHP directly, so anything answered before nginx is
+# invisible to it. Timing find_user_xml (minus the fixed CLI overhead) is the
+# only measurement that covers the path a real call takes.
 probe_command() {
     switch_command probe_lookup "$LOAD_START" "$LOAD_DOMAIN" "${PROBE_COUNT:-30}"
 }
@@ -1322,8 +1317,8 @@ run_sip_phase() {
     local successful failed already_failed=0
 
     # A cell measured behind a half-applied switch is a plausible but
-    # meaningless number, so a failed switch fails the cell instead. This is
-    # how the Lua round that could not serve lookups is kept out of the data.
+    # meaningless number, so a failed switch fails the cell instead: a
+    # configuration that did not take must never reach the results.
     if ! apply_variant "$TIER" "$variant"; then
         cell_failed "${TIER}/${variant}/sip-cps${CPS} (variant switches)"
         return 1

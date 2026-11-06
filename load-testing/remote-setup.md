@@ -185,31 +185,9 @@ location = /api/v1/xml-handler {
 
 ---
 
-## 8. Lua XML cache proxy
+## 8. Lua XML cache proxy (retired)
 
-Two halves that must move together.
-
-| Half | File | Enabled | Disabled |
-|:--|:--|:--|:--|
-| FreeSWITCH binding | `/etc/freeswitch/autoload_configs/lua.conf.xml` | both `<param>` lines active | both wrapped in `<!-- … -->` |
-| Application mirror | `.env` `FS_LUA_PROXY_ENABLED` | `true` | `false` |
-
-```bash
-grep -cE '^[[:space:]]*<param name="xml-handler-(script|bindings)"' /etc/freeswitch/autoload_configs/lua.conf.xml
-grep -E '^FS_LUA_PROXY_ENABLED=' /var/www/tallpbx/.env
-```
-
-**Correct pairings:** `0 + false` (off, the installer default) or `2 + true` (on).
-**Wrong pairings measure nothing:** `0 + true` makes Laravel fill a Redis mirror FreeSWITCH never reads; `2 + false` makes Lua read a mirror nobody fills.
-
-`mod_lua` must load **before** `mod_xml_curl` in `modules.conf.xml`, or the handler is never consulted:
-
-```bash
-grep -nE 'mod_(lua|xml_curl)' /etc/freeswitch/autoload_configs/modules.conf.xml
-```
-
-**Apply:** `scripts/lib/switch.sh apply_lua_bindings on|off` (also reloads `mod_lua` and clears config).
-**Prove:** `scripts/lib/switch.sh assert_lua_bindings on|off` — checks the params, the `.env` flag, and that `mod_lua` is loaded.
+The optional Lua XML cache proxy was evaluated and retired in the 5.x series. Its handler, binding template, mirror writers, and switch commands were removed from the product; the historical measurements live under `load-testing/results/` and `load-testing/status.md`, and the retired design is recorded in `docs/architecture.md` §6.
 
 ---
 
@@ -414,7 +392,6 @@ A run is only comparable when these are what the manifest says they are:
 | Broadcast throttle | unset (500 ms) | `.env` |
 | PHP-FPM | `pm = static`, `max_children = 5` | `pool.d/www.conf` |
 | XML entry file | stock (`index.php`) | nginx `location` |
-| Lua proxy | `.env false` + bindings commented | `.env`, `lua.conf.xml` |
 | Octane binding | as installed (both gateways declared) | `xml_curl.conf.xml` |
 | Runtime database | disk | `/var/lib/freeswitch/db` |
 | Cache TTLs | unset (config defaults) | `.env` |

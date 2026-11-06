@@ -441,7 +441,9 @@ The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache 
 
 ### Comparing Feature Configurations (Fast Controller and Lua Proxy)
 
-TallPBX has two independent speed-ups on the XML handler. They can be measured alone or together, but the comparison only means something when every configuration is measured **on the same host, in the same session, with the same request counts**.
+> **The Lua proxy is historical.** It was evaluated and retired in the 5.x series and removed from the product; its measurements live under `load-testing/results/` and `load-testing/status.md`. This protocol is kept so those numbers stay reproducible from the pre-removal source, and so the surviving stock-versus-fast comparison keeps its method.
+
+TallPBX had two independent speed-ups on the XML handler. They can be measured alone or together, but the comparison only means something when every configuration is measured **on the same host, in the same session, with the same request counts**.
 
 **Use the existing remote test host.** The minimal tier already provisioned for this work is **1 shared vCPU, 1 GB RAM, 2 GB swap**, running TallPBX with a seeded test tenant. Reuse it. A fresh host is for validating the installer, not for comparing features.
 
@@ -468,20 +470,17 @@ TallPBX has two independent speed-ups on the XML handler. They can be measured a
    ```
    With the Lua proxy on, this measures **misses and mirror writes**, not hits. State that in the report, or the two rows look like they contradict each other.
 
-**Switching each feature:**
+**Switching the fast controller:**
 
 | Feature | Turned on | Turned off | Restart needed |
 | :--- | :--- | :--- | :--- |
 | **Fast controller** | the nginx `location` sends requests to `xml-handler-fast.php` | the block reverts to `try_files $uri /index.php?$query_string;` | nginx reload only |
-| **Lua proxy** | both `xml-handler-*` parameters are active in `lua.conf.xml` | both parameters are commented out | FreeSWITCH restart |
 
-`FS_LUA_PROXY_ENABLED=false` is **not** a kill switch: it stops new copies being written while FreeSWITCH keeps serving what is already in Redis. Removing the bindings is what actually turns it off.
-
-Step-by-step commands for both switches are in `docs/operations.md` → *Fast XML Handler Path* and *Optional Lua Directory Cache*.
+The Lua proxy's switches were removed with the feature; reproducing its historical cells requires the pre-removal source. Step-by-step commands for the fast controller are in `docs/operations.md` → *Fast XML Handler Path*.
 
 **Reading the result:**
 
-- If the Lua proxy earns its place, the FreeSWITCH lookup cost in **B** and **C** is a small fraction of **A**.
+- The FreeSWITCH lookup cost in **B** and **C** versus **A** shows what the Lua path bought; the historical outcome is recorded in `load-testing/status.md`.
 - If the fast controller earns its place, the web-app cost in **D** is clearly below **A**, and **C**'s miss cost inherits that.
 - If a configuration shows no difference, that feature is not paying for its complexity on this hardware.
 

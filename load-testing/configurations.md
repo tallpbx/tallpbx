@@ -1,6 +1,6 @@
 # Configuration Switches
 
-Six variants are built from four independent switches, plus two runtime settings used for ablations. Each switch is applied by `scripts/lib/switch.sh`, which then calls its matching `assert_*` and reads the effective value back. A mismatch prints `SWITCH-FAILED <detail>` and returns non-zero, which fails that cell rather than producing a number.
+Four variants are built from three independent switches, plus the runtime settings used for ablations. Each switch is applied by `scripts/lib/switch.sh`, which then calls its matching `assert_*` and reads the effective value back. A mismatch prints `SWITCH-FAILED <detail>` and returns non-zero, which fails that cell rather than producing a number.
 
 ```bash
 bash load-testing/scripts/lib/switch.sh <command> [arguments]
@@ -16,7 +16,6 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 |:--|:--|:--|
 | `apply_fpm_profile` | `static\|dynamic <children>` | PHP-FPM pool mode and worker count |
 | `apply_xml_path` | `stock\|fast` | nginx entry file for `/api/v1/xml-handler` |
-| `apply_lua_bindings` | `on\|off` | Lua XML handler params + `FS_LUA_PROXY_ENABLED` |
 | `apply_octane_binding` | `on\|off` | Which `xml_curl` gateway FreeSWITCH consults |
 | `apply_ttl` | `<dialplan> <contributor> [directory] [acl]` | XML cache lifetimes |
 | `apply_fs_loglevel` | `debug\|info\|notice\|warning\|err` | FreeSWITCH file log ceiling |
@@ -25,10 +24,9 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 | `apply_esl_profile` | `essential\|full` | How many event types the ESL listener subscribes to |
 | `apply_broadcast_throttle` | `<milliseconds>` | Reverb debounce window; `0` disables it |
 | `probe_lookup` | `<extension> <domain> [count]` | Nothing — it measures one directory lookup |
-| `coherent_baseline` | — | Makes the Lua flag agree with the bindings |
 | `restore_baseline` | — | Reverts everything this library changed |
 
-Each `apply_*` has an `assert_*` twin. `probe_lookup`, `coherent_baseline` and `restore_baseline` have no twin by design.
+Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` have no twin by design.
 
 ---
 
@@ -47,14 +45,6 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup`, `coherent_baseline` and `
 - **Assertion:** the location body contains the expected `try_files … /index.php` (stock) or `SCRIPT_FILENAME … xml-handler-fast.php` (fast).
 - **Effect:** framework boot per lookup versus a reduced bootstrap.
 - **Caveat:** `nginx -t` runs before the reload; an invalid rewrite is refused and the old workers keep serving.
-
-## `apply_lua_bindings`
-
-- **Argument:** `on` or `off`.
-- **Files:** `lua.conf.xml` (two `<param>` lines commented or active) **and** `.env` `FS_LUA_PROXY_ENABLED`.
-- **Assertion:** three things — the params' state, the `.env` flag, and that `mod_lua` is loaded when `on`.
-- **Effect:** on `on`, directory and dialplan lookups can be answered inside FreeSWITCH from Redis; on `off`, every lookup reaches PHP.
-- **Caveat:** the halves must agree. `flag true + bindings off` fills a mirror nothing reads; `flag false + bindings on` reads a mirror nobody fills. `assert_lua_bindings` rejects both.
 
 ## `apply_octane_binding`
 
@@ -113,24 +103,16 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup`, `coherent_baseline` and `
 - **What it does:** times `find_user_xml id <extension> <domain>` *n* times, times `status` the same number of times, and prints the difference:
 
 ```
-lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528 lua_bindings=off
+lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 ```
 
 - **Why `status` is subtracted:** the CLI round trip is fixed and large enough to swamp the lookup it is meant to measure.
-- **What it proves:** what FreeSWITCH waits for on a directory lookup — the only measurement that can see a Lua hit, because a hit never reaches nginx or PHP.
-- **What it does *not* prove:** `lua_bindings` reports the configured binding state, not which component answered. Proving a hit needs the mirror-TTL check described in `docs/load-testing-guide.md`.
+- **What it proves:** what FreeSWITCH waits for on a directory lookup, with the CLI overhead removed.
+- **What it does *not* prove:** which component answered the lookup — a configured state is not proof of who served.
 
-## `coherent_baseline` and `restore_baseline`
+## `restore_baseline`
 
-`restore_baseline` restores every file and `.env` value this library changed, reloads the affected services, then calls `coherent_baseline` before declaring success.
-
-`coherent_baseline` compares the Lua bindings against `FS_LUA_PROXY_ENABLED` and corrects the flag to match the bindings, printing:
-
-```
-baseline-corrected FS_LUA_PROXY_ENABLED true -> false (bindings are commented)
-```
-
-This exists because a snapshot can capture the two disagreeing, and restoring that faithfully would leave the next cell measuring a configuration that cannot work.
+`restore_baseline` restores every file and `.env` value this library changed and reloads the affected services before declaring success.
 
 `restore_baseline` is idempotent: with no snapshots present it does nothing, so it is safe to call from a teardown trap after a failure that happened before the first apply.
 
@@ -138,14 +120,12 @@ This exists because a snapshot can capture the two disagreeing, and restoring th
 
 ## How the variants combine the switches
 
-| Variant | FPM | XML path | Lua | Octane |
-|:--|:--|:--|:--|:--|
-| `v-stock-dynamic` | `dynamic 5` | stock | off | off |
-| `v-stock-static` | `static 5` | stock | off | off |
-| `v-fast` | `static 5` | **fast** | off | off |
-| `v-lua-stock` | `static 5` | stock | **on** | off |
-| `v-lua-fast` | `static 5` | **fast** | **on** | off |
-| `v-octane` | `static 5` | stock | off | **on** |
+| Variant | FPM | XML path | Octane |
+|:--|:--|:--|:--|
+| `v-stock-dynamic` | `dynamic 5` | stock | off |
+| `v-stock-static` | `static 5` | stock | off |
+| `v-fast` | `static 5` | **fast** | off |
+| `v-octane` | `static 5` | stock | **on** |
 
 `load-testing/matrix.php` is the authority; the runner reads the `requires` list per variant and applies each entry in order.
 

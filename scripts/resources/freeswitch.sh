@@ -19,9 +19,6 @@ cd "$(dirname "$0")"
 . ./config.sh
 . ./colors.sh
 . ./environment.sh
-# Helpers for the optional Lua directory cache. Kept in their own file so the
-# module-order and password decisions can be tested against fixtures.
-. ./freeswitch-lua-proxy.sh
 # Helpers for the JSON CDR gateway (mod_json_cdr) and its failure spool.
 . ./freeswitch-json-cdr.sh
 
@@ -403,6 +400,17 @@ configure_dynamic_xml() {
     disable_freeswitch_module "$modules_conf" "mod_redis"
     disable_freeswitch_module "$modules_conf" "mod_memcache"
 
+    # The opt-in FS_HIREDIS_* tenant-limit dialplan actions (limit and
+    # hiredis_raw) run against the "default" mod_hiredis profile. Deploy it
+    # next to the module enablement so those actions work as soon as the
+    # flags are on. Only copied when missing so a password edit made by an
+    # administrator survives re-runs (the shipped template keeps the
+    # password param commented out).
+    if [ ! -f "${conf_dir}/autoload_configs/hiredis.conf.xml" ]; then
+        install -m 0644 "${app_dir}/scripts/freeswitch/hiredis.conf.xml" \
+            "${conf_dir}/autoload_configs/hiredis.conf.xml"
+    fi
+
     # The packaged stock directory (default.xml and default/1000-1019.xml)
     # shadows the app-managed directory: FreeSWITCH resolves local users first,
     # so REGISTER auth for those usernames would fall back to stock passwords.
@@ -495,61 +503,6 @@ XML
     load_required_freeswitch_modules
 }
 
-# Deploy the optional Lua directory cache (disabled by default).
-#
-# The handler, its bindings template, and the tuned hiredis profile are
-# installed so enabling the cache is a single .env change plus a restart.
-# Nothing here enables the feature: FS_LUA_PROXY_ENABLED stays false until an
-# administrator opts in (see docs/operations.md).
-configure_lua_directory_cache() {
-    local app_dir="/var/www/tallpbx"
-    local conf_dir=""
-    local modules_conf=""
-    local scripts_dir=""
-    local source_dir="${app_dir}/scripts/freeswitch"
-    local installed_hiredis=""
-    local redis_password_param=""
-
-    conf_dir="$(freeswitch_conf_dir)"
-    modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
-    scripts_dir="${conf_dir}/scripts"
-    installed_hiredis="${conf_dir}/autoload_configs/hiredis.conf.xml"
-
-    if [ ! -f "${source_dir}/tallpbx_xml_handler.lua" ]; then
-        warning "Lua directory cache templates not found in ${source_dir}; skipping"
-        return 0
-    fi
-
-    verbose "Deploying the optional Lua directory cache (disabled by default)"
-    mkdir -p "$scripts_dir"
-    install -m 0644 "${source_dir}/tallpbx_xml_handler.lua" "${scripts_dir}/tallpbx_xml_handler.lua"
-
-    # Decide the password before the template overwrites the existing profile.
-    # The helper only inherits one when the old profile was already local, and
-    # otherwise reads the application's own REDIS_PASSWORD, so the Debian
-    # sample for 172.18.101.101 is never carried onto 127.0.0.1.
-    redis_password_param="$(tallpbx_resolve_hiredis_password "$installed_hiredis" "${app_dir}/.env")"
-
-    install -m 0644 "${source_dir}/lua.conf.xml" "${conf_dir}/autoload_configs/lua.conf.xml"
-    install -m 0644 "${source_dir}/hiredis.conf.xml" "$installed_hiredis"
-
-    # Leaves the parameter commented out when there is no real password.
-    tallpbx_apply_hiredis_password "$installed_hiredis" "$redis_password_param"
-
-    # Ensure lua.conf.xml has xml-handler bindings disabled in favor of persistent Octane worker
-    if [ -f "${conf_dir}/autoload_configs/lua.conf.xml" ]; then
-        sed -i -E 's|^([[:space:]]*)<param name="xml-handler-bindings"([^>]*)/>|\1<!-- <param name="xml-handler-bindings"\2/> -->|' "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
-    fi
-
-    # mod_lua must load before mod_xml_curl. FreeSWITCH appends XML search
-    # bindings and tries them in load order, so a later module is never asked.
-    ensure_freeswitch_module_enabled "$modules_conf" "mod_lua" "<!-- Languages -->"
-    tallpbx_move_mod_lua_before_xml_curl "$modules_conf"
-
-    chown freeswitch:freeswitch "$modules_conf" "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
-    chmod 0640 "${conf_dir}/autoload_configs/lua.conf.xml" 2>/dev/null || true
-    chmod 0644 "$installed_hiredis" "${scripts_dir}/tallpbx_xml_handler.lua" 2>/dev/null || true
-}
 
 # Install and configure mod_json_cdr, which posts one JSON call record per
 # call leg to the TallPBX ingestion endpoint.
@@ -598,7 +551,6 @@ if [ "${1:-}" = "--configure-only" ]; then
     configure_freeswitch_switch_defaults
     configure_freeswitch_sound_defaults
     configure_dynamic_xml
-    configure_lua_directory_cache
     configure_json_cdr
     systemctl daemon-reload 2>/dev/null || true
     exit 0
@@ -1085,7 +1037,6 @@ fi
 configure_freeswitch_switch_defaults
 configure_freeswitch_sound_defaults
 configure_dynamic_xml
-configure_lua_directory_cache
 configure_json_cdr
 set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALLED_METHOD "$freeswitch_install_method"
 

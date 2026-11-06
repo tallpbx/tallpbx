@@ -22,7 +22,7 @@ mkdir -p "$LOGDIR"
 pbx() { timeout 90 ssh -i "$HOME/.ssh/ppx2-client.rsa" -o ConnectTimeout=8 root@162.243.62.138 "$@"; }
 
 for transport in octane off; do
-    for variant in v-octane v-lua-stock v-lua-fast; do
+    for variant in v-octane; do
         for cps in 8 10; do
             label="cdr-${transport}-${variant}-cps${cps}"
             echo "=== ${label} starting $(date -u +%FT%TZ) ==="

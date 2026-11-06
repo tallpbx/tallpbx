@@ -153,7 +153,7 @@ it('rejects an empty payload', function () {
 
 it('isolates the stream on redis database 3 without a key prefix', function () {
     // The unprefixed key keeps the stream literally "pbx:cdr:stream" for
-    // operational tooling, mirroring the lua_proxy connection.
+    // operational tooling sees the literal stream key.
     expect(config('database.redis.cdr'))->toMatchArray([
         'database' => '3',
         'prefix' => '',

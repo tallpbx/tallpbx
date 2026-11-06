@@ -43,13 +43,11 @@ Apply every setting in `remote-setup.md` §3–§11 and keep the proof from each
 ssh "$PBX_HOST" 'cd /var/www/tallpbx && \
   echo "log=$(grep -E "^FS_LOG_LEVEL=" .env)"; \
   echo "esl=$(grep -E "^FS_ESL_EVENT_PROFILE=" .env)"; \
-  echo "lua_flag=$(grep -E "^FS_LUA_PROXY_ENABLED=" .env)"; \
-  echo "lua_params=$(grep -cE "^[[:space:]]*<param name=\"xml-handler-(script|bindings)\"" /etc/freeswitch/autoload_configs/lua.conf.xml)"; \
   echo "fpm=$(grep -E "^pm( |\.max_children)" /etc/php/8.5/fpm/pool.d/www.conf | tr "\n" " ")"; \
   echo "cdr=$(systemctl is-active tallpbx-cdr-worker) mod_json_cdr=$(fs_cli -x "module_exists mod_json_cdr")"'
 ```
 
-**Checkpoint:** `log=notice`, `esl=essential`, `lua_flag=false` with `lua_params=0` (or `true` with `2` — never mixed), `fpm= pm = static pm.max_children = 5`, `cdr=active`, `mod_json_cdr=true`.
+**Checkpoint:** `log=notice`, `esl=essential`, `fpm= pm = static pm.max_children = 5`, `cdr=active`, `mod_json_cdr=true`.
 
 ---
 
@@ -107,7 +105,7 @@ bash load-testing/scripts/load-test-matrix.sh \
 One invocation per variant, each applying its own switches:
 
 ```bash
-for variant in v-stock-static v-fast v-octane v-lua-stock v-lua-fast; do
+for variant in v-stock-static v-fast v-octane; do
   bash load-testing/scripts/load-test-matrix.sh \
     --tier=h1-1c1g --variant="$variant" --phase=xml \
     --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3

@@ -220,7 +220,7 @@ Example: `h1-1c1g/v-stock-dynamic/100x5-production-60-dialplan-r2.json` is repea
 ## Probe file fields
 
 ```
-lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528 lua_bindings=off
+lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 ```
 
 | Field | Meaning |
@@ -228,7 +228,6 @@ lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528 lua_bindings=off
 | `find_user_ms` | Total time for *n* `find_user_xml` calls, including process startup |
 | `status_ms` | Total time for *n* `status` calls — the fixed CLI overhead |
 | `net_ms` | The difference: what FreeSWITCH actually spent on the lookups |
-| `lua_bindings` | `on` or `off`, read from `lua.conf.xml` — the configured state, not proof of who served |
 
 ---
 

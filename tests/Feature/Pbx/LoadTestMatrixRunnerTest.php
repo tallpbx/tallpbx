@@ -74,7 +74,7 @@ describe('load test matrix runner', function (): void {
             ->all();
 
         $tiers = ['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h2d-2c8g', 'h4d-4c16g'];
-        $variants = ['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-lua-stock', 'v-lua-fast', 'v-octane'];
+        $variants = ['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-octane'];
         $phases = ['xml', 'sip', 'ablation'];
 
         $expected = [];
@@ -159,19 +159,6 @@ describe('load test matrix runner', function (): void {
         expect($octane->getOutput())->toContain('--url=http://127.0.0.1:8090/api/v1/xml-handler')
             ->and($stock->getOutput())->toContain('--url=http://127.0.0.1/api/v1/xml-handler')
             ->and($stock->getOutput())->not->toContain('8090');
-    });
-
-    it('measures the FreeSWITCH lookup path alongside every XML cell', function (): void {
-        $process = matrixRunnerProcess(
-            ['--dry-run', '--tier=h1-1c1g', '--variant=v-lua-stock', '--phase=xml', '--profile=100x5', '--section=dialplan', '--repeats=1'],
-            $this->artifactRoot,
-        );
-
-        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
-
-        // A Lua hit never reaches nginx or PHP, so the HTTP client cannot
-        // observe it; the FreeSWITCH probe is the only measurement that can.
-        expect($process->getOutput())->toContain('probe_lookup');
     });
 
     it('restricts the battery to one cache policy when asked', function (): void {

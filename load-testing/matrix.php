@@ -100,34 +100,25 @@ return [
     | runner aborts the cell when one of them cannot be asserted.
     |   fpm:<mode>            PHP-FPM pool mode
     |   xml-path:<stock|fast> nginx front controller for /api/v1/xml-handler
-    |   lua:<on|off>          mod_xml_curl Lua mirror bindings
     |   octane:<on|off>       tallpbx-octane XML binding on 127.0.0.1:8090
     */
 
     'variants' => [
         'v-stock-dynamic' => [
             'label' => 'Stock PHP-FPM with the Debian dynamic pool',
-            'requires' => ['fpm:dynamic', 'xml-path:stock', 'lua:off', 'octane:off'],
+            'requires' => ['fpm:dynamic', 'xml-path:stock', 'octane:off'],
         ],
         'v-stock-static' => [
             'label' => 'Stock PHP-FPM with a static pool',
-            'requires' => ['fpm:static', 'xml-path:stock', 'lua:off', 'octane:off'],
+            'requires' => ['fpm:static', 'xml-path:stock', 'octane:off'],
         ],
         'v-fast' => [
             'label' => 'Fast front controller through PHP-FPM',
-            'requires' => ['fpm:static', 'xml-path:fast', 'lua:off', 'octane:off'],
-        ],
-        'v-lua-stock' => [
-            'label' => 'Lua mirror in front of stock PHP-FPM',
-            'requires' => ['fpm:static', 'xml-path:stock', 'lua:on', 'octane:off'],
-        ],
-        'v-lua-fast' => [
-            'label' => 'Lua mirror in front of the fast controller',
-            'requires' => ['fpm:static', 'xml-path:fast', 'lua:on', 'octane:off'],
+            'requires' => ['fpm:static', 'xml-path:fast', 'octane:off'],
         ],
         'v-octane' => [
             'label' => 'Persistent RoadRunner worker',
-            'requires' => ['fpm:static', 'xml-path:stock', 'lua:off', 'octane:on'],
+            'requires' => ['fpm:static', 'xml-path:stock', 'octane:on'],
         ],
     ],
 

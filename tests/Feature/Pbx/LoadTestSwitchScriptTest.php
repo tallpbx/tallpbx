@@ -59,8 +59,6 @@ describe('load test switch helpers', function (): void {
             'assert_fs_db_mode',
             'apply_xml_path',
             'assert_xml_path',
-            'apply_lua_bindings',
-            'assert_lua_bindings',
             'apply_ttl',
             'assert_ttl',
             'apply_cdr_transport',
@@ -75,59 +73,6 @@ describe('load test switch helpers', function (): void {
         expect($script)->toContain('trap restore_baseline EXIT INT TERM')
             // Clearing the trap first keeps a failing restore from recursing.
             ->and($script)->toContain('trap - EXIT INT TERM');
-    });
-
-    it('restarts the long-lived processes that hold the proxy flag', function (): void {
-        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
-
-        preg_match('/^apply_lua_bindings\(\) \{.*?^\}/ms', $script, $match);
-        $apply = $match[0] ?? '';
-
-        // PHP-FPM re-reads .env on every request, but the persistent worker
-        // boots once and keeps its configuration for its whole life. Editing
-        // .env without restarting it leaves the proxy switched off in the
-        // process that actually serves lookups.
-        expect($apply)->toContain('restart_xml_worker');
-
-        preg_match('/^restart_xml_worker\(\) \{.*?^\}/ms', $script, $helper);
-
-        expect($helper[0] ?? '')->toContain('tallpbx-xml-worker');
-    });
-
-    it('proves the mirror can be written before claiming the proxy is on', function (): void {
-        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
-
-        // The file and the flag can both be correct while the process serving
-        // lookups still refuses to write the mirror. The only assertion that
-        // catches that is a behavioural one.
-        expect($script)->toContain('pbx:fsxml:tenant:user:');
-    });
-
-    it('warms a cold Lua mirror before judging the serve probe', function (): void {
-        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
-
-        preg_match('/^assert_lua_serves\(\) \{.*?^\}/ms', $script, $match);
-        $assert = $match[0] ?? '';
-
-        // Enabling the proxy restarts FreeSWITCH and the worker. For the first
-        // lookups afterwards the mirror is cold, so they legitimately reach
-        // PHP while the entry is written — and a probe run at that moment
-        // fails a working proxy for being cold. The probe warms the entry and
-        // retries before it is allowed to fail the switch.
-        expect($assert)->toContain('warm')
-            ->and($assert)->toContain('for attempt in');
-    });
-
-    it('corrects a half-applied Lua pair before declaring the baseline restored', function (): void {
-        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
-
-        preg_match('/^restore_baseline\(\) \{.*?^\}/ms', $script, $match);
-
-        // The bindings are the baseline; the .env flag follows them. A restore
-        // that reproduced a captured mismatch left Laravel writing a Redis
-        // mirror FreeSWITCH never read.
-        expect($match[0] ?? '')->toContain('coherent_baseline')
-            ->and($script)->toContain('baseline-corrected');
     });
 
     it('measures a FreeSWITCH lookup with the CLI overhead subtracted', function (): void {
@@ -154,4 +99,17 @@ describe('load test switch helpers', function (): void {
         expect($script)->toContain('SWITCH-FAILED')
             ->and($script)->toContain('set -euo pipefail');
     });
+});
+
+it('no longer carries the retired lua proxy switches', function (): void {
+    $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+    $matrix = (string) file_get_contents(base_path('load-testing/matrix.php'));
+
+    expect($script)->not->toContain('apply_lua_bindings')
+        ->and($script)->not->toContain('lua_bindings_state')
+        ->and($script)->not->toContain('coherent_baseline')
+        ->and($script)->not->toContain('restart_xml_worker')
+        ->and($script)->not->toContain('redis_pattern_present')
+        ->and($matrix)->not->toContain('v-lua')
+        ->and($matrix)->not->toContain("'lua:");
 });

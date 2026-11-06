@@ -1142,3 +1142,45 @@ it('documents xml-handler throttle config keys exactly as config reads them', fu
         ->not->toContain('freeswitch.xml_handler.throttle.limit')
         ->not->toContain('freeswitch.xml_handler.throttle.decay_minutes');
 });
+
+it('no longer ships the retired lua proxy anywhere in the product', function (): void {
+    // The Lua XML cache was evaluated and retired; its measurements stay
+    // under load-testing/ and the design note in docs/architecture.md.
+    // Nothing may install, configure, ship, or reference it anymore.
+    $freeswitch = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+    $envExample = (string) file_get_contents(base_path('.env.example'));
+    $freeswitchConfig = (string) file_get_contents(base_path('config/freeswitch.php'));
+    $databaseConfig = (string) file_get_contents(base_path('config/database.php'));
+    $phpunit = (string) file_get_contents(base_path('phpunit.xml'));
+    $directoryBuilder = (string) file_get_contents(base_path('app/Services/Xml/DirectoryXmlBuilder.php'));
+
+    expect($freeswitch)->not->toContain('configure_lua_directory_cache')
+        ->and($freeswitch)->not->toContain('freeswitch-lua-proxy.sh')
+        ->and($freeswitch)->not->toContain('mod_lua')
+        ->and($envExample)->not->toContain('FS_LUA_PROXY')
+        ->and($envExample)->not->toContain('FS_REDIS_')
+        ->and($freeswitchConfig)->not->toContain('lua_proxy')
+        ->and($databaseConfig)->not->toContain('lua_proxy')
+        ->and($phpunit)->not->toContain('FS_LUA_PROXY')
+        ->and($phpunit)->not->toContain('FS_REDIS_')
+        ->and($directoryBuilder)->not->toContain('shouldMirror')
+        ->and(file_exists(base_path('scripts/resources/freeswitch-lua-proxy.sh')))->toBeFalse()
+        ->and(file_exists(base_path('scripts/freeswitch/tallpbx_xml_handler.lua')))->toBeFalse()
+        ->and(file_exists(base_path('scripts/freeswitch/lua.conf.xml')))->toBeFalse()
+        ->and(file_exists(base_path('app/Services/Xml/FsXmlMirrorWriter.php')))->toBeFalse();
+});
+
+it('deploys the mod_hiredis default profile the tenant limit dialplan actions require', function (): void {
+    // The opt-in FS_HIREDIS_* tenant-limit actions (limit / hiredis_raw in
+    // DefaultDialplansProvisioner) run against the "default" mod_hiredis
+    // profile. The Lua proxy that originally carried this template is retired,
+    // so the profile must ship as plain mod_hiredis infrastructure, deployed
+    // alongside the module enablement in configure_dynamic_xml.
+    $profile = (string) file_get_contents(base_path('scripts/freeswitch/hiredis.conf.xml'));
+    $freeswitch = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    expect($profile)->toContain('<configuration name="hiredis.conf"')
+        ->and($profile)->toContain('<profile name="default">')
+        ->and($freeswitch)->toContain('hiredis.conf.xml')
+        ->and($freeswitch)->toContain('autoload_configs/hiredis.conf.xml');
+});

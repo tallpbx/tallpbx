@@ -471,19 +471,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Lua XML Proxy
-    |--------------------------------------------------------------------------
-    |
-    | Optional in-process directory cache served by mod_lua (disabled in favor
-    | of the persistent Octane worker). Defaults to false.
-    | Laravel mirrors every rendered directory document into Redis under the
-    | fixed pbx:fsxml namespace, and FreeSWITCH answers from that mirror
-    | before it calls mod_xml_curl. The flag below controls the mirror writes
-    | only; the kill-switch is removing the bindings from lua.conf.xml.
-    |
-    */
-    /*
-    |--------------------------------------------------------------------------
     | Modules Required to Render FreeSWITCH XML
     |--------------------------------------------------------------------------
     |
@@ -527,14 +514,6 @@ return [
         Modules\Security\Providers\ModuleServiceProvider::class,
         Modules\TimeConditions\Providers\ModuleServiceProvider::class,
         Modules\Voicemails\Providers\ModuleServiceProvider::class,
-    ],
-
-    'lua_proxy' => [
-        'enabled' => filter_var(env('FS_LUA_PROXY_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
-
-        // Redis connection name from config/database.php. It must stay
-        // unprefixed, because the Lua script queries raw key names.
-        'connection' => env('FS_LUA_PROXY_CONNECTION', 'lua_proxy'),
     ],
 
     /*

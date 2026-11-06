@@ -40,7 +40,7 @@ describe('load test matrix configuration', function (): void {
             ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'a')->count())->toBe(3)
             ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'b')->count())->toBe(2)
             ->and(array_keys(loadTestMatrix()['variants']))
-            ->toBe(['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-lua-stock', 'v-lua-fast', 'v-octane']);
+            ->toBe(['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-octane']);
     });
 
     it('defines both CDR ingestion transports', function (): void {

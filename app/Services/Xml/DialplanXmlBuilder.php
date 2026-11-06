@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Xml;
 
-use App\Services\DialplanContext;
 use App\Services\DialplanXmlCollector;
 use App\Services\TenantManager;
 use App\Support\Concerns\EscapesXml;
@@ -454,70 +453,7 @@ class DialplanXmlBuilder
             },
         );
 
-        $this->mirrorDialplanXml($context, $destination, $ttl, (int) $tenantId, $version, $epoch, $xml);
-
         return $xml;
-    }
-
-    /**
-     * Mirror the rendered dialplan into the raw Redis namespace read by the
-     * optional FreeSWITCH Lua handler.
-     *
-     * Runs after the cache result, so a document served from the PHP cache
-     * refreshes the mirror as well. This is the path that runs on every call
-     * leg, so nothing here may make a lookup fail; the writer swallows its own
-     * errors.
-     */
-    private function mirrorDialplanXml(string $context, string $destination, int $ttl, int $tenantId, int $version, int $epoch, string $xml): void
-    {
-        // Cheapest check first: on the default configuration the feature is
-        // off and a call setup must not resolve anything extra.
-        if (! (bool) config('freeswitch.lua_proxy.enabled', false)) {
-            return;
-        }
-
-        if ($ttl <= 0 || $context === '' || $destination === '') {
-            return;
-        }
-
-        // The Lua handler can only address a dialplan when the tenant is
-        // encoded in the context name. Mirroring anything else would write a
-        // key FreeSWITCH can never ask for, so leave those on the PHP path.
-        $contextTenant = app(DialplanContext::class)->parseTenantId($context);
-
-        if ($contextTenant === null || (int) $contextTenant !== $tenantId) {
-            return;
-        }
-
-        // A bump since the render started means this document no longer
-        // describes the current routing rules. Publishing it under the newer
-        // revision would route live calls with superseded rules, so skip and
-        // let the next lookup republish instead.
-        if ((int) RoutingCacheVersion::get($tenantId) !== $version) {
-            return;
-        }
-
-        // The same rule for ownership: an account or domain change that lands
-        // mid-render can change how a destination resolves.
-        if ((int) RoutingCacheVersion::getGlobal() !== $epoch) {
-            return;
-        }
-
-        $writer = app(FsXmlMirrorWriter::class);
-
-        // After a cache flush the store restarts at 0 while the mirror keeps
-        // the last revision and its payload keys, and revisions that ran
-        // while the proxy was off only moved the store. Publishing through
-        // one method advances the mirrored key to the revision the payload is
-        // actually written under, so the Lua handshake cannot lag behind.
-        $publishVersion = $writer->publishVersion($tenantId, $version);
-
-        // Lua cannot build a dialplan key without the epoch either, so the
-        // shared epoch key has to match the epoch this payload is published
-        // under. Publishing through one method keeps the two in step.
-        $publishEpoch = $writer->publishEpoch($epoch);
-
-        $writer->writeDialplan($tenantId, $context, $destination, $publishVersion, $publishEpoch, $xml);
     }
 
     /**

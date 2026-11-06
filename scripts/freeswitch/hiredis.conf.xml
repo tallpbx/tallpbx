@@ -4,11 +4,10 @@
       <connections>
         <connection name="primary">
           <!--
-              The optional Lua directory cache performs three sequential GETs
-              per lookup. Keep this endpoint pointed at the same Redis instance
-              and database (DB 0) that Laravel mirrors into; FS_REDIS_HOST,
-              FS_REDIS_PORT, and FS_REDIS_DB move the Laravel side only, so a
-              split deployment must update this file as well.
+              Profile used by the optional FS_HIREDIS_* tenant-limit dialplan
+              actions (limit / hiredis_raw in generated dialplans). Point it at
+              the same Redis instance the PBX application uses (REDIS_HOST and
+              REDIS_PORT in /var/www/tallpbx/.env).
           -->
           <param name="hostname" value="127.0.0.1"/>
           <param name="port" value="6379"/>
@@ -18,7 +17,7 @@
           <!--
               Required when the local redis-server sets a password
               (REDIS_PASSWORD in /var/www/tallpbx/.env). Without it every
-              lookup receives -NOAUTH and falls through to mod_xml_curl.
+              action receives -NOAUTH.
           -->
           <!-- <param name="password" value="CHANGE_ME"/> -->
         </connection>

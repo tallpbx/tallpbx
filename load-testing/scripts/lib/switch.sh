@@ -39,7 +39,6 @@ FS_AUTOLOAD_DIR="${FS_CONF_DIR}/autoload_configs"
 
 # Absolute paths of the files each switch rewrites.
 FS_XML_CURL_CONF="${FS_CONF_DIR}/autoload_configs/xml_curl.conf.xml"
-FS_LUA_CONF="${FS_CONF_DIR}/autoload_configs/lua.conf.xml"
 FS_JSON_CDR_CONF="${FS_CONF_DIR}/autoload_configs/json_cdr.conf.xml"
 
 # ------------------------------------------------------------------------------
@@ -600,122 +599,20 @@ assert_xml_path() {
 }
 
 # ------------------------------------------------------------------------------
-# FreeSWITCH Lua XML bindings
+# Persistent worker / listener restarts
 # ------------------------------------------------------------------------------
 
-# Report whether the Lua XML handler bindings are active in lua.conf.xml.
-lua_bindings_state() {
-    local active
-
-    active="$(grep -cE '^[[:space:]]*<param name="xml-handler-bindings"' "$FS_LUA_CONF" 2>/dev/null || true)"
-
-    if [ "${active:-0}" -gt 0 ]; then
-        printf 'on'
-        return 0
-    fi
-
-    printf 'off'
-}
-
-# Enable or disable the mod_lua XML bindings and the Laravel Redis mirror.
+# Restart FreeSWITCH so it re-reads the switch configuration files.
 #
-# Both halves must move together: an enabled binding without the mirror flag
-# reads an empty Redis namespace and silently answers nothing, which is
-# exactly the kind of half-applied switch this library exists to prevent.
-
-# Restart the persistent worker so it picks up a changed .env value.
-#
-# PHP-FPM reads .env on every request, but the worker boots once and keeps
-# its configuration for its whole life. Without this restart a flag change is
-# invisible to the process that actually serves the lookups, and the cell
-# measures the old configuration while the files on disk look correct.
-restart_xml_worker() {
-    if ! systemctl is-active tallpbx-xml-worker >/dev/null 2>&1; then
-        return 0
-    fi
-
-    if ! systemctl restart tallpbx-xml-worker >/dev/null 2>&1; then
-        fail_switch "could not restart tallpbx-xml-worker; it still holds the old configuration"
-        return 1
-    fi
-
-    # The worker answers a moment after the unit is active again.
-    local attempt
-
-    for attempt in $(seq 1 15); do
-        if curl -s -o /dev/null -m 2 -X POST "http://127.0.0.1:8090/api/v1/xml-handler" -d "<xml/>"; then
-            break
-        fi
-
-        sleep 1
-    done
-
-    return 0
-}
-
-# Report whether a Redis key pattern currently matches anything.
-#
-# The mirror is read and written by two different clients, so the check has to
-# work whether or not the server requires a password.
-redis_pattern_present() {
-    local pattern="$1" password
-
-    if redis-cli --scan --pattern "$pattern" 2>/dev/null | grep -q .; then
-        return 0
-    fi
-
-    password="$(env_get REDIS_PASSWORD)"
-
-    if [ -z "$password" ]; then
-        return 1
-    fi
-
-    redis-cli -a "$password" --no-auth-warning --scan --pattern "$pattern" 2>/dev/null | grep -q .
-}
-
-# Prove the mirror can actually be written.
-#
-# The file and the flag can both be correct while the process serving lookups
-# still refuses to write the mirror, so only a behavioural check catches it.
-# One lookup is triggered and the identity key the writer must have produced
-# is looked for. The epoch suffix is part of the key, so a prefix is matched.
-assert_lua_mirror_writable() {
-    local extension="${LUA_MIRROR_EXTENSION:-2000}"
-    local domain="${LUA_MIRROR_DOMAIN:-load.test.local}"
-    local pattern="pbx:fsxml:tenant:user:${domain}:${extension}:*"
-    local attempt
-
-    if ! command -v redis-cli >/dev/null 2>&1; then
-        fail_switch "redis-cli is required to prove the Lua mirror is writable"
-        return 1
-    fi
-
-    for attempt in 1 2 3; do
-        fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
-
-        if redis_pattern_present "$pattern"; then
-            log "asserted Lua mirror is writable (${pattern})"
-            return 0
-        fi
-
-        sleep 1
-    done
-
-    fail_switch "the Lua mirror was not written after a lookup (${pattern} matched nothing)"
-    return 1
-}
-
-# Restart FreeSWITCH so it re-reads the XML handler configuration.
-#
-# mod_lua reads lua.conf.xml when the module loads, so a file edit alone
-# changes nothing: the running module keeps the bindings it booted with. A
-# reload of the module is not reliable on this build, and the harness runs on
-# a host with no live calls, so the restart is the honest mechanism.
+# Several modules read their configuration only at load time, so a file edit
+# alone changes nothing: the running module keeps what it booted with. A
+# reload is not reliable on this build, and the harness runs on a host with
+# no live calls, so the restart is the honest mechanism.
 restart_freeswitch() {
     local attempt
 
     if ! systemctl restart freeswitch >/dev/null 2>&1; then
-        fail_switch "could not restart freeswitch; the Lua bindings stay inert"
+        fail_switch "could not restart freeswitch; the old configuration stays loaded"
         return 1
     fi
 
@@ -732,72 +629,11 @@ restart_freeswitch() {
     return 1
 }
 
-# Prove the Lua handler actually serves lookups.
-#
-# Configuration being right is not evidence: the file can list the bindings,
-# the flag can be true and the mirror can be full, while FreeSWITCH still
-# asks PHP. The timing middleware writes one line to the application log for
-# every request PHP handles, so a batch of lookups plus a count of the new
-# lines says who served them: no new lines means FreeSWITCH answered them
-# itself.
-#
-# This requires FS_XML_HANDLER_LOG_TIMING, which apply_lua_bindings turns on
-# while the proxy is enabled. Without it the count would be zero for the wrong
-# reason, so the check refuses to run.
-#
-# The probe warms the mirror first. Enabling the proxy restarts FreeSWITCH and
-# the persistent worker, and for the first lookups afterwards the entry is
-# cold: they legitimately reach PHP while the proxy writes it. Judging on a
-# cold start fails a working proxy for being cold, so warming and retrying is
-# what makes this assertion honest in both directions.
-assert_lua_serves() {
-    local extension="${LUA_MIRROR_EXTENSION:-2000}"
-    local domain="${LUA_MIRROR_DOMAIN:-load.test.local}"
-    local log_file="${APP_DIR}/storage/logs/laravel.log"
-    local timing before after served index attempt
-
-    timing="$(env_get FS_XML_HANDLER_LOG_TIMING)"
-
-    if [ "${timing,,}" != "true" ]; then
-        fail_switch "lookup attribution needs FS_XML_HANDLER_LOG_TIMING=true"
-        return 1
-    fi
-
-    # Warm the entry so the measured batch is not paying the cold start.
-    for index in 1 2 3; do
-        fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
-    done
-
-    sleep 1
-
-    for attempt in 1 2 3; do
-        before="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
-
-        for index in 1 2 3; do
-            fs_cli -x "find_user_xml id ${extension} ${domain}" >/dev/null 2>&1 || true
-        done
-
-        sleep 1
-        after="$(grep -c 'XML Handler timing.' "$log_file" 2>/dev/null || true)"
-        served=$(( after - before ))
-
-        if [ "$served" -eq 0 ]; then
-            log "asserted the Lua handler serves lookups (0 of 3 reached PHP)"
-            return 0
-        fi
-
-        sleep 2
-    done
-
-    fail_switch "the Lua handler served none of 3 lookups after warming; ${served} reached PHP"
-    return 1
-}
 
 # Restart the ESL listener so it re-reads the environment.
 #
 # The listener boots once and keeps its configuration for its whole life, so
-# an .env change is invisible to it until it restarts — the same trap that
-# kept the Lua flag from reaching the worker.
+# an .env change is invisible to it until it restarts.
 restart_listener() {
     local attempt
 
@@ -956,105 +792,7 @@ assert_esl_profile() {
     log "asserted ESL profile ${expected} from the listener's own start-up record (${events:-?} event types)"
 }
 
-apply_lua_bindings() {
-    local state="${1:-}"
 
-    case "$state" in
-        on | off) ;;
-        *)
-            fail_switch "lua bindings must be on or off (got '${state}')"
-            return 1
-            ;;
-    esac
-
-    if [ ! -f "$FS_LUA_CONF" ]; then
-        fail_switch "lua.conf.xml not found at ${FS_LUA_CONF}"
-        return 1
-    fi
-
-    snapshot_once lua-conf "$FS_LUA_CONF"
-    snapshot_env
-
-    # Captured before the edit: whether FreeSWITCH needs a restart depends on
-    # whether the binding state actually changes.
-    local before_state
-    before_state="$(lua_bindings_state)"
-
-    if [ "$state" = "on" ]; then
-        # Attribution is only possible when PHP logs the requests it serves,
-        # so enabling the proxy enables that logging for the duration.
-        env_set FS_XML_HANDLER_LOG_TIMING true
-
-        # The pattern contains an alternation, so the delimiter must not be a pipe.
-        sed -i -E 's#^([[:space:]]*)<!--[[:space:]]*(<param name="xml-handler-(script|bindings)"[^>]*/>)[[:space:]]*-->#\1\2#' "$FS_LUA_CONF"
-        env_set FS_LUA_PROXY_ENABLED true
-    else
-        sed -i -E 's#^([[:space:]]*)(<param name="xml-handler-(script|bindings)"[^>]*/>)#\1<!-- \2 -->#' "$FS_LUA_CONF"
-        env_set FS_LUA_PROXY_ENABLED false
-    fi
-
-    # FreeSWITCH reads lua.conf.xml at module load, so a file edit changes
-    # nothing on its own. Restart only when the state actually changes, so the
-    # Lua-off variants do not pay for a restart they do not need.
-    if [ "$before_state" != "$state" ]; then
-        restart_freeswitch || return 1
-    fi
-
-    # The flag is read by the persistent worker, which boots once. Restart it
-    # only when the state actually changes: an unconditional restart would put
-    # a full framework boot in front of every variant, and the transient that
-    # follows lands inside the next cell's measurement.
-    if [ "$before_state" != "$state" ]; then
-        restart_xml_worker || return 1
-    fi
-
-    # `reload mod_lua` unloads and reloads the module; on this build it can
-    # answer "Already Loaded!" and leave the module unloaded. Loading it when
-    # it is already present is harmless, so ensure it is present instead.
-    if ! fs_cli -x "module_exists mod_lua" 2>/dev/null | grep -q '^true'; then
-        fs_cli -x "load mod_lua" >/dev/null 2>&1 || true
-    fi
-
-    log "applied Lua XML bindings ${state}"
-    assert_lua_bindings "$state" || return 1
-
-    # Configuration being correct is not proof that the proxy works. Proving
-    # the mirror can be written, and that FreeSWITCH answers from it, is.
-    if [ "$state" = "on" ]; then
-        assert_lua_mirror_writable || return 1
-        assert_lua_serves || return 1
-    fi
-}
-
-# Prove the bindings file, the mirror flag and the module agree.
-assert_lua_bindings() {
-    local state="${1:-}" current mirror
-
-    current="$(lua_bindings_state)"
-    mirror="$(env_get FS_LUA_PROXY_ENABLED)"
-
-    if [ "$current" != "$state" ]; then
-        fail_switch "lua bindings expected ${state} but lua.conf.xml reports ${current}"
-        return 1
-    fi
-
-    if [ "$state" = "on" ] && [ "${mirror,,}" != "true" ]; then
-        fail_switch "lua bindings are on but FS_LUA_PROXY_ENABLED is '${mirror:-unset}'"
-        return 1
-    fi
-
-    if [ "$state" = "off" ] && [ "${mirror,,}" = "true" ]; then
-        fail_switch "lua bindings are off but FS_LUA_PROXY_ENABLED is still true"
-        return 1
-    fi
-
-    if [ "$state" = "on" ] && ! fs_cli -x "module_exists mod_lua" 2>/dev/null | grep -q '^true'; then
-        fail_switch "mod_lua is not loaded"
-        return 1
-    fi
-
-    log "asserted Lua XML bindings ${state}"
-}
 
 # ------------------------------------------------------------------------------
 # FreeSWITCH Octane XML binding
@@ -1330,7 +1068,7 @@ snapshot_env() {
 
     : > "$file"
 
-    for key in FS_XML_HANDLER_DIALPLAN_CACHE_TTL FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL FS_XML_HANDLER_DIRECTORY_CACHE_TTL FS_XML_HANDLER_ACL_CACHE_TTL FS_LUA_PROXY_ENABLED; do
+    for key in FS_XML_HANDLER_DIALPLAN_CACHE_TTL FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL FS_XML_HANDLER_DIRECTORY_CACHE_TTL FS_XML_HANDLER_ACL_CACHE_TTL; do
         line="$(grep -E "^#?[[:space:]]*${key}=" "${APP_DIR}/.env" 2>/dev/null | tail -n 1 || true)"
         printf '%s\t%s\n' "$key" "$line" >> "$file"
     done
@@ -1368,9 +1106,8 @@ now_ms() {
 
 # Measure what FreeSWITCH waits for on one directory lookup.
 #
-# A Lua cache hit is answered inside FreeSWITCH and never reaches nginx or
-# PHP, so an HTTP client cannot observe it. Asking FreeSWITCH itself is the
-# only measurement on that path. `status` is timed the same way and
+# Asking FreeSWITCH itself measures the path a real call takes, including
+# anything answered before nginx is reached. `status` is timed the same way and
 # subtracted, because the command-line round trip is fixed and large enough
 # to swamp the lookup it is meant to measure.
 probe_lookup() {
@@ -1402,35 +1139,10 @@ probe_lookup() {
     net_ms=$(( find_ms - status_ms ))
     [ "$net_ms" -lt 0 ] && net_ms=0
 
-    printf 'lookup_count=%s find_user_ms=%s status_ms=%s net_ms=%s lua_bindings=%s\n' \
-        "$count" "$find_ms" "$status_ms" "$net_ms" "$(lua_bindings_state)"
+    printf 'lookup_count=%s find_user_ms=%s status_ms=%s net_ms=%s\n' \
+        "$count" "$find_ms" "$status_ms" "$net_ms"
 }
 
-# Make the Lua pair agree again after a restore.
-#
-# The baseline is defined by the bindings in lua.conf.xml; the .env mirror
-# flag follows them. A snapshot can capture the two disagreeing (flag on,
-# bindings commented), and restoring that faithfully leaves Laravel writing
-# a Redis mirror FreeSWITCH never reads: cost with no benefit, and a cell
-# that looks configured but measures as if the feature were off.
-coherent_baseline() {
-    local bindings flag
-
-    bindings="$(lua_bindings_state)"
-    flag="$(env_get FS_LUA_PROXY_ENABLED)"
-
-    if [ "$bindings" = "off" ] && [ "${flag,,}" = "true" ]; then
-        env_set FS_LUA_PROXY_ENABLED false
-        log "baseline-corrected FS_LUA_PROXY_ENABLED true -> false (bindings are commented)"
-
-        return 0
-    fi
-
-    if [ "$bindings" = "on" ] && [ "${flag,,}" != "true" ]; then
-        env_set FS_LUA_PROXY_ENABLED true
-        log "baseline-corrected FS_LUA_PROXY_ENABLED ${flag:-unset} -> true (bindings are active)"
-    fi
-}
 
 # ------------------------------------------------------------------------------
 # Baseline restoration
@@ -1451,7 +1163,6 @@ restore_baseline() {
 
     restore_env
     restore_file fpm-pool
-    restore_file lua-conf
     restore_file xml-curl-conf
     restore_file json-cdr-conf
 
@@ -1468,10 +1179,6 @@ restore_baseline() {
         done < "${STATE_DIR}/nginx-files.list"
     fi
 
-    # The flag and the bindings are one setting in two places, so the pair is
-    # reconciled before the baseline is declared restored.
-    coherent_baseline
-
     level="$(env_get FS_LOG_LEVEL)"
 
     if [ -n "$level" ]; then
@@ -1486,7 +1193,6 @@ restore_baseline() {
     fi
 
     fs_cli -x "reload mod_xml_curl" >/dev/null 2>&1 || true
-    fs_cli -x "reload mod_lua" >/dev/null 2>&1 || true
     fs_cli -x "reload mod_json_cdr" >/dev/null 2>&1 || true
 
     if nginx -t >/dev/null 2>&1; then
@@ -1509,7 +1215,6 @@ Usage: switch.sh <command> [arguments]
   apply_fs_loglevel <debug|info|notice|warning|err|crit|alert>   assert_fs_loglevel <level>
   apply_fs_db_mode <disk|tmpfs>                   assert_fs_db_mode <disk|tmpfs>
   apply_xml_path <stock|fast>                     assert_xml_path <stock|fast>
-  apply_lua_bindings <on|off>                     assert_lua_bindings <on|off>
   apply_octane_binding <on|off>                   assert_octane_binding <on|off>
   apply_ttl <dialplan> <contributor> [directory] [acl]   assert_ttl <dialplan> <contributor> [directory] [acl]
   apply_cdr_transport <fpm|octane>                assert_cdr_transport <fpm|octane>
@@ -1534,8 +1239,6 @@ main() {
         assert_fs_db_mode | assert-fs-db-mode) assert_fs_db_mode "$@" ;;
         apply_xml_path | apply-xml-path) apply_xml_path "$@" ;;
         assert_xml_path | assert-xml-path) assert_xml_path "$@" ;;
-        apply_lua_bindings | apply-lua-bindings) apply_lua_bindings "$@" ;;
-        assert_lua_bindings | assert-lua-bindings) assert_lua_bindings "$@" ;;
         apply_octane_binding | apply-octane-binding) apply_octane_binding "$@" ;;
         assert_octane_binding | assert-octane-binding) assert_octane_binding "$@" ;;
         apply_ttl | apply-ttl) apply_ttl "$@" ;;
@@ -1547,7 +1250,6 @@ main() {
         apply_esl_profile | apply-esl-profile) apply_esl_profile "$@" ;;
         assert_esl_profile | assert-esl-profile) assert_esl_profile "$@" ;;
         probe_lookup | probe-lookup) probe_lookup "$@" ;;
-        coherent_baseline | coherent-baseline) coherent_baseline ;;
         restore_baseline | restore-baseline) restore_baseline ;;
         '' | -h | --help | help)
             usage

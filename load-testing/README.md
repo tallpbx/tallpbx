@@ -37,9 +37,8 @@ Read the scripts only when the documents do not answer a question:
 1. **Never mutate live `nftables` state.** Verify with `nft list ruleset`; never `add`, `insert`, `delete` or `flush`. Firewall changes go through `tpbx security:apply`.
 2. **Never start a cell without a manifest.** Every tier run begins by writing `manifest.json`; a number without a manifest is not evidence.
 3. **Never trust an `apply_*` without its `assert_*`.** A switch that silently did not take effect produces a plausible but meaningless number. `SWITCH-FAILED` fails that cell on purpose.
-4. **Never leave a half-applied pair.** The Lua proxy is a flag in `.env` *and* two commented params in `lua.conf.xml`. One without the other measures nothing. `restore_baseline` reconciles them and prints `baseline-corrected`.
-5. **Never commit host credentials.** No IP addresses, key names, key paths or passwords belong in this directory. The operator supplies `PBX_HOST` and the SSH identity; the runner uses the ambient SSH configuration.
-6. **Never edit `docs/load-testing-results.md`** as part of a series. The previous series record stays untouched; a new report is written in a new file.
+4. **Never commit host credentials.** No IP addresses, key names, key paths or passwords belong in this directory. The operator supplies `PBX_HOST` and the SSH identity; the runner uses the ambient SSH configuration.
+5. **Never edit `docs/load-testing-results.md`** as part of a series. The previous series record stays untouched; a new report is written in a new file.
 
 ---
 
@@ -98,7 +97,5 @@ The matrix is the single source: the runner, the tests and the documents all cit
 ## Known limits, stated up front
 
 - **Repeat noise is roughly 10 %.** A difference smaller than that between two variants is not a finding at three repeats.
-- **An HTTP XML client cannot see a Lua cache hit.** A hit is answered inside FreeSWITCH and never reaches nginx or PHP. The lookup probe (`probe_lookup`) is the only measurement on that path.
-- **The probe reports the configured state, not proof of who served.** `lua_bindings=on` means the binding is active; the mirror-TTL check in `docs/load-testing-guide.md` is what proves a hit.
 - **`manifest.json` describes the invocation, not each cell.** It is rewritten at the start of every run, so a tier measured across several invocations keeps only the last manifest.
 - **Octane cells are measured on port 8090**, a different HTTP server from nginx. That is intentional and is recorded in the report path.
