@@ -69,11 +69,40 @@ server {
     # FreeSWITCH fetches its XML here with the shared token in the query
     # string; disable logging for this path so the token never lands in
     # the access log (the application logs handler activity itself).
-    # Forward XML requests to standard index.php (fallback for Octane port 8090).
+    # Served by the trimmed fast controller: it answers lookups with a
+    # fraction of the boot work of the full application and is the fallback
+    # whenever the optional Octane worker is disabled or unavailable.
     location = /api/v1/xml-handler {
         access_log off;
-        try_files \$uri /index.php?\$query_string;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
+        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
+        fastcgi_read_timeout 2s;
+        fastcgi_pass unix:/var/run/php/php$php_version-fpm.sock;
     }
+    # Third tier: FreeSWITCH re-sends the complete request here when the fast
+    # entry fails at the HTTP layer (5xx or timeout). It forwards the request
+    # to the full application while keeping the canonical handler URI so
+    # Laravel routes it, and logs every fallback it serves so a silent
+    # degradation is visible to monitoring.
+    location = /api/v1/xml-handler-stock {
+        access_log /var/log/nginx/xml-stock-fallback.log;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
+        fastcgi_param REQUEST_URI /api/v1/xml-handler\$is_args\$args;
+        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
+        fastcgi_read_timeout 3s;
+        fastcgi_pass unix:/var/run/php/php$php_version-fpm.sock;
+    }
+
+    # Stock mode (previous default): boot the full application for every
+    # lookup. Slower than the fast controller but kept available for
+    # compatibility and debugging - replace the active block with this one
+    # and reload nginx to use it.
+    # location = /api/v1/xml-handler {
+    #     access_log off;
+    #     try_files \$uri /index.php?\$query_string;
+    # }
 
     error_page 404 /index.php;
 

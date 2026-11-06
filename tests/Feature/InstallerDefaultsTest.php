@@ -84,6 +84,46 @@ it('keeps the XML handler token out of the nginx access logs', function (): void
     }
 });
 
+it('serves the XML handler through the fast controller while keeping the stock block available', function (): void {
+    // The trimmed fast controller is the shipped default XML path. When the
+    // optional Octane worker is disabled (the shipped state), FreeSWITCH's
+    // fallback binding lands here. The stock mode - the full application
+    // bootstrapped per lookup - stays available in every template as a
+    // commented block, so switching back is a copy-and-reload, not a rewrite.
+    foreach (['letsencrypt.sh', 'nginx.sh'] as $resourceScript) {
+        $script = (string) file_get_contents(base_path("scripts/resources/{$resourceScript}"));
+
+        // The active (non-commented) block serves the fast controller; the
+        // commented stock block below it must not leak into this assertion.
+        preg_match('/\n    location = \/api\/v1\/xml-handler \{[\s\S]*?\n    \}/', $script, $activeBlock);
+
+        expect($activeBlock[0] ?? '')
+            ->toContain('xml-handler-fast.php')
+            ->not->toContain('try_files');
+
+        // The stock rollback block ships commented, next to the active one.
+        expect($script)->toMatch(
+            '/# location = \/api\/v1\/xml-handler \{[\s\S]*?#     try_files [^\n]*\/index\.php/'
+        );
+    }
+});
+
+it('ships a logged stock fallback location for the third binding tier', function (): void {
+    // FreeSWITCH's xml_curl gateway posts the lookup fields, so an nginx
+    // error_page redirect would lose the POST body. The third tier is
+    // therefore a real FreeSWITCH binding that re-sends the full request to
+    // this location, which forwards it to index.php with the canonical
+    // handler URI so Laravel routes it - and logs every fallback it serves.
+    foreach (['letsencrypt.sh', 'nginx.sh'] as $resourceScript) {
+        $script = (string) file_get_contents(base_path("scripts/resources/{$resourceScript}"));
+
+        expect($script)->toContain('location = /api/v1/xml-handler-stock {')
+            ->toContain('fastcgi_param REQUEST_URI /api/v1/xml-handler\\$is_args\\$args;')
+            ->toContain('/var/log/nginx/xml-stock-fallback.log')
+            ->toContain('fastcgi_read_timeout 2s;');
+    }
+});
+
 it('ships production-safe debug and session defaults in the environment template', function (): void {
     $example = (string) file_get_contents(base_path('.env.example'));
 

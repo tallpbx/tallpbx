@@ -431,14 +431,24 @@ configure_dynamic_xml() {
         return 0
     fi
 
-    # FreeSWITCH and the persistent XML worker run locally on the same host. Always use local loopback (127.0.0.1:8090)
-    # for the cURL XML gateway. This ensures zero-latency internal lookups, avoids external
-    # network and firewall dependencies, and routes directly to the persistent Octane/RoadRunner lean worker.
+    # The XML ladder, in order: the optional worker (loopback :8090), the
+    # trimmed fast controller behind nginx, then the stock full application
+    # behind nginx. FreeSWITCH re-sends the complete request to each binding,
+    # so the POST bodies survive the fall-through; the short timeouts bound
+    # the worst case instead of letting one hung tier stall every lookup.
+    # CDR ingestion always posts to PHP-FPM (see json_cdr.conf.xml) - the
+    # worker must stay free for XML lookups.
     gateway_url="http://127.0.0.1:8090${xml_path}?token=${xml_token}"
 
+    # Install the optional Octane XML worker but never enable or start it
+    # here: the shipped default serves XML through the fast controller and
+    # the worker is an opt-in performance mode. Leaving its systemd state
+    # untouched keeps an administrator's choice intact across installer
+    # re-runs; enabling it is `systemctl enable --now tallpbx-xml-worker`
+    # (see docs/operations.md, Octane XML worker).
     local systemd_service="${app_dir}/scripts/resources/systemd/tallpbx-xml-worker.service"
     if [ -f "$systemd_service" ] && [ -d "/etc/systemd/system" ]; then
-        verbose "Installing TallPBX XML persistent lean worker systemd service"
+        verbose "Installing the optional Octane XML worker systemd unit (left disabled)"
         cp "$systemd_service" /etc/systemd/system/tallpbx-xml-worker.service
         chmod 0644 /etc/systemd/system/tallpbx-xml-worker.service 2>/dev/null || true
         if [ ! -x "${app_dir}/rr" ] && ! command -v rr >/dev/null 2>&1; then
@@ -455,8 +465,6 @@ configure_dynamic_xml() {
         fi
         if command -v systemctl >/dev/null 2>&1; then
             systemctl daemon-reload 2>/dev/null || true
-            systemctl enable tallpbx-xml-worker 2>/dev/null || true
-            systemctl restart tallpbx-xml-worker 2>/dev/null || systemctl start tallpbx-xml-worker 2>/dev/null || true
         fi
     fi
 
@@ -467,11 +475,15 @@ configure_dynamic_xml() {
   <bindings>
     <binding name="tallpbx-octane">
       <param name="gateway-url" value="${gateway_url}" bindings="directory|dialplan|configuration"/>
-      <param name="timeout" value="3"/>
+      <param name="timeout" value="1"/>
     </binding>
     <binding name="tallpbx-fallback">
       <param name="gateway-url" value="http://127.0.0.1${xml_path}?token=${xml_token}" bindings="directory|dialplan|configuration"/>
-      <param name="timeout" value="5"/>
+      <param name="timeout" value="2"/>
+    </binding>
+    <binding name="tallpbx-stock">
+      <param name="gateway-url" value="http://127.0.0.1${xml_path}-stock?token=${xml_token}" bindings="directory|dialplan|configuration"/>
+      <param name="timeout" value="3"/>
     </binding>
   </bindings>
 </configuration>

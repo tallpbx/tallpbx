@@ -40,10 +40,31 @@ it('configures FreeSWITCH to query the persistent lean worker on port 8090 and i
         ->and($script)->toContain('"${app_dir}/vendor/bin/rr" get -s -l "${app_dir}"')
         ->and($script)->toContain('tallpbx-xml-worker.service')
         ->and($script)->toContain('/etc/systemd/system/tallpbx-xml-worker.service')
-        ->and($script)->toContain('systemctl enable tallpbx-xml-worker')
         ->and($script)->toContain('systemctl daemon-reload')
         ->and($script)->toContain('<binding name="tallpbx-octane">')
-        ->and($script)->toContain('<binding name="tallpbx-fallback">');
+        ->and($script)->toContain('<binding name="tallpbx-fallback">')
+        // The ladder's third tier: FreeSWITCH re-sends the full request to a
+        // stock location, so POST bodies survive - bounded by short timeouts
+        // (worker 1s, fast controller 2s, stock 3s instead of 3s/5s).
+        ->and($script)->toContain('<binding name="tallpbx-stock">')
+        ->and($script)->toContain('${xml_path}-stock?token=${xml_token}')
+        ->and($script)->toContain('<param name="timeout" value="1"/>')
+        ->and($script)->toContain('<param name="timeout" value="2"/>')
+        ->and($script)->toContain('<param name="timeout" value="3"/>')
+        // CDR always uses PHP-FPM: the worker must stay free for XML.
+        ->and($script)->not->toContain('8090/api/v1/cdr');
+});
+
+it('installs the optional worker without enabling or starting it', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    // The shipped default serves XML through the fast controller; the worker
+    // is an opt-in performance mode. The installer must leave its systemd
+    // state untouched so enabling it is the administrator's explicit act
+    // (systemctl enable --now tallpbx-xml-worker) and re-runs never undo it.
+    expect($script)->not->toContain('systemctl enable tallpbx-xml-worker')
+        ->and($script)->not->toContain('systemctl start tallpbx-xml-worker')
+        ->and($script)->not->toContain('systemctl restart tallpbx-xml-worker');
 });
 
 it('configures xml_curl.conf.xml with the octane roadrunner worker url on port 8090', function (): void {

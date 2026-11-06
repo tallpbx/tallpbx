@@ -470,11 +470,35 @@ If editing configuration files by hand:
    fs_cli -x "reloadxml"
    ```
 
-## Telephony XML Worker (Octane / RoadRunner)
+## Octane XML Worker (Optional Performance Mode)
 
-FreeSWITCH's directory, dialplan, and configuration lookups are answered by a resident RoadRunner worker on `127.0.0.1:8090` rather than by PHP-FPM. The worker keeps the framework and the telephony modules in memory, so a lookup does not pay a process boot, and the administrative panel keeps its own PHP-FPM workers no matter how busy the phones are.
+FreeSWITCH's directory, dialplan, and configuration lookups can be answered by a resident RoadRunner worker on `127.0.0.1:8090` instead of by PHP-FPM. The worker keeps the application warm between requests and keeps the XML load off PHP-FPM entirely.
 
-`scripts/resources/freeswitch.sh` installs and enables the unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions the `rr` binary, and writes both `mod_xml_curl` bindings: the worker first (3 s timeout), then nginx/PHP-FPM (5 s) as the fallback.
+**It is optional and ships disabled.** The default installation serves XML through the fast controller (next section). The installer always installs the worker's systemd unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions the `rr` binary, and writes the three `mod_xml_curl` bindings that form the XML ladder: the worker first (**1 s** timeout), the fast controller behind nginx (**2 s**), then the stock full application behind nginx (**3 s**). FreeSWITCH re-sends the complete request to each binding, so the POST lookup fields survive every fall-through, and enabling or disabling the worker needs **no FreeSWITCH change**.
+
+### Enabling It
+
+```bash
+sudo systemctl enable --now tallpbx-xml-worker
+```
+
+The first lookup after enabling is served by the worker; nothing else changes. The installer never enables or starts the unit, so an administrator's choice survives installer re-runs.
+
+### Expected Gain (1 vCPU / 967 MB reference tier)
+
+| Metric | Fast controller (default) | Octane worker |
+|---|---|---|
+| XML lookups (100 requests, 5 concurrent) | 43.1 req/sec | **187 req/sec** |
+| Lookup latency avg / p50 / p95 | 110 / 108 / 120 ms | **15 / 14 / 25 ms** |
+| Call setup p50 at 8 calls/sec | 128 ms | **84 ms** |
+| Call completion at 8 calls/sec | 100 % (calls) | ~100 % |
+| RAM | none resident | **81 MB held / 58 MB attributed** |
+
+Run exactly **one worker per vCPU** — a second worker on one core competes with FreeSWITCH and roughly doubles the memory. On the 967 MB tier the worker costs roughly 8 % of RAM; if memory is the binding constraint, the fast controller alone already keeps the tier's practical ceiling.
+
+### CDR Always Uses PHP-FPM
+
+CDR ingestion (`mod_json_cdr`) **always** posts to PHP-FPM (`http://127.0.0.1/api/v1/cdr`); never point it at the worker. When one worker serves both XML and CDR, the CDR posts queue behind lookups and time out (measured 66 % call completion versus 71 % with CDR on PHP-FPM at 10 calls/sec). With the worker handling XML, PHP-FPM is free for CDR — one of the worker's main benefits.
 
 ### Check It
 
@@ -499,27 +523,26 @@ sudo systemctl restart tallpbx-xml-worker
 
 The worker holds compiled PHP in memory, so a code deployment (`git pull`, `composer install`, `tpbx migrate`) needs this restart; `tpbx optimize:clear` alone does not reload it. While it restarts, FreeSWITCH uses the nginx fallback binding, so registrations and calls continue on the PHP path.
 
-### Roll Back to PHP-FPM
+### Disabling It (Rollback)
 
 ```bash
 sudo systemctl disable --now tallpbx-xml-worker
 ```
 
-Then remove the `tallpbx-octane` binding from `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and run `fs_cli -x reloadxml`. Every lookup now takes the nginx path. The fast front controller (below) and the Lua cache remain available as separate, independent switches.
+The next lookup falls through to the fast controller automatically — the binding stays in place and costs one refused loopback connection while the worker is down. The fast controller and the Lua cache remain available as separate, independent switches.
 
 ### Tuning Notes
 
-- Worker count, port, job recycling, and the per-worker memory cap live in `.rr.yaml`; the unit starts with `--workers=auto` and `--max-requests=10000`.
-- Measured on the 4-core reference host: four workers held roughly 162 MB resident (~40 MB each).
-- The worker serves only `/api/v1/xml-handler`. `/panel`, sessions, Livewire, and Reverb stay on PHP-FPM.
+- Worker count, port, job recycling, and the per-worker memory cap live in `.rr.yaml`; the unit starts with `--workers=auto` and `--max-requests=10000`. On a 1 vCPU host `auto` resolves to one worker.
+- The worker serves only `/api/v1/xml-handler`. `/panel`, sessions, Livewire, and Reverb stay on PHP-FPM, and CDR ingestion stays on PHP-FPM too.
 
-## Fast XML Handler Path
+## Fast XML Handler Path (Default)
 
 A normal request boots the whole application — roughly 90 service providers, including every module — even though a directory lookup needs almost none of that. The fast front controller (`public/xml-handler-fast.php`) boots a small allowlist instead; the controller, the XML builders, and the cache are unchanged, so the response is byte-identical.
 
-**It is not enabled on fresh installs.** FreeSWITCH posts to the resident worker described above, and nginx serves `/api/v1/xml-handler` through the normal `index.php` path as the fallback binding. The fast path remains available as an optional latency improvement for that PHP fallback.
+**It is the shipped default.** `scripts/resources/nginx.sh` and the Let's Encrypt site templates serve `/api/v1/xml-handler` from `xml-handler-fast.php`, and FreeSWITCH's second `mod_xml_curl` binding — the one used whenever the optional Octane worker is disabled or down — lands there. If the fast entry itself fails at the HTTP layer (5xx or a 2 s read timeout), FreeSWITCH's third binding re-sends the request to `/api/v1/xml-handler-stock`, which forwards it to `index.php` with the canonical handler URI and writes one line per fallback to `/var/log/nginx/xml-stock-fallback.log` — an empty file means the stock tier has never been needed.
 
-Measured on the 1 vCPU reference host: app-side p50 39.88 → 27.86 ms and throughput 22.9 → 33.1 requests/second at concurrency 1.
+Measured on the 1 vCPU / 967 MB reference host (100 requests at 5 concurrent, dialplan render, median of three runs, 2026-11-05 slim-boot code): throughput **30.1 → 43.1 requests/second**, p50 **154 → 108 ms**, p95 172 → 120 ms, peak memory per request **32 → 26 MB**. Under call load, call completion at 5 calls/sec rose from 34 % (stock path, 2026-11-04) to **92 %**, and 8 calls/sec completes at **100 %** with 108–128 ms p50 setup time. CDR ingestion remains on PHP-FPM; at sustained 5+ calls/sec its full-stack posts compete with the XML lookups for the same PHP-FPM workers — see the Octane worker section for the trade-off and the option that frees PHP-FPM by moving XML to the worker.
 
 If the fast path throws for any reason, the same request is served by the normal application, so a fault costs speed rather than registrations.
 
@@ -532,9 +555,11 @@ grep -A5 'location = /api/v1/xml-handler {' /etc/nginx/sites-available/pbx
 - **Fast path:** the block contains `fastcgi_param SCRIPT_FILENAME $realpath_root/xml-handler-fast.php;`
 - **Normal path:** the block is the single-line `try_files $uri /index.php?$query_string;` form
 
-### Disabling It (Rollback)
+### Disabling It (Rollback to Stock Mode)
 
-Replace the whole `location` block with the single-line form:
+The stock mode — the full application bootstrapped for every lookup — remains a supported configuration: both site templates ship its block commented directly under the active one, and the fast controller itself falls back to that same full application whenever it throws, so a fault costs speed rather than registrations. It is slower than the fast path (roughly 30 vs 43 lookups/sec, 154 vs 108 ms p50 on the reference tier) but it is the compatibility and debugging escape hatch.
+
+Replace the whole active `location` block with the single-line stock form:
 
 ```nginx
     location = /api/v1/xml-handler { access_log off; try_files $uri /index.php?$query_string; }
