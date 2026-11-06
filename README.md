@@ -220,7 +220,7 @@ TallPBX follows the **[Laravel framework versioning model](https://laravel.com/d
 
 - **Versioned Series Branches**: Following the pattern used by Laravel, the repository does not maintain a perpetual `main` or `master` branch. Instead, active development takes place directly on versioned series branches representing release lines (e.g. `1.1`, `2.0`, `3.x`, `4.x`, `5.x`).
 - **Release Strategy**:
-  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `5.x` series introduces the Pulse-style Redis Stream CDR pipeline and version-aware Lua caching, is not backwards compatible with `4.x`, and requires a fresh install rather than an in-place upgrade from earlier major lines (`4.x`, `3.x`, `2.0`, `1.x`).
+  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `5.x` series introduces the Pulse-style Redis Stream CDR pipeline, is not backwards compatible with `4.x`, and requires a fresh install rather than an in-place upgrade from earlier major lines (`4.x`, `3.x`, `2.0`, `1.x`).
   - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
   - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
 - **Active Release Branches**:

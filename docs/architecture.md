@@ -406,49 +406,15 @@ sequenceDiagram
     Note over Handler,Redis: Next mod_xml_curl computes key with v=2 -> instant cache miss
 ```
 
-#### 6. In-Process XML Cache (FreeSWITCH Lua + Redis Mirror)
+#### 6. In-Process XML Cache (FreeSWITCH Lua + Redis Mirror) — retired
 
-> **Status:** shipped in 5.x and off by default (`FS_LUA_PROXY_ENABLED=false`). It covers directory and dialplan lookups; configuration, phrase, and ACL lookups always fall through. Current appliances run with the bindings removed because the persistent Octane worker (§7.5.7) is the primary path, and the proxy stays available as a reversible option — enablement and rollback are documented in [operations](operations.md) → Optional Lua XML Cache. While the bindings are off, every lookup follows §7.5.5. Evidence: [four-way comparison](load-testing-results.md#xml-serving-configurations-four-way-comparison-1-vcpu).
+> **Status:** evaluated on the 1 vCPU reference tier and retired as a shipped option. The fastest call-path measurements it produced (52 ms p50 call setups, and the only 100 % completion at 10 calls/sec when CDR rode the idle worker) are preserved in [`docs/load-testing-results.md`](load-testing-results.md) and under `load-testing/results/`. The design is recorded here for historical context only.
 
-**The bottleneck it removes.** A cache hit still costs a full HTTP round trip through nginx, a PHP-FPM worker, and a Laravel boot before Redis is even asked. On the reference 1 shared vCPU host a directory lookup measured roughly 55 ms app-side at concurrency 1, of which only ~11 ms was XML assembly — the other ~44 ms was framework boot and dispatch. Because each lookup holds a worker for that entire window, the pool saturates at about 26 XML requests per second and the tail stretches to roughly 1,000 ms at concurrency 25. The XML is not the expensive part; reaching it is.
-
-**How it works.** Laravel continues to render and cache the document exactly as described above, and additionally writes the same bytes into a mirror namespace in Redis that FreeSWITCH reads for itself. A hit never leaves the FreeSWITCH process: no HTTP, no nginx, no PHP-FPM worker, no framework boot.
-
-```mermaid
-flowchart TD
-    A["FreeSWITCH: REGISTER / INVITE"] --> B["mod_lua xml-handler script"]
-    B --> C{"Mirror lookup in Redis DB 0<br/>tenant map -> version -> payload"}
-    C -->|"all keys present"| D["XML returned from inside FreeSWITCH<br/>no HTTP, no PHP-FPM, no framework boot"]
-    C -->|"missing key, Redis error, or malformed value"| E["mod_xml_curl<br/>POST /api/v1/xml-handler"]
-    E --> F["PHP-FPM worker<br/>XmlHandlerController"]
-    F --> G{"Laravel cache hit?<br/>Redis DB 1"}
-    G -->|"hit"| H["Rendered XML"]
-    G -->|"miss"| I["Build XML from MariaDB"]
-    I --> H
-    I --> J["Mirror write to DB 0<br/>SET ... EX directory_cache_ttl"]
-    H --> K["HTTP 200 back to FreeSWITCH"]
-    J -.->|"next lookup hits"| C
-```
-
-| Mirror key | Purpose | Expiry |
-| :--- | :--- | :--- |
-| `pbx:fsxml:tenant:user:{domain}:{user}:e{epoch}` | Resolves which tenant owns a SIP identity, so shared domains stay unambiguous. The epoch is the global routing revision, so an account or domain moved to another tenant cannot keep resolving to the previous owner | 60 s |
-| `pbx:fsxml:ver:{tenantId}` | The tenant's current routing version, mirrored from `RoutingCacheVersion` | none |
-| `pbx:fsxml:ver:global` | The global routing revision, used as the identity epoch and as part of the dialplan key | none |
-| `pbx:fsxml:dir:{tenantId}:{tag}:{domain}:{user}:v{version}` | The rendered directory document itself, as raw XML | 60 s |
-| `pbx:fsxml:dp:{tenantId}:{context}:{destination}:v{version}:e{epoch}` | The rendered dialplan document for one context and destination, as raw XML | 60 s |
-
-Three properties keep the mirror safe:
-
-- **It is a second representation, not a second cache of different data.** The same rendered bytes are stored twice: PHP-serialised under a SHA-1 key in DB 1 for Laravel, and as raw XML under a readable key for Lua. Lua cannot use the DB 1 object directly — the value is wrapped by PHP `serialize()` and the key requires SHA-1, which FreeSWITCH does not provide.
-- **There is still only one invalidation mechanism.** The version is embedded in the mirror key and comes from the same `RoutingCacheVersion::bump()` described in §7.5.4, so a panel edit bypasses both stores at the same instant. The 60-second TTL exists only to bound memory.
-- **Failure means miss, never stale.** A missing key, a Redis error, or a malformed value makes the script return nil, and FreeSWITCH falls through to `mod_xml_curl` — today's path. A Redis outage costs response time; it never fails a registration or a call.
-
-The economics of a hit are three or four `GET` commands (well under 10 µs of Redis work) replacing the roughly 55 ms of PHP that the lookup would otherwise consume. A directory hit reads the identity epoch, the identity map, the tenant version, and the payload; a dialplan hit reads the epoch, the tenant version, and the payload, because the tenant is carried inside the context name (`tenant_{id}_internal`). Redis itself is not a constraint at these volumes: at the measured 26 requests per second it uses well under 1 % of a single core, and pressure would appear only in the tens of thousands of requests per second.
+An in-process `mod_lua` binding answered directory and dialplan lookups from a Redis mirror (`pbx:fsxml:*` in DB 0) that Laravel wrote alongside the PHP cache: three or four `GET` commands replacing a full HTTP round trip per lookup. It was retired because it required maintaining a mirrored second representation of every rendered document — including a revision handshake (`ver:{tenantId}`, `ver:global`, the identity epoch) whose drift once broke lookups — while the trimmed fast controller and the optional Octane worker deliver comparable capacity with a single cache. The implementing code survives only in the repository history and in the load-testing tooling.
 
 #### 7. Persistent Telephony XML Worker (Octane / RoadRunner)
 
-> **Status:** the primary serving path on fresh installs. FreeSWITCH posts to `http://127.0.0.1:8090/api/v1/xml-handler` and a resident RoadRunner worker answers without booting the framework per request. Operating instructions are in [operations](operations.md) → Telephony XML Worker; measurements are in [load-testing results](load-testing-results.md#persistent-octane-worker-4-core-reference-appliance).
+> **Status:** an optional performance mode. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH falling through the three-tier ladder (worker 1 s, fast controller 2 s, stock full application 3 s).
 
 **The cost it removes.** Under PHP-FPM every lookup pays Composer autoloading, provider registration, and container construction before Redis is asked — roughly 44 ms of a ~55 ms hit on the reference 1 vCPU host (§7.5.6). The worker keeps the framework, Eloquent connections, and module contributors in memory, so the same lookup only runs the controller. Measured on the 4-core reference appliance (baseline: PHP-FPM with 12 static workers on the same host): 33.9 requests/second at 100×5 and 66.6 requests/second at 500×25 with zero failed requests, against 10.95 and 3.59 requests/second for the pool. Those figures come from a CLI harness that adds per-batch connection overhead, so they understate an in-process client; the 2,500 req/s design target was not demonstrated.
 

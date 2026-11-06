@@ -529,7 +529,7 @@ The worker holds compiled PHP in memory, so a code deployment (`git pull`, `comp
 sudo systemctl disable --now tallpbx-xml-worker
 ```
 
-The next lookup falls through to the fast controller automatically — the binding stays in place and costs one refused loopback connection while the worker is down. The fast controller and the Lua cache remain available as separate, independent switches.
+The next lookup falls through to the fast controller automatically — the binding stays in place and costs one refused loopback connection while the worker is down. The stock tier below remains the last line of defence; nothing else changes.
 
 ### Tuning Notes
 
@@ -602,85 +602,6 @@ curl -s "http://127.0.0.1/api/v1/xml-handler?$Q" -H "X-FS-Token: $TOKEN" | head 
 ```
 
 To confirm the handler is responding at all, a `403` means the token check is working and the endpoint is alive; a `500` means the front controller itself failed and the request should have fallen back to the normal application — check `storage/logs/laravel.log`.
-
-## Optional Lua XML Cache (Directory and Dialplan)
-
-TallPBX can answer FreeSWITCH directory and dialplan lookups from Redis inside FreeSWITCH itself, before `mod_xml_curl` reaches PHP. Laravel mirrors every rendered document into Redis DB 0 under the `pbx:fsxml` namespace, and a `mod_lua` search binding reads it with three or four `GET`s. The feature is **off by default**. Configuration, phrase, and ACL lookups always use `mod_xml_curl`.
-
-Dialplan matters most: every call leg produces at least one dialplan lookup, while directory lookups happen per registration and per user resolution.
-
-Nothing calls this path when the bindings are absent, so a stock install behaves exactly as before.
-
-### What Mirrors What
-
-| Key | Contents | Lifetime |
-|:--|:--|:--|
-| `pbx:fsxml:ver:global` | The identity epoch: the system-wide routing revision | Until overwritten |
-| `pbx:fsxml:tenant:user:<domain>:<user>:e<epoch>` | The tenant ID PHP resolved for that identity | Directory cache TTL (60 s default) |
-| `pbx:fsxml:ver:<tenantId>` | Current routing revision for the tenant | Until overwritten |
-| `pbx:fsxml:dir:<tenantId>:<tag>:<domain>:<user>:v<version>` | The rendered directory document | Directory cache TTL (60 s default) |
-| `pbx:fsxml:dp:<tenantId>:<context>:<destination>:v<version>:e<epoch>` | The rendered dialplan document | Dialplan cache TTL (60 s default) |
-
-The revision is part of every payload key, so any panel change that bumps the tenant revision makes the next Lua lookup miss, fall through to `mod_xml_curl`, and re-warm the mirror with fresh credentials.
-
-A dialplan lookup reads no tenant map: the tenant is encoded in the context name (`tenant_<id>_internal` or `tenant_<id>_public`), and PHP only mirrors contexts shaped that way. Its key carries **both** revisions — the tenant revision for panel saves and the identity epoch for SIP account or domain changes — because a stale dialplan does not merely show wrong data, it routes a live call the wrong way. If either revision is missing or the document is newer than the revisions Lua read, the lookup misses.
-
-The identity map carries a second token, the **identity epoch**. The payload revision cannot protect the map, because the map is what decides which tenant the revision belongs to. The epoch is the global routing revision; it moves whenever a SIP account or tenant domain is created, changed, enabled, disabled, or deleted — the only writes that can change which tenant owns a username or a realm. A missing epoch is a miss, never a default, so Lua never guesses an identity.
-
-> **Cost of the epoch rule:** the global revision also salts the dialplan cache keys, so a SIP account or domain edit invalidates every tenant's dialplan once, in addition to the tenant that owns the record. That is the price of a single, provable invalidation token for identity; it is one rebuild per tenant on the next dialplan request, not a per-request cost.
-
-### Enabling the Lab Proxy
-
-1. Copy the versioned templates into FreeSWITCH:
-   ```bash
-   sudo install -d -o freeswitch -g tallpbx-media -m 755 /etc/freeswitch/scripts
-   sudo install -o freeswitch -g tallpbx-media -m 644 scripts/freeswitch/tallpbx_xml_handler.lua /etc/freeswitch/scripts/
-   sudo install -o freeswitch -g tallpbx-media -m 644 scripts/freeswitch/lua.conf.xml /etc/freeswitch/autoload_configs/lua.conf.xml
-   sudo install -o freeswitch -g tallpbx-media -m 644 scripts/freeswitch/hiredis.conf.xml /etc/freeswitch/autoload_configs/hiredis.conf.xml
-   ```
-2. In `/etc/freeswitch/autoload_configs/modules.conf.xml`, move `<load module="mod_lua"/>` **above** `<load module="mod_xml_curl"/>` and leave every other module in place. FreeSWITCH appends XML search bindings and tries them in load order, so the earlier module is asked first — with the stock order the Lua handler is never consulted.
-3. If Redis requires a password (`REDIS_PASSWORD` in `/var/www/tallpbx/.env`), uncomment the `password` parameter in `hiredis.conf.xml` and set the same value.
-4. Set `FS_LUA_PROXY_ENABLED=true` in `/var/www/tallpbx/.env`, then run `tpbx optimize:clear`.
-5. Restart FreeSWITCH in a maintenance window: `sudo systemctl restart freeswitch`.
-
-### Verifying
-
-```bash
-# The Lua handler must be able to reach Redis.
-fs_cli -x "hiredis_raw default PING"        # expect +PONG (shown as PONG)
-
-# Warm one lookup, then confirm the mirror keys exist in DB 0.
-fs_cli -x "find_user_xml id <extension> <domain>"
-redis-cli -n 0 GET pbx:fsxml:ver:global
-redis-cli -n 0 GET "pbx:fsxml:tenant:user:<domain>:<extension>:e$(redis-cli -n 0 GET pbx:fsxml:ver:global)"
-redis-cli -n 0 GET pbx:fsxml:ver:<tenantId>
-
-# A second lookup for the same identity must not add an /api/v1/xml-handler
-# request to the nginx access log.
-
-# Place one call inside the tenant and confirm the dialplan was mirrored and
-# that the call added no xml-handler request to the access log.
-redis-cli -n 0 --scan --pattern 'pbx:fsxml:dp:*'
-```
-
-### Rollback: Lua XML Cache Proxy
-
-Removing the bindings is the kill-switch. Setting `FS_LUA_PROXY_ENABLED=false` only stops new mirror writes; FreeSWITCH keeps reading whatever is still in Redis until the TTL expires, so it is not a rollback by itself.
-
-1. Comment out `xml-handler-script` and `xml-handler-bindings` in `/etc/freeswitch/autoload_configs/lua.conf.xml`.
-2. Restart FreeSWITCH: `sudo systemctl restart freeswitch`.
-3. Confirm directory lookups work through PHP again:
-   ```bash
-   fs_cli -x "find_user_xml id <extension> <domain>"
-   tail -f /var/www/tallpbx/storage/logs/laravel.log   # new xml-handler requests appear
-   ```
-4. Optionally delete the mirror keys; they expire on their own within the cache TTL:
-   ```bash
-   redis-cli -n 0 --scan --pattern 'pbx:fsxml:dir:*' | xargs -r redis-cli -n 0 DEL
-   redis-cli -n 0 --scan --pattern 'pbx:fsxml:dp:*' | xargs -r redis-cli -n 0 DEL
-   ```
-
-No database migration, `.env` rollback, or PHP change is required — the mirror is additive storage and the PHP path is unchanged.
 
 ## Call Detail Records (CDR) Pipeline
 
