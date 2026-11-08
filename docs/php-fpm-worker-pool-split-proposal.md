@@ -1,6 +1,6 @@
 # PHP-FPM Worker Pool Split — Proposal
 
-**Status:** proposal only. **Do not implement before the CDR fast entry is measured** (`docs/cdr-performance-improvement-implementation-plan.md`). The three-tier XML ladder is already committed (`4fe5951`); this is the next infrastructure change *after* the CDR work, and the two must not be combined in one change.
+**Status:** proposal only. Its gate is satisfied — the CDR fast entry is delivered and measured, with the results recorded in `load-testing/status.md` (5 CPS: 300/300 calls, 601 CDR rows, against 276/300 and 46/552 before). The three-tier XML ladder is already committed (`4fe5951`); this is the next infrastructure change *after* the CDR work, and the two must not be combined in one change.
 
 ## 1. Problem
 
@@ -75,6 +75,6 @@ Restore the templates and remove the pool file (or re-run the installer from the
 
 ## 8. Sequencing (binding)
 
-1. **Now / next:** implement and measure the **CDR fast entry** (`docs/cdr-performance-improvement-implementation-plan.md`).
+1. **Done:** the **CDR fast entry** is implemented and measured; its results are in `load-testing/status.md`.
 2. **Only after** its gates pass: implement this split, measure, and decide A vs B (vs C).
 3. If the CDR fast entry already makes CDR gates pass at the target rates, this proposal becomes an *optional* improvement for panel isolation — evaluate on the measured panel responsiveness numbers, not pre-emptively.
