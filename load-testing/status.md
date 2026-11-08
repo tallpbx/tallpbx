@@ -6,15 +6,17 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 **Question:** what does serving CDR through `public/cdr-fast.php` (five providers) buy on the 1 vCPU tier, in calls completed and in CPU by process, against the same tests run with CDR through `index.php`?
 
-**Build:** `5.x` @ `021efba` (fast CDR entry + shared minimal bootstrap + fail-open fix), host and generator as below.
+**Build:** `5.x` @ `05cbe5e` (fast CDR entry + shared minimal bootstrap + fail-open fix + idempotent harness switches), host and generator as below.
 
 | Step | State |
 |:--|:--|
 | Deploy to the PBX | **Done.** Fast CDR entry live; POST 200 with no `Access-Control-Allow-Origin` header, which only the full application adds |
 | XML battery, `v-fast`, 100x5, production-60 | **Done.** 32.1 / 32.6 / 31.4 req/s, p50 114 ms, 100 % HTTP 200 — against 25.5 req/s mean in `refresh-20261103` |
-| CPS ladder, `v-fast`, before/after arms | **In progress.** First attempt failed at SIPp registration with `503 Maximum Calls In Progress` from the switch's session-rate limiter; the runner's smoke had passed under the *baseline* configuration, not the variant |
-| Octane sanity (XML only) | Pending — one battery and one SIP cell, to prove the opt-in worker still serves with the new shared bootstrap |
-| Pool-split decision (UI vs v-fast+CDR) | Pending — needs the CPU-by-process table from the ladder |
+| CPS ladder, `v-fast`, fast CDR arm | **Done.** 5 CPS: **300/300 calls, 601 CDR rows** against 276/300 and 46/552 before the fast entry. 8 CPS 102/480, 10 CPS 62/600, 15 CPS 53/847 — all three completed with the CDR gate passing and **zero FreeSWITCH restarts**; they previously could not finish at all |
+| Octane sanity (XML only) | Not run this series; the worker stays opt-in and untested against the new bootstrap here |
+| Pool-split decision (UI vs v-fast+CDR) | **Open.** The 5-worker pool saturates above 5 CPS on this 1 vCPU host; the split needs the per-process CPU table, and the honest baseline is 5 CPS, not 8–15 |
+
+**Rate ceiling on this tier:** 5 CPS serves 300/300; every rate above it degrades sharply (8 CPS 21 %, 10 CPS 10 %, 15 CPS 6 % of offered calls completed). The degradation tracks PHP-FPM worker saturation, not CDR ingestion, and it is the reason the comparison anchor is 5 CPS.
 
 **Traps found and fixed this series** (now in `procedure.md` → Step 10):
 
@@ -22,6 +24,9 @@ Where the series stands right now. Updated when a phase completes, not continuou
 - `/etc/nginx/sites-available/pbx.loadtest.bak` is captured once and never refreshed; after a template change it must be refreshed, or the baseline restore undoes the new default.
 - `503 Maximum Calls In Progress` at registration is the switch's session-rate limiter (`max-sessions` 1000, `sessions-per-second` 60) being consumed by internet scanners; check `fs_cli -x "show status"` before blaming the variant.
 - FreeSWITCH restarted four times under the scanner flood; a restart inside a cell rejects the call as `CALL_REJECTED` while registration still passes. The runner now waits for readiness and fails a cell whose switch PID changed.
+- **The harness unloaded `mod_xml_curl` on every cell**, even when the binding file already matched the wanted state. Unloading the module frees the binding structures while a lookup can still be using one: six core dumps (08:14–08:52) all fault in `xml_strstr` with a zeroed binding. Bindings are now applied by a FreeSWITCH restart, and only when the state actually differs — never by reloading the module.
+- **The CPU sampler held its SSH channel open** for the whole sampling window, so SIPp started about six minutes late and the sample covered idle time. The sampler now forks detached from the channel.
+- **Apply and restore rewrote files and restarted the switch or php-fpm unconditionally.** Both now compare the current state first and do nothing when it already matches, which keeps registrations alive across consecutive cells of the same variant.
 
 **Host hardening applied for the series** (real traffic, not test probes):
 
@@ -35,7 +40,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 ---
 
-**Last updated:** 2026-11-03 (ledger below)
+**Last updated:** 2026-11-08 (ledger below)
 **Series:** `refresh-20261103`
 **Tier under test:** `h1-1c1g` — 1 vCPU, 967 MB, 2 GB swap, shared CPU (`x.x.x.138`)
 **Generator:** 1 vCPU, 967 MB, no firewall (`x.x.x.55`)
@@ -318,20 +323,19 @@ Generator In  IP 162.243.62.138.5080 > 107.170.3.55.5088: UDP, length 1082
 
 ## Next actions, in order
 
-> **2026-11-04 handoff:** the authoritative resume list now lives at the top of
-> `docs/load-testing-refresh-implementation-plan.md` (→ *CURRENT STATUS*). The short version:
+> **2026-11-08:** the CDR comparison is closed on its anchor rate. What follows replaces the
+> 2026-11-04 handoff, whose items were completed or superseded during this series.
 
-1. `git pull --ff-only origin 5.x` on **both** hosts (`162.243.62.138`, `107.170.3.55`); on the
-   generator also `pkill -f 'sipp [-]sf'` — the validate script and scenario paths moved into
-   `load-testing/` in the consolidation commit.
-2. **Add a fast SIP smoke preflight** to the runner (~2 min: 1 registration + 1 extension call +
-   1 outbound call + CDR check) so a broken chain is found before a 30-minute series starts.
-   (Was mid-TDD at session end; the red test was removed to keep the tree green.)
-3. Run the six-variant SIP series at `--cps=2` — the comparison Task 6 still lacks.
-4. The 14 feature scenarios (`EXTENDED=1`) on surviving variants, then the call-rate ladder.
-5. The ESL `full` and throttle-`0` ablations (switches exist and are output-verified).
-6. The `directory` section for surviving paths, the failure ramp for `v-octane`/`v-fast`, and
-   the app-side timing decision.
+1. **Pool-split decision (open).** The 1 vCPU host is worker-bound above 5 CPS. The split needs
+   the per-process CPU table captured at 5 and 8 CPS — the sampler now runs detached, so a cell
+   records the process breakdown for its own window.
+2. **Second anchor (optional).** A 3 CPS repeat would give the comparison a second clean rate
+   beside 5 CPS. Nothing above 5 CPS is a usable anchor on this tier.
+3. **Octane sanity against the new bootstrap (optional).** One XML battery plus one SIP cell with
+   the worker enabled, to prove the opt-in path still serves after the shared minimal bootstrap.
+4. **Broader refresh work** — the extended scenarios, the ESL and throttle ablations, and the
+   app-side timing decision — is tracked at the top of
+   `docs/load-testing-refresh-implementation-plan.md` (→ *CURRENT STATUS*).
 
 Two things are deliberately *not* on this list: a special re-run to re-validate the Lua proxy
 (the behavioural gate now proves it on every enable), and any further cache-policy sweep
