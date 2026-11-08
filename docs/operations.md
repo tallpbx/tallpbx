@@ -662,6 +662,20 @@ ls -l /var/log/freeswitch/json_cdr/quarantine/
 
 After correcting the cause (for example, assigning the domain to a tenant), move a corrected file back into `failed/` and the next drain imports it. Reviewed quarantine files can be deleted; they are only kept for diagnosis. Sizing is modest — roughly 10 KB per call leg — and the spool only fills while deliveries are failing.
 
+### Fast Entry and Rollback
+
+CDR posts are served by a trimmed entry point (`public/cdr-fast.php`, backed by `App\Support\CdrFastBootstrap`) that boots five service providers instead of the full application. The endpoint only verifies the token and appends to Redis, so it needs neither the panel stack nor the route table; on a shared PHP-FPM pool this keeps a post from queueing behind a full framework boot while calls are being routed. Every nginx template points `location = /api/v1/cdr` at that file and forwards the `Authorization` header the Basic handshake depends on.
+
+The entry fails open: any error inside it re-serves the request through `index.php`, and if the full application fails too, FreeSWITCH retries and then spools the record to disk. A fault therefore costs speed, never a record.
+
+Rollback is the stock block that ships commented underneath the active location in `/etc/nginx/sites-available/tallpbx`. Replace the active block with it and reload nginx; no FreeSWITCH, database, or stream change is involved:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+To confirm which path served a post, `access_log` is off for this location by design (the token travels in a header), so check the stream instead: a `200` from `curl -u tallpbx:<token> -X POST http://127.0.0.1/api/v1/cdr -d '{}'` should raise `redis-cli -n 3 XLEN pbx:cdr:stream` by one, and the worker should return it to 0 within seconds.
+
 ### Rotating the Ingestion Token
 
 1. Generate a new secret and save it as `FREESWITCH_CDR_TOKEN` in `/var/www/tallpbx/.env`.

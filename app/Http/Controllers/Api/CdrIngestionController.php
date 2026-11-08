@@ -33,13 +33,13 @@ class CdrIngestionController extends Controller
     public function store(Request $request): JsonResponse
     {
         if (! $this->authenticated($request)) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+            return new JsonResponse(['error' => 'Unauthorized'], 401);
         }
 
         $payload = $this->payload($request);
 
         if ($payload === '') {
-            return response()->json(['error' => 'Empty payload'], 422);
+            return new JsonResponse(['error' => 'Empty payload'], 422);
         }
 
         try {
@@ -51,12 +51,15 @@ class CdrIngestionController extends Controller
 
             // 503 is the failover contract: mod_json_cdr retries, then writes
             // the record to its error directory for the drain command.
-            return response()->json(['error' => 'Ingest unavailable'], 503);
+            return new JsonResponse(['error' => 'Ingest unavailable'], 503);
         }
 
         // An empty 200 is the cheapest success answer; libcurl treats any 2xx
-        // as delivered.
-        return response()->json([], 200);
+        // as delivered. JsonResponse is constructed directly (not through
+        // response()) because that helper builds the ResponseFactory with the
+        // view factory injected, which would pull the view service into the
+        // fast CDR entry's provider allowlist.
+        return new JsonResponse([], 200);
     }
 
     /**

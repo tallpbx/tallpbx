@@ -151,3 +151,36 @@ it('lets the scheduler reach the spool and runs the drain from the schedule', fu
         ->and($console)->toContain('everyFiveMinutes()')
         ->and($console)->toContain('withoutOverlapping()');
 });
+
+it('routes cdr posts through the fast entry in every nginx server block', function (): void {
+    // The fast CDR entry is only reachable through nginx. Both templates must
+    // point /api/v1/cdr at cdr-fast.php, forward the Authorization header the
+    // Basic handshake needs, and ship the stock block commented underneath so
+    // rollback is a copy and a reload with no FreeSWITCH change.
+    $templates = [
+        'scripts/resources/nginx.sh' => 1,
+        'scripts/resources/letsencrypt.sh' => 2,
+    ];
+
+    foreach ($templates as $path => $expectedBlocks) {
+        $source = (string) file_get_contents(base_path($path));
+
+        // Anchored at the line start so the commented stock block underneath
+        // is not counted as an active location.
+        preg_match_all('/^[ \t]*location = \/api\/v1\/cdr \{[^}]*\}/m', $source, $matches);
+        $blocks = $matches[0] ?? [];
+
+        expect($blocks)->toHaveCount(
+            $expectedBlocks,
+            "{$path} must declare the fast CDR location in every server block",
+        );
+
+        foreach ($blocks as $block) {
+            expect($block)->toContain('fastcgi_param SCRIPT_FILENAME \\$realpath_root/cdr-fast.php;')
+                ->and($block)->toContain('fastcgi_param HTTP_AUTHORIZATION \\$http_authorization;')
+                ->and($block)->toContain('fastcgi_read_timeout 2s;');
+        }
+
+        expect(substr_count($source, '# location = /api/v1/cdr {'))->toBe($expectedBlocks);
+    }
+});

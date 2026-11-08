@@ -95,6 +95,27 @@ server {
         fastcgi_pass unix:/var/run/php/php$php_version-fpm.sock;
     }
 
+    # mod_json_cdr posts one JSON document per call leg here; the endpoint
+    # only verifies the token and appends to Redis. Served by the trimmed CDR
+    # entry so a post never waits behind a full framework boot while the
+    # pool is serving lookups. The Authorization header carries the token.
+    location = /api/v1/cdr {
+        access_log off;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root/cdr-fast.php;
+        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
+        fastcgi_read_timeout 2s;
+        fastcgi_pass unix:/var/run/php/php$php_version-fpm.sock;
+    }
+
+    # Stock mode (previous default): boot the full application for every CDR
+    # post. Slower under call load but kept available for compatibility and
+    # debugging - replace the active block with this one and reload nginx.
+    # location = /api/v1/cdr {
+    #     access_log off;
+    #     try_files \$uri /index.php?\$query_string;
+    # }
+
     # Stock mode (previous default): boot the full application for every
     # lookup. Slower than the fast controller but kept available for
     # compatibility and debugging - replace the active block with this one

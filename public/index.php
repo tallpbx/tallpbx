@@ -18,7 +18,12 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 require __DIR__.'/../vendor/autoload.php';
 
 // Bootstrap Laravel and handle the request...
+// `require`, not `require_once`: the fast front controllers (public/cdr-fast.php
+// and public/xml-handler-fast.php) reach this file as their fail-open fallback
+// after they already required bootstrap/app.php in the same process, and
+// require_once would hand back `true` instead of the application. Re-evaluating
+// bootstrap/app.php builds a fresh application, which is what the fallback needs.
 /** @var Application $app */
-$app = require_once __DIR__.'/../bootstrap/app.php';
+$app = require __DIR__.'/../bootstrap/app.php';
 
 $app->handleRequest(Request::capture());

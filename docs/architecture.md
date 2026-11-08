@@ -844,7 +844,7 @@ After recovery, re-apply from the Security Center (or `tpbx security:apply`) so 
 
 ## 17. CDR Ingestion: `mod_json_cdr` → Redis Stream → MariaDB
 
-> **Status:** deployed in TallPBX 5.x. The installer adds `freeswitch-mod-json-cdr`; `/api/v1/cdr` accepts posts; `tpbx cdr:work` runs under `tallpbx-cdr-worker.service`; and `tpbx cdr:drain-spool` reconciles the failure spool every five minutes. The owning module is `app-modules/call-detail-records` with table `cdrs` (the 5.x rename of `xml-cdr` / `xml_cdr`). This section documents the architecture and the durability rules the pipeline obeys; operating instructions are in [operations](operations.md) → Call Detail Records (CDR) Pipeline, and the build record remains in the [pipeline plan](superpowers/plans/2026-10-31-cdr-modernization-pipeline.md).
+> **Status:** deployed in TallPBX 5.x. The installer adds `freeswitch-mod-json-cdr`; `/api/v1/cdr` accepts posts; `tpbx cdr:work` runs under `tallpbx-cdr-worker.service`; and `tpbx cdr:drain-spool` reconciles the failure spool every five minutes. The owning module is `app-modules/call-detail-records` with table `cdrs` (the 5.x rename of `xml-cdr` / `xml_cdr`). This section documents the architecture and the durability rules the pipeline obeys; operating instructions are in [operations](operations.md) → Call Detail Records (CDR) Pipeline; design and plan documents were removed after completion (recover from git history if needed).
 
 ### 17.1 Why records are not written synchronously
 
@@ -880,6 +880,8 @@ flowchart TD
 1. **FreeSWITCH emits.** `mod_json_cdr` serialises each leg as raw JSON and POSTs it to `/api/v1/cdr`. Nothing is parsed on the way in — the raw document is preserved for diagnostics.
 2. **The endpoint appends and returns.** The controller validates the token, appends the payload with `XADD`, and returns 200 immediately. No Eloquent, no SQL, no serialisation work on the request path.
 3. **The worker digests.** `tpbx cdr:work`, owned by `tallpbx-cdr-worker.service`, reads up to 100 entries with `XRANGE`, parses them, writes the batch in a single transaction using an idempotent upsert keyed on `(call_uuid, leg)`, and deletes the entries with `XDEL` **only after the commit succeeds**. Delivery is at-least-once; the unique index makes the retry harmless.
+
+**How the endpoint is served.** nginx points the exact `/api/v1/cdr` location at `public/cdr-fast.php`, which boots a container from five service providers through `App\Support\CdrFastBootstrap` and the shared `App\Support\MinimalBootstrap` base (the XML fast entry uses the same base). No database, encryption, view or module providers are registered, because the request only verifies a token and appends to Redis; the controller returns `JsonResponse` directly so the `response()` helper cannot pull the view factory back in. The entry fails open to `index.php`, so a fault costs speed and never a record, and the stock location ships commented underneath for a one-block rollback. The provider allowlist and the stream bytes are pinned by tests (`CdrFastEntryTest`), the same way the XML entry is pinned by its byte-equality suites.
 
 ### 17.3 Failure modes and the designed response
 
