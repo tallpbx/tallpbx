@@ -118,6 +118,8 @@ done
 
 **Checkpoint per variant:** same as Step 5, plus the report path proves where the load went — `v-octane` cells are labelled against `127.0.0.1:8090`, every other variant against nginx.
 
+> Switching to or from `v-octane` changes the `mod_xml_curl` binding, and the switch applies that with a FreeSWITCH **restart**, never a module reload: unloading the module while a lookup is in flight frees the binding the lookup is using and kills the switch. A `v-fast` or `v-stock` switch only rewrites the nginx location and needs no restart. The rule and its reasoning are in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*.
+
 > Repeat noise on a 1 vCPU host is about 10 %. Differences smaller than that between two variants are not findings. Raise `--repeats` before drawing a conclusion from a small gap.
 
 ---

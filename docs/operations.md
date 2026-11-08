@@ -474,7 +474,7 @@ If editing configuration files by hand:
 
 FreeSWITCH's directory, dialplan, and configuration lookups can be answered by a resident RoadRunner worker on `127.0.0.1:8090` instead of by PHP-FPM. The worker keeps the application warm between requests and keeps the XML load off PHP-FPM entirely.
 
-**It is optional and ships disabled.** The default installation serves XML through the fast controller (next section). The installer always installs the worker's systemd unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions the `rr` binary, and writes the three `mod_xml_curl` bindings that form the XML ladder: the worker first (**1 s** timeout), the fast controller behind nginx (**2 s**), then the stock full application behind nginx (**3 s**). FreeSWITCH re-sends the complete request to each binding, so the POST lookup fields survive every fall-through, and enabling or disabling the worker needs **no FreeSWITCH change**.
+**It is optional and ships disabled.** The default installation serves XML through the fast controller (next section). The installer always installs the worker's systemd unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions the `rr` binary, and writes the three `mod_xml_curl` bindings that form the XML ladder: the worker first (**1 s** timeout), the fast controller behind nginx (**2 s**), then the stock full application behind nginx (**3 s**). FreeSWITCH re-sends the complete request to each binding, so the POST lookup fields survive every fall-through, and starting or stopping the worker **as a running service** needs **no FreeSWITCH change**. Retiring the binding itself — so lookups never try port 8090 — edits `xml_curl.conf.xml` and does require a FreeSWITCH restart; see [Switching Between the Stock, Fast and Octane XML Paths](#switching-between-the-stock-fast-and-octane-xml-paths).
 
 ### Enabling It
 
@@ -602,6 +602,50 @@ curl -s "http://127.0.0.1/api/v1/xml-handler?$Q" -H "X-FS-Token: $TOKEN" | head 
 ```
 
 To confirm the handler is responding at all, a `403` means the token check is working and the endpoint is alive; a `500` means the front controller itself failed and the request should have fallen back to the normal application — check `storage/logs/laravel.log`.
+
+## Switching Between the Stock, Fast and Octane XML Paths
+
+Three XML paths exist, and only one kind of switch needs FreeSWITCH restarted.
+
+| Path | What answers FreeSWITCH's XML lookups | How it is selected |
+| --- | --- | --- |
+| **Octane** | Resident RoadRunner worker on `127.0.0.1:8090` | The `tallpbx-octane` binding is active in `xml_curl.conf.xml` **and** the worker is running |
+| **Fast** (default) | `xml-handler-fast.php` behind nginx | The `tallpbx-octane` binding is commented out and the nginx location points at the fast controller |
+| **Stock** | `index.php`, the whole application, behind nginx | Same binding as Fast, but the nginx location falls through to `index.php` |
+
+### Switching To or From Octane Requires a FreeSWITCH Restart
+
+Enabling or disabling the Octane binding edits `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`, and FreeSWITCH reads that file only when `mod_xml_curl` loads. Apply the change with a restart:
+
+```bash
+sudo systemctl restart freeswitch
+```
+
+The restart loads the module with the new binding list while no lookup is in flight.
+
+> **Never switch bindings with `reload mod_xml_curl` on a switch that may be serving calls.**
+> That command unloads the module and frees the memory that holds its bindings, while a registration or call may already be mid-lookup against one of them. The lookup then reads freed memory and FreeSWITCH dies with a segmentation fault, dropping every registration and call on the host at once. `reloadxml` is not a substitute either: it re-reads FreeSWITCH's static XML tree, not the binding file, so the switch keeps answering from the old bindings.
+
+### Fast to Stock Is an nginx Change Only
+
+Fast and Stock share the same binding URL, so moving between them only rewrites the nginx `location` block documented below. Apply it with:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+No FreeSWITCH restart and no binding change are involved in that direction.
+
+### Confirm Which Path Is Live
+
+```bash
+# Active binding lines only; a commented-out binding does not match.
+grep -cE '^[[:space:]]*<binding name="tallpbx-octane"' /etc/freeswitch/autoload_configs/xml_curl.conf.xml
+systemctl is-active tallpbx-xml-worker
+grep -A5 'location = /api/v1/xml-handler {' /etc/nginx/sites-available/pbx
+```
+
+A count of `1` with an active worker means Octane answers first; `0` means lookups fall through to the nginx location, which then decides between the fast controller and `index.php`.
 
 ## Call Detail Records (CDR) Pipeline
 
