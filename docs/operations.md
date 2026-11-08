@@ -686,6 +686,10 @@ ls /var/log/freeswitch/json_cdr/failed/ | wc -l   # 0 is normal; nonzero means d
 
 A steadily growing `XLEN` means the worker is not keeping up. The worker logs a `CDR stream backlog` warning above 1,000 pending entries (adjust with `--warn-pending`). Because Redis append-only persistence is enabled by the installer, undigested entries survive a reboot — but a growing backlog still deserves attention.
 
+`tpbx cdr:health`, scheduled every five minutes, reports the same signals as three lines — `spooled_posts`, `backlog`, `failed_posts` — and exits non-zero when any of them breaches its threshold, so a silent failure lands in the scheduler log instead of nowhere. All three default to zero on a healthy host; the options `--spool-dir`, `--stream`, `--warn-pending`, and `--nginx-error-log` override the paths and thresholds.
+
+The fast entry's fallback is silent by design: when `cdr-fast.php` throws, the request is re-served by the full application and the caller still receives a normal 200. Every fallback appends one line to `storage/logs/cdr-fast-fallback.log`, so `wc -l` on that file tells you whether the fast entry has been quietly falling back; an absent or empty file means it never has.
+
 ### When the Worker Stops
 
 ```bash

@@ -281,3 +281,12 @@ it('serves the fallback through index.php when the fast entry already booted', f
         ->and($output)->not->toContain('handleRequest() on true')
         ->and($output)->toContain('<html');
 });
+
+it('records every fast-entry fallback in a dedicated log', function (): void {
+    $shim = (string) file_get_contents(base_path('public/cdr-fast.php'));
+
+    // The second tier is silent by design, so one appended line makes it
+    // countable without reading the PHP error log across the whole host.
+    expect($shim)->toContain('cdr-fast-fallback.log')
+        ->and($shim)->toContain('FILE_APPEND');
+});

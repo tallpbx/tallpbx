@@ -69,6 +69,12 @@ Schedule::command('cdr:drain-spool')
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
+// Report CDR records that did not land. The ingestion path fails soft at every
+// layer, so without this scheduled check a broken fast entry looks healthy.
+Schedule::command('cdr:health')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 Schedule::command('security:verify')
     ->everyFiveMinutes()
     ->withoutOverlapping();

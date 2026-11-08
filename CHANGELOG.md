@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CDR Health Check and Fallback Counter**: The ingestion path fails soft at every layer, which is right but hides a broken path behind a normal-looking 200. `tpbx cdr:health` — scheduled every five minutes — reports `spooled_posts`, `backlog`, and `failed_posts` as one line each and exits non-zero when any crosses its threshold, so a silent failure appears in the scheduler log. Separately, every fast-entry fail-open now appends one line to `storage/logs/cdr-fast-fallback.log`, which makes a long-running fallback countable instead of invisible. No migration, `.env`, service, or FreeSWITCH change is required.
+
 ## [5.1.0] - 2026-11-08
 
 ### Added

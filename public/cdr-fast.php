@@ -29,6 +29,15 @@ try {
     $response = CdrFastBootstrap::handle(Request::createFromGlobals());
     $response->send();
 } catch (Throwable $exception) {
+    // One appended line per fallback in a dedicated file. The second tier is
+    // silent by design, so without this counter an operator cannot tell a
+    // healthy fast entry from one that has fallen back for days.
+    @file_put_contents(
+        __DIR__.'/../storage/logs/cdr-fast-fallback.log',
+        sprintf("%s fast-entry fell back: %s: %s\n", gmdate('c'), $exception::class, $exception->getMessage()),
+        FILE_APPEND | LOCK_EX
+    );
+
     // Report the failure, then serve the request the normal way. index.php
     // starts from a clean container because the fast path restores the
     // previous one before rethrowing.
