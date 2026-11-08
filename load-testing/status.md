@@ -21,6 +21,17 @@ Where the series stands right now. Updated when a phase completes, not continuou
 - The SIP smoke now runs **per variant with that variant's switches applied**; the old smoke ran under the baseline and could pass while the variant under test could not register.
 - `/etc/nginx/sites-available/pbx.loadtest.bak` is captured once and never refreshed; after a template change it must be refreshed, or the baseline restore undoes the new default.
 - `503 Maximum Calls In Progress` at registration is the switch's session-rate limiter (`max-sessions` 1000, `sessions-per-second` 60) being consumed by internet scanners; check `fs_cli -x "show status"` before blaming the variant.
+- FreeSWITCH restarted four times under the scanner flood; a restart inside a cell rejects the call as `CALL_REJECTED` while registration still passes. The runner now waits for readiness and fails a cell whose switch PID changed.
+
+**Host hardening applied for the series** (real traffic, not test probes):
+
+| Layer | State | Evidence |
+|:--|:--|:--|
+| SIP scanner auto-ban (Attack Protection) | Enabled: enforcement on, 24 h bans, 5 min escalation window | Detector renders on `tenant_<id>_public` dialplans (3 hooks) and not on internal; queue worker and ESL listener active. It has not fired yet because the observed attackers are REGISTER floods, which never enter the dialplan, and no INVITE with a curated signature arrived during the sample window |
+| VoIPBL external blocklist | Enabled, `119,419` entries synced into `external_blocklist_ips` | FreeSWITCH log fell from hundreds of lines per 15 s to ~1 |
+| Geo-blocking | Whitelist mode, **US + CA** only; `18,098` CIDR lines in `geo_allowed_ips` | Orchestrator `223.204.248.93` whitelisted first (the lockout guard refuses to arm otherwise); panel 200; post-change SIP smoke from the US generator passes register, call and outbound |
+
+**Lockout note:** enabling whitelist-mode geo without whitelisting the orchestrator address first will drop the measurement session. The rescue path is the Security Center's one-click *whitelist current IP*, or `LockoutGuardService::whitelistIp()` followed by `tpbx security:apply`.
 
 ---
 

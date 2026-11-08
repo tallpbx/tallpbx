@@ -51,6 +51,8 @@ ssh "$PBX_HOST" 'cd /var/www/tallpbx && \
 
 **What the shipped default serves:** XML through the fast controller on PHP-FPM, with the three-tier ladder above it (Octane worker first when enabled, then the fast controller, then the stock full application); CDR through `public/cdr-fast.php` on PHP-FPM, with the stock block commented underneath for rollback. Octane is an opt-in performance mode, not part of the default, and CDR never uses it. A host whose site file still serves XML or CDR through `index.php` is running the old default — refresh the nginx template before measuring.
 
+**Security posture on the measurement host:** internet SIP scanners consume the switch's session budget and log bandwidth, so the host runs three layers before a series: SIP scanner auto-ban (Attack Protection, 24 h bans), the VoIPBL external blocklist, and geo-blocking in whitelist mode for the countries the generator and the operator live in. **Whitelist the orchestrator address before arming whitelist-mode geo** — the lockout guard refuses otherwise, and forcing it drops your own session.
+
 ---
 
 ## Step 3 — Seed the tenant
