@@ -174,6 +174,14 @@ it('seeds callable PBX defaults for the customer tenant', function () {
         ->assertSee('<user id="1000">', false)
         ->assertSee('GeneratedSecret123!', false);
 
+    // This request describes the default dialplan shape. Pin the hiredis markers
+    // off explicitly: the flag also comes from FS_HIREDIS_LIMIT_ENABLED, and an
+    // operator's local .env opt-in must not decide whether the suite passes.
+    config([
+        'freeswitch.xml_handler.hiredis_limit_enabled' => false,
+        'freeswitch.xml_handler.hiredis_marker_enabled' => false,
+    ]);
+
     $this->get('/api/v1/xml-handler?'.http_build_query([
         'section' => 'dialplan',
         'Caller-Context' => $dialplanContext->internal((string) $tenant->id),
