@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-11-08
+
 ### Added
 - **Fast CDR Ingestion Entry**: CDR posts no longer boot the full application. `POST /api/v1/cdr` is now served by `public/cdr-fast.php` through a shared minimal bootstrap (`App\Support\MinimalBootstrap`, `App\Support\CdrFastBootstrap`) that registers five service providers instead of roughly ninety — no database, encryption, view or module providers, because the endpoint only verifies the token and appends to the Redis stream. The controller returns `JsonResponse` directly so the `response()` helper cannot pull the view factory back in. Both nginx templates point the location at the new entry, forward the `Authorization` header and ship the stock block commented underneath, so rollback is a copy and `systemctl reload nginx`; there is no FreeSWITCH, database, or stream-format change. The entry fails open to `index.php`, so a fault costs speed and never a record. The XML fast entry was refactored onto the same shared bootstrap with no behaviour change, guarded by its existing byte-equality suites. **Upgrade note**: re-run `bash scripts/resources/nginx.sh` (or the installer) to deploy the new location, then `tpbx optimize:clear`.
 
