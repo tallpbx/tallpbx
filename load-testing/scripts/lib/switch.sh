@@ -812,6 +812,63 @@ octane_binding_state() {
     printf 'off'
 }
 
+# Refuse an xml_curl configuration whose bindings lack a gateway-url.
+#
+# A binding without a URL reaches the module with a null url, and the first
+# lookup that lands on it passes NULL to strstr() and kills the switch.
+assert_xml_curl_config() {
+    local file="${1:-$FS_XML_CURL_CONF}"
+
+    python3 - "$file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+try:
+    text = open(path, encoding="utf-8").read()
+except OSError as exc:
+    print(f"gateway-url check failed: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+# Strip XML comments so a disabled binding is not reported as broken.
+text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+
+bad = 0
+for match in re.finditer(r"<binding\b([^>]*)>(.*?)</binding>", text, flags=re.S):
+    name = re.search(r'name="([^"]*)"', match.group(1))
+    label = name.group(1) if name else "unnamed"
+    if "gateway-url" not in match.group(2):
+        print(f"gateway-url missing for binding [{label}]", file=sys.stderr)
+        bad += 1
+
+sys.exit(1 if bad else 0)
+PY
+}
+
+# Apply an XML binding change by restarting the switch.
+#
+# Reloading the XML module unloads it while lookups can still hold the old
+# user_data pointer. That binding memory is freed, and the next fetch
+# dereferences it and segfaults inside xml_url_fetch. A restart swaps the
+# module with no lookups in flight, which is the only safe way to re-read the
+# bindings at runtime.
+restart_freeswitch_for_binding_change() {
+    local waited=0
+
+    systemctl restart freeswitch || return 1
+
+    while [ "$waited" -lt 60 ]; do
+        if fs_cli -x "status" 2>/dev/null | grep -q '^UP'; then
+            return 0
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    printf 'FreeSWITCH did not come back after a binding restart\n' >&2
+    return 1
+}
+
 # Enable or disable the persistent-worker XML binding.
 #
 # The FPM variants are only meaningful with this binding disabled, because
@@ -862,8 +919,13 @@ apply_octane_binding() {
         mv "${FS_XML_CURL_CONF}.loadtest.tmp" "$FS_XML_CURL_CONF"
     fi
 
-    if ! fs_cli -x "reload mod_xml_curl" >/dev/null 2>&1; then
-        fail_switch "FreeSWITCH rejected 'reload mod_xml_curl'"
+    if ! assert_xml_curl_config; then
+        fail_switch "xml_curl config has a binding without gateway-url"
+        return 1
+    fi
+
+    if ! restart_freeswitch_for_binding_change; then
+        fail_switch "FreeSWITCH did not come back after the binding restart"
         return 1
     fi
 
@@ -1161,9 +1223,20 @@ restore_baseline() {
 
     local file level mode
 
+    local xml_before xml_after
+
     restore_env
     restore_file fpm-pool
+
+    # Restoring the file leaves the runtime on the old bindings, so restart
+    # only when the file actually changed; reloading the module is never safe.
+    xml_before="$(sha256sum "$FS_XML_CURL_CONF" 2>/dev/null | awk '{print $1}')"
     restore_file xml-curl-conf
+    xml_after="$(sha256sum "$FS_XML_CURL_CONF" 2>/dev/null | awk '{print $1}')"
+    if [ "$xml_before" != "$xml_after" ]; then
+        restart_freeswitch_for_binding_change >/dev/null 2>&1 || log "binding restart after restore failed"
+    fi
+
     restore_file json-cdr-conf
 
     # nginx files keep their backup next to the original; the recorded list
@@ -1192,7 +1265,6 @@ restore_baseline() {
         fi
     fi
 
-    fs_cli -x "reload mod_xml_curl" >/dev/null 2>&1 || true
     fs_cli -x "reload mod_json_cdr" >/dev/null 2>&1 || true
 
     if nginx -t >/dev/null 2>&1; then
@@ -1240,6 +1312,7 @@ main() {
         apply_xml_path | apply-xml-path) apply_xml_path "$@" ;;
         assert_xml_path | assert-xml-path) assert_xml_path "$@" ;;
         apply_octane_binding | apply-octane-binding) apply_octane_binding "$@" ;;
+        assert_xml_curl_config | assert-xml-curl-config) assert_xml_curl_config "$@" ;;
         assert_octane_binding | assert-octane-binding) assert_octane_binding "$@" ;;
         apply_ttl | apply-ttl) apply_ttl "$@" ;;
         assert_ttl | assert-ttl) assert_ttl "$@" ;;

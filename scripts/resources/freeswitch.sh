@@ -500,6 +500,20 @@ XML
     chown freeswitch:freeswitch "$modules_conf" "$xml_curl_conf" 2>/dev/null || true
     chmod 0640 "$xml_curl_conf" 2>/dev/null || true
 
+    # Refuse a binding that has no gateway-url before the switch can load it.
+    # mod_xml_curl registers such a binding with a null url, and the first
+    # lookup that reaches it dereferences NULL and segfaults the switch. The
+    # validator runs straight from the autoloader so it writes no caches and
+    # needs no console bootstrap.
+    if [ -f "${app_dir}/vendor/autoload.php" ] && command -v php >/dev/null 2>&1; then
+        if ! php -r 'require $argv[1]."/vendor/autoload.php"; $errors = App\Support\FreeSwitchXmlCurlConfig::errors($argv[2]); foreach ($errors as $error) { fwrite(STDERR, $error.PHP_EOL); } exit($errors === [] ? 0 : 1);' "$app_dir" "$xml_curl_conf"; then
+            error "xml_curl.conf.xml has a binding without a gateway-url; FreeSWITCH would crash on the first lookup"
+            return 1
+        fi
+    else
+        warning "Skipping xml_curl.conf.xml validation; the application is not installed yet"
+    fi
+
     load_required_freeswitch_modules
 }
 

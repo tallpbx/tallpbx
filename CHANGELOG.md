@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Fast Entry Fail-Open Restored**: The fast front controllers answer a fault by re-serving the request through `index.php`, but `public/index.php` loaded `bootstrap/app.php` with `require_once`, which returns `true` once the fast entry has already included that file in the same process — so the fallback died with a fatal error instead of serving the request. `index.php` now re-evaluates the bootstrap file, so a fault costs speed and never a record. This covers `public/cdr-fast.php` and the existing `public/xml-handler-fast.php`. No migration, `.env`, or FreeSWITCH change is required.
 
+- **Refuse XML Bindings That Crash FreeSWITCH**: `mod_xml_curl` registers every `<binding>` in `xml_curl.conf.xml` even when it has no `gateway-url`. Such a binding reaches the module with a null url, and the first directory or dialplan lookup passes NULL to `strstr()` and kills the switch with a SIGSEGV. A new `App\Support\FreeSwitchXmlCurlConfig` validator and the `freeswitch:validate-xml-curl` command detect this, and the installer now refuses to finish writing the configuration when any binding lacks a usable `gateway-url`. Commented-out bindings are ignored, so the disabled-state files remain valid. No migration or `.env` change is required.
+
 ## [5.0.0] - 2026-11-05
 
 ### Added

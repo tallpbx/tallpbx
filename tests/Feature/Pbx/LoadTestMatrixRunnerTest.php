@@ -520,4 +520,62 @@ describe('load test matrix runner', function (): void {
             expect($script)->not->toContain($mutation);
         }
     });
+
+    it('restarts freeswitch instead of unloading mod_xml_curl at runtime', function (): void {
+        $lib = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        // Unloading the module while lookups are in flight leaves the XML
+        // registry holding freed bindings; the next fetch then dereferences a
+        // zeroed binding and the switch dies inside xml_url_fetch.
+        expect($lib)->not->toContain('reload mod_xml_curl')
+            ->and($lib)->toContain('restart_freeswitch_for_binding_change');
+    });
+
+    it('refuses an xml_curl binding that has no gateway-url', function (): void {
+        $fixture = (string) tempnam(sys_get_temp_dir(), 'xmlcurl');
+        file_put_contents($fixture, <<<'XML'
+<configuration name="xml_curl.conf" description="cURL XML Gateway">
+  <bindings>
+    <binding name="broken">
+      <param name="bindings" value="directory"/>
+    </binding>
+  </bindings>
+</configuration>
+XML);
+
+        $process = new Process(
+            ['bash', base_path('load-testing/scripts/lib/switch.sh'), 'assert_xml_curl_config', $fixture],
+            base_path(),
+        );
+        $process->run();
+
+        expect($process->isSuccessful())->toBeFalse()
+            ->and($process->getErrorOutput())->toContain('gateway-url');
+
+        unlink($fixture);
+    });
+
+    it('accepts an xml_curl config whose bindings all carry a gateway-url', function (): void {
+        $fixture = (string) tempnam(sys_get_temp_dir(), 'xmlcurl');
+        file_put_contents($fixture, <<<'XML'
+<configuration name="xml_curl.conf" description="cURL XML Gateway">
+  <bindings>
+    <binding name="tallpbx-fallback">
+      <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=abc"/>
+      <param name="bindings" value="directory|dialplan"/>
+    </binding>
+  </bindings>
+</configuration>
+XML);
+
+        $process = new Process(
+            ['bash', base_path('load-testing/scripts/lib/switch.sh'), 'assert_xml_curl_config', $fixture],
+            base_path(),
+        );
+        $process->run();
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        unlink($fixture);
+    });
 });
