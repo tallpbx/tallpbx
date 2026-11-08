@@ -185,6 +185,9 @@ git commit -m "chore(load-test): record <series> raw artifacts"
 | `CDR-GATE FAILED … reason=no-tally` | There is no SIPp tally to judge, because registration or the call never completed | Fix the earlier failure first; the gate is reporting a missing measurement, not a missing record |
 | A location added by the installer disappears after the first cell | The runner restores `${file}.loadtest.bak`, which is captured once and never refreshed | After changing an nginx template, refresh the backup from the generated file (`cp /etc/nginx/sites-available/pbx /etc/nginx/sites-available/pbx.loadtest.bak`) so the baseline encodes the current default |
 | Manual register test gets `401` twice | The scenario expects the generated auth CSV, not the call CSV | Drive registration through `scripts/pbx-sipp-validate.sh` (it writes `<run-dir>/sipp-users-auth.csv`), or point `-inf` at that file |
+| `FS-NOT-READY` | FreeSWITCH did not report ready (CLI, `mod_json_cdr`) within 90 s | Check `systemctl status freeswitch`. A half-booted switch accepts registrations with no CDR module and rejects the call as `CALL_REJECTED` |
+| `FS-RESTARTED label=… pid=a->b` | FreeSWITCH restarted inside the cell window | The cell is invalid — the in-flight call is rejected and the registrations it depends on are rebuilt. Find the restart cause before re-running; never count the cell |
+| FS CPU high, `Can't find user […]` at tens per second in `freeswitch.log` | Internet SIP scanners are consuming the session budget and the log | Ban the sources through the application pipeline (Security Center, or `SecurityBanService::ban()` followed by `security:reconcile`), flush their conntrack flows, then confirm the log is quiet for 15 s before starting a cell |
 
 A cell failure never aborts the series: the runner records it in `failures.log` and continues. The series is only trustworthy when `failures.log` is empty.
 

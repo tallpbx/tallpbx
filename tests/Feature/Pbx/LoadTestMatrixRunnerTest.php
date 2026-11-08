@@ -412,6 +412,18 @@ describe('load test matrix runner', function (): void {
         expect($process->getOutput())->toMatch('/mkdir -p [^\n]*v-octane[^\n]*cpuwatch\.sh/');
     });
 
+    it('refuses to measure across a freeswitch restart', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        // Two failures wasted a measurement window on 2026-11-08: a switch
+        // that was still booting served the smoke, and a restart during the
+        // cell turned a completed call into CALL_REJECTED. Readiness before
+        // the cell and a PID comparison after it are the guards.
+        expect($script)->toContain('wait_for_freeswitch')
+            ->and($script)->toContain('FS-RESTARTED')
+            ->and($script)->toMatch('/freeswitch_main_pid/');
+    });
+
     it('proves the smoke under each variant, not the baseline', function (): void {
         $process = matrixRunnerProcess(
             ['--dry-run', '--tier=h1-1c1g', '--variant=v-fast', '--phase=sip'],

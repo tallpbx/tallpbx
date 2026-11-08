@@ -840,6 +840,39 @@ probe_command() {
     switch_command probe_lookup "$LOAD_START" "$LOAD_DOMAIN" "${PROBE_COUNT:-30}"
 }
 
+# Read FreeSWITCH's main PID on the PBX.
+#
+# A cell measured across a switch restart is not a measurement: the call that
+# was in flight is rejected and the module state that the cell depends on
+# (registrations, CDR) is rebuilt underneath it.
+freeswitch_main_pid() {
+    run_on_pbx 'systemctl show freeswitch -p MainPID --value' 2>/dev/null | tr -d '[:space:]'
+}
+
+# Wait until FreeSWITCH can actually serve calls again.
+#
+# `status` answers before the modules finish loading on a 1 vCPU host, so the
+# readiness definition is: the CLI answers, the CDR module is present, and the
+# switch reports itself ready. Without this the smoke can register against a
+# half-booted switch and fail a variant for the host's timing, not its code.
+wait_for_freeswitch() {
+    local attempt status_text
+
+    for attempt in $(seq 1 45); do
+        status_text="$(run_on_pbx 'fs_cli -x "status" 2>/dev/null | head -2; fs_cli -x "module_exists mod_json_cdr" 2>/dev/null' 2>/dev/null)"
+
+        if printf '%s' "$status_text" | grep -q 'is ready' \
+            && printf '%s' "$status_text" | grep -q 'true'; then
+            return 0
+        fi
+
+        sleep 2
+    done
+
+    printf 'FS-NOT-READY the switch did not report ready within 90 s\n' >&2
+    return 1
+}
+
 # Build the per-service CPU attribution command that wraps an ablation cell.
 #
 # The output lands on the PBX inside the tier's artifact tree, so the teardown
@@ -1324,13 +1357,18 @@ warm_directory() {
 # none of them.
 run_sip_phase() {
     local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file cpu_csv
-    local successful failed already_failed=0
+    local successful failed already_failed=0 fs_pid_before fs_pid_after
 
     # A cell measured behind a half-applied switch is a plausible but
     # meaningless number, so a failed switch fails the cell instead: a
     # configuration that did not take must never reach the results.
     if ! apply_variant "$TIER" "$variant"; then
         cell_failed "${TIER}/${variant}/sip-cps${CPS} (variant switches)"
+        return 1
+    fi
+
+    if ! wait_for_freeswitch; then
+        cell_failed "${TIER}/${variant}/sip-cps${CPS} (freeswitch not ready)"
         return 1
     fi
 
@@ -1371,9 +1409,21 @@ run_sip_phase() {
     run_on_pbx "$(cpuwatch_command "${TIER}/${variant}/sip-cps${CPS}" "$cpu_csv" $((LADDER_SECONDS + 120)))" >/dev/null 2>&1 \
         || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
 
+    # A restart during the window invalidates the cell: the in-flight call is
+    # rejected and the registrations it depends on are rebuilt underneath it.
+    fs_pid_before="$(freeswitch_main_pid)"
+
     run_status=0
 
     run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || run_status=$?
+
+    fs_pid_after="$(freeswitch_main_pid)"
+
+    if [ -n "$fs_pid_before" ] && [ "$fs_pid_before" != "$fs_pid_after" ]; then
+        printf 'FS-RESTARTED label=%s pid=%s->%s\n' "$label" "$fs_pid_before" "$fs_pid_after" \
+            | tee "${local_run_dir}/fs-restart.txt" >&2
+        cell_failed "${label}-fs-restart"
+    fi
 
     # The sampler writes on the PBX; pull it beside the cell artifacts so the
     # report reads CPU from the same directory as the tally it explains.
@@ -1531,6 +1581,11 @@ run_sip_smoke() {
     # which is ten wasted minutes and no evidence.
     if ! apply_variant "$TIER" "$variant"; then
         printf 'SMOKE-FAILED %s/%s (variant switches)\n' "$TIER" "$variant" >&2
+        return 1
+    fi
+
+    if ! wait_for_freeswitch; then
+        printf 'SMOKE-FAILED %s/%s (freeswitch not ready)\n' "$TIER" "$variant" >&2
         return 1
     fi
 
