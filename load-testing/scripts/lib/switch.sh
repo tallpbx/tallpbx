@@ -172,7 +172,7 @@ service_reload() {
 
 # Apply a PHP-FPM process-manager mode and worker cap, then assert the result.
 apply_fpm_profile() {
-    local mode="${1:-}" children="${2:-}" pool
+    local mode="${1:-}" children="${2:-}" pool current_mode current_children
 
     case "$mode" in
         static | dynamic) ;;
@@ -195,6 +195,16 @@ apply_fpm_profile() {
     fi
 
     snapshot_once fpm-pool "$pool"
+
+    # Skip when the pool already runs the requested shape; restarting php-fpm
+    # for an identical file only interrupts the cell.
+    current_mode="$(awk -F= '/^pm[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
+    current_children="$(awk -F= '/^pm\.max_children[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
+    if [ "$current_mode" = "$mode" ] && [ "$current_children" = "$children" ]; then
+        log "php-fpm already ${mode}/${children} in ${pool}"
+        assert_fpm_profile "$mode" "$children"
+        return $?
+    fi
 
     sed -i -E "s/^[;[:space:]]*pm[[:space:]]*=[[:space:]]*.*/pm = ${mode}/" "$pool"
     sed -i -E "s/^[;[:space:]]*pm\.max_children[[:space:]]*=[[:space:]]*.*/pm.max_children = ${children}/" "$pool"
@@ -800,9 +810,9 @@ assert_esl_profile() {
 
 # Report whether the tallpbx-octane binding is active in xml_curl.conf.xml.
 octane_binding_state() {
-    local active
+    local file="${1:-$FS_XML_CURL_CONF}" active
 
-    active="$(grep -cE '^[[:space:]]*<binding name="tallpbx-octane"' "$FS_XML_CURL_CONF" 2>/dev/null || true)"
+    active="$(grep -cE '^[[:space:]]*<binding name="tallpbx-octane"' "$file" 2>/dev/null || true)"
 
     if [ "${active:-0}" -gt 0 ]; then
         printf 'on'
@@ -891,6 +901,16 @@ apply_octane_binding() {
     fi
 
     snapshot_once xml-curl-conf "$FS_XML_CURL_CONF"
+
+    # A repeated apply must be free: when the file already holds the wanted
+    # state the runtime already matches it, so no rewrite, no restart and no
+    # registration churn. Every cell used to unload the module here even when
+    # nothing changed, which is what killed the switch during the ladder.
+    if [ "$(octane_binding_state)" = "$state" ]; then
+        log "octane XML binding already ${state}; nothing to change"
+        assert_octane_binding "$state"
+        return $?
+    fi
 
     # Rewriting an already-commented block would nest comment markers, which
     # XML forbids, so an idempotent apply skips straight to the assertion.
@@ -1221,9 +1241,7 @@ restore_baseline() {
 
     log "restoring baseline configuration"
 
-    local file level mode
-
-    local xml_before xml_after
+    local file level mode xml_before xml_after json_before json_after
 
     restore_env
     restore_file fpm-pool
@@ -1237,7 +1255,14 @@ restore_baseline() {
         restart_freeswitch_for_binding_change >/dev/null 2>&1 || log "binding restart after restore failed"
     fi
 
+    # The CDR module reads its configuration on load as well, so reload it
+    # only when the restore actually changed the file.
+    json_before="$(sha256sum "$FS_JSON_CDR_CONF" 2>/dev/null | awk '{print $1}')"
     restore_file json-cdr-conf
+    json_after="$(sha256sum "$FS_JSON_CDR_CONF" 2>/dev/null | awk '{print $1}')"
+    if [ "$json_before" != "$json_after" ]; then
+        fs_cli -x "reload mod_json_cdr" >/dev/null 2>&1 || true
+    fi
 
     # nginx files keep their backup next to the original; the recorded list
     # is what survives between the apply process and this one.
@@ -1264,8 +1289,6 @@ restore_baseline() {
             apply_fs_db_mode "$mode" || log "runtime database restore failed"
         fi
     fi
-
-    fs_cli -x "reload mod_json_cdr" >/dev/null 2>&1 || true
 
     if nginx -t >/dev/null 2>&1; then
         systemctl reload nginx >/dev/null 2>&1 || true
@@ -1313,6 +1336,7 @@ main() {
         assert_xml_path | assert-xml-path) assert_xml_path "$@" ;;
         apply_octane_binding | apply-octane-binding) apply_octane_binding "$@" ;;
         assert_xml_curl_config | assert-xml-curl-config) assert_xml_curl_config "$@" ;;
+        octane_binding_state | octane-binding-state) octane_binding_state "$@" ;;
         assert_octane_binding | assert-octane-binding) assert_octane_binding "$@" ;;
         apply_ttl | apply-ttl) apply_ttl "$@" ;;
         assert_ttl | assert-ttl) assert_ttl "$@" ;;

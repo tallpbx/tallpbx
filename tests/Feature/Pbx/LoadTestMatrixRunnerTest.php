@@ -595,4 +595,49 @@ XML);
 
         unlink($fixture);
     });
+
+    it('reads the octane binding state from a configuration file', function (): void {
+        $on = (string) tempnam(sys_get_temp_dir(), 'xmlcurl');
+        file_put_contents($on, "<configuration>\n  <bindings>\n    <binding name=\"tallpbx-octane\">\n      <param name=\"gateway-url\" value=\"http://x\"/>\n    </binding>\n  </bindings>\n</configuration>");
+
+        $off = (string) tempnam(sys_get_temp_dir(), 'xmlcurl');
+        file_put_contents($off, "<configuration><bindings>\n<!-- <binding name=\"tallpbx-octane\"> -->\n<binding name=\"tallpbx-fallback\"><param name=\"gateway-url\" value=\"http://x\"/></binding>\n</bindings></configuration>");
+
+        foreach ([[$on, 'on'], [$off, 'off']] as [$path, $expected]) {
+            $process = new Process(['bash', base_path('load-testing/scripts/lib/switch.sh'), 'octane_binding_state', $path], base_path());
+            $process->run();
+            expect(trim($process->getOutput()))->toBe($expected);
+        }
+
+        unlink($on);
+        unlink($off);
+    });
+
+    it('leaves the switch alone when the binding already matches', function (): void {
+        $lib = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        // A repeated apply must be a no-op: no rewrite, no restart. The early
+        // return has to sit before the restart call inside the apply itself,
+        // otherwise the shell reaches the restart anyway.
+        $start = strpos($lib, 'apply_octane_binding()');
+        $already = $start === false ? false : strpos($lib, 'octane XML binding already', $start);
+        $restart = $start === false ? false : strpos($lib, 'restart_freeswitch_for_binding_change', $start);
+
+        expect($start)->toBeInt()
+            ->and($already)->toBeInt()
+            ->and($restart)->toBeInt()
+            ->and($already)->toBeLessThan($restart);
+    });
+
+    it('leaves php-fpm alone when the pool already matches', function (): void {
+        $lib = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        expect($lib)->toContain('php-fpm already');
+    });
+
+    it('reloads the cdr module only when its configuration changed', function (): void {
+        $lib = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        expect($lib)->toContain('json_before');
+    });
 });
