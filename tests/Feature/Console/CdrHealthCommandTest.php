@@ -92,7 +92,7 @@ it('fails when the stream backlog crosses the warning threshold', function (): v
 it('fails when the nginx log records a failed post to the cdr endpoint', function (): void {
     $spool = cdrHealthDir();
     $log = cdrHealthFile([
-        '2026/11/08 10:00:00 [error] 1#1: upstream timed out (110: Connection timed out) while reading response header from upstream, request: "POST /api/v1/cdr HTTP/1.1", upstream: "fastcgi://unix:/run/php/php8.5-fpm.sock"',
+        gmdate('Y/m/d H:i:s').' [error] 1#1: upstream timed out (110: Connection timed out) while reading response header from upstream, request: "POST /api/v1/cdr HTTP/1.1", upstream: "fastcgi://unix:/run/php/php8.5-fpm.sock"',
     ]);
 
     $this->artisan('cdr:health', [
@@ -102,6 +102,26 @@ it('fails when the nginx log records a failed post to the cdr endpoint', functio
     ])
         ->expectsOutputToContain('failed_posts=1')
         ->assertFailed();
+
+    rmdir($spool);
+    unlink($log);
+});
+
+it('ignores failed posts older than the window', function (): void {
+    // The error log keeps history; an alert that counted every old line would
+    // fire for days after a single bad afternoon.
+    $spool = cdrHealthDir();
+    $log = cdrHealthFile([
+        '2026/11/04 07:17:58 [error] 1#1: recv() failed (104: Connection reset by peer) while reading response header from upstream, request: "POST /api/v1/cdr HTTP/1.1"',
+    ]);
+
+    $this->artisan('cdr:health', [
+        '--spool-dir' => $spool,
+        '--stream' => 'pbx:cdr:stream:test-'.Str::random(6),
+        '--nginx-error-log' => $log,
+    ])
+        ->expectsOutputToContain('failed_posts=0')
+        ->assertSuccessful();
 
     rmdir($spool);
     unlink($log);

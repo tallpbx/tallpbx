@@ -29,7 +29,8 @@ class CdrHealthCommand extends Command
         {--stream=pbx:cdr:stream : Redis stream that buffers accepted posts}
         {--warn-pending=1000 : Pending stream entries that count as a backlog}
         {--nginx-error-log=/var/log/nginx/error.log : nginx error log to scan}
-        {--log-lines=2000 : Trailing log lines inspected for failed posts}';
+        {--log-lines=2000 : Trailing log lines inspected for failed posts}
+        {--window=15 : Minutes of log history that count as recent}';
 
     /**
      * One-line description used by the console command list.
@@ -47,7 +48,11 @@ class CdrHealthCommand extends Command
     {
         $spooled = $this->spooledPosts((string) $this->option('spool-dir'));
         $backlog = $this->backlog((string) $this->option('stream'));
-        $failed = $this->failedPosts((string) $this->option('nginx-error-log'), (int) $this->option('log-lines'));
+        $failed = $this->failedPosts(
+            (string) $this->option('nginx-error-log'),
+            (int) $this->option('log-lines'),
+            (int) $this->option('window')
+        );
         $warnPending = (int) $this->option('warn-pending');
 
         $this->line("spooled_posts={$spooled}");
@@ -105,19 +110,23 @@ class CdrHealthCommand extends Command
      * Count recent web-server failures for the CDR endpoint.
      *
      * nginx records upstream failures in its error log even though the CDR
-     * location has request logging off, so this reads the tail of that file
-     * and counts lines that mention the endpoint and a transport failure.
+     * location has request logging off, so this reads the tail of that file and
+     * counts lines that mention the endpoint, a transport failure, and a
+     * timestamp inside the window. The log keeps history, and an alert that
+     * counted every old line would stay red for days after one bad afternoon.
      *
      * @param  string  $path  nginx error log
      * @param  int  $lines  How many trailing lines to inspect
+     * @param  int  $minutes  How far back a failure still counts
      */
-    private function failedPosts(string $path, int $lines): int
+    private function failedPosts(string $path, int $lines, int $minutes = 15): int
     {
         if (! is_file($path)) {
             return 0;
         }
 
         $tail = $this->trailingLines($path, $lines);
+        $cutoff = now()->subMinutes(max(1, $minutes));
         $failed = 0;
 
         foreach ($tail as $line) {
@@ -125,9 +134,19 @@ class CdrHealthCommand extends Command
                 continue;
             }
 
-            if (preg_match('/(upstream|FastCGI|timed out|no live upstreams)/i', $line) === 1) {
-                $failed++;
+            if (preg_match('/(upstream|FastCGI|timed out|no live upstreams)/i', $line) !== 1) {
+                continue;
             }
+
+            // nginx writes "Y/m/d H:i:s" in the host's local time; a line
+            // whose stamp cannot be read is ignored rather than counted.
+            $at = \DateTimeImmutable::createFromFormat('Y/m/d H:i:s', substr($line, 0, 19));
+
+            if ($at === false || $at < $cutoff) {
+                continue;
+            }
+
+            $failed++;
         }
 
         return $failed;
