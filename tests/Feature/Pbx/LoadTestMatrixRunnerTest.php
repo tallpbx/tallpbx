@@ -361,8 +361,10 @@ describe('load test matrix runner', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 
         // A cell measured behind a half-applied switch is a plausible but
-        // meaningless number. Every phase must stop at the switch failure.
-        expect(substr_count($script, 'if ! apply_variant'))->toBe(3);
+        // meaningless number. Every phase must stop at the switch failure,
+        // and the variant smoke is the fourth gate: a smoke run under the
+        // baseline proves nothing about the variant.
+        expect(substr_count($script, 'if ! apply_variant'))->toBe(4);
     });
 
     it('keeps long ssh sessions alive instead of hanging for hours', function (): void {
@@ -408,6 +410,22 @@ describe('load test matrix runner', function (): void {
         // so the launcher must create the destination itself — otherwise the
         // shell redirect fails and the sample dies silently.
         expect($process->getOutput())->toMatch('/mkdir -p [^\n]*v-octane[^\n]*cpuwatch\.sh/');
+    });
+
+    it('proves the smoke under each variant, not the baseline', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-fast', '--phase=sip'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // The preflight must run with the variant's switches applied. A smoke
+        // run under the baseline proves the baseline, not the variant: a
+        // variant that cannot register then only surfaces inside a 60 s cell,
+        // after the 120 s register timeout, with no useful evidence.
+        expect($process->getOutput())->toContain('v-fast / smoke')
+            ->and($process->getOutput())->toContain('pbx-sipp-validate.sh');
     });
 
     it('attributes CPU to each service during a SIP ladder rung', function (): void {

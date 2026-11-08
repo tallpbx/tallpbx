@@ -2,7 +2,29 @@
 
 Where the series stands right now. Updated when a phase completes, not continuously — if a number is not here, it is not measured yet.
 
-**Last updated:** 2026-11-03
+## Current series — `cdr-entry-20261108` (CDR fast entry)
+
+**Question:** what does serving CDR through `public/cdr-fast.php` (five providers) buy on the 1 vCPU tier, in calls completed and in CPU by process, against the same tests run with CDR through `index.php`?
+
+**Build:** `5.x` @ `021efba` (fast CDR entry + shared minimal bootstrap + fail-open fix), host and generator as below.
+
+| Step | State |
+|:--|:--|
+| Deploy to the PBX | **Done.** Fast CDR entry live; POST 200 with no `Access-Control-Allow-Origin` header, which only the full application adds |
+| XML battery, `v-fast`, 100x5, production-60 | **Done.** 32.1 / 32.6 / 31.4 req/s, p50 114 ms, 100 % HTTP 200 — against 25.5 req/s mean in `refresh-20261103` |
+| CPS ladder, `v-fast`, before/after arms | **In progress.** First attempt failed at SIPp registration with `503 Maximum Calls In Progress` from the switch's session-rate limiter; the runner's smoke had passed under the *baseline* configuration, not the variant |
+| Octane sanity (XML only) | Pending — one battery and one SIP cell, to prove the opt-in worker still serves with the new shared bootstrap |
+| Pool-split decision (UI vs v-fast+CDR) | Pending — needs the CPU-by-process table from the ladder |
+
+**Traps found and fixed this series** (now in `procedure.md` → Step 10):
+
+- The SIP smoke now runs **per variant with that variant's switches applied**; the old smoke ran under the baseline and could pass while the variant under test could not register.
+- `/etc/nginx/sites-available/pbx.loadtest.bak` is captured once and never refreshed; after a template change it must be refreshed, or the baseline restore undoes the new default.
+- `503 Maximum Calls In Progress` at registration is the switch's session-rate limiter (`max-sessions` 1000, `sessions-per-second` 60) being consumed by internet scanners; check `fs_cli -x "show status"` before blaming the variant.
+
+---
+
+**Last updated:** 2026-11-03 (ledger below)
 **Series:** `refresh-20261103`
 **Tier under test:** `h1-1c1g` — 1 vCPU, 967 MB, 2 GB swap, shared CPU (`x.x.x.138`)
 **Generator:** 1 vCPU, 967 MB, no firewall (`x.x.x.55`)

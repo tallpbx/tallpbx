@@ -49,6 +49,8 @@ ssh "$PBX_HOST" 'cd /var/www/tallpbx && \
 
 **Checkpoint:** `log=notice`, `esl=essential`, `fpm= pm = static pm.max_children = 5`, `cdr=active`, `mod_json_cdr=true`.
 
+**What the shipped default serves:** XML through the fast controller on PHP-FPM, with the three-tier ladder above it (Octane worker first when enabled, then the fast controller, then the stock full application); CDR through `public/cdr-fast.php` on PHP-FPM, with the stock block commented underneath for rollback. Octane is an opt-in performance mode, not part of the default, and CDR never uses it. A host whose site file still serves XML or CDR through `index.php` is running the old default — refresh the nginx template before measuring.
+
 ---
 
 ## Step 3 — Seed the tenant
@@ -178,6 +180,11 @@ git commit -m "chore(load-test): record <series> raw artifacts"
 | `UNKNOWN-REQUIREMENT` | The matrix names a switch the runner cannot drive | The matrix and `scripts/lib/switch.sh` are out of step — fix the code, not the run |
 | `baseline-corrected …` | The restore found and fixed a mismatched Lua pair | Not an error; it means the previous state was incoherent. Investigate how it got that way |
 | `WARNING: could not pull artifacts` | The `scp` back from the PBX failed | Artifacts still exist on the PBX; copy them before the host is deleted |
+| `SMOKE-FAILED <tier>/<variant>` | The variant's own preflight failed; no cell ran behind it | Read `<tier>/<variant>/sip-smoke/summary.md` and fix the chain before re-running. The smoke is per variant **with that variant's switches applied** — a smoke that ran under the baseline proves nothing about the variant |
+| `register: failed with exit code 124` | SIPp's register step timed out before the cell began | Almost always FreeSWITCH's session-rate limiter: scanners consume `sessions-per-second` and legitimate REGISTERs get `503 Maximum Calls In Progress` (then `481` on the retry). Check `fs_cli -x "show status"` — it prints `N session(s) per Sec out of max 60` and `1000 session(s) max` at the shipped defaults (`max-sessions` in `switch.conf.xml`, `FS_SESSIONS_PER_SECOND` in `.env`). Re-run once the host is idle; a repeatable failure under load is a finding about the host, not the runner |
+| `CDR-GATE FAILED … reason=no-tally` | There is no SIPp tally to judge, because registration or the call never completed | Fix the earlier failure first; the gate is reporting a missing measurement, not a missing record |
+| A location added by the installer disappears after the first cell | The runner restores `${file}.loadtest.bak`, which is captured once and never refreshed | After changing an nginx template, refresh the backup from the generated file (`cp /etc/nginx/sites-available/pbx /etc/nginx/sites-available/pbx.loadtest.bak`) so the baseline encodes the current default |
+| Manual register test gets `401` twice | The scenario expects the generated auth CSV, not the call CSV | Drive registration through `scripts/pbx-sipp-validate.sh` (it writes `<run-dir>/sipp-users-auth.csv`), or point `-inf` at that file |
 
 A cell failure never aborts the series: the runner records it in `failures.log` and continues. The series is only trustworthy when `failures.log` is empty.
 

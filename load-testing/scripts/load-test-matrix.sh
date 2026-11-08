@@ -892,12 +892,14 @@ sip_command() {
 # The preflight is a setup check, not a measurement, so it gets its own
 # directory: a later cell must never read its summary as one of the series.
 smoke_run_dir() {
+    local variant="${1:-}"
+
     if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
-        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/sip-smoke"
+        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/${variant}/sip-smoke"
         return
     fi
 
-    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/sip-smoke"
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/${variant}/sip-smoke"
 }
 
 # Build the SIP smoke preflight: two registrations (the caller and the callee
@@ -959,17 +961,21 @@ list_cells() {
 dry_run_cells() {
     local tier variant phase profile_id ttl_id section repeat ablation value run_dir
 
-    # The SIP smoke preflight is printed first because it runs first: a
-    # broken chain is found in two minutes rather than at minute 30 of a
-    # six-variant series.
-    if printf '%s\n' "$(selected_phases)" | grep -qx 'sip'; then
-        printf '=== %s / smoke / preflight\n' "${TIER:-<tier>}"
-        printf '  %s\n' "$(smoke_command "$(smoke_run_dir)")"
-    fi
+    # The SIP smoke preflight is printed per variant because it runs with that
+    # variant's switches applied: a broken chain is found in two minutes rather
+    # than at minute 30 of a six-variant series, and a smoke run under the
+    # baseline cannot prove anything about the variant.
 
     while IFS= read -r tier; do
         while IFS= read -r variant; do
             while IFS= read -r phase; do
+                # The variant smoke runs first and with the variant's switches
+                # applied, so it is printed before the cell header.
+                if [ "$phase" = "sip" ]; then
+                    printf '=== %s / %s / smoke / preflight\n' "$tier" "$variant"
+                    printf '  %s\n' "$(smoke_command "$(smoke_run_dir "$variant")")"
+                fi
+
                 printf '=== %s / %s / %s\n' "$tier" "$variant" "$phase"
 
                 case "$phase" in
@@ -1516,12 +1522,21 @@ run_ablation_phase() {
 # in two minutes will fail every cell of a 30-minute series for the same
 # reason, so the preflight fails the whole run instead of one cell.
 run_sip_smoke() {
-    local remote_run_dir local_run_dir label before after counts
+    local variant="$1" remote_run_dir local_run_dir label before after counts
     local successful failed
 
-    remote_run_dir="$(smoke_run_dir)"
-    local_run_dir="${ARTIFACT_ROOT}/${TIER}/sip-smoke"
-    label="${TIER}/smoke"
+    # The smoke must prove the configuration under test. A smoke that ran
+    # under the baseline proves the baseline: a variant that cannot register
+    # then only surfaces inside a 60 s cell after the 120 s register timeout,
+    # which is ten wasted minutes and no evidence.
+    if ! apply_variant "$TIER" "$variant"; then
+        printf 'SMOKE-FAILED %s/%s (variant switches)\n' "$TIER" "$variant" >&2
+        return 1
+    fi
+
+    remote_run_dir="$(smoke_run_dir "$variant")"
+    local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-smoke"
+    label="${TIER}/${variant}/smoke"
 
     mkdir -p "$local_run_dir"
 
@@ -1604,19 +1619,9 @@ execute_cells() {
 
     # The SIP smoke preflight runs before any series cell: a broken chain is
     # found in two minutes rather than after the first 30-minute series has
-    # failed for a reason that was visible at setup time. It is paid once per
-    # tier — the ladder is many short invocations, and its passing record is
-    # what tells later invocations the chain was already proven.
-    if printf '%s\n' "$(selected_phases)" | grep -qx 'sip'; then
-        smoke_gate="${ARTIFACT_ROOT}/${TIER}/sip-smoke/cdr-gate.txt"
-
-        if [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
-            printf 'SMOKE-ALREADY-PASSED %s (see %s)\n' "$TIER" "$smoke_gate" >&2
-        elif ! run_sip_smoke; then
-            printf 'SIP smoke preflight failed; no series cell was measured on %s.\n' "$TIER" >&2
-            exit 1
-        fi
-    fi
+    # failed for a reason that was visible at setup time. It runs per variant,
+    # with that variant's switches applied, and its passing record is what
+    # tells later invocations of the same variant the chain was proven once.
 
     while IFS= read -r variant; do
         while IFS= read -r phase; do
@@ -1624,7 +1629,18 @@ execute_cells() {
 
             case "$phase" in
                 xml) run_xml_phase "$variant" || failures=$((failures + 1)) ;;
-                sip) run_sip_phase "$variant" || failures=$((failures + 1)) ;;
+                sip)
+                    smoke_gate="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-smoke/cdr-gate.txt"
+
+                    if [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
+                        printf 'SMOKE-ALREADY-PASSED %s/%s (see %s)\n' "$TIER" "$variant" "$smoke_gate" >&2
+                    elif ! run_sip_smoke "$variant"; then
+                        printf 'SIP smoke preflight failed for %s/%s; no series cell was measured.\n' "$TIER" "$variant" >&2
+                        failures=$((failures + 1))
+                        continue
+                    fi
+
+                    run_sip_phase "$variant" || failures=$((failures + 1)) ;;
                 ablation) run_ablation_phase "$variant" || failures=$((failures + 1)) ;;
             esac
         done < <(selected_phases)
