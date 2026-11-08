@@ -25,6 +25,7 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
   - [4 vCPU / 16 GB RAM (Dedicated Cloud Node)](#4-vcpu--16-gb-ram-dedicated-cloud-node)
   - [Persistent Octane Worker (4-core Reference Appliance)](#persistent-octane-worker-4-core-reference-appliance)
   - [XML Serving Configurations: Four-Way Comparison (1 vCPU)](#xml-serving-configurations-four-way-comparison-1-vcpu)
+- [CDR Fast Entry Series (1 vCPU, 2026-11-08)](#cdr-fast-entry-series-1-vcpu-2026-11-08)
 - [Live Call Capacity & Telephony Feature Validation (SIP Signaling)](#live-call-capacity--telephony-feature-validation-sip-signaling)
   - [End-to-End Functional Feature Validation (All Tiers)](#end-to-end-functional-feature-validation-all-tiers)
   - [1 vCPU / 1 GB RAM Live Call Capacity](#1-vcpu--1-gb-ram-live-call-capacity)
@@ -510,6 +511,65 @@ At 100×5 the cost is inside the noise.
 - The 500×25 tier has two rounds per cell, not three.
 - Calls were placed with `originate loopback` and fail at the bridge because the test extension is not registered. That failure is after the dialplan lookup, so it does not affect the dialplan measurement.
 - No SIPp end-to-end call test was run for these configurations; that measures registration and media, not XML lookup cost.
+
+---
+
+## CDR Fast Entry Series (1 vCPU, 2026-11-08)
+
+**Question.** What does serving CDR ingestion through `public/cdr-fast.php` — a five-provider minimal bootstrap instead of the full application — buy on the entry tier, and what does the switch sustain while it runs?
+
+**Environment.** PBX `x.x.x.138`, 1 vCPU, 967 MB, 2 GB swap; generator `x.x.x.55`, 1 vCPU, no firewall. Build `5.x` @ `759ed6a`. XML served by the fast controller (`v-fast`), CDR by the fast entry, FreeSWITCH on its three-binding ladder with the Octane binding disabled, and the full default nftables ruleset active for the whole series.
+
+### Ingestion latency (single POST, empty body → 422)
+
+| Path | p50 | p90 | Probes |
+|:--|--:|--:|--:|
+| Stock `index.php` | 205 ms | — | 30 |
+| Fast entry | **78 ms** | 100 ms | 30 |
+| Fast entry, concurrency 5 | 82 ms | 155 ms | 50 |
+
+A real attributed payload posted end-to-end returned 200, drained the stream within 2 s, and wrote one correct row with the payload byte length preserved.
+
+### Call cells (fast entry, post-fix harness)
+
+| Offered | Calls ok | Failed | CDR rows | Gate |
+|--:|--:|--:|--:|:--|
+| 5 CPS (anchor, earlier cell) | **300** | 0 | **601** | pass |
+| 8 CPS | 102 | 378 | 231 | pass |
+| 10 CPS | 62 | 538 | 153 | pass |
+| 15 CPS | 53 | 847 | 148 | pass |
+
+The 5 CPS anchor is the highest rate this tier serves fully; it compares with 276/300 calls and 46/552 rows recorded before the fast entry. Above 5 CPS the host is worker-bound and completion falls roughly linearly with the offered rate.
+
+### CPU by process during the cells (peak % of one core)
+
+| Class | 8 CPS | 10 CPS | 15 CPS |
+|:--|--:|--:|--:|
+| php-fpm | 116 | **127** | 117 |
+| freeswitch | 52 | 52 | 61 |
+| mariadb | 15 | 18 | 18 |
+| queue-worker | 13 | 15 | 16 |
+| esl-listener | 7 | 10 | 12 |
+| cdr-worker | 6 | 7 | 6 |
+| redis | 6 | 6 | 7 |
+| octane-worker (idle) | 6 | 3 | 3 |
+
+php-fpm is the ceiling: one pool of five static workers saturates while FreeSWITCH still has headroom, and the CDR worker stays under 7 %, so the write side of the pipeline is not the limit. Attributed memory: php-fpm 68–71 MB, FreeSWITCH 160–166 MB, cdr-worker 44 MB.
+
+### What the retry-and-spool ladder absorbed
+
+nginx recorded **1,596 failed posts** to `/api/v1/cdr` between 2026-11-04 and 2026-11-08 11:11 — the overloaded cells and the crash era. None were lost: FreeSWITCH retried, spooled what it could not deliver, and the drain reconciled it; the spool is empty.
+
+### Stability
+
+Six core dumps between 04:22 and 08:52 all faulted inside `mod_xml_curl`'s fetch with a zeroed binding. Root cause: the load-test harness unloaded that module between cells. Once binding changes were applied by restarting the switch — and repeated applies became no-ops — eight consecutive cells at 5–15 CPS completed with **zero** restarts.
+
+### Measurement limits (do not use these)
+
+- Per-process samples taken before ~10:50 came from a sampler that held its SSH channel and covered the pre-call window; those files are idle readings, not call load.
+- The stock-CDR arm was only sampled at 2 CPS, pre-fix, at idle. There is **no valid CPU or memory A/B between stock and fast CDR**; only the latency table above compares the two paths.
+- The sampler files for 8/10/15 CPS on the workstation are stale; the valid copies remain on the PBX under `storage/app/load-tests/cdr-fpm-fast-20261108/`.
+- Raw artifacts are not committed; per-cell data stays in `load-testing/results/` on the host that produced it.
 
 ---
 
