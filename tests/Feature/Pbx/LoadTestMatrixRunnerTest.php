@@ -412,6 +412,23 @@ describe('load test matrix runner', function (): void {
         expect($process->getOutput())->toMatch('/mkdir -p [^\n]*v-octane[^\n]*cpuwatch\.sh/');
     });
 
+    it('detaches the CPU sampler so the cell is not blocked behind it', function (): void {
+        $root = storage_path('framework/testing/cpuwatch-detach-'.uniqid());
+
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-fast', '--phase=sip', '--cps=10'],
+            $root,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // A sampler left in the foreground of the SSH session holds the channel
+        // open until its whole window expires, so SIPp starts minutes late and
+        // the sample covers idle time instead of the cell. The launcher must
+        // fork it into its own session and give the SSH channel nothing to hold.
+        expect($process->getOutput())->toMatch('/\( nohup bash [^\n]*cpuwatch\.sh[^\n]*& \) <\/dev\/null/');
+    });
+
     it('refuses to measure across a freeswitch restart', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 

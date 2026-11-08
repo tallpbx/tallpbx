@@ -883,7 +883,7 @@ cpuwatch_command() {
 
     directory="$(dirname "$destination")"
 
-    printf 'mkdir -p %q && cd %q && nohup bash %q --sample 1 %q %q > %q 2>&1 &' \
+    printf 'mkdir -p %q && cd %q && ( nohup bash %q --sample 1 %q %q > %q 2>&1 & ) </dev/null >/dev/null 2>&1' \
         "$directory" "$REMOTE_APP_DIR" "$REMOTE_APP_DIR/load-testing/scripts/tools/cpuwatch.sh" \
         "$seconds" "$label" "$destination"
 }
