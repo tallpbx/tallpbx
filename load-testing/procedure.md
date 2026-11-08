@@ -163,12 +163,20 @@ This is the only phase where ESL profile, broadcast throttling and CDR transport
 
 ## Step 9 — Keep the results
 
+Raw run directories are **never committed**. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored for a reason: one series produces thousands of per-cell files that are unreviewable and bloat every clone. Staging them with `git add -A` after a run is the failure mode this rule exists to prevent.
+
+What a series leaves behind:
+
 ```bash
-git add load-testing/results/<series>
-git commit -m "chore(load-test): record <series> raw artifacts"
+# 1. The written report — the durable record, one new file per series.
+$EDITOR docs/load-testing-<series>.md
+
+# 2. Stage only what a reviewer should read.
+git add docs/load-testing-<series>.md      # plus any code the series changed
+git commit -m "docs(load-test): record the <series> report"
 ```
 
-**Checkpoint:** `git status` is clean and the results directory is inside the commit. Results kept only under `storage/` are ignored by git and can be removed by `git clean -fdx`.
+**Checkpoint:** `git status` shows no `load-testing/results/**` or `storage/app/load-tests/**` paths staged, and the report cites the run directory it came from so any figure can be traced back to the files on the host. If the raw data must survive the host, copy it to external storage outside the repository — not into git.
 
 ---
 

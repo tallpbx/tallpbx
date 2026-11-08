@@ -40,6 +40,15 @@ Thumbs.db
 app-modules/backups/backups
 tests/Browser/Screenshots/
 /storage/framework/browser-media*
+
+# Raw load-test measurement artifacts are working data, never committed.
+# A run produces thousands of per-cell files (SIPp traces, CSVs, JSON
+# reports) that are noise in review and bloat every clone. The durable
+# record of a series is its written report in docs/; raw artifacts stay in
+# storage/app/load-tests/<series>/ (already ignored below) or on the host
+# that produced them.
+/load-testing/results/
+/storage/app/load-tests/
 /custom-modules/*
 !/custom-modules/.gitkeep
 rr

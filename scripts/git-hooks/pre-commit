@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+#
+# Pre-commit guard: refuse any commit that stages raw load-test artifacts.
+#
+# One series produces thousands of per-cell files (SIPp traces, CSVs, JSON
+# reports, transport logs). They are working data, never repository content —
+# see load-testing/README.md rule 6. This hook is the last line of defence:
+# .gitignore stops them being added by accident, this stops them being added
+# deliberately or by a `git add -A` that bypasses an ignore rule.
+#
+# Enable once per clone (the repository does not change your git config):
+#
+#     git config core.hooksPath scripts/git-hooks
+#
+set -euo pipefail
+
+blocked_prefixes=(
+    "load-testing/results/"
+    "storage/app/load-tests/"
+)
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+[ -n "$staged" ] || exit 0
+
+offending=""
+while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    for prefix in "${blocked_prefixes[@]}"; do
+        case "$path" in
+            "$prefix"*)
+                offending="${offending}${path}"$'\n'
+                ;;
+        esac
+    done
+done <<< "$staged"
+
+if [ -n "$offending" ]; then
+    cat >&2 <<MSG
+COMMIT REFUSED: raw load-test artifacts are staged.
+
+${offending}
+Raw run directories are working data, never repository content:
+  load-testing/results/     (git-ignored)
+  storage/app/load-tests/   (git-ignored)
+
+The durable record of a series is its written report under docs/.
+Unstage these paths and stage only the report and the code:
+
+  git restore --staged load-testing/results storage/app/load-tests
+
+See load-testing/README.md rule 6.
+MSG
+    exit 1
+fi
+
+exit 0

@@ -39,6 +39,12 @@ Read the scripts only when the documents do not answer a question:
 3. **Never trust an `apply_*` without its `assert_*`.** A switch that silently did not take effect produces a plausible but meaningless number. `SWITCH-FAILED` fails that cell on purpose.
 4. **Never commit host credentials.** No IP addresses, key names, key paths or passwords belong in this directory. The operator supplies `PBX_HOST` and the SSH identity; the runner uses the ambient SSH configuration.
 5. **Never edit `docs/load-testing-results.md`** as part of a series. The previous series record stays untouched; a new report is written in a new file.
+6. **Never commit raw measurement artifacts.** One series produces thousands of per-cell files — SIPp traces, CSVs, JSON reports, transport logs — that are unreviewable and bloat every clone. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored; keep them that way. The durable record of a series is its **written report** under `docs/`, not the run directory. Staging a run with `git add -A` is how this rule gets broken: stage the report and the code, never the results tree.
+
+   Three guards enforce this, and removing any of them is a defect:
+   - `.gitignore` ignores both trees;
+   - `scripts/git-hooks/pre-commit` refuses a commit that stages them — enable it once per clone with `git config core.hooksPath scripts/git-hooks`;
+   - `tests/Feature/Pbx/LoadTestArtifactHygieneTest.php` fails the suite if either guard disappears.
 
 ---
 
@@ -66,7 +72,7 @@ The run writes a manifest, applies each switch and asserts it, runs the cell, re
 ## Where results live
 
 ```
-load-testing/results/<series>/<tier>/
+load-testing/results/<series>/<tier>/          (git-ignored, local working data)
     manifest.json          what host, build and configuration the run had
     <variant>/*.json        one file per cell, with per-request timings
     <variant>/probe-*.txt  what FreeSWITCH waited for on one lookup
@@ -74,9 +80,7 @@ load-testing/results/<series>/<tier>/
     failures.log           one line per failed cell (empty means clean)
 ```
 
-`load-testing/results/` is the **durable** copy: it is inside the repository, so it survives the measurement hosts being deleted and travels with a clone.
-
-The PBX under test also keeps its own copy under `storage/app/load-tests/<series>/`. That one is deliberately ignored by git so a measurement can never dirty the host's working tree, and it is disposable.
+The run directory is **working data, not repository content**: `load-testing/results/` and `storage/app/load-tests/` are ignored by git. Keeping a series means writing its report into `docs/` (a new file, never a rewrite of an earlier one), and — if the raw data must survive the host — copying the run directory to external storage outside the repository. Archived series from before this convention remain tracked in git history; that is history, not a pattern to follow.
 
 ---
 
