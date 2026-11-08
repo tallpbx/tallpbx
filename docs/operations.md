@@ -505,15 +505,20 @@ CDR ingestion (`mod_json_cdr`) **always** posts to PHP-FPM (`http://127.0.0.1/ap
 ```bash
 systemctl status tallpbx-xml-worker
 ss -ltnp | grep 8090
-journalctl -u tallpbx-xml-worker -n 50 --no-pager
 grep -A3 'binding name="tallpbx-octane"' /etc/freeswitch/autoload_configs/xml_curl.conf.xml
 ```
 
-A live lookup should appear in the journal as a 200:
+The journal does not record individual requests at the default log level, so it cannot tell you whether the worker is answering. Prove it with connections instead — fire a burst of lookups and watch the worker's port while they run:
 
 ```bash
-fs_cli -x "find_user_xml id <extension> <domain>"
+( for i in $(seq 1 40); do fs_cli -x "find_user_xml id <extension> <domain>" >/dev/null; done ) &
+max=0; for i in $(seq 1 120); do
+  n=$(ss -tan | grep -c ':8090'); [ "$n" -gt "$max" ] && max=$n; sleep 0.05
+done
+wait; echo "peak connections to 8090: $max"
 ```
+
+A peak well above zero means FreeSWITCH is fetching from the worker; a peak of zero means the lookup is being answered by the next binding, the fast controller. `fs_cli -x "user_exists id <extension> <domain>"` should also return `true` for a seeded extension.
 
 ### Restart It After a Deployment
 
