@@ -410,6 +410,22 @@ describe('load test matrix runner', function (): void {
         expect($process->getOutput())->toMatch('/mkdir -p [^\n]*v-octane[^\n]*cpuwatch\.sh/');
     });
 
+    it('attributes CPU to each service during a SIP ladder rung', function (): void {
+        $process = matrixRunnerProcess(
+            ['--dry-run', '--tier=h1-1c1g', '--variant=v-fast', '--phase=sip', '--cps=5'],
+            $this->artifactRoot,
+        );
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        // A rung's completion says how many calls finished; it does not say
+        // where the CPU went. Every rung therefore carries a per-service
+        // sample over its own window, named by the offered rate so a ladder
+        // never overwrites an earlier rung.
+        expect($process->getOutput())->toMatch('/cpuwatch\.sh[^\n]*sip-cps5-cpu\.csv/')
+            ->and($process->getOutput())->toContain('pbx-sipp-validate.sh');
+    });
+
     it('restricts the ablation phase to one knob on request', function (): void {
         $process = matrixRunnerProcess(
             ['--dry-run', '--tier=h1-1c1g', '--variant=v-stock-dynamic', '--phase=ablation', '--ablation=fs-db'],

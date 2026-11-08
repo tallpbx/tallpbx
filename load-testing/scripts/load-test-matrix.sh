@@ -999,6 +999,10 @@ dry_run_cells() {
                         done
                         ;;
                     sip)
+                        # A rung's completion says how many calls finished,
+                        # not where the CPU went, so every rung is wrapped in
+                        # the same per-service sample the ablation cells use.
+                        printf '  %s\n' "$(cpuwatch_command "${tier}/${variant}/sip-cps${CPS}" "${REMOTE_ARTIFACT_ROOT}/${tier}/${variant}/sip-cps${CPS}-cpu.csv" $((LADDER_SECONDS + 120)))"
                         printf '  %s\n' "$(sip_command "$(sip_run_dir "$tier" "$variant")")"
                         ;;
                     ablation)
@@ -1313,7 +1317,7 @@ warm_directory() {
 # that gate a cell can report every call answered while the pipeline recorded
 # none of them.
 run_sip_phase() {
-    local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file
+    local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file cpu_csv
     local successful failed already_failed=0
 
     # A cell measured behind a half-applied switch is a plausible but
@@ -1352,9 +1356,24 @@ run_sip_phase() {
         return 1
     fi
 
+    # Per-service CPU across the cell window, on the PBX: the same sampler
+    # the ablation cells use, so a rung's cost is attributable by process
+    # rather than inferred from completion alone. The sample outlives the
+    # window on purpose; the CSV is trimmed by timestamp when read.
+    cpu_csv="${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/sip-cps${CPS}-cpu.csv"
+
+    run_on_pbx "$(cpuwatch_command "${TIER}/${variant}/sip-cps${CPS}" "$cpu_csv" $((LADDER_SECONDS + 120)))" >/dev/null 2>&1 \
+        || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
+
     run_status=0
 
     run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || run_status=$?
+
+    # The sampler writes on the PBX; pull it beside the cell artifacts so the
+    # report reads CPU from the same directory as the tally it explains.
+    # shellcheck disable=SC2086
+    scp $SSH_OPTS -P "$SSH_PORT" "${PBX_HOST}:${cpu_csv}" "${local_run_dir}/cpu.csv" >/dev/null 2>&1 \
+        || printf 'WARNING: could not pull the CPU sample for %s\n' "$label" >&2
 
     # The artifacts are pulled before the cell is judged, because the summary
     # arrives with them and a stale summary would decide the wrong thing.
