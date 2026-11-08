@@ -556,6 +556,42 @@ The 5 CPS anchor is the highest rate this tier serves fully; it compares with 27
 
 php-fpm is the ceiling: one pool of five static workers saturates while FreeSWITCH still has headroom, and the CDR worker stays under 7 %, so the write side of the pipeline is not the limit. Attributed memory: php-fpm 68–71 MB, FreeSWITCH 160–166 MB, cdr-worker 44 MB.
 
+### Stock vs fast CDR ingestion at 5 CPS (interleaved A/B)
+
+Four cells, alternating **fast → stock → fast → stock**, 300 offered calls each at 5 CPS. Both arms serve XML through the fast controller, so only the CDR entry differs, and each arm is proved live before its cell by the CORS header the full application adds and the fast entry does not. Alternating the order puts host drift on both arms instead of on whichever ran second.
+
+| Slot | Arm | Calls ok | CDR rows |
+|:--|:--|--:|--:|
+| 1 | fast | 249 | 513 |
+| 2 | stock | 88 | 194 |
+| 3 | fast | 179 | 377 |
+| 4 | stock | 104 | 227 |
+| — | **fast total** | **428 / 600** | **890** |
+| — | **stock total** | **192 / 600** | **421** |
+
+Fast delivered **2.2× the completed calls and 2.1× the CDR rows**. Within-arm spread was 249→179 (fast) and 88→104 (stock), so the gap is much larger than the drift the interleaving was meant to cancel.
+
+Per-process load, measured in the second pair (179 vs 104 completed calls, same window):
+
+| Class | fast peak CPU | stock peak CPU | fast RAM | stock RAM |
+|:--|--:|--:|--:|--:|
+| php-fpm | 113 % | 119 % | 76 MB | **99 MB** |
+| freeswitch | 45 % | 31 % | 132 MB | 123 MB |
+| mariadb | 16 % | 17 % | 84 MB | 72 MB |
+| cdr-worker | 7 % | 4 % | 45 MB | 45 MB |
+| redis | 6 % | 4 % | 4 MB | 4 MB |
+
+Both arms pin PHP-FPM at roughly one core, so the peak is not the difference — the work done at that peak is. Normalized per completed call:
+
+| Arm | php-fpm CPU-seconds in the call window | Per completed call |
+|:--|--:|--:|
+| fast | 27.8 s | **155 ms** |
+| stock | 27.1 s | **261 ms** |
+
+Fast converts the same ~27 CPU-seconds into 69 % more completed calls and holds **23 MB less** resident in PHP-FPM (23 % lower). FreeSWITCH's lower CPU on the stock arm is consistent with fewer registrations reaching a call attempt, not with stock being cheaper.
+
+**Caveats.** One interleaved pair; each series keeps a single CPU CSV, so the per-process table describes the second pair only while the call counts cover all four cells. The host is shared, and the earlier 2 CPS stock sample predates the sampler fix and remains unusable.
+
 ### What the retry-and-spool ladder absorbed
 
 nginx recorded **1,596 failed posts** to `/api/v1/cdr` between 2026-11-04 and 2026-11-08 11:11 — the overloaded cells and the crash era. None were lost: FreeSWITCH retried, spooled what it could not deliver, and the drain reconciled it; the spool is empty.
@@ -567,7 +603,7 @@ Six core dumps between 04:22 and 08:52 all faulted inside `mod_xml_curl`'s fetch
 ### Measurement limits (do not use these)
 
 - Per-process samples taken before ~10:50 came from a sampler that held its SSH channel and covered the pre-call window; those files are idle readings, not call load.
-- The stock-CDR arm was only sampled at 2 CPS, pre-fix, at idle. There is **no valid CPU or memory A/B between stock and fast CDR**; only the latency table above compares the two paths.
+- The stock-CDR arm was only sampled at 2 CPS, pre-fix, at idle; that sample is unusable. The valid comparison is the interleaved 5 CPS A/B above, and it covers one pair of cells.
 - The sampler files for 8/10/15 CPS on the workstation are stale; the valid copies remain on the PBX under `storage/app/load-tests/cdr-fpm-fast-20261108/`.
 - Raw artifacts are not committed; per-cell data stays in `load-testing/results/` on the host that produced it.
 
