@@ -67,6 +67,22 @@ describe('load test switch helpers', function (): void {
         );
     });
 
+    it('applies the shipped dynamic floor, not just the worker ceiling', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        // The installer ships pm = dynamic with one resident worker
+        // (start and min_spare 1, max_spare 2). A cell that claims to measure
+        // "the shipped default" is only faithful when the harness applies the
+        // same knobs, so a dynamic profile writes and asserts them alongside
+        // the mode and the ceiling.
+        expect($script)
+            ->toContain('want_start=1')
+            ->toContain('want_max_spare=2')
+            ->toContain('pm.start_servers = ${want_start}')
+            ->toContain('pm.min_spare_servers = ${want_min_spare}')
+            ->toContain('pm.max_spare_servers = ${want_max_spare}');
+    });
+
     it('restores the baseline from a teardown trap', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 

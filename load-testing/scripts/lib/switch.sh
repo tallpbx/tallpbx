@@ -173,6 +173,8 @@ service_reload() {
 # Apply a PHP-FPM process-manager mode and worker cap, then assert the result.
 apply_fpm_profile() {
     local mode="${1:-}" children="${2:-}" pool current_mode current_children
+    local want_start="" want_min_spare="" want_max_spare=""
+    local current_start current_min_spare current_max_spare
 
     case "$mode" in
         static | dynamic) ;;
@@ -196,11 +198,27 @@ apply_fpm_profile() {
 
     snapshot_once fpm-pool "$pool"
 
+    # The installer ships pm = dynamic with ONE resident worker: start and
+    # min_spare 1, max_spare 2. A cell that claims to measure "the shipped
+    # default" is only faithful when the harness applies those same knobs, so
+    # a dynamic profile writes and asserts them alongside mode and ceiling.
+    if [ "$mode" = "dynamic" ]; then
+        want_start=1
+        want_min_spare=1
+        want_max_spare=2
+    fi
+
     # Skip when the pool already runs the requested shape; restarting php-fpm
     # for an identical file only interrupts the cell.
     current_mode="$(awk -F= '/^pm[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
     current_children="$(awk -F= '/^pm\.max_children[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
-    if [ "$current_mode" = "$mode" ] && [ "$current_children" = "$children" ]; then
+    current_start="$(awk -F= '/^pm\.start_servers[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
+    current_min_spare="$(awk -F= '/^pm\.min_spare_servers[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
+    current_max_spare="$(awk -F= '/^pm\.max_spare_servers[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
+    if [ "$current_mode" = "$mode" ] && [ "$current_children" = "$children" ] \
+        && { [ -z "$want_start" ] || { [ "$current_start" = "$want_start" ] \
+            && [ "$current_min_spare" = "$want_min_spare" ] \
+            && [ "$current_max_spare" = "$want_max_spare" ]; }; }; then
         log "php-fpm already ${mode}/${children} in ${pool}"
         assert_fpm_profile "$mode" "$children"
         return $?
@@ -208,6 +226,13 @@ apply_fpm_profile() {
 
     sed -i -E "s/^[;[:space:]]*pm[[:space:]]*=[[:space:]]*.*/pm = ${mode}/" "$pool"
     sed -i -E "s/^[;[:space:]]*pm\.max_children[[:space:]]*=[[:space:]]*.*/pm.max_children = ${children}/" "$pool"
+
+    # Only a dynamic profile carries a floor; static pools ignore these knobs.
+    if [ -n "$want_start" ]; then
+        sed -i -E "s/^[;[:space:]]*pm\.start_servers[[:space:]]*=[[:space:]]*.*/pm.start_servers = ${want_start}/" "$pool"
+        sed -i -E "s/^[;[:space:]]*pm\.min_spare_servers[[:space:]]*=[[:space:]]*.*/pm.min_spare_servers = ${want_min_spare}/" "$pool"
+        sed -i -E "s/^[;[:space:]]*pm\.max_spare_servers[[:space:]]*=[[:space:]]*.*/pm.max_spare_servers = ${want_max_spare}/" "$pool"
+    fi
 
     if ! service_reload "$(php_fpm_service)"; then
         fail_switch "php-fpm did not come back after applying ${mode}/${children}"
