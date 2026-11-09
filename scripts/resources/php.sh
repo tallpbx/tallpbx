@@ -166,12 +166,12 @@ configure_php_fpm_pool() {
 
     if [ "$total_ram_mb" -ge 3500 ]; then
         target_max_children=12
-        verbose "Configuring PHP-FPM dynamic 1-12 workers (detected ${total_ram_mb}MB RAM, 4GB+ tier)"
+        verbose "Configuring PHP-FPM: dynamic pool, one idle worker, ceiling of 12 (detected ${total_ram_mb}MB RAM, 4GB+ tier)"
     elif [ "$total_ram_mb" -ge 1800 ]; then
         target_max_children=6
-        verbose "Configuring PHP-FPM dynamic 1-6 workers (detected ${total_ram_mb}MB RAM, 2GB tier)"
+        verbose "Configuring PHP-FPM: dynamic pool, one idle worker, ceiling of 6 (detected ${total_ram_mb}MB RAM, 2GB tier)"
     else
-        verbose "Configuring PHP-FPM dynamic 1-3 workers (detected ${total_ram_mb}MB RAM, minimal tier)"
+        verbose "Configuring PHP-FPM: dynamic pool, one idle worker, ceiling of 3 (detected ${total_ram_mb}MB RAM, minimal tier)"
     fi
 
     # Update the process manager mode and the full dynamic knob set. The

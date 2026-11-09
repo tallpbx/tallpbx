@@ -234,16 +234,22 @@ Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per second
 
 ### PHP-FPM Worker Sizing
 
-PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer detects host RAM and automatically tunes the PHP-FPM worker pool in `/etc/php/8.5/fpm/pool.d/www.conf` for optimal performance:
+PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer detects host RAM and automatically tunes the PHP-FPM worker pool in `/etc/php/8.5/fpm/pool.d/www.conf`.
 
-| Server Size | Process Mode (`pm`) | Workers (`pm.max_children`) | Notes |
-| :--- | :--- | :---: | :--- |
-| **1 GB RAM** | `static` | `5` | Pre-forked baseline (eliminates fork latency during bursts; requires ≥ 2GB swap). |
-| **2 GB RAM** | `static` | `6` | Balanced for small office bursts. |
-| **4 GB RAM** | `static` | `12` | Recommended baseline (validated for 25+ calls/sec). |
-| **8 GB+ RAM** | `static` | `24` | For higher-concurrency call centers. |
+**Every setting the installer writes, in full:**
 
-#### Why Spare Workers and Static Mode Matter for a Phone System
+| Setting | 1 GB RAM | 2 GB RAM | 4 GB+ RAM | What it does in plain terms |
+| :--- | :---: | :---: | :---: | :--- |
+| `pm` | `dynamic` | `dynamic` | `dynamic` | Workers start and stop with load instead of all running 24/7. |
+| `pm.start_servers` | `1` | `1` | `1` | How many worker processes exist the moment PHP-FPM starts. |
+| `pm.min_spare_servers` | `1` | `1` | `1` | The fewest idle workers kept ready. When the last idle worker takes a request, PHP-FPM starts another. |
+| `pm.max_spare_servers` | `2` | `2` | `2` | The most idle workers kept around. When more than this sit unused, PHP-FPM retires them. |
+| `pm.max_children` | `3` | `6` | `12` | The hard ceiling on total workers, busy or idle. Requests queue beyond it. |
+| `pm.max_requests` | `10000` | `10000` | `10000` | Each worker retires after this many requests and is replaced, so long-running workers cannot accumulate memory over weeks of uptime. |
+
+In plain terms: **one worker at boot, growing to at most three under load on a 1 GB server (six on 2 GB, twelve on 4 GB+), and shrinking back to at most two when quiet.**
+
+#### Why Worker Sizing Matters for a Phone System
 
 On a standard website (such as a blog or storefront), PHP only works when a person clicks a page in their web browser. If nobody is visiting, the server can let its workers go to sleep. If a new visitor arrives and the server takes an extra half-second to start a new worker process, the person barely notices.
 
@@ -263,18 +269,17 @@ In TallPBX, the communication line between FreeSWITCH and PHP is the ultimate ho
 
 Because this is a real-time hotpath, **instant responsiveness is crucial**. If a website takes two seconds to load, it is a minor annoyance. But if a phone system takes two seconds to look up a call route, the caller hears dead silence, desk phones report "Call Failed", and FreeSWITCH will give up and drop the call after a brief timeout.
 
-##### Why Debian's Default "Dynamic" Setting Falls Short
-Debian defaults to `pm = dynamic`, which starts with 2 workers and allows the server to scale down to just 1 worker when the system is quiet. While this saves a small amount of memory on an idle server, it creates serious problems for a PBX:
-- **Starting from a Dead Stop**: When an idle server suddenly receives a burst of phone calls (such as several calls arriving at the start of a business day), it has to create new worker processes on the fly. Spawning new workers takes 200–500 milliseconds of heavy processor work. This delay stalls the hotpath right when the server is busiest.
-- **Worker Starvation**: If an administrator is clicking around or saving settings in the web panel, the single active worker is tied up. Incoming phone calls are forced to sit in a waiting line, leading to delayed audio, timeouts, and dropped calls.
+##### Why These Numbers and Not Debian's Defaults
 
-##### The Advantage of Pre-Warmed Static Workers
-TallPBX configures PHP-FPM in `static` mode across all hardware sizes (including 5 static workers on 1 GB servers):
-- **Always Ready**: All worker processes are pre-started and sitting quietly in memory 24/7. When a call arrives, an idle worker is already there to answer FreeSWITCH within milliseconds.
-- **Dedicated Lanes**: Even if someone is using the web panel, there are always spare workers standing by to handle call routing on the hotpath without hesitation.
-- **Comfortable Memory Footprint**: Five static workers take only about 250 MB of memory. Together with the operating system (~150 MB), FreeSWITCH (~200 MB), MariaDB (~180 MB), and Redis (~25 MB), the complete system uses roughly ~825 MB. This leaves plenty of headroom for disk caching and is safely backed by the documented 2 GB swap baseline (see Step 3: Configure a Swapfile above).
+Debian ships `pm = dynamic` with `pm.start_servers = 2`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 3` and `pm.max_children = 5`. TallPBX keeps Debian's mode but tightens the numbers, based on a worker-count measurement sweep on the minimal 1 vCPU / 1 GB reference host (2026-11-08; full results in [`docs/load-testing-results.md`](docs/load-testing-results.md)):
 
-In `static` mode, all workers remain initialized and ready for call bursts. Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases.
+- **More workers lose calls at the limit.** At the call rate where the system starts to fail, completion rose as workers were removed: 38 % of calls completed with 5 workers versus 97 % with 1 worker. On a single busy core, extra workers only deepen the request queue, so more lookups miss FreeSWITCH's 5-second `mod_xml_curl` timeout.
+- **Debian's wider worker range churns.** With a ceiling of 5 and up to 3 idle workers, processes are forked and retired at burst edges — and each new worker pays a 200–500 ms start cost exactly when the queue is deepest. In measurement it was the only configuration that lost calls at the supported rate (235 of 300 completed), while the settings above completed 300 of 300.
+- **A quiet phone system needs almost nothing.** Every worker count tested — even a single worker — completed 300 of 300 calls at the supported rate of 5 calls/sec, because the warm lookup cache makes each lookup a fast in-memory hit.
+
+The earlier pre-forked `static` baseline ("5 static workers on 1 GB") is retired: static spends its memory 24/7 and, at the failure boundary, completed fewer calls than the dynamic settings above.
+
+Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases; raise `pm.max_children` for high-traffic PBX servers and restart PHP-FPM.
 
 ### File Permissions
 

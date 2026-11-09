@@ -14,7 +14,7 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 
 | Command | Argument | What it changes |
 |:--|:--|:--|
-| `apply_fpm_profile` | `static\|dynamic <children>` | PHP-FPM pool mode and worker count |
+| `apply_fpm_profile` | `static\|dynamic <children>` | PHP-FPM pool mode and worker count. A dynamic profile also applies the installer's idle floor (`pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`) so a cell measuring "the shipped default" is faithful |
 | `apply_xml_path` | `stock\|fast` | nginx entry file for `/api/v1/xml-handler` |
 | `apply_octane_binding` | `on\|off` | Which `xml_curl` gateway FreeSWITCH consults |
 | `apply_ttl` | `<dialplan> <contributor> [directory] [acl]` | XML cache lifetimes |

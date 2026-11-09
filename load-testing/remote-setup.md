@@ -140,12 +140,12 @@ grep -E '^(pm|pm\.max_children)' /etc/php/8.5/fpm/pool.d/www.conf
 ```
 
 - `pm = dynamic` — Debian's default; workers start and stop with load.
-- `pm = static` — fixed worker count; the installer default for an appliance.
+- `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2` and `pm.max_children = 3` — the installer default for the minimal tier: one worker at boot, growing to at most three under load and shrinking back to at most two when quiet (see `INSTALL.md` → PHP-FPM Worker Sizing).
 
 **Apply:**
 
 ```bash
-sudo sed -i -E 's|^pm = .*|pm = static|; s|^pm\.max_children = .*|pm.max_children = 5|' \
+sudo sed -i -E 's|^pm = .*|pm = dynamic|; s|^pm\.max_children = .*|pm.max_children = 3|; s|^pm\.start_servers = .*|pm.start_servers = 1|; s|^pm\.min_spare_servers = .*|pm.min_spare_servers = 1|; s|^pm\.max_spare_servers = .*|pm.max_spare_servers = 2|' \
   /etc/php/8.5/fpm/pool.d/www.conf
 sudo nginx -t && sudo systemctl reload nginx
 sudo systemctl reload php8.5-fpm
@@ -390,7 +390,7 @@ A run is only comparable when these are what the manifest says they are:
 | FreeSWITCH log level | `notice` | `switch.conf.xml`, `vars.xml` |
 | ESL profile | `essential` | `.env` |
 | Broadcast throttle | unset (500 ms) | `.env` |
-| PHP-FPM | `pm = static`, `max_children = 5` | `pool.d/www.conf` |
+| PHP-FPM | `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` (installer default) | `pool.d/www.conf` |
 | XML entry file | stock (`index.php`) | nginx `location` |
 | Octane binding | as installed (both gateways declared) | `xml_curl.conf.xml` |
 | Runtime database | disk | `/var/lib/freeswitch/db` |

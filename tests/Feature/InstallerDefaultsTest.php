@@ -1090,8 +1090,9 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
 it('auto-configures a dynamic PHP-FPM pool with a measured per-memory ceiling', function (): void {
     $phpScript = (string) file_get_contents(base_path('scripts/resources/php.sh'));
 
-    // The minimal tier runs dynamic 1-3 workers: the 2026-11-08 worker sweep
-    // on the 1 vCPU / 1 GB reference host showed completion at the call-rate
+    // The minimal tier runs a dynamic pool that starts with one worker, grows
+    // to at most three under load, and shrinks back to at most two when quiet:
+    // the 2026-11-08 worker sweep on the 1 vCPU / 1 GB reference host showed completion at the call-rate
     // boundary rising as workers were removed (38 % at 5 workers to 84 % at
     // 1), so the ceiling sits at 3 - the last point before the boundary curve
     // collapses - instead of the old static 5. Larger tiers keep their

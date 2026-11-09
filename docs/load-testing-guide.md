@@ -57,7 +57,7 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 5. **Use FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${destination}/${context}` rather than raw extension strings to avoid `CHAN_NOT_IMPLEMENTED` failures.
 6. **Terminate Background UAS Listeners Between Runs**: In multi-scenario scripts, clean up background UAS processes before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` socket binding collisions.
 7. **Allocate Dedicated Client Ports on Shared Hosts**: When the load generator host also runs FreeSWITCH, SIPp UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). Use local ports 5100+ (`EXTENDED_UAC_LOCAL_PORT=5100`).
-8. **Tune PHP-FPM Worker Pools**: Debian's default dynamic pool (`pm.max_children = 5`) saturates at concurrency 25, creating worker starvation and latency spikes. TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` to `pm = static` across all profiles (`pm.max_children = 5` for 1GB VPS, `6` for 2GB, `12` for 4GB, `24` for 8GB+), eliminating dynamic process-fork latency during burst call arrivals.
+8. **Tune PHP-FPM Worker Pools**: TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` as a dynamic pool: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, and `pm.max_children = 3` on 1 GB systems (`6` on 2 GB, `12` on 4 GB+), plus `pm.max_requests = 10000`. The 2026-11-08 worker sweep showed more workers lose calls at the failure boundary on minimal hardware (38 % of calls completed with 5 workers versus 97 % with 1) and that Debian's stock values churn at burst edges (see [`load-testing-results.md`](load-testing-results.md)).
 9. **Set Long Registration Leases**: The SIP registration scenario (`load-testing/tools/sipp/register.xml`) must use a 1-hour lease (`Expires: 3600`) so registrations do not expire mid-test.
 
 ---
@@ -615,7 +615,7 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 | Symptom | Suspected Bottleneck | Verification Command | Remediation Action |
 | :--- | :--- | :--- | :--- |
 | **Rising setup latency; CPU near 100%** | FreeSWITCH CPU starvation | `top` / `htop` on PBX | Lower logging level (`notice`); upgrade to 2+ vCPUs. |
-| **`server reached pm.max_children`** | PHP-FPM worker starvation | `tail -n 50 /var/log/php8.5-fpm.log` | Switch to `pm = static` with 12 workers (on ≥ 4GB RAM). |
+| **`server reached pm.max_children`** | PHP-FPM worker starvation | `tail -n 50 /var/log/php8.5-fpm.log` | Raise `pm.max_children` for the tier (installer default is `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and reload PHP-FPM. |
 | **`503 Maximum Calls In Progress`** | FreeSWITCH session throttle | `fs_cli -x "fsctl sps"` | Increase `FS_SESSIONS_PER_SECOND=120` in `.env`. |
 | **`403 Forbidden` on REGISTRATION** | Credential or realm mismatch | Inspect `register.log` | Regenerate seed data and re-sync `sipp-users-auth.csv`. |
 | **`503 NORMAL_TEMPORARY_FAILURE`** | Early voicemail NOTIFY race | UAS log shows unexpected NOTIFY | Wait 8s after registration before starting the UAS listener. |

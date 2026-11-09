@@ -27,7 +27,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 | FreeSWITCH log level | `notice` |
 | ESL profile | `essential` |
 | Broadcast throttle | unset (500 ms) |
-| PHP-FPM | `pm = static`, `max_children = 5` on 1 GB |
+| PHP-FPM | Installer default on 1 GB: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` |
 | XML entry file | stock (`index.php`) |
 | Lua proxy | `.env false` + bindings commented |
 | Octane binding | as installed (both gateways declared) |

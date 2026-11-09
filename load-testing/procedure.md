@@ -47,7 +47,7 @@ ssh "$PBX_HOST" 'cd /var/www/tallpbx && \
   echo "cdr=$(systemctl is-active tallpbx-cdr-worker) mod_json_cdr=$(fs_cli -x "module_exists mod_json_cdr")"'
 ```
 
-**Checkpoint:** `log=notice`, `esl=essential`, `fpm= pm = static pm.max_children = 5`, `cdr=active`, `mod_json_cdr=true`.
+**Checkpoint:** `log=notice`, `esl=essential`, `fpm= pm = dynamic pm.max_children = 3` (the installer default for the minimal tier: `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3`), `cdr=active`, `mod_json_cdr=true`.
 
 **What the shipped default serves:** XML through the fast controller on PHP-FPM, with the three-tier ladder above it (Octane worker first when enabled, then the fast controller, then the stock full application); CDR through `public/cdr-fast.php` on PHP-FPM, with the stock block commented underneath for rollback. Octane is an opt-in performance mode, not part of the default, and CDR never uses it. A host whose site file still serves XML or CDR through `index.php` is running the old default — refresh the nginx template before measuring.
 
