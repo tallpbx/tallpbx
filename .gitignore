@@ -47,7 +47,15 @@ tests/Browser/Screenshots/
 # record of a series is its written report in docs/; raw artifacts stay in
 # storage/app/load-tests/<series>/ (already ignored below) or on the host
 # that produced them.
-/load-testing/results/
+# Load-test run data: per-cell fragments stay out of git — there are thousands
+# of them and they would pollute the commit history — but the useful,
+# cross-scenario-comparable data is consolidated into a few files under
+# results/consolidated/ and versioned: per-cell metrics, per-service CPU/RAM,
+# and per-call setup latency. Full raw runs are archived locally outside
+# version control.
+/load-testing/results/**
+!/load-testing/results/consolidated/
+!/load-testing/results/consolidated/**
 /storage/app/load-tests/
 /custom-modules/*
 !/custom-modules/.gitkeep

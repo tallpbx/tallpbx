@@ -19,6 +19,15 @@ blocked_prefixes=(
     "storage/app/load-tests/"
 )
 
+# Exception: the distilled, cross-scenario measurement set is repository
+# content. The consolidated CSVs under load-testing/results/consolidated/
+# hold per-cell metrics, per-service CPU/RAM and per-call setup latency for
+# every series (see load-testing/README.md rule 6); everything else under
+# the results trees stays out of history.
+allowed_prefixes=(
+    "load-testing/results/consolidated/"
+)
+
 staged="$(git diff --cached --name-only --diff-filter=ACMR)"
 
 [ -n "$staged" ] || exit 0
@@ -26,6 +35,13 @@ staged="$(git diff --cached --name-only --diff-filter=ACMR)"
 offending=""
 while IFS= read -r path; do
     [ -n "$path" ] || continue
+    allowed=no
+    for prefix in "${allowed_prefixes[@]}"; do
+        case "$path" in
+            "$prefix"*) allowed=yes ;;
+        esac
+    done
+    [ "$allowed" = yes ] && continue
     for prefix in "${blocked_prefixes[@]}"; do
         case "$path" in
             "$prefix"*)
@@ -41,11 +57,12 @@ COMMIT REFUSED: raw load-test artifacts are staged.
 
 ${offending}
 Raw run directories are working data, never repository content:
-  load-testing/results/     (git-ignored)
+  load-testing/results/     (git-ignored except consolidated/)
   storage/app/load-tests/   (git-ignored)
 
-The durable record of a series is its written report under docs/.
-Unstage these paths and stage only the report and the code:
+The versioned record of a series is its distilled data under
+load-testing/results/consolidated/ plus its written report under docs/.
+Unstage the raw paths and stage only those:
 
   git restore --staged load-testing/results storage/app/load-tests
 

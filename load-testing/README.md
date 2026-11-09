@@ -38,12 +38,12 @@ Read the scripts only when the documents do not answer a question:
 2. **Never start a cell without a manifest.** Every tier run begins by writing `manifest.json`; a number without a manifest is not evidence.
 3. **Never trust an `apply_*` without its `assert_*`.** A switch that silently did not take effect produces a plausible but meaningless number. `SWITCH-FAILED` fails that cell on purpose.
 4. **Never commit host credentials.** No IP addresses, key names, key paths or passwords belong in this directory. The operator supplies `PBX_HOST` and the SSH identity; the runner uses the ambient SSH configuration.
-5. **Never edit `docs/load-testing-results.md`** as part of a series. The previous series record stays untouched; a new report is written in a new file.
-6. **Never commit raw measurement artifacts.** One series produces thousands of per-cell files — SIPp traces, CSVs, JSON reports, transport logs — that are unreviewable and bloat every clone. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored; keep them that way. The durable record of a series is its **written report** under `docs/`, not the run directory. Staging a run with `git add -A` is how this rule gets broken: stage the report and the code, never the results tree.
+5. **Write the series record into `docs/load-testing-results.md`** as a new dated section, and distill the series data into the consolidated CSVs under `load-testing/results/consolidated/`. Keep the committed record to a few documents — the results document plus the consolidated data files — so future re-analysis has one comparable dataset instead of scattered reports.
+6. **Never commit raw measurement fragments.** One series produces thousands of per-cell files — SIPp traces, CSVs, JSON reports, transport logs — that are unreviewable and bloat every clone. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored; keep them that way. What IS repository content: the distilled, cross-scenario comparison data under `/load-testing/results/consolidated/` — `*-cells.csv` (per-cell metrics), `*-services.csv` (per-service CPU and RAM) and `*-setup-latency.csv` (per-call setup times) — appended to by every series, plus the written record in `docs/`. Staging a run with `git add -A` is how this rule gets broken: stage the consolidated data, the report and the code, never the raw run directory.
 
    Three guards enforce this, and removing any of them is a defect:
-   - `.gitignore` ignores both trees;
-   - `scripts/git-hooks/pre-commit` refuses a commit that stages them — enable it once per clone with `git config core.hooksPath scripts/git-hooks`;
+   - `.gitignore` ignores both trees except `/load-testing/results/consolidated/`;
+   - `scripts/git-hooks/pre-commit` refuses a commit that stages raw fragments (the consolidated directory is allow-listed) — enable it once per clone with `git config core.hooksPath scripts/git-hooks`;
    - `tests/Feature/Pbx/LoadTestArtifactHygieneTest.php` fails the suite if either guard disappears.
 
 ---
