@@ -744,3 +744,89 @@ While the XML throughput benchmarks above measure raw handler performance, this 
 For hardware sizing, compute isolation architecture, and ESL event pruning instructions, see [telephony-capacity-scaling-guide.md](telephony-capacity-scaling-guide.md).
 
 *Artifacts for the XML-side four-way comparison: `storage/app/load-tests/` on the test host (`task1-*.json`, `cache-sweep-*`); the SIP-capacity artifacts are listed with each live-call tier above.*
+
+---
+
+### PHP-FPM Static Worker Sweep on Minimal Hardware (1 vCPU / 1 GB, 2026-11-08)
+
+**Question.** How many PHP-FPM workers does minimum hardware actually need, and at what point does adding workers stop helping because the bottleneck is elsewhere?
+
+**Configuration.** The shipped default throughout: the trimmed fast XML controller (`xml-handler-fast.php`) and fast CDR entry (`cdr-fast.php`) sharing one PHP-FPM pool, no panel traffic, FreeSWITCH log level `notice`, XML/CDR access logs disabled, **with the full default nftables firewall enabled**. Build `5.x` @ `dd14e577`; 1 vCPU / 967 MB PBX (x.x.x.138); separate SIPp generator (x.x.x.55).
+
+**Method.** One cell per worker count: the per-variant smoke (20 registrations plus register, extension-call and outbound checks) as the warm-up, then a 60 second offered-load window at a fixed call rate, a CDR gate verdict, and per-service CPU sampled every 2 seconds (php-fpm, nginx, freeswitch, esl-listener, reverb, cdr-worker, queue-worker, scheduler, mariadb, redis). One run per cell.
+
+**Phase 1 — 5 calls/sec (300 offered).** Every pool size is identical: 300/300 calls completed, 0 failed, 601 CDR rows at **5, 4, 3, 2 and 1 worker alike**. With the 60-second lookup cache warm, a lookup is a Redis hit, so 5 calls/sec fits in a single worker. The rate sits below the constraint and cannot discriminate worker counts:
+
+| Workers | Completed | CDR rows | Call setup p50 / p95 | php-fpm CPU (busy window mean / peak) | freeswitch CPU (mean) | php-fpm RAM (attributed) |
+|:--|:--|:--|:--|:--|:--|--:|
+| 5 | 300/300 | 601 | 464 / 2 972 ms | 75.8 % / 93 % | 31.7 % | 62 MB |
+| 4 | 300/300 | 601 | 2 048 / 3 816 ms | 81.4 % / 99 % | 33.5 % | 85 MB |
+| 3 | 300/300 | 601 | 824 / 1 480 ms | 79.1 % / 92 % | 32.5 % | 68 MB |
+| 2 | 300/300 | 601 | 436 / 1 640 ms | 73.6 % / 92 % | 31.6 % | 64 MB |
+| 1 | 300/300 | 601 | 372 / 920 ms | 74.3 % / 90 % | 32.5 % | 61 MB |
+
+The setup and CPU spread across worker sizes is single-run noise on a shared core, not a worker signal: every metric that decides anything is flat.
+
+**Phase 2 — 6 calls/sec (360 offered): the failure boundary.** The same cells at 6 calls/sec fail everywhere, but completion rises monotonically as workers are *removed*:
+
+| | 5 CPS, N=5 | 6 CPS, N=5 | 6 CPS, N=4 | 6 CPS, N=3 | 6 CPS, N=2 | **6 CPS, N=1** |
+|:--|:--|:--|:--|:--|:--|:--|
+| Completed / offered | **300/300 (100 %)** | 138/360 (38 %) | 184/360 (51 %) | 230/360 (64 %) | 256/360 (71 %) | **302/360 (84 %)** |
+| Failed | 0 | 222 | 176 | 130 | 104 | **58** |
+| CDR rows / gate | 601 / ok | 319 / ok | 388 / ok | 478 / ok | 531 / ok | 624 / ok |
+| Call setup p50 / p95 | 464 / 2 972 ms | 4 580 / 7 652 ms | 3 404 / 6 120 ms | 2 168 / 5 896 ms | 1 804 / 5 472 ms | **1 444 / 5 416 ms** |
+| **php-fpm** CPU (busy-window mean / peak) | 75.8 % / 93 % | 83.1 % / 100 % | 90.1 % / 120 % | 88.2 % / 110 % | 89.4 % / 117 % | 88.9 % / 113 % |
+| php-fpm share of the core (corrected) | ~55 % | ~64 % | ~61 % | ~61 % | ~60 % | **~61 %** |
+| freeswitch CPU (mean / peak) | 31.7 % / 37 % | 16.4 % / 43 % | 24.1 % / 44 % | 24.5 % / 41 % | 26.9 % / 43 % | 26.5 % / 41 % |
+| cdr-worker CPU | 2.5 % | 4.4 % | 4.1 % | 3.9 % | 3.7 % | 3.6 % |
+| mariadb CPU | 9.8 % | 9.6 % | 10.7 % | 9.9 % | 10.0 % | 9.2 % |
+| redis CPU | 3.2 % | 4.1 % | 4.0 % | 3.9 % | 3.9 % | 3.9 % |
+| **nginx** CPU | 1.0 % | 0.8 % | 1.0 % | 1.0 % | 1.1 % | 1.2 % |
+
+Every cell passed the CDR gate (rows at least equal to completed calls), ran under zero FreeSWITCH restarts, and restored its baseline afterwards.
+
+**Complete per-service data, for future re-derivation.** CPU is the busy-window mean per class (absolute values read ~25–30 % high per the sampler caveat below; the row sums are the uncorrected totals). RAM is the attributed mean in the same window — held figures run roughly twice as large for the PHP processes because shared code is counted per process.
+
+| Service class | 6 CPS, N=5 | N=4 | N=3 | N=2 | N=1 |
+|:--|--:|--:|--:|--:|--:|
+| php-fpm | 83.1 % | 90.1 % | 88.2 % | 89.4 % | 88.9 % |
+| freeswitch | 16.4 % | 24.1 % | 24.5 % | 26.9 % | 26.5 % |
+| mariadb | 9.6 % | 10.7 % | 9.9 % | 10.0 % | 9.2 % |
+| queue-worker | 5.4 % | 6.3 % | 5.9 % | 5.9 % | 5.5 % |
+| esl-listener | 3.1 % | 4.2 % | 4.2 % | 4.7 % | 4.5 % |
+| cdr-worker | 4.4 % | 4.1 % | 3.9 % | 3.7 % | 3.6 % |
+| redis | 4.1 % | 4.0 % | 3.9 % | 3.9 % | 3.9 % |
+| octane-worker (idle) | 1.6 % | 1.6 % | 1.6 % | 1.7 % | 1.7 % |
+| nginx | 0.8 % | 1.0 % | 1.0 % | 1.1 % | 1.2 % |
+| reverb | 0.8 % | 0.8 % | 0.8 % | 0.8 % | 0.7 % |
+| scheduler | 0.3 % | 0.1 % | 0.2 % | 0.2 % | 0.1 % |
+| **Sum (uncorrected)** | 129.8 % | 147.1 % | 143.9 % | 148.3 % | 145.7 % |
+
+| RAM attributed | 6 CPS, N=5 | N=4 | N=3 | N=2 | N=1 |
+|:--|--:|--:|--:|--:|--:|
+| php-fpm | 58 MB | 71 MB | 68 MB | 64 MB | 61 MB |
+| freeswitch | 91 MB | 132 MB | 134 MB | 133 MB | 121 MB |
+| mariadb | 44 MB | 64 MB | 67 MB | 84 MB | 89 MB |
+| queue-worker | 39 MB | 39 MB | 39 MB | 39 MB | 39 MB |
+| cdr-worker | 44 MB | 45 MB | 45 MB | 45 MB | 45 MB |
+| esl-listener | 11 MB | 12 MB | 12 MB | 12 MB | 12 MB |
+| octane-worker (idle) | 29 MB | 29 MB | 29 MB | 29 MB | 29 MB |
+| reverb | 28 MB | 29 MB | 29 MB | 29 MB | 29 MB |
+| scheduler | 26 MB | 26 MB | 26 MB | 26 MB | 26 MB |
+| nginx | 4 MB | 4 MB | 4 MB | 4 MB | 4 MB |
+| redis | 3 MB | 4 MB | 4 MB | 3 MB | 4 MB |
+| **Total** | 376 MB | 455 MB | 457 MB | 469 MB | 458 MB |
+
+The RAM totals move with MariaDB buffer churn and with how early each cell's calls failed (the N=5 cell lost most of its calls early and did less database work), not with the PHP-FPM worker count: php-fpm's own share is 58–71 MB throughout.
+
+**Findings.**
+
+1. **Fewer workers lose less at the boundary.** Completion rises 38 % → 84 % and setup p50 falls 4.6 s → 1.4 s as the pool shrinks from 5 to 1 worker. The pool's total CPU share is flat (~60–64 % of one core) across every worker count: the same total work, only a different queue shape. On a saturated single core extra workers deepen the request backlog, so more lookups miss FreeSWITCH's 5 second `mod_xml_curl` deadline. A single-server FIFO queue meets that deadline more often than N parallel workers of equal aggregate capacity.
+2. **CDR never suffered.** The Redis buffer plus the `cdr:work` drain absorbed every cell; record integrity held even when 62 % of calls failed. nginx stayed under 1.2 % of the core throughout.
+3. **The old "5 static workers" default spent memory on backlog.** One or two workers serve the supported rate identically and hold the boundary far better; 3 is the last ceiling before the curve collapses (4 workers: 51 %, 5 workers: 38 %).
+
+**Installer change.** The installer now configures `pm = dynamic` on every tier with one idle worker (`start_servers = 1`, `min_spare_servers = 1`, `max_spare_servers = 2`), a per-memory ceiling of 3 on minimal hardware (6 on 2 GB, 12 on 4 GB+), and `pm.max_requests = 10000` so long-lived workers recycle. Minimal hardware therefore idles at ~24 MB of PHP-FPM instead of ~83 MB.
+
+**Caveats.** One run per cell on a shared-CPU host (~10 % repeat noise; the monotonic five-point trend is the signal, individual gaps under ~10 points are not findings). The lookup cache was warm in every cell (60 second TTL); cold-cache expiry bursts at the boundary are untested and are the one scenario where more workers may legitimately help. cpuwatch percentages read roughly 25–30 % high in absolute terms (its sample window counts its own scanning time), so the corrected share column is the figure to compare between processes. No panel traffic ran during the cells.
+
+*Artifacts: the series' useful data is consolidated into three versioned files under `load-testing/results/consolidated/` — `worker-sweep-20261108-cells.csv` (one row per cell: completion, CDR rows, setup percentiles, headline CPU/RAM), `worker-sweep-20261108-services.csv` (per-service CPU and RAM per cell) and `worker-sweep-20261108-setup-latency.csv` (every completed call's setup time) — carrying this series and the earlier `cdr-fpm-fast-20261108` comparison cells together, so scenarios stay comparable. The raw per-cell fragments remain git-ignored working data on the host, with a full-fidelity local archive beside them (`worker-sweep-20261108.tar.gz`, outside version control).*
