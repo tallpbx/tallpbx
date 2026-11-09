@@ -51,6 +51,10 @@ classify() {
         *"schedule:work"*) printf 'scheduler' ;;
         *"freeswitch"*) printf 'freeswitch' ;;
         *"php-fpm"*) printf 'php-fpm' ;;
+        # The reverse proxy in front of PHP-FPM. A separate nginx class keeps
+        # the proxy's share of the core visible, so PHP is not blamed for work
+        # nginx did (or vice versa when comparing XML paths).
+        *"nginx"*) printf 'nginx' ;;
         *"mariadbd"* | *"mysqld"*) printf 'mariadb' ;;
         *"redis-server"*) printf 'redis' ;;
         *) printf '' ;;
