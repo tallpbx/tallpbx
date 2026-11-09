@@ -40,7 +40,7 @@ describe('load test matrix configuration', function (): void {
             ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'a')->count())->toBe(3)
             ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'b')->count())->toBe(2)
             ->and(array_keys(loadTestMatrix()['variants']))
-            ->toBe(['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-octane']);
+            ->toBe(['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-fast-default', 'v-octane']);
     });
 
     it('defines both CDR ingestion transports', function (): void {
@@ -52,6 +52,34 @@ describe('load test matrix configuration', function (): void {
 
         expect($ladder)->toBe([2, 3, 5, 8, 10, 15, 20, 25, 30, 40])
             ->and($ladder)->toBe(collect($ladder)->sort()->values()->all());
+    });
+
+    it('resolves the shipped dynamic baseline to the installer ceiling', function (): void {
+        // A cell that claims to measure "the shipped default" is only faithful
+        // when the tier table resolves the dynamic profile to the ceiling the
+        // installer really writes for that much memory. The installer derives
+        // it from detected RAM (3 below 1800 MB, 6 below 3500 MB, 12 above),
+        // so the matrix must agree; otherwise a dynamic cell silently measures
+        // a pool shape nobody deploys.
+        $installerCeiling = static fn (int $ramMb): int => $ramMb >= 3500 ? 12 : ($ramMb >= 1800 ? 6 : 3);
+
+        $stageA = collect(loadTestMatrix()['tiers'])->where('stage', 'a');
+
+        $measured = $stageA
+            ->map(fn (array $tier): array => [
+                'mode' => $tier['fpm_alt'],
+                'ceiling' => $tier['fpm_alt_children'],
+            ])
+            ->all();
+
+        $shipped = $stageA
+            ->map(fn (array $tier): array => [
+                'mode' => 'dynamic',
+                'ceiling' => $installerCeiling((int) $tier['ram_mb']),
+            ])
+            ->all();
+
+        expect($measured)->toBe($shipped);
     });
 
     it('lists every SIPp scenario that ships in load-testing/tools/sipp', function (): void {

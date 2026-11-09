@@ -280,6 +280,33 @@ tier_fpm_children() {
     matrix_value tiers "$tier" fpm_children
 }
 
+# The artifact path segment for one variant on one tier.
+#
+# The same variant can run different PHP-FPM pool shapes — a worker sweep is
+# exactly that — and they used to share one directory, so each run overwrote
+# the previous cpu.csv. On 2026-11-09 that destroyed per-service CPU for three
+# of four sweep cells; only the last survived. The resolved shape is therefore
+# part of the segment, so v-fast-fpm-static1 and v-fast-fpm-static5 write side
+# by side instead of on top of each other.
+variant_dir() {
+    local tier="$1" variant="$2" requirement mode=""
+
+    while IFS= read -r requirement; do
+        case "$requirement" in
+            fpm:*) mode="${requirement#fpm:}"; break ;;
+        esac
+    done < <(matrix_list variants "$variant" requires)
+
+    # A variant that names no pool (for example an XML-only ablation) keeps its
+    # plain name; there is nothing to disambiguate.
+    if [ -z "$mode" ]; then
+        printf '%s\n' "$variant"
+        return
+    fi
+
+    printf '%s\n' "${variant}-fpm-${mode}$(tier_fpm_children "$tier" "$mode")"
+}
+
 # ------------------------------------------------------------------------------
 # Selection and validation
 # ------------------------------------------------------------------------------
@@ -527,14 +554,16 @@ cdrs_wait_for() {
 # runner copies back afterwards; on a single-host run it is the artifact
 # directory itself.
 sip_run_dir() {
-    local tier="$1" variant="$2"
+    local tier="$1" variant="$2" dir
+
+    dir="$(variant_dir "$tier" "$variant")"
 
     if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
-        printf '%s\n' "${ARTIFACT_ROOT}/${tier}/${variant}/sip-cps${CPS}"
+        printf '%s\n' "${ARTIFACT_ROOT}/${tier}/${dir}/sip-cps${CPS}"
         return
     fi
 
-    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${tier}/${variant}/sip-cps${CPS}"
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${tier}/${dir}/sip-cps${CPS}"
 }
 
 # Copy one SIP cell's artifacts from the generator back to this host.
@@ -803,7 +832,7 @@ xml_command() {
     acl="$(matrix_value cache_ttl_profiles "$ttl_id" acl)"
 
     label="${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
-    report="${REMOTE_ARTIFACT_ROOT}/${tier}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
+    report="${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
     url="$(xml_url_for_variant "$variant")"
 
     printf 'cd %q && php artisan pbx:load-test:dialplan --tenant=%q --url=%q --requests=%q --concurrency=%q --scenario=%q --section=%q --label=%q --report=%q' \
@@ -822,7 +851,7 @@ verify_command() {
     local tier="$1" variant="$2" profile_id="$3" ttl_id="$4" section="$5" repeat="$6"
     local report label requests url
 
-    report="${REMOTE_ARTIFACT_ROOT}/${tier}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
+    report="${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
     label="${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
     requests="$(matrix_value xml_profiles "$profile_id" requests)"
     url="$(xml_url_for_variant "$variant")"
@@ -896,11 +925,11 @@ ablation_run_dir() {
     local variant="$1" label="$2"
 
     if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
-        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/${variant}/${label}"
+        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/${label}"
         return
     fi
 
-    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/${variant}/${label}"
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/$(variant_dir "$TIER" "$variant")/${label}"
 }
 
 # Build the exact SIPp validation command for one SIP cell.
@@ -927,12 +956,14 @@ sip_command() {
 smoke_run_dir() {
     local variant="${1:-}"
 
+    # Smoke artifacts are scoped by pool shape too: a smoke that passed under
+    # one worker count must never be reused to vouch for another.
     if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
-        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/${variant}/sip-smoke"
+        printf '%s\n' "${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke"
         return
     fi
 
-    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/${variant}/sip-smoke"
+    printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke"
 }
 
 # Build the SIP smoke preflight: two registrations (the caller and the callee
@@ -1041,7 +1072,7 @@ dry_run_cells() {
                         # A rung's completion says how many calls finished,
                         # not where the CPU went, so every rung is wrapped in
                         # the same per-service sample the ablation cells use.
-                        printf '  %s\n' "$(cpuwatch_command "${tier}/${variant}/sip-cps${CPS}" "${REMOTE_ARTIFACT_ROOT}/${tier}/${variant}/sip-cps${CPS}-cpu.csv" $((LADDER_SECONDS + 120)))"
+                        printf '  %s\n' "$(cpuwatch_command "${tier}/${variant}/sip-cps${CPS}" "${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/sip-cps${CPS}-cpu.csv" $((LADDER_SECONDS + 120)))"
                         printf '  %s\n' "$(sip_command "$(sip_run_dir "$tier" "$variant")")"
                         ;;
                     ablation)
@@ -1057,7 +1088,7 @@ dry_run_cells() {
                                     printf '  [%s] %s\n' "$ablation" "$(ablation_command "$ablation" "$value")"
                                     # Ablation cells place calls and are wrapped in a
                                     # per-service CPU sample, exactly as they run.
-                                    printf '  [%s] %s\n' "$ablation" "$(cpuwatch_command "ablation-${ablation}-${value}" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/ablation-${ablation}-${value}-cps${CPS}-r1-cpu.csv")"
+                                    printf '  [%s] %s\n' "$ablation" "$(cpuwatch_command "ablation-${ablation}-${value}" "${REMOTE_ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ablation-${ablation}-${value}-cps${CPS}-r1-cpu.csv")"
                                     printf '  [%s] %s\n' "$ablation" "$(sip_command "$(ablation_run_dir "$variant" "ablation-${ablation}-${value}-cps${CPS}-r1")")"
                                 else
                                     printf '  [%s] SKIPPED (no switch helper for value %s)\n' "$ablation" "$value"
@@ -1318,7 +1349,7 @@ run_xml_phase() {
 
                 # Time what FreeSWITCH itself waits for under this cache
                 # policy. The HTTP client cannot cover this path.
-                probe_log="${ARTIFACT_ROOT}/${TIER}/${variant}/probe-${profile_id}-${ttl_id}.txt"
+                probe_log="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/probe-${profile_id}-${ttl_id}.txt"
                 mkdir -p "$(dirname "$probe_log")"
 
                 if ! run_on_pbx "$(probe_command)" > "$probe_log" 2>&1; then
@@ -1404,7 +1435,7 @@ run_sip_phase() {
     # the ablation cells use, so a rung's cost is attributable by process
     # rather than inferred from completion alone. The sample outlives the
     # window on purpose; the CSV is trimmed by timestamp when read.
-    cpu_csv="${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/sip-cps${CPS}-cpu.csv"
+    cpu_csv="${REMOTE_ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}-cpu.csv"
 
     run_on_pbx "$(cpuwatch_command "${TIER}/${variant}/sip-cps${CPS}" "$cpu_csv" $((LADDER_SECONDS + 120)))" >/dev/null 2>&1 \
         || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2

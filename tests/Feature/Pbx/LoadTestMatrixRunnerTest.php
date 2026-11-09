@@ -74,7 +74,7 @@ describe('load test matrix runner', function (): void {
             ->all();
 
         $tiers = ['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h2d-2c8g', 'h4d-4c16g'];
-        $variants = ['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-octane'];
+        $variants = ['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-fast-default', 'v-octane'];
         $phases = ['xml', 'sip', 'ablation'];
 
         $expected = [];

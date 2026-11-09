@@ -28,9 +28,11 @@ return [
     | vcpu/ram_mb:  the provisioned size of the cloud instance.
     | cpu:          whether the hypervisor shares the physical cores.
     | swap_mb:      swap configured by the installer before tests start.
-    | fpm:          canonical PHP-FPM pool mode; fpm_children is its worker cap.
-    | fpm_alt:      optional second profile measured on that tier (h1-1c1g only,
-    |               where the dynamic-vs-static comparison is run).
+    | fpm:          canonical (sweep) PHP-FPM pool mode; fpm_children is its cap.
+    | fpm_alt:      the shipped installer default for that tier's RAM, addressable
+    |               as a profile so a cell can measure what is actually deployed.
+    |               Always dynamic; fpm_alt_children is the installer's RAM-derived
+    |               ceiling (3 below 1800 MB, 6 below 3500 MB, 12 above).
     */
 
     'tiers' => [
@@ -43,7 +45,7 @@ return [
             'fpm' => 'static',
             'fpm_children' => 5,
             'fpm_alt' => 'dynamic',
-            'fpm_alt_children' => 5,
+            'fpm_alt_children' => 3,
         ],
         'h1-1c2g' => [
             'stage' => 'a',
@@ -53,8 +55,8 @@ return [
             'swap_mb' => 2048,
             'fpm' => 'static',
             'fpm_children' => 6,
-            'fpm_alt' => null,
-            'fpm_alt_children' => null,
+            'fpm_alt' => 'dynamic',
+            'fpm_alt_children' => 6,
         ],
         'h2-2c2g' => [
             'stage' => 'a',
@@ -64,8 +66,8 @@ return [
             'swap_mb' => 2048,
             'fpm' => 'static',
             'fpm_children' => 6,
-            'fpm_alt' => null,
-            'fpm_alt_children' => null,
+            'fpm_alt' => 'dynamic',
+            'fpm_alt_children' => 6,
         ],
         'h2d-2c8g' => [
             'stage' => 'b',
@@ -115,6 +117,14 @@ return [
         'v-fast' => [
             'label' => 'Fast front controller through PHP-FPM',
             'requires' => ['fpm:static', 'xml-path:fast', 'octane:off'],
+        ],
+        // The shape the installer actually deploys: dynamic pool, fast XML
+        // controller, no worker. Its worker cap comes from the tier's
+        // fpm_alt_children, so a cell measuring "the shipped default" is
+        // faithful on every RAM tier without a temporary injection.
+        'v-fast-default' => [
+            'label' => 'Shipped default: dynamic PHP-FPM pool, fast XML controller',
+            'requires' => ['fpm:dynamic', 'xml-path:fast', 'octane:off'],
         ],
         'v-octane' => [
             'label' => 'Persistent RoadRunner worker',
