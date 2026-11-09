@@ -21,3 +21,11 @@ pre-2vcpu-debian-20261108,stock-6cps,dynamic-debian,production-60,6,5,360,188,17
 pre-2vcpu-debian-20261108,default-control,dynamic-1-3,production-60,5,3,300,300,0,601,ok,300,927.992,4375.96,5259.95,80.8,102.0,31.9,62.6,456.1
 pre-2vcpu-recycle-20261108,recycle-cap400,static-2,production-60,6,2,360,248,112,519,ok,248,2259.98,6483.94,8519.93,79.3,105.0,29.4,61.5,451.4
 pre-2vcpu-octane-20261109,octane-anchor,static-5+worker,production-60,6,5,360,360,0,721,ok,360,279.998,2587.98,2959.97,45.0,72.0,39.9,80.5,390.9
+2vcpu-20261109,ladder-6cps,dynamic-6,production-60,6,6,360,360,0,721,ok,360,120.00,232.00,544.00,62.2,127.0,52.6,47.4,723.8
+2vcpu-20261109,ladder-10cps,dynamic-6,production-60,10,6,600,600,0,1201,ok,600,1663.98,3859.97,4387.96,176.1,239.0,94.4,60.7,780.0
+2vcpu-20261109,ladder-12cps,dynamic-6,production-60,12,6,720,299,421,635,ok,299,3843.97,6859.94,7635.93,225.0,308.0,63.5,63.0,874.7
+2vcpu-20261109-sweep,boundary-12cps,static-1,production-60,12,1,720,317,403,672,ok,317,4623.96,6687.94,8203.93,,,,,
+2vcpu-20261109-sweep,boundary-12cps,static-2,production-60,12,2,720,258,462,593,ok,258,4891.96,8019.93,8543.92,,,,,
+2vcpu-20261109-sweep,boundary-12cps,static-4,production-60,12,4,720,311,409,685,ok,311,4923.96,7591.93,8607.92,,,,,
+2vcpu-20261109-sweep,boundary-12cps,static-5,production-60,12,5,720,248,472,533,ok,248,5435.95,7503.93,7943.93,,,,,
+2vcpu-20261109-octane,octane-12cps,octane-static-6,production-60,12,6,720,720,0,1441,ok,720,284.00,3971.96,4591.96,189.2,297.0,96.8,54.1,922.7
