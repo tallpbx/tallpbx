@@ -25,7 +25,6 @@ Operational manual for benchmarking, stress testing, and validating telephony pe
   - [Running the Test](#running-the-test)
   - [Relevant .env Configuration](#relevant-env-configuration)
   - [Cache Sweep & Hit Rate Benchmarking](#cache-sweep--hit-rate-benchmarking)
-  - [Comparing Feature Configurations (Fast Controller and Lua Proxy)](#comparing-feature-configurations-fast-controller-and-lua-proxy)
 - [Executing Test 2: End-to-End SIP Calls](#executing-test-2-end-to-end-sip-calls)
   - [Running the Automated Suite (`pbx-sipp-validate.sh`)](#running-the-automated-suite-pbx-sipp-validatesh)
   - [Runner Configuration Variables](#runner-configuration-variables)
@@ -148,7 +147,7 @@ When evaluating benchmark output:
 `--timing` asks the XML handler for two opt-in response headers and records them in the report's additive `timing` block:
 
 - **`handler_ms`** — time inside the XML handler pipeline as measured by the timing middleware. Excludes framework boot.
-- **`request_ms`** — time since `LARAVEL_START`, including framework boot and route resolution. Use this number when judging whether in-process caching (for example a FreeSWITCH Lua cache) would remove meaningful work.
+- **`request_ms`** — time since `LARAVEL_START`, including framework boot and route resolution. Use this number when judging whether caching would remove meaningful work.
 - **`db_queries`** — average and maximum database queries per lookup.
 - **`by_section`** — per-section counts and `request_ms` p50/p95 (dialplan vs. directory).
 
@@ -438,55 +437,6 @@ The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache 
 > - **It measures the safety net.** If the finished-answer memory is ever emptied or fails, this test shows exactly how the system would behave — and how much speed the shared building blocks preserve on their own (historically roughly half of the database savings).
 > - **It splits the credit for the caching win.** Comparing this test against the all-off test and the normal test shows how much of the total speed-up each kind of memory provides.
 > - **It pinpoints slowdowns.** If the normal test ever comes back slower than expected: if this test is *also* slow, the problem is in the shared building blocks; if this test is still fast, the problem is in the finished-answer memory.
-
-### Comparing Feature Configurations (Fast Controller and Lua Proxy)
-
-> **The Lua proxy is historical.** It was evaluated and retired in the 5.x series and removed from the product; its measurements live under `load-testing/results/` and `load-testing/status.md`. This protocol is kept so those numbers stay reproducible from the pre-removal source, and so the surviving stock-versus-fast comparison keeps its method.
-
-TallPBX had two independent speed-ups on the XML handler. They can be measured alone or together, but the comparison only means something when every configuration is measured **on the same host, in the same session, with the same request counts**.
-
-**Use the existing remote test host.** The minimal tier already provisioned for this work is **1 shared vCPU, 1 GB RAM, 2 GB swap**, running TallPBX with a seeded test tenant. Reuse it. A fresh host is for validating the installer, not for comparing features.
-
-| Configuration | Fast controller | Lua proxy | What it represents |
-| :--- | :---: | :---: | :--- |
-| **A — stock** | off | off | A normal install before either speed-up |
-| **B — Lua proxy only** | off | on | Answers served inside FreeSWITCH, straight from Redis |
-| **C — both** | on | on | Cache misses take the cheaper PHP path; hits never reach PHP |
-| **D — fast controller only** | on | off | The PHP path made cheaper, no Lua involved |
-
-**Take two measurements per configuration, because they answer different questions:**
-
-1. **What FreeSWITCH waits for.** Thirty `find_user_xml` lookups timed together, minus thirty `status` calls on the same host — that subtraction removes the command-line overhead, which is large and fixed.
-   ```bash
-   fs_cli -x "find_user_xml id <extension> <domain>"
-   ```
-   This is the only measurement that sees a Lua **hit**, because a hit never reaches nginx or PHP.
-2. **What the web app costs when it is asked.** The directory variant of Test 1, with timing headers enabled:
-   ```bash
-   tpbx pbx:load-test:dialplan --tenant=<tenant> \
-     --url=http://127.0.0.1/api/v1/xml-handler \
-     --section=directory --requests=100 --concurrency=1 --timing \
-     --token="$FS_XML_HANDLER_TOKEN"
-   ```
-   With the Lua proxy on, this measures **misses and mirror writes**, not hits. State that in the report, or the two rows look like they contradict each other.
-
-**Switching the fast controller:**
-
-| Feature | Turned on | Turned off | Restart needed |
-| :--- | :--- | :--- | :--- |
-| **Fast controller** | the nginx `location` sends requests to `xml-handler-fast.php` | the block reverts to `try_files $uri /index.php?$query_string;` | nginx reload only |
-
-The Lua proxy's switches were removed with the feature; reproducing its historical cells requires the pre-removal source. Step-by-step commands for the fast controller are in `docs/operations.md` → *Fast XML Handler Path*.
-
-**Reading the result:**
-
-- The FreeSWITCH lookup cost in **B** and **C** versus **A** shows what the Lua path bought; the historical outcome is recorded in `load-testing/status.md`.
-- If the fast controller earns its place, the web-app cost in **D** is clearly below **A**, and **C**'s miss cost inherits that.
-- If a configuration shows no difference, that feature is not paying for its complexity on this hardware.
-
-**Recording the results:** one table with all four configurations and both measurements, the host details (CPU, RAM, swap, PHP worker count, cache TTLs), the date, and a keep-or-remove line per feature naming the number that justifies it.
-
----
 
 ## Executing Test 2: End-to-End SIP Calls
 

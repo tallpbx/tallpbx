@@ -366,11 +366,11 @@ TallPBX decouples cache freshness from cache expiration:
 
 In v4.2.0, the default `FS_XML_HANDLER_CACHE_TTL` was raised from 5 seconds to 60 seconds because versioned cache invalidation guarantees instant freshness on writes. For configuration details and environment variables, refer to [Environment Reference Guide §2.2](env-reference.md#22-telephony-xml-handler--dynamic-dialplan-engine); for benchmark methodologies and production tuning guidance, see the load-testing documentation ([Load Testing Results](load-testing-results.md) and [Load Testing Guide](load-testing-guide.md)).
 
-**Identity answers need their own epoch.** The cached answer to *which tenant owns this username* — `TenantIdentity` in DB 1, and the Lua mirror's identity map — cannot embed a tenant revision, because that answer is what selects the tenant. It carried only a 60-second TTL, so a SIP account or tenant domain moved to another tenant could keep resolving to its previous owner until the TTL expired: a cross-tenant boundary rather than a stale document. Both keys now embed the **global routing revision as an identity epoch** (`…:e<epoch>`); `RoutingCacheObserver` bumps the global revision on every `SipAccount` and `TenantDomain` write, and a missing or non-numeric epoch is a miss, never a default. The accepted cost is that the global revision also salts dialplan keys, so an account or domain edit invalidates each tenant's dialplan once on its next request. `TenantIdentityResolverTest` covers account and domain re-homing, `RoutingCacheObserverTest` covers the bumps, and `DirectoryXmlMirrorTest` covers the epoch-keyed mirror and its refusal to publish when the epoch moves mid-render.
+**Identity answers need their own epoch.** The cached answer to *which tenant owns this username* — `TenantIdentity` in DB 1 — cannot embed a tenant revision, because that answer is what selects the tenant. It carried only a 60-second TTL, so a SIP account or tenant domain moved to another tenant could keep resolving to its previous owner until the TTL expired: a cross-tenant boundary rather than a stale document. Both keys now embed the **global routing revision as an identity epoch** (`…:e<epoch>`); `RoutingCacheObserver` bumps the global revision on every `SipAccount` and `TenantDomain` write, and a missing or non-numeric epoch is a miss, never a default. The accepted cost is that the global revision also salts dialplan keys, so an account or domain edit invalidates each tenant's dialplan once on its next request. `TenantIdentityResolverTest` covers account and domain re-homing, and `RoutingCacheObserverTest` covers the bumps.
 
 #### 5. Request Flow & Invalidation Sequence
 
-In a fresh install the handler runs inside the resident worker (§7.5.7) and FreeSWITCH reaches it on loopback port 8090. The nginx hop shown below is the fallback binding.
+In a fresh install the handler runs behind nginx as the trimmed fast controller — the shipped default — and the request flow is the one shown below. The optional persistent worker of §7.5.6 short-circuits this path when it is enabled: FreeSWITCH then consults its loopback port 8090 binding first.
 
 ```mermaid
 sequenceDiagram
@@ -406,13 +406,7 @@ sequenceDiagram
     Note over Handler,Redis: Next mod_xml_curl computes key with v=2 -> instant cache miss
 ```
 
-#### 6. In-Process XML Cache (FreeSWITCH Lua + Redis Mirror) — retired
-
-> **Status:** evaluated on the 1 vCPU reference tier and retired as a shipped option. The fastest call-path measurements it produced (52 ms p50 call setups, and the only 100 % completion at 10 calls/sec when CDR rode the idle worker) are preserved in [`docs/load-testing-results.md`](load-testing-results.md) and under `load-testing/results/`. The design is recorded here for historical context only.
-
-An in-process `mod_lua` binding answered directory and dialplan lookups from a Redis mirror (`pbx:fsxml:*` in DB 0) that Laravel wrote alongside the PHP cache: three or four `GET` commands replacing a full HTTP round trip per lookup. It was retired because it required maintaining a mirrored second representation of every rendered document — including a revision handshake (`ver:{tenantId}`, `ver:global`, the identity epoch) whose drift once broke lookups — while the trimmed fast controller and the optional Octane worker deliver comparable capacity with a single cache. The implementing code survives only in the repository history and in the load-testing tooling.
-
-#### 7. Persistent Telephony XML Worker (Octane / RoadRunner)
+#### 6. Persistent Telephony XML Worker (Octane / RoadRunner)
 
 > **Status:** an optional performance mode. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH falling through the three-tier ladder (worker 1 s, fast controller 2 s, stock full application 3 s).
 
@@ -434,7 +428,7 @@ The second and third bindings are what make a worker restart or crash safe: look
 
 **Correctness is unchanged.** The worker resolves the same `XmlHandlerController` and builders, reads and writes the same Redis DB 1 keys, and honours the same `RoutingCacheVersion` bumps (§7.5.4) and 60-second TTL. Both builders wrap their miss path in `Cache::lock(...)->block(3)`, so a registration stampede produces one XML build and the other requests wait for it instead of issuing duplicate queries. `tests/Feature/Http/XmlHandlerOctaneParityTest.php` asserts byte-identical documents against standard dispatch, and `tests/Feature/Octane/TenantStateIsolationTest.php` covers the cross-tenant cleanup.
 
-**Rollback posture.** The fast front controller and the Lua mirror remain in the codebase, disabled, so a deployment can return to the nginx path without a code change (operations → Fast XML Handler Path, and → Optional Lua XML Cache).
+**Rollback posture.** The stock entry ships commented beside the fast location in both nginx templates, so a deployment can return to the full-application path with a block swap and an nginx reload (operations → Fast XML Handler Path).
 
 ---
 

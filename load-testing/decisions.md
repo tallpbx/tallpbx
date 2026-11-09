@@ -29,7 +29,6 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 | Broadcast throttle | unset (500 ms) |
 | PHP-FPM | Installer default on 1 GB: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` |
 | XML entry file | stock (`index.php`) |
-| Lua proxy | `.env false` + bindings commented |
 | Octane binding | as installed (both gateways declared) |
 | FreeSWITCH runtime DB | disk |
 | Cache TTLs | unset (config defaults) |
@@ -63,22 +62,6 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 **Rejected:** explaining the difference away as "Octane is not observable by an HTTP client". It is observable; the runner was pointing at the wrong server.
 
 **Status:** settled.
-
----
-
-## D5 — Lua cache hits are measured through FreeSWITCH, not the HTTP client
-
-**Decision:** Each XML cell also records a `find_user_xml` probe (minus the `status` overhead). Lua variants are judged from that probe plus the SIP phases, not from the HTTP client's numbers.
-
-**Why:** a Lua hit is answered inside FreeSWITCH and never reaches nginx or PHP, so an HTTP client that posts directly to PHP cannot see one. The probe asks the component that actually answers.
-
-**Rejected:** concluding "Lua gives no benefit" from an HTTP measurement. That conclusion was in the making and would have been an artifact of the driver, not a property of the proxy.
-
-**Caveat:** the probe reports the configured binding state (`lua_bindings=on|off`), not which component served a given lookup. Proving a hit needs the mirror-TTL check.
-
-**Status:** settled for timing; attribution still provisional.
-
-> **Finding (2026-11-04):** the proxy was measured with the proxy genuinely enabled and still served no hit, because of an epoch mismatch in product code — PHP publishes the identity key under `max(current, stored)` while `pbx:fsxml:ver:global` is only seeded and never updated, so the Lua handler builds a key that PHP never wrote. The proxy cannot be classified until that is resolved; see `status.md` → *The Lua proxy: two defects*.
 
 ---
 

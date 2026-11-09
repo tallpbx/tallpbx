@@ -28,7 +28,6 @@ During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`)
 
 1. **XML Generation is NOT the Scaling Bottleneck**:
    - The **Octane Lean Worker** (`tallpbx-xml-worker.service`) delivers over **150 XML req/sec** sustained with sub-10ms response times.
-   - The **In-Process Lua Proxy** (`tallpbx_xml_handler.lua`) bypasses PHP completely, reading direct from Redis RAM in **~6 ms**.
    - Even when XML resolution cost was reduced to near-zero, the 1 vCPU system consistently hit a ceiling between **6.2 and 10 CPS**.
 
 2. **The 10 CPS Wall on 1 vCPU is Full-Stack CPU Exhaustion**:
