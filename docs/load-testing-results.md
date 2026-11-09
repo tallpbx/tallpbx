@@ -830,3 +830,39 @@ The RAM totals move with MariaDB buffer churn and with how early each cell's cal
 **Caveats.** One run per cell on a shared-CPU host (~10 % repeat noise; the monotonic five-point trend is the signal, individual gaps under ~10 points are not findings). The lookup cache was warm in every cell (60 second TTL); cold-cache expiry bursts at the boundary are untested and are the one scenario where more workers may legitimately help. cpuwatch percentages read roughly 25–30 % high in absolute terms (its sample window counts its own scanning time), so the corrected share column is the figure to compare between processes. No panel traffic ran during the cells.
 
 *Artifacts: the series' useful data is consolidated into three versioned files under `load-testing/results/consolidated/` — `worker-sweep-20261108-cells.csv` (one row per cell: completion, CDR rows, setup percentiles, headline CPU/RAM), `worker-sweep-20261108-services.csv` (per-service CPU and RAM per cell) and `worker-sweep-20261108-setup-latency.csv` (every completed call's setup time) — carrying this series and the earlier `cdr-fpm-fast-20261108` comparison cells together, so scenarios stay comparable. The raw per-cell fragments remain git-ignored working data on the host, with a full-fidelity local archive beside them (`worker-sweep-20261108.tar.gz`, outside version control).*
+
+---
+
+### Pre-2vCPU Verification Block and Default Selection (1 vCPU / 1 GB, 2026-11-09)
+
+**Question.** Before resizing the reference host to 2 vCPU, finish the minimal-hardware record: validate the new shipped default, bound run-to-run noise, cover the worker-recycling and cold-cache edge cases, and measure Debian's stock pool shape as a default candidate.
+
+**Configurations compared, every setting spelled out:**
+
+- **Shipped default** — `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3`, `pm.max_requests = 10000`. In plain terms: one worker at boot, growing to at most three under load and shrinking back to at most two when quiet.
+- **Debian stock** — `pm = dynamic`, `pm.start_servers = 2`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 3`, `pm.max_children = 5`.
+- **Static pools** (the sweep's repeats) — `pm = static` with `pm.max_children` fixed at 5, 2 or 1.
+
+**Comparison.** 60-second cells, per-variant smoke as warm-up, CDR gate on every cell; ranges are two-run bands:
+
+| Configuration | 5 calls/sec (supported rate) | 6 calls/sec (failure boundary) |
+|:--|:--|:--|
+| static 5 | 300/300 (100 %) | 38–50 % |
+| static 4 | 300/300 | 51 % |
+| static 3 | 300/300 | 64 % |
+| static 2 | 300/300 | 62–71 % |
+| static 1 | 300/300 | 84–97 % |
+| **Shipped default** | **300/300 (100 %)** | **70 %** |
+| **Debian stock** | **235/300 (78 %)** | 52–56 % |
+
+**Findings.**
+
+1. **The shipped default is validated at both rates.** It passes the supported rate completely and sits in the best band at the boundary — the tuned settings buy ~16 points of completion at the boundary over Debian stock.
+2. **Debian stock is the only configuration that ever lost calls at the supported rate** (65 of 300 failed; setup p50 1.5 s, p95 5.9 s). Its wider worker range (up to 3 idle, ceiling 5) forks and retires workers at burst edges, and each new worker pays its start cost when the queue is deepest.
+3. **Cold cache costs points but does not collapse small pools:** with a zero-TTL dialplan/contributor cache at 6 calls/sec, 2 static workers completed 57 % versus 62–71 % warm.
+4. **Worker recycling is safe.** With `pm.max_requests` lowered to 500/400 for the measurement window, the pool recycled repeatedly (16 distinct worker PIDs) with 7 of 7 lookup runs at 100 % success, and a 6 calls/sec cell with recycling mid-call completed 248/360 (69 %) — inside the normal band for that pool. At the shipped 10000 this mechanism is exercised roughly daily on a busy host.
+5. **The panel stays reachable under call flood.** A login-page probe inside the PBX during a 6 calls/sec cell answered all 200 samples (HTTP 302), mean 0.33 s, worst 18.65 s — slow, never dark.
+
+This section supersedes the earlier production rule in the 1 vCPU section above (the 3 calls/sec planning figure and its static-worker recommendation): the supported rate is 5 calls/sec with the shipped default, and static pools are retired for these tiers.
+
+*Artifacts: every cell is consolidated in `load-testing/results/consolidated/` (rows tagged `pre-2vcpu-20261108`, `pre-2vcpu-debian-20261108`, `pre-2vcpu-recycle-20261108`), including the 200 panel-probe samples in `worker-sweep-20261108-panel-probe.csv`. Raw fragments stay git-ignored on the host.*
