@@ -118,24 +118,29 @@ fi
 
 # Tune PHP-FPM worker pool sizing based on available physical memory.
 # FreeSWITCH invokes HTTP XML handlers for call lookups (extensions, routes, voicemail).
-# During simultaneous call bursts, workers must be ready immediately to prevent 502/504
-# gateway timeouts and failed calls. Configuring static worker pools provides instant
-# worker availability without fork latency.
+# During simultaneous call bursts, a spare worker must be ready immediately to prevent
+# 502/504 gateway timeouts and failed calls, so the pool grows on demand and is kept
+# small: on minimal hardware more concurrent workers measurably LOSE calls (see below).
 #
-# Sizing logic based on physical RAM:
-# - Standard server (>= 3500 MB RAM): 12 static workers. Tested to handle 25+ calls/sec
-#   burst concurrency with zero timeouts, while leaving ~2.9GB RAM free for FreeSWITCH and MariaDB.
-# - Small server (>= 1800 MB RAM): 6 static workers. Balanced for 2GB instances.
-# - Minimal server (< 1800 MB RAM): 5 static workers.
+# Sizing logic based on physical RAM (ceiling of the dynamic range):
+# - Standard server (>= 3500 MB RAM): 12 workers. The previous 4GB+ capacity envelope,
+#   leaving ~2.9GB RAM free for FreeSWITCH and MariaDB.
+# - Small server (>= 1800 MB RAM): 6 workers. Balanced for 2GB instances.
+# - Minimal server (< 1800 MB RAM): 3 workers, measured (see below).
 #
-# Why static 5 workers instead of Debian's dynamic mode:
-# Debian packages default to dynamic mode with 2 workers to start and 1 minimum. In a PBX,
-# dynamic worker creation introduces 200–500ms of fork latency when burst calls arrive,
-# causing call setup delays and potential FreeSWITCH mod_xml_curl timeouts. Furthermore,
-# background XML routing queries can starve web administration requests.
-# With the documented 2GB swap baseline configured as a safety buffer, 5 static workers consume only
-# ~250MB total RAM, fitting comfortably within 1GB physical RAM (~825MB total system footprint)
-# while guaranteeing instant, sub-millisecond response times.
+# Why dynamic workers with a low ceiling instead of a static pool:
+# The 2026-11-08 worker sweep (load-testing/results/worker-sweep-*) measured
+# every pool size from 5 down to 1 on the 1 vCPU / 1 GB reference host. At the
+# supported rate (5 calls/sec) every size completed 300/300 calls; at the
+# failure boundary (6 calls/sec) completion rose monotonically as workers were
+# REMOVED: 38% at 5 workers to 84% at 1. On a saturated single core extra
+# workers only deepen the request backlog, so more lookups miss FreeSWITCH's
+# 5 second mod_xml_curl deadline. The pool therefore sits at one resident
+# worker (Debian's dynamic mode) and grows only for burst overlap and
+# single-stuck-request tolerance, capped at 3 - the last ceiling before the
+# boundary curve collapses (4 workers drop to 51%, 5 to 38%). Fork latency on
+# burst growth is the residual cost of dynamic mode; the tight ceiling bounds
+# it. Full series and method: docs/load-testing-results.md.
 configure_php_fpm_pool() {
     local pool_conf="/etc/php/$php_version/fpm/pool.d/www.conf"
     if [ ! -f "$pool_conf" ]; then
@@ -147,27 +152,38 @@ configure_php_fpm_pool() {
     total_ram_mb=$(free -m | awk '/^Mem:/{print $2}')
     total_ram_mb="${total_ram_mb:-1024}"
 
-    local target_pm="static"
-    local target_max_children=12
+    # Dynamic mode on every tier with one low idle floor: one resident worker
+    # at idle, growing only while requests queue behind it.
+    local target_pm="dynamic"
+    local target_start_servers=1
+    local target_min_spare_servers=1
+    local target_max_spare_servers=2
+    local target_max_requests=10000
+
+    # The ceiling is the only per-tier value: 3 on minimal hardware (measured),
+    # the previous capacity envelope on larger hosts (6 on 2GB, 12 on 4GB+).
+    local target_max_children=3
 
     if [ "$total_ram_mb" -ge 3500 ]; then
-        target_pm="static"
         target_max_children=12
-        verbose "Configuring PHP-FPM with $target_max_children static workers (detected ${total_ram_mb}MB RAM, 4GB+ tier)"
+        verbose "Configuring PHP-FPM dynamic 1-12 workers (detected ${total_ram_mb}MB RAM, 4GB+ tier)"
     elif [ "$total_ram_mb" -ge 1800 ]; then
-        target_pm="static"
         target_max_children=6
-        verbose "Configuring PHP-FPM with $target_max_children static workers (detected ${total_ram_mb}MB RAM, 2GB tier)"
+        verbose "Configuring PHP-FPM dynamic 1-6 workers (detected ${total_ram_mb}MB RAM, 2GB tier)"
     else
-        target_pm="static"
-        target_max_children=5
-        verbose "Configuring PHP-FPM with $target_max_children static workers (detected ${total_ram_mb}MB RAM, 1GB tier with 2GB swap baseline)"
+        verbose "Configuring PHP-FPM dynamic 1-3 workers (detected ${total_ram_mb}MB RAM, minimal tier)"
     fi
 
-    # Update process manager mode (pm = static or dynamic)
+    # Update the process manager mode and the full dynamic knob set. The
+    # sed patterns also rewrite commented-out Debian defaults. pm.max_requests
+    # recycles long-lived workers so resident memory cannot creep over weeks
+    # of uptime (the same bound the Octane worker uses).
     sed -i -E "s/^[; ]*pm\s*=\s*.*/pm = $target_pm/" "$pool_conf"
-    # Update maximum concurrent worker processes (pm.max_children)
     sed -i -E "s/^[; ]*pm\.max_children\s*=\s*.*/pm.max_children = $target_max_children/" "$pool_conf"
+    sed -i -E "s/^[; ]*pm\.start_servers\s*=\s*.*/pm.start_servers = $target_start_servers/" "$pool_conf"
+    sed -i -E "s/^[; ]*pm\.min_spare_servers\s*=\s*.*/pm.min_spare_servers = $target_min_spare_servers/" "$pool_conf"
+    sed -i -E "s/^[; ]*pm\.max_spare_servers\s*=\s*.*/pm.max_spare_servers = $target_max_spare_servers/" "$pool_conf"
+    sed -i -E "s/^[; ]*pm\.max_requests\s*=\s*.*/pm.max_requests = $target_max_requests/" "$pool_conf"
 }
 
 configure_php_fpm_pool

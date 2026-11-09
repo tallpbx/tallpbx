@@ -1087,17 +1087,28 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
         ->and($operationsDoc)->toContain('tpbx pbx:sounds:install');
 });
 
-it('auto-configures PHP-FPM static worker pools based on host memory', function (): void {
+it('auto-configures a dynamic PHP-FPM pool with a measured per-memory ceiling', function (): void {
     $phpScript = (string) file_get_contents(base_path('scripts/resources/php.sh'));
 
+    // The minimal tier runs dynamic 1-3 workers: the 2026-11-08 worker sweep
+    // on the 1 vCPU / 1 GB reference host showed completion at the call-rate
+    // boundary rising as workers were removed (38 % at 5 workers to 84 % at
+    // 1), so the ceiling sits at 3 - the last point before the boundary curve
+    // collapses - instead of the old static 5. Larger tiers keep their
+    // ceilings but share the low idle floor.
     expect($phpScript)->toContain('configure_php_fpm_pool')
         ->and($phpScript)->toContain('total_ram_mb=$(free -m')
-        ->and($phpScript)->toContain('target_pm="static"')
+        ->and($phpScript)->toContain('target_pm="dynamic"')
         ->and($phpScript)->toContain('target_max_children=12')
         ->and($phpScript)->toContain('target_max_children=6')
-        ->and($phpScript)->toContain('target_max_children=5')
+        ->and($phpScript)->toContain('target_max_children=3')
+        ->and($phpScript)->toContain('worker-sweep')
         ->and($phpScript)->toContain('pm = $target_pm')
-        ->and($phpScript)->toContain('pm.max_children = $target_max_children');
+        ->and($phpScript)->toContain('pm.max_children = $target_max_children')
+        ->and($phpScript)->toContain('pm.start_servers = $target_start_servers')
+        ->and($phpScript)->toContain('pm.min_spare_servers = $target_min_spare_servers')
+        ->and($phpScript)->toContain('pm.max_spare_servers = $target_max_spare_servers')
+        ->and($phpScript)->toContain('pm.max_requests = $target_max_requests');
 });
 
 it('configures default XML handler cache TTL in tall.sh', function (): void {
