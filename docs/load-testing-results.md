@@ -7,6 +7,7 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
 
 ## Contents
 
+- [Current Baseline: Measured Capacity & PHP-FPM Defaults](#current-baseline-measured-capacity--php-fpm-defaults)
 - [Executive Summary & Hardware Sizing Matrix](#executive-summary--hardware-sizing-matrix)
   - [Datacenter Telephony Capacity Comparison](#datacenter-telephony-capacity-comparison)
   - [Dialplan XML Routing Performance Comparison](#dialplan-xml-routing-performance-comparison)
@@ -33,6 +34,71 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
   - [2 vCPU / 2 GB RAM Live Call Capacity](#2-vcpu--2-gb-ram-live-call-capacity)
   - [4 vCPU / 16 GB RAM Live Call Capacity](#4-vcpu--16-gb-ram-live-call-capacity)
   - [Cross-Architecture Call Capacity (Octane vs Lua vs Fast Controller)](#cross-architecture-call-capacity-octane-vs-lua-vs-fast-controller)
+  - [PHP-FPM Static Worker Sweep on Minimal Hardware (1 vCPU / 1 GB, 2026-11-08)](#php-fpm-static-worker-sweep-on-minimal-hardware-1-vcpu--1-gb-2026-11-08)
+  - [Pre-2vCPU Verification Block and Default Selection (1 vCPU / 1 GB, 2026-11-09)](#pre-2vcpu-verification-block-and-default-selection-1-vcpu--1-gb-2026-11-09)
+  - [2 vCPU / 2 GB: Capacity Ladder and Worker Sweep (2026-11-09)](#2-vcpu--2-gb-capacity-ladder-and-worker-sweep-2026-11-09)
+
+---
+
+## Current Baseline: Measured Capacity & PHP-FPM Defaults
+
+This section is the authoritative summary. Everything below it is the dated evidence that produced these numbers; where older tables disagree, this section wins.
+
+### What the installer ships
+
+| Setting | Value | What it does |
+|:--|:--|:--|
+| `pm` | `dynamic` | Workers start and retire with load |
+| `pm.start_servers` | `1` | Workers present at startup |
+| `pm.min_spare_servers` | `1` | Fewest idle kept ready; forks when the last idle worker takes a request |
+| `pm.max_spare_servers` | `2` | Most idle tolerated; retires above this |
+| `pm.max_children` | `3` below 1,800 MB · `6` below 3,500 MB · `12` above | Hard ceiling on total workers, chosen from detected RAM |
+| `pm.max_requests` | `10000` | Requests per worker before it recycles, bounding memory creep |
+
+### Measured call capacity, two hardware tiers
+
+Both rows were measured on the current build with the fast XML controller, the fast CDR entry, a warm 60-second lookup cache, FreeSWITCH logging at `notice`, and the full default `nftables` firewall. Each cell offered calls for 60 seconds.
+
+| Host | Supported rate (100 % completion) | First failing rate | Completion at the failing rate | Setup p50 / p95 at that rate |
+|:--|:--|:--|:--|:--|
+| **1 vCPU / 1 GB** | **5 calls/sec** (300/300) | 6 calls/sec | 70 % (252/360) | 4 580 / 7 652 ms |
+| **2 vCPU / 2 GB** | **10 calls/sec** (600/600) | 12 calls/sec | 41.5 % (299/720) | 3 844 / 6 860 ms |
+
+Capacity scales with cores, and the ceiling is **CPU**, not the pool and not CDR: at 12 calls/sec on two cores PHP-FPM alone demanded 2.25 cores while CDR integrity held at every rate tested, including a cell that lost 58 % of its calls.
+
+### The persistent worker removes the boundary at both tiers
+
+Same rate, same warm cache, same firewall — only the XML serving path changes from PHP-FPM to the optional RoadRunner worker on port 8090:
+
+| Host | Rate | Shipped FPM pool | **Octane worker** | FPM setup p50 | Octane setup p50 |
+|:--|:--|:--|:--|:--|:--|
+| 1 vCPU / 1 GB | 6 calls/sec | 70 % (252/360) | **100 % (360/360)** | 4 580 ms | 280 ms |
+| 2 vCPU / 2 GB | 12 calls/sec | 41.5 % (299/720) | **100 % (720/720)** | 3 844 ms | **284 ms** |
+
+Both Octane cells passed the CDR gate (721 and 1 441 rows) with zero failed calls, so the call-rate boundary documented above is a property of the **PHP-FPM XML path**, not of the hardware. Median setup latency falls 13× at the same rate.
+
+> [!NOTE]
+> Per-process CPU in the Octane cells is not trustworthy: the sampler reports the RoadRunner child processes under the `php-fpm` class, so the split between `php-fpm` and `octane-worker` is distorted even though the totals are correct. Completion, CDR reconciliation and latency are unaffected. A p95 of 3 948 ms at 12 calls/sec also shows a tail worth investigating if Octane is ever promoted from option to default.
+
+### How the pool shape matters — the same experiment at each tier's own boundary
+
+Each column is that tier's first failing rate, because a rate below capacity cannot discriminate pool shapes.
+
+| Pool shape | 1 vCPU @ 6 calls/sec | 2 vCPU @ 12 calls/sec |
+|:--|:--|:--|
+| **dynamic, RAM ceiling** (shipped) | **70 %** (252/360) | **41.5 %** (299/720) |
+| static 1 | 84–97 % (two runs) | 44.0 % (317/720) |
+| static 2 | 62–71 % (two runs) | 35.8 % (258/720) |
+| static 3 | 64 % (230/360) | — |
+| static 4 | 51 % (184/360) | 43.2 % (311/720) |
+| static 5 | 38–50 % (two runs) | 34.4 % (248/720) |
+| Debian stock dynamic (ceiling 5, higher idle floor) | 52–56 % | — |
+
+**On one core the pool shape is first-order:** completion spans **59 points** and orders strictly — fewer workers always lose fewer calls, because extra workers only deepen a queue that one core has to drain. **On two cores it is second-order:** the span is **10 points**, the ordering is non-monotonic (1 > 4 > dynamic > 2 > 5), and a single run per shape cannot separate those differences from noise. Latency still degrades with more workers on both tiers (median 4 624 → 5 436 ms as workers go 1 → 5), so the queue-depth mechanism survives even where it no longer decides the outcome.
+
+**Consequence for the default:** keep the dynamic pool on every tier. On one core its tight ceiling matches the best measured behaviour; on two it delivers the best median setup latency of the five shapes. Only the ceiling varies, and only with RAM.
+
+Detailed evidence, per-service CPU and per-call latency for each of these cells: *PHP-FPM Static Worker Sweep on Minimal Hardware*, *Pre-2vCPU Verification Block and Default Selection*, and *2 vCPU / 2 GB: Capacity Ladder and Worker Sweep* below.
 
 ---
 
@@ -741,6 +807,8 @@ While the XML throughput benchmarks above measure raw handler performance, this 
 
 **Multi-core scaling horizon.** A 1 vCPU server maxes out at ~6.2–10 CPS because telephony and PHP daemons share one core. Separating FreeSWITCH from Laravel on **2 vCPUs** unlocks **15–20 CPS**; on **4 vCPUs** Octane scales to **30–60+ CPS** with only four worker threads (~250 MB RAM), where PHP-FPM would require 24–32 workers (~1.2 GB RAM).
 
+*Superseded on 2026-11-09:* the 2 vCPU projection above was made before the current default was measured. With the shipped dynamic pool, a 2 vCPU / 2 GB host completes **10 calls/sec (600/600)** and loses 58 % at 12 calls/sec — see *2 vCPU / 2 GB: Capacity Ladder and Worker Sweep* below.
+
 For hardware sizing, compute isolation architecture, and ESL event pruning instructions, see [telephony-capacity-scaling-guide.md](telephony-capacity-scaling-guide.md).
 
 *Artifacts for the XML-side four-way comparison: `storage/app/load-tests/` on the test host (`task1-*.json`, `cache-sweep-*`); the SIP-capacity artifacts are listed with each live-call tier above.*
@@ -867,3 +935,44 @@ The RAM totals move with MariaDB buffer churn and with how early each cell's cal
 This section supersedes the earlier production rule in the 1 vCPU section above (the 3 calls/sec planning figure and its static-worker recommendation): the supported rate is 5 calls/sec with the shipped default, and static pools are retired for these tiers.
 
 *Artifacts: every cell is consolidated in `load-testing/results/consolidated/` (rows tagged `pre-2vcpu-20261108`, `pre-2vcpu-debian-20261108`, `pre-2vcpu-recycle-20261108`, `pre-2vcpu-octane-20261109`), including the 200 panel-probe samples in `worker-sweep-20261108-panel-probe.csv`. Raw fragments stay git-ignored on the host.*
+
+---
+
+### 2 vCPU / 2 GB: Capacity Ladder and Worker Sweep (2026-11-09)
+
+**Question.** After resizing the reference host from 1 vCPU / 1 GB to 2 vCPU / 2 GB, where does the call ceiling sit, and does the pool shape that won on one core still win on two?
+
+**Configuration.** The shipped installer default throughout: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 6` (selected automatically because detected RAM is 1,973 MB) and `pm.max_requests = 10000`; fast XML controller, Octane disabled, warm 60-second lookup cache, FreeSWITCH logging at `notice`, full default nftables firewall. Host: 2 vCPU, 1,973 MB RAM, 2 GB swap; build `1333389f`.
+
+**Method.** One 60-second cell per rate, 20 registered endpoints, per-series smoke (registration, extension call, outbound call, CDR gate) before the measured window, CDR gate judging every cell, baseline restored after each. The first failing rate defines the boundary; the worker sweep then runs at that rate only, because a rate below capacity cannot discriminate pool shapes.
+
+**Phase 1 — capacity ladder (shipped dynamic pool, ceiling 6).**
+
+| Offered rate | Completed | CDR rows | Call setup p50 / p95 / max | php-fpm CPU (mean / peak) | freeswitch CPU | Sum of services |
+|:--|:--|:--|:--|:--|:--|:--|
+| 6 calls/sec | 360/360 (100 %) | 721 | 120 / 232 / 544 ms | 62.2 % / 127 % | 52.6 % | 73 % of both cores |
+| 10 calls/sec | 600/600 (100 %) | 1 201 | 1 664 / 3 860 / 4 388 ms | 176.1 % / 239 % | 94.4 % | 168 % of both cores |
+| 12 calls/sec | 299/720 (41.5 %) | 635 | 3 844 / 6 860 / 7 636 ms | 225.0 % / 308 % | 63.5 % | 178 % of both cores |
+
+**Phase 2 — static worker sweep at 12 calls/sec.** Same rate, same variant, same warm cache; only the pool shape changes.
+
+| Pool | Completed | Call setup p50 / p95 / max |
+|:--|:--|:--|
+| static 1 | 317/720 (44.0 %) | 4 624 / 6 688 / 8 204 ms |
+| static 2 | 258/720 (35.8 %) | 4 892 / 8 020 / 8 544 ms |
+| static 4 | 311/720 (43.2 %) | 4 924 / 7 592 / 8 608 ms |
+| static 5 | 248/720 (34.4 %) | 5 436 / 7 504 / 7 944 ms |
+| dynamic, ceiling 6 (baseline) | 299/720 (41.5 %) | 3 844 / 6 860 / 7 636 ms |
+
+**Findings.**
+
+1. **Capacity roughly doubles with the second core: about 10 calls/sec clean on 2 vCPU versus 5 on 1 vCPU.** 10 calls/sec completes every call; 12 calls/sec loses 58 % of them. The boundary is between the two.
+2. **The ceiling is CPU, not the pool and not CDR.** At 12 calls/sec PHP-FPM alone demands 2.25 cores on a 2-core host, so the machine is oversubscribed by 1.78× across all services. CDR integrity held at every rate and under 58 % call loss, so ingestion is not the failure mode.
+3. **Worker count is second-order on two cores.** Completion across five pool shapes spans 34–44 % — 10 points — and the ordering is non-monotonic (1 > 4 > dynamic > 2 > 5). One run each, so the differences are not separable from run-to-run noise. On 1 vCPU the same comparison spanned 59 points and was strictly ordered.
+4. **Latency still degrades monotonically with more workers.** Median setup rises 4 624 → 4 892 → 4 924 → 5 436 ms as workers go 1 → 2 → 4 → 5, so the queue-depth mechanism survives even though it no longer decides the outcome.
+5. **The shipped dynamic pool is the right default on this tier.** Mid-pack completion with the best median setup time of the five shapes (3 844 ms), and it needs no tuning per host.
+6. **The Octane worker clears the boundary entirely.** The same 12 calls/sec cell that defeated every PHP-FPM shape completed **720/720 (100 %)** through the persistent worker on port 8090, with 1 441 CDR rows and a median setup of **284 ms** versus 3 844 ms — a 13× improvement that matches the 1 vCPU result (360/360 at 6 calls/sec where FPM scored 70 %). The call-rate ceiling is therefore a property of the PHP-FPM XML path, not of the host, at both tiers. One caveat: the sampler books RoadRunner child processes under `php-fpm`, so the per-service CPU split for this cell is unreliable.
+
+**Data limitation.** The four sweep cells shared one artifact directory (`…/2vcpu-20261109-sweep/h2-2c2g/v-fast/sip-cps12`), so each run overwrote the previous `cpu.csv`. Completion, CDR reconciliation and per-call setup latency survived for all four (latency files were attributed by row count, which matched each cell's completed-call count exactly), but per-service CPU and RAM survive only for the three ladder cells. The consolidated rows for the sweep therefore carry blank CPU columns rather than reconstructed values. The harness should include the pool shape in the artifact path before any further sweep.
+
+*Artifacts: consolidated rows tagged `2vcpu-20261109` (ladder), `2vcpu-20261109-sweep` (worker sweep) and `2vcpu-20261109-octane` (persistent worker) in `load-testing/results/consolidated/`. Raw fragments stay git-ignored on the host.*

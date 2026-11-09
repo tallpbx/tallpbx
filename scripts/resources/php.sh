@@ -134,13 +134,22 @@ fi
 # supported rate (5 calls/sec) every size completed 300/300 calls; at the
 # failure boundary (6 calls/sec) completion rose monotonically as workers were
 # REMOVED: 38% at 5 workers to 84% at 1. On a saturated single core extra
-# workers only deepen the request backlog, so more lookups miss FreeSWITCH's
-# 5 second mod_xml_curl deadline. The pool therefore sits at one resident
-# worker (Debian's dynamic mode) and grows only for burst overlap and
-# single-stuck-request tolerance, capped at 3 - the last ceiling before the
-# boundary curve collapses (4 workers drop to 51%, 5 to 38%). Fork latency on
-# burst growth is the residual cost of dynamic mode; the tight ceiling bounds
-# it. Full series and method: docs/load-testing-results.md.
+# workers only deepen the request backlog, so more lookups miss the two
+# second nginx read timeout in front of PHP-FPM. The pool therefore sits at
+# one resident worker (Debian's dynamic mode) and grows only for burst overlap
+# and single-stuck-request tolerance, capped at 3 on the 1 GB tier - the last
+# ceiling before the boundary curve collapses (4 workers drop to 51%, 5 to
+# 38%). Fork latency on burst growth is the residual cost of dynamic mode; the
+# tight ceiling bounds it.
+#
+# That tight ceiling is a single-core result and must not be carried to larger
+# hosts. The 2026-11-09 re-measurement on 2 vCPU / 2 GB found the pool shape
+# second-order there: five shapes (dynamic ceiling 6, static 1, 2, 4 and 5)
+# all landed between 34% and 44% completion at the 12 calls/sec boundary while
+# PHP-FPM alone demanded 2.25 cores, so the limit is total CPU rather than
+# worker count. On multi-core hosts the ceiling therefore follows detected RAM
+# (6 on 2 GB, 12 on 4 GB+) and buys burst tolerance instead of being trimmed
+# to the minimum. Full series and method: docs/load-testing-results.md.
 configure_php_fpm_pool() {
     local pool_conf="/etc/php/$php_version/fpm/pool.d/www.conf"
     if [ ! -f "$pool_conf" ]; then

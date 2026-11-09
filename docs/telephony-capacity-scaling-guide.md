@@ -30,6 +30,15 @@ During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`)
    - The **Octane Lean Worker** (`tallpbx-xml-worker.service`) delivers over **150 XML req/sec** sustained with sub-10ms response times.
    - Even when XML resolution cost was reduced to near-zero, the 1 vCPU system consistently hit a ceiling between **6.2 and 10 CPS**.
 
+> **The "Fast Controller Only" row above is superseded.** It was measured with the retired static five-worker pool, where lookups queued behind a fixed child count and the 5-second curl limit killed calls. The shipped default is now a dynamic pool that starts one worker and grows to a per-memory ceiling, and with it the fast controller is fully viable — measured on the current build:
+>
+> | Host | Supported rate (100 % completion) | First failing rate | Completion at that rate |
+> | :--- | :--- | :--- | :--- |
+> | 1 vCPU / 1 GB | **5 calls/sec** (300/300) | 6 calls/sec | 70 % (252/360) |
+> | 2 vCPU / 2 GB | **10 calls/sec** (600/600) | 12 calls/sec | 41.5 % (299/720) |
+>
+> The 1 vCPU figure covers every pool shape from one to five workers, which all pass 5 calls/sec; the failure boundary itself is full-stack CPU saturation, not XML generation. Full method and per-service CPU: [`load-testing-results.md`](load-testing-results.md).
+
 2. **The 10 CPS Wall on 1 vCPU is Full-Stack CPU Exhaustion**:
    At 10 CPS with 50 concurrent in-flight calls, top profiling on the 1 vCPU host revealed **0.0% idle CPU** (100% saturation):
    - **`freeswitch:listen` (33.3% CPU)**: Reads, deserializes, and dispatches hundreds of FreeSWITCH ESL JSON events per second across 25 subscribed event types into the Laravel application and database.
@@ -77,9 +86,9 @@ During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`)
 
 The single most impactful step for scaling past 10 CPS is adding a second compute core.
 
-* **Single-Core Ceiling**: 6–10 CPS (~35–60 concurrent active calls).
-* **Dual-Core Sizing (2 vCPU / 2 GB RAM)**: Separates FreeSWITCH's real-time VoIP threads from background PHP daemons and database writes. Unlocks **15–20 CPS** (~75–120 concurrent calls).
-* **Quad-Core Dedicated Sizing (4 vCPU / 8 GB+ RAM)**: Provides dedicated CPU cores with zero "noisy neighbor" steal time (`st%`). Unlocks **30–60+ CPS** (~150–350 concurrent active calls).
+* **Single-Core Ceiling**: **5 calls/sec supported**, failing at 6 calls/sec (~30 concurrent active calls). Independent of pool shape: every worker count from one to five passes 5 and loses at least a third of the calls at 6.
+* **Dual-Core Sizing (2 vCPU / 2 GB RAM)**: Separates FreeSWITCH's real-time VoIP threads from background PHP daemons and database writes. **Doubles the supported rate to 10 calls/sec** (measured, 600/600), failing at 12 calls/sec — not the 15–20 calls/sec previously projected. Worker count is second-order here: five pool shapes measured within 34–44 % at the boundary, while PHP-FPM alone demanded 2.25 cores.
+* **Quad-Core Dedicated Sizing (4 vCPU / 8 GB+ RAM)**: Provides dedicated CPU cores with zero "noisy neighbor" steal time (`st%`). Projected at **30–60+ CPS** (~150–350 concurrent active calls); not yet measured on the current build.
 
 ---
 

@@ -249,6 +249,15 @@ PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer det
 
 In plain terms: **one worker at boot, growing to at most three under load on a 1 GB server (six on 2 GB, twelve on 4 GB+), and shrinking back to at most two when quiet.**
 
+**Measured capacity with exactly these settings** (full default firewall, warm 60-second lookup cache, 60-second cells):
+
+| Host | Supported rate | First failing rate | Completion at the failing rate |
+| :--- | :--- | :--- | :--- |
+| 1 vCPU / 1 GB | **5 calls/sec** (300 of 300) | 6 calls/sec | 70 % |
+| 2 vCPU / 2 GB | **10 calls/sec** (600 of 600) | 12 calls/sec | 41.5 % |
+
+Two results shape the default. On a single core, **fewer workers is better at the failure boundary** — completion rose from 38 % with five static workers to 97 % with one, because extra workers only deepen a queue that is already limited by the CPU. On two cores the pool shape stops mattering: five shapes measured within 34–44 % at the boundary while PHP-FPM alone demanded 2.25 cores, so the ceiling is set by available CPU rather than by worker count. In both cases the dynamic pool above is the right configuration, and `pm.max_children` follows detected RAM. Method, per-service CPU and full tables: [`docs/load-testing-results.md`](docs/load-testing-results.md).
+
 #### Why Worker Sizing Matters for a Phone System
 
 On a standard website (such as a blog or storefront), PHP only works when a person clicks a page in their web browser. If nobody is visiting, the server can let its workers go to sleep. If a new visitor arrives and the server takes an extra half-second to start a new worker process, the person barely notices.
