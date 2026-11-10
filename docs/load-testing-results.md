@@ -11,6 +11,7 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
 - [Executive Summary & Hardware Sizing Matrix](#executive-summary--hardware-sizing-matrix)
   - [Datacenter Telephony Capacity Comparison](#datacenter-telephony-capacity-comparison)
   - [Dialplan XML Routing Performance Comparison](#dialplan-xml-routing-performance-comparison)
+  - [Fast Controller vs. Laravel Octane Across Hardware Tiers](#fast-controller-vs-laravel-octane-across-hardware-tiers)
   - [Production Sizing & Configuration Matrix](#production-sizing--configuration-matrix)
 - [Production Recommendations: XML Caching & PHP-FPM Worker Tuning](#production-recommendations-xml-caching--php-fpm-worker-tuning)
 - [Capacity Planning Rules](#capacity-planning-rules)
@@ -24,7 +25,6 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
   - [2 vCPU / 2 GB RAM (Dual-Core)](#2-vcpu--2-gb-ram-dual-core)
   - [2 vCPU Dedicated / 8 GB RAM (Dedicated Compute Node)](#2-vcpu-dedicated--8-gb-ram-dedicated-compute-node)
   - [4 vCPU Shared / 8 GB RAM (Cloud VPS / Appliance)](#4-vcpu-shared--8-gb-ram-cloud-vps--appliance)
-  - [Persistent Octane Worker (4-core Reference Appliance)](#persistent-octane-worker-4-core-reference-appliance)
   - [XML Serving Configurations: Four-Way Comparison (1 vCPU)](#xml-serving-configurations-four-way-comparison-1-vcpu)
 - [CDR Fast Entry Series (1 vCPU, 2026-11-08)](#cdr-fast-entry-series-1-vcpu-2026-11-08)
 - [Live Call Capacity & Telephony Feature Validation (SIP Signaling)](#live-call-capacity--telephony-feature-validation-sip-signaling)
@@ -139,6 +139,45 @@ XML throughput and latency across moderate bursts (`100 x 5`: 100 requests at 5 
 1. **The Shared-Core Baseline (~24–26 req/sec with Dynamic Pool)**: On a 1-core shared-CPU instance with dynamic PHP-FPM auto-tuning (`pm = dynamic`, max 3 workers), XML throughput reaches 26.4 req/sec under burst concurrency, and sustains 26.0 req/sec across 1,000 queries with zero errors.
 2. **Quad-Core Shared Scaling & Octane Multipliers**: Moving to 4 shared vCPUs with dynamic workers (`pm.max_children = 12`) increases PHP-FPM burst throughput to **45.1 req/sec** under saturation, with 0 dropped requests. Enabling the resident RoadRunner/Octane worker unleashes **140.5 req/sec** sustained with median latency under 85 ms (a **3.1× to 3.8× speedup** over PHP-FPM).
 3. **Database vs. Cache Scaling**: Redis contributor and dialplan caching shield MariaDB during high-concurrency bursts, keeping average response times under 240 ms on entry hardware and under 70 ms on dedicated instances.
+
+---
+
+### Fast Controller vs. Laravel Octane Across Hardware Tiers
+
+Direct comparison of the shipped dynamic PHP-FPM fast controller (`v-fast-default`) against the resident RoadRunner/Octane XML worker (`v-octane` on loopback `:8090`) across measured cloud VPS hardware tiers:
+
+| Hardware Tier | Execution Engine | Concurrency Profile | XML Throughput | Latency (Average / Median) | Live Call Capacity | Failure Bottleneck & Domain Isolation |
+| :--- | :--- | :--- | ---: | ---: | :---: | :--- |
+| **1 vCPU / 1–2 GB RAM**<br>*(Single Core Shared)* | **Fast Controller (FPM)**<br>Dynamic (max 3 workers) | `100 x 5` (Burst)<br>`500 x 25` (Ceiling) | 25.5 req/sec<br>24.8 req/sec | 181.0 ms / ~153 ms<br>596.0 ms / ~585 ms | **5 calls/sec**<br>*(300/300 calls)* | Contention on 1 shared core; FPM worker queueing past 2s read timeout at 6+ CPS. |
+| | **Laravel Octane**<br>Resident Worker (`:8090`) | `100 x 5` (Burst)<br>`500 x 25` (Ceiling) | **168.5 req/sec**<br>**159.9 req/sec** | **~20.0 ms** / ~18 ms<br>**~25.0 ms** / ~22 ms | **6.23 calls/sec**<br>*(99.3% completed)* | **+560% to +970% XML throughput**; live call rate limited by 1 core shared between FreeSWITCH (33%) and ESL (33%). Telephony surges never touch port 80/443. |
+| **2 vCPU / 2 GB RAM**<br>*(Dual Core Shared)* | **Fast Controller (FPM)**<br>Dynamic (max 6 workers) | `100 x 5` (Burst)<br>`500 x 25` (Ceiling) | 24.7 req/sec<br>24.9 req/sec | 183.0 ms / ~183 ms<br>590.3 ms / 656.8 ms | **10 calls/sec**<br>*(600/600 calls)* | FreeSWITCH separated from background PHP; fails at 12 CPS due to FPM worker saturation. |
+| | **Laravel Octane**<br>Resident Worker (`:8090`) | `100 x 5` (Burst)<br>`500 x 25` (Ceiling) | **137.5 req/sec**<br>**286.3 req/sec** | **20.3 ms** / ~15 ms<br>**42.2 ms** / 38.5 ms | **25+ calls/sec**<br>*(Headroom)* | **11.5× throughput speedup; 14× latency reduction.** Dedicated daemon prevents administrative lockout on port 80/443 during high call volume. |
+| **4 vCPU / 8 GB RAM**<br>*(Quad Core Shared)* | **Fast Controller (FPM)**<br>Dynamic (max 12 workers) | `100 x 5` (Burst)<br>`1,000 x 25` (Ceiling) | 20.12 req/sec<br>45.08 req/sec | 174.3 ms / 152.2 ms<br>336.3 ms / 330.8 ms | **15–25 calls/sec**<br>*(100% 14-scenario pass)* | High-density FPM baseline; 100% completion across all 14 scenarios and 461 MariaDB CDR rows. |
+| | **Laravel Octane**<br>Resident Worker (`:8090`) | `100 x 5` (Burst)<br>`1,000 x 25` (Ceiling) | **67.20 req/sec**<br>**140.54 req/sec** | **46.4 ms** / 43.2 ms<br>**89.6 ms** / 85.2 ms | **30–60+ calls/sec**<br>*(Horizon)* | **3.1× sustained throughput; 3.8× lower median latency.** 4 worker threads hold ~165 MB resident RAM, leaving >7.5 GB RAM free for RTP buffers. |
+
+#### Understanding the Architecture: Three Perspectives
+
+##### 1. The Everyday Analogy (For Non-Technical Users & PBX Administrators)
+Think of incoming phone calls like customers arriving at a busy drive-through restaurant:
+- **FreeSWITCH** is the host greeting callers at the intercom: *"Hello, who are you calling?"*
+- FreeSWITCH doesn't make routing decisions on its own; it sends an order slip into the kitchen (**Laravel**) asking: *"Extension 2001 is calling 2002. Where do I connect this call?"*
+- **Fast Controller (PHP-FPM)**: Every time an order slip arrives, a cook has to walk into the kitchen, switch on the lights, open all the recipe books from page 1, read the routing instructions, answer the question, switch off the lights, and leave the room. It does this quickly (20–45 times a second), but when 10 calls arrive at the exact same instant, the hallway jams up, calls queue, and anyone trying to walk in through the front lobby doors (the administrative web panel) gets stuck in the hallway (`HTTP 504 Gateway Timeout`).
+- **Laravel Octane (Resident Worker on Port 8090)**: The cook stays inside the kitchen with the lights on, recipe books wide open in memory, standing right at a **private express drive-through window (`port 8090`)** dedicated solely to phone calls. The answer takes 2 milliseconds instead of 50 milliseconds. And because Octane has its own private window, telephony traffic never touches the front lobby doors (`port 80/443`), meaning system administrators can always log into the panel instantly, even during a massive call storm.
+
+##### 2. The Linux System Administrator View (Processes, Sockets & Interrupts)
+- **PHP-FPM Process Model**: PHP-FPM operates a pool of worker processes (`pm = dynamic`, ceiling of 3 on 1 GB, 6 on 2 GB, 12 on 4 GB). Under concurrency, once all workers are busy, incoming HTTP requests from `mod_xml_curl` queue against the Unix socket backlog. When queue wait exceeds Nginx's `fastcgi_read_timeout` (2s), Nginx returns `504 Gateway Timeout` and FreeSWITCH drops or retries the call.
+- **Octane / RoadRunner Event Loop**: Managed via systemd (`tallpbx-xml-worker.service`), RoadRunner holds a fixed pool of persistent PHP CLI worker processes listening directly on `127.0.0.1:8090`. Framework bootstrap state stays pre-warmed in RAM, completely bypassing Nginx FastCGI process spawning overhead.
+- **CPU Scheduling & Context Switching**:
+  - *1 vCPU*: Octane answers XML requests at 168 req/s, but live call capacity is capped at ~6.2 CPS because the single core is 100% busy dividing time between FreeSWITCH's Sofia SIP threads (33%), ESL JSON event processing (33%), and WebSocket broadcasting (25%).
+  - *2 vCPU*: Adding a second core eliminates the thread lock contention between VoIP packet processing and PHP/MariaDB, jumping XML throughput to **286 req/s** and call capacity to **25+ CPS**.
+  - *4 vCPU*: 4 Octane workers hold just **~165 MB of resident RAM** (compared to 1.2 GB for 24+ PHP-FPM workers), preserving **>7.5 GB RAM** for FreeSWITCH socket buffers and MariaDB's InnoDB cache, completing all 14 telephony feature scenarios with 100% zero-drop reliability and 461 MariaDB CDR rows.
+- **Failure Domain Isolation (Port 80 vs Port 8090)**: By separating telephony curl lookups onto loopback port 8090, port 80/443 remains completely idle during call bursts, eliminating administrative lockouts.
+
+##### 3. The PHP / Laravel Developer View (Bootstrap Lifecycle & Memory Safety)
+- **Bootstrap Lifecycle**: Standard PHP-FPM evaluates `bootstrap/app.php`, boots service providers, configures DI containers, and tears down the entire object graph upon script termination. The Fast Controller (`xml-handler-fast.php`) bypasses the heavy web middleware stack using `MinimalBootstrap`, dropping boots to ~24 providers.
+- **Octane In-Memory Execution**: RoadRunner boots Laravel once into persistent memory. Subsequent HTTP requests execute through `Application::handle()`, executing in 1.7 ms to 10 ms (`handler_ms`).
+- **State Safety & Tenant Isolation**: Because memory persists across requests, state leakage is prevented by `ClearTenantContext` and `VerifyCleanDatabaseState` event listeners firing on request termination, ensuring tenant scoping and DB connections remain completely clean.
+- **Cache Stampede Protection**: Atomic Redis locks (`Cache::lock`) serialize cold-key builds so only one worker compiles dynamic routing XML while concurrent requests wait and read the cached result.
 
 ---
 
