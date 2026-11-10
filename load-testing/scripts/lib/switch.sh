@@ -1175,7 +1175,7 @@ snapshot_env() {
 
     : > "$file"
 
-    for key in FS_XML_HANDLER_DIALPLAN_CACHE_TTL FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL FS_XML_HANDLER_DIRECTORY_CACHE_TTL FS_XML_HANDLER_ACL_CACHE_TTL; do
+    for key in FS_XML_HANDLER_DIALPLAN_CACHE_TTL FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL FS_XML_HANDLER_DIRECTORY_CACHE_TTL FS_XML_HANDLER_ACL_CACHE_TTL FS_ESL_EVENT_PROFILE FS_BROADCAST_THROTTLE_MS; do
         line="$(grep -E "^#?[[:space:]]*${key}=" "${APP_DIR}/.env" 2>/dev/null | tail -n 1 || true)"
         printf '%s\t%s\n' "$key" "$line" >> "$file"
     done
@@ -1267,8 +1267,20 @@ restore_baseline() {
     log "restoring baseline configuration"
 
     local file level mode xml_before xml_after json_before json_after
+    local esl_before throttle_before esl_after throttle_after
+
+    esl_before="$(env_get FS_ESL_EVENT_PROFILE)"
+    throttle_before="$(env_get FS_BROADCAST_THROTTLE_MS)"
 
     restore_env
+
+    esl_after="$(env_get FS_ESL_EVENT_PROFILE)"
+    throttle_after="$(env_get FS_BROADCAST_THROTTLE_MS)"
+
+    if [ "$esl_before" != "$esl_after" ] || [ "$throttle_before" != "$throttle_after" ]; then
+        restart_listener >/dev/null 2>&1 || true
+    fi
+
     restore_file fpm-pool
 
     # Restoring the file leaves the runtime on the old bindings, so restart
@@ -1338,6 +1350,10 @@ Usage: switch.sh <command> [arguments]
   apply_octane_binding <on|off>                   assert_octane_binding <on|off>
   apply_ttl <dialplan> <contributor> [directory] [acl]   assert_ttl <dialplan> <contributor> [directory] [acl]
   apply_cdr_transport <fpm|octane>                assert_cdr_transport <fpm|octane>
+  apply_esl_profile <essential|full>              assert_esl_profile <essential|full> [before]
+  apply_broadcast_throttle <ms>                   assert_broadcast_throttle <ms> [before]
+  probe_lookup <extension> <domain> [count]
+  assert_xml_curl_config [path]                   octane_binding_state [path]
   restore_baseline
 USAGE
 }

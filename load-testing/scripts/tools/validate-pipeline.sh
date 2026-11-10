@@ -94,8 +94,10 @@ $series = $argv[8];
 $rows = [];
 foreach ($variants as $variant) {
     for ($round = 1; $round <= $rounds; $round++) {
-        $file = sprintf("%s/%s-validate-r%d/%s/%s/%s-%s-%s-r1.json", $base, $series, $round, $tier, $variant, $profile, $ttl, $section);
-        if (! is_file($file)) { printf("   %-16s round %d: MISSING\n", $variant, $round); continue; }
+        $pattern = sprintf("%s/%s-validate-r%d/%s/%s*/%s-%s-%s-r1.json", $base, $series, $round, $tier, $variant, $profile, $ttl, $section);
+        $matches = glob($pattern);
+        $file = $matches[0] ?? "";
+        if ($file === "" || ! is_file($file)) { printf("   %-16s round %d: MISSING\n", $variant, $round); continue; }
         $j = json_decode((string) file_get_contents($file), true);
         $rows[$variant][$round] = [
             "rps" => (float) $j["requests_per_second"],

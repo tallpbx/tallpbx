@@ -258,7 +258,7 @@ return [
     | SIPp Feature Scenarios
     |--------------------------------------------------------------------------
     |
-    | Must list every tools/sipp/uac-*.xml plus register.xml; the config test
+    | Must list every load-testing/tools/sipp/uac-*.xml plus register.xml; the config test
     | fails when this list and the shipped scenario files disagree.
     */
 

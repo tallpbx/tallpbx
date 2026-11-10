@@ -102,4 +102,14 @@ describe('artifact address scrubber', function (): void {
             ->and((string) file_get_contents(base_path(SCRUB_SCRATCH.'/manifest.json')))
             ->toContain('x.x.x.138');
     });
+
+    it('keeps driver scripts free of hardcoded public IPv4 addresses and private key paths', function (): void {
+        foreach (glob(base_path('load-testing/scripts/drivers/*.sh')) as $driverFile) {
+            $contents = (string) file_get_contents($driverFile);
+
+            expect($contents)
+                ->not->toMatch('/\b(?!127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/')
+                ->not->toContain('ppx2-client');
+        }
+    });
 });

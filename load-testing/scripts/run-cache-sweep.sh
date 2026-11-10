@@ -10,7 +10,7 @@
 # Usage:
 #   PBX_URL="http://127.0.0.1/api/v1/xml-handler" \
 #   TENANT="load-test-beta" \
-#   bash scripts/run-cache-sweep.sh
+#   bash load-testing/scripts/run-cache-sweep.sh
 # ==============================================================================
 
 set -euo pipefail

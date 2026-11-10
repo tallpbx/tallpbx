@@ -640,4 +640,26 @@ XML);
 
         expect($lib)->toContain('json_before');
     });
+
+    it('resolves local_run_dir, ladder.csv, smoke_gate, and ablation cpu.csv through variant_dir', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        expect($script)
+            ->toContain('local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}"')
+            ->toContain('ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"')
+            ->toContain('local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/${cpu_label}-cps${CPS}-r${repeat}"')
+            ->toContain('${REMOTE_ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/${cpu_label}-cps${CPS}-r${repeat}-cpu.csv')
+            ->toContain('local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke"')
+            ->toContain('smoke_gate="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke/cdr-gate.txt"');
+    });
+
+    it('stages generator scenarios and validation script under load-testing subdirectories on SIPP_HOST', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+
+        expect($script)
+            ->toContain('${SIPP_APP_DIR}/load-testing/tools')
+            ->toContain('${SIPP_APP_DIR}/load-testing/scripts')
+            ->toContain('${SIPP_HOST}:${SIPP_APP_DIR}/load-testing/tools/')
+            ->toContain('${SIPP_HOST}:${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh');
+    });
 });

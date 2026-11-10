@@ -115,6 +115,14 @@ describe('load test switch helpers', function (): void {
         expect($script)->toContain('SWITCH-FAILED')
             ->and($script)->toContain('set -euo pipefail');
     });
+
+    it('snapshots ESL and broadcast throttle env keys and documents all 16 commands in usage', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        expect($script)
+            ->toContain('for key in FS_XML_HANDLER_DIALPLAN_CACHE_TTL FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL FS_XML_HANDLER_DIRECTORY_CACHE_TTL FS_XML_HANDLER_ACL_CACHE_TTL FS_ESL_EVENT_PROFILE FS_BROADCAST_THROTTLE_MS; do')
+            ->and($script)->toMatch('/usage\(\)[\s\S]*?apply_esl_profile[\s\S]*?apply_broadcast_throttle[\s\S]*?probe_lookup[\s\S]*?assert_xml_curl_config[\s\S]*?octane_binding_state/');
+    });
 });
 
 it('no longer carries the retired lua proxy switches', function (): void {

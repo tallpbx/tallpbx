@@ -53,9 +53,9 @@ REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
 # Permanent copy of the raw artifacts.
 #
-# Results now live inside the repository (load-testing/results), which is the
-# durable copy: it survives the measurement hosts being deleted and travels
-# with a clone. ARCHIVE_ROOT stays available for an extra copy elsewhere, and
+# Raw per-cell fragments under load-testing/results/<series>/ are git-ignored
+# working artifacts while consolidated CSVs under load-testing/results/consolidated/
+# are committed. ARCHIVE_ROOT stays available for an extra copy elsewhere, and
 # is empty by default so a run does not write outside the repo.
 if [ -z "${ARCHIVE_ROOT+set}" ]; then
     ARCHIVE_ROOT=""
@@ -65,7 +65,7 @@ fi
 # measures PHP-FPM and reports the number as Octane.
 PBX_OCTANE_URL="${PBX_OCTANE_URL:-http://127.0.0.1:8090/api/v1/xml-handler}"
 PBX_XML_TOKEN="${PBX_XML_TOKEN:-}"
-# Load-test data uses the same environment names as scripts/pbx-sipp-validate.sh,
+# Load-test data uses the same environment names as load-testing/scripts/pbx-sipp-validate.sh,
 # so an operator who already knows one tool does not have to learn a second
 # vocabulary. The LOAD_* names stay available for programmatic callers.
 LOAD_TENANT="${LOAD_TENANT:-${TENANT:-load-test-beta}}"
@@ -144,8 +144,9 @@ LADDER_SECONDS="${LADDER_SECONDS:-60}"
 LIST_MODE=0
 DRY_RUN=0
 
-# The matrix cache is scratch, not evidence: keeping it beside the results
-# would add an untracked file to a committed directory on every invocation.
+# The matrix cache is scratch, not evidence: raw per-cell fragments under
+# load-testing/results/<series>/ are git-ignored working artifacts while
+# consolidated CSVs under load-testing/results/consolidated/ are committed.
 MATRIX_CACHE="${MATRIX_CACHE:-${TMPDIR:-/tmp}/tallpbx-load-matrix-${SERIES}.json}"
 
 # Lookups are memoised: building a dry-run touches every profile field, and one
@@ -338,7 +339,7 @@ Environment:
   PBX_XML_TOKEN          XML handler token, when authentication is enabled
   SERIES                 Series directory name (default refresh-YYYYMMDD)
   ARCHIVE_ROOT           Optional extra copy of the artifacts (empty by default;
-                         load-testing/results is the durable copy)
+                         consolidated CSVs under load-testing/results/consolidated/ are committed)
   TENANT / DOMAIN        Seeded tenant slug and SIP realm
   EXTENSIONS / START     Generated extension count and first number
   PASSWORD               SIP password for the generated accounts
@@ -677,19 +678,19 @@ sipp_prepare_generator() {
 
     : > "$sync_log"
 
-    if ! run_on_sipp "mkdir -p $(printf '%q' "${SIPP_APP_DIR}/tools") $(printf '%q' "${SIPP_APP_DIR}/scripts") $(printf '%q' "${SIPP_APP_DIR}/storage/app/load-tests")" >> "$sync_log" 2>&1; then
+    if ! run_on_sipp "mkdir -p $(printf '%q' "${SIPP_APP_DIR}/load-testing/tools") $(printf '%q' "${SIPP_APP_DIR}/load-testing/scripts") $(printf '%q' "${SIPP_APP_DIR}/storage/app/load-tests")" >> "$sync_log" 2>&1; then
         printf 'SIPP-PREPARE-FAILED could not create the generator directories; see %s\n' "$sync_log" >&2
         return 1
     fi
 
     # shellcheck disable=SC2086
-    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${ROOT_DIR}/load-testing/tools/sipp" "${SIPP_HOST}:${SIPP_APP_DIR}/tools/" >> "$sync_log" 2>&1; then
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" -r "${ROOT_DIR}/load-testing/tools/sipp" "${SIPP_HOST}:${SIPP_APP_DIR}/load-testing/tools/" >> "$sync_log" 2>&1; then
         printf 'SIPP-PREPARE-FAILED could not copy the SIPp scenarios; see %s\n' "$sync_log" >&2
         return 1
     fi
 
     # shellcheck disable=SC2086
-    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" "${ROOT_DIR}/load-testing/scripts/pbx-sipp-validate.sh" "${SIPP_HOST}:${SIPP_APP_DIR}/scripts/pbx-sipp-validate.sh" >> "$sync_log" 2>&1; then
+    if ! scp $SSH_OPTS -P "$SIPP_SSH_PORT" "${ROOT_DIR}/load-testing/scripts/pbx-sipp-validate.sh" "${SIPP_HOST}:${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh" >> "$sync_log" 2>&1; then
         printf 'SIPP-PREPARE-FAILED could not copy the validation script; see %s\n' "$sync_log" >&2
         return 1
     fi
@@ -1222,8 +1223,9 @@ teardown_tier() {
     fi
 
     # The measurement hosts are disposable and their addresses are not public
-    # knowledge, so the committed copy shows them as x.x.x.NNN. The raw
-    # artifacts stay on the host.
+    # knowledge, so the artifacts show them as x.x.x.NNN. Raw per-cell fragments
+    # under load-testing/results/<series>/ are git-ignored working artifacts while
+    # consolidated CSVs under load-testing/results/consolidated/ are committed.
     if [ -d "${ARTIFACT_ROOT}/${TIER}" ]; then
         bash "${TOOLS_DIR}/scrub-artifacts.sh" "${ARTIFACT_ROOT}/${TIER}" "$PBX_HOST" "$SIPP_HOST" >/dev/null 2>&1 \
             || printf 'WARNING: could not obfuscate the host addresses in the artifacts\n' >&2
@@ -1404,7 +1406,7 @@ run_sip_phase() {
     fi
 
     remote_run_dir="$(sip_run_dir "$TIER" "$variant")"
-    local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-cps${CPS}"
+    local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}"
     label="${TIER}/${variant}/sip-cps${CPS}"
 
     mkdir -p "$local_run_dir"
@@ -1490,7 +1492,7 @@ run_sip_phase() {
 
     # One row per rung: the stop rule (three consecutive rungs under 95 %
     # completion) is applied from this record, not from memory.
-    ladder_file="${ARTIFACT_ROOT}/${TIER}/${variant}/ladder.csv"
+    ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
     mkdir -p "$(dirname "$ladder_file")"
 
     if [ ! -f "$ladder_file" ]; then
@@ -1551,7 +1553,7 @@ run_ablation_phase() {
 
             for repeat in $(seq 1 "$REPEATS"); do
                 remote_run_dir="$(ablation_run_dir "$variant" "${cpu_label}-cps${CPS}-r${repeat}")"
-                local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/${cpu_label}-cps${CPS}-r${repeat}"
+                local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/${cpu_label}-cps${CPS}-r${repeat}"
                 mkdir -p "$local_run_dir"
 
                 warm_directory
@@ -1570,7 +1572,7 @@ run_ablation_phase() {
                 # Per-service CPU across the whole cell window, on the PBX.
                 # The sample is named by rate and repeat so a ladder over
                 # several rungs never overwrites the earlier rungs' samples.
-                run_on_pbx "$(cpuwatch_command "$cpu_label" "${REMOTE_ARTIFACT_ROOT}/${TIER}/${variant}/${cpu_label}-cps${CPS}-r${repeat}-cpu.csv" 360)" >/dev/null 2>&1 \
+                run_on_pbx "$(cpuwatch_command "$cpu_label" "${REMOTE_ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/${cpu_label}-cps${CPS}-r${repeat}-cpu.csv" 360)" >/dev/null 2>&1 \
                     || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
 
                 run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || true
@@ -1621,7 +1623,7 @@ run_sip_smoke() {
     fi
 
     remote_run_dir="$(smoke_run_dir "$variant")"
-    local_run_dir="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-smoke"
+    local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke"
     label="${TIER}/${variant}/smoke"
 
     mkdir -p "$local_run_dir"
@@ -1716,7 +1718,7 @@ execute_cells() {
             case "$phase" in
                 xml) run_xml_phase "$variant" || failures=$((failures + 1)) ;;
                 sip)
-                    smoke_gate="${ARTIFACT_ROOT}/${TIER}/${variant}/sip-smoke/cdr-gate.txt"
+                    smoke_gate="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke/cdr-gate.txt"
 
                     if [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
                         printf 'SMOKE-ALREADY-PASSED %s/%s (see %s)\n' "$TIER" "$variant" "$smoke_gate" >&2

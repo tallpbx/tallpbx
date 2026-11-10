@@ -7,9 +7,17 @@ set -uo pipefail
 
 cd /var/www/tallpbx || exit 1
 
-export PBX_HOST=162.243.62.138
-export SSH_OPTS="-i ${HOME}/.ssh/ppx2-client.rsa -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
-export SIPP_HOST=107.170.3.55
+# Required targets: a committed script never hardcodes host addresses.
+: "${PBX_HOST:?Set PBX_HOST to the target PBX IP or hostname}"
+: "${SIPP_HOST:?Set SIPP_HOST to the SIPp generator IP or hostname}"
+export PBX_HOST SIPP_HOST
+
+# Optional explicit identity: export SSH_OPTS only when one is given, so
+# the runner's own default (StrictHostKeyChecking=accept-new, keepalives)
+# still applies for agent/default-key sessions.
+if [ -n "${SSH_IDENTITY:-}" ]; then
+    export SSH_OPTS="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
+fi
 export SERIES=refresh-20261103
 
 mkdir -p /tmp/loadtest-logs

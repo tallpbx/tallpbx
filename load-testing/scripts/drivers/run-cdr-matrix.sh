@@ -3,15 +3,22 @@
 #
 # Legs: cdr-octane (ingestion on the persistent worker) and off (mod_json_cdr
 # unloaded). The cdr-fpm leg is already measured — the main ladder ran with the
-# shipped default. Variants include both Lua paths per the operator's request,
-# at the two boundary rates where the CDR cost should dominate.
+# shipped default, at the two boundary rates where the CDR cost should dominate.
 set -uo pipefail
 
 cd /var/www/tallpbx || exit 1
 
-export PBX_HOST=162.243.62.138
-export SSH_OPTS="-i ${HOME}/.ssh/ppx2-client.rsa -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
-export SIPP_HOST=107.170.3.55
+# Required targets: a committed script never hardcodes host addresses.
+: "${PBX_HOST:?Set PBX_HOST to the target PBX IP or hostname}"
+: "${SIPP_HOST:?Set SIPP_HOST to the SIPp generator IP or hostname}"
+export PBX_HOST SIPP_HOST
+
+# Optional explicit identity: export SSH_OPTS only when one is given, so
+# the runner's own default (StrictHostKeyChecking=accept-new, keepalives)
+# still applies for agent/default-key sessions.
+if [ -n "${SSH_IDENTITY:-}" ]; then
+    export SSH_OPTS="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
+fi
 export SERIES=refresh-20261103
 
 LOGDIR="${ROOT_DIR:-/var/www/tallpbx}/load-testing/results/${SERIES}/driver-logs"; mkdir -p "$LOGDIR"
@@ -19,7 +26,7 @@ SUMMARY="${LOGDIR}/cdr-matrix.csv"
 mkdir -p "$LOGDIR"
 [ -f "$SUMMARY" ] || echo "transport,variant,cps,successful,failed" > "$SUMMARY"
 
-pbx() { timeout 90 ssh -i "$HOME/.ssh/ppx2-client.rsa" -o ConnectTimeout=8 root@162.243.62.138 "$@"; }
+pbx() { timeout 90 ssh ${SSH_OPTS:-} root@"${PBX_HOST}" "$@"; }
 
 for transport in octane off; do
     for variant in v-octane; do
