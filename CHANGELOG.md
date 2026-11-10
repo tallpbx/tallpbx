@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.2] - 2026-11-10
+
 ### Changed
-- **Load-Testing Gaps & Consolidation Plans Retired**: Removed `docs/load-testing-gaps-implementation-plan.md` and `docs/superpowers/plans/2026-11-09-load-testing-consolidation.md` following full verification of 1c, 2c, and 4c shared cloud benchmarks, 14-scenario SIP validation, and FreeSWITCH source build procedures. Added unified cross-tier Fast Controller vs Octane architectural comparison to `docs/load-testing-results.md`.
-- **Load-Testing Quad-Core Shared Sizing & Benchmark Modernization**: Replaced all 4 vCPU dedicated legacy test records with authoritative empirical load tests run on cost-effective shared cloud hardware (`4 vCPU shared / 8 GB RAM`). Documented PHP-FPM dynamic pool scaling (`pm = dynamic`, dynamic ceiling 12 workers) reaching 45.08 req/s under saturation, persistent Laravel Octane worker scaling to 140.54 req/s (3.1× speedup, 85 ms median latency), full 14-scenario SIP validation pass with 0 call drops, and 461 MariaDB CDR rows reconciled. Reconciled `docs/load-testing-results.md`, `load-testing/status.md`, `load-testing/procedure.md`, and `docs/telephony-capacity-scaling-guide.md`.
-- **Load-Testing Refresh Implementation Plan Retired**: Removed `docs/load-testing-refresh-implementation-plan.md` following the full delivery of the automated matrix runner, 1 vCPU and 2 vCPU worker sweeps, fast front controllers (`public/xml-handler-fast.php` and `public/cdr-fast.php`), and consolidation of authoritative results into `docs/load-testing-results.md`.
+- **Default Configuration vs Performance Option Unified Architecture Comparison**: Added a consolidated cross-tier comparison table to `docs/load-testing-results.md` contrasting the default configuration (shipped dynamic Fast Controller via PHP-FPM) against the performance option (opt-in Laravel Octane resident worker on loopback port 8090) across 1 vCPU, 2 vCPU, and 4 vCPU tiers. Includes three intuitive architectural perspectives: an everyday drive-through restaurant analogy for non-technical users, a process and socket backlog model for Linux sysadmins, and an in-memory lifecycle model for PHP developers.
+- **Load-Testing Quad-Core Shared Sizing & Modernization**: Replaced all 4 vCPU dedicated legacy test records with authoritative empirical load tests run on cost-effective shared cloud hardware (`4 vCPU shared / 8 GB RAM`). Documented PHP-FPM dynamic pool scaling (`pm = dynamic`, dynamic ceiling 12 workers) reaching 45.08 req/s under saturation, persistent Laravel Octane worker scaling to 140.54 req/s (3.1× speedup, 85 ms median latency), full 14-scenario SIP validation pass with 0 call drops, and 461 MariaDB CDR rows reconciled. Reconciled `docs/load-testing-results.md`, `load-testing/status.md`, `load-testing/procedure.md`, and `docs/telephony-capacity-scaling-guide.md`.
+- **PHP-FPM Worker Pool Split Proposal Retired**: Removed `docs/php-fpm-worker-pool-split-proposal.md` as the unified dynamic worker pool with memory ceilings (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) and the optional persistent RoadRunner/Octane worker render a socket split unnecessary.
+- **Load-Testing Implementation Plans Retired**: Removed `docs/load-testing-gaps-implementation-plan.md`, `docs/superpowers/plans/2026-11-09-load-testing-consolidation.md`, and `docs/load-testing-refresh-implementation-plan.md` following full verification of 1c, 2c, and 4c shared cloud benchmarks, 14-scenario SIP validation, and FreeSWITCH source build procedures.
+
+### Fixed
+- **FreeSWITCH Source Helper Functions Ordering**: Defined `source_build_is_installed()` and `freeswitch_packages_are_installed()` before `configure_json_cdr()` in `scripts/resources/freeswitch.sh`, ensuring source build detection succeeds during automated installation and module configuration.
 
 ## [5.1.1] - 2026-11-09
 
