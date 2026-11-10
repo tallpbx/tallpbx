@@ -31,7 +31,7 @@ Laravel Boost is active as an MCP server (`.cursor/mcp.json` runs `php artisan b
 ## Cache Clearing Rule (Mandatory)
 After ANY code changes (Blade views, config, routes, events, Livewire components, compiled classes), ALWAYS run:
 ```bash
-php artisan optimize:clear
+tpbx optimize:clear
 ```
 
 ## Standardized Action Progress Animation Architecture (Three Patterns)
@@ -43,7 +43,8 @@ All asynchronous or mutating actions triggered via Livewire must display a stand
 
 ## Mandatory Verification Order
 Before claiming a feature is complete:
-1. `php artisan optimize:clear`
-2. `php artisan test --compact --parallel`
-3. `./vendor/bin/pest tests/Browser` (for UI changes)
-4. `php artisan route:list --name=<feature-name>` (for new routes)
+1. `tpbx optimize:clear`
+2. `./vendor/bin/pint --dirty` (PHP files only)
+3. `./vendor/bin/pest --parallel path/to/SpecificTest.php` (targeted tests for routine work)
+4. `tpbx test --compact --parallel` and `./vendor/bin/pest --parallel tests/Browser` (at most once before commit, and only for significant multi-subsystem changes)
+5. `tpbx route:list --name=<feature-name>` (when routes change)

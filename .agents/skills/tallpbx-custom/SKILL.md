@@ -1,6 +1,6 @@
 ---
 name: tallpbx-custom
-description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), unit standardization in documentation and specs (preferring GB/MB over GiB/MiB), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 5.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 5 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery), or test execution scoping and verification discipline (run targeted tests for specific parts changed; full test suite and full browser tests run a maximum of ONE time before committing, and ONLY when making significant architectural changes affecting several parts of the code; never repeatedly or on scoped/trivial changes)."
+description: "Invoke when working on TallPBX-specific patterns: Laravel Boost MCP tool priority (database-schema, database-query, search-docs, application-info), unit standardization in documentation and specs (preferring GB/MB over GiB/MiB), versioning and release strategy (Laravel versioned series model, SemVer, unreleased 5.x modernization), the installer and resource scripts, plain-language administrative copy and prompt standards, the x-tooltip Blade component, DaisyUI 5 tooltip positioning and safelisting, the custom.css Tailwind v4 architecture, Livewire 4 + Alpine 3 reactive UI toggling, scroll preservation with wire:navigate:scroll, the TALL stack dual-event binding pattern, authentication guards (admin/web), tenant context and isolation, impersonation, group permissions, permission seeding, cross-tenant data boundaries, primary-database safety guards, changelog maintenance and release tagging conventions, UI alert and feedback patterns (inline alerts, in-dialog error states, and top-right toasts), action progress animation architecture across three patterns (top alert banners, form/tool action buttons, and table row dimming with icon-button auto-spinners), live-firewall safety and lockout prevention (nftables change rules, the loopback local-services guard, and lockout recovery), or test execution scoping and verification discipline (run targeted tests for specific parts changed; full test suite and full browser tests run a maximum of ONE time before committing, and ONLY when making significant architectural changes affecting several parts of the code; never repeatedly or on scoped/trivial changes)."
 license: MIT
 metadata:
   author: tallpbx
@@ -179,7 +179,7 @@ TallPBX enforces a strict two-tier policy for running host Linux commands to pre
 
 **Mandatory for any change that touches firewall behavior, the security helper, ruleset
 generation, or the security switches.** Two production lockouts on 2026-09-29 drove these
-rules; see the recovery runbooks in `docs/operations.md` and `docs/security-architecture.md` §9.3.
+rules; see the recovery runbooks in `docs/operations.md` and `docs/architecture.md` (§16.3).
 
 ### The two failure modes that must never recur
 
@@ -230,7 +230,7 @@ step 1 alone usually fixes it by restoring the database/cache connection:
 
 After recovery, re-apply from the Security Center (or `tpbx security:apply`) so the
 saved configuration and the kernel agree again. Full runbooks: `docs/operations.md` →
-"Recovering from a Firewall Lockout"; `docs/security-architecture.md` §9.3; `AGENTS.md` →
+"Recovering from a Firewall Lockout"; `docs/architecture.md` (§16.3); `AGENTS.md` →
 "Live Firewall Safety".
 
 ## x-tooltip Component
@@ -363,7 +363,7 @@ run `npm run build` to recompile the DaisyUI classes into the production CSS
 bundle. For development, `npm run dev` with Vite HMR will pick up changes
 automatically.
 
-## Livewire 4 + Alpine 5 Reactive UI Toggling
+## Livewire 4 + Alpine 3 Reactive UI Toggling
 
 For form sections that toggle based on a Livewire property (like switching
 between Password and OAuth 2.0 auth types), use the idiomatic **direct `$wire`
@@ -715,13 +715,13 @@ All module service providers MUST extend `App\Support\ModuleServiceProvider`
 views, migrations, routes, Livewire components, menu items, and permissions.
 
 Required overrides:
-- `moduleName(): string` — kebab-case name (e.g. `'bridges'`, `'smtp-connector'`)
+- `moduleName(): string` — kebab-case name (e.g. `'bridges'`, `'email-connector'`)
 - `moduleNamespace(): string` — PHP namespace (e.g. `'Modules\Bridges'`)
 
 Optional overrides:
 - `menuItems(): array` — sidebar menu entries
 - `permissions(): array` — permission definitions as `[key => description]`
-- `hasTranslations(): bool` — return `true` if module has `resources/lang/`
+- `hasTranslations(): bool` — return `true` if module has translations (default auto-detects `lang/` or `resources/lang/`, registered via `loadTranslationsFrom(__DIR__.'/../../lang', 'email-connector')` and cascading loader)
 
 ### Route Auto-Registration
 
@@ -960,7 +960,7 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular trans
   - `advanced` <=> `pbx.advanced`
   - `monitoring` <=> `pbx.monitoring`
   - `custom` <=> Third-party community modules
-- **FreeSWITCH v1.11 Core Correlation**: The required PBX modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) strictly correlate to FreeSWITCH v1.11's three mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`). All other telephony modules represent optional FreeSWITCH feature modules (`mod_voicemail`, `mod_conference`, `mod_callcenter`, `mod_local_stream`, `mod_xml_cdr`, etc.) and must remain toggleable.
+- **FreeSWITCH v1.11 Core Correlation**: The required PBX modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) strictly correlate to FreeSWITCH v1.11's three mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`). All other telephony modules represent optional FreeSWITCH feature modules (`mod_voicemail`, `mod_conference`, `mod_callcenter`, `mod_local_stream`, `mod_json_cdr`, etc.) and must remain toggleable.
 
 
 

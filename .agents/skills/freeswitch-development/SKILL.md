@@ -30,7 +30,7 @@ Before changing FreeSWITCH-related behavior, inspect the local implementation po
 - Dialplan context: `app/Services/DialplanContext.php`
 - Tenant defaults: `app/Services/TenantDefaults/`
 - PBX modules: `app-modules/*/src`
-- Existing tests: `tests/Feature/Http/XmlHandlerControllerTest.php`, `tests/Feature/Services/FreeSwitchListenCommandTest.php`, `tests/Unit/Services/FreeSwitchServiceTest.php`, and relevant `tests/Feature/Modules/**`
+- Existing tests: `tests/Feature/Http/XmlHandlerControllerTest.php`, `tests/Feature/Services/FreeSwitchListenCommandTest.php`, `tests/Unit/Services/FreeSwitchServiceTest.php`, and relevant `app-modules/{module}/tests/`
 
 When the task touches a specific PBX feature, inspect that module's migration, model, service, Livewire components, views, provider, tests, and route behavior before designing changes.
 
@@ -152,8 +152,8 @@ Use the documented WSL/VirtualBox or WireGuard layout unless the user explicitly
 - Load generator: WSL host `192.168.1.65`, SSH port `2222`, running SIPp locally from `/root/pbx-sipp-validation`.
 - PBX under test: VirtualBox or server host such as `192.168.1.76`, running FreeSWITCH, Nginx, PHP-FPM, Laravel, MariaDB, and Redis.
 - Run SIPp from WSL, not from the PBX server, so client-side SIPp load does not consume PBX CPU.
-- Use `scripts/pbx-sipp-validate.sh` or the scenarios in `tools/sipp/` as the source of truth before inventing new commands.
-- Use `docs/sipp-server-to-server-validation.md` as the recovery/runbook reference when a reboot or restart breaks the test setup.
+- Use `load-testing/scripts/pbx-sipp-validate.sh` or the scenarios in `load-testing/tools/sipp/` as the source of truth before inventing new commands.
+- Use `docs/load-testing-guide.md` as the recovery/runbook reference when a reboot or restart breaks the test setup.
 
 For remote datacenter tests where the load generator is behind NAT, prefer WireGuard rather than public inbound exposure to the load generator:
 
@@ -175,7 +175,7 @@ Before every SIPp CPS run, perform the repeatable preflight gate instead of trou
 8. FreeSWITCH `sessions-per-second` is high enough for the test target; the project default is 60 so tests are not accidentally capped by the old 30 SPS setting.
 9. PHP-FPM and Laravel config caches have been refreshed after `.env` or code changes.
 
-If the PBX data or CSV preflight fails, run `tpbx pbx:load-test:seed --tenant=load-test-virtualbox --domain=192.168.1.76 --extensions=20 --start=2000 --password='LoadTest1234!' --sipp-host=192.168.1.65 --sipp-port=5066 --output=storage/app/load-tests/sipp-users-virtualbox-sps60.csv --reset --no-interaction`, copy the CSV to WSL, regenerate the auth CSV, and clear Laravel's application cache before retrying. A missing SIP account or malformed auth CSV produces `403 Forbidden` setup failures and must not be counted as a CPS result.
+If the PBX data or CSV preflight fails, run `tpbx pbx:load-test:seed --tenant=load-test-virtualbox --domain=192.168.1.76 --extensions=20 --start=2000 --password='LoadTest1234' --sipp-host=192.168.1.65 --sipp-port=5066 --output=storage/app/load-tests/sipp-users-virtualbox-sps60.csv --reset --no-interaction`, copy the CSV to WSL, regenerate the auth CSV, and clear Laravel's application cache before retrying. A missing SIP account or malformed auth CSV produces `403 Forbidden` setup failures and must not be counted as a CPS result.
 
 When clearing stale SIPp processes from WSL through SSH, prefer `pgrep -x sipp` plus `kill`. Avoid putting `pkill -f /usr/local/bin/sipp` directly in the SSH command string because the pattern can match and terminate the SSH shell running the cleanup command.
 
@@ -191,7 +191,7 @@ When interpreting CPS results:
 
 For XML-curl bottleneck work, use the XML handler timing log deliberately:
 
-- Enable `FS_XML_HANDLER_LOG_TIMING=true` only for diagnostic runs, then disable it afterward.
+- Enable `FS_XML_HANDLER_LOG_TIMING=true` only for diagnostic runs, then disable it afterward. Note that `tpbx pbx:load-test:dialplan --timing` requires `FS_XML_HANDLER_TIMING_HEADERS=true` in `.env` to record server-side timing breakdown headers.
 - Compare `elapsed_ms`, `db_query_count`, `db_time_ms`, and `non_db_time_ms` by XML section.
 - Dialplan XML may be cached and cheap while directory/auth XML is still expensive; do not assume dialplan timing represents the whole call setup path.
 - In recent VirtualBox testing, directory/auth lookups were the larger Laravel-side cost than cached dialplan lookups, so optimize tenant identity and directory XML caching before broad MariaDB/PHP tuning.
@@ -212,14 +212,12 @@ Use representative hardware for capacity claims, and preserve the distinction be
 - Keep optional hardware sizes explicitly marked as skipped when the user decides not to run them; do not leave them as pending after the benchmark series is closed.
 - Preserve artifact directories under `storage/app/load-tests/`, but do not commit generated load-test artifacts unless the user explicitly asks.
 
-Project observations from July 2026 representative VPS testing:
+Project observations from 5.x representative testing & installer defaults:
 
-- On 1 vCPU/1 GB, Debian's default PHP-FPM dynamic pool was acceptable for light or moderate use. Static 6 was a reasonable optional high-load profile with about 440 MB available after testing and no swap growth.
-- On 1 vCPU/2 GB, added memory improved headroom but not throughput; the single shared CPU remained the limiter and provider scheduling noise was plausible.
-- On 2 vCPU/2 GB, static 6 produced the strongest remote XML-handler results and substantial memory headroom.
-- A 2 vCPU/2 GB sweep of static 8, 10, and 12 workers did not improve throughput meaningfully and introduced worse p99/max tail spikes. Keep `pm.max_children = 6` as the recommended 2 GB profile unless future measurements prove otherwise.
-- Keep `pm.max_requests = 0` unless sustained monitoring demonstrates worker memory growth. Nonzero recycling should be a leak-mitigation setting, not a default capacity-tuning variable.
-- For the standard 4 GB combined PBX/application server, use the project install guidance before changing the current recommendation.
+- The installer ships a dynamic pool: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, and `pm.max_children = 3` on 1 GB (`6` on 2 GB, `12` on 4 GB+), plus `pm.max_requests = 10000` so long-running workers recycle.
+- The 2026-11-08 worker sweep measured every pool size on the minimal tier: more workers lose calls at the failure boundary (38% completed with 5 workers versus 97% with 1), and Debian's stock values were the only configuration to lose calls at the supported rate.
+- That single-core result does not generalize to larger hosts: the 2026-11-09 re-measurement on 2 vCPU / 2 GB found worker count second-order (all five shapes landed within 34–44% at the 12 calls/sec boundary while PHP-FPM demanded 2.25 cores). Supported rates with dynamic defaults: 5 calls/sec on 1 vCPU, 10 calls/sec on 2 vCPU. Do not raise `pm.max_children` without before/after `pbx:load-test:dialplan` reports.
+- For high-concurrency environments or high call setup rates, use the optional Octane XML worker service (`tallpbx-xml-worker`) instead of inflating PHP-FPM worker pools.
 
 ## External References
 

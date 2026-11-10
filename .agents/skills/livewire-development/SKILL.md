@@ -90,7 +90,7 @@ new class extends Component {
 
 These things changed in Livewire 4, but may not have been updated in this application. Verify this application's setup to ensure you follow existing conventions.
 
-- Use `Route::livewire()` for full-page components (e.g., `Route::livewire('/posts/create', CreatePost::class)`); config keys renamed: `layout` → `component_layout`, `lazy_placeholder` → `component_placeholder`.
+- In TallPBX, use standard Laravel routing `Route::get('/dashboard', Dashboard::class)` instead of `Route::livewire()` (AGENTS.md:293); config keys renamed: `layout` → `component_layout`, `lazy_placeholder` → `component_placeholder`.
 - `wire:model` now ignores child events by default (use `wire:model.deep` for old behavior); `wire:scroll` renamed to `wire:navigate:scroll`.
 - Component tags must be properly closed; `wire:transition` now uses View Transitions API (modifiers removed).
 - JavaScript: `$wire.$js('name', fn)` → `$wire.$js.name = fn`; `commit`/`request` hooks → `interceptMessage()`/`interceptRequest()`.
@@ -158,7 +158,11 @@ Used for actions triggered directly from table rows (e.g. deleting an entry, pro
 ## Alpine & JavaScript
 
 - `wire:transition` uses browser View Transitions API; `$errors` and `$intercept` magic properties available.
-- Non-blocking `wire:poll` and parallel `wire:model.live` updates improve performance.
+
+> [!WARNING]
+> **Polling (`wire:poll`) is prohibited in TallPBX.** TallPBX uses event-driven WebSockets (Laravel Reverb + Echo) for real-time updates and notifications instead of polling. Never use `wire:poll` in components or Blade templates.
+
+- Parallel `wire:model.live` updates improve performance.
 
 For interceptors and hooks, see [reference/javascript-hooks.md](reference/javascript-hooks.md).
 

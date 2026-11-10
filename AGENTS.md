@@ -12,7 +12,7 @@
 
 ## Load Testing Harness
 
-All capacity-test documentation and scripts live in [`load-testing/`](load-testing/README.md). Before running, changing, or reasoning about a load test, read `load-testing/README.md` and follow its reading order. Raw results are committed under `load-testing/results/`.
+All capacity-test documentation and scripts live in [`load-testing/`](load-testing/README.md). Before running, changing, or reasoning about a load test, read `load-testing/README.md` and follow its reading order. Consolidated benchmark CSVs are committed under load-testing/results/consolidated/ (raw per-cell fragments under load-testing/results/<series>/ and storage/app/load-tests/ are git-ignored).
 
 ## CRITICAL — Laravel Boost MCP Priority & Tool Usage
 
@@ -45,7 +45,7 @@ The entire TallPBX user interface must remain **predictably consistent, intuitiv
   3. *Enabled but Unconfigured / Idle* (`bg-warning` amber warning dot, `badge-warning` "Idle", warning indicator for empty criteria): Feature is administratively ON, but has 0 configured criteria (e.g. 0 countries or 0 IP entries). Never report an enabled feature as "Disabled" when unconfigured, which causes cognitive dissonance where the administrator's toggle appears ignored.
   Additionally, master summary tables reflect status via indicator dots, metrics, and action badges; interactive mutation (the enable/disable switch itself) lives exclusively within the subsystem's dedicated tab or workbench.
 - **Consistent Micro-Interactions**: All toggle switches, button triggers, table row actions, and confirmation modals must adhere to the standardized visual feedback patterns (DaisyUI spinners, pointer-events locks, present-continuous labels e.g. "Enabling..." / "Disabling...", and operational toast notifications).
-- **100% Parity Between Module Manifest Categories and Navigation Menu Parents**: Every module's manifest category in `module.json` (`"category": "<group>"`) MUST match its sidebar navigation parent (`'parent' => '<group>'` in `ModuleServiceProvider.php`). An administrator seeing a module under PBX Routing, PBX Accounts, or PBX Monitoring in `/panel/modules` must find it in the exact same category in the navigation menu. Furthermore, the required PBX modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) strictly correlate to FreeSWITCH v1.11's mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`). All other telephony modules represent optional FreeSWITCH feature modules (`mod_voicemail`, `mod_conference`, `mod_callcenter`, `mod_local_stream`, `mod_xml_cdr`, etc.) and must remain toggleable.
+- **100% Parity Between Module Manifest Categories and Navigation Menu Parents**: Every module's manifest category in `module.json` (`"category": "<group>"`) MUST match its sidebar navigation parent (`'parent' => '<group>'` in `ModuleServiceProvider.php`). An administrator seeing a module under PBX Routing, PBX Accounts, or PBX Monitoring in `/panel/modules` must find it in the exact same category in the navigation menu. Furthermore, the required PBX modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) strictly correlate to FreeSWITCH v1.11's mandatory `mod_xml_curl` runtime bindings (`directory`, `dialplan`, and `configuration: sofia.conf`). All other telephony modules represent optional FreeSWITCH feature modules (`mod_voicemail`, `mod_conference`, `mod_callcenter`, `mod_local_stream`, `mod_json_cdr`, etc.) and must remain toggleable.
 
 ## CRITICAL — Cache Clearing After Code Changes
 
@@ -77,7 +77,7 @@ tpbx optimize:clear
 
 # 4. Full test suite and full browser tests (MAXIMUM ONCE before commit, and ONLY for significant multi-subsystem changes)
 # DO NOT run these for localized, scoped, or cosmetic work (e.g. typography normalizations, translations, single-component tweaks)
-tpbx test --compact --parallel   # Only for significant architectural changes affecting several parts of the code
+tpbx test --compact --parallel   # Or tpbx app:test; only for significant architectural changes affecting several parts of the code
 ./vendor/bin/pest tests/Browser         # Only when major cross-cutting UI/navigation overhauls are made
 
 # 5. Routes exist (for new routes/features)
@@ -152,17 +152,17 @@ command demonstration. Two production outages were caused this way:
 
 ## SIP Load Testing & Multi-Host Reproducibility Guidelines
 
-When reproducing or executing SIP load tests (`tpbx pbx:load-test:*`, `scripts/pbx-sipp-validate.sh`, or `scripts/run-cache-sweep.sh`), agents must follow these operational rules:
+When reproducing or executing SIP load tests (`tpbx pbx:load-test:*`, `load-testing/scripts/pbx-sipp-validate.sh`, or `load-testing/scripts/run-cache-sweep.sh`), agents must follow these operational rules:
 1. **Public IP Obfuscation**: In all documentation, public test reports, and committed logs, public IP addresses must be obfuscated to show only the last octet (e.g. `x.x.x.218` or `...YYY`). Never expose complete public IP addresses.
 2. **Pest Parallel Flag**: Always run the Pest test suite with `--parallel` (`tpbx test --compact --parallel`). Running tests sequentially takes an excessively long time.
 3. **SSH Remote Password Handling**: When invoking `tpbx pbx:load-test:seed` on a remote PBX over SSH, do not use special characters (such as `!`) in the password argument (e.g., use `LoadTest1234`), or quote/escape carefully (`--password=\"...\"`). Bash subshells over SSH strip unescaped exclamation marks, creating credential mismatches that cause `403 Forbidden` on SIP REGISTER.
-4. **Multi-Host CSV Synchronization**: When seeding accounts on a remote PBX, the generated `storage/app/load-tests/sipp-users.csv` is written on the PBX filesystem. Before running `scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the local load generator orchestrator, copy the CSV from the PBX to the local generator: `scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv`.
+4. **Multi-Host CSV Synchronization**: When seeding accounts on a remote PBX, the generated `storage/app/load-tests/sipp-users.csv` is written on the PBX filesystem. Before running `load-testing/scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the local load generator orchestrator, copy the CSV from the PBX to the local generator: `scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv`.
 5. **Load Generator Ingress Firewall Rules (`nftables`)**: When testing outbound gateway routing, media flow playback, or extended scenarios, FreeSWITCH bridges calls to the generator host (UAS ports 5088, 5090, RTP 6000). If the generator host runs TallPBX or has an active default-drop stateful firewall, those unsolicited inbound UDP packets will be dropped unless whitelisted: `sudo nft add element inet tallpbx_filter whitelist_ips { <PBX_IP> }`. On a dedicated generator VM with no firewall (`INPUT ACCEPT`), no firewall configuration is needed.
 6. **FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${safeDest}/${context}` rather than raw extension strings `{dialplan=XML,context=${context}}2000` to avoid `CHAN_NOT_IMPLEMENTED` failures.
-7. **Background UAS Port Collision Prevention**: When transitioning between validation steps in `scripts/pbx-sipp-validate.sh`, existing background UAS processes must be cleanly terminated before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` port collisions.
+7. **Background UAS Port Collision Prevention**: When transitioning between validation steps in `load-testing/scripts/pbx-sipp-validate.sh`, existing background UAS processes must be cleanly terminated before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` port collisions.
 8. **UAC Port Allocation in Multi-Role Generators**: When the load generator host also runs FreeSWITCH, UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). `EXTENDED_UAC_LOCAL_PORT` defaults to `5100` (spanning 5100–5114) to prevent socket binding collisions.
 9. **PHP-FPM Pool Sizing**: The installer ships a dynamic pool — `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, and `pm.max_children = 3` on 1 GB systems (`6` on 2 GB, `12` on 4 GB+), plus `pm.max_requests = 10000`. The 2026-11-08 worker sweep measured every pool size on the minimal tier: more workers lose calls at the failure boundary (38 % completed with 5 workers versus 97 % with 1), and Debian's stock values were the only configuration to lose calls at the supported rate. **That single-core result does not generalise to larger hosts**: the 2026-11-09 re-measurement on 2 vCPU / 2 GB found worker count second-order there — all five shapes landed within 34–44 % at the 12 calls/sec boundary while PHP-FPM alone demanded 2.25 cores. Supported rates with this default: 5 calls/sec on 1 vCPU, 10 calls/sec on 2 vCPU. Do not raise `pm.max_children` without before/after `pbx:load-test:dialplan` reports.
-10. **SIP Registration Expiry During Long Test Suites**: The SIP registration scenario (`tools/sipp/register.xml`) must use a sufficiently long lease (`Expires: 3600`) rather than the default 300s so registrations do not expire mid-test. In multi-scenario test runners, re-register endpoints before extended parity scenarios to prevent `Reason: SIP;cause=806;text="USER_NOT_REGISTERED"`.
+10. **SIP Registration Expiry During Long Test Suites**: The SIP registration scenario (`load-testing/tools/sipp/register.xml`) must use a sufficiently long lease (`Expires: 3600`) rather than the default 300s so registrations do not expire mid-test. In multi-scenario test runners, re-register endpoints before extended parity scenarios to prevent `Reason: SIP;cause=806;text="USER_NOT_REGISTERED"`.
 11. **Unit Standardization in Documentation**: Always use standard, accessible decimal storage and memory units (**GB**, **MB**, **KB**) across all documentation, guides, and agent instructions (e.g. `2 GB swap`, `4 GB RAM`, `25 GB disk`), rather than binary IEC prefixes (**GiB**, **MiB**), keeping sizing specs clear and consistent for system administrators. Binary units (`GiB`, `MiB`) are reserved strictly for quoting literal, unformatted command output (e.g. raw `free -m` or `free -h` dumps).
 
 **CI availability**: `.github/workflows/tests.yml` provides an on-demand Pest suite (in-memory SQLite plus a Redis service, on PHP 8.5) triggered via `workflow_dispatch`. Tests are run locally before every push as the primary verification gate (steps 1–4 above). Use the CI workflow for environment-parity checks or when verifying changes on a runner that mirrors the production PHP toolchain.
@@ -318,7 +318,7 @@ All module service providers MUST extend `App\Support\ModuleServiceProvider` ins
 - `moduleNamespace(): string` — Return the PHP root namespace (e.g., `'Modules\Bridges'`, `'Modules\ActiveCalls'`).
 
 **Optional overrides:**
-- `menuItems(): array` — Return menu items in the format expected by `MenuService::register()`. Menu items do NOT include a `guard` key — visibility is controlled by permissions alone.
+- `menuItems(): array` — Return menu items in the format expected by `MenuService::register()`. `MenuService::getFlat(?string $guard = null)` reads `$item['guard'] ?? 'web'` when a guard filter is supplied (e.g., `'guard' => 'admin'` on admin-scoped modules), while the unified panel sidebar calls `getTree()` with `$guard = null` and gates item visibility via permissions (`MenuService::cannotView()`).
 - `permissions(): array` — Return permissions as `[key => description]` pairs. Permission names use the `admin.*` prefix (e.g., `'bridges.view'`), NOT the route prefix.
 - `translationPath(): ?string` — Override to customize the translation directory path (by default automatically detects `lang/` then `resources/lang/`).
 - `hasTranslations(): bool` — Returns `true` if `translationPath()` is non-null.
@@ -416,16 +416,17 @@ The `routeGroups()` method can be overridden to define additional auto-registrat
 
 ### Creating a New Module
 
-When creating a new module:
-1. Create the directory `app-modules/{module-name}/` with `src/`, `resources/views/` structure (no `routes/` directory needed for standard CRUD — routes auto-register under `/panel/`)
-2. The service provider extends `\App\Support\ModuleServiceProvider` and defines `moduleName()` and `moduleNamespace()`
-3. If the module has a CRUD service with no custom logic, extend `\App\Support\CrudService`
-4. If the module has custom business logic, create a dedicated service interface + implementation
-5. Create Livewire components as needed (see Livewire component base classes below). Follow standard naming: `{PascalModule}List` and `{PascalModule}Edit`
-6. Add a path repository entry in root `composer.json` and run `composer update {package-name}` to register the new module
+- `tpbx make:module <slug> --category=<cat> --icon=<heroicon>` scaffolds new custom modules into `custom-modules/<slug>/` (which is git-ignored and auto-discovered via PSR-4 without editing `composer.json`).
+- Built-in core modules live in `app-modules/` (`source = 'core'`) and are autoloaded directly via root `composer.json` PSR-4 mappings.
+- The service provider extends `\App\Support\ModuleServiceProvider` and defines `moduleName()` and `moduleNamespace()`.
+- If the module has a CRUD service with no custom logic, extend `\App\Support\CrudService`.
+- If the module has custom business logic, create a dedicated service interface + implementation.
+- Create Livewire components as needed (see Livewire component base classes below). Follow standard naming: `{PascalModule}List` and `{PascalModule}Edit`.
 
 ### Safe Module Uninstall
 
+- Built-in core modules live in `app-modules/` (`source = 'core'`) and can never be uninstalled; optional core modules can be enabled/disabled, while the 5 required core modules (`extensions`, `sip-accounts`, `dialplans`, `sip-profiles`, `gateways`) cannot be disabled.
+- `custom-modules/` (`source = 'custom'`) and Composer `vendor/` (`source = 'vendor'`) modules support `tpbx module:uninstall <name> [--keep-data]`.
 - Module uninstall support is opt-in through an explicit `ModuleUninstaller` handler. A module without a reviewed handler must remain non-uninstallable.
 - The currently reviewed table-owned modules are `pin-numbers`, `acl`, `email-templates`, `email-queue`, `tenant-limits`, and `call-broadcast`. Their ownership is isolated and their schemas can be recreated on reinstall.
 - Do not add uninstall handlers to core SIP, directory, or routing modules, XML dialplan contributors with application-level indexes, modules involved in cross-module foreign-key chains, file-owning modules, or operational modules with runtime state until their cleanup and retention contracts are explicit.
@@ -625,7 +626,7 @@ For actions triggered directly from table rows (e.g. deleting an entry, promotin
 - Do not write static XML configuration files to disk. Instead, serve dynamic dialplans, directories, configurations, and phrases using FreeSWITCH's `mod_xml_curl` through the application's XML Handler API (`/api/v1/xml-handler`).
 - Store media payloads such as call recordings, uploaded recordings, voicemails, and fax files as files. Database tables should store file paths and metadata only; do not introduce base64/blob media storage for these payloads.
 - Do not vendor default FreeSWITCH prompt or music binaries into the Laravel repository. Fresh installs should use FreeSWITCH sound packages such as the US English Callie prompts and packaged music-on-hold files, with app-managed custom media stored as files.
-- Fresh installs are expected to install `freeswitch-mod-sofia`, `freeswitch-mod-callcenter`, `freeswitch-mod-dptools`, `freeswitch-mod-hiredis`, `freeswitch-mod-local-stream`, `freeswitch-mod-sndfile`, and `freeswitch-mod-xml-curl`; enable `mod_sofia`, `mod_callcenter`, `mod_dptools`, `mod_hiredis`, `mod_local_stream`, `mod_sndfile`, and `mod_xml_curl` in `modules.conf.xml`; disable legacy `mod_redis` and `mod_memcache`; write `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`; and install `/etc/systemd/system/freeswitch.service.d/10-tallpbx-dependencies.conf` so FreeSWITCH starts after Nginx, PHP-FPM, MariaDB, and Redis. For existing servers or token rotation, run `scripts/resources/freeswitch.sh --configure-only` after `.env` contains `FS_XML_HANDLER_TOKEN`.
+- Fresh installs are expected to install `freeswitch-mod-sofia`, `freeswitch-mod-callcenter`, `freeswitch-mod-dptools`, `freeswitch-mod-hiredis`, `freeswitch-mod-local-stream`, `freeswitch-mod-sndfile`, `freeswitch-mod-json-cdr`, and `freeswitch-mod-xml-curl`; enable `mod_sofia`, `mod_callcenter`, `mod_dptools`, `mod_hiredis`, `mod_local_stream`, `mod_sndfile`, `mod_json_cdr`, and `mod_xml_curl` in `modules.conf.xml`; disable legacy `mod_redis` and `mod_memcache`; write `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and `/etc/freeswitch/autoload_configs/json_cdr.conf.xml`; and install `/etc/systemd/system/freeswitch.service.d/10-tallpbx-dependencies.conf` so FreeSWITCH starts after Nginx, PHP-FPM, MariaDB, and Redis. For existing servers or token rotation, run `scripts/resources/freeswitch.sh --configure-only` after `.env` contains `FS_XML_HANDLER_TOKEN`.
 - Fresh non-demo installs create only the Default tenant and administrator access through `DatabaseSeeder`; demo mode is the sole creator of sample PBX data. Keep both paths idempotent so installer re-runs do not duplicate their seeded data.
 - Prefer tenant context strings (for example, `tenant_{id}_internal` and `tenant_{id}_public`) as the primary tenant discriminator for FreeSWITCH XML handling. Domain-based tenant resolution is a fallback only and must fail closed or require additional identity data when a domain is shared by multiple tenants.
 - Ensure all multi-step database writes (e.g., creating an Extension along with Voicemails and Dialplans) are wrapped inside `DB::transaction()` to prevent partial failure states.
@@ -633,9 +634,9 @@ For actions triggered directly from table rows (e.g. deleting an entry, promotin
 - Keep XML handler auth enabled for real-server tests and pass `--token="$FS_XML_HANDLER_TOKEN"` to `pbx:load-test:dialplan`. If the token changes, run `tpbx optimize:clear` so PHP-FPM sees the new config.
 - XML handler successful request logging is intentionally opt-in through `FS_XML_HANDLER_LOG_REQUESTS`; avoid enabling it during load tests. Redis is the recommended default cache and session store for this project (`CACHE_STORE=redis`, `SESSION_DRIVER=redis`, `SESSION_CONNECTION=session`). The telephony XML cache is controlled by `FS_XML_HANDLER_CACHE_TTL` and `FS_XML_HANDLER_CACHE_STORE` (with granular subsystem overrides); avoid file/database stores for concurrency tests because they add their own latency. First-party context-wide contributor fragments are controlled by `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL`. Keep `mod_hiredis` installed/loaded by default, but keep generated per-call hiredis dialplan behavior opt-in through `FS_HIREDIS_LIMIT_ENABLED` and `FS_HIREDIS_MARKER_ENABLED`.
 - Use `--label`, `--max-failure-rate`, and `--max-average-ms` on `pbx:load-test:dialplan` when comparing repeat runs. The JSON report is the durable source for run ID, Git state, environment, target scenario mix, success/failure rates, average, min, and max latencies, thresholds, and pass/fail reasons.
-- For SIPp end-to-end validation, prefer running `scripts/pbx-sipp-validate.sh` from a separate Linux host or VM against the PBX host. The runner registers seeded users, starts auto-answer UAS scenarios, places extension-to-extension and outbound-route calls, and stores artifacts under `storage/app/load-tests/sipp-e2e-*`. Set `MEDIA_FLOW=1` only when live recording/MOH/announcement RTP checks are needed; it seeds synthetic media destinations and uses SIPp RTP echo with optional tcpdump pcaps. Use `docs/load-testing-guide.md` as the authoritative operating guide for topology, manual commands, and artifact interpretation, and `docs/load-testing-results.md` for empirical benchmark results and hardware sizing. If `sipp` is missing, install it on the load generator before running the script.
+- For SIPp end-to-end validation, prefer running `load-testing/scripts/pbx-sipp-validate.sh` from a separate Linux host or VM against the PBX host. The runner registers seeded users, starts auto-answer UAS scenarios, places extension-to-extension and outbound-route calls, and stores artifacts under `storage/app/load-tests/sipp-e2e-*`. Set `MEDIA_FLOW=1` only when live recording/MOH/announcement RTP checks are needed; it seeds synthetic media destinations and uses SIPp RTP echo with optional tcpdump pcaps. Use `docs/load-testing-guide.md` as the authoritative operating guide for topology, manual commands, and artifact interpretation, and `docs/load-testing-results.md` for empirical benchmark results and hardware sizing. If `sipp` is missing, install it on the load generator before running the script.
 - A recording media validation must prove that the call remains active long enough to capture media, ends normally, and produces a non-empty retained recording. Merely reaching `record_session` is not a pass; the default `*732` path has previously started recording and immediately hung up with SIP `480`, causing FreeSWITCH to discard an empty file.
-- Installer changes that affect deployment dependencies must keep Redis explicit and preserve FreeSWITCH dynamic XML defaults: install `redis-server`/`redis-tools`, enable `redis-server`, keep `php8.5-redis`, install/enable Sofia, callcenter, dptools, hiredis, local-stream, sndfile, and xml-curl FreeSWITCH modules, disable legacy redis/memcache FreeSWITCH modules, and document upgrade steps for existing file-cache/file-session or manual XML curl installs.
+- Installer changes that affect deployment dependencies must keep Redis explicit and preserve FreeSWITCH dynamic XML defaults: install `redis-server`/`redis-tools`, enable `redis-server`, keep `php8.5-redis`, install/enable Sofia, callcenter, dptools, hiredis, local-stream, sndfile, json-cdr, and xml-curl FreeSWITCH modules, disable legacy redis/memcache FreeSWITCH modules, and document upgrade steps for existing file-cache/file-session or manual XML curl installs.
 - Installer mode selection must remain idempotent: with no demo or development flag, interactive runs ask for each choice and use the persisted value as the default; pressing Enter must preserve the current installation. Non-interactive runs reuse persisted or detected state. Never remove Composer development dependencies or Laravel Boost unless `--production` is explicit or production mode was explicitly recorded. Keep only approved installer flags; do not add aliases without user approval. Demo reconciliation must remain non-destructive.
 - Validate installer and installer-rerun idempotency on a fresh disposable Debian server. Do not use a host that has been repeatedly resized, tuned, or populated with synthetic load-test data for production installer conclusions.
 - When reviewing PHP-FPM limits, inspect `php-fpm8.5 -tt` and `/var/log/php8.5-fpm.log` for `pm.max_children` saturation. The installer ships `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` on 1 GB (`6` on 2 GB, `12` on 4 GB+) and `pm.max_requests = 10000` so long-running workers recycle. See `INSTALL.md` → PHP-FPM Worker Sizing before changing sizing guidance. More workers can make CPU contention worse on minimal hardware; confirm with before/after `pbx:load-test:dialplan` reports.
@@ -651,7 +652,7 @@ For actions triggered directly from table rows (e.g. deleting an entry, promotin
 # Smoke — critical-path only (~200 tests, ~20s)
 tpbx app:test --smoke
 
-# Default — all feature tests with --parallel (~2,400 tests, a few minutes)
+# Default — all feature tests with --parallel (2,900+ tests, a few minutes)
 tpbx app:test
 
 # Full — features + Pest 4 browser tests via Playwright (~10 min on a 4 GB server)
@@ -664,7 +665,7 @@ tpbx app:test --sequential
 tpbx app:test --smoke --clear-cache
 ```
 
-**Do NOT run `tpbx test --parallel` directly.** Use `app:test` instead — it applies `--compact` and `--parallel` automatically. Both test commands force in-memory SQLite and refuse any other test database; `app:test` also removes inherited `.env` values before starting Pest. Run smoke after small changes, default before committing, and full only before pushing.
+Run `tpbx app:test` (or `tpbx test --compact --parallel`) — `app:test` applies `--compact` and `--parallel` automatically, forces in-memory SQLite, refuses any other test database, and removes inherited `.env` values before starting Pest. Run smoke after small changes, default before committing, and full only before pushing.
 
 **Never re-run the same tests without code changes.** Tests take 60-180 seconds and re-running without changes wastes time.
 
@@ -780,7 +781,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
 - Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
 - Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
-- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
+- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic. Maintain documentation integrity: always preserve all existing comments and docstrings that are unrelated to your code changes.
 - Use array shape type definitions in PHPDoc blocks.
 
 === deployments rules ===
@@ -804,13 +805,13 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Do Things the Laravel Way
 
-- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
-- If you're creating a generic PHP class, use `php artisan make:class`.
+- Use `tpbx make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `tpbx list` and check their parameters with `tpbx [command] --help`.
+- If you're creating a generic PHP class, use `tpbx make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
 ### Model Creation
 
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `tpbx make:model --help` to check the available options.
 
 ## APIs & Eloquent Resources
 
@@ -824,7 +825,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
 - Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+- When creating tests, make use of `tpbx make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
 
 ## Vite Error
 
@@ -842,24 +843,24 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Laravel Pint Code Formatter
 
-- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
+- If you have modified any PHP files, you must run `./vendor/bin/pint --dirty` before finalizing changes to ensure your code matches the project's expected style.
+- Never scan the entire repository during routine work. Run `./vendor/bin/pint --dirty` to format uncommitted PHP edits, or `./vendor/bin/pint --dirty --test` to verify formatting without modifying files. Never run unscoped `vendor/bin/pint --test` or `vendor/bin/pint --format agent`.
 
 === pest/core rules ===
 
 # Pest
 
-- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- This project uses Pest. Create tests with `tpbx make:test --pest {name}`.
 - Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
 - Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
 - Do not delete tests or test files without approval. They are part of the application.
 
 ## Running Tests
 
-- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `tpbx test --compact` or `./vendor/bin/pest`.
 - Rerun a test after each change to it.
 - Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
-- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
+- After the feature tests pass, run `tpbx test --compact --parallel` (or `tpbx app:test`).
 
 </laravel-boost-guidelines>
 

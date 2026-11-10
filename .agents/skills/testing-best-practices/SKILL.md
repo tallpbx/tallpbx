@@ -61,5 +61,5 @@ Most changes need more than one rule file.
 
 - Module-owned tests live inside the module at `app-modules/{name}/tests/` with `*Test.php` filenames; the phpunit.xml Feature suite discovers them through the `app-modules/*/tests` glob.
 - Cross-module tests (tenant isolation, dialplan integration, panel smoke) stay in the central `tests/` tree. They are skipped automatically by the ModuleAwareTestGuard when a referenced module is uninstalled — never let a missing module fail the suite.
-- For URL-only or Dusk tests that touch a module without importing its classes, add `$this->skipWhenModuleUninstalled('<module>');` as the first line of the test.
-- Convention guards run with the suite: ModuleFactoryIsolationTest (factories inside modules), ModuleBoundaryTest (declared, acyclic dependencies), CoreModulesProtectedTest (protected core set).
+- For URL-only or Pest browser tests that touch a module without importing its classes, add `$this->skipWhenModuleUninstalled('<module>');` as the first line of the test.
+- Convention and architecture guards run with the suite: `tests/Feature/Architecture/ModuleArchitectureTest.php` (contract seams, shared kernel boundaries, manifest parity, route and translation conventions, factory isolation, declared acyclic dependencies, and protected core set).
