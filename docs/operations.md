@@ -16,7 +16,7 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `tallpbx-scheduler` | Scheduled tasks and sweeps |
 | `tallpbx-reverb` | Real-time WebSocket server |
 | `tallpbx-cdr-worker` | Call detail record processor (see [Call Detail Records](#call-detail-records-cdr-pipeline)) |
-| `tallpbx-xml-worker` | Persistent XML worker serving FreeSWITCH lookups (see [Telephony XML Worker](#telephony-xml-worker-octane--roadrunner)) |
+| `tallpbx-xml-worker` | Opt-in persistent XML worker serving FreeSWITCH lookups via Octane/RoadRunner (`127.0.0.1:8090`, installed disabled by default; see [Telephony XML Worker](#telephony-xml-worker-octane--roadrunner)) |
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
@@ -35,7 +35,7 @@ TallPBX enforces a strict privilege boundary across its configuration paths usin
 | `/etc/tallpbx/` | `2775 root:www-data` | Runtime firewall rules (`firewall.nft`, `external_blocklist.nft`, `geo_blocking.nft.pending`) and SSL/TLS certificates (`certs/`). |
 | `/etc/tallpbx/geoip/` | `0750 root:www-data` | Pre-aggregated IPdeny Geo-IP country zone caches (`*.v4.zone`, `*.v6.zone`). |
 | `/var/www/tallpbx/` | `0755 root:www-data` | Web application source code, Artisan CLI commands, and web UI. |
-| `/var/lib/tallpbx/media/` | `2775 www-data:www-data` | Call recordings, voicemail audio, and tenant media files. |
+| `/var/lib/tallpbx/media/` | `2775 www-data:tallpbx-media` | Call recordings, voicemail audio, and tenant media files. |
 
 ## Health Checks and Testing
 
@@ -298,7 +298,7 @@ systemctl restart redis-server
 redis-cli ping    # should respond PONG
 ```
 
-Active sessions reside in isolated Redis DB 2 (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`), while application and XML dialplan caches reside in DB 1 (`REDIS_CACHE_DB=1`). Running `tpbx optimize:clear` or `tpbx cache:clear` clears only DB 1, leaving active administrator and tenant logins intact. Furthermore, standard Debian Redis configurations maintain RDB snapshot persistence (`/var/lib/redis/dump.rdb`), preserving active session keys across graceful Redis service restarts.
+Active sessions reside in isolated Redis DB 2 (`REDIS_SESSION_DB=2`, `SESSION_CONNECTION=session`), while application and XML dialplan caches reside in DB 1 (`REDIS_CACHE_DB=1`), and incoming call detail records buffer in DB 3 (`REDIS_CDR_DB=3`). Running `tpbx optimize:clear` or `tpbx cache:clear` clears only DB 1, leaving active administrator sessions and CDR ingestion streams intact. Furthermore, TallPBX configures Redis with Append-Only File (AOF) durability (`appendonly yes`, `appendfsync everysec` configured by `scripts/resources/redis-durability.sh`) alongside RDB snapshots (`/var/lib/redis/dump.rdb`), preserving active session keys and stream records across Redis service restarts with bounded loss of ≤1 second.
 
 After restoring Redis, clear stale cache:
 
@@ -440,10 +440,26 @@ The token is synchronized between two locations:
 
 2. **FreeSWITCH Dynamic XML Gateway Configuration**:
    * File: `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`
-   * Line:
+   * Structure (3-tier binding ladder):
      ```xml
-     <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
+     <configuration name="xml_curl.conf" description="cURL XML Gateway">
+       <bindings>
+         <binding name="tallpbx-octane">
+           <param name="gateway-url" value="http://127.0.0.1:8090/api/v1/xml-handler?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
+           <param name="timeout" value="1"/>
+         </binding>
+         <binding name="tallpbx-fallback">
+           <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
+           <param name="timeout" value="2"/>
+         </binding>
+         <binding name="tallpbx-stock">
+           <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler-stock?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
+           <param name="timeout" value="3"/>
+         </binding>
+       </bindings>
+     </configuration>
      ```
+   * Validation: Validate the configuration with `tpbx freeswitch:validate-xml-curl` before restarting FreeSWITCH to ensure no binding is missing a `gateway-url` (which would crash `mod_xml_curl`).
 
 ### Updating or Rotating the Token
 
@@ -456,18 +472,19 @@ Update the token in `/var/www/tallpbx/.env`, then run the resource configuration
 ```bash
 tpbx optimize:clear
 bash scripts/resources/freeswitch.sh --configure-only
-systemctl restart freeswitch
+sudo systemctl restart freeswitch
 ```
 
 #### Option 2: Manual Cut-and-Paste
 
 If editing configuration files by hand:
 1. Copy the secret token string from `FS_XML_HANDLER_TOKEN` in `/var/www/tallpbx/.env`.
-2. Edit `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and paste the token into the `gateway-url` parameter query string (`?token=YOUR_TOKEN`).
-3. Clear Laravel application caches and reload FreeSWITCH:
+2. Edit `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` and paste the token into each binding's `gateway-url` query string (`?token=YOUR_TOKEN`).
+3. Clear Laravel application caches, validate the XML curl configuration, and restart FreeSWITCH (note that `fs_cli -x "reloadxml"` does not re-parse `xml_curl.conf.xml` bindings; a FreeSWITCH restart is required):
    ```bash
    tpbx optimize:clear
-   fs_cli -x "reloadxml"
+   tpbx freeswitch:validate-xml-curl
+   sudo systemctl restart freeswitch
    ```
 
 ## Octane XML Worker (Optional Performance Mode)
@@ -547,7 +564,7 @@ A normal request boots the whole application — roughly 90 service providers, i
 
 **It is the shipped default.** `scripts/resources/nginx.sh` and the Let's Encrypt site templates serve `/api/v1/xml-handler` from `xml-handler-fast.php`, and FreeSWITCH's second `mod_xml_curl` binding — the one used whenever the optional Octane worker is disabled or down — lands there. If the fast entry itself fails at the HTTP layer (5xx or a 2 s read timeout), FreeSWITCH's third binding re-sends the request to `/api/v1/xml-handler-stock`, which forwards it to `index.php` with the canonical handler URI and writes one line per fallback to `/var/log/nginx/xml-stock-fallback.log` — an empty file means the stock tier has never been needed.
 
-Measured on the 1 vCPU / 967 MB reference host (100 requests at 5 concurrent, dialplan render, median of three runs, 2026-11-05 slim-boot code): throughput **30.1 → 43.1 requests/second**, p50 **154 → 108 ms**, p95 172 → 120 ms, peak memory per request **32 → 26 MB**. Under call load, call completion at 5 calls/sec rose from 34 % (stock path, 2026-11-04) to **92 %**, and 8 calls/sec completes at **100 %** with 108–128 ms p50 setup time. CDR ingestion remains on PHP-FPM; at sustained 5+ calls/sec its full-stack posts compete with the XML lookups for the same PHP-FPM workers — see the Octane worker section for the trade-off and the option that frees PHP-FPM by moving XML to the worker.
+Measured on the 1 vCPU / 967 MB reference host (100 requests at 5 concurrent, dialplan render, median of three runs, 2026-11-05 slim-boot code): throughput **30.1 → 43.1 requests/second**, p50 **154 → 108 ms**, p95 172 → 120 ms, peak memory per request **32 → 26 MB**. Under call load, call completion at 5 calls/sec rose from 34 % (stock path, 2026-11-04) to **92 %**, and 8 calls/sec completes at **100 %** with 108–128 ms p50 setup time. CDR ingestion remains on PHP-FPM, where `POST /api/v1/cdr` is served by the dedicated 5-provider `public/cdr-fast.php` entry (`App\Support\CdrFastBootstrap`) to buffer records directly into Redis without full framework boot overhead; at sustained 5+ calls/sec these posts share PHP-FPM workers with XML lookups — see the Octane worker section for the trade-off and the option that frees PHP-FPM by moving XML to the worker.
 
 If the fast path throws for any reason, the same request is served by the normal application, so a fault costs speed rather than registrations.
 
@@ -585,6 +602,8 @@ Replace the same block with:
         access_log off;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $realpath_root/xml-handler-fast.php;
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+        fastcgi_read_timeout 2s;
         fastcgi_pass unix:/var/run/php/php8.5-fpm.sock;
     }
 ```
@@ -686,7 +705,7 @@ ls /var/log/freeswitch/json_cdr/failed/ | wc -l   # 0 is normal; nonzero means d
 
 A steadily growing `XLEN` means the worker is not keeping up. The worker logs a `CDR stream backlog` warning above 1,000 pending entries (adjust with `--warn-pending`). Because Redis append-only persistence is enabled by the installer, undigested entries survive a reboot — but a growing backlog still deserves attention.
 
-`tpbx cdr:health`, scheduled every five minutes, reports the same signals as three lines — `spooled_posts`, `backlog`, `failed_posts` — and exits non-zero when any of them breaches its threshold, so a silent failure lands in the scheduler log instead of nowhere. All three default to zero on a healthy host; the options `--spool-dir`, `--stream`, `--warn-pending`, `--nginx-error-log`, and `--window` override the paths and thresholds. `failed_posts` counts only failures inside the last `--window` minutes (default 15), so older history in the log does not keep the check red.
+`tpbx cdr:health`, scheduled every five minutes, reports the same signals as three lines — `spooled_posts`, `backlog`, `failed_posts` — and exits non-zero when any of them breaches its threshold, so a silent failure lands in the scheduler log instead of nowhere. All three default to zero on a healthy host; the options `--spool-dir`, `--stream`, `--warn-pending`, `--nginx-error-log`, `--log-lines` (default 2000), and `--window` override the paths and thresholds. `failed_posts` counts only failures inside the last `--window` minutes (default 15), so older history in the log does not keep the check red.
 
 The fast entry's fallback is silent by design: when `cdr-fast.php` throws, the request is re-served by the full application and the caller still receives a normal 200. Every fallback appends one line to `storage/logs/cdr-fast-fallback.log`, so `wc -l` on that file tells you whether the fast entry has been quietly falling back; an absent or empty file means it never has.
 
@@ -721,7 +740,7 @@ CDR posts are served by a trimmed entry point (`public/cdr-fast.php`, backed by 
 
 The entry fails open: any error inside it re-serves the request through `index.php`, and if the full application fails too, FreeSWITCH retries and then spools the record to disk. A fault therefore costs speed, never a record.
 
-Rollback is the stock block that ships commented underneath the active location in `/etc/nginx/sites-available/tallpbx`. Replace the active block with it and reload nginx; no FreeSWITCH, database, or stream change is involved:
+Rollback is the stock block that ships commented underneath the active location in `/etc/nginx/sites-available/pbx`. Replace the active block with it and reload nginx; no FreeSWITCH, database, or stream change is involved:
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx

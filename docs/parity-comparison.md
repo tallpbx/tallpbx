@@ -107,7 +107,7 @@ This document provides a detailed feature-by-feature and architectural compariso
 | **Active Conferences** | `active-conferences` (live participants, mute, kick) | `app/conferences_active` | `conferences` live view | 🟢 **Full Parity** |
 | **Active Call Center** | `call-center-active` (agent status, pause/resume, logout)| `app/call_center_active` | `queues` FOP2 view | 🟢 **Full Parity** |
 | **SIP Status / Regs** | `sip-status`, `registrations` (real-time registrations) | `app/sip_status`, `app/registrations` | `core` registrations / `sipsettings` | 🟢 **Full Parity** |
-| **Call Detail Records** | `xml-cdr` (billsec, caller, destination, hangup cause) | `app/xml_cdr` | `cdr`, `cel` | 🟢 **Full Parity** |
+| **Call Detail Records** | `call-detail-records` (JSON CDR ingestion via mod_json_cdr and Redis Stream, dual-leg reporting, recording playback, and CSV export) | `app/xml_cdr` | `cdr`, `cel` | 🟢 **Full Parity** |
 | **Event Rate Limits** | `event-rate-limits` (event flood protection) | `app/event_guard` (Event Guard) | `firewall` (Fail2ban IP only) | 🟢 **Full Parity** |
 
 ---

@@ -207,7 +207,7 @@ All automated feature and browser tests execute inside an isolated in-memory SQL
 TallPBX is built to handle busy phone systems smoothly. When phones register or place calls, FreeSWITCH asks TallPBX for user account and routing rules. TallPBX keeps frequently used rules in high-speed memory (Redis), allowing calls to connect almost instantly (sub-millisecond lookups) without straining the database even during heavy call bursts.
 
 - **Built-in Benchmarking**: Test tooling (`tpbx pbx:load-test:dialplan`) measures call routing speed and capacity.
-- **End-to-End SIP Validation**: The test harness (`scripts/pbx-sipp-validate.sh`) verifies phone registrations, outbound calls, audio echo, call forwarding, ring groups, and voicemail.
+- **End-to-End SIP Validation**: The test harness (`load-testing/scripts/pbx-sipp-validate.sh`) verifies phone registrations, outbound calls, audio echo, call forwarding, ring groups, and voicemail.
 - **Hardware Capacity**: Tested to sustain 25+ calls/sec and 250+ concurrent channels on standard 4 GB instances.
 
 For complete benchmarking instructions, PHP-FPM pool sizing, and empirical performance metrics across hardware tiers:

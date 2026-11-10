@@ -91,7 +91,7 @@ The FreeSWITCH telephony subsystem manages real-time call control, SIP signaling
 | `FS_ESL_HOST` | `string` | `127.0.0.1` | `freeswitch.esl.host` | FreeSWITCH Event Socket Layer (ESL) TCP listening host. Default `127.0.0.1` binds exclusively to loopback. |
 | `FS_ESL_PORT` | `integer` | `8021` | `freeswitch.esl.port` | ESL TCP management port (standard FreeSWITCH default: `8021`). |
 | `FS_ESL_PASSWORD` | `string` | `ClueCon` | `freeswitch.esl.password` | **CRITICAL SECRET**: Authentication password for ESL connections (`autoload_configs/event_socket.conf.xml`). **Must be changed from `ClueCon` in production** to prevent unauthorized full remote code execution on the PBX. |
-| `FS_ESL_TIMEOUT` | `integer` | `5` | `freeswitch.esl.timeout` | Connection and socket read timeout in seconds for synchronous ESL command execution. |
+| `FS_ESL_TIMEOUT` | `integer` | `10` | `freeswitch.esl.timeout` | Connection and socket read timeout in seconds for synchronous ESL command execution. |
 | `FS_ESL_RECONNECT_INTERVAL`| `integer` | `5` | `freeswitch.esl.reconnect_interval`| Delay in seconds between connection retries when the background ESL event loop listener disconnects. |
 | `FS_ESL_QUEUE_NAME` | `string` | `default` | `freeswitch.esl.queue_name` | Name of the background queue channel utilized for offloading event listeners (e.g. security incident recording, call recordings, voicemail persistence). Default: `default`. |
 | `FS_ESL_BUFFER_SIZE` | `integer` | `1000` | `freeswitch.esl.buffer_size` | In-memory queue buffer capacity for non-blocking ESL event processing in `FreeSwitchListenCommand`, preventing socket drops during high-concurrency event bursts. |
@@ -119,20 +119,21 @@ See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path
 | `FS_XML_HANDLER_TOKEN` | `string` | `null` | `freeswitch.xml_handler.token` | **CRITICAL SECRET**: Bearer token or query parameter token required to access the XML handler. Failed authentication attempts trigger immediate security alerts and automated firewall banning. |
 | `FS_XML_HANDLER_LOG_REQUESTS`| `boolean`| `false` | `freeswitch.xml_handler.log_requests` | Logs all incoming XML curl requests and raw POST parameters to Laravel logs for debugging. |
 | `FS_XML_HANDLER_LOG_TIMING` | `boolean` | `false` | `freeswitch.xml_handler.log_timing` | Records request-to-response generation latency benchmarks in logs. |
-| `FS_XML_HANDLER_CACHE_STORE` | `string` | `redis` | `freeswitch.xml_handler.cache.store` | Master cache store (e.g. `redis`, `file`) for FreeSWITCH XML responses. Defaults to system `CACHE_STORE` if omitted. |
-| `FS_XML_HANDLER_CACHE_TTL` | `integer` | `60` | `freeswitch.xml_handler.cache.ttl` | Master cache time-to-live in seconds for XML responses. Changing this setting synchronizes dialplan, directory, and ACL caches simultaneously. |
-| `FS_XML_HANDLER_DIALPLAN_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.cache.dialplan.store` | Specific cache store override for dialplan XML generation. |
-| `FS_XML_HANDLER_DIALPLAN_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.cache.dialplan.ttl` | Specific TTL in seconds for dialplan XML responses. |
-| `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL`| `integer` | *(master)* | `freeswitch.xml_handler.cache.contributor.ttl` | Specific TTL in seconds for modular dialplan contributor fragments. |
-| `FS_XML_HANDLER_DIRECTORY_CACHE_STORE`| `string` | *(master)* | `freeswitch.xml_handler.cache.directory.store`| Specific cache store override for directory XML (user lookups, SIP credentials). |
-| `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.cache.directory.ttl` | Specific TTL in seconds for user directory XML. |
-| `FS_XML_HANDLER_ACL_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.cache.acl.store` | Specific cache store override for IP Access Control List (ACL) configurations. |
-| `FS_XML_HANDLER_ACL_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.cache.acl.ttl` | Specific TTL in seconds for ACL configurations. |
-| `FS_XML_HANDLER_ROUTING_VERSION_STORE`| `string` | `redis` | `freeswitch.xml_handler.cache.routing_version_store` | Fast key-value store used to hold global routing invalidation version tags. |
+| `FS_XML_HANDLER_CACHE_STORE` | `string` | `redis` | `freeswitch.xml_handler.cache_store` | Master cache store (e.g. `redis`, `file`) for FreeSWITCH XML responses. Defaults to system `CACHE_STORE` if omitted. |
+| `FS_XML_HANDLER_CACHE_TTL` | `integer` | `60` | `freeswitch.xml_handler.cache_ttl` | Master cache time-to-live in seconds for XML responses. Changing this setting synchronizes dialplan, directory, and ACL caches simultaneously. |
+| `FS_XML_HANDLER_DIALPLAN_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.dialplan_cache_store` | Specific cache store override for dialplan XML generation. |
+| `FS_XML_HANDLER_DIALPLAN_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.dialplan_cache_ttl` | Specific TTL in seconds for dialplan XML responses. |
+| `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL`| `integer` | *(master)* | `freeswitch.xml_handler.dialplan_contributor_cache_ttl` | Specific TTL in seconds for modular dialplan contributor fragments. |
+| `FS_XML_HANDLER_DIRECTORY_CACHE_STORE`| `string` | *(master)* | `freeswitch.xml_handler.directory_cache_store`| Specific cache store override for directory XML (user lookups, SIP credentials). |
+| `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.directory_cache_ttl` | Specific TTL in seconds for user directory XML. |
+| `FS_XML_HANDLER_ACL_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.configuration_cache_store` | Specific cache store override for configuration / IP Access Control List (ACL) configurations (`freeswitch.xml_handler.acl_cache_store`). |
+| `FS_XML_HANDLER_ACL_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.configuration_cache_ttl` | Specific TTL in seconds for configuration / ACL configurations (`freeswitch.xml_handler.acl_cache_ttl`). |
+| `FS_XML_HANDLER_ROUTING_VERSION_STORE`| `string` | `null` | `freeswitch.xml_handler.routing_version_store` | Fast key-value store used to hold global routing invalidation version tags. Defaults to system cache store when omitted. |
 | `FS_XML_HANDLER_THROTTLE_ENABLED` | `boolean` | `true` | `freeswitch.xml_handler.throttle_enabled` | Enables rate limiting on `/api/v1/xml-handler` to protect against token brute forcing and denial of service. |
 | `FS_XML_HANDLER_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.xml_handler.throttle_limit` | Maximum allowed XML curl requests per minute per IP address. |
 | `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle_decay_minutes` | Decay window in minutes for XML handler rate limiting. |
-| `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` by `scripts/resources/systemd/tallpbx-xml-worker.service`. While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
+| `FS_XML_HANDLER_TIMING_HEADERS` | `boolean` | `false` | `freeswitch.xml_handler.timing_headers` | When enabled, XML handler responses include app-side timing headers for callers sending `X-TallPBX-Timing: 1`. Used for load testing; keep disabled in production. |
+| `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` by `scripts/resources/systemd/tallpbx-xml-worker.service` and evaluated by `App\Support\MinimalBootstrap` (`App\Support\TelephonyWorkerProviders::isSlimBoot()`). While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
 
 ---
 
@@ -142,20 +143,20 @@ Configures FreeSWITCH's internal state storage engine (Sofia registrations, acti
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `FS_DB_DRIVER` | `string` | `sqlite` | `freeswitch.db.driver` | FreeSWITCH internal state storage driver (`sqlite`, `mariadb`, `pgsql`, or `odbc`). |
-| `FS_DB_DSN` | `string` | `null` | `freeswitch.db.dsn` | Direct connection string URI for MariaDB/PostgreSQL (e.g. `mariadb://Server=127.0.0.1;Port=3306;Database=freeswitch;Uid=...;Pwd=...`). |
-| `FS_DB_ODBC_DSN` | `string` | `null` | `freeswitch.db.odbc_dsn` | ODBC DSN string formatted as `dsn:username:password` when using unixODBC. |
-| `FS_DB_HOST` | `string` | `127.0.0.1` | `freeswitch.db.host` | Database hostname for FreeSWITCH runtime tables. |
-| `FS_DB_PORT` | `integer` | `3306` | `freeswitch.db.port` | Database port for FreeSWITCH runtime tables. |
-| `FS_DB_NAME` | `string` | `freeswitch` | `freeswitch.db.name` | Database name dedicated to FreeSWITCH runtime tables. |
-| `FS_DB_USERNAME` | `string` | `freeswitch` | `freeswitch.db.username` | Database user for FreeSWITCH runtime tables. |
-| `FS_DB_PASSWORD` | `string` | `null` | `freeswitch.db.password` | Database password for FreeSWITCH runtime tables. |
-| `FS_DB_OPTIONS` | `string` | `null` | `freeswitch.db.options` | Optional database driver options string appended to DSN. |
-| `FS_CORE_DB_NAME` | `string` | `null` | `freeswitch.db.core_db_name` | Custom path or database name for core FreeSWITCH SQLite database (`/var/lib/freeswitch/db/core.db`). |
-| `FS_AUTO_CREATE_SCHEMAS` | `boolean` | `true` | `freeswitch.db.auto_create_schemas` | Whether FreeSWITCH automatically creates missing schema tables in external database on startup. |
-| `FS_CORE_NON_SQLITE_DB_REQUIRED`| `boolean`| `false` | `freeswitch.db.core_non_sqlite_db_required` | Forces FreeSWITCH to halt startup if a non-SQLite external database is unavailable. |
-| `FS_ODBC_SKIP_AUTOCOMMIT_FLIP` | `boolean`| `false` | `freeswitch.db.odbc_skip_autocommit_flip` | Skips ODBC autocommit flipping for specialized database drivers. |
-| `FS_AUTO_CLEAR_SQL` | `boolean` | `false` | `freeswitch.db.auto_clear_sql` | Automatically drops and recreates runtime SQL tables on system reboot. |
+| `FS_DB_DRIVER` | `string` | `sqlite` | `freeswitch.database.driver` | FreeSWITCH internal state storage driver (`sqlite`, `mariadb`, `pgsql`, or `odbc`). |
+| `FS_DB_DSN` | `string` | `null` | `freeswitch.database.dsn` | Direct connection string URI for MariaDB/PostgreSQL (e.g. `mariadb://Server=127.0.0.1;Port=3306;Database=freeswitch;Uid=...;Pwd=...`). |
+| `FS_DB_ODBC_DSN` | `string` | `null` | `freeswitch.database.odbc_dsn` | ODBC DSN string formatted as `dsn:username:password` when using unixODBC. |
+| `FS_DB_HOST` | `string` | `127.0.0.1` | `freeswitch.database.host` | Database hostname for FreeSWITCH runtime tables. |
+| `FS_DB_PORT` | `integer` | `3306` | `freeswitch.database.port` | Database port for FreeSWITCH runtime tables. |
+| `FS_DB_NAME` | `string` | `freeswitch` | `freeswitch.database.database` | Database name dedicated to FreeSWITCH runtime tables. |
+| `FS_DB_USERNAME` | `string` | `freeswitch` | `freeswitch.database.username` | Database user for FreeSWITCH runtime tables. |
+| `FS_DB_PASSWORD` | `string` | `null` | `freeswitch.database.password` | Database password for FreeSWITCH runtime tables. |
+| `FS_DB_OPTIONS` | `string` | `null` | `freeswitch.database.options` | Optional database driver options string appended to DSN. |
+| `FS_CORE_DB_NAME` | `string` | `null` | `freeswitch.database.core_db_name` | Custom path or database name for core FreeSWITCH SQLite database (`/var/lib/freeswitch/db/core.db`). |
+| `FS_AUTO_CREATE_SCHEMAS` | `boolean` | `true` | `freeswitch.database.auto_create_schemas` | Whether FreeSWITCH automatically creates missing schema tables in external database on startup. |
+| `FS_CORE_NON_SQLITE_DB_REQUIRED`| `boolean`| `false` | `freeswitch.database.core_non_sqlite_db_required` | Forces FreeSWITCH to halt startup if a non-SQLite external database is unavailable. |
+| `FS_ODBC_SKIP_AUTOCOMMIT_FLIP` | `boolean`| `false` | `freeswitch.database.odbc_skip_autocommit_flip` | Skips ODBC autocommit flipping for specialized database drivers. |
+| `FS_AUTO_CLEAR_SQL` | `boolean` | `false` | `freeswitch.database.auto_clear_sql` | Automatically drops and recreates runtime SQL tables on system reboot. |
 
 ---
 
@@ -164,11 +165,11 @@ Configures FreeSWITCH's internal state storage engine (Sofia registrations, acti
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
 | `FS_LOG_LEVEL` | `string` | `notice` | `freeswitch.switch.loglevel` | FreeSWITCH console log level (`console`, `alert`, `crit`, `err`, `warning`, `notice`, `info`, `debug`). Use `notice` for production deployments to eliminate disk I/O bottlenecks. |
-| `FS_SESSIONS_PER_SECOND` | `integer` | `60` | `freeswitch.sessions_per_second` | Global call origination rate limit (SPS) enforced in `switch.conf.xml` to prevent CPU starvation. |
-| `FS_HIREDIS_LIMIT_ENABLED` | `boolean` | `false` | `freeswitch.hiredis.limit_enabled` | Enables `mod_hiredis` distributed call concurrency and rate limits across PBX clusters. |
-| `FS_HIREDIS_LIMIT_MAX` | `integer` | `100000` | `freeswitch.hiredis.limit_max` | Maximum total active limits tracked in Hiredis. |
-| `FS_HIREDIS_MARKER_ENABLED`| `boolean` | `false` | `freeswitch.hiredis.marker_enabled`| Enables cluster heartbeat markers in Redis for multi-PBX node health detection. |
-| `FS_PIN_TRIGGER` | `string` | `*99` | `freeswitch.pin_trigger` | Feature code prefix dialed to initiate user PIN management IVR. |
+| `FS_SESSIONS_PER_SECOND` | `integer` | `60` | `freeswitch.switch.sessions_per_second` | Global call origination rate limit (SPS) enforced in `switch.conf.xml` to prevent CPU starvation. |
+| `FS_HIREDIS_LIMIT_ENABLED` | `boolean` | `false` | `freeswitch.xml_handler.hiredis_limit_enabled` | Enables `mod_hiredis` distributed call concurrency and rate limits across PBX clusters. |
+| `FS_HIREDIS_LIMIT_MAX` | `integer` | `100000` | `freeswitch.xml_handler.hiredis_limit_max` | Maximum total active limits tracked in Hiredis. |
+| `FS_HIREDIS_MARKER_ENABLED`| `boolean` | `false` | `freeswitch.xml_handler.hiredis_marker_enabled`| Enables cluster heartbeat markers in Redis for multi-PBX node health detection. |
+| `FS_PIN_TRIGGER` | `string` | `*97` | `freeswitch.xml_handler.pin_trigger` | Feature code prefix dialed to initiate user PIN management IVR. |
 
 ---
 
@@ -178,6 +179,10 @@ Configures automated outbound dialing, campaign pacing, and outcome tracking.
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
+| `CALL_BROADCAST_SIMULATE` | `boolean` | `false` | `call-broadcast.simulate` | Dry-run simulation mode for testing broadcast campaigns without originating actual calls. |
+| `CALL_BROADCAST_MAX_CONCURRENT` | `integer` | `10` | `call-broadcast.default_max_concurrent` | Default maximum concurrent outbound call channels allocated for broadcast campaigns. |
+| `CALL_BROADCAST_RETRY_DELAY` | `integer` | `60` | `call-broadcast.retry_delay_seconds` | Delay in seconds before re-attempting failed or uncompleted broadcast recipient calls. |
+| `CALL_BROADCAST_ORIGINATE_DELAY_MS` | `integer` | `200` | `call-broadcast.originate_delay_ms` | Delay in milliseconds between consecutive originate requests to smooth out telephony burst load. |
 | `FS_CALL_BROADCAST_CALLER_ID` | `string` | `0000000000` | `call-broadcast.caller_id` | Default outbound caller ID number utilized for campaigns if unspecified. |
 | `FS_CALL_BROADCAST_MEDIA` | `string` | `ivr/ivr-welcome.wav` | `call-broadcast.media` | Default audio prompt played to recipients upon call answer. |
 | `FS_CALL_BROADCAST_PACING_SECONDS` | `integer` | `1` | `call-broadcast.pacing_seconds` | Interval in seconds between sequential outbound campaign call originations. |
@@ -191,6 +196,37 @@ Configures automated outbound dialing, campaign pacing, and outcome tracking.
 | :--- | :--- | :--- | :--- | :--- |
 | `PBX_DEFAULT_SIP_PASSWORD` | `string` | `null` | `freeswitch.default_sip_password` | Default SIP password assigned when creating extensions if left blank. Must be strong if set. |
 | `PBX_DEMO_MODE` | `boolean` | `false` | `freeswitch.demo_mode` | Populates sample demo extensions, dialplans, and IVR configurations during initial installer seeding. |
+
+---
+
+### 2.7 Call Detail Record (CDR) Ingestion & Stream Pipeline
+
+Configures high-throughput CDR ingestion (`mod_json_cdr`) and Redis Stream buffering (`pbx:cdr:stream`).
+
+| Variable | Type | Default | Config Key | Description & Security Implications |
+| :--- | :--- | :--- | :--- | :--- |
+| `FREESWITCH_CDR_TOKEN` | `string` | `null` | `freeswitch.cdr.token` | **CRITICAL SECRET**: Authentication token required by `mod_json_cdr` HTTP POSTs to `/api/v1/cdr`. The endpoint fails closed when empty. |
+| `FREESWITCH_CDR_THROTTLE_ENABLED` | `boolean` | `true` | `freeswitch.cdr.throttle_enabled` | Enforces rate limiting on `/api/v1/cdr` to prevent ingestion buffer flooding. |
+| `FREESWITCH_CDR_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.cdr.throttle_limit` | Maximum allowed CDR POST requests per minute. |
+| `FREESWITCH_CDR_THROTTLE_DECAY_MINUTES` | `integer` | `1` | `freeswitch.cdr.throttle_decay_minutes` | Rate limiting decay window in minutes for CDR ingestion. |
+| `FREESWITCH_CDR_SPOOL_DIR` | `path` | `/var/log/freeswitch/json_cdr/failed` | `freeswitch.cdr.spool_dir` | Directory where `mod_json_cdr` spools undelivered call records when endpoint is unavailable; reconciled by `tpbx cdr:drain-spool`. |
+| `FREESWITCH_CDR_QUARANTINE_DIR` | `path` | `/var/log/freeswitch/json_cdr/quarantine` | `freeswitch.cdr.quarantine_dir` | Directory where unparseable payloads or orphaned tenant records are preserved for diagnosis. |
+| `REDIS_CDR_DB` | `integer` | `3` | `database.redis.cdr.database` | Dedicated Redis database index for the durable CDR stream (`pbx:cdr:stream`), backed by AOF persistence. |
+
+---
+
+### 2.8 Octane / RoadRunner Persistent XML Worker Engine
+
+Configures the optional persistent RoadRunner worker daemon serving FreeSWITCH XML curl requests on loopback port 8090.
+
+| Variable | Type | Default | Config Key | Description & Security Implications |
+| :--- | :--- | :--- | :--- | :--- |
+| `OCTANE_SERVER` | `string` | `roadrunner` | `octane.server` | Application server driver used by Octane (`roadrunner`, `swoole`, `frankenphp`). |
+| `OCTANE_HOST` | `string` | `127.0.0.1` | `octane.host` | Loopback IP address bound by the Octane worker. TallPBX binds strictly to loopback. |
+| `OCTANE_PORT` | `integer` | `8090` | `octane.port` | Loopback TCP port targeted by FreeSWITCH's primary `tallpbx-octane` binding in `xml_curl.conf.xml`. |
+| `OCTANE_HTTPS` | `boolean` | `false` | `octane.https` | Controls whether absolute URLs generated inside Octane use HTTPS scheme. |
+| `OCTANE_STATE_FILE` | `path` | `storage/logs/octane-server-state.json` | `octane.state_file` | File path recording Octane daemon process PID and running state. |
+| `OCTANE_ROADRUNNER_COMMAND` | `string` | `vendor/bin/roadrunner-worker` | `octane.roadrunner.command` | RoadRunner worker process execution command. |
 
 ---
 
@@ -285,17 +321,18 @@ TallPBX relies heavily on Redis for high-throughput XML response caching, sessio
 | `REDIS_PASSWORD` | `string` | `null` | `database.redis.default.password`| Authentication password for Redis server. Highly recommended in multi-server networks. |
 | `REDIS_USERNAME` | `string` | `null` | `database.redis.default.username`| ACL username for Redis 6+ authenticated connections. |
 | `REDIS_DB` | `integer` | `0` | `database.redis.default.database`| Default Redis database index (0–15). |
-| `REDIS_PREFIX` | `string` | `tallpbx_database_` | `database.redis.options.prefix` | Key prefix for database Redis connections. |
+| `REDIS_PREFIX` | `string` | `tallpbx-database-` | `database.redis.options.prefix` | Key prefix for database Redis connections. |
 | `REDIS_URL` | `string` | `null` | `database.redis.default.url` | Redis connection URL string. |
-| `REDIS_PERSISTENT` | `boolean` | `false` | `database.redis.default.persistent`| Maintains persistent socket connections across HTTP requests, eliminating TCP handshake overhead. |
+| `REDIS_PERSISTENT` | `boolean` | `false` | `database.redis.options.persistent`| Maintains persistent socket connections across HTTP requests, eliminating TCP handshake overhead. |
 | `REDIS_TIMEOUT` | `float` | `null` | `database.redis.default.timeout` | Connection timeout in seconds. |
-| `REDIS_MAX_RETRIES` | `integer` | `null` | `database.redis.default.max_retries` | Maximum command retry attempts upon transient Redis connection drop. |
-| `REDIS_BACKOFF_ALGORITHM`| `string` | `null` | `database.redis.default.backoff_algorithm` | Exponential backoff algorithm for Redis connection retries. |
-| `REDIS_BACKOFF_BASE` | `integer` | `null` | `database.redis.default.backoff_base` | Base backoff duration in milliseconds. |
-| `REDIS_BACKOFF_CAP` | `integer` | `null` | `database.redis.default.backoff_cap` | Maximum backoff cap duration in milliseconds. |
+| `REDIS_MAX_RETRIES` | `integer` | `3` | `database.redis.default.max_retries` | Maximum command retry attempts upon transient Redis connection drop. |
+| `REDIS_BACKOFF_ALGORITHM`| `string` | `decorrelated_jitter` | `database.redis.default.backoff_algorithm` | Exponential backoff algorithm for Redis connection retries. |
+| `REDIS_BACKOFF_BASE` | `integer` | `100` | `database.redis.default.backoff_base` | Base backoff duration in milliseconds. |
+| `REDIS_BACKOFF_CAP` | `integer` | `2000` | `database.redis.default.backoff_cap` | Maximum backoff cap duration in milliseconds. |
 | `REDIS_CLUSTER` | `string` | `redis` | `database.redis.options.cluster` | Redis cluster driver name when deploying clustered topologies. |
 | `REDIS_CACHE_DB` | `integer` | `1` | `database.redis.cache.database` | Redis database index isolated specifically for application and XML cache keys. |
 | `REDIS_SESSION_DB` | `integer` | `2` | `database.redis.session.database` | Redis database index isolated specifically for stateful HTTP user and admin sessions. |
+| `REDIS_CDR_DB` | `integer` | `3` | `database.redis.cdr.database` | Redis database index isolated specifically for the durable CDR ingestion stream (`pbx:cdr:stream`). |
 | `REDIS_CACHE_CONNECTION` | `string` | `cache` | `cache.stores.redis.connection` | Named Redis connection configuration mapped to cache operations. |
 | `REDIS_CACHE_LOCK_CONNECTION` | `string` | `default` | `cache.stores.redis.lock_connection` | Redis connection used for atomic distributed mutex locks. |
 
@@ -306,7 +343,7 @@ TallPBX relies heavily on Redis for high-throughput XML response caching, sessio
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
 | `CACHE_STORE` | `string` | `redis` | `cache.default` | Application cache backend (`redis`, `file`, `database`, `memcached`, `array`). |
-| `CACHE_PREFIX` | `string` | `tallpbx_cache_` | `cache.prefix` | Global namespace prefix prepended to all cache keys to avoid collision on shared Redis servers. |
+| `CACHE_PREFIX` | `string` | `tallpbx-cache-` | `cache.prefix` | Global namespace prefix prepended to all cache keys to avoid collision on shared Redis servers. |
 | `CACHE_STORAGE_DISK` | `string` | `null` | `cache.stores.file.disk` | Storage disk allocated for file-based caching. |
 | `CACHE_STORAGE_PATH` | `path` | `null` | `cache.stores.file.path` | Custom local filesystem directory path for file-based cache artifacts. |
 | `DB_CACHE_CONNECTION` | `string` | `null` | `cache.stores.database.connection` | SQL database connection used when `CACHE_STORE=database`. |
@@ -397,7 +434,7 @@ Configures local storage directories and cloud object storage integrations for a
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
 | `FILESYSTEM_DISK` | `string` | `local` | `filesystems.default` | Default application storage disk (`local`, `public`, `s3`). |
-| `TALLPBX_MEDIA_ROOT` | `path` | `/var/lib/tallpbx/media` | `media-storage.root` | Authoritative root filesystem path for all PBX media (call recordings, voicemail audio, greeting prompts). Standard permissions: `2775 www-data:www-data`. |
+| `TALLPBX_MEDIA_ROOT` | `path` | `/var/lib/tallpbx/media` | `media-storage.store_root`, `media-storage.spool_root` | Base root filesystem path for all PBX media (`store/` and `spool/`). Configured as `media-storage.store_root` (`<root>/store`) and `media-storage.spool_root` (`<root>/spool`). Standard permissions: `2775 www-data:tallpbx-media`. |
 | `TALLPBX_BACKUP_ROOT` | `path` | `/var/lib/tallpbx/backups`| `backup-storage.root` | Authoritative root filesystem path for disaster recovery archive archives. Standard permissions: `2770 root:www-data`. |
 
 ---
@@ -573,8 +610,8 @@ Governs zero-touch hardware provisioning for IP phones (Yealink, Polycom, Cisco,
 | :--- | :--- | :--- | :--- | :--- |
 | `PROVISIONING_ENABLED` | `boolean` | `false` | `provisioning.enabled` | Master gate for phone auto-provisioning. When `false`, all provisioning endpoints reject incoming requests. |
 | `PROVISIONING_CIDR` | `string` | `null` | `provisioning.cidr` | **NETWORK PERIMETER GUARD**: Comma-separated list of allowed IP subnets (CIDRs, e.g. `192.168.1.0/24,10.10.0.0/16`) permitted to request phone configurations. Requests outside these subnets are immediately dropped. |
-| `PROVISIONING_HTTP_AUTH_USERNAME`| `string`| `null` | `provisioning.http_auth.username`| HTTP Basic or Digest authentication username enforced on provisioning requests. |
-| `PROVISIONING_HTTP_AUTH_PASSWORD`| `string`| `null` | `provisioning.http_auth.password`| **CRITICAL SECRET**: HTTP authentication password enforced on provisioning requests. |
+| `PROVISIONING_HTTP_AUTH_USERNAME`| `string`| `null` | `provisioning.http_auth_username`| HTTP Basic or Digest authentication username enforced on provisioning requests. |
+| `PROVISIONING_HTTP_AUTH_PASSWORD`| `string`| `null` | `provisioning.http_auth_password`| **CRITICAL SECRET**: HTTP authentication password enforced on provisioning requests. |
 
 ---
 
@@ -584,7 +621,7 @@ Manages git-based self-updating, preflight checks, database migrations, asset re
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `GIT_UPDATE_STEP_TIMEOUT_SECONDS` | `integer` | `300` | `git-update.step_timeout_seconds` | Execution timeout in seconds (default 5 minutes) allocated to individual updater pipeline operations (`git pull`, `composer install`, `tpbx migrate`). |
+| `GIT_UPDATE_STEP_TIMEOUT_SECONDS` | `integer` | `600` | `git-update.step_timeout_seconds` | Execution timeout in seconds (default 10 minutes) allocated to individual updater pipeline operations (`git pull`, `composer install`, `tpbx migrate`). |
 
 ---
 
@@ -637,13 +674,19 @@ SESSION_SECURE_COOKIE=true
 QUEUE_CONNECTION=database
 BROADCAST_CONNECTION=reverb
 
+# Redis Keyspaces & Durability
+REDIS_CACHE_DB=1
+REDIS_SESSION_DB=2
+REDIS_CDR_DB=3
+
 # FreeSWITCH Engine
-FS_LOG_LEVEL=warning
-FS_SESSIONS_PER_SECOND=30
+FS_LOG_LEVEL=notice
+FS_SESSIONS_PER_SECOND=60
 FS_XML_HANDLER_AUTH=true
 FS_XML_HANDLER_CACHE_TTL=60
 FS_ESL_PASSWORD=<generate-random-secret>
 FS_XML_HANDLER_TOKEN=<generate-random-secret>
+FREESWITCH_CDR_TOKEN=<generate-random-secret>
 ```
 
 ### High-Throughput PBX (100–1,000+ Extensions, Call Centers)
@@ -657,23 +700,27 @@ SESSION_SECURE_COOKIE=true
 QUEUE_CONNECTION=redis
 BROADCAST_CONNECTION=reverb
 
-# Redis Connection Persistence
+# Redis Connection Persistence & Keyspaces
 REDIS_CLIENT=phpredis
 REDIS_PERSISTENT=true
 REDIS_CACHE_DB=1
 REDIS_SESSION_DB=2
+REDIS_CDR_DB=3
 
 # FreeSWITCH Engine Tuning
-FS_LOG_LEVEL=warning
+FS_LOG_LEVEL=notice
 FS_SESSIONS_PER_SECOND=120
 FS_SOFIA_INBOUND_REG_THREAD=true
 FS_SOFIA_MAX_REG_THREADS=16
 FS_ESL_BUFFER_SIZE=5000
 
-# XML Handler Caching
+# XML Handler & CDR Ingestion
 FS_XML_HANDLER_AUTH=true
 FS_XML_HANDLER_CACHE_TTL=60
 FS_XML_HANDLER_CACHE_STORE=redis
 FS_XML_HANDLER_ROUTING_VERSION_STORE=redis
 FS_XML_HANDLER_THROTTLE_LIMIT=12000
+FS_ESL_PASSWORD=<generate-random-secret>
+FS_XML_HANDLER_TOKEN=<generate-random-secret>
+FREESWITCH_CDR_TOKEN=<generate-random-secret>
 ```
