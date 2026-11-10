@@ -1,5 +1,10 @@
 # Commit Evaluation Report: 2026-11-02 (`5.x`)
 
+> [!NOTE] Historical Status
+> This document is a historical commit evaluation and reference report.
+> **Implemented items**: Fast CDR front controller (`public/cdr-fast.php`), dynamic PHP-FPM pool default (`pm = dynamic`), Lua proxy retirement in 5.0.0, 200-sample panel latency probe, and `tpbx cdr:health`.
+> **Unimplemented proposals**: The dedicated `[xml]` / `[www]` PHP-FPM socket split remains an unimplemented proposal; the single dynamic pool with persistent RoadRunner/Octane XML worker (`tallpbx-xml-worker`) was adopted instead.
+
 Authoritative review of every Git commit made on **2026-11-02** to the active `5.x` series branch, evaluated against the project conventions in [`AGENTS.md`](../AGENTS.md). Use this record to confirm what shipped, what it affects, and which follow-up actions are still outstanding.
 
 > [!NOTE]

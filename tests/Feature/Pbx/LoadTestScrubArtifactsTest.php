@@ -130,4 +130,30 @@ describe('artifact address scrubber', function (): void {
         expect($configurations)->toContain('v-fast-default')
             ->and($configurations)->toContain('1000x25');
     });
+
+    it('keeps docs markdown files free of un-obfuscated public IPs, hardcoded key names, and doubled load-testing prefixes', function (): void {
+        $doublePrefix = 'load-testing/'.'load-testing/';
+        $keyName = 'ppx2-'.'client';
+
+        // Only the two active working documents are skipped, by exact name: a
+        // broad *evaluation* pattern would also skip committed historical
+        // reports (for example todays-commit-evaluation.md).
+        $activeWorkingDocs = [
+            '5.x-evaluation-implementation-plan.md',
+            'evaluation-of-5.x-implementation-plan.md',
+        ];
+
+        foreach (glob(base_path('docs/*.md')) as $docFile) {
+            if (in_array(basename($docFile), $activeWorkingDocs, true)) {
+                continue;
+            }
+
+            $contents = (string) file_get_contents($docFile);
+
+            expect($contents)
+                ->not->toMatch('/\b(?!127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|0\.0\.0\.0|255\.|198\.51\.100\.|203\.0\.113\.|192\.0\.2\.|1\.1\.1\.1|8\.8\.)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/')
+                ->not->toContain($keyName)
+                ->not->toContain($doublePrefix);
+        }
+    });
 });

@@ -1,5 +1,10 @@
 # PHP-FPM Worker Pool Split — Proposal
 
+> [!NOTE] Historical Status
+> This document is a historical architectural proposal and reference record.
+> **Implemented items**: Fast CDR front controller (`public/cdr-fast.php`), dynamic PHP-FPM pool default (`pm = dynamic`), Lua proxy retirement in 5.0.0, 200-sample panel latency probe, and `tpbx cdr:health`.
+> **Unimplemented proposals**: The dedicated `[xml]` / `[www]` PHP-FPM socket split described below remains an unimplemented proposal; the single dynamic pool with persistent RoadRunner/Octane XML worker (`tallpbx-xml-worker`) was adopted instead.
+
 **Status:** proposal only. Its gate is satisfied — the CDR fast entry is delivered and measured, with the results recorded in `load-testing/status.md` (5 CPS: 300/300 calls, 601 CDR rows, against 276/300 and 46/552 before). The three-tier XML ladder is already committed (`4fe5951`); this is the next infrastructure change *after* the CDR work, and the two must not be combined in one change.
 
 ## 1. Problem

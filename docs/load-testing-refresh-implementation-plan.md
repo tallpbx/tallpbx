@@ -1,5 +1,10 @@
 # Load-Testing Refresh & Results Rewrite Implementation Plan
 
+> [!NOTE] Historical Status
+> This document is a historical plan and reference record.
+> **Implemented items**: Fast CDR front controller (`public/cdr-fast.php`), dynamic PHP-FPM pool default (`pm = dynamic`), Lua proxy retirement in 5.0.0, 200-sample panel latency probe, and `tpbx cdr:health`.
+> **Unimplemented proposals**: The dedicated `[xml]` / `[www]` PHP-FPM socket split remains an unimplemented proposal; the single dynamic pool with persistent RoadRunner/Octane XML worker (`tallpbx-xml-worker`) was adopted instead.
+
 > ## CURRENT STATUS — 2026-11-04 (READ THIS FIRST)
 >
 > **This section is the handoff record for a fresh agent. It supersedes anything below that
@@ -36,8 +41,8 @@ off: ~63 ms). They do not combine on the HTTP path because a Lua hit never reach
 | Role | Address | Notes |
 |:--|:--|:--|
 | Orchestrator | this workstation (`fspbx1`, 192.168.1.76) | repo + committed raw results under `load-testing/results/` |
-| PBX under test | `162.243.62.138` (`root`, key `~/.ssh/ppx2-client.rsa`) | Debian 13, 1 vCPU / 967 MB = tier `h1-1c1g`; branch `5.x`, clean |
-| Load generator | `107.170.3.55` (same key) | SIPp only; no firewall; raised limits; holds its own repo checkout |
+| PBX under test | `x.x.x.138` (`root`, key `<SSH_KEY_PATH>`) | Debian 13, 1 vCPU / 967 MB = tier `h1-1c1g`; branch `5.x`, clean |
+| Load generator | `x.x.x.55` (same key) | SIPp only; no firewall; raised limits; holds its own repo checkout |
 
 ### What was just committed (the consolidation)
 
@@ -63,7 +68,7 @@ runs, the outbound gateway host read from the PBX database, and the cell judged 
 
 ### Resume here — in this order
 
-1. `git pull` on **both** hosts (`162.243.62.138`, `107.170.3.55`); on the generator also
+1. `git pull` on **both** hosts (`x.x.x.138`, `x.x.x.55`); on the generator also
    `pkill -f 'sipp [-]sf'` to clear leftover listeners, then verify
    `load-testing/scripts/pbx-sipp-validate.sh` and `load-testing/tools/sipp/` resolve.
 2. **Add a fast SIP smoke preflight to the runner** (~2 min: 1 registration + 1 extension call +
@@ -374,8 +379,8 @@ test('keeps the capacity ladder ascending and complete', function (): void {
         ->and($ladder)->toBe(collect($ladder)->sort()->values()->all());
 });
 
-test('lists every SIPp scenario that ships in tools/sipp', function (): void {
-    $files = collect(glob(base_path('tools/sipp/{uac-*,register}.xml'), GLOB_BRACE))
+test('lists every SIPp scenario that ships in load-testing/tools/sipp', function (): void {
+    $files = collect(glob(base_path('load-testing/tools/sipp/{uac-*,register}.xml'), GLOB_BRACE))
         ->map(fn (string $path): string => basename($path, '.xml'))
         ->sort()->values()->all();
 

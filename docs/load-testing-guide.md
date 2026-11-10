@@ -127,7 +127,7 @@ tpbx pbx:load-test:dialplan \
   --timing --token="$FS_XML_HANDLER_TOKEN"
 
 # 3. Run SIPp end-to-end validation suite from the load generator
-PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
+PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 ```
 
 ---
@@ -403,13 +403,13 @@ FS_SESSIONS_PER_SECOND=60
 
 ### Cache Sweep & Hit Rate Benchmarking
 
-To benchmark all 4 standard cache tiers on your host and measure exact Redis keyspace hit rates:
+To benchmark all 5 standard cache tiers on your host and measure exact Redis keyspace hit rates:
 
 ```bash
 bash load-testing/scripts/run-cache-sweep.sh
 ```
 
-The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache off, Production baseline 60s, and Memory hit ceiling) and automatically restores the exact `.env` TTL values captured before the sweep upon completion — including when interrupted mid-run.
+The script runs a standardized 5-tier test (Cold baseline, Dialplan route cache off, Production baseline 60s, Memory hit ceiling, and Directory mixed) and automatically restores the exact `.env` TTL values captured before the sweep upon completion — including when interrupted mid-run.
 
 **The five cache settings, in plain English:**
 
@@ -421,7 +421,7 @@ The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache 
 | `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` | "Phone book" lookups: which SIP user is calling, and their credentials. |
 | `FS_XML_HANDLER_ACL_CACHE_TTL` | The list of trusted IP addresses. |
 
-**What each cache profile sets** (numbers are seconds; `0` means the cache is off; the column names refer to the four individual cache settings above). The sweep only changes the first two — Directory and ACL keep whatever `.env` already has (`60` by default):
+**What each cache profile sets** (numbers are seconds; `0` means the cache is off; the column names refer to the four individual cache settings above):
 
 | Profile | Dialplan Route Cache TTL | Contributor Snippet Cache TTL | Directory User Cache TTL | ACL IP List Cache TTL | What this run tells you |
 | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -429,6 +429,7 @@ The script runs a standardized 4-tier test (Cold baseline, Dialplan route cache 
 | **Dialplan cache off** (snippets on) | `0` | `60` | `60` | `60` | Each number's final routing answer is rebuilt on every request, while the shared module snippets stay cached. |
 | **Production baseline (60s)** | `60` | `60` | `60` | `60` | Normal production settings: full caching enabled, with instant panel invalidation via cache versioning (`RoutingCacheVersion`). |
 | **Memory hit ceiling** | `60` | `60` | `60` | `60` | The best case: the same number is requested repeatedly, so every answer comes straight from Redis memory with zero database queries. |
+| **Directory mixed** | `120` | `60` | `0` | `60` | Mixed directory and dialplan lookups with app-side timing headers (`--timing`), evaluating directory lookups with zero user cache alongside a 120s dialplan route cache. |
 
 > [!NOTE]
 > The XML-only benchmark only exercises the dialplan and contributor caches — it never asks the directory or ACL caches anything. That is why their values never change between profiles, and why testing them one at a time would show no difference.
@@ -446,13 +447,13 @@ Execute the validation suite from the load generator host:
 
 ```bash
 # Basic run: Registration, internal extension calls, and outbound routing
-PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
+PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 
 # Media flow run: Adds call recording (*732), music on hold, and IVR announcements
-MEDIA_FLOW=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
+MEDIA_FLOW=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 
 # Extended parity run: Adds ring groups, voicemail, conferences, forwarding, etc.
-EXTENDED=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/load-testing/scripts/pbx-sipp-validate.sh
+EXTENDED=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 ```
 
 A successful run exits `0` and creates a detailed artifact directory under `storage/app/load-tests/sipp-e2e-*` containing `summary.md`, CSV timings, and error logs.
@@ -574,7 +575,7 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 ### Common Failures & Remediation
 
 1. **High Concurrency XML Latency**:
-   On single-core VPS nodes, XML generation under concurrency 25 hits a CPU limit of ~14–16 req/sec. Deploy 2+ vCPUs with pre-forked static workers to scale beyond 15 calls/sec.
+   On single-core VPS nodes, XML generation under concurrency 25 hits a CPU limit of ~14–16 req/sec. Deploy 2+ vCPUs with the shipped dynamic FPM pool (`pm.max_children = 6`) or enable the optional Octane worker (`tallpbx-xml-worker`) to scale beyond 15 calls/sec (25+ CPS).
 2. **Delayed Audio or Dropped Packets**:
    Ensure RTP media ports (`16384-32768/udp`) are open in the firewall. If testing over WireGuard, verify MTU (`1420`) to prevent UDP fragmentation.
 3. **Stuck Channels After Teardown**:

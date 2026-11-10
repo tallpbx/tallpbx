@@ -110,16 +110,16 @@ Empirical call capacity, setup latencies, and saturation boundaries measured acr
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile (`www.conf`) | Cache Policy (`.env`) | Sustained Call Setup Rate | Call Setup Latency (`p50` / `p95`) | Peak Call Capacity / Concurrency | Recommended Production Role |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = static` (5 workers) | Production default (`TTL: 60s`) | 3 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 calls/sec saturation boundary) | Micro / Edge (1–10 extensions) |
-| **1 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Production default (`TTL: 60s`) | 3 calls/sec | 276 ms / ~2.2s | 0 MB swap; single-core compute bound | Small Branch (1–15 extensions) |
-| **2 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Production default (`TTL: 60s`) | 3–5 calls/sec<br>*(up to 8–10 burst)* | ~1.1s (at 2 calls/sec)<br>~4.0s / ~9.5s (at 5 calls/sec)* | 10 calls/sec burst ceiling (89% answer rate, 50 concurrency) | Standard SMB (10–75 extensions) |
-| **2 vCPU, 8 GB RAM** | **Dedicated CPU** | **`pm = static` (12 workers)** | **Production default (`TTL: 60s`)** | **5–8 calls/sec** | **160 ms / 180 ms** | **100% 14-scenario pass; sub-second XML peak latency (923 ms)** | **Mid-Market Dedicated (50–150 extensions)** |
-| **4 vCPU, 16 GB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Baseline reference (`TTL: 60s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 calls/sec burst ceiling (100% completion across 2,110 calls, 0 drops)** | **High-Density Enterprise / Call Center (150–400+ extensions)** |
+| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = dynamic` (max 3 workers) | Production default (`TTL: 60s`) | 5 calls/sec | 244 ms / 328 ms | ~20–35 concurrent (5 calls/sec saturation boundary) | Micro / Edge (1–10 extensions) |
+| **1 vCPU, 2 GB RAM** | Shared vCPU | `pm = dynamic` (max 6 workers) | Production default (`TTL: 60s`) | 5 calls/sec | 276 ms / ~2.2s | 0 MB swap; single-core compute bound | Small Branch (1–15 extensions) |
+| **2 vCPU, 2 GB RAM** | Shared vCPU | `pm = dynamic` (max 6 workers) | Production default (`TTL: 60s`) | 10 calls/sec<br>*(25+ CPS with Octane)* | ~1.1s (at 2 calls/sec)<br>3.8s / 6.9s (at 12 calls/sec)* | 10 calls/sec sustained ceiling (100% completion; 25+ CPS with Octane) | Standard SMB (10–75 extensions) |
+| **2 vCPU, 8 GB RAM** | **Dedicated CPU** | **`pm = dynamic` (max 12 workers)** | **Production default (`TTL: 60s`)** | **10–15 calls/sec** | **160 ms / 180 ms** | **100% 14-scenario pass; sub-second XML peak latency (923 ms)** | **Mid-Market Dedicated (50–150 extensions)** |
+| **4 vCPU, 16 GB RAM** | **Dedicated CPU** | **`pm = dynamic` (max 12 workers)** | **Baseline reference (`TTL: 60s`)** | **15–20 calls/sec** | **148–180 ms / 180–472 ms** | **30 calls/sec burst ceiling (100% completion across 2,110 calls, 0 drops)** | **High-Density Enterprise / Call Center (150–400+ extensions)** |
 
-*\*At baseline arrival rates (2–3 calls/sec), setup latency on the 2 vCPU instance is sub-second to ~1.1s. The ~4.0s p50 and ~9.5s p95 figures reflect queueing delay under heavy 5 calls/sec load where 25 in-flight setups compete for 6 static PHP-FPM workers.*
+*\*At baseline arrival rates (2–3 calls/sec), setup latency on the 2 vCPU instance is sub-second to ~1.1s. The 3.8s p50 and 6.9s p95 figures reflect queueing delay under heavy 12 calls/sec load where calls compete for dynamic PHP-FPM workers.*
 
 > [!NOTE]
-> **Benchmark methodology and caching profile.** The 1 vCPU / 1 GB RAM tier reflects empirical testing under the current production default (`FS_XML_HANDLER_CACHE_TTL=60`, PHP-FPM `pm = static`, and default `nftables` firewall active). Higher hardware tiers reflect reference benchmarks captured under the pre-v4.2.0 baseline and will be updated as the test host is upsized. Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the 60-second default preserves full routing freshness while shielding MariaDB from high-concurrency spikes. All measurements ran with the **full default `nftables` firewall enabled** (geo-blocking, pre-filters, and default-drop active), matching a production-hardened deployment.
+> **Benchmark methodology and caching profile.** The 1 vCPU / 1 GB RAM tier reflects empirical testing under the current production default (`FS_XML_HANDLER_CACHE_TTL=60`, PHP-FPM `pm = dynamic`, and default `nftables` firewall active). Higher hardware tiers reflect reference benchmarks captured under the pre-v4.2.0 baseline and will be updated as the test host is upsized. Since v4.2.0, panel writes invalidate cached routing XML immediately through versioned cache keys (`RoutingCacheVersion`), so the 60-second default preserves full routing freshness while shielding MariaDB from high-concurrency spikes. All measurements ran with the **full default `nftables` firewall enabled** (geo-blocking, pre-filters, and default-drop active), matching a production-hardened deployment.
 
 ---
 
@@ -129,15 +129,15 @@ XML throughput and latency across moderate bursts (`100 x 5`: 100 requests at 5 
 
 | Hardware Configuration | CPU Allocation | PHP-FPM Profile | Cache Policy | Moderate Burst (`100 x 5`) | High Burst (`500 x 25`) | Sustained Ceiling (`1,000 x 25`) | Peak Tail Latency (`Max`) | Uncached MariaDB (`100 x 5`) | Pure Memory Ceiling (`100 x 5`) |
 | :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = static` (5 workers) | Production (`TTL: 60s`) | 26.4 req/sec (181 ms) | 24.8 req/sec (596 ms) | 26.0 req/sec (566 ms) | 1,632 ms | 15.7 req/sec (309 ms) | 18.9 req/sec (255 ms) |
-| **1 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 60s`) | 14.2 req/sec (340 ms) | 13.2 req/sec (1,147 ms) | 13.5 req/sec (1,129 ms) | 2,369 ms | 12.5 req/sec (313 ms) | 12.0 req/sec (327 ms) |
-| **2 vCPU, 2 GB RAM** | Shared vCPU | `pm = static` (6 workers) | Production (`TTL: 60s`) | 24.7 req/sec (183 ms) | 23.9 req/sec (626 ms) | 24.2 req/sec (618 ms) | 1,209 ms | 17.9 req/sec (181 ms) | 18.1 req/sec (181 ms) |
-| **2 vCPU, 8 GB RAM** | **Dedicated CPU** | **`pm = static` (12 workers)** | **Production (`TTL: 60s`)** | **30.8 req/sec (144 ms)** | **31.3 req/sec (569 ms)** | **30.7 req/sec (576 ms)** | **984 ms** | **26.3 req/sec (137 ms)** | **27.8 req/sec (133 ms)** |
-| **4 vCPU, 16 GB RAM** | **Dedicated CPU** | **`pm = static` (24 workers)** | **Baseline (`TTL: 60s`)** | **57.3 req/sec (77 ms)** | **65.0 req/sec (333 ms)** | **65.3 req/sec (327 ms)** | **448 ms** | **41.1 req/sec (108 ms)** | **72.5 req/sec (61 ms)** |
+| **1 vCPU, 1 GB RAM** | Shared vCPU | `pm = dynamic` (max 3) | Production (`TTL: 60s`) | 26.4 req/sec (181 ms) | 24.8 req/sec (596 ms) | 26.0 req/sec (566 ms) | 1,632 ms | 15.7 req/sec (309 ms) | 18.9 req/sec (255 ms) |
+| **1 vCPU, 2 GB RAM** | Shared vCPU | `pm = dynamic` (max 6) | Production (`TTL: 60s`) | 14.2 req/sec (340 ms) | 13.2 req/sec (1,147 ms) | 13.5 req/sec (1,129 ms) | 2,369 ms | 12.5 req/sec (313 ms) | 12.0 req/sec (327 ms) |
+| **2 vCPU, 2 GB RAM** | Shared vCPU | `pm = dynamic` (max 6) | Production (`TTL: 60s`) | 24.7 req/sec (183 ms) | 23.9 req/sec (626 ms) | 24.2 req/sec (618 ms) | 1,209 ms | 17.9 req/sec (181 ms) | 18.1 req/sec (181 ms) |
+| **2 vCPU, 8 GB RAM** | **Dedicated CPU** | **`pm = dynamic` (max 12)** | **Production (`TTL: 60s`)** | **30.8 req/sec (144 ms)** | **31.3 req/sec (569 ms)** | **30.7 req/sec (576 ms)** | **984 ms** | **26.3 req/sec (137 ms)** | **27.8 req/sec (133 ms)** |
+| **4 vCPU, 16 GB RAM** | **Dedicated CPU** | **`pm = dynamic` (max 12)** | **Baseline (`TTL: 60s`)** | **57.3 req/sec (77 ms)** | **65.0 req/sec (333 ms)** | **65.3 req/sec (327 ms)** | **448 ms** | **41.1 req/sec (108 ms)** | **72.5 req/sec (61 ms)** |
 
 **Key Architectural Takeaways:**
-1. **The Shared-Core Baseline (~24–26 req/sec with Static Pool)**: On a 1-core shared-CPU instance with static PHP-FPM auto-tuning (`pm = static`, 5 workers), XML throughput reaches 26.4 req/sec under burst concurrency (+69% over the legacy dynamic pool), and sustains 26.0 req/sec across 1,000 queries with zero errors.
-2. **Dedicated CPU Scaling (>4x Multiplier)**: Moving to 4 dedicated vCPUs with 24 pre-forked static workers eliminates worker starvation. Sustained throughput reaches **65.3 req/sec**, while peak tail latency drops by >80% (capped under 450 ms across 1,000 sustained queries).
+1. **The Shared-Core Baseline (~24–26 req/sec with Dynamic Pool)**: On a 1-core shared-CPU instance with dynamic PHP-FPM auto-tuning (`pm = dynamic`, max 3 workers), XML throughput reaches 26.4 req/sec under burst concurrency, and sustains 26.0 req/sec across 1,000 queries with zero errors.
+2. **Dedicated CPU Scaling (>4x Multiplier)**: Moving to 4 dedicated vCPUs with dynamic workers eliminates worker starvation. Sustained throughput reaches **65.3 req/sec**, while peak tail latency drops by >80% (capped under 450 ms across 1,000 sustained queries).
 3. **Database vs. Cache Scaling**: Redis contributor and dialplan caching shield MariaDB during high-concurrency bursts, keeping average response times under 240 ms on entry hardware and under 70 ms on dedicated instances.
 
 ---
@@ -148,19 +148,18 @@ Use this authoritative reference when selecting server specifications, tuning PH
 
 | Profile / Tier | Recommended Hardware | PHP-FPM Profile (`www.conf`) | Cache TTL Window | Dialplan XML Throughput | Sustained Call Capacity | Active Call Ceiling | Primary Target Deployment |
 | :--- | :--- | :--- | :--- | :--- | :--- | ---: | --- |
-| **Micro / Edge** | 1 vCPU, 1–2 GB RAM | `pm = static`<br>`pm.max_children = 5` | 60 seconds (default) | 19–26 req/sec | 3–5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
-| **Standard SMB** | 2–4 vCPU, 4 GB RAM | `pm = static`<br>`pm.max_children = 12` | 60 seconds (default) | 19–28 req/sec | 5–8 calls/sec | 50–100 concurrent | Small-to-medium business (10–75 phones) |
-| **Mid-Market** | 4–8 vCPU, 8–16 GB RAM | `pm = static`<br>`pm.max_children = 24` | 60 seconds (default) | 65–72 req/sec | 15–20 calls/sec | 200–400 concurrent | Multi-department office (75–250 phones) |
-| **Call Center** | 8+ vCPU, 16 GB RAM | `pm = static`<br>`pm.max_children = 32–48` | 60 seconds (default) | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
-| **Enterprise / Multi-Tenant** | 16+ vCPU, 32 GB RAM | `pm = static`<br>`pm.max_children = 64` | 60 seconds (default) | 100–150+ req/sec | 45–60+ calls/sec | 1,000+ concurrent | Multi-tenant cloud hosted PBX |
+| **Micro / Edge** | 1 vCPU, 1–2 GB RAM | `pm = dynamic`<br>`pm.max_children = 3` | 60 seconds (default) | 19–26 req/sec | 5 calls/sec | 20–35 concurrent | Home office, small branch (1–10 phones) |
+| **Standard SMB** | 2–4 vCPU, 2–4 GB RAM | `pm = dynamic`<br>`pm.max_children = 6` | 60 seconds (default) | 19–28 req/sec | 10 calls/sec (25+ with Octane) | 50–100 concurrent | Small-to-medium business (10–75 phones) |
+| **Mid-Market** | 4–8 vCPU, 8–16 GB RAM | `pm = dynamic`<br>`pm.max_children = 12` | 60 seconds (default) | 65–72 req/sec | 15–20 calls/sec | 200–400 concurrent | Multi-department office (75–250 phones) |
+| **Call Center** | 8+ vCPU, 16 GB RAM | `pm = dynamic`<br>`pm.max_children = 12` | 60 seconds (default) | 60–90+ req/sec | 25–40 calls/sec | 400–800 concurrent | Queue-heavy inbound contact center |
+| **Enterprise / Multi-Tenant** | 16+ vCPU, 32 GB RAM | `pm = dynamic`<br>`pm.max_children = 12` | 60 seconds (default) | 100–150+ req/sec | 45–60+ calls/sec | 1,000+ concurrent | Multi-tenant cloud hosted PBX |
 
 > [!NOTE]
 > Since v4.2.0 the tier-differentiated TTL windows above are obsolete: panel edits invalidate cached routing XML immediately, so every tier runs the same 60-second default. Longer windows only trade Redis keyspace memory for rebuild avoidance — extend per deployment only if memory headroom allows.
 
 > [!TIP]
 > **PHP-FPM Worker Sizing Formula**:  
-> `pm.max_children = (Total RAM - System & Telephony Overhead [1.5 GB]) / Worker RSS (~65 MB)`  
-> On a 4 GB VM: `(4096 - 1536) / 65 ≈ 39` theoretical limit. Setting `pm.max_children = 12` caps PHP-FPM memory under 800 MB, leaving >2.5 GB free for FreeSWITCH RTP media, MariaDB buffers, and Redis.
+> The installer (`scripts/resources/php.sh`) configures dynamic worker pools based on physical RAM: `pm.max_children = 3` on < 1,800 MB, `6` on ≥ 1,800 MB, and `12` on ≥ 3,500 MB (with `start_servers = 1`, `min_spare_servers = 1`, `max_spare_servers = 2`, and `pm.max_requests = 10000`). This bounds memory creep while preventing worker starvation and queue-depth penalties.
 
 ---
 
@@ -176,23 +175,23 @@ TallPBX caches compiled dialplan XML responses, individual contributor fragments
 | **Dialplan Cache Off (Dynamic Routes)** | `0` | `60` | `60` | `60` | ~36.8% | 253 ms | **Instant Route Assembly.** Reuses cached modular snippets while compiling fresh route containers on demand for each call. |
 | **Cold Baseline (Direct Database Routing)** | `0` | `0` | `60` | `60` | ~96.6%* | 309 ms | **Direct DB routing.** Bypasses dialplan and snippet cache layers; directory and ACL entries remain cached in Redis. (*Hit rate reflects directory and ACL lookups). |
 
-- Benchmark all 4 cache tiers on your host: `bash scripts/run-cache-sweep.sh`
+- Benchmark all 5 cache tiers on your host: `bash load-testing/scripts/run-cache-sweep.sh`
 - Check active Redis cache efficiency: `redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'`
 
 ### 2. PHP-FPM Worker Pool Tuning (`/etc/php/8.5/fpm/pool.d/www.conf`)
 
-Unlike a standard website where PHP only serves human page clicks in a browser, a PBX uses PHP-FPM to serve real-time XML call routing to FreeSWITCH. This communication line is the system's **hotpath** — the critical highway of code that must run for every phone registration, extension lookup, and inbound/outbound call. If PHP workers are asleep or busy when a call arrives, callers hear silence and FreeSWITCH drops the call.
+Unlike a standard website where PHP only serves human page clicks in a browser, a PBX uses PHP-FPM to serve real-time XML call routing to FreeSWITCH. This communication line is the system's **hotpath** — the critical highway of code that must run for every phone registration, extension lookup, and inbound/outbound call.
 
-- **Always Use Static Mode (`pm = static`) Across All Tiers**: Dynamic mode spawns workers on demand, introducing 200–500 ms process-fork latency during call bursts. In benchmarks, dynamic mode with 5 workers saturated at concurrency 25, creating worker starvation warnings and 502 timeouts. Static mode keeps all workers pre-forked in memory so spare workers are always ready to answer the hotpath instantly, even while users navigate the web panel.
-- **Installer Auto-Tuning**: Fresh installations detect system RAM via `free -m` and configure optimal worker pools:
-  - **≥ 3,500 MB RAM (4GB+ standard)**: `pm = static`, `pm.max_children = 12` (+15% throughput, zero timeouts, >2.5 GB free RAM).
-  - **≥ 1,800 MB RAM (2GB small)**: `pm = static`, `pm.max_children = 6`.
-  - **< 1,800 MB RAM (1GB minimal)**: `pm = static`, `pm.max_children = 5` (pre-forked baseline to eliminate fork latency during bursts; paired with mandatory ≥ 2GB swap).
+- **Dynamic Mode (`pm = dynamic`) Shipped Across All Tiers**: The 2026-11-08/09 worker sweeps demonstrated that static pools idle-consume RAM on small hosts and lose more calls at the 1 vCPU failure boundary (where fewer workers queue fewer calls behind the single core). On 2+ vCPUs, worker count is second-order behind Octane (`tallpbx-xml-worker`). TallPBX therefore ships `pm = dynamic` with one resident idle worker (`pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_requests = 10000`).
+- **Installer Auto-Tuning**: Fresh installations (`scripts/resources/php.sh`) detect system RAM via `free -m` and configure optimal worker pool ceilings:
+  - **≥ 3,500 MB RAM (4GB+ standard)**: `pm = dynamic`, `pm.max_children = 12`.
+  - **≥ 1,800 MB RAM (2GB small)**: `pm = dynamic`, `pm.max_children = 6`.
+  - **< 1,800 MB RAM (1GB minimal)**: `pm = dynamic`, `pm.max_children = 3` (measured tight ceiling to minimize queue backlog at the failure boundary).
 - **Check for Pool Saturation**:
   ```bash
   tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
   ```
-  If this warning appears during peak calling periods, increase `pm.max_children` using the formula above and restart PHP-FPM (`systemctl restart php8.5-fpm`).
+  If this warning appears during peak calling periods, verify whether CPU is saturated before raising `pm.max_children`, or consider enabling the persistent RoadRunner/Octane worker (`tallpbx-xml-worker`) on port 8090.
 
 ---
 
@@ -478,7 +477,7 @@ Cache hits recorded `X-TallPBX-DB-Queries: 0`, and atomic cache locks serialize 
 
 ### XML Serving Configurations: Four-Way Comparison (1 vCPU)
 
-> **Measured 2026-11-01, before the persistent worker became the primary path.** The fast front controller and the Lua proxy are now disabled in favour of the RoadRunner worker (see above); this section is the reference data for those two optional paths and for the request-cost baseline they were built to remove.
+> **Measured 2026-11-01, before the persistent worker and fast front controller were standardized.** The fast front controller (`xml-handler-fast.php`) is now the shipped default, the RoadRunner/Octane worker (`tallpbx-xml-worker`) is opt-in on `:8090`, and the Lua proxy was retired after this 4-way comparison; this section is the historical reference data for those paths and for the request-cost baseline they were built to evaluate.
 
 **Purpose:** measure the two optional speed-ups independently and together, so a decision to keep or remove either one rests on a number. **Supersedes** the earlier directory-only sweep: the pre-dialplan run reached the same gate decision — app-side p95 73.9–292.4 ms, HTTP p95 1,233 ms at concurrency 25, directory share 66.7 % (PROCEED) — and its full report was retired once this comparison replaced it.
 
@@ -566,9 +565,8 @@ At 100×5 the cost is inside the noise.
 
 **Recommendation.**
 
-- **Keep the fast controller on by default.** It is free, it needs no FreeSWITCH change, and it helps every section.
-- **Keep the proxy available but decide per deployment.** On a box whose call-setup rate is the constraint, it is the difference between ~140 ms and ~22 ms per call. On a box already saturated on the HTTP side, its write cost is a real tax — and it only pays off if call setup, not admin traffic, is the bottleneck.
-- **Do not treat the proxy as a way to raise HTTP throughput.** It cannot: requests over HTTP still go through PHP.
+- **Fast controller shipped as default (`xml-handler-fast.php`).** It is free, requires no FreeSWITCH change, and helps every section.
+- **Lua proxy evaluated and retired in 5.0.0.** The RoadRunner/Octane persistent worker (`tallpbx-xml-worker`) on `:8090` provides superior throughput (66+ req/s) and sub-second setup latencies without the cache-mirroring write tax or maintenance overhead of the Lua proxy.
 
 **Caveats.**
 
@@ -681,7 +679,7 @@ Live SIP benchmarks measure complete telephony call setup, bidirectional audio f
 
 ### End-to-End Functional Feature Validation (All Tiers)
 
-Before capacity stress testing, the full 14-scenario telephony feature validation suite was executed via `scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`) between the PBX target (`...141`) and the dedicated load generator (`...116`) over public IP, evaluating directly against the PBX's active default `nftables` firewall rules. **All 14 scenarios passed with 100% completion:**
+Before capacity stress testing, the full 14-scenario telephony feature validation suite was executed via `load-testing/scripts/pbx-sipp-validate.sh` (`MEDIA_FLOW=1`, `EXTENDED=1`) between the PBX target (`...141`) and the dedicated load generator (`...116`) over public IP, evaluating directly against the PBX's active default `nftables` firewall rules. **All 14 scenarios passed with 100% completion:**
 
 | Test Scenario | Destination / Feature | Off / Limit / Count | Result | Operational Verification Summary |
 | :--- | :--- | ---: | :---: | :--- |
@@ -719,7 +717,7 @@ Sustained extension-to-extension capacity tests with SIP authentication and XML 
 - Each authenticated call requires **three discrete XML HTTP requests**: (1) caller auth digest challenge in `directory`, (2) dialplan context lookup in `dialplan`, and (3) destination location in `directory`.
 - At **3 CPS**, the XML arrival rate is ~9 req/sec. The 5 PHP-FPM workers process requests in ~250 ms without queueing, delivering a median call setup latency of **244 ms** and 100% success.
 - At **5+ CPS**, XML arrival exceeds 15 req/sec (matching the single-core CPU limit). Requests queue up in the PHP-FPM listen backlog; when queued delay exceeds FreeSWITCH `mod_xml_curl`'s 5.0s timeout, Sofia fails the lookup and issues `403 Forbidden`.
-- **Production Rule**: On 1 vCPU / 1 GB nodes, plan production telephony capacity at **3 calls/sec** (~20–35 concurrent active calls). Deployments requiring 5+ calls/sec should upgrade to 2+ vCPUs and configure `pm = static` with `pm.max_children = 12`.
+- **Production Rule**: On 1 vCPU / 1 GB nodes, plan production telephony capacity at **5 calls/sec** (100% completion; ~20–35 concurrent active calls). Deployments requiring 10+ calls/sec should upgrade to 2+ vCPUs with the shipped dynamic pool (`pm.max_children = 6`) or enable the persistent Octane worker (`tallpbx-xml-worker`) to reach 25+ calls/sec.
 
 *Artifacts: `storage/app/load-tests/capacity/datacenter-b1-sipp-20260924T1849Z/`.*
 
