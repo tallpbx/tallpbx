@@ -1196,3 +1196,14 @@ it('deploys the mod_hiredis default profile the tenant limit dialplan actions re
         ->and($freeswitch)->toContain('hiredis.conf.xml')
         ->and($freeswitch)->toContain('autoload_configs/hiredis.conf.xml');
 });
+
+it('configures letsencrypt port 80 server block with root directive, unescaped php_version socket, and HTTP_AUTHORIZATION on index.php', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/resources/letsencrypt.sh'));
+
+    expect($script)
+        ->not->toContain('unix:/var/run/php/php\${php_version:-8.5}-fpm.sock')
+        ->toContain("    listen 80;\n    listen [::]:80;\n    server_name \${CERT_DOMAIN};\n    root /var/www/tallpbx/public;");
+
+    expect(substr_count($script, 'fastcgi_param HTTP_AUTHORIZATION \$http_authorization;'))
+        ->toBeGreaterThanOrEqual(8);
+});

@@ -530,8 +530,11 @@ configure_json_cdr() {
     conf_dir="$(freeswitch_conf_dir)"
     modules_conf="${conf_dir}/autoload_configs/modules.conf.xml"
 
-    # The module ships as its own package; apt skips it when already present.
-    apt_get_with_lock_wait install -y freeswitch-mod-json-cdr
+    # The module ships as its own package on apt-based installs; source builds
+    # compile event_handlers/mod_json_cdr via enable_tallpbx_source_modules().
+    if [ "${freeswitch_install_method:-packages}" != "source" ] && ! source_build_is_installed; then
+        apt_get_with_lock_wait install -y freeswitch-mod-json-cdr
+    fi
 
     # Failure spool first so the module never starts without its fallback.
     ensure_json_cdr_spool_dirs
@@ -576,6 +579,7 @@ uninstall_freeswitch_packages() {
     systemctl stop freeswitch 2>/dev/null || true
     apt_get_with_lock_wait remove -y freeswitch-meta-vanilla freeswitch freeswitch-mod-av \
         freeswitch-mod-callcenter freeswitch-mod-dptools freeswitch-mod-hiredis \
+        freeswitch-mod-json-cdr \
         freeswitch-mod-local-stream freeswitch-mod-opus freeswitch-mod-png \
         freeswitch-mod-rtc freeswitch-mod-sndfile freeswitch-mod-sofia \
         freeswitch-mod-signalwire freeswitch-mod-verto freeswitch-mod-xml-curl \
@@ -691,7 +695,7 @@ enable_tallpbx_source_modules() {
     # Keep source builds functionally aligned with the package profile. These
     # entries are intentionally the FreeSWITCH source-tree module paths.
     for module in applications/mod_callcenter applications/mod_dptools applications/mod_voicemail \
-        applications/mod_hiredis endpoints/mod_sofia formats/mod_av \
+        applications/mod_hiredis endpoints/mod_sofia event_handlers/mod_json_cdr formats/mod_av \
         formats/mod_local_stream formats/mod_sndfile xml_int/mod_xml_curl \
         say/mod_say_es say/mod_say_fr; do
         sed -i "s|^#${module}|${module}|" "$modules_file"

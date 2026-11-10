@@ -184,3 +184,14 @@ it('routes cdr posts through the fast entry in every nginx server block', functi
         expect(substr_count($source, '# location = /api/v1/cdr {'))->toBe($expectedBlocks);
     }
 });
+
+it('supports mod_json_cdr in source-build mode and package uninstallation in freeswitch.sh', function (): void {
+    $script = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    // Upstream FreeSWITCH build/modules.conf.in places mod_json_cdr under
+    // event_handlers/mod_json_cdr (src/mod/event_handlers/mod_json_cdr).
+    expect($script)
+        ->toContain('if [ "${freeswitch_install_method:-packages}" != "source" ] && ! source_build_is_installed; then')
+        ->toContain('event_handlers/mod_json_cdr')
+        ->toContain('freeswitch-mod-json-cdr \\');
+});

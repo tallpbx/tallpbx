@@ -31,20 +31,23 @@ use Illuminate\Support\Facades\Log;
  *
  *   <configuration name="xml_curl.conf" description="cURL XML Gateway">
  *     <bindings>
- *       <binding name="directory">
+ *       <binding name="tallpbx-octane">
  *         <param name="gateway-url"
- *           value="https://pbx.example.com/api/v1/xml-handler"
- *           bindings="directory"/>
+ *           value="http://127.0.0.1:8090/api/v1/xml-handler?token=YOUR_TOKEN"
+ *           bindings="directory|dialplan|configuration"/>
+ *         <param name="timeout" value="1"/>
  *       </binding>
- *       <binding name="dialplan">
+ *       <binding name="tallpbx-fallback">
  *         <param name="gateway-url"
- *           value="https://pbx.example.com/api/v1/xml-handler"
- *           bindings="dialplan"/>
+ *           value="http://127.0.0.1/api/v1/xml-handler?token=YOUR_TOKEN"
+ *           bindings="directory|dialplan|configuration"/>
+ *         <param name="timeout" value="2"/>
  *       </binding>
- *       <binding name="configuration">
+ *       <binding name="tallpbx-stock">
  *         <param name="gateway-url"
- *           value="https://pbx.example.com/api/v1/xml-handler"
- *           bindings="configuration"/>
+ *           value="http://127.0.0.1/api/v1/xml-handler-stock?token=YOUR_TOKEN"
+ *           bindings="directory|dialplan|configuration"/>
+ *         <param name="timeout" value="3"/>
  *       </binding>
  *     </bindings>
  *   </configuration>

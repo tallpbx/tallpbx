@@ -202,6 +202,7 @@ server {
     listen 80;
     listen [::]:80;
     server_name ${CERT_DOMAIN};
+    root /var/www/tallpbx/public;
 
     # Let's Encrypt HTTP-01 challenge
     location /.well-known/acme-challenge/ {
@@ -218,7 +219,7 @@ server {
         fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
         fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
         fastcgi_read_timeout 2s;
-        fastcgi_pass unix:/var/run/php/php\${php_version:-8.5}-fpm.sock;
+        fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
     }
     # Third tier: FreeSWITCH re-sends the complete request here when the fast
     # entry fails at the HTTP layer (5xx or timeout). It forwards the request
@@ -232,7 +233,7 @@ server {
         fastcgi_param REQUEST_URI /api/v1/xml-handler\$is_args\$args;
         fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
         fastcgi_read_timeout 3s;
-        fastcgi_pass unix:/var/run/php/php\${php_version:-8.5}-fpm.sock;
+        fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
     }
 
     # mod_json_cdr posts one JSON document per call leg here; the endpoint
@@ -269,8 +270,9 @@ server {
     # }
 
     location ~ ^/index\.php(/|\$) {
-        fastcgi_pass unix:/var/run/php/php\${php_version:-8.5}-fpm.sock;
+        fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
         include fastcgi_params;
         fastcgi_hide_header X-Powered-By;
     }
@@ -337,7 +339,7 @@ server {
     # FreeSWITCH fetches its XML here with the shared token in the query
     # string; disable logging for this path so the token never lands in
     # the access log (the application logs handler activity itself).
-    # Forward XML requests to standard index.php (fallback for Octane port 8090).
+    # Served by the trimmed fast controller (fallback when Octane on 8090 is off).
     location = /api/v1/xml-handler {
         access_log off;
         include fastcgi_params;
@@ -396,6 +398,7 @@ server {
     location ~ ^/index\.php(/|\$) {
         fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
         fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
+        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
         include fastcgi_params;
         fastcgi_hide_header X-Powered-By;
     }
