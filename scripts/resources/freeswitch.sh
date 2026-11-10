@@ -517,6 +517,15 @@ XML
     load_required_freeswitch_modules
 }
 
+# Report whether this server has the source-build files needed for a rebuild.
+source_build_is_installed() {
+    [ -x /usr/bin/freeswitch ] && [ -f /usr/src/freeswitch/Makefile ]
+}
+
+# Report whether apt currently owns the FreeSWITCH server package.
+freeswitch_packages_are_installed() {
+    dpkg-query -W -f='${db:Status-Status}' freeswitch 2>/dev/null | grep -Fxq installed
+}
 
 # Install and configure mod_json_cdr, which posts one JSON call record per
 # call leg to the TallPBX ingestion endpoint.
@@ -599,16 +608,6 @@ uninstall_freeswitch_source() {
     fi
     rm -rf "$source_directory"
     rm -f /lib/systemd/system/freeswitch.service
-}
-
-# Report whether this server has the source-build files needed for a rebuild.
-source_build_is_installed() {
-    [ -x /usr/bin/freeswitch ] && [ -f /usr/src/freeswitch/Makefile ]
-}
-
-# Report whether apt currently owns the FreeSWITCH server package.
-freeswitch_packages_are_installed() {
-    dpkg-query -W -f='${db:Status-Status}' freeswitch 2>/dev/null | grep -Fxq installed
 }
 
 # Install the compiler, libraries, and headers required to build FreeSWITCH.
