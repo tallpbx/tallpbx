@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Load-Testing Quad-Core Shared Sizing & Benchmark Modernization**: Replaced all 4 vCPU dedicated legacy test records with authoritative empirical load tests run on cost-effective shared cloud hardware (`4 vCPU shared / 8 GB RAM`). Documented PHP-FPM dynamic pool scaling (`pm = dynamic`, dynamic ceiling 12 workers) reaching 45.08 req/s under saturation, persistent Laravel Octane worker scaling to 140.54 req/s (3.1× speedup, 85 ms median latency), full 14-scenario SIP validation pass with 0 call drops, and 461 MariaDB CDR rows reconciled. Reconciled `docs/load-testing-results.md`, `load-testing/status.md`, `load-testing/procedure.md`, and `docs/telephony-capacity-scaling-guide.md`.
 - **Load-Testing Refresh Implementation Plan Retired**: Removed `docs/load-testing-refresh-implementation-plan.md` following the full delivery of the automated matrix runner, 1 vCPU and 2 vCPU worker sweeps, fast front controllers (`public/xml-handler-fast.php` and `public/cdr-fast.php`), and consolidation of authoritative results into `docs/load-testing-results.md`.
 
 ## [5.1.1] - 2026-11-09

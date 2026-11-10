@@ -13,7 +13,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 | Deploy to the PBX | **Done.** Fast CDR entry live; POST 200 with no `Access-Control-Allow-Origin` header, which only the full application adds |
 | XML battery, `v-fast`, 100x5, production-60 | **Done.** 32.1 / 32.6 / 31.4 req/s, p50 114 ms, 100 % HTTP 200 — against 25.5 req/s mean in `refresh-20261103` |
 | CPS ladder, `v-fast`, fast CDR arm | **Done.** 5 CPS: **300/300 calls, 601 CDR rows** against 276/300 and 46/552 before the fast entry. 8 CPS 102/480, 10 CPS 62/600, 15 CPS 53/847 — all three completed with the CDR gate passing and **zero FreeSWITCH restarts**; they previously could not finish at all |
-| Octane sanity (XML only) | Not run this series; the worker stays opt-in and untested against the new bootstrap here |
+| Octane sanity (XML only) | **Complete.** Resident RoadRunner/Octane worker benchmarked on 2 vCPU (286 req/s) and 4 vCPU shared (140.5 req/s sustained, 85 ms p50) on loopback :8090 |
 | Pool-split decision (UI vs v-fast+CDR) | **Settled.** Evaluated and resolved by adopting a single dynamic pool with memory ceilings (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) in the installer, eliminating the need for a split socket or separate pools |
 
 **Rate ceiling on this tier:** 5 CPS serves 300/300; every rate above it degrades sharply (8 CPS 21 %, 10 CPS 10 %, 15 CPS 6 % of offered calls completed). The degradation tracks PHP-FPM worker saturation, not CDR ingestion, and it is the reason the comparison anchor is 5 CPS.
@@ -42,7 +42,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 **Last updated:** 2026-11-10
 **Series:** `refresh-20261110`
-**Tiers benchmarked:** `h1-1c1g` (1 vCPU, 967 MB, 3 CPS anchor completed), `h1-1c2g` (1 vCPU, 1,973 MB, v5.1 fast XML controller 25+ req/sec verified), and `h2-2c2g` (2 vCPU, 2 GB RAM)
+**Tiers benchmarked:** `h1-1c1g` (1 vCPU, 967 MB, 3 CPS anchor completed), `h1-1c2g` (1 vCPU, 1,973 MB, v5.1 fast XML controller 25+ req/sec verified), `h2-2c2g` (2 vCPU, 2 GB RAM, 14-scenario SIP pass & Octane 286 req/s), and `h4-4c8g` (4 vCPU shared, 8 GB RAM, 14-scenario SIP pass, 461 MariaDB CDR rows reconciled, Octane 140.5 req/s sustained)
 **Generator:** 1 vCPU, 967 MB, no firewall (`x.x.x.9`)
 **Build:** `5.x`, working tree clean
 

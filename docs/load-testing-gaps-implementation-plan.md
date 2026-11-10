@@ -207,7 +207,7 @@
 - Consumes: 4-core compute host running both PHP-FPM (`pm.max_children = 12`) and RoadRunner Octane worker (`:8090`).
 - Produces: Finalized non-provisional 4-core Octane vs Fast Controller benchmark dataset.
 
-- [ ] **Step 1: Execute `v-fast-default` 4-core benchmark**
+- [x] **Step 1: Execute `v-fast-default` 4-core benchmark**
   - Run dialplan benchmark against shipped default fast XML controller:
     ```bash
     tpbx pbx:load-test:dialplan --tenant=load-test-vbox --requests=100 --concurrency=5 --scenario=cache-hit --label="4c-vfast-100x5-cachehit"
@@ -217,7 +217,7 @@
     ```
   - Record req/sec, median latency (p50), and tail latency (p95).
 
-- [ ] **Step 2: Execute `v-octane` 4-core benchmark**
+- [x] **Step 2: Execute `v-octane` 4-core benchmark**
   - Run dialplan benchmark against resident RoadRunner worker:
     ```bash
     tpbx pbx:load-test:dialplan --tenant=load-test-vbox --url=http://127.0.0.1:8090/api/v1/xml-handler --requests=100 --concurrency=5 --scenario=cache-hit --label="4c-octane-100x5-cachehit"
@@ -227,17 +227,17 @@
     ```
   - Record req/sec, median latency (p50), and tail latency (p95).
 
-- [ ] **Step 3: Update `docs/load-testing-results.md`**
+- [x] **Step 3: Update `docs/load-testing-results.md`**
   - Remove the provisional notice block in § "Persistent Octane Worker (4-core Reference Appliance)".
   - Replace older static 12-worker baseline with the empirical `v-fast-default` dynamic ceiling 12 metrics.
   - Finalize empirical Octane speedup multipliers.
   - In `load-testing/status.md`, mark item 3 ("Octane sanity against the new bootstrap") as **Complete**.
 
-- [ ] **Step 4: Verify test suite**
+- [x] **Step 4: Verify test suite**
   - Run `./vendor/bin/pest tests/Feature/Pbx/LoadTestScrubArtifactsTest.php`.
   - Expect: PASS.
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
   ```bash
   git add docs/load-testing-results.md load-testing/status.md
   git commit -m "docs(results): finalize 4-core appliance octane and fast controller benchmarks"
@@ -254,28 +254,28 @@
 **Interfaces:**
 - Produces: Fully reconciled documentation, 100% clean test suite, and compliant codebase.
 
-- [ ] **Step 1: Add historical context callout to 2 vCPU Dedicated / 8 GB RAM section**
+- [x] **Step 1: Add historical context callout to 2 vCPU Dedicated / 8 GB RAM section**
   - In `docs/load-testing-results.md:372`:
     - Add a `> [!NOTE] Historical Benchmark` callout explaining that the dedicated dual-core measurements reflect pre-5.0.0 full-framework routing with 12 static workers.
     - Note that under current v5.1 architecture with the fast XML controller and dynamic pool ceiling, sustained dedicated core throughput reaches ~55–65 req/sec with sub-100ms median latency.
 
-- [ ] **Step 2: Clear application caches**
+- [x] **Step 2: Clear application caches**
   ```bash
   tpbx optimize:clear
   ```
 
-- [ ] **Step 3: Run Pint code style check**
+- [x] **Step 3: Run Pint code style check**
   ```bash
   ./vendor/bin/pint --dirty --test
   ```
 
-- [ ] **Step 4: Run comprehensive load-testing test suite**
+- [x] **Step 4: Run comprehensive load-testing test suite**
   ```bash
   ./vendor/bin/pest tests/Feature/Pbx/LoadTestMatrixConfigTest.php tests/Feature/Pbx/LoadTestMatrixRunnerTest.php tests/Feature/Pbx/LoadTestSwitchScriptTest.php tests/Feature/Pbx/LoadTestArtifactPathTest.php tests/Feature/Pbx/LoadTestScrubArtifactsTest.php tests/Feature/Pbx/LoadTestArtifactHygieneTest.php tests/Feature/Pbx/LoadTestCdrGateTest.php tests/Feature/Pbx/LoadTestCpuwatchTest.php
   ```
   - Expect: All 8 feature test suites PASS with 0 failures.
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
   ```bash
   git add docs/load-testing-results.md
   git commit -m "docs(results): contextualize 2c8g dedicated tier and finalize test verification"
@@ -294,7 +294,7 @@
 - Consumes: Running server provisioned with package-based FreeSWITCH.
 - Produces: Verified package-to-source uninstallation, compiling FreeSWITCH + core modules from source, and operational service verification.
 
-- [ ] **Step 1: Execute installer with Source build method**
+- [x] **Step 1: Execute installer with Source build method**
   - Re-run the interactive installer (or with `FSPBX_FREESWITCH_INSTALL_METHOD=source`):
     ```bash
     FSPBX_FREESWITCH_INSTALL_METHOD=source bash /var/www/tallpbx/scripts/install.sh
@@ -303,7 +303,7 @@
   - Verify that `install_freeswitch_source_dependencies` installs compilers and libraries (`libks`, `sofia-sip`, `spandsp`).
   - Verify FreeSWITCH builds and installs into `/usr/bin/freeswitch`.
 
-- [ ] **Step 2: Verify FreeSWITCH source runtime and modules**
+- [x] **Step 2: Verify FreeSWITCH source runtime and modules**
   - Confirm service starts cleanly: `systemctl status freeswitch`.
   - Confirm core modules are loaded:
     ```bash
@@ -312,10 +312,10 @@
     ```
   - Confirm `source_build_is_installed` returns true (`[ -x /usr/bin/freeswitch ] && [ -f /usr/src/freeswitch/Makefile ]`).
 
-- [ ] **Step 3: Document findings in `load-testing/procedure.md`**
+- [x] **Step 3: Document findings in `load-testing/procedure.md`**
   - Add a note detailing compilation duration across core tiers and confirming that package-to-source migration cleanly transitions configuration and runtime directories without data loss.
 
-- [ ] **Step 4: Commit Task 6**
+- [x] **Step 4: Commit Task 6**
   ```bash
   git add scripts/resources/freeswitch.sh docs/load-testing-gaps-implementation-plan.md load-testing/procedure.md
   git commit -m "docs(load-testing): add freeswitch source compilation and package migration verification task"

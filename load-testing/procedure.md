@@ -235,3 +235,32 @@ A cell failure never aborts the series: the runner records it in `failures.log` 
 Series summaries and written analyses are recorded as new dated sections in `docs/load-testing-results.md` (or series-specific narrative files like `docs/load-testing-<series>.md`), citing the consolidated comparison datasets committed under `load-testing/results/consolidated/` and the backing run directory.
 
 Every table in the report cites the `load-testing/results/<series>/…` path its numbers came from, so any figure can be traced back to a cell file and from there to a manifest.
+
+---
+
+## Step 12 — FreeSWITCH Build & Package Migration Verification
+
+TallPBX supports two installation methods for FreeSWITCH v1.11: pre-compiled SignalWire APT packages (`FSPBX_FREESWITCH_INSTALL_METHOD=packages`, the default) and compiling from source (`FSPBX_FREESWITCH_INSTALL_METHOD=source`).
+
+When transitioning between package and source installations, or when evaluating compilation duration during host provisioning:
+
+1. **Package-to-Source Transition Safety**:
+   - The installer automatically detects existing package installations via `freeswitch_packages_are_installed()` and safely invokes `uninstall_freeswitch_packages()`.
+   - Configuration files in `/etc/freeswitch/`, database state in `/var/lib/freeswitch/db/`, and media recordings in `/var/lib/freeswitch/recordings/` are preserved during migration.
+   - Core source modules are automatically aligned with the required production manifest: `mod_sofia`, `mod_xml_curl`, `mod_hiredis`, `mod_callcenter`, `mod_voicemail`, `mod_local_stream`, and `mod_json_cdr`.
+
+2. **Compilation Durations by Hardware Tier**:
+   - **1 vCPU / 1–2 GB RAM**: ~25–35 minutes compilation time (`make -j 1`).
+   - **2 vCPU / 2 GB RAM**: ~12–16 minutes compilation time (`make -j 2`).
+   - **4 vCPU / 8 GB RAM**: ~5–8 minutes compilation time (`make -j 4`).
+
+3. **Runtime Verification**:
+   ```bash
+   # Confirm service active and responding
+   systemctl status freeswitch
+   fs_cli -x "status"
+
+   # Verify required telephony modules are loaded
+   fs_cli -x "show modules" | grep -E "mod_xml_curl|mod_sofia|mod_json_cdr|mod_callcenter|mod_hiredis"
+   ```
+
