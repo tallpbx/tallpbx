@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drive the call-rate ladder: one rung per offered calls-per-second rate,
-# all six variants inside each rung (interleaved at the same rate, so host
-# drift hits every variant equally). The stop rule from the plan: stop after
+# across the matrix variants inside each rung (interleaved at the same rate,
+# so host drift hits every variant equally). The stop rule from the plan: stop after
 # three consecutive rungs whose completion rate is under 95 %.
 set -uo pipefail
 
@@ -18,19 +18,22 @@ export PBX_HOST SIPP_HOST
 if [ -n "${SSH_IDENTITY:-}" ]; then
     export SSH_OPTS="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
 fi
-export SERIES=refresh-20261103
+: "${SERIES:=refresh-20261103}"
+export SERIES
 
-mkdir -p /tmp/loadtest-logs
+ROOT_DIR="${ROOT_DIR:-/var/www/tallpbx}"
+LOGDIR="${ROOT_DIR}/load-testing/results/${SERIES}/driver-logs"
+mkdir -p "$LOGDIR"
 
 consecutive=0
 
 for cps in 5 8 10 15 20 25 30 40; do
     echo "=== RUNG cps=${cps} starting $(date -u +%FT%TZ) ==="
     bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --phase=sip --cps="${cps}" --repeats=1 \
-        > "/tmp/loadtest-logs/ladder-cps${cps}.log" 2>&1 || true
+        > "${LOGDIR}/ladder-cps${cps}.log" 2>&1 || true
 
     completion=$(awk -F, -v c="${cps}" 'NR>1 && $2==c {t+=$3+$4; s+=$3} END {if (t>0) printf "%.1f", 100*s/t; else printf "0"}' \
-        load-testing/results/refresh-20261103/h1-1c1g/*/ladder.csv 2>/dev/null)
+        "${ROOT_DIR}/load-testing/results/${SERIES}/h1-1c1g"/*/ladder.csv 2>/dev/null)
 
     echo "=== RUNG cps=${cps} completion=${completion}% at $(date -u +%FT%TZ) ==="
 

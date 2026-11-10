@@ -14,6 +14,15 @@ return [
     | serving variant, load profile, cache policy and SIPp scenario from here,
     | so a cell can never be skipped by ad-hoc shell logic.
     |
+    | Active runtime serving modes:
+    |   - v-fast-default: Shipped default appliance runtime mode (dynamic PHP-FPM
+    |     pool sized to tier RAM + fast XML controller).
+    |   - v-octane: Opt-in resident RoadRunner worker mode on 127.0.0.1:8090.
+    |
+    | Comparative benchmarking modes:
+    |   - v-fast, v-stock-static, v-stock-dynamic: Static pool and baseline profiles
+    |     retained for sweep benchmarking and ablation comparisons.
+    |
     | Stage A measures every variant on the shared-CPU tiers and ends at the
     | decision gate (Task 10). Stage B re-runs only the configuration frozen
     | at that gate, on dedicated-CPU tiers.
@@ -28,11 +37,11 @@ return [
     | vcpu/ram_mb:  the provisioned size of the cloud instance.
     | cpu:          whether the hypervisor shares the physical cores.
     | swap_mb:      swap configured by the installer before tests start.
-    | fpm:          canonical (sweep) PHP-FPM pool mode; fpm_children is its cap.
-    | fpm_alt:      the shipped installer default for that tier's RAM, addressable
-    |               as a profile so a cell can measure what is actually deployed.
-    |               Always dynamic; fpm_alt_children is the installer's RAM-derived
-    |               ceiling (3 below 1800 MB, 6 below 3500 MB, 12 above).
+    | fpm:          canonical (sweep) static PHP-FPM pool mode; fpm_children is its cap.
+    | fpm_alt:      the shipped installer dynamic pool default for that tier's RAM,
+    |               measured by the v-fast-default variant to test the real appliance
+    |               deployment. Always dynamic; fpm_alt_children is the installer's
+    |               RAM-derived ceiling (3 below 1800 MB, 6 below 3500 MB, 12 above).
     */
 
     'tiers' => [
@@ -98,6 +107,15 @@ return [
     | XML-Serving Variants
     |--------------------------------------------------------------------------
     |
+    | Defines the XML runtime serving modes.
+    |
+    | Runtime serving modes:
+    |   - v-fast-default: Shipped default appliance runtime mode (dynamic PHP-FPM
+    |     pool sized to tier RAM + fast XML controller).
+    |   - v-octane: Opt-in resident RoadRunner worker mode on 127.0.0.1:8090.
+    |   - v-fast, v-stock-static, v-stock-dynamic: Static pool and baseline profiles
+    |     retained for sweep benchmarking comparisons.
+    |
     | requires: the switch settings a cell must apply before it runs. The
     | runner aborts the cell when one of them cannot be asserted.
     |   fpm:<mode>            PHP-FPM pool mode
@@ -118,14 +136,13 @@ return [
             'label' => 'Fast front controller through PHP-FPM',
             'requires' => ['fpm:static', 'xml-path:fast', 'octane:off'],
         ],
-        // The shape the installer actually deploys: dynamic pool, fast XML
-        // controller, no worker. Its worker cap comes from the tier's
-        // fpm_alt_children, so a cell measuring "the shipped default" is
-        // faithful on every RAM tier without a temporary injection.
+        // The shipped default appliance runtime mode: dynamic pool sized to
+        // available RAM (via tier fpm_alt_children) + fast XML controller.
         'v-fast-default' => [
             'label' => 'Shipped default: dynamic PHP-FPM pool, fast XML controller',
             'requires' => ['fpm:dynamic', 'xml-path:fast', 'octane:off'],
         ],
+        // Opt-in resident RoadRunner worker mode for low-latency XML serving.
         'v-octane' => [
             'label' => 'Persistent RoadRunner worker',
             'requires' => ['fpm:static', 'xml-path:stock', 'octane:on'],

@@ -19,11 +19,13 @@ export PBX_HOST SIPP_HOST
 if [ -n "${SSH_IDENTITY:-}" ]; then
     export SSH_OPTS="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
 fi
-export SERIES=refresh-20261103
+: "${SERIES:=refresh-20261103}"
+export SERIES
 
-LOGDIR="${ROOT_DIR:-/var/www/tallpbx}/load-testing/results/${SERIES}/driver-logs"; mkdir -p "$LOGDIR"
-SUMMARY="${LOGDIR}/cdr-matrix.csv"
+ROOT_DIR="${ROOT_DIR:-/var/www/tallpbx}"
+LOGDIR="${ROOT_DIR}/load-testing/results/${SERIES}/driver-logs"
 mkdir -p "$LOGDIR"
+SUMMARY="${LOGDIR}/cdr-matrix.csv"
 [ -f "$SUMMARY" ] || echo "transport,variant,cps,successful,failed" > "$SUMMARY"
 
 pbx() { timeout 90 ssh ${SSH_OPTS:-} root@"${PBX_HOST}" "$@"; }

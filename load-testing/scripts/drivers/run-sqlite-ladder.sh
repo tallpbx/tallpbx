@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Compare FreeSWITCH's runtime SQLite database on disk vs in memory (tmpfs)
-# for the stock variant across a small CPS ladder.
+# across a small CPS ladder for the baseline dynamic variant.
 #
 # Each rung runs the fs-db ablation, which measures BOTH modes under real
 # call load inside one invocation — the same host state, the same warm-up,
@@ -22,24 +22,29 @@ export PBX_HOST SIPP_HOST
 if [ -n "${SSH_IDENTITY:-}" ]; then
     export SSH_OPTS="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10"
 fi
-export SERIES=refresh-20261105-slimboot-sqlite
+: "${SERIES:=refresh-20261105-slimboot-sqlite}"
+export SERIES
+
+ROOT_DIR="${ROOT_DIR:-/var/www/tallpbx}"
+LOGDIR="${ROOT_DIR}/load-testing/results/${SERIES}/driver-logs"
+mkdir -p "$LOGDIR"
 
 echo "=== SQLITE SMOKE + cps=2 reference start $(date -u +%FT%TZ) ==="
 if bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --phase=sip --variant=v-stock-dynamic --cps=2 --repeats=1 \
-    > /tmp/sqlite-ladder-smoke.log 2>&1; then
+    > "${LOGDIR}/sqlite-ladder-smoke.log" 2>&1; then
     echo "=== SQLITE SMOKE ok $(date -u +%FT%TZ) ==="
 else
-    echo "=== SQLITE SMOKE FAILED (see /tmp/sqlite-ladder-smoke.log) $(date -u +%FT%TZ) ==="
+    echo "=== SQLITE SMOKE FAILED (see ${LOGDIR}/sqlite-ladder-smoke.log) $(date -u +%FT%TZ) ==="
 fi
 
 for cps in 2 3 4 5 6; do
     echo "=== SQLITE RUNG cps=${cps} start $(date -u +%FT%TZ) ==="
 
     if bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --phase=ablation --variant=v-stock-dynamic --ablation=fs-db --cps="${cps}" --repeats=1 \
-        > "/tmp/sqlite-ladder-cps${cps}.log" 2>&1; then
+        > "${LOGDIR}/sqlite-ladder-cps${cps}.log" 2>&1; then
         echo "=== SQLITE RUNG cps=${cps} ok $(date -u +%FT%TZ) ==="
     else
-        echo "=== SQLITE RUNG cps=${cps} FAILED (see /tmp/sqlite-ladder-cps${cps}.log) $(date -u +%FT%TZ) ==="
+        echo "=== SQLITE RUNG cps=${cps} FAILED (see ${LOGDIR}/sqlite-ladder-cps${cps}.log) $(date -u +%FT%TZ) ==="
     fi
 done
 
