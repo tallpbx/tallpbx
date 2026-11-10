@@ -828,6 +828,14 @@ For hardware sizing, compute isolation architecture, and ESL event pruning instr
 
 **Method.** One cell per worker count: the per-variant smoke (20 registrations plus register, extension-call and outbound checks) as the warm-up, then a 60 second offered-load window at a fixed call rate, a CDR gate verdict, and per-service CPU sampled every 2 seconds (php-fpm, nginx, freeswitch, esl-listener, reverb, cdr-worker, queue-worker, scheduler, mariadb, redis). One run per cell.
 
+**Confirmatory Second Anchor — 3 calls/sec (180 offered, 2026-11-10).**
+To confirm linear sub-boundary behavior below the 5 calls/sec capacity ceiling, a secondary anchor was measured on the minimal tier (`h1-1c1g`, 1 vCPU / 967 MB RAM, `pm = dynamic` max 3 workers, warm 60s cache, nftables active):
+- **Calls offered / completed:** 180 / 180 (100.00 % completion, 0 failed)
+- **CDR rows / gate:** 361 rows (180 caller + 180 callee legs + 1 initial register leg), CDR gate passed
+- **Call setup latency:** p50 124.0 ms, p90 236.4 ms, p95 300.2 ms, max 464.0 ms
+- **Resource utilization:** php-fpm mean 10.3 % (peak 56.0 %), FreeSWITCH mean 10.1 % (peak 28.0 %), total attributed RAM mean 466.8 MB (peak 475.4 MB)
+This demonstrates clean linear scaling, low latency, and zero call loss under the shipped dynamic pool configuration.
+
 **Phase 1 — 5 calls/sec (300 offered).** Every pool size is identical: 300/300 calls completed, 0 failed, 601 CDR rows at **5, 4, 3, 2 and 1 worker alike**. With the 60-second lookup cache warm, a lookup is a Redis hit, so 5 calls/sec fits in a single worker. The rate sits below the constraint and cannot discriminate worker counts:
 
 | Workers | Completed | CDR rows | Call setup p50 / p95 | php-fpm CPU (busy window mean / peak) | freeswitch CPU (mean) | php-fpm RAM (attributed) |

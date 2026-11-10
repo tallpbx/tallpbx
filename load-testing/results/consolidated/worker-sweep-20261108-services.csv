@@ -284,3 +284,13 @@ pre-2vcpu-octane-20261109,octane-anchor,static-5+worker,production-60,6,5,schedu
 2vcpu-20261109-octane,octane-12cps,octane-static-6,production-60,12,6,nginx,2.2,5.0,1.1,16.5,6.4
 2vcpu-20261109-octane,octane-12cps,octane-static-6,production-60,12,6,reverb,1.0,2.0,0.6,92.2,63.2
 2vcpu-20261109-octane,octane-12cps,octane-static-6,production-60,12,6,scheduler,0.2,1.0,0.2,92.1,63.2
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,cdr-worker,0.8,3.0,0.8,82.5,55.2
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,esl-listener,1.4,5.0,1.4,85.0,57.6
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,freeswitch,10.1,28.0,10.1,87.6,76.3
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,mariadb,2.6,17.0,2.6,61.4,53.4
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,nginx,0.3,2.0,0.3,8.5,2.9
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,php-fpm,10.3,56.0,10.3,133.9,47.0
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,queue-worker,1.5,17.0,1.5,80.4,53.3
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,redis,1.4,5.0,1.4,14.6,7.6
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,reverb,0.3,2.0,0.3,85.0,57.8
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,scheduler,0.1,1.0,0.1,83.0,55.7

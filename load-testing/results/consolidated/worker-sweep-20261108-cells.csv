@@ -29,3 +29,4 @@ pre-2vcpu-octane-20261109,octane-anchor,static-5+worker,production-60,6,5,360,36
 2vcpu-20261109-sweep,boundary-12cps,static-4,production-60,12,4,720,311,409,685,ok,311,4923.96,7591.93,8607.92,,,,,
 2vcpu-20261109-sweep,boundary-12cps,static-5,production-60,12,5,720,248,472,533,ok,248,5435.95,7503.93,7943.93,,,,,
 2vcpu-20261109-octane,octane-12cps,octane-static-6,production-60,12,6,720,720,0,1441,ok,720,284.00,3971.96,4591.96,189.2,297.0,96.8,54.1,922.7
+refresh-20261110,anchor-3cps,dynamic-3,production-60,3,3,180,180,0,361,ok,180,124.00,300.20,464.00,10.3,56.0,10.1,47.0,466.8

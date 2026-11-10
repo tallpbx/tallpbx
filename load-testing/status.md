@@ -329,8 +329,7 @@ Generator In  IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
 > 2026-11-04 handoff, whose items were completed or superseded during this series.
 
 1. **Pool-split decision (settled).** Evaluated and resolved: the single dynamic pool with memory ceilings (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) was adopted across tiers in the installer, eliminating the need for a split socket or separate pools.
-2. **Second anchor (optional).** A 3 CPS repeat would give the comparison a second clean rate
-   beside 5 CPS. Nothing above 5 CPS is a usable anchor on this tier.
+2. **Second anchor (Complete).** Confirmed on minimal tier (`h1-1c1g` / `refresh-20261110`): 3 CPS 60-second cell completed 180/180 calls (100 %), 0 failed, 361 CDR rows recorded, call setup p50 124 ms, p95 300 ms, max 464 ms, mean CPU PHP 10.3 % / FS 10.1 %, verifying linear sub-boundary performance.
 3. **Octane sanity against the new bootstrap (optional).** One XML battery plus one SIP cell with
    the worker enabled, to prove the opt-in path still serves after the shared minimal bootstrap.
 4. **Broader refresh work** — the extended scenarios, the ESL and throttle ablations, and the
