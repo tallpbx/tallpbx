@@ -9,7 +9,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Single declarative source for the two-stage refresh series documented in
-    | docs/load-testing-refresh-implementation-plan.md. The runner
+    | load-testing/README.md and docs/load-testing-results.md. The runner
     | (load-testing/scripts/load-test-matrix.sh) and its tests read every tier,
     | serving variant, load profile, cache policy and SIPp scenario from here,
     | so a cell can never be skipped by ad-hoc shell logic.

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Load-Testing Refresh Implementation Plan Retired**: Removed `docs/load-testing-refresh-implementation-plan.md` following the full delivery of the automated matrix runner, 1 vCPU and 2 vCPU worker sweeps, fast front controllers (`public/xml-handler-fast.php` and `public/cdr-fast.php`), and consolidation of authoritative results into `docs/load-testing-results.md`.
+
 ## [5.1.1] - 2026-11-09
 
 ### Added

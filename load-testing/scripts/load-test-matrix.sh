@@ -3,7 +3,7 @@
 # TallPBX Load-Test Refresh Matrix Runner
 #
 # Orchestrates the two-stage refresh series described in
-# docs/load-testing-refresh-implementation-plan.md:
+# load-testing/README.md:
 #
 #   --list      print every tier x variant x phase the matrix will run
 #   --dry-run   print the exact command for each cell without executing

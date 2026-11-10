@@ -334,8 +334,7 @@ Generator In  IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
 3. **Octane sanity against the new bootstrap (optional).** One XML battery plus one SIP cell with
    the worker enabled, to prove the opt-in path still serves after the shared minimal bootstrap.
 4. **Broader refresh work** — the extended scenarios, the ESL and throttle ablations, and the
-   app-side timing decision — is tracked at the top of
-   `docs/load-testing-refresh-implementation-plan.md` (→ *CURRENT STATUS*).
+   app-side timing decision — is tracked in `load-testing/decisions.md` and `docs/load-testing-results.md`.
 
 Two things are deliberately *not* on this list: a special re-run to re-validate the Lua proxy
 (the behavioural gate now proves it on every enable), and any further cache-policy sweep
