@@ -40,10 +40,10 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 ---
 
-**Last updated:** 2026-11-09 (ledger below)
-**Series:** `refresh-20261103`
-**Tiers benchmarked:** Both `h1-1c1g` (1 vCPU, 967 MB, 2 GB swap, `x.x.x.138`) and `h2-2c2g` (2 vCPU, 2 GB RAM, 2 GB swap) benchmark suites completed
-**Generator:** 1 vCPU, 967 MB, no firewall (`x.x.x.55`)
+**Last updated:** 2026-11-10
+**Series:** `refresh-20261110`
+**Tiers benchmarked:** `h1-1c1g` (1 vCPU, 967 MB, 3 CPS anchor completed), `h1-1c2g` (1 vCPU, 1,973 MB, v5.1 fast XML controller 25+ req/sec verified), and `h2-2c2g` (2 vCPU, 2 GB RAM)
+**Generator:** 1 vCPU, 967 MB, no firewall (`x.x.x.9`)
 **Build:** `5.x`, working tree clean
 
 ---

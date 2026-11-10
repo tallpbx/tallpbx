@@ -12,7 +12,7 @@
 
 - **Monotonic Hardware Scaling**: Never attempt to downgrade server hardware. Start at the lowest tier (`h1-1c1g`) and resize upward.
 - **Never mutate live `nftables` state**: All firewall rules flow through `tpbx security:apply` or the Security Center.
-- **Public IP & Key Obfuscation**: Obfuscate all public IPv4 addresses (`x.x.x.NNN`, `<PBX_IP>`, `<GEN_IP>`) and omit private key paths (`ppx2-client`).
+- **Public IP & Key Obfuscation**: Obfuscate all public IPv4 addresses (`x.x.x.NNN`, `<PBX_IP>`, `<GEN_IP>`) and omit private SSH key paths.
 - **Decimal Unit Standard**: Use standard decimal units (**GB**, **MB**, **KB**) in all documentation prose.
 - **Pint Discipline**: Run `./vendor/bin/pint --dirty` only on modified PHP files before commit.
 - **Cache Discipline**: Run `tpbx optimize:clear` after any configuration, view, or code changes.
@@ -95,7 +95,7 @@
 - Consumes: Resized 1c2g droplet with zero swap pressure and higher FPM memory ceiling.
 - Produces: Updated v5.1 fast-controller benchmark replacing legacy pre-5.0 numbers.
 
-- [ ] **Step 1: Perform in-place RAM upgrade on droplet**
+- [x] **Step 1: Perform in-place RAM upgrade on droplet**
   - Power down droplet via console or `shutdown -h now`.
   - Resize Droplet from `s-1vcpu-1gb` -> `s-1vcpu-2gb` (CPU and RAM only, preserving disk).
   - Power on droplet.
@@ -105,7 +105,7 @@
     ```
   - Confirm `pm.max_children` dynamically adjusts to `6` (the ceiling for 1,800 MB–3,500 MB RAM).
 
-- [ ] **Step 2: Run `v-fast-default` dialplan XML benchmark suite**
+- [x] **Step 2: Run `v-fast-default` dialplan XML benchmark suite**
   - Execute dialplan test under `v-fast-default`:
     ```bash
     tpbx pbx:load-test:dialplan --tenant=load-test-vbox --requests=100 --concurrency=5 --scenario=mixed --label="1c2g-vfast-100x5"
@@ -114,16 +114,16 @@
     ```
   - Verify throughput increases to ~25–30 req/sec (replacing the pre-5.0 14 req/sec measurement).
 
-- [ ] **Step 3: Update `docs/load-testing-results.md`**
+- [x] **Step 3: Update `docs/load-testing-results.md`**
   - In `docs/load-testing-results.md` § "1 vCPU / 2 GB RAM (Memory-Scaled)":
     - Update tables with modern v5.1 fast XML controller metrics.
     - Add a historical comparison callout explaining the jump from 14 req/sec (v4.3 index.php routing) to 26+ req/sec (v5.1 fast controller).
 
-- [ ] **Step 4: Verify test suite**
+- [x] **Step 4: Verify test suite**
   - Run `./vendor/bin/pest tests/Feature/Pbx/LoadTestScrubArtifactsTest.php`.
   - Expect: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
   ```bash
   git add docs/load-testing-results.md load-testing/status.md
   git commit -m "docs(results): update 1c2g memory-scaled tier with v5.1 fast controller benchmarks"

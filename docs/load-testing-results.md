@@ -299,11 +299,23 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 ### 1 vCPU / 2 GB RAM (Memory-Scaled)
 
-- **Host**: Cloud VPS (`...141`), resized in place. 1 shared vCPU, 2 GB RAM, 2 GB swap (0 MB used).
-- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
-- **Finding**: Doubling RAM completely eliminated swap usage (0 MB swap used) and increased free RAM buffer to ~1.2 GB, but XML throughput remained compute-bound on the single core (~13.2–14.2 req/sec), confirming that telephony routing throughput scales with CPU cores rather than memory.
+- **Host**: Cloud VPS (`x.x.x.149`), resized in place from `s-1vcpu-1gb`. 1 shared vCPU, 1,973 MB RAM, 2 GB swap (0 MB used).
+- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
+- **Finding**: Doubling RAM completely eliminated swap pressure (0 MB swap used) and expanded the PHP-FPM dynamic ceiling to 6 workers. With the TallPBX v5.1 fast XML controller (`xml-handler-fast.php`), throughput nearly doubled from the legacy v4.3 baseline (~14.2 req/sec to **25.1 req/sec**), and average latency dropped from 339.6 ms to **152.9 ms**.
 
-#### XML Throughput & Concurrency Scaling
+> [!NOTE]
+> **Historical Architecture Comparison (v4.3 Index Routing vs. v5.1 Fast Controller):**
+> In pre-5.0 releases, dialplan XML lookups routed through the full Laravel application lifecycle (`index.php`), resulting in an architectural compute ceiling of ~13–14 req/sec on a single core regardless of RAM. In TallPBX v5.1, the standalone fast XML controller bypasses full HTTP framework bootstrapping while maintaining Redis cache serialization and DB fallback. On the exact same 1 vCPU / 2 GB hardware, throughput jumped from 14.2 req/sec to **25.10 req/sec** (+76.5%), and 500-request burst latency dropped by nearly half (1,147 ms to **590 ms**).
+
+#### XML Throughput & Concurrency Scaling (TallPBX v5.1 Fast Controller)
+
+| Tier | Repetitions | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | Operational Observations |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
+| `100 x 5` (mixed) | 1 (r1) | **25.101** | 152.9 ms | ~150 ms | 54.5 ms | 224.2 ms | ~195 ms | Standard production baseline; 100/100 HTTP 200, latency cut by 55% vs legacy. |
+| `500 x 25` (mixed) | 1 (r1) | **24.897** | 590.3 ms | ~580 ms | 110.8 ms | 1,294.3 ms | ~980 ms | Concurrency 25 burst; throughput rock-solid at ~25 req/sec with 0 errors across 6 workers. |
+| `100 x 5` (cache-hit) | 1 (r1) | **26.265** | 153.5 ms | ~150 ms | 64.1 ms | 335.1 ms | ~210 ms | 100% warm cache-hit scenario; peak single-core throughput ceiling. |
+
+#### Legacy Architecture Reference (v4.3 `index.php` Routing, Historical)
 
 | Tier | Repetitions | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | p99 | Jitter (`std_dev`) | Operational Observations |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |

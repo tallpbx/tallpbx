@@ -150,6 +150,51 @@ class ApplianceSyncHostCommand extends Command
             }
         });
 
+        // Reconcile PHP-FPM dynamic pool ceiling based on detected physical RAM
+        $this->components->task('Reconciling PHP-FPM worker pool ceiling', function (): void {
+            $poolFiles = glob('/etc/php/*/fpm/pool.d/www.conf') ?: [];
+            if (empty($poolFiles)) {
+                return;
+            }
+
+            $totalMb = 1024;
+            if (file_exists('/proc/meminfo')) {
+                $content = (string) file_get_contents('/proc/meminfo');
+                if (preg_match('/^MemTotal:\s+(\d+)\s+kB/m', $content, $matches)) {
+                    $totalMb = (int) round(((int) $matches[1]) / 1024);
+                }
+            }
+
+            $targetMaxChildren = match (true) {
+                $totalMb >= 3500 => 12,
+                $totalMb >= 1800 => 6,
+                default => 3,
+            };
+
+            $reloaded = false;
+            foreach ($poolFiles as $poolFile) {
+                if (! is_writable($poolFile)) {
+                    continue;
+                }
+
+                $content = (string) file_get_contents($poolFile);
+                if (preg_match('/^[; ]*pm\.max_children\s*=\s*(\d+)/m', $content, $matches)) {
+                    $current = (int) $matches[1];
+                    if ($current !== $targetMaxChildren) {
+                        $updated = preg_replace('/^[; ]*pm\.max_children\s*=\s*.*/m', "pm.max_children = {$targetMaxChildren}", $content);
+                        if ($updated !== null && $updated !== $content) {
+                            file_put_contents($poolFile, $updated);
+                            $reloaded = true;
+                        }
+                    }
+                }
+            }
+
+            if ($reloaded && function_exists('exec')) {
+                @exec('systemctl reload php8.5-fpm 2>/dev/null || systemctl restart php8.5-fpm 2>/dev/null');
+            }
+        });
+
         $this->components->info('Appliance host synchronization complete.');
 
         return self::SUCCESS;
