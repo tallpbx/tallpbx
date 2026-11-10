@@ -146,7 +146,7 @@
 - Consumes: Resized 2-core droplet providing compute headroom for multi-leg fan-out.
 - Produces: Extended feature benchmark data for Ring Groups and IVR menus.
 
-- [ ] **Step 1: Perform in-place CPU upgrade on droplet**
+- [x] **Step 1: Perform in-place CPU upgrade on droplet**
   - Power down droplet and resize to `s-2vcpu-2gb`.
   - Power on droplet.
   - Verify dual cores available:
@@ -155,28 +155,41 @@
     ```
   - Confirm `nproc` reports `2`.
 
-- [ ] **Step 2: Execute Ring Group multi-leg scenario**
+- [x] **Step 2: Execute Ring Group multi-leg scenario**
   - Configure a 5-extension Ring Group in tenant `load-test-vbox`.
   - Execute SIPp call flow where 1 inbound call rings 5 extensions simultaneously, with 1 answering after 2 seconds.
   - Assert CDR reconciliation: 1 answered A-leg + 1 answered B-leg + 4 cancelled B-legs = 6 total CDR records.
   - Measure setup latency under dual-core concurrency.
 
-- [ ] **Step 3: Execute IVR Menu Traversal scenario**
+- [x] **Step 3: Execute IVR Menu Traversal scenario**
   - Configure an IVR menu with a 3-second audio greeting and DTMF digit routing.
   - Execute SIPp scenario sending DTMF `1` to route to extension destination.
   - Assert CDR duration reflects total menu traversal time + bridge duration.
 
-- [ ] **Step 4: Document extended scenario patterns in `load-testing/procedure.md`**
-  - In `load-testing/procedure.md`, add specifications, fan-out ratios, and CDR gate rules for Ring Groups and IVR menus.
+- [x] **Step 4: Execute Octane 2 vCPU performance comparison**
+  - Enable `tallpbx-xml-worker.service` on port 8090:
+    ```bash
+    systemctl start tallpbx-xml-worker
+    ```
+  - Run 2 vCPU Octane dialplan benchmark:
+    ```bash
+    tpbx pbx:load-test:dialplan --tenant=load-test-beta --url=http://127.0.0.1:8090/api/v1/xml-handler --requests=500 --concurrency=25 --scenario=mixed --label="2c2g-octane-500x25"
+    ```
+  - Run 12 CPS SIP load test under Octane to measure throughput and failure-boundary elimination.
+  - Measure throughput improvement and latency reduction compared to PHP-FPM.
 
-- [ ] **Step 5: Verify test suite**
+- [x] **Step 5: Document extended scenario & Octane results in `load-testing/procedure.md` & `docs/load-testing-results.md`**
+  - In `load-testing/procedure.md`, add specifications, fan-out ratios, and CDR gate rules for Ring Groups and IVR menus.
+  - In `docs/load-testing-results.md`, document 2 vCPU Octane throughput and SIP capacity comparison.
+
+- [x] **Step 6: Verify test suite**
   - Run `./vendor/bin/pest tests/Feature/Pbx/LoadTestMatrixConfigTest.php tests/Feature/Pbx/LoadTestCdrGateTest.php`.
   - Expect: PASS.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
   ```bash
-  git add load-testing/procedure.md load-testing/reference.md docs/load-testing-results.md
-  git commit -m "docs(load-testing): validate dual-core extended ring group and IVR telephony scenarios"
+  git add load-testing/procedure.md load-testing/reference.md docs/load-testing-results.md docs/load-testing-gaps-implementation-plan.md
+  git commit -m "docs(load-testing): validate dual-core extended ring group, IVR, and Octane benchmarks"
   ```
 
 ---

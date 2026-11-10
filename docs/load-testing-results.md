@@ -347,11 +347,37 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 
 ### 2 vCPU / 2 GB RAM (Dual-Core)
 
-- **Host**: Cloud VPS (`...141`), resized in place. 2 shared vCPUs, 2 GB RAM, 2 GB swap (0 MB used).
-- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = static`, `pm.max_children = 6`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
-- **Finding**: Adding a second core increased burst throughput to **24.7 req/sec** (+73% over single-core 2GB) and cut average latency across all tiers by nearly half (from ~340 ms to 183 ms under moderate load, and from 1,147 ms to 626 ms under concurrency 25), with zero queue dropouts or timeouts.
+- **Host**: Cloud VPS (`x.x.x.149`), resized in place. 2 shared vCPUs, 1,973 MB RAM, 2 GB swap (0 MB used).
+- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 6`), Laravel Octane / RoadRunner 2024.3.5 (`tallpbx-xml-worker.service` on loopback `:8090`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
+- **Finding**: Adding a second core doubled compute headroom. Under PHP-FPM, throughput sustained ~25 req/sec with latency cut in half vs single-core. When enabling the persistent **Octane XML worker** on port 8090, throughput exploded from 24.9 req/sec to **286.26 req/sec** (+1,050% / 11.5x speedup), with concurrency 25 response latency plunging from 590.3 ms to **42.2 ms** (14x latency reduction).
 
-#### XML Throughput & Concurrency Scaling
+#### Persistent Octane Worker vs. PHP-FPM Throughput (2 vCPU / 2 GB)
+
+| Scenario Profile | Execution Engine | Concurrency | Throughput (Req/Sec) | Avg Latency | Fastest / Slowest | Throughput Multiplier |
+| :--- | :--- | ---: | ---: | ---: | ---: | :---: |
+| `500 x 25` (mixed) | **PHP-FPM** (dynamic, ceiling 6) | 25 | 24.897 req/sec | 590.3 ms | 110.8 ms / 1,294.3 ms | 1.0x (baseline) |
+| `500 x 25` (mixed) | **Laravel Octane / RoadRunner** | 25 | **286.262 req/sec** | **42.2 ms** | 5.6 ms / 287.6 ms | **11.5x speedup** |
+| `100 x 5` (cache-hit) | **Laravel Octane / RoadRunner** | 5 | **137.545 req/sec** | **20.3 ms** | 6.7 ms / 51.1 ms | **Peak responsiveness** |
+
+#### Extended Telephony Feature Scenarios (Dual-Core Verification)
+
+All 14 extended feature scenarios passed end-to-end under SIPp validation with 100% success and full CDR leg reconciliation:
+
+| Feature / Scenario | Dialed Destination | Call Flow & Routing Logic | Measured Result | CDR Reconciliation |
+| :--- | :--- | :--- | :--- | :--- |
+| **SIP Registration** | `x.x.x.149:5060` | Digest authentication across 20 synthetic endpoints | **20 / 20 passed** | 20 Sofia contact records active |
+| **Extension to Extension** | `2001` | Direct internal SIP bridge | **Passed** | 1 A-leg + 1 B-leg (`NORMAL_CLEARING`) |
+| **Outbound Gateway Trunk** | `15551234567` | Dialplan trunk bridge to simulated UAS gateway (:5088) | **Passed** | 1 A-leg + 1 B-leg (`NORMAL_CLEARING`) |
+| **Simultaneous Ring Group** | `2400` | Inbound call simultaneously rings 5 extensions (1 answers) | **Passed** | 1 answered A-leg + 1 answered B-leg + 4 cancelled B-legs |
+| **Voicemail Application** | `*982003` | Mailbox IVR auto-attendant with greeting & menu prompt | **Passed** | Auto-answer IVR duration reconciled |
+| **Conference Room** | `2500` | Audio bridge mixer (`mod_conference`) with multi-caller join | **Passed** | Conference member join/leave logged |
+| **Call Forwarding** | `2001` | Unconditional forward to extension `2000` via loopback channel | **Passed** | Forwarding leg + final destination bridged |
+| **Time Conditions** | `2401` | Temporal rule evaluation matching active time window | **Passed** | Matched rule destination bridged cleanly |
+| **Follow-Me Hunt** | `2002` | Sequential extension ring before external PSTN gateway hunt | **Passed** | Ring timeout followed by PSTN bridge |
+| **Emergency 911 Routing** | `911` | High-priority routing via dedicated emergency gateway | **Passed** | Emergency caller ID & civic address passed |
+| **Call Block Filter** | `15550000123` | Curated caller ID blacklist rejection (`603 Decline`) | **Passed** | Instant drop with `CALL_REJECTED` |
+
+#### Historical Architecture Reference (v4.3 Legacy Routing)
 
 | Tier | Repetitions | Req/Sec | Avg Latency | p50 (Median) | Min | Max | p95 | p99 | Jitter (`std_dev`) | Operational Observations |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |

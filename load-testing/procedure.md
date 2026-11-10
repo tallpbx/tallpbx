@@ -163,6 +163,32 @@ This is the only phase where ESL profile, broadcast throttling and CDR transport
 
 ---
 
+## Step 8a — Extended telephony feature scenarios
+
+To validate complex telephony routing patterns beyond basic 1-to-1 extension calls (Ring Groups, IVR menus, Voicemail, Conferences, Call Forwarding, Follow-Me, Time Conditions, Emergency 911, and Call Blocking):
+
+1. **Seed extended and media fixtures on the PBX:**
+   ```bash
+   ssh "$PBX_HOST" 'cd /var/www/tallpbx && tpbx pbx:load-test:seed \
+     --tenant=load-test-beta --domain="$PBX_HOST" \
+     --include-extended-fixtures --include-media-fixtures'
+   ```
+
+2. **Run extended scenario validation from the generator:**
+   ```bash
+   ssh "$SIPP_HOST" 'cd /var/www/tallpbx && \
+     PBX_HOST="$PBX_HOST" LOAD_GENERATOR_IP="$SIPP_HOST" \
+     TENANT=load-test-beta DOMAIN="$PBX_HOST" SKIP_SEED=1 EXTENDED=1 \
+     bash load-testing/scripts/pbx-sipp-validate.sh'
+   ```
+
+**Multi-leg CDR reconciliation ratios:**
+- **Simultaneous Ring Group (1:N):** 1 inbound call ringing $N$ endpoints produces $N+1$ CDR legs (1 answered A-leg + 1 answered B-leg + $N-1$ cancelled B-legs).
+- **Call Forwarding (1:1):** 1 caller leg + 1 bridged forwarding leg (`NORMAL_CLEARING`).
+- **Call Block:** 1 rejected caller leg with `hangup_cause=CALL_REJECTED`.
+
+---
+
 ## Step 9 — Keep the results
 
 Raw run directories are **never committed**. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored for a reason: one series produces thousands of per-cell files that are unreviewable and bloat every clone. Staging them with `git add -A` after a run is the failure mode this rule exists to prevent.

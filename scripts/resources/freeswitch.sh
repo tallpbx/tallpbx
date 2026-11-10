@@ -461,7 +461,7 @@ configure_dynamic_xml() {
         chmod 0644 /etc/systemd/system/tallpbx-xml-worker.service 2>/dev/null || true
         if [ ! -x "${app_dir}/rr" ] && ! command -v rr >/dev/null 2>&1; then
             verbose "Downloading RoadRunner binary via vendor/bin/rr"
-            "${app_dir}/vendor/bin/rr" get -s -l "${app_dir}" 2>/dev/null || true
+            "${app_dir}/vendor/bin/rr" get -s -f "2024.*" -l "${app_dir}" 2>/dev/null || true
         fi
         if [ -f "${app_dir}/rr" ]; then
             chown root:www-data "${app_dir}/rr" 2>/dev/null || true

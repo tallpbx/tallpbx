@@ -315,3 +315,17 @@ bash -n load-testing/scripts/lib/switch.sh
 | `cdr_transports` | `cdr-fpm` and `cdr-octane` |
 
 Adding a variant means editing this file only; the runner, the tests and these documents read from it.
+
+---
+
+## Multi-Leg CDR Reconciliation Ratios
+
+Complex telephony routing patterns generate multiple correlated call legs. The CDR gate asserts row counts matching each flow's fan-out ratio:
+
+| Scenario | Leg Structure | Generated Rows | Gate Assertion |
+|:--|:--|---:|:--|
+| **Extension to Extension** | 1 A-leg (caller) + 1 B-leg (callee) | 2 | `rows >= 2 * completed` |
+| **Simultaneous Ring Group** | 1 A-leg + 1 answered B-leg + $(N-1)$ cancelled B-legs | $N+1$ | `rows >= (N + 1) * completed` |
+| **Call Forwarding** | 1 A-leg + 1 loopback B-leg | 2 | `rows >= 2 * completed` |
+| **Conference Room** | 1 member leg per attendee | $M$ | `rows >= members` |
+| **Call Block (Reject)** | 1 rejected A-leg (`CALL_REJECTED`) | 1 | `rows >= completed` |
