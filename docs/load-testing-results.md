@@ -98,7 +98,7 @@ Each column is that tier's first failing rate, because a rate below capacity can
 
 **Consequence for the default:** keep the dynamic pool on every tier. On one core its tight ceiling matches the best measured behaviour; on two it delivers the best median setup latency of the five shapes. Only the ceiling varies, and only with RAM.
 
-Detailed evidence, per-service CPU and per-call latency for each of these cells: *PHP-FPM Static Worker Sweep on Minimal Hardware*, *Pre-2vCPU Verification Block and Default Selection*, and *2 vCPU / 2 GB: Capacity Ladder and Worker Sweep* below.
+Detailed evidence, per-service CPU and per-call latency for each of these cells: *PHP-FPM Static Worker Sweep on Minimal Hardware*, *Pre-2vCPU Verification Block and Default Selection*, and *2 vCPU / 2 GB: Capacity Ladder and Worker Sweep* below (consolidated CSV artifacts: `load-testing/results/consolidated/worker-sweep-20261108-*.csv`).
 
 ---
 
@@ -255,6 +255,9 @@ This centralized reference defines all testing notation, metrics, and scenario t
 ---
 
 ## Dialplan & Cache Engine Benchmarks (XML Throughput)
+
+> [!NOTE] Historical Benchmark (v4.3.0 Series)
+> The per-tier measurements in this section were recorded on earlier v4.3.0 builds with static PHP-FPM worker pools (`pm = static`). In TallPBX 5.x, the dynamic pool default (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) and the fast front controller (`xml-handler-fast.php`) were adopted based on the 2026-11-08/09 worker sweeps. For current baseline measurements, see [Current Baseline: Measured Capacity & PHP-FPM Defaults](#current-baseline-measured-capacity--php-fpm-defaults).
 
 Direct benchmarks of the web and database routing engine. Evaluates raw HTTP request throughput (`req/sec`) and latency (`ms`) as FreeSWITCH queries Laravel for dynamic dialplan and directory XML documents. The 1 vCPU / 1 GB RAM baseline was measured under current v4.3.0 defaults (`FS_XML_HANDLER_CACHE_TTL=60`, static PHP-FPM pools, and active default `nftables` firewall).
 
@@ -477,7 +480,8 @@ Cache hits recorded `X-TallPBX-DB-Queries: 0`, and atomic cache locks serialize 
 
 ### XML Serving Configurations: Four-Way Comparison (1 vCPU)
 
-> **Measured 2026-11-01, before the persistent worker and fast front controller were standardized.** The fast front controller (`xml-handler-fast.php`) is now the shipped default, the RoadRunner/Octane worker (`tallpbx-xml-worker`) is opt-in on `:8090`, and the Lua proxy was retired after this 4-way comparison; this section is the historical reference data for those paths and for the request-cost baseline they were built to evaluate.
+> [!NOTE] Historical Benchmark (2026-11-01 Series)
+> Measured 2026-11-01, before the persistent worker and fast front controller were standardized. The fast front controller (`xml-handler-fast.php`) is now the shipped default, the RoadRunner/Octane worker (`tallpbx-xml-worker`) is opt-in on `:8090`, and the Lua proxy was retired after this 4-way comparison; this section is the historical reference data for those paths and for the request-cost baseline they were built to evaluate.
 
 **Purpose:** measure the two optional speed-ups independently and together, so a decision to keep or remove either one rests on a number. **Supersedes** the earlier directory-only sweep: the pre-dialplan run reached the same gate decision — app-side p95 73.9–292.4 ms, HTTP p95 1,233 ms at concurrency 25, directory share 66.7 % (PROCEED) — and its full report was retired once this comparison replaced it.
 
@@ -674,6 +678,9 @@ Six core dumps between 04:22 and 08:52 all faulted inside `mod_xml_curl`'s fetch
 ---
 
 ## Live Call Capacity & Telephony Feature Validation (SIP Signaling)
+
+> [!NOTE] Historical Benchmark (Pre-5.0.0 Static Pool Series)
+> The tier capacity tables below were measured with static worker pools. In 5.x, the dynamic pool default (`pm = dynamic`) and fast front controllers are the standard. For current baseline call capacity (5 CPS on 1 vCPU, 10 CPS on 2 vCPU, 25+ CPS with Octane), see [Current Baseline: Measured Capacity & PHP-FPM Defaults](#current-baseline-measured-capacity--php-fpm-defaults).
 
 Live SIP benchmarks measure complete telephony call setup, bidirectional audio flows, and feature validation across two hosts: the PBX target (`...141`) and a dedicated load generator (`...116`). Setup latency is measured from the initial `INVITE` through digest authentication to the destination `200 OK`.
 
@@ -895,7 +902,7 @@ The RAM totals move with MariaDB buffer churn and with how early each cell's cal
 
 **Caveats.** One run per cell on a shared-CPU host (~10 % repeat noise; the monotonic five-point trend is the signal, individual gaps under ~10 points are not findings). The lookup cache was warm in every cell (60 second TTL); cold-cache expiry bursts at the boundary are untested and are the one scenario where more workers may legitimately help. cpuwatch percentages read roughly 25–30 % high in absolute terms (its sample window counts its own scanning time), so the corrected share column is the figure to compare between processes. No panel traffic ran during the cells.
 
-*Artifacts: the series' useful data is consolidated into three versioned files under `load-testing/results/consolidated/` — `worker-sweep-20261108-cells.csv` (one row per cell: completion, CDR rows, setup percentiles, headline CPU/RAM), `worker-sweep-20261108-services.csv` (per-service CPU and RAM per cell) and `worker-sweep-20261108-setup-latency.csv` (every completed call's setup time) — carrying this series and the earlier `cdr-fpm-fast-20261108` comparison cells together, so scenarios stay comparable. The raw per-cell fragments remain git-ignored working data on the host, with a full-fidelity local archive beside them (`worker-sweep-20261108.tar.gz`, outside version control).*
+*Artifacts: the series' useful data is consolidated into versioned files under `load-testing/results/consolidated/` (`worker-sweep-20261108-*.csv`) — `worker-sweep-20261108-cells.csv` (one row per cell: completion, CDR rows, setup percentiles, headline CPU/RAM), `worker-sweep-20261108-services.csv` (per-service CPU and RAM per cell) and `worker-sweep-20261108-setup-latency.csv` (every completed call's setup time) — carrying this series and the earlier `cdr-fpm-fast-20261108` comparison cells together, so scenarios stay comparable. The raw per-cell fragments remain git-ignored working data on the host, with a full-fidelity local archive beside them (`worker-sweep-20261108.tar.gz`, outside version control).*
 
 ---
 
@@ -932,7 +939,7 @@ The RAM totals move with MariaDB buffer churn and with how early each cell's cal
 
 This section supersedes the earlier production rule in the 1 vCPU section above (the 3 calls/sec planning figure and its static-worker recommendation): the supported rate is 5 calls/sec with the shipped default, and static pools are retired for these tiers.
 
-*Artifacts: every cell is consolidated in `load-testing/results/consolidated/` (rows tagged `pre-2vcpu-20261108`, `pre-2vcpu-debian-20261108`, `pre-2vcpu-recycle-20261108`, `pre-2vcpu-octane-20261109`), including the 200 panel-probe samples in `worker-sweep-20261108-panel-probe.csv`. Raw fragments stay git-ignored on the host.*
+*Artifacts: every cell is consolidated in `load-testing/results/consolidated/worker-sweep-20261108-*.csv` (rows tagged `pre-2vcpu-20261108`, `pre-2vcpu-debian-20261108`, `pre-2vcpu-recycle-20261108`, `pre-2vcpu-octane-20261109`), including the 200 panel-probe samples in `worker-sweep-20261108-panel-probe.csv`. Raw fragments stay git-ignored on the host.*
 
 ---
 
@@ -973,4 +980,4 @@ This section supersedes the earlier production rule in the 1 vCPU section above 
 
 **Data limitation.** The four sweep cells shared one artifact directory (`…/2vcpu-20261109-sweep/h2-2c2g/v-fast/sip-cps12`), so each run overwrote the previous `cpu.csv`. Completion, CDR reconciliation and per-call setup latency survived for all four (latency files were attributed by row count, which matched each cell's completed-call count exactly), but per-service CPU and RAM survive only for the three ladder cells. The consolidated rows for the sweep therefore carry blank CPU columns rather than reconstructed values. The harness should include the pool shape in the artifact path before any further sweep.
 
-*Artifacts: consolidated rows tagged `2vcpu-20261109` (ladder), `2vcpu-20261109-sweep` (worker sweep) and `2vcpu-20261109-octane` (persistent worker) in `load-testing/results/consolidated/`. Raw fragments stay git-ignored on the host.*
+*Artifacts: consolidated rows tagged `2vcpu-20261109` (ladder), `2vcpu-20261109-sweep` (worker sweep) and `2vcpu-20261109-octane` (persistent worker) in `load-testing/results/consolidated/worker-sweep-20261108-*.csv`. Raw fragments stay git-ignored on the host.*
