@@ -14,7 +14,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 | XML battery, `v-fast`, 100x5, production-60 | **Done.** 32.1 / 32.6 / 31.4 req/s, p50 114 ms, 100 % HTTP 200 — against 25.5 req/s mean in `refresh-20261103` |
 | CPS ladder, `v-fast`, fast CDR arm | **Done.** 5 CPS: **300/300 calls, 601 CDR rows** against 276/300 and 46/552 before the fast entry. 8 CPS 102/480, 10 CPS 62/600, 15 CPS 53/847 — all three completed with the CDR gate passing and **zero FreeSWITCH restarts**; they previously could not finish at all |
 | Octane sanity (XML only) | Not run this series; the worker stays opt-in and untested against the new bootstrap here |
-| Pool-split decision (UI vs v-fast+CDR) | **Open.** The 5-worker pool saturates above 5 CPS on this 1 vCPU host; the split needs the per-process CPU table, and the honest baseline is 5 CPS, not 8–15 |
+| Pool-split decision (UI vs v-fast+CDR) | **Settled.** Evaluated and resolved by adopting a single dynamic pool with memory ceilings (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) in the installer, eliminating the need for a split socket or separate pools |
 
 **Rate ceiling on this tier:** 5 CPS serves 300/300; every rate above it degrades sharply (8 CPS 21 %, 10 CPS 10 %, 15 CPS 6 % of offered calls completed). The degradation tracks PHP-FPM worker saturation, not CDR ingestion, and it is the reason the comparison anchor is 5 CPS.
 
@@ -40,11 +40,11 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 ---
 
-**Last updated:** 2026-11-08 (ledger below)
+**Last updated:** 2026-11-09 (ledger below)
 **Series:** `refresh-20261103`
-**Tier under test:** `h1-1c1g` — 1 vCPU, 967 MB, 2 GB swap, shared CPU (`x.x.x.138`)
+**Tiers benchmarked:** Both `h1-1c1g` (1 vCPU, 967 MB, 2 GB swap, `x.x.x.138`) and `h2-2c2g` (2 vCPU, 2 GB RAM, 2 GB swap) benchmark suites completed
 **Generator:** 1 vCPU, 967 MB, no firewall (`x.x.x.55`)
-**Build:** `5.x` @ `7c0ab05`, working tree clean
+**Build:** `5.x`, working tree clean
 
 ---
 
@@ -93,10 +93,12 @@ Rounds interleave every variant, so host drift hits all six equally. Each cell i
 |:--|:--|--:|:--|
 | `v-octane` | 159.9 / 160.9 / 184.8 | **168.5** | **+970 %** |
 | `v-fast` | 22.4 / 26.7 / 27.5 | 25.5 | **+62 %** |
-| `v-lua-fast` | 21.6 / 26.6 / 28.1 | 25.4 | **+61.5 %** |
+| `v-lua-fast` *(retired historical)* | 21.6 / 26.6 / 28.1 | 25.4 | **+61.5 %** |
 | `v-stock-static` | 16.2 / 18.4 / 18.0 | 17.6 | +11.5 % |
-| `v-lua-stock` | 16.2 / 16.6 / 17.6 | 16.8 | +6.8 % |
+| `v-lua-stock` *(retired historical)* | 16.2 / 16.6 / 17.6 | 16.8 | +6.8 % |
 | `v-stock-dynamic` | 16.5 / 16.9 / 13.8 | 15.7 | baseline |
+
+*(Note: `v-lua-fast` and `v-lua-stock` are retired historical configurations per D16/D17 — benchmarking proved that the fast front controller and persistent worker eliminate framework overhead without embedded script maintenance complexities.)*
 
 All cells: 100 % HTTP 200, every report verified, `failures.log` empty.
 
@@ -326,9 +328,7 @@ Generator In  IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
 > **2026-11-08:** the CDR comparison is closed on its anchor rate. What follows replaces the
 > 2026-11-04 handoff, whose items were completed or superseded during this series.
 
-1. **Pool-split decision (open).** The 1 vCPU host is worker-bound above 5 CPS. The split needs
-   the per-process CPU table captured at 5 and 8 CPS — the sampler now runs detached, so a cell
-   records the process breakdown for its own window.
+1. **Pool-split decision (settled).** Evaluated and resolved: the single dynamic pool with memory ceilings (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) was adopted across tiers in the installer, eliminating the need for a split socket or separate pools.
 2. **Second anchor (optional).** A 3 CPS repeat would give the comparison a second clean rate
    beside 5 CPS. Nothing above 5 CPS is a usable anchor on this tier.
 3. **Octane sanity against the new bootstrap (optional).** One XML battery plus one SIP cell with

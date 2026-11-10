@@ -206,6 +206,6 @@ A cell failure never aborts the series: the runner records it in `failures.log` 
 
 ## Step 11 — Write the report
 
-A series produces a **new** report file. `docs/load-testing-results.md` is the record of an earlier series and is not rewritten.
+Series summaries and written analyses are recorded as new dated sections in `docs/load-testing-results.md` (or series-specific narrative files like `docs/load-testing-<series>.md`), citing the consolidated comparison datasets committed under `load-testing/results/consolidated/` and the backing run directory.
 
-Every table in the new report cites the `load-testing/results/<series>/…` path its numbers came from, so any figure can be traced back to a cell file and from there to a manifest.
+Every table in the report cites the `load-testing/results/<series>/…` path its numbers came from, so any figure can be traced back to a cell file and from there to a manifest.

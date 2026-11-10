@@ -75,6 +75,11 @@ The run writes a manifest, applies each switch and asserts it, runs the cell, re
 ## Where results live
 
 ```
+storage/app/load-tests/                        (git-ignored, PBX scratch space)
+    sipp-users.csv         seeded endpoint accounts and credentials
+    sipp-users-auth.csv    auth CSV for SIPp scenarios
+    dialplan.xml           temporary XML dumps from single commands
+
 load-testing/results/<series>/<tier>/          (git-ignored, local working data)
     manifest.json          what host, build and configuration the run had
     <variant>/*.json        one file per cell, with per-request timings
@@ -88,7 +93,12 @@ load-testing/results/consolidated/             (committed repository content)
     *-setup-latency.csv    per-call setup latency distributions
 ```
 
-Raw per-cell fragments under `load-testing/results/<series>/` and `storage/app/load-tests/` are git-ignored working artifacts. Consolidated CSVs under `load-testing/results/consolidated/` are committed repository content, and series narrative reports live in `docs/load-testing-results.md` (or `docs/load-testing-<series>.md`). Keeping a series means updating the consolidated CSVs and writing its report into `docs/` (a new dated section in `docs/load-testing-results.md` or a new series file), and — if the raw data must survive the host — copying the run directory to external storage outside the repository. Archived series from before this convention remain tracked in git history; that is history, not a pattern to follow.
+Strict separation of artifact storage:
+- `storage/app/load-tests/`: Scratch space on the PBX for single Artisan commands (`pbx:load-test:seed`, `pbx:load-test:dialplan`). Always git-ignored.
+- `load-testing/results/<series>/`: Per-cell raw run artifacts from matrix runs. Always git-ignored.
+- `load-testing/results/consolidated/`: Clean, multi-series consolidated CSV comparison datasets (`*-cells.csv`, `*-services.csv`, `*-setup-latency.csv`). Committed repository content.
+
+Series narrative reports live in `docs/load-testing-results.md` (as a new dated section) or dedicated series narrative files like `docs/load-testing-<series>.md`. Keeping a series means updating the consolidated CSVs and writing its report into `docs/`, and — if the raw data must survive the host — copying the run directory to external storage outside the repository. Archived series from before this convention remain tracked in git history; that is history, not a pattern to follow.
 
 ---
 
