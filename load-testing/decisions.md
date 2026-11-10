@@ -28,12 +28,12 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 | ESL profile | `essential` |
 | Broadcast throttle | unset (500 ms) |
 | PHP-FPM | Installer default on 1 GB: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` |
-| XML entry file | stock (`index.php`) |
+| XML entry file | fast (`xml-handler-fast.php`) |
 | Octane binding | as installed (both gateways declared) |
 | FreeSWITCH runtime DB | disk |
 | Cache TTLs | unset (config defaults) |
 
-**Why:** these are what the installer ships on a fresh appliance, so they are what a customer actually gets.
+**Why:** these are what the installer ships on a fresh appliance, so they are what a customer actually gets. The fast controller (`xml-handler-fast.php`) is the shipped default in 5.x; the in-process Lua XML proxy was evaluated and retired in `a5db9c5` after benchmarking.
 
 **Rejected:** treating the scaling-guide optimisations as prerequisites. A prerequisite that is itself being measured cannot also be the baseline.
 
@@ -65,11 +65,19 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 ---
 
+## D5 — XML load profiles and retention policies
+
+**Decision:** The standard sustained ceiling profile is `1000x25` (1000 requests, concurrency 25, tested across `--rates=5,10,15,20,25`) and `1000x25-8020` (80/20 mixed distribution). Retention policies evaluate `production-60` (60s / 60s) and `extended-30` (30s / 30s) against uncached and cold baselines.
+
+**Status:** settled.
+
+---
+
 ## D6 — Cache TTL is measured once, at the baseline
 
 **Decision:** The full cache-policy sweep (six policies) runs only against the baseline variant. Every other variant is measured at `production-60` alone (`--ttl=production-60`).
 
-**Why:** the sweep answers "how much is caching worth", which is a property of the workload, not of the variant. Repeating it per variant multiplies runtime without a new question, and on the dialplan section `uniform-30` was shown to duplicate `production-60` because directory and ACL TTLs do not affect dialplan XML.
+**Why:** the sweep answers "how much is caching worth", which is a property of the workload, not of the variant. Repeating it per variant multiplies runtime without a new question, and on the dialplan section `extended-30` was shown to duplicate `production-60` because directory and ACL TTLs do not affect dialplan XML.
 
 **Rejected:** six policies × six variants × three repeats as the default.
 
@@ -89,25 +97,23 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 ---
 
-## D8 — Raw results are committed inside the repository
+## D8 — Raw results are git-ignored; consolidated CSVs are committed
 
-**Decision:** `load-testing/results/<series>/` is the durable copy and is committed. The PBX keeps an ignored scratch copy under `storage/app/load-tests/`.
+**Decision:** Raw per-cell fragments under `load-testing/results/<series>/` and `storage/app/load-tests/` are git-ignored working artifacts. Consolidated comparison datasets under `load-testing/results/consolidated/` (`*-cells.csv`, `*-services.csv`, `*-setup-latency.csv`) are committed repository content. Series narrative reports live in `docs/load-testing-results.md` (or `docs/load-testing-<series>.md`).
 
-**Why:** the measurement hosts are deleted when the series ends, and `storage/` is git-ignored and removable by `git clean -fdx`. Results kept only there are not results.
+**Why:** thousands of per-cell files (traces, logs, JSON dumps) bloat the repository. Consolidated data files provide clean, diffable, and comparable datasets across series without repository bloat.
 
-**Rejected:** an external `/srv` archive as the only durable copy (machine-specific, invisible to a clone), and keeping results uncommitted (lost on cleanup).
-
-**Consequence:** every run grows repository history permanently. Commit results once per series, not per cell.
+**Rejected:** committing raw measurement fragments or keeping results uncommitted.
 
 **Status:** settled.
 
 ---
 
-## D9 — A series publishes a new report; the old results document is not rewritten
+## D9 — Consolidated metrics and series summaries live in `docs/load-testing-results.md`
 
-**Decision:** `docs/load-testing-results.md` stays untouched as the record of the earlier series. A new report is written in a new file, citing the `load-testing/results/<series>/…` paths behind every table.
+**Decision:** `docs/load-testing-results.md` (or series-specific narrative files like `docs/load-testing-<series>.md`) records the written analysis, citing the consolidated CSVs under `load-testing/results/consolidated/` and the backing run directory.
 
-**Why:** overwriting makes it impossible to tell a re-measured number from a copied one, and the earlier series' provenance disappears.
+**Why:** keeping clean, comparable summaries avoids losing series provenance while maintaining repository hygiene.
 
 **Status:** settled.
 
@@ -163,7 +169,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 ## D14 — Every switch is applied by a script that also asserts it
 
-**Decision:** A setting is changed only through `scripts/lib/switch.sh`, and every `apply_*` has an `assert_*` that reads the effective value back. A mismatch fails that cell (`SWITCH-FAILED`).
+**Decision:** A setting is changed only through `load-testing/scripts/lib/switch.sh`, and every `apply_*` has an `assert_*` that reads the effective value back. A mismatch fails that cell (`SWITCH-FAILED`).
 
 **Why:** three separate defects produced plausible numbers from configurations that had not actually been applied — a `sed` delimiter collision that silently failed the Lua switch, the restore leaving the Lua flag and bindings disagreeing, and the Octane variant measuring the wrong server. An assertion turns each of those from a wrong result into a failed cell.
 
@@ -209,7 +215,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 **Decision:** Before each SIP cell the runner terminates any SIPp process left on the generator and waits for ports 5066 and 5088 to be free.
 
-**Why:** each background UAS the validation script starts lives for `timeout 300`, so the previous cell's listener is still holding its port when the next cell begins. The new UAS cannot bind, the scenario either aborts or runs without a responder, and the outbound calls reach nobody. That failure reads exactly like a routing fault: FreeSWITCH answers 503 with cause 41 ("no route") while the dialplan is correct and the bridge action executes.
+**Why:** each background UAS the validation script (`load-testing/scripts/pbx-sipp-validate.sh`) starts lives for `timeout 300`, so the previous cell's listener is still holding its port when the next cell begins. The new UAS cannot bind, the scenario either aborts or runs without a responder, and the outbound calls reach nobody. That failure reads exactly like a routing fault: FreeSWITCH answers 503 with cause 41 ("no route") while the dialplan is correct and the bridge action executes.
 
 It cost several runs to trace, because the symptom looks like the product. The evidence that settled it: the generator's UAS log for the one cell that worked shows `Total-calls 5`, while the cells that failed show no listener at all — and a direct capture confirmed the INVITE leaves the PBX and arrives at the generator with nothing listening to answer it.
 

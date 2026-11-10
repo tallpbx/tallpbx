@@ -112,4 +112,22 @@ describe('artifact address scrubber', function (): void {
                 ->not->toContain('ppx2-client');
         }
     });
+
+    it('keeps load-testing documentation free of hardcoded public IPv4 addresses and documents active matrix standards', function (): void {
+        foreach (glob(base_path('load-testing/*.md')) as $mdFile) {
+            $contents = (string) file_get_contents($mdFile);
+
+            expect($contents)
+                ->not->toMatch('/\b(?!127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/')
+                ->not->toContain('ppx2-client');
+        }
+
+        $readme = (string) file_get_contents(base_path('load-testing/README.md'));
+        expect($readme)->toContain('v-fast-default')
+            ->and($readme)->toContain('1000x25');
+
+        $configurations = (string) file_get_contents(base_path('load-testing/configurations.md'));
+        expect($configurations)->toContain('v-fast-default')
+            ->and($configurations)->toContain('1000x25');
+    });
 });

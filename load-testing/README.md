@@ -24,11 +24,14 @@ Read the scripts only when the documents do not answer a question:
 
 | Script | Purpose |
 |:--|:--|
-| `scripts/load-test-matrix.sh` | Orchestrator: lists, dry-runs and executes cells; applies and asserts each switch remotely; pulls artifacts; restores the baseline |
-| `scripts/lib/switch.sh` | The switches themselves. One `apply_*` per setting, each with a matching `assert_*` that reads the value back |
-| `scripts/lib/manifest.sh` | Writes and reads `manifest.json`; verifies host sizing against the matrix |
-| `scripts/tools/cpuwatch.sh` | Attributes CPU to each service over a time window |
-| `scripts/tools/ab-esl-reverb.sh` | Alternating on/off runs of the ESL listener and Reverb |
+| `load-testing/scripts/load-test-matrix.sh` | Orchestrator: lists, dry-runs and executes cells; applies and asserts each switch remotely; pulls artifacts; restores the baseline |
+| `load-testing/scripts/lib/switch.sh` | The switches themselves. One `apply_*` per setting, each with a matching `assert_*` that reads the value back |
+| `load-testing/scripts/lib/manifest.sh` | Writes and reads `manifest.json`; verifies host sizing against the matrix |
+| `load-testing/scripts/drivers/` | Execution drivers for automated ladders and matrices (`run-ladder.sh`, `run-sqlite-ladder.sh`, `run-cdr-matrix.sh`) |
+| `load-testing/scripts/pbx-sipp-validate.sh` | End-to-end SIPp scenario validation harness |
+| `load-testing/scripts/run-cache-sweep.sh` | Dialplan cache TTL policy sweep runner |
+| `load-testing/scripts/tools/cpuwatch.sh` | Attributes CPU to each service over a time window |
+| `load-testing/scripts/tools/ab-esl-reverb.sh` | Alternating on/off runs of the ESL listener and Reverb |
 
 ---
 
@@ -78,9 +81,14 @@ load-testing/results/<series>/<tier>/          (git-ignored, local working data)
     <variant>/probe-*.txt  what FreeSWITCH waited for on one lookup
     logs/*.log             the stdout of each cell command
     failures.log           one line per failed cell (empty means clean)
+
+load-testing/results/consolidated/             (committed repository content)
+    *-cells.csv            per-cell metrics across series
+    *-services.csv         per-service CPU and RAM
+    *-setup-latency.csv    per-call setup latency distributions
 ```
 
-The run directory is **working data, not repository content**: `load-testing/results/` and `storage/app/load-tests/` are ignored by git. Keeping a series means writing its report into `docs/` (a new file, never a rewrite of an earlier one), and — if the raw data must survive the host — copying the run directory to external storage outside the repository. Archived series from before this convention remain tracked in git history; that is history, not a pattern to follow.
+Raw per-cell fragments under `load-testing/results/<series>/` and `storage/app/load-tests/` are git-ignored working artifacts. Consolidated CSVs under `load-testing/results/consolidated/` are committed repository content, and series narrative reports live in `docs/load-testing-results.md` (or `docs/load-testing-<series>.md`). Keeping a series means updating the consolidated CSVs and writing its report into `docs/` (a new dated section in `docs/load-testing-results.md` or a new series file), and — if the raw data must survive the host — copying the run directory to external storage outside the repository. Archived series from before this convention remain tracked in git history; that is history, not a pattern to follow.
 
 ---
 
@@ -89,10 +97,10 @@ The run directory is **working data, not repository content**: `load-testing/res
 | Axis | Options | Where defined |
 |:--|:--|:--|
 | Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `load-testing/matrix.php` → `tiers` |
-| XML-serving variant | stock dynamic, stock static, fast controller, Lua over stock, Lua over fast, Octane worker | → `variants` |
-| Load profile | 25×1, 100×5, 500×25, 1000×50 | → `xml_profiles` |
-| Cache policy | cold, dialplan-off, production-60, cache-hit-60, uniform-30, uncached | → `cache_ttl_profiles` |
-| SIP scenarios | 14 feature scenarios plus a call-rate ladder | → `sipp_scenarios` |
+| XML-serving variant | `v-stock`, `v-fast`, `v-fast-default`, `v-octane`, `v-octane-swell` (note `v-lua-stock` and `v-lua-fast` were retired in `5.0.0`) | → `variants` |
+| Load profile | `25x1`, `100x5`, `500x25`, `1000x25` (`--rates=5,10,15,20,25`), `1000x25-8020` | → `xml_profiles` |
+| Cache policy / TTL presets | `default` (`300s / 60s`), `tuned` (`1800s / 600s`), `production-60` (`60s / 60s`), `extended-30` (`30s / 30s`), `cold`, `dialplan-off`, `cache-hit-60`, `uncached-redis` (`0s / 0s`, store `redis`), `uncached-db` (`0s / 0s`, store `null`) | → `cache_ttl_profiles` |
+| SIP scenarios | 14 feature scenarios plus a call-rate ladder | → `sip_scenarios` |
 
 The matrix is the single source: the runner, the tests and the documents all cite it.
 

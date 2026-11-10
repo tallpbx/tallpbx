@@ -33,7 +33,7 @@ Every abbreviation and jargon term used in this directory, in plain language. No
 | **Entry file** | The PHP file nginx hands a request to. `index.php` boots the whole framework; `xml-handler-fast.php` skips most of it |
 | **Octane** | A long-lived PHP worker (served by RoadRunner) that keeps the application in memory between requests, so there is no per-request boot |
 | **RoadRunner** | The process supervisor that keeps those Octane workers alive and connects them to port 8090 |
-| **Lua** | A small scripting language embedded in FreeSWITCH. Here it runs a script that answers lookups from Redis without involving PHP |
+| **Lua** | (Retired in 5.0.0) Formerly evaluated as an in-process XML cache proxy script in FreeSWITCH; retired after benchmarking |
 | **Redis** | The in-memory key/value store holding cached lookups and the CDR queue |
 | **MariaDB** | The database |
 
@@ -64,7 +64,7 @@ Every abbreviation and jargon term used in this directory, in plain language. No
 | **CPS** (calls per second) | Offered call rate in the SIP phases |
 | **TTL** (time to live) | How long a cached answer is kept before it is rebuilt |
 | **Profile** | A named load shape, such as `100x5` = 100 requests, 5 at a time |
-| **Variant** | One complete serving configuration (pool mode + entry file + Lua + Octane) |
+| **Variant** | One complete serving configuration (pool mode + entry file + Octane; active variants: `v-stock`, `v-fast`, `v-fast-default`, `v-octane`, `v-octane-swell`) |
 | **Tier** | A hardware size the series measures on |
 | **Cell** | One measurement: one variant × profile × cache policy × repeat |
 | **Repeat** | The same cell run again, to see how much the number moves on its own |
@@ -99,8 +99,9 @@ bash load-testing/scripts/load-test-matrix.sh [options]
 | `--tier=<id>` | Restrict to one hardware tier. Required to execute |
 | `--variant=<id>` | Restrict to one XML-serving variant |
 | `--phase=xml\|sip\|ablation` | Restrict to one phase |
+| `--ablation=<id>` | Restrict to one ablation experiment (`fs-loglevel`, `broadcast-throttle`, `cdr-pipeline`, etc.) |
 | `--section=dialplan\|directory\|mixed` | Restrict the XML battery to one request section |
-| `--profile=<id>` | Restrict to one load profile (`25x1`, `100x5`, `500x25`, `1000x50`) |
+| `--profile=<id>` / `--profiles=<list>` | Restrict to one or more load profiles (default `1000x25,1000x25-8020`; also `25x1`, `100x5`, `500x25`) |
 | `--ttl=<id>` | Restrict to one cache policy (`production-60`, `cold`, …) |
 | `--repeats=<n>` | Repetitions per cell (default 3) |
 | `--cps=<n>` | Offered calls per second for SIP and ablation cells (default 5) |
@@ -114,6 +115,7 @@ An unknown tier, variant, phase or cache policy exits non-zero before anything r
 | Variable | Default | Purpose |
 |:--|:--|:--|
 | `PBX_HOST` | `local` | SSH target of the PBX under test; `local` runs cells in place |
+| `SIPP_HOST` | *(empty)* | Address of the load generator host running SIPp |
 | `SSH_PORT` | `22` | SSH port |
 | `SSH_OPTS` | `-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10` | Extra SSH options; put `-i <identity>` here |
 | `REMOTE_APP_DIR` | `/var/www/tallpbx` | Application root on the PBX |
@@ -124,26 +126,26 @@ An unknown tier, variant, phase or cache policy exits non-zero before anything r
 | `PBX_OCTANE_URL` | `http://127.0.0.1:8090/api/v1/xml-handler` | Endpoint used automatically by `v-octane` |
 | `PBX_XML_TOKEN` | *(empty)* | XML handler token; when empty the PBX reuses its configured token |
 | `SERIES` | `refresh-YYYYMMDD` | Series directory name |
-| `TENANT` / `DOMAIN` | `load-test-beta` / `load.test.local` | Seeded tenant and SIP realm |
+| `TENANT` / `DOMAIN` | `load-test-beta` / dynamic | Seeded tenant and SIP realm; `DOMAIN` defaults dynamically to `FS_DEFAULT_SIP_REALM` from `.env` (falling back to `test.example.com` or `load.test.local`) |
 | `EXTENSIONS` / `START` | `20` / `2000` | Generated extension count and first number |
 | `PASSWORD` | `LoadTest1234` | SIP password (keep it alphanumeric) |
 | `REPEATS` / `CPS` | `3` / `5` | Defaults for the matching flags; flags win |
 | `MATRIX_CACHE` | `${TMPDIR:-/tmp}/tallpbx-load-matrix-<series>.json` | Realised matrix JSON; scratch, never evidence |
 
-`LOAD_*` aliases (`LOAD_TENANT`, `LOAD_DOMAIN`, …) remain available for programmatic callers; the unprefixed names above are the documented ones and match `scripts/pbx-sipp-validate.sh`.
+`LOAD_*` aliases (`LOAD_TENANT`, `LOAD_DOMAIN`, …) remain available for programmatic callers; the unprefixed names above are the documented ones and match `load-testing/scripts/pbx-sipp-validate.sh`.
 
 ---
 
 ## SIPp runner variables
 
-`scripts/pbx-sipp-validate.sh` runs **on the orchestrator**, not on the PBX. The matrix runner supplies `PBX_HOST`, `TENANT`, `DOMAIN`, `EXTENSIONS`, `START`, `PASSWORD`, `SKIP_SEED=1`, `CALL_RATE` (from `--cps`) and `RUN_DIR`; everything else keeps its default and can be overridden for a hand-run.
+`load-testing/scripts/pbx-sipp-validate.sh` runs **on the orchestrator**, not on the PBX. The matrix runner supplies `PBX_HOST`, `TENANT`, `DOMAIN`, `EXTENSIONS`, `START`, `PASSWORD`, `SKIP_SEED=1`, `CALL_RATE` (from `--cps`) and `RUN_DIR`; everything else keeps its default and can be overridden for a hand-run.
 
 | Variable | Default | Meaning |
 |:--|:--|:--|
 | `PBX_HOST` | `127.0.0.1` | SIP target — the PBX under test |
 | `PBX_PORT` | `5060` | SIP port on the PBX |
 | `LOAD_GENERATOR_IP` | first local IPv4 | Address the PBX must be able to reach |
-| `TENANT` / `DOMAIN` | `load-test-beta` / `load.test.local` | Seeded tenant and realm |
+| `TENANT` / `DOMAIN` | `load-test-beta` / dynamic | Seeded tenant and realm (defaults dynamically to `FS_DEFAULT_SIP_REALM`, falling back to `test.example.com`) |
 | `EXTENSIONS` / `START` | `20` / `2000` | Accounts to use and the first number |
 | `PASSWORD` | `LoadTest1234` | SIP password for those accounts |
 | `SKIP_SEED` | `0` | `1` reuses accounts that are already seeded |
@@ -193,6 +195,8 @@ load-testing/results/<series>/<tier>/
     ├── <profile>-<ttl>-<section>-r<n>.json     one cell
     └── probe-<profile>-<ttl>.txt               one lookup probe
 ```
+
+Variant directories follow `<variant>` or `<variant>-fpm-<mode><children>` naming when documenting explicit PHP-FPM pool sizing (for example `v-fast-fpm-dynamic3` or `v-stock-fpm-static5`).
 
 Example: `h1-1c1g/v-stock-dynamic/100x5-production-60-dialplan-r2.json` is repeat 2 of the 100-request/5-concurrent dialplan cell under the production cache policy.
 
@@ -252,7 +256,7 @@ The manifest is rewritten at the start of every invocation. A tier measured acro
 
 ## Tooling scripts
 
-### `scripts/tools/cpuwatch.sh`
+### `load-testing/scripts/tools/cpuwatch.sh`
 
 Attributes CPU and memory to each service. Two modes:
 
@@ -266,11 +270,11 @@ bash load-testing/scripts/tools/cpuwatch.sh --sample 2 420 "xml-run"
 
 The sampling mode writes `label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb` to stdout, so a run can be watched rather than guessed at: it shows whether a service was idle for the whole run or busy during part of it.
 
-Classes: `esl-listener`, `reverb`, `octane-worker`, `cdr-worker`, `queue-worker`, `scheduler`, `freeswitch`, `php-fpm`, `mariadb`, `redis`.
+Classes: `freeswitch`, `php-fpm`, `octane`, `redis`, `mariadb`, `nginx`, `reverb`, `horizon`, `esl-listener`.
 
 A class reporting zero CPU is genuinely idle: one clock tick is 10 ms, so a two-second sample cannot hide more than 0.5 % of a core.
 
-### `scripts/tools/ab-esl-reverb.sh`
+### `load-testing/scripts/tools/ab-esl-reverb.sh`
 
 Runs the same XML cell alternating between the ESL listener and Reverb running and stopped, with a warm-up cell first. Ordering matters: PHP-FPM workers start cold after a reload, and a single cold cell looks like a large difference that is not there.
 
@@ -284,7 +288,7 @@ Interpretation: if both services report `ticks=0` under XML-only load and the al
 |:--|:--|
 | `tests/Feature/Pbx/LoadTestMatrixConfigTest.php` | Every tier, variant, profile and scenario exists and covers the plan |
 | `tests/Feature/Pbx/LoadTestManifestCommandTest.php` | The manifest has all sections, a 40-character SHA, and no verbatim secret |
-| `tests/Feature/Pbx/LoadTestSwitchScriptTest.php` | Every `apply_*` has an `assert_*`, the restore is trapped, the Lua pair is reconciled, the probe exists, and nothing touches `nftables` |
+| `tests/Feature/Pbx/LoadTestSwitchScriptTest.php` | Every `apply_*` has an `assert_*`, the restore is trapped, the probe exists, and nothing touches `nftables` |
 | `tests/Feature/Pbx/LoadTestMatrixRunnerTest.php` | Listing completeness, dry-run never executes, filter validation, per-variant URL, the probe is wired in, `--ttl` narrows the battery |
 
 ```bash
@@ -306,8 +310,8 @@ bash -n load-testing/scripts/lib/switch.sh
 | `xml_profiles` | Load profile id → requests and concurrency |
 | `cache_ttl_profiles` | Cache policy id → the four TTLs and the request scenario |
 | `xml_sections` | `dialplan`, `directory`, `mixed` |
-| `sipp_scenarios` | The 14 SIPp feature scenarios |
+| `sip_scenarios` | The 14 SIPp feature scenarios |
 | `ablations` | Single-knob experiments and their values |
-| `cdr_transports` | `fpm` and `octane` |
+| `cdr_transports` | `cdr-fpm` and `cdr-octane` |
 
 Adding a variant means editing this file only; the runner, the tests and these documents read from it.

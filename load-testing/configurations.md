@@ -1,6 +1,6 @@
 # Configuration Switches
 
-Four variants are built from three independent switches, plus the runtime settings used for ablations. Each switch is applied by `scripts/lib/switch.sh`, which then calls its matching `assert_*` and reads the effective value back. A mismatch prints `SWITCH-FAILED <detail>` and returns non-zero, which fails that cell rather than producing a number.
+Five variants (`v-stock`, `v-fast`, `v-fast-default`, `v-octane`, `v-octane-swell`) are built from three independent switches, plus the runtime settings used for ablations. Each switch is applied by `load-testing/scripts/lib/switch.sh`, which then calls its matching `assert_*` and reads the effective value back. A mismatch prints `SWITCH-FAILED <detail>` and returns non-zero, which fails that cell rather than producing a number.
 
 ```bash
 bash load-testing/scripts/lib/switch.sh <command> [arguments]
@@ -49,18 +49,18 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` hav
 ## `apply_octane_binding`
 
 - **Argument:** `on` or `off`.
-- **File:** `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` — the whole `<binding name="tallpbx-octane">` block is commented or uncommented, then `mod_xml_curl` reloads.
-- **Assertion:** exactly one of the two states, read from the file.
+- **File:** `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` — the whole `<binding name="tallpbx-octane">` block is commented or uncommented.
+- **Assertion:** verified via `tpbx freeswitch:validate-xml-curl` and FreeSWITCH is restarted (`systemctl restart freeswitch`), never by reloading `mod_xml_curl` (unloading the module while lookups are in-flight causes segfaults).
 - **Effect:** whether FreeSWITCH's own lookups go to the persistent worker on `:8090` or to nginx.
 - **Caveat:** the shipped file declares **both** gateways active, so `on` reproduces the installed state. An Octane *cell* must also post its HTTP load at `:8090`; the runner does this per variant and it is recorded in the report path.
 
 ## `apply_ttl`
 
-- **Argument:** four integers — `dialplan`, `contributor`, then optional `directory`, `acl`. `0` disables that cache.
+- **Argument:** four integers — `dialplan`, `contributor`, then optional `directory`, `acl`. `0` disables that cache. Pre-configured presets include `default` (300s / 60s), `tuned` (1800s / 600s), `production-60` (60s / 60s), `extended-30` (30s / 30s), and `uncached-db` (0s / 0s, store `null`). Load profiles such as `1000x25` (1000 requests, concurrency 25, tested across rates 5, 10, 15, 20, 25) evaluate these retention ceilings.
 - **File:** `.env` (`FS_XML_HANDLER_*_CACHE_TTL`), followed by `config:clear`.
-- **Assertion:** the four values read back from `.env`.
+- **Assertion:** `assert_ttl` reads Laravel's resolved runtime configuration: `config('freeswitch.xml_handler.dialplan_cache_ttl')`, `config('freeswitch.xml_handler.dialplan_contributor_cache_ttl')`, `config('freeswitch.xml_handler.directory_cache_ttl')`, and `config('freeswitch.xml_handler.directory_cache_store')`.
 - **Effect:** how often PHP must rebuild an answer, and with that how much database work a lookup costs.
-- **Caveat:** only `dialplan` and `contributor` affect dialplan XML generation. Changing `directory` and `acl` while measuring the dialplan section changes nothing measurable — that is why `uniform-30` and `production-60` land inside each other's noise.
+- **Caveat:** only `dialplan` and `contributor` affect dialplan XML generation. Changing `directory` and `acl` while measuring the dialplan section changes nothing measurable — that is why `extended-30` and `production-60` land inside each other's noise.
 
 ## `apply_fs_loglevel`
 
@@ -94,7 +94,7 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` hav
 
 - **Argument:** milliseconds. `500` is the shipped default (about two broadcasts per second per scope); `0` disables debouncing so every handled event is dispatched to Reverb.
 - **File:** `.env` `FS_BROADCAST_THROTTLE_MS`, then the listener is restarted for the same reason as above.
-- **Assertion:** the declared value and that the listener was restarted after it was written. The running value cannot be read out of the process, so the **effect** is proven by the measurement — listener CPU and Reverb CPU under a fixed call load — not by a configuration read.
+- **Assertion:** `assert_broadcast_throttle` inspects the listener's start-up record for `"broadcast_throttle_ms":<expected>`. The runner verifies that the listener was restarted and that the new process recorded the expected debounce interval.
 - **Effect:** this is what the debounce is worth. With `0`, a call burst produces one HTTP POST to Reverb per event instead of at most two per second, and on a single core that competes directly with call handling.
 - **Caveat:** like the ESL profile, it is meaningless without calls. Measured under XML-only load, both Reverb and the listener reported zero CPU regardless of this setting.
 
@@ -122,10 +122,13 @@ lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 
 | Variant | FPM | XML path | Octane |
 |:--|:--|:--|:--|
-| `v-stock-dynamic` | `dynamic 5` | stock | off |
-| `v-stock-static` | `static 5` | stock | off |
+| `v-stock` | `static 5` (or dynamic installer default) | stock | off |
 | `v-fast` | `static 5` | **fast** | off |
+| `v-fast-default` | `dynamic` (installer default: 1–3 workers on 1 GB) | **fast** | off |
 | `v-octane` | `static 5` | stock | **on** |
+| `v-octane-swell` | `static` / worker concurrency swell | stock | **on** |
+
+> **Historical note:** The in-process Lua XML cache proxy variants (`v-lua-stock` and `v-lua-fast`) were evaluated and retired after benchmarking demonstrated that the fast front controller (`xml-handler-fast.php`) and persistent RoadRunner worker (`v-octane`) eliminated framework overhead without embedded script maintenance complexities.
 
 `load-testing/matrix.php` is the authority; the runner reads the `requires` list per variant and applies each entry in order.
 

@@ -34,7 +34,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 |:--|:--|:--|
 | SIP scanner auto-ban (Attack Protection) | Enabled: enforcement on, 24 h bans, 5 min escalation window | Detector renders on `tenant_<id>_public` dialplans (3 hooks) and not on internal; queue worker and ESL listener active. It has not fired yet because the observed attackers are REGISTER floods, which never enter the dialplan, and no INVITE with a curated signature arrived during the sample window |
 | VoIPBL external blocklist | Enabled, `119,419` entries synced into `external_blocklist_ips` | FreeSWITCH log fell from hundreds of lines per 15 s to ~1 |
-| Geo-blocking | Whitelist mode, **US + CA** only; `18,098` CIDR lines in `geo_allowed_ips` | Orchestrator `223.204.248.93` whitelisted first (the lockout guard refuses to arm otherwise); panel 200; post-change SIP smoke from the US generator passes register, call and outbound |
+| Geo-blocking | Whitelist mode, **US + CA** only; `18,098` CIDR lines in `geo_allowed_ips` | Orchestrator `x.x.x.93` whitelisted first (the lockout guard refuses to arm otherwise); panel 200; post-change SIP smoke from the US generator passes register, call and outbound |
 
 **Lockout note:** enabling whitelist-mode geo without whitelisting the orchestrator address first will drop the measurement session. The rescue path is the Security Center's one-click *whitelist current IP*, or `LockoutGuardService::whitelistIp()` followed by `tpbx security:apply`.
 
@@ -176,7 +176,7 @@ The whole monitored run — `v-stock-static` and `v-octane`, three repeats each,
 
 The `php-fpm` peak above 100 % is expected: the figure sums all five workers, so more than one core means the pool was saturated across several workers at once. `freeswitch` peaks at 16 % while serving lookups for the Octane variant.
 
-The raw samples and the script that produced them are in `monitoring/` beside the tier artifacts.
+The raw samples and the script that produced them (`load-testing/scripts/tools/cpuwatch.sh`) are in `monitoring/` beside the tier artifacts.
 
 ### Host memory state at the end of the variant sweep
 
@@ -235,7 +235,7 @@ This is the first cell of the SIP phase. One cell is a working measurement, not 
 Every endpoint of every tenant failed to register with 401/403, which reads like a credentials problem and is not one.
 
 ```
-[WARNING] sofia_reg.c: Can't find user [2019@162.243.62.138] from 107.170.3.55
+[WARNING] sofia_reg.c: Can't find user [2019@x.x.x.138] from x.x.x.55
 ```
 
 FreeSWITCH resolves a registering user under the realm its profile names, and the tenant profiles carried the appliance-wide `$${domain}` — the box's own address. The directory has no users under that realm, so the lookup missed every time.
@@ -285,8 +285,8 @@ Action bridge(sofia/external/1555123000@x.x.x.55:5088)
 and the bridge leaves the box and arrives:
 
 ```
-PBX       Out IP 162.243.62.138.5080 > 107.170.3.55.5088: UDP, length 1082
-Generator In  IP 162.243.62.138.5080 > 107.170.3.55.5088: UDP, length 1082
+PBX       Out IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
+Generator In  IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
 ```
 
 **What this changed in the harness:** the generator's SIPp ports are now cleared before every cell, and the CDR gate is to compare *legs* rather than rows — one row per call looks healthy even when nothing was bridged.

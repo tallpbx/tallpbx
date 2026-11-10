@@ -106,10 +106,10 @@ bash load-testing/scripts/load-test-matrix.sh \
 
 ## Step 6 — Remaining variants
 
-One invocation per variant, each applying its own switches:
+One invocation per variant, each applying its own switches (or filter via `--variants v-stock-static,v-fast,v-fast-default,v-octane`):
 
 ```bash
-for variant in v-stock-static v-fast v-octane; do
+for variant in v-stock-static v-fast v-fast-default v-octane; do
   bash load-testing/scripts/load-test-matrix.sh \
     --tier=h1-1c1g --variant="$variant" --phase=xml \
     --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
@@ -118,7 +118,7 @@ done
 
 **Checkpoint per variant:** same as Step 5, plus the report path proves where the load went — `v-octane` cells are labelled against `127.0.0.1:8090`, every other variant against nginx.
 
-> Switching to or from `v-octane` changes the `mod_xml_curl` binding, and the switch applies that with a FreeSWITCH **restart**, never a module reload: unloading the module while a lookup is in flight frees the binding the lookup is using and kills the switch. A `v-fast` or `v-stock` switch only rewrites the nginx location and needs no restart. The rule and its reasoning are in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*.
+> Switching to or from `v-octane` changes the `mod_xml_curl` binding, and the switch validates configuration via `tpbx freeswitch:validate-xml-curl` and applies that with a FreeSWITCH **restart** (`systemctl restart freeswitch`), never a module reload (`fs_cli -x 'reload mod_xml_curl'`): unloading the module while a lookup is in flight frees the binding the lookup is using and kills the switch. A `v-fast` or `v-stock` switch only rewrites the nginx location and needs no restart. The rule and its reasoning are in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*.
 
 > Repeat noise on a 1 vCPU host is about 10 %. Differences smaller than that between two variants are not findings. Raise `--repeats` before drawing a conclusion from a small gap.
 
@@ -170,15 +170,15 @@ Raw run directories are **never committed**. `/load-testing/results/` and `/stor
 What a series leaves behind:
 
 ```bash
-# 1. The written report — the durable record, one new file per series.
-$EDITOR docs/load-testing-<series>.md
+# 1. Update the consolidated comparison datasets and series report
+$EDITOR docs/load-testing-results.md
 
-# 2. Stage only what a reviewer should read.
-git add docs/load-testing-<series>.md      # plus any code the series changed
-git commit -m "docs(load-test): record the <series> report"
+# 2. Stage only consolidated CSVs, reports, and code
+git add docs/load-testing-results.md load-testing/results/consolidated/*.csv
+git commit -m "docs(load-test): record the <series> report and consolidated data"
 ```
 
-**Checkpoint:** `git status` shows no `load-testing/results/**` or `storage/app/load-tests/**` paths staged, and the report cites the run directory it came from so any figure can be traced back to the files on the host. If the raw data must survive the host, copy it to external storage outside the repository — not into git.
+**Checkpoint:** `git status` shows no raw `load-testing/results/**` or `storage/app/load-tests/**` per-cell paths staged. Consolidated CSVs under `load-testing/results/consolidated/` and documentation in `docs/` are committed. If the raw data must survive the host, copy it to external storage outside the repository — not into git.
 
 ---
 
@@ -189,14 +189,13 @@ git commit -m "docs(load-test): record the <series> report"
 | `SWITCH-FAILED <detail>` | An `apply_*` did not read back as applied | Fix the host setting in `remote-setup.md`; do not re-run the cell until the assertion passes |
 | `CELL-FAILED <label>` | The cell command exited non-zero | Read `logs/<label>.log`; a `502` means the pool reload window was not waited out |
 | `XML-HANDLER-NOT-READY` | The readiness probe never answered after a switch | Confirm nginx and PHP-FPM are healthy, then re-run the variant |
-| `UNKNOWN-REQUIREMENT` | The matrix names a switch the runner cannot drive | The matrix and `scripts/lib/switch.sh` are out of step — fix the code, not the run |
-| `baseline-corrected …` | The restore found and fixed a mismatched Lua pair | Not an error; it means the previous state was incoherent. Investigate how it got that way |
+| `UNKNOWN-REQUIREMENT` | The matrix names a switch the runner cannot drive | The matrix and `load-testing/scripts/lib/switch.sh` are out of step — fix the code, not the run |
 | `WARNING: could not pull artifacts` | The `scp` back from the PBX failed | Artifacts still exist on the PBX; copy them before the host is deleted |
 | `SMOKE-FAILED <tier>/<variant>` | The variant's own preflight failed; no cell ran behind it | Read `<tier>/<variant>/sip-smoke/summary.md` and fix the chain before re-running. The smoke is per variant **with that variant's switches applied** — a smoke that ran under the baseline proves nothing about the variant |
 | `register: failed with exit code 124` | SIPp's register step timed out before the cell began | Almost always FreeSWITCH's session-rate limiter: scanners consume `sessions-per-second` and legitimate REGISTERs get `503 Maximum Calls In Progress` (then `481` on the retry). Check `fs_cli -x "show status"` — it prints `N session(s) per Sec out of max 60` and `1000 session(s) max` at the shipped defaults (`max-sessions` in `switch.conf.xml`, `FS_SESSIONS_PER_SECOND` in `.env`). Re-run once the host is idle; a repeatable failure under load is a finding about the host, not the runner |
 | `CDR-GATE FAILED … reason=no-tally` | There is no SIPp tally to judge, because registration or the call never completed | Fix the earlier failure first; the gate is reporting a missing measurement, not a missing record |
 | A location added by the installer disappears after the first cell | The runner restores `${file}.loadtest.bak`, which is captured once and never refreshed | After changing an nginx template, refresh the backup from the generated file (`cp /etc/nginx/sites-available/pbx /etc/nginx/sites-available/pbx.loadtest.bak`) so the baseline encodes the current default |
-| Manual register test gets `401` twice | The scenario expects the generated auth CSV, not the call CSV | Drive registration through `scripts/pbx-sipp-validate.sh` (it writes `<run-dir>/sipp-users-auth.csv`), or point `-inf` at that file |
+| Manual register test gets `401` twice | The scenario expects the generated auth CSV, not the call CSV | Drive registration through `load-testing/scripts/pbx-sipp-validate.sh` (it writes `<run-dir>/sipp-users-auth.csv`), or point `-inf` at that file |
 | `FS-NOT-READY` | FreeSWITCH did not report ready (CLI, `mod_json_cdr`) within 90 s | Check `systemctl status freeswitch`. A half-booted switch accepts registrations with no CDR module and rejects the call as `CALL_REJECTED` |
 | `FS-RESTARTED label=… pid=a->b` | FreeSWITCH restarted inside the cell window | The cell is invalid — the in-flight call is rejected and the registrations it depends on are rebuilt. Find the restart cause before re-running; never count the cell |
 | FS CPU high, `Can't find user […]` at tens per second in `freeswitch.log` | Internet SIP scanners are consuming the session budget and the log | Ban the sources through the application pipeline (Security Center, or `SecurityBanService::ban()` followed by `security:reconcile`), flush their conntrack flows, then confirm the log is quiet for 15 s before starting a cell |

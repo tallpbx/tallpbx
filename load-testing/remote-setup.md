@@ -180,8 +180,8 @@ location = /api/v1/xml-handler {
 }
 ```
 
-**Apply:** `scripts/lib/switch.sh apply_xml_path stock|fast` (it runs `nginx -t` and refuses an invalid rewrite).
-**Prove:** `scripts/lib/switch.sh assert_xml_path stock|fast`.
+**Apply:** `load-testing/scripts/lib/switch.sh apply_xml_path stock|fast` (it runs `nginx -t` and refuses an invalid rewrite).
+**Prove:** `load-testing/scripts/lib/switch.sh assert_xml_path stock|fast`.
 
 ---
 
@@ -191,24 +191,39 @@ The optional Lua XML cache proxy was evaluated and retired in the 5.x series. It
 
 ---
 
-## 9. Octane binding and port 8090
+## 9. Octane binding and port 8090 (`xml_curl.conf.xml` Multi-Binding Fallback)
 
-`xml_curl.conf.xml` ships **two** gateways. FreeSWITCH consults the first declared one:
+`xml_curl.conf.xml` ships with the complete **three-tier** binding ladder. FreeSWITCH consults the gateways in file order:
 
 ```xml
-<binding name="tallpbx-octane">    <param name="gateway-url" value="http://127.0.0.1:8090/api/v1/xml-handler?token=…"/></binding>
-<binding name="tallpbx-fallback">  <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=…"/></binding>
+<configuration name="xml_curl.conf" description="cURL XML Gateway">
+  <bindings>
+    <binding name="tallpbx-octane">
+      <param name="gateway-url" value="http://127.0.0.1:8090/api/v1/xml-handler?token=…" bindings="directory|dialplan|configuration"/>
+      <param name="timeout" value="1"/>
+    </binding>
+    <binding name="tallpbx-fallback">
+      <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=…" bindings="directory|dialplan|configuration"/>
+      <param name="timeout" value="2"/>
+    </binding>
+    <binding name="tallpbx-stock">
+      <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler-stock?token=…" bindings="directory|dialplan|configuration"/>
+      <param name="timeout" value="3"/>
+    </binding>
+  </bindings>
+</configuration>
 ```
 
-The Octane worker serves the same route on `:8090`. Both return `403` without a token, which is how you prove the route is live on each server:
+The Octane worker serves the XML handler route on `:8090`, the fast controller serves on `/api/v1/xml-handler`, and the stock framework handler serves on `/api/v1/xml-handler-stock`. All endpoints return `403` without a token, which proves each route is live and secure:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8090/api/v1/xml-handler -d '<xml/>'
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-handler  -d '<xml/>'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-handler-stock -d '<xml/>'
 ```
 
-**Apply:** `scripts/lib/switch.sh apply_octane_binding on|off` (comments or uncomments the whole binding, then reloads `mod_xml_curl`).
-**Prove:** `scripts/lib/switch.sh assert_octane_binding on|off`.
+**Apply:** `load-testing/scripts/lib/switch.sh apply_octane_binding on|off` (validates with `tpbx freeswitch:validate-xml-curl` and restarts FreeSWITCH via `systemctl restart freeswitch`, never reloading `mod_xml_curl` while lookups are live).
+**Prove:** `load-testing/scripts/lib/switch.sh assert_octane_binding on|off` and `tpbx freeswitch:validate-xml-curl`.
 
 **Measurement rule:** an Octane cell must post to `http://127.0.0.1:8090/api/v1/xml-handler`. The runner does this automatically for the `v-octane` variant; posting to nginx would measure PHP-FPM and label it Octane.
 
@@ -328,11 +343,11 @@ The 5100 base exists precisely so a generator that also runs FreeSWITCH does not
 ### Two pitfalls that produce wrong results rather than errors
 
 1. **A stray background UAS makes the next bind fail with `errno 98`.** Between scenarios, existing UAS processes on 5066 or 5088 must be gone before the next listener starts. A leftover listener keeps answering, so the run appears to succeed while a scenario is served by the wrong process.
-2. **A short registration lease expires mid-suite.** `tools/sipp/register.xml` uses `Expires: 3600` deliberately; a shorter lease produces `SIP;cause=806;text="USER_NOT_REGISTERED"` partway through an extended run, which reads as a PBX fault but is a test-fixture fault.
+2. **A short registration lease expires mid-suite.** `load-testing/tools/sipp/register.xml` uses `Expires: 3600` deliberately; a shorter lease produces `SIP;cause=806;text="USER_NOT_REGISTERED"` partway through an extended run, which reads as a PBX fault but is a test-fixture fault.
 
 ### The generator is the orchestrator
 
-The SIP phases run `scripts/pbx-sipp-validate.sh` **locally**, with `PBX_HOST` pointing at the PBX. SIPp must therefore be installed on the machine running `load-testing/scripts/load-test-matrix.sh`, not on the PBX. Running SIPp on the PBX measures the measurement.
+The SIP phases run `load-testing/scripts/pbx-sipp-validate.sh` **locally**, with `PBX_HOST` pointing at the PBX. SIPp must therefore be installed on the machine running `load-testing/scripts/load-test-matrix.sh`, not on the PBX. Running SIPp on the PBX measures the measurement.
 
 ---
 
@@ -391,7 +406,7 @@ A run is only comparable when these are what the manifest says they are:
 | ESL profile | `essential` | `.env` |
 | Broadcast throttle | unset (500 ms) | `.env` |
 | PHP-FPM | `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` (installer default) | `pool.d/www.conf` |
-| XML entry file | stock (`index.php`) | nginx `location` |
+| XML entry file | fast (`xml-handler-fast.php`) | nginx `location` |
 | Octane binding | as installed (both gateways declared) | `xml_curl.conf.xml` |
 | Runtime database | disk | `/var/lib/freeswitch/db` |
 | Cache TTLs | unset (config defaults) | `.env` |
