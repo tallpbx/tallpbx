@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **PHP-FPM Pool Reconciliation Reported Success While Failing**: `appliance:sync-host` previously skipped unwritable pool files, unmatched directives, and failed `systemctl` calls in silence, so an operator saw a green tick whether the pool had been rewritten or not. It now validates the rewritten file with `php-fpm -t`, restores the previous file when the test rejects it, reports the outcome per PHP version, and exits non-zero when the pool could not be brought to the target shape.
+- **`.env` Kept Its Group When the Installer Rewrote a Value**: `set_env_value` replaces `.env` through a temporary file and copied only the permission bits, so the replacement belonged to `root:root` instead of `root:www-data`. PHP-FPM reads `.env` as `www-data`, so writing a value outside a full install — or after the final permission repair — left the panel unable to read its own configuration until the next `tpbx permissions:repair`. The helper now copies the owner and group alongside the mode. Installer runs were unaffected because they end with a full permission repair.
 
 ## [5.1.2] - 2026-11-10
 

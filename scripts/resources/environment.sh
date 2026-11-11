@@ -63,7 +63,13 @@ set_env_value () {
         }
     ' "$env_file" > "$temp_file"
 
+    # The temporary file belongs to whoever ran this function (root during an
+    # install), so copying only the mode would hand .env to root:root and leave
+    # PHP-FPM, which reads it as www-data, unable to open its own configuration.
+    # Copy the owner and group too; chown needs root, so an unprivileged caller
+    # keeps the ownership it already had.
     chmod --reference="$env_file" "$temp_file"
+    chown --reference="$env_file" "$temp_file" 2>/dev/null || true
     mv "$temp_file" "$env_file"
 }
 

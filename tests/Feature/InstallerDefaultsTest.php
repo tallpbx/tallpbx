@@ -373,6 +373,49 @@ it('idempotently writes active Laravel database environment values', function ()
     }
 });
 
+it('preserves environment file ownership when rewriting a value', function (): void {
+    // set_env_value replaces .env through a temporary file. Copying only the
+    // mode left the replacement owned by root:root, which locks PHP-FPM out of
+    // its own configuration because it reads the file as www-data.
+    $environmentPath = tempnam(sys_get_temp_dir(), 'pbx-installer-owner-');
+
+    expect($environmentPath)->not->toBeFalse();
+
+    file_put_contents($environmentPath, "APP_NAME=TallPBX\n");
+
+    // The regression only shows when the file's group differs from the group
+    // the rewriting process would create for itself. www-data is that group on
+    // every TallPBX host; without it the assertion cannot fail, so the test is
+    // skipped rather than passing vacuously.
+    $webGroup = function_exists('posix_getgrnam') ? posix_getgrnam('www-data') : false;
+
+    if ($webGroup === false || ! @chgrp($environmentPath, $webGroup['gid'])) {
+        unlink($environmentPath);
+
+        $this->markTestSkipped('Requires the www-data group and permission to change file ownership.');
+    }
+
+    $ownerBefore = fileowner($environmentPath);
+
+    $helperPath = escapeshellarg(base_path('scripts/resources/environment.sh'));
+    $environmentArgument = escapeshellarg($environmentPath);
+    $command = 'source '.$helperPath.' && set_env_value '.$environmentArgument.' PHP_FPM_MAX_CHILDREN 3';
+
+    try {
+        $process = new Process(['bash', '-c', $command], base_path());
+        $process->run();
+
+        clearstatcache(true, $environmentPath);
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and((string) file_get_contents($environmentPath))->toContain('PHP_FPM_MAX_CHILDREN=3')
+            ->and(fileowner($environmentPath))->toBe($ownerBefore)
+            ->and(filegroup($environmentPath))->toBe($webGroup['gid']);
+    } finally {
+        unlink($environmentPath);
+    }
+});
+
 it('resolves persisted installer modes consistently', function (): void {
     $environmentPath = tempnam(sys_get_temp_dir(), 'pbx-installer-mode-');
 
