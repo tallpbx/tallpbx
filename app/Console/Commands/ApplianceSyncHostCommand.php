@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 
 /**
  * Reconciles appliance IP addresses across environment configuration, tenant SIP realms,
@@ -150,50 +151,38 @@ class ApplianceSyncHostCommand extends Command
             }
         });
 
-        // Reconcile PHP-FPM dynamic pool ceiling based on detected physical RAM
-        $this->components->task('Reconciling PHP-FPM worker pool ceiling', function (): void {
-            $poolFiles = glob('/etc/php/*/fpm/pool.d/www.conf') ?: [];
-            if (empty($poolFiles)) {
-                return;
+        // Reconcile the PHP-FPM worker pool. A snapshot carries the pool file
+        // from the machine it was taken on, so a restore onto differently sized
+        // hardware would otherwise keep a ceiling that no longer fits. The
+        // reconciler is the same script the installer runs, so both paths write
+        // the same six directives from one memory-to-ceiling table.
+        $poolFailure = null;
+        $this->components->task('Reconciling PHP-FPM worker pool', function () use (&$poolFailure): void {
+            $result = Process::path(base_path())
+                ->timeout(120)
+                ->env(['FPM_POOL_MAX_CHILDREN_OVERRIDE' => (string) config('php-fpm.max_children', '')])
+                ->run('bash scripts/resources/php-fpm-pool.sh');
+
+            // Report the per-version outcome (changed, validated, reloaded) in
+            // verbose runs, where an operator wants to see what was rewritten.
+            $output = trim($result->output());
+            if ($output !== '' && $this->output->isVerbose()) {
+                $this->components->bulletList(explode(PHP_EOL, $output));
             }
 
-            $totalMb = 1024;
-            if (file_exists('/proc/meminfo')) {
-                $content = (string) file_get_contents('/proc/meminfo');
-                if (preg_match('/^MemTotal:\s+(\d+)\s+kB/m', $content, $matches)) {
-                    $totalMb = (int) round(((int) $matches[1]) / 1024);
-                }
-            }
-
-            $targetMaxChildren = match (true) {
-                $totalMb >= 3500 => 12,
-                $totalMb >= 1800 => 6,
-                default => 3,
-            };
-
-            $reloaded = false;
-            foreach ($poolFiles as $poolFile) {
-                if (! is_writable($poolFile)) {
-                    continue;
-                }
-
-                $content = (string) file_get_contents($poolFile);
-                if (preg_match('/^[; ]*pm\.max_children\s*=\s*(\d+)/m', $content, $matches)) {
-                    $current = (int) $matches[1];
-                    if ($current !== $targetMaxChildren) {
-                        $updated = preg_replace('/^[; ]*pm\.max_children\s*=\s*.*/m', "pm.max_children = {$targetMaxChildren}", $content);
-                        if ($updated !== null && $updated !== $content) {
-                            file_put_contents($poolFile, $updated);
-                            $reloaded = true;
-                        }
-                    }
-                }
-            }
-
-            if ($reloaded && function_exists('exec')) {
-                @exec('systemctl reload php8.5-fpm 2>/dev/null || systemctl restart php8.5-fpm 2>/dev/null');
+            // A pool that could not be brought to the target shape is a failed
+            // restore step, not a warning: the host would keep serving with a
+            // ceiling nobody verified.
+            if ($result->failed()) {
+                $poolFailure = trim($result->errorOutput()) ?: 'PHP-FPM pool reconciliation failed.';
             }
         });
+
+        if ($poolFailure !== null) {
+            $this->components->error($poolFailure);
+
+            return self::FAILURE;
+        }
 
         $this->components->info('Appliance host synchronization complete.');
 

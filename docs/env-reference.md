@@ -249,6 +249,7 @@ Manages core Laravel application lifecycle, encryption keys, admin authenticatio
 | `APP_FAKER_LOCALE` | `string` | `en_US` | `app.faker_locale` | Locale used for generating test and factory data. |
 | `APP_MAINTENANCE_DRIVER` | `string` | `file` | `app.maintenance.driver` | Maintenance mode lock storage driver (`file`, `cache`). |
 | `APP_MAINTENANCE_STORE` | `string` | `null` | `app.maintenance.store` | Specific cache store used when maintenance driver is set to `cache`. |
+| `PHP_FPM_MAX_CHILDREN` | `integer` | `null` | `php-fpm.max_children` | Optional override for the PHP-FPM worker ceiling. Empty derives the ceiling from detected physical memory (3 workers on 1 GB, 6 on 2 GB, 12 on 4 GB+). Set it only to reproduce a published benchmark tier on hardware of a different size; both the installer and `appliance:sync-host` honour it, and an invalid value is ignored with a warning. `pm.max_requests` still recycles each worker after 10,000 requests. |
 
 ---
 

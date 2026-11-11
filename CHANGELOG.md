@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **PHP-FPM Worker Ceiling Override**: `PHP_FPM_MAX_CHILDREN` in `.env` pins the PHP-FPM worker ceiling instead of deriving it from detected RAM. It exists for one situation: reproducing a published benchmark tier on hardware of a different size — for example, running the 1 vCPU / 1 GB configuration on a 4 GB test host. Left unset, the ceiling follows memory exactly as before (3 workers on 1 GB, 6 on 2 GB, 12 on 4 GB+). Both the installer and `appliance:sync-host` honour the key, and a value that is not a positive whole number is reported and ignored rather than taking the pool down to zero workers. No migration, FreeSWITCH reload, or other `.env` change is required.
+
+### Changed
+- **`appliance:sync-host` Reconciles the Whole PHP-FPM Pool**: The command now applies all six pool directives (`pm`, `max_children`, `start_servers`, `min_spare_servers`, `max_spare_servers`, `max_requests`) through `scripts/resources/php-fpm-pool.sh` — the same script the installer runs — instead of rewriting `pm.max_children` on its own. A snapshot restored onto differently sized hardware therefore comes back with a pool that matches that machine, and a fresh install and a restore can no longer produce different shapes from the same documented configuration. The reload now follows the PHP version found in the pool path instead of assuming PHP 8.5.
+
+### Fixed
+- **PHP-FPM Pool Reconciliation Reported Success While Failing**: `appliance:sync-host` previously skipped unwritable pool files, unmatched directives, and failed `systemctl` calls in silence, so an operator saw a green tick whether the pool had been rewritten or not. It now validates the rewritten file with `php-fpm -t`, restores the previous file when the test rejects it, reports the outcome per PHP version, and exits non-zero when the pool could not be brought to the target shape.
+
 ## [5.1.2] - 2026-11-10
 
 ### Changed

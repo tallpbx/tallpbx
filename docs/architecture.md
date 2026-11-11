@@ -891,7 +891,7 @@ The pipeline is built around one uncomfortable fact: **the disk spool only ever 
 | `cdr:work` dead or crash-looping | Endpoint keeps answering 200 | Nothing, by design — the stream is the buffer, safely persisted by Redis AOF | Stream growth; `tpbx cdr:health` runs every 5 minutes via the scheduler to monitor `backlog`, `spooled_posts`, and `failed_posts` and alert operators before buffer exhaustion |
 | MariaDB unavailable | Worker transaction fails | Entries stay in the stream, because `XDEL` runs only after a successful commit | Stream growth; monitored every 5 minutes by `tpbx cdr:health` |
 | Malformed JSON | 200 (it was already accepted) | The worker quarantines it instead of dropping it | Manual triage, never silent loss |
-| `appliance:sync-host` runs after a host or IP change | Not involved | Only the cache store (DB 1) and the compiled caches are flushed; DB 2 sessions and DB 3 stream entries are untouched | None |
+| `appliance:sync-host` runs after a host or IP change | Not involved | Only the cache store (DB 1) and the compiled caches are flushed; DB 2 sessions and DB 3 stream entries are untouched. The command also reconciles the PHP-FPM pool through `scripts/resources/php-fpm-pool.sh`, the same reconciler the installer runs, so a snapshot restored on differently sized hardware returns with a pool that fits it | None |
 
 ### 17.4 The rule that makes the accepted window acceptable
 

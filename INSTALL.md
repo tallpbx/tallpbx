@@ -249,6 +249,8 @@ PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer det
 
 In plain terms: **one worker at boot, growing to at most three under load on a 1 GB server (six on 2 GB, twelve on 4 GB+), and shrinking back to at most two when quiet.**
 
+The same six values are re-applied later by `appliance:sync-host`, which runs the installer's own reconciler (`scripts/resources/php-fpm-pool.sh`) after a snapshot restore or an IP change. A server restored onto differently sized hardware therefore comes back with a pool that fits the new machine instead of keeping the ceiling from the machine the snapshot was taken on. A host whose RAM does not match any published tier can be pinned to one with `PHP_FPM_MAX_CHILDREN` in `.env`; editing `/etc/php/*/fpm/pool.d/www.conf` by hand lasts only until the next install or restore.
+
 **Measured capacity with exactly these settings** (full default firewall, warm 60-second lookup cache, 60-second cells):
 
 | Host | Supported rate | First failing rate | Completion at the failing rate |
@@ -288,7 +290,7 @@ Debian ships `pm = dynamic` with `pm.start_servers = 2`, `pm.min_spare_servers =
 
 The earlier pre-forked `static` baseline ("5 static workers on 1 GB") is retired: static spends its memory 24/7 and, at the failure boundary, completed fewer calls than the dynamic settings above.
 
-Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases; raise `pm.max_children` for high-traffic PBX servers and restart PHP-FPM.
+Check `/var/log/php8.5-fpm.log` for worker-limit warnings if call volume increases; raise the ceiling for high-traffic PBX servers and restart PHP-FPM. Because the installer and `appliance:sync-host` both rewrite the pool from detected RAM, `PHP_FPM_MAX_CHILDREN` — not the file — is the durable place to change it.
 
 ### File Permissions
 

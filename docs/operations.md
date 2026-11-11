@@ -64,6 +64,7 @@ not prevent a person with MariaDB access from running destructive SQL manually.
 To monitor telephony lookup latency and verify PHP-FPM workers under call bursts:
 - **Check Redis Hit Rates**: `redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'`
 - **Verify PHP-FPM Sizing**: `grep -E 'pm =|pm.max_children' /etc/php/8.5/fpm/pool.d/www.conf`
+- **Preview a Pool Reconciliation**: `bash scripts/resources/php-fpm-pool.sh --dry-run` reports the ceiling this host's RAM resolves to and which directives would change, without touching the file
 - **Check Worker Saturation**: `tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"`
 
 For comprehensive load testing runbooks, SIPp feature scenarios, and empirical hardware sizing, see [docs/load-testing-guide.md](load-testing-guide.md) and [docs/load-testing-results.md](load-testing-results.md).
@@ -238,7 +239,7 @@ journalctl -u php8.5-fpm --no-pager -n 50
 tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
 ```
 
-If you see `server reached pm.max_children setting`, the pool was saturated by concurrent HTTP XML handler requests. The installer auto-configures `pm = dynamic` with one resident worker and a per-memory ceiling of `3` workers on 1GB systems (`6` on 2GB systems, `12` on 4GB+ systems) — the 2026-11-08 worker sweep showed that on minimal hardware more concurrent workers lose calls at the call-rate boundary, so the ceiling is deliberately tight (see [load-testing-results.md](load-testing-results.md) → *PHP-FPM Static Worker Sweep on Minimal Hardware*). That tight ceiling is a single-core result: the 2026-11-09 measurement on 2 vCPU / 2 GB found the pool shape second-order, with every shape between 34 % and 44 % at the 12 calls/sec boundary, so on multi-core hosts the limit is total CPU rather than worker count. If needed on high-traffic PBX servers, increase `pm.max_children` in `/etc/php/8.5/fpm/pool.d/www.conf` and restart PHP-FPM.
+If you see `server reached pm.max_children setting`, the pool was saturated by concurrent HTTP XML handler requests. The installer auto-configures `pm = dynamic` with one resident worker and a per-memory ceiling of `3` workers on 1GB systems (`6` on 2GB systems, `12` on 4GB+ systems) — the 2026-11-08 worker sweep showed that on minimal hardware more concurrent workers lose calls at the call-rate boundary, so the ceiling is deliberately tight (see [load-testing-results.md](load-testing-results.md) → *PHP-FPM Static Worker Sweep on Minimal Hardware*). That tight ceiling is a single-core result: the 2026-11-09 measurement on 2 vCPU / 2 GB found the pool shape second-order, with every shape between 34 % and 44 % at the 12 calls/sec boundary, so on multi-core hosts the limit is total CPU rather than worker count. If needed on high-traffic PBX servers, increase `pm.max_children` in `/etc/php/8.5/fpm/pool.d/www.conf` and restart PHP-FPM. On a host whose RAM does not match a published tier, set `PHP_FPM_MAX_CHILDREN` instead of editing the file: the installer and `appliance:sync-host` both re-derive the ceiling from detected RAM, so a hand-edited value is replaced by the next install or restore run, while the override key survives both. See [env-reference.md](env-reference.md) → *Application Runtime & Maintenance*.
 
 ### "Permission denied" Errors in the Panel or Logs
 
