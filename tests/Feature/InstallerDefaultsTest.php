@@ -1089,27 +1089,24 @@ it('supports interactive and headless configuration of FreeSWITCH sound prompt l
 
 it('auto-configures a dynamic PHP-FPM pool with a measured per-memory ceiling', function (): void {
     $phpScript = (string) file_get_contents(base_path('scripts/resources/php.sh'));
+    $poolScript = (string) file_get_contents(base_path('scripts/resources/php-fpm-pool.sh'));
 
-    // The minimal tier runs a dynamic pool that starts with one worker, grows
-    // to at most three under load, and shrinks back to at most two when quiet:
-    // the 2026-11-08 worker sweep on the 1 vCPU / 1 GB reference host showed completion at the call-rate
-    // boundary rising as workers were removed (38 % at 5 workers to 84 % at
-    // 1), so the ceiling sits at 3 - the last point before the boundary curve
-    // collapses - instead of the old static 5. Larger tiers keep their
-    // ceilings but share the low idle floor.
-    expect($phpScript)->toContain('configure_php_fpm_pool')
-        ->and($phpScript)->toContain('total_ram_mb=$(free -m')
-        ->and($phpScript)->toContain('target_pm="dynamic"')
-        ->and($phpScript)->toContain('target_max_children=12')
-        ->and($phpScript)->toContain('target_max_children=6')
-        ->and($phpScript)->toContain('target_max_children=3')
-        ->and($phpScript)->toContain('worker-sweep')
-        ->and($phpScript)->toContain('pm = $target_pm')
-        ->and($phpScript)->toContain('pm.max_children = $target_max_children')
-        ->and($phpScript)->toContain('pm.start_servers = $target_start_servers')
-        ->and($phpScript)->toContain('pm.min_spare_servers = $target_min_spare_servers')
-        ->and($phpScript)->toContain('pm.max_spare_servers = $target_max_spare_servers')
-        ->and($phpScript)->toContain('pm.max_requests = $target_max_requests');
+    // The installer hands the pool shape to the shared reconciler instead of
+    // writing it itself, and suppresses the reload because it restarts PHP-FPM
+    // a few lines later. `appliance:sync-host` runs the same script, so a
+    // restore cannot reapply a different shape than a fresh install.
+    expect($phpScript)->toContain('. ./php-fpm-pool.sh')
+        ->and($phpScript)->toContain('fpm_pool_main --reload=none')
+        ->and($phpScript)->toContain('PHP_FPM_MAX_CHILDREN')
+        ->and($phpScript)->not->toContain('pm.max_children = $target_max_children');
+
+    // The reconciler owns the single memory -> ceiling table: the 4 GB, 2 GB
+    // and minimal tiers, with the minimal ceiling at 3 because the 2026-11-08
+    // worker sweep showed call completion rising as workers were removed.
+    expect($poolScript)->toContain('fpm_pool_target_max_children')
+        ->and($poolScript)->toContain('-ge 3500')
+        ->and($poolScript)->toContain('-ge 1800')
+        ->and($poolScript)->toContain('pm.max_requests = 10000');
 });
 
 it('configures default XML handler cache TTL in tall.sh', function (): void {

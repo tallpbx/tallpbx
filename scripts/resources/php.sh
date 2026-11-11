@@ -16,6 +16,9 @@ cd "$(dirname "$0")"
 . ./environment.sh
 # Durability helpers for the Redis instance that buffers CDR stream entries.
 . ./redis-durability.sh
+# PHP-FPM pool reconciler, shared with `appliance:sync-host` so the installer
+# and a snapshot restore write the same six directives from one RAM table.
+. ./php-fpm-pool.sh
 
 verbose "Installing PHP $php_version"
 
@@ -116,83 +119,26 @@ if ! verify_redis_appendonly; then
     warning "Redis append-only persistence is not active; undigested CDR records can be lost on restart"
 fi
 
-# Tune PHP-FPM worker pool sizing based on available physical memory.
-# FreeSWITCH invokes HTTP XML handlers for call lookups (extensions, routes, voicemail).
-# During simultaneous call bursts, a spare worker must be ready immediately to prevent
-# 502/504 gateway timeouts and failed calls, so the pool grows on demand and is kept
-# small: on minimal hardware more concurrent workers measurably LOSE calls (see below).
+# Reconcile the PHP-FPM worker pool with the documented shape for this host's
+# physical RAM. The tier table and the six directives it writes live in
+# php-fpm-pool.sh, which `appliance:sync-host` runs too, so an installer run and
+# a snapshot restore cannot disagree about the pool.
 #
-# Sizing logic based on physical RAM (ceiling of the dynamic range):
-# - Standard server (>= 3500 MB RAM): 12 workers. The previous 4GB+ capacity envelope,
-#   leaving ~2.9GB RAM free for FreeSWITCH and MariaDB.
-# - Small server (>= 1800 MB RAM): 6 workers. Balanced for 2GB instances.
-# - Minimal server (< 1800 MB RAM): 3 workers, measured (see below).
-#
-# Why dynamic workers with a low ceiling instead of a static pool:
-# The 2026-11-08 worker sweep (load-testing/results/worker-sweep-*) measured
-# every pool size from 5 down to 1 on the 1 vCPU / 1 GB reference host. At the
-# supported rate (5 calls/sec) every size completed 300/300 calls; at the
-# failure boundary (6 calls/sec) completion rose monotonically as workers were
-# REMOVED: 38% at 5 workers to 84% at 1. On a saturated single core extra
-# workers only deepen the request backlog, so more lookups miss the two
-# second nginx read timeout in front of PHP-FPM. The pool therefore sits at
-# one resident worker (Debian's dynamic mode) and grows only for burst overlap
-# and single-stuck-request tolerance, capped at 3 on the 1 GB tier - the last
-# ceiling before the boundary curve collapses (4 workers drop to 51%, 5 to
-# 38%). Fork latency on burst growth is the residual cost of dynamic mode; the
-# tight ceiling bounds it.
-#
-# That tight ceiling is a single-core result and must not be carried to larger
-# hosts. The 2026-11-09 re-measurement on 2 vCPU / 2 GB found the pool shape
-# second-order there: five shapes (dynamic ceiling 6, static 1, 2, 4 and 5)
-# all landed between 34% and 44% completion at the 12 calls/sec boundary while
-# PHP-FPM alone demanded 2.25 cores, so the limit is total CPU rather than
-# worker count. On multi-core hosts the ceiling therefore follows detected RAM
-# (6 on 2 GB, 12 on 4 GB+) and buys burst tolerance instead of being trimmed
-# to the minimum. Full series and method: docs/load-testing-results.md.
+# The reload is suppressed here because the installer restarts PHP-FPM a few
+# lines below; letting the reconciler reload as well would bounce the service
+# twice and discard the first restart's warm workers.
 configure_php_fpm_pool() {
-    local pool_conf="/etc/php/$php_version/fpm/pool.d/www.conf"
-    if [ ! -f "$pool_conf" ]; then
-        return 0
+    local override
+
+    # Optional administrator override (PHP_FPM_MAX_CHILDREN in .env), used to pin
+    # a host to a published tier when its RAM does not match the benchmark host.
+    override=$(get_env_value "/var/www/tallpbx/.env" PHP_FPM_MAX_CHILDREN)
+
+    if [ -n "$override" ]; then
+        verbose "Configuring PHP-FPM: administrator override PHP_FPM_MAX_CHILDREN=$override"
     fi
 
-    # Read total physical system RAM in megabytes
-    local total_ram_mb
-    total_ram_mb=$(free -m | awk '/^Mem:/{print $2}')
-    total_ram_mb="${total_ram_mb:-1024}"
-
-    # Dynamic mode on every tier with one low idle floor: one resident worker
-    # at idle, growing only while requests queue behind it.
-    local target_pm="dynamic"
-    local target_start_servers=1
-    local target_min_spare_servers=1
-    local target_max_spare_servers=2
-    local target_max_requests=10000
-
-    # The ceiling is the only per-tier value: 3 on minimal hardware (measured),
-    # the previous capacity envelope on larger hosts (6 on 2GB, 12 on 4GB+).
-    local target_max_children=3
-
-    if [ "$total_ram_mb" -ge 3500 ]; then
-        target_max_children=12
-        verbose "Configuring PHP-FPM: dynamic pool, one idle worker, ceiling of 12 (detected ${total_ram_mb}MB RAM, 4GB+ tier)"
-    elif [ "$total_ram_mb" -ge 1800 ]; then
-        target_max_children=6
-        verbose "Configuring PHP-FPM: dynamic pool, one idle worker, ceiling of 6 (detected ${total_ram_mb}MB RAM, 2GB tier)"
-    else
-        verbose "Configuring PHP-FPM: dynamic pool, one idle worker, ceiling of 3 (detected ${total_ram_mb}MB RAM, minimal tier)"
-    fi
-
-    # Update the process manager mode and the full dynamic knob set. The
-    # sed patterns also rewrite commented-out Debian defaults. pm.max_requests
-    # recycles long-lived workers so resident memory cannot creep over weeks
-    # of uptime (the same bound the Octane worker uses).
-    sed -i -E "s/^[; ]*pm\s*=\s*.*/pm = $target_pm/" "$pool_conf"
-    sed -i -E "s/^[; ]*pm\.max_children\s*=\s*.*/pm.max_children = $target_max_children/" "$pool_conf"
-    sed -i -E "s/^[; ]*pm\.start_servers\s*=\s*.*/pm.start_servers = $target_start_servers/" "$pool_conf"
-    sed -i -E "s/^[; ]*pm\.min_spare_servers\s*=\s*.*/pm.min_spare_servers = $target_min_spare_servers/" "$pool_conf"
-    sed -i -E "s/^[; ]*pm\.max_spare_servers\s*=\s*.*/pm.max_spare_servers = $target_max_spare_servers/" "$pool_conf"
-    sed -i -E "s/^[; ]*pm\.max_requests\s*=\s*.*/pm.max_requests = $target_max_requests/" "$pool_conf"
+    FPM_POOL_MAX_CHILDREN_OVERRIDE="$override" fpm_pool_main --reload=none
 }
 
 configure_php_fpm_pool
