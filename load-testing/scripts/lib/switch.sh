@@ -173,8 +173,8 @@ service_reload() {
 # Apply a PHP-FPM process-manager mode and worker cap, then assert the result.
 apply_fpm_profile() {
     local mode="${1:-}" children="${2:-}" pool current_mode current_children
-    local want_start="" want_min_spare="" want_max_spare=""
-    local current_start current_min_spare current_max_spare
+    local want_start="" want_min_spare="" want_max_spare="" want_max_requests=""
+    local current_start current_min_spare current_max_spare current_max_requests
 
     case "$mode" in
         static | dynamic) ;;
@@ -198,14 +198,24 @@ apply_fpm_profile() {
 
     snapshot_once fpm-pool "$pool"
 
+    # Deliberate split of responsibility: this library writes disposable,
+    # per-cell profiles - including `static` pools the shipped default never
+    # uses - and applies them in place. Correctness here comes from
+    # snapshot_once() and restore_baseline(), not from a config test. The
+    # shipped shape itself is owned by scripts/resources/php-fpm-pool.sh; do
+    # not merge the two, because the harness runs against staged remote
+    # checkouts that may predate that script.
+    #
     # The installer ships pm = dynamic with ONE resident worker: start and
-    # min_spare 1, max_spare 2. A cell that claims to measure "the shipped
-    # default" is only faithful when the harness applies those same knobs, so
-    # a dynamic profile writes and asserts them alongside mode and ceiling.
+    # min_spare 1, max_spare 2, and worker recycling at 10,000 requests. A cell
+    # that claims to measure "the shipped default" is only faithful when the
+    # harness applies those same knobs, so a dynamic profile writes and asserts
+    # them alongside mode and ceiling.
     if [ "$mode" = "dynamic" ]; then
         want_start=1
         want_min_spare=1
         want_max_spare=2
+        want_max_requests=10000
     fi
 
     # Skip when the pool already runs the requested shape; restarting php-fpm
@@ -215,10 +225,12 @@ apply_fpm_profile() {
     current_start="$(awk -F= '/^pm\.start_servers[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
     current_min_spare="$(awk -F= '/^pm\.min_spare_servers[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
     current_max_spare="$(awk -F= '/^pm\.max_spare_servers[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
+    current_max_requests="$(awk -F= '/^pm\.max_requests[[:space:]]*=/{value=$2; gsub(/[[:space:]]/, "", value); print value}' "$pool" | head -1)"
     if [ "$current_mode" = "$mode" ] && [ "$current_children" = "$children" ] \
         && { [ -z "$want_start" ] || { [ "$current_start" = "$want_start" ] \
             && [ "$current_min_spare" = "$want_min_spare" ] \
-            && [ "$current_max_spare" = "$want_max_spare" ]; }; }; then
+            && [ "$current_max_spare" = "$want_max_spare" ] \
+            && [ "$current_max_requests" = "$want_max_requests" ]; }; }; then
         log "php-fpm already ${mode}/${children} in ${pool}"
         assert_fpm_profile "$mode" "$children"
         return $?
@@ -227,11 +239,13 @@ apply_fpm_profile() {
     sed -i -E "s/^[;[:space:]]*pm[[:space:]]*=[[:space:]]*.*/pm = ${mode}/" "$pool"
     sed -i -E "s/^[;[:space:]]*pm\.max_children[[:space:]]*=[[:space:]]*.*/pm.max_children = ${children}/" "$pool"
 
-    # Only a dynamic profile carries a floor; static pools ignore these knobs.
+    # Only a dynamic profile carries the shipped floor and recycling bound;
+    # a static cell sets the mode and ceiling alone.
     if [ -n "$want_start" ]; then
         sed -i -E "s/^[;[:space:]]*pm\.start_servers[[:space:]]*=[[:space:]]*.*/pm.start_servers = ${want_start}/" "$pool"
         sed -i -E "s/^[;[:space:]]*pm\.min_spare_servers[[:space:]]*=[[:space:]]*.*/pm.min_spare_servers = ${want_min_spare}/" "$pool"
         sed -i -E "s/^[;[:space:]]*pm\.max_spare_servers[[:space:]]*=[[:space:]]*.*/pm.max_spare_servers = ${want_max_spare}/" "$pool"
+        sed -i -E "s/^[;[:space:]]*pm\.max_requests[[:space:]]*=[[:space:]]*.*/pm.max_requests = ${want_max_requests}/" "$pool"
     fi
 
     if ! service_reload "$(php_fpm_service)"; then
@@ -245,7 +259,7 @@ apply_fpm_profile() {
 
 # Read the pool file back and prove the mode and worker cap are live.
 assert_fpm_profile() {
-    local mode="${1:-}" children="${2:-}" pool current_mode current_children
+    local mode="${1:-}" children="${2:-}" pool current_mode current_children current_max_requests
 
     pool="$(fpm_pool_file)"
 
@@ -256,9 +270,17 @@ assert_fpm_profile() {
 
     current_mode="$(sed -nE 's/^[[:space:]]*pm[[:space:]]*=[[:space:]]*([a-z]+).*/\1/p' "$pool" | tail -n 1)"
     current_children="$(sed -nE 's/^[[:space:]]*pm\.max_children[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$pool" | tail -n 1)"
+    current_max_requests="$(sed -nE 's/^[[:space:]]*pm\.max_requests[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$pool" | tail -n 1)"
 
     if [ "$current_mode" != "$mode" ] || [ "$current_children" != "$children" ]; then
         fail_switch "fpm-profile expected ${mode}/${children} but read ${current_mode:-unset}/${current_children:-unset}"
+        return 1
+    fi
+
+    # A dynamic cell also claims the shipped recycling bound, so prove it: a
+    # leftover value from the host would silently change what the cell measures.
+    if [ "$mode" = "dynamic" ] && [ "$current_max_requests" != "10000" ]; then
+        fail_switch "fpm-profile expected pm.max_requests 10000 but read ${current_max_requests:-unset}"
         return 1
     fi
 

@@ -140,15 +140,17 @@ grep -E '^(pm|pm\.max_children)' /etc/php/8.5/fpm/pool.d/www.conf
 ```
 
 - `pm = dynamic` — Debian's default; workers start and stop with load.
-- `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2` and `pm.max_children = 3` — the installer default for the minimal tier: one worker at boot, growing to at most three under load and shrinking back to at most two when quiet (see `INSTALL.md` → PHP-FPM Worker Sizing).
+- `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` and `pm.max_requests = 10000` — the installer default for the minimal tier: one worker at boot, growing to at most three under load and shrinking back to at most two when quiet, with each worker recycling after 10,000 requests (see `INSTALL.md` → PHP-FPM Worker Sizing).
 
 **Apply:**
 
 ```bash
-sudo sed -i -E 's|^pm = .*|pm = dynamic|; s|^pm\.max_children = .*|pm.max_children = 3|; s|^pm\.start_servers = .*|pm.start_servers = 1|; s|^pm\.min_spare_servers = .*|pm.min_spare_servers = 1|; s|^pm\.max_spare_servers = .*|pm.max_spare_servers = 2|' \
-  /etc/php/8.5/fpm/pool.d/www.conf
+# Preview, then apply. The override pins the ceiling for a host whose RAM does
+# not match the minimal tier; the script writes all six directives, validates
+# them with `php-fpm -t` and reloads the unit itself.
+sudo bash -c 'FPM_POOL_MAX_CHILDREN_OVERRIDE=3 /var/www/tallpbx/scripts/resources/php-fpm-pool.sh --dry-run'
+sudo bash -c 'FPM_POOL_MAX_CHILDREN_OVERRIDE=3 /var/www/tallpbx/scripts/resources/php-fpm-pool.sh'
 sudo nginx -t && sudo systemctl reload nginx
-sudo systemctl reload php8.5-fpm
 ```
 
 **Prove:** the runner asserts the values back. Switching the pool briefly answers `502`; the runner waits for a readiness probe before measuring.
@@ -405,7 +407,7 @@ A run is only comparable when these are what the manifest says they are:
 | FreeSWITCH log level | `notice` | `switch.conf.xml`, `vars.xml` |
 | ESL profile | `essential` | `.env` |
 | Broadcast throttle | unset (500 ms) | `.env` |
-| PHP-FPM | `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` (installer default) | `pool.d/www.conf` |
+| PHP-FPM | `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3`, `pm.max_requests = 10000` (installer default) | `pool.d/www.conf`, written by `scripts/resources/php-fpm-pool.sh` |
 | XML entry file | fast (`xml-handler-fast.php`) | nginx `location` |
 | Octane binding | as installed (both gateways declared) | `xml_curl.conf.xml` |
 | Runtime database | disk | `/var/lib/freeswitch/db` |

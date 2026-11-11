@@ -71,16 +71,35 @@ describe('load test switch helpers', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
         // The installer ships pm = dynamic with one resident worker
-        // (start and min_spare 1, max_spare 2). A cell that claims to measure
-        // "the shipped default" is only faithful when the harness applies the
-        // same knobs, so a dynamic profile writes and asserts them alongside
-        // the mode and the ceiling.
+        // (start and min_spare 1, max_spare 2) and worker recycling after
+        // 10,000 requests. A cell that claims to measure "the shipped default"
+        // is only faithful when the harness applies every one of those knobs,
+        // so a dynamic profile writes and asserts them alongside mode and
+        // ceiling - a leftover host value for max_requests would silently
+        // change what the cell measures.
         expect($script)
             ->toContain('want_start=1')
             ->toContain('want_max_spare=2')
+            ->toContain('want_max_requests=10000')
             ->toContain('pm.start_servers = ${want_start}')
             ->toContain('pm.min_spare_servers = ${want_min_spare}')
-            ->toContain('pm.max_spare_servers = ${want_max_spare}');
+            ->toContain('pm.max_spare_servers = ${want_max_spare}')
+            ->toContain('pm.max_requests = ${want_max_requests}')
+            // The skip check must compare the recycling bound too, or a second
+            // run would consider a stale value "already applied".
+            ->toContain('[ "$current_max_requests" = "$want_max_requests" ]');
+    });
+
+    it('documents the split from the shipped-shape reconciler', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
+
+        // The harness deliberately writes per-cell profiles in place instead of
+        // delegating to scripts/resources/php-fpm-pool.sh, which owns the one
+        // shipped shape. The reason is recorded so the duplication is not
+        // "fixed" by wiring the two together across staged remote checkouts.
+        expect($script)
+            ->toContain('scripts/resources/php-fpm-pool.sh')
+            ->toContain('not merge the two');
     });
 
     it('restores the baseline from a teardown trap', function (): void {
