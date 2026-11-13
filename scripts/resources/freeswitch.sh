@@ -459,9 +459,14 @@ configure_dynamic_xml() {
         verbose "Installing the optional Octane XML worker systemd unit (left disabled)"
         cp "$systemd_service" /etc/systemd/system/tallpbx-xml-worker.service
         chmod 0644 /etc/systemd/system/tallpbx-xml-worker.service 2>/dev/null || true
-        if [ ! -x "${app_dir}/rr" ] && ! command -v rr >/dev/null 2>&1; then
+        # Octane >= 2.23 supports RoadRunner v3 (the version-check incompatibility
+        # with RoadRunner 3.0 was fixed there), so fetch the current v3 line
+        # instead of the 2024 calendar-versioned binary this script used to pin.
+        if [ ! -x "${app_dir}/rr" ] || "${app_dir}/rr" --version 2>/dev/null | grep -q "version 2024"; then
             verbose "Downloading RoadRunner binary via vendor/bin/rr"
-            "${app_dir}/vendor/bin/rr" get -s -f "2024.*" -l "${app_dir}" 2>/dev/null || true
+            # stdin is closed so the downloader's confirmation prompt can never
+            # hang an unattended install; a failed download is non-fatal here.
+            "${app_dir}/vendor/bin/rr" get -s -f "3.*" -l "${app_dir}" </dev/null 2>/dev/null || verbose "rr get did not complete — fetch roadrunner-*-linux-amd64 from the RoadRunner releases manually"
         fi
         if [ -f "${app_dir}/rr" ]; then
             chown root:www-data "${app_dir}/rr" 2>/dev/null || true

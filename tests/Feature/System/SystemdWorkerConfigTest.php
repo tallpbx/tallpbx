@@ -37,7 +37,7 @@ it('configures FreeSWITCH to query the persistent lean worker on port 8090 and i
 
     expect($script)->toContain('gateway_url="http://127.0.0.1:8090${xml_path}?token=${xml_token}"')
         ->and($script)->not->toContain('gateway_url="http://127.0.0.1${xml_path}?token=${xml_token}"')
-        ->and($script)->toContain('"${app_dir}/vendor/bin/rr" get -s -f "2024.*" -l "${app_dir}"')
+        ->and($script)->toContain('"${app_dir}/vendor/bin/rr" get -s -f "3.*" -l "${app_dir}"')
         ->and($script)->toContain('tallpbx-xml-worker.service')
         ->and($script)->toContain('/etc/systemd/system/tallpbx-xml-worker.service')
         ->and($script)->toContain('systemctl daemon-reload')
