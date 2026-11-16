@@ -150,7 +150,7 @@ Evaluated against the conventions documented in [`AGENTS.md`](../AGENTS.md).
 | CHANGELOG heading discipline | **Fail** | Default log level and default ESL subscription set are changes to existing functionality but are filed under `### Added` rather than `### Changed` |
 | CHANGELOG upgrade notes for reload / `.env` impact | **Fail** | No note that `freeswitch-listener` must restart and FreeSWITCH must reload for `8cd0d3c` to take effect, and no `.env` migration guidance |
 | Environment reference completeness | **Fail** | `FS_ESL_EVENT_PROFILE`, `FS_ESL_SUBSCRIBE`, `FS_BROADCAST_THROTTLE_MS` are absent from [`docs/env-reference.md`](env-reference.md); the `FS_LOG_LEVEL` row still documents default `debug` and a config key `freeswitch.log_level` that does not exist (actual key: `freeswitch.switch.loglevel`) |
-| Documentation link integrity | **Minor fail** | Broken relative link `](config/freeswitch.php)` in `docs/telephony-capacity-scaling-guide.md` (resolves to `docs/config/…`); stale "planned" wording at `docs/architecture.md` line 567 after §7.5.6 was re-statused |
+| Documentation link integrity | **Minor fail** | Broken relative link to `config/freeswitch.php` in `docs/telephony-capacity-scaling-guide.md` (written repository-root-relative, so it resolved to `docs/config/…`); stale "planned" wording at `docs/architecture.md` line 567 after §7.5.6 was re-statused |
 | Decimal storage / memory units (GB/MB) | **Pass** | New and edited documentation uses GB / MB throughout; no GiB / MiB in authored prose |
 | UI consistency (DaisyUI tokens, toggle states, badges) | **N/A** | No Blade, CSS, Livewire, or toggle markup changed in any of the six commits |
 
@@ -194,7 +194,7 @@ The window check in both listeners returns early and never schedules a trailing 
 
 ### R6 — Low to medium: documentation drift introduced or left unresolved
 
-- Broken relative link in `docs/telephony-capacity-scaling-guide.md`: `[config/freeswitch.php](config/freeswitch.php)`.
+- Broken relative link in `docs/telephony-capacity-scaling-guide.md` to `config/freeswitch.php` (repository-root-relative form; the live link now reads `../config/freeswitch.php`).
 - `docs/architecture.md` line 567 still reads *"DB 0 mirror namespace (planned, §7.5.6)"* although §7.5.6 was re-statused to shipped in the same session.
 - Three new environment variables undocumented (see [§4](#4-consistency-check)).
 

@@ -656,7 +656,7 @@ TallPBX uses a **two-tier architecture** to ensure security rules, IP lists, thr
    - Database tables (`security_bans`, `security_ip_lists`, `security_rules`, `security_settings`, `security_threat_feeds`) permanently store all whitelisted IPs, blacklisted subnets, custom firewall rules, PBX port definitions, and active attacker bans.
 
 2. **Tier 2: Boot Persistence (`/etc/tallpbx/firewall.nft`, `/etc/tallpbx/external_blocklist.nft`, & `/etc/nftables.conf`)**
-   - Whenever any security change is made in the web UI, [SecurityConfigGenerator](../app-modules/security/src/Services/SecurityConfigGenerator.php) compiles the active ruleset directly into `/etc/tallpbx/firewall.nft`.
+   - Whenever any security change is made in the web UI, [SecurityConfigGenerator](../app-modules/security/src/Services/Firewall/SecurityConfigGenerator.php) compiles the active ruleset directly into `/etc/tallpbx/firewall.nft`.
    - External blocklist elements are maintained in `/etc/tallpbx/external_blocklist.nft` and loaded into `@external_blocklist_ips`.
    - The systemd boot loader `/etc/nftables.conf` includes `/etc/tallpbx/firewall.nft`.
    - When the Linux server reboots, systemd's `nftables.service` executes `/etc/nftables.conf` before networking starts, instantly restoring all rules, trusted IPs, external blocklists, and temporary attacker bans with their remaining expiration times intact.
@@ -673,7 +673,7 @@ TallPBX enforces a strict privilege separation boundary between root installer s
 > All ruleset updates are atomic (all-or-nothing). TallPBX tests proposed rules with `nft -c` and runs zero-lockout guards before applying. If any check fails, the transaction is aborted and the existing active firewall continues uninterrupted. You are never left with broken or half-applied rules.
 
 ### Zero-Lockout Protections
-Before any restrictive policy or rule change is applied, [LockoutGuardService](../app-modules/security/src/Services/LockoutGuardService.php) enforces two distinct safety checks:
+Before any restrictive policy or rule change is applied, [LockoutGuardService](../app-modules/security/src/Services/Firewall/LockoutGuardService.php) enforces two distinct safety checks:
 1. **Administrator Connection Guard (`assertSafe()`)**: Checks the current administrator's active connection IP against the proposed ruleset. If a change would disconnect the active administrator, the change is rejected immediately with a descriptive warning.
 2. **Local Services Guard (`assertLocalServicesSafe()`)**: Strictly forbids disabling pre-filters while the default policy is set to Block Unknown without an explicit loopback allow rule, guaranteeing that server processes (PHP-FPM, MariaDB, Redis) can never be severed from one another.
 

@@ -711,8 +711,10 @@ database each time — the query is trivial.
 ### ModuleServiceProvider Base Class
 
 All module service providers MUST extend `App\Support\ModuleServiceProvider`
-(not `Illuminate\Support\ServiceProvider`). The base class auto-registers
-views, migrations, routes, Livewire components, menu items, and permissions.
+(not `Illuminate\Support\ServiceProvider`). The base class auto-registers views,
+migrations, Livewire components, menu items, permissions, and console commands.
+**Route auto-registration is retired**: every built-in module ships an explicit
+`routes/web.php`, and `ModuleArchitectureTest` enforces it.
 
 Required overrides:
 - `moduleName(): string` — kebab-case name (e.g. `'bridges'`, `'email-connector'`)
@@ -721,16 +723,16 @@ Required overrides:
 Optional overrides:
 - `menuItems(): array` — sidebar menu entries
 - `permissions(): array` — permission definitions as `[key => description]`
-- `hasTranslations(): bool` — return `true` if module has translations (default auto-detects `lang/` or `resources/lang/`, registered via `loadTranslationsFrom(__DIR__.'/../../lang', 'email-connector')` and cascading loader)
+- `hasTranslations(): bool` — return `true` to cascade the module's `lang/` dictionary into the global `admin` group (default auto-detects `lang/` or `resources/lang/`). The base provider resolves the directory through `protected function translationPath(): ?string`, so no module calls `loadTranslationsFrom()` itself; keys keep the module prefix and are read with `__('admin.<prefix>_*')`.
 
-### Route Auto-Registration
+### Explicit Module Routes
 
-Modules with standard Livewire component naming (`{PascalModule}List`,
-`{PascalModule}Edit`) get routes auto-registered under `/panel/` — no
-`routes/web.php` file needed. Create a `routes/web.php` only when:
-- The module uses non-standard component names
-- The module needs public/non-authenticated endpoints
-- The module needs additional routes beyond index/create/edit
+Every built-in module declares its routes explicitly in `routes/web.php`
+(`ModuleArchitectureTest` fails a module without one). A module adds routes
+beyond its standard index/create/edit pair when:
+- It needs public or non-authenticated endpoints
+- It serves a non-Livewire controller action (downloads, callbacks)
+- It exposes an API surface separate from the panel pages
 
 ### Setting Model Pattern
 
@@ -910,7 +912,7 @@ Run the narrow affected test files first, then `tpbx app:test --smoke` when shar
   - `5.x`: Current primary development branch for 5.x features and releases (not backwards compatible with 4.x; requires a fresh install).
 - **No Dual-Commit Syncs**: There are no dual-commit syncs between `main` and version branches. Commits belong to the active series branch (`5.x`) or maintenance branches when backporting fixes for existing releases.
 - **Web Updater Recognition**: The web updater UI recognizes version branches (`^\d+(\.x|(\.\d+)+)`) as stable release series, sorting them in reverse version order so `5.x` is the top/default target.
-- **Documentation**: User-facing versioning details are in [`README.md#versioning--release-strategy`](README.md#versioning--release-strategy), installation notes in [`INSTALL.md`](INSTALL.md), and release logs in [`CHANGELOG.md`](CHANGELOG.md).
+- **Documentation**: User-facing versioning details are in [`README.md#versioning--release-strategy`](../../../README.md#versioning--release-strategy), installation notes in [`INSTALL.md`](../../../INSTALL.md), and release logs in [`CHANGELOG.md`](../../../CHANGELOG.md).
 
 ### Tagging Best Practices (Do NOT Tag Every Commit)
 - **Never tag individual commits or task completions.**
@@ -946,7 +948,7 @@ TallPBX uses **Native Path Cascading** (`FileLoader::addPath`) for modular trans
 - **Module Language File Header Requirement (Built-in Modules)**: Every built-in `app-modules/{module}/lang/{en,es,fr}/admin.php` file must start with the standardized collision-warning docblock. Custom modules and `make:module` scaffolds do not need to include it.
 - **Runtime Collision Guard**: `ModuleServiceProvider` inspects keys on boot and throws `LogicException` in local/testing (or logs critical error and refuses path in production) if any collision with root keys is detected.
 - **Automated Architecture Tests**: `tests/Feature/Architecture/TranslationParityTest.php` checks root non-collision, peer non-collision, 100% locale parity and headers for built-in `app-modules/`, root dictionary parity across `en`, `es`, `fr`, and the runtime collision guard.
-- Complete architectural reference: [`docs/architecture.md`](docs/architecture.md).
+- Complete architectural reference: [`docs/architecture.md`](../../../docs/architecture.md).
 
 ## Module Manifest Taxonomy & Navigation Parity
 
