@@ -12,18 +12,6 @@ In telephony and VoIP PBX systems, the **"Hello World"** is the **Echo Test (`*9
 
 Making a successful echo test call proves the entire VoIP pipeline is operational:
 
-```
-┌─────────────────┐         SIP Signaling (UDP 5060)         ┌─────────────────┐
-│                 │ ───────────────────────────────────────> │                 │
-│   SIP Client    │          Digest Authentication           │     TallPBX     │
-│   (Softphone)   │ <─────────────────────────────────────── │   (FreeSWITCH)  │
-│                 │                                          │                 │
-│                 │         RTP Media Stream (Audio)         │                 │
-│  Mic / Speaker  │ ═══════════════════════════════════════> │   echo() App    │
-│                 │ <═══════════════════════════════════════ │ (Audio Loopback)│
-└─────────────────┘                                          └─────────────────┘
-```
-
 1. **Authentication**: The client authenticates against TallPBX's dynamic database directory via `mod_xml_curl`.
 2. **SIP Registration**: FreeSWITCH registers the client's network contact endpoint (`sofia_contact`).
 3. **Dialplan Routing**: The dialed destination (`*9196`) matches the tenant's internal dialplan rules.
@@ -65,6 +53,25 @@ Before starting, ensure you have:
 5. Click **Save**.
 
 TallPBX instantly generates the directory mapping for FreeSWITCH. No server reload or restart is required.
+
+### What happens behind the scenes
+
+With the extension saved, this is the whole path a call takes. The diagram sits
+here, after the step that creates the account, so the first thing you did is
+still the first thing you read.
+
+```
+┌─────────────────┐         SIP Signaling (UDP 5060)         ┌─────────────────┐
+│                 │ ───────────────────────────────────────> │                 │
+│   SIP Client    │             Basic / digest              │     TallPBX     │
+│   (Softphone)   │ <─────────────────────────────────────── │   (FreeSWITCH)  │
+│                 │                                          │                 │
+│                 │         RTP Media Stream (Audio)         │                 │
+│  Mic / Speaker  │ ═══════════════════════════════════════> │   echo() App    │
+│                 │ <═══════════════════════════════════════ │ (Audio Loopback)│
+└─────────────────┘                                          └─────────────────┘
+```
+
 
 ---
 

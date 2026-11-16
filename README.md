@@ -2,6 +2,20 @@
 
 TallPBX is a self-hosted business phone system named after its foundation on the **TALL stack** (**T**ailwind CSS, **A**lpine.js, **L**ivewire, and **L**aravel). It gives an administrator a web control panel for setting up and managing phones, extensions, call routing, voicemail, recordings, and other everyday PBX features. It runs on your own Debian server and uses FreeSWITCH® to handle calls.
 
+## Start Here
+
+| If you want to… | Start with | Authoritative detail |
+| :--- | :--- | :--- |
+| Install the appliance | [INSTALL.md](INSTALL.md) | [Operations & Maintenance](docs/operations.md) |
+| Make your first phone call | [PBX "Hello World"](docs/pbx-hello-world.md) | [PBX Concepts](docs/pbx-concepts.md) |
+| Configure a desk phone | [Desk-Phone Provisioning Guide](docs/provisioning-guide.md) | [Environment Reference](docs/env-reference.md) |
+| Back up or restore the appliance | [Backup & Restore Journey](docs/backup-restore-guide.md) | [Operations & Maintenance](docs/operations.md) |
+| Operate, tune, or recover a host | [Operations & Maintenance](docs/operations.md) | [System Architecture](docs/architecture.md) |
+| Scale call capacity | [Scaling Guide](docs/telephony-capacity-scaling-guide.md) | [`load-testing/`](load-testing/README.md) |
+| Understand tenants and isolation | [Tenants & Multi-Tenancy](docs/multi-tenancy.md) | [System Architecture](docs/architecture.md) |
+| Change the code | [Developer Guide](docs/developer-guide.md) | [System Architecture](docs/architecture.md) |
+| Cut a release | [Release Checklist](docs/release-checklist.md) | [CHANGELOG.md](CHANGELOG.md) |
+
 ## What You Can Do With It
 
 - Create extensions and connect desk phones or softphones.
