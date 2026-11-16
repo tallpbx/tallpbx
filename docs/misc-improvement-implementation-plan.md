@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the 28 findings of `docs/gpt-evaluation.md` plus the two code gaps its critical evaluation found inside reviewed modules, in nine independently shippable work packages (0–8). Remaining items that need a product decision, rather than code, are recorded under **Deferred decisions**.
+**Goal:** Close the 28 audit findings plus the two code gaps identified inside reviewed modules, in nine independently shippable work packages (0–8). Remaining items that need a product decision, rather than code, are recorded under **Deferred decisions**.
 
 **Architecture:** Keep the modular monolith. Each fix gives one operation one owner: services own complete state changes inside a transaction, middleware guards the authentication boundary once, shell helpers claim work atomically, and every destructive operation writes a journal outside the database it replaces. No new framework, no generic repositories, no compatibility shims for a pre-5.x layout.
 
 **Tech Stack:** PHP 8.5, Laravel 13.42, Livewire 4.4, Pest 4, PHPUnit 12, Symfony Process 8.1, MariaDB 11 / SQLite in tests, Redis, systemd, Bash, Tailwind/DaisyUI 5.
 
-**Spec:** `docs/gpt-evaluation.md` (the audit; every finding ID below refers to it) and the critical evaluation in this conversation, whose corrections are recorded in **Deviations** below. Read both before Task 1.
+**Spec:** This plan is self-contained. The external audit (`gpt-evaluation.md`) and intermediate review reports referenced below are not committed to `docs/`; all finding IDs (`T01`–`T03`, `C01`–`C05`, `O01`–`O08`, `D01`–`D10`, `M01`–`M02`) and review corrections are inline in the sections and tasks below.
 
 ## Global Constraints
 
@@ -44,7 +44,7 @@ These are deliberate and supersede the audit's ordering where they conflict.
 | **D01 re-rated P2** (first task of package 6) | It is a documentation/instruction hazard, not a tenant boundary or recovery defect, so it does not meet the audit's own P1 definition. It stays first in its own queue. |
 | **Two findings added** the audit missed | Task 0.2: `mysqldump` receives the database password on the command line. Task 2.6: restore swallows every service-restart failure and reports `completed`. Both are inside modules the audit reviewed. |
 | **Restore journal (Task 2.1) precedes request claiming (Task 2.2)** | "Already terminal" can only be answered by the journal once the database has been replaced. |
-| **Tenant-relative CDR direction deferred** (see Deferred Decisions) | It needs a schema/query decision and a live cross-tenant bridged call to validate; shipping a half-defined direction model would be worse than quarantining. |
+| **Tenant-relative CDR direction added as Task 1.4** | Initially deferred in round 1; promoted in round 3 so C02 closes cross-tenant call direction cleanly. |
 
 ## Corrections applied after review
 
@@ -80,7 +80,7 @@ The report was re-issued against the corrected plan. Its 13 issues were checked 
 | 2 — scaffold assertions | Test scoped to what `make:module` emits, plus a separate built-in `routes/web.php` assertion | The report's Option B; the command is left unchanged |
 | 3 — context naming | `DialplanContext::parseTenantId()` / `::internal()` | Reuses the existing helper; `default` means "no candidate", not `unresolved-context` |
 | 4 — Livewire impersonation bypass | `PanelActor::resolve()` validates the origin administrator | As proposed, with a Livewire-level test |
-| 5 — `hydrate()` ordering | Adds `updatedTenantId()` beside `hydrate()` | `updating` runs before Livewire assigns the value, so the report's `updatingTenantId()` would be a no-op; `updated` runs immediately after and before the action |
+| 5 — `hydrate()` ordering | Adds `updated(string $property)` beside `hydrate()` (superseded `updatedTenantId()` in round 4) | `updating` runs before Livewire assigns the value; `updated(string $property)` runs after assignment and avoids PHP 8.5 signature conflicts on four subclasses |
 | 6 — reflection, snapshot, test path | Rename propagated, snapshot exclusions added, `tests/Feature/Backups` corrected | As proposed |
 | 7 — post-import failure | `catch` writes the journal first, then reconciles in its own `try/catch` | As proposed, plus a regression test |
 | 8 — preflight ordering and arity | Space check after the archive check; trailing nullable constructor arguments | As proposed; the reported "test breaks" is a warning, not a failure |
@@ -107,6 +107,17 @@ Three gaps the report did not list are also closed: the journal directory is add
 
 The report's claim that `ripgrep` is installed was re-checked and is false in this workspace (`command -v rg` returns nothing; neither `/usr/bin/rg` nor `/usr/local/bin/rg` exists), so the `grep -rnE` steps stay. Four defects it did not list are also fixed: `backups:restore-status` becomes a bootless script because every Artisan command boots `ModuleState` and therefore the database; the dispatcher uses `systemctl list-units` because `is-active` does not accept globs; Task 4.1 no longer names a nonexistent `SipAccountServiceInterface::find`; and the Global Constraints now state the repository's PHP conventions.
 
+### Fourth review round
+
+Evaluated against `665ad77` and resolved 14 remaining defects:
+
+- **Task 0.2:** Invokes `dumpDatabase()` via `ReflectionMethod` in tests (it is `private`) and makes `BackupService::__construct()`'s `ProcessRunner` nullable (`?ProcessRunner $runner = null`) so 2-argument test instantiations remain intact.
+- **Tasks 1.3–1.4:** Uses channel-local `set` (not `export`) for `tenant_id` in `DialplanXmlBuilder` so cross-tenant B-legs keep their own tenant identity; allows uniquely-owned domains to resolve when no channel/context candidate is present (fixing Step 1's `default` test and existing CDR suites); fixes `CdrTenantDirectionTest` (`where('call_uuid', ...)`), adds batch preloading via `Cdr::preloadTenantDirections()`, and updates `CdrList::exportCdrs()`.
+- **Tasks 2.1–2.3:** Moves `/var/lib/tallpbx/restore-requests` into `config('backup-storage.request_root')` so tests do not trigger live systemd path units; updates `RestoreServiceTest` for the `.claimed` marker requirement; adds `'id'` to `RestoreOperation::$fillable` so `updateOrCreate` preserves journal UUIDs; removes `tallpbx-queue.service` from modified files and `git add`.
+- **Tasks 2.6–2.8 & 3.1–3.3:** Moves `RuntimeServiceReconcilerTest` to `tests/Feature/Services/`; runs `probeHttpHealth()` (`GET /up`) *after* `artisan up` (avoiding 503 maintenance deadlocks); adds `reconcileAfterUpdate()` for unprivileged `www-data` web updates and updates `GitUpdatePipelineTest`; fixes `RestoreUploadCeilingTest` field/method names, kilobyte units, and `actingAs`; fixes `git-channels.blade.php` unreachable `Unknown` badge and detached-HEAD rollback.
+- **Tasks 4.1–4.4:** Eliminates `LazyLoadingViolationException` under `Model::preventLazyLoading()` (`ExtensionSaveService`, `ExtensionService::syncUsers()`); switches `BaseEditComponent` to `updated(string $property)` (preventing PHP 8.5 fatal signature conflicts on four subclasses) and fixes `OutboundRoutesEdit`, `ExtensionSettingsEdit`, and `ExtensionsBulkCreate`; fixes `CdrDrainSpoolCommandTest` path and updates `CdrRedisIngestDigestTest` for transient `QueryException` handling.
+- **Tasks 6.1–6.5 & 7.3:** Strips scheme from both `FS_SERVER` and `APP_URL` in `config/freeswitch.php` (refreshing `FreeswitchConfigTest`); updates `pbx-sipp-validate.sh` `DOMAIN` default; fixes `ModuleServiceProvider::translationPath()`/`hasTranslations()` naming, `MakeModuleScaffoldTest` `bootstrap/cache` dir setup, `docs/todays-commit-evaluation.md` broken link, and excludes `docs/misc-improvement-implementation-plan.md` (and historical `docs/changelog/*`) from self-matching verification checks.
+
 ## File Structure
 
 | Path | Responsibility | Task |
@@ -131,10 +142,12 @@ The report's claim that `ripgrep` is installed was re-checked and is false in th
 | `app-modules/extensions/src/Services/ExtensionService.php` | Tenant-scoped uniqueness and membership | 4.2, 4.3 |
 | `app/Services/Cdr/CdrBatchWriter.php`, `CdrRedisIngest.php` | Poison-record isolation | 4.4 |
 | `app/Console/Commands/CdrDrainSpoolCommand.php` | Spool drain keeps rejected records instead of unlinking them | 4.4 |
-| `app/Support/BaseEditComponent.php` | Tenant initialization shared by every edit form | 4.2, 8.1 |
-| `app/Services/Xml/DialplanXmlBuilder.php` | Tenant identity export for dialplan-created legs | 1.3 |
+| `app/Support/BaseEditComponent.php` | Tenant initialization and property re-pinning shared by every edit form | 4.2, 8.1 |
+| `app-modules/extensions/src/Livewire/ExtensionsBulkCreate.php`, `OutboundRoutesEdit.php`, `ExtensionSettingsEdit.php` | Tenant derivation alignment in overriding/bulk edit forms | 4.2 |
+| `app-modules/call-detail-records/src/Livewire/CdrList.php` | Batch peer-direction preloading and CSV export parity | 1.4 |
+| `app/Services/Xml/DialplanXmlBuilder.php` | Channel-local tenant identity `set` for dialplan-created legs | 1.3 |
 | `app/Console/Commands/PbxLoadTestSeedCommand.php` | Seeder realm default | 6.4 |
-| `scripts/resources/tall.sh`, `scripts/tallpbx-queue.service` | Journal directory and systemd sandbox | 2.1 |
+| `scripts/resources/tall.sh`, `scripts/resources/tallpbx-restore.service` | Journal directory and systemd unit path | 2.1 |
 | `docs/*.md`, `AGENTS.md`, `.agents/skills/*` | Documentation corrections and journeys | 6.x, 7.x |
 
 ---
@@ -239,7 +252,8 @@ it('persists the SQLite dump from the command output', function (): void {
     $tempDir = sys_get_temp_dir().'/tallpbx-dump-'.Str::random(8);
     File::ensureDirectoryExists($tempDir);
 
-    app(BackupServiceInterface::class)->dumpDatabase($tempDir);
+    $service = app(BackupServiceInterface::class);
+    (new ReflectionMethod($service, 'dumpDatabase'))->invoke($service, $tempDir);
 
     expect(file_get_contents($tempDir.'/database.sql'))->toBe('CREATE TABLE x (id);');
 });
@@ -278,7 +292,7 @@ Do not write `$result->output` for mysqldump: `--result-file` streams to disk an
 
 - [ ] **Step 4: Add the injection and update the stale test at `BackupServiceTest.php:315`**
 
-Constructor becomes `__construct(FileStoreServiceInterface $fileStoreService, MediaStorageServiceInterface $mediaStorage, private readonly ProcessRunner $runner)`; replace the string assertions with argv assertions.
+Constructor becomes `__construct(FileStoreServiceInterface $fileStoreService, MediaStorageServiceInterface $mediaStorage, ?ProcessRunner $runner = null)` and initializes `$this->runner = $runner ?? app(ProcessRunner::class)` so existing 2-argument instantiations (`BackupServiceTest.php:350`) remain valid; replace the string assertions at `BackupServiceTest.php:315` with argv assertions.
 
 - [ ] **Step 5: Run the backups suite**
 
@@ -578,7 +592,7 @@ git commit -m "fix(auth): rotate remember tokens when an account is disabled"
 - Test: `tests/Feature/Services/DialplanTenantExportTest.php` (new)
 
 **Interfaces:**
-- Consumes: two identity sources — the directory user variable (`DirectoryXmlBuilder`, `<variable name="tenant_id" …>`, L241) for registered A-legs, and the dialplan export added in Step 3 for every other leg.
+- Consumes: two identity sources — the directory user variable (`DirectoryXmlBuilder`, `<variable name="tenant_id" …>`, L241) for registered A-legs, and the channel-local dialplan `set` added in Step 3 for dialplan-routed legs.
 - Produces: `parse()` returns `null` (quarantine) for unknown, ambiguous, or conflicting identity; never selects an arbitrary domain row.
 
 - [ ] **Step 1: Write the failing tests**
@@ -592,11 +606,10 @@ dataset('cdr attribution', [
     'domain disagrees with the captured variable' => [fn () => 2, 1, null],
 ]);
 
-it('attributes a CDR only from a captured identity', function (Closure $variable, int $tenantCount, ?int $expected) {
+it('attributes a CDR cleanly and quarantines ambiguity or conflicts', function (Closure $variable, int $tenantCount, ?int $expected) {
     // Create $tenantCount tenants sharing domain "shared.test"; tenant 1 also
-    // owns "dedicated.test". Ownership comes only from the channel capture
-    // (tenant_id variable or dialplan context); the domain is a conflict check,
-    // never an assignment source.
+    // owns "dedicated.test". Shared domains never guess a tenant; conflicts and
+    // missing tenants quarantine.
 })->with('cdr attribution');
 
 it('attributes an inbound call from its tenant dialplan context', function (): void {
@@ -619,7 +632,7 @@ it('attributes an internal extension call from its tenant context', function ():
 
 it('treats a non-tenant context as absent, never as a conflict', function (): void {
     // The captured fixtures carry context "default"; it must not quarantine a
-    // payload whose domain resolves cleanly.
+    // payload whose dedicated domain resolves cleanly.
     expect(parseCdr(domain: 'dedicated.test', context: 'default')['tenant_id'])->toBe(1);
 });
 
@@ -633,53 +646,61 @@ it('quarantines a payload whose dialplan context and tenant variable disagree', 
 Run: `./vendor/bin/pest tests/Feature/Services/CdrTenantAttributionTest.php`
 Expected: FAIL — the shared-domain case parses and attributes to the first row.
 
-- [ ] **Step 3: Export the tenant identity from every tenant dialplan context**
+- [ ] **Step 3: Set the tenant identity on every tenant dialplan context**
 
-Directory variables are set only on the authenticating A-leg; a bridged B-leg and a gateway call never receive them. Add the export beside the existing caller-ID export in `DialplanXmlBuilder` (L87 shows the pattern), so every leg carries the identity:
+Directory variables are set only on the authenticating A-leg; a bridged B-leg and a gateway call never receive them. Add a channel-local `set` beside the existing caller-ID action in `DialplanXmlBuilder` (L87):
 
 ```php
 $writer->selfClosingTag('action', [
-    'application' => 'export',
+    'application' => 'set',
     'data' => 'tenant_id='.$tenantId,
 ], 10);
 ```
 
-Test it in `DialplanTenantExportTest`: render the dialplan for a tenant and assert `data="tenant_id=<id>"` appears in the context named by `DialplanContext::internal($id)` (`tenant_<id>_internal`) **and** `DialplanContext::public($id)` (`tenant_<id>_public`). Internal contexts are never named `tenant_<id>` — [DialplanContext.php:27](../app/Services/DialplanContext.php#L27) already encodes the real shape. This is the difference between attributing a B-leg and quarantining it.
+Use `set` (channel-local), **not** `export`: `export` copies `tenant_id` across bridges onto the B-leg, which would overwrite or conflict with the callee tenant's context on a cross-tenant bridge (Task 1.4). Test it in `DialplanTenantExportTest`: render the dialplan for a tenant and assert `application="set"` and `data="tenant_id=<id>"` appear in the context named by `DialplanContext::internal($id)` (`tenant_<id>_internal`) **and** `DialplanContext::public($id)` (`tenant_<id>_public`). Internal contexts are never named `tenant_<id>` — [DialplanContext.php:27](../app/Services/DialplanContext.php#L27) already encodes the real shape.
 
-- [ ] **Step 4: Replace the domain lookup with a capture-only resolution**
+- [ ] **Step 4: Replace the ambiguous domain lookup with unambiguous resolution**
 
 Add `private function resolveTenantId(array $variables, array $profile): ?int`:
 
-1. Read `variables.tenant_id`; a numeric value names the **only** possible candidate.
-2. Read `variables.context` or `callflow[0].caller_profile.context` and pass it to `app(DialplanContext::class)->parseTenantId($context)`. A returned id is a candidate; `null` means "no candidate" and must never quarantine — the captured fixtures carry `"context": "default"`.
+1. Read `variables.tenant_id`; a numeric value names the variable candidate.
+2. Read `variables.context` or `callflow[0].caller_profile.context` and pass it to `app(DialplanContext::class)->parseTenantId($context)`. A numeric value is the context candidate; `null` means "no context candidate" and must never quarantine — the captured fixtures carry `"context": "default"`.
 3. When both named a candidate and they disagree → quarantine (`conflicting-identity`).
-4. **The domain never assigns ownership.** Resolve it only as a conflict check: when the domain maps to exactly one tenant and that tenant differs from the candidate → quarantine (`conflicting-identity`). A domain shared by several tenants carries no information and is ignored.
-5. No candidate at all → quarantine (`missing-identity`). This is deliberate: after Step 3 exports `tenant_id` on every dialplan leg and the directory already exports it for registered A-legs, a payload without one means a broken producer, and guessing from a domain that may have moved is the defect C02 exists to remove.
+4. Query `TenantDomain::query()->where('domain', $domain)->distinct()->pluck('tenant_id')` (uncached, as the existing comment explains).
+5. When a channel/context candidate `$candidate` exists:
+   - If the domain resolves to a single tenant that differs from `$candidate` → quarantine (`conflicting-identity`). (A domain shared by several tenants carries no conflict signal.)
+   - Confirm `Tenant::query()->whereKey($candidate)->exists()`; if missing → quarantine (`unknown-tenant`).
+   - Otherwise return `$candidate`.
+6. When no channel/context candidate exists:
+   - If the domain resolves to **exactly one** tenant → return that tenant (preserving compatibility for non-tenant-context payloads on dedicated domains, including the captured CDR fixtures).
+   - If the domain matches zero tenants or more than one tenant (shared domain) → quarantine (`missing-identity` / `ambiguous-domain`).
 
-Keep the lookup uncached (the existing comment explains why). Log `reason` as `conflicting-identity` or `missing-identity` alongside `domain` and `context`. Do not add an `unresolved-context` reason: a non-tenant context is normal, not an error. Keep the existing `null` → quarantine contract in `parse()`.
+Log `reason` (`conflicting-identity`, `unknown-tenant`, `ambiguous-domain`, or `missing-identity`) alongside `domain` and `context`. Do not add an `unresolved-context` reason: a non-tenant context is normal, not an error. Keep the existing `null` → quarantine contract in `parse()`.
 
 - [ ] **Step 5: Run the tests**
 
-Run: `./vendor/bin/pest tests/Feature/Services/CdrTenantAttributionTest.php tests/Feature/Services/DialplanTenantExportTest.php tests/Feature/Services/CdrRedisIngestDigestTest.php`
+Run: `./vendor/bin/pest tests/Feature/Services/CdrTenantAttributionTest.php tests/Feature/Services/DialplanTenantExportTest.php tests/Feature/Services/CdrPayloadParserTest.php tests/Feature/Services/CdrRedisIngestDigestTest.php tests/Feature/Commands/CdrDrainSpoolCommandTest.php`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add app/Services/Xml/DialplanXmlBuilder.php app/Services/Cdr/CdrPayloadParser.php tests/Feature/Services/CdrTenantAttributionTest.php tests/Feature/Services/DialplanTenantExportTest.php
-git commit -m "fix(cdr): export tenant identity to every leg and quarantine ambiguity"
+git commit -m "fix(cdr): resolve tenant identity unambiguously and quarantine conflicts"
 ```
 
 ### Task 1.4: Give every CDR a tenant-relative direction (C02)
 
 **Files:**
 - Modify: `app-modules/call-detail-records/src/Models/Cdr.php`
+- Modify: `app-modules/call-detail-records/src/Livewire/CdrList.php:154`, `:176-186`
 - Modify: `app-modules/call-detail-records/resources/views/cdr-list.blade.php:40`, `:56`
 - Modify: `app-modules/call-detail-records/resources/views/cdr-detail.blade.php:20-21`
+- Modify: `app-modules/call-detail-records/lang/{en,es,fr}/admin.php`
 - Test: `app-modules/call-detail-records/tests/CdrTenantDirectionTest.php` (new)
 
 **Interfaces:**
-- Produces: `Cdr::tenantDirection(): string` — `internal`, `inbound` or `outbound`, relative to `$this->tenant_id`. It reads the peer leg through `withoutGlobalScope('tenant')` but takes **only** the peer's `tenant_id`; no other peer field becomes reachable through this method.
+- Produces: `Cdr::tenantDirection(): string` — `internal`, `inbound` or `outbound`, relative to `$this->tenant_id`, and `Cdr::preloadTenantDirections(iterable $records): void` to avoid N+1 queries on list pages and exports. It reads the peer leg through `withoutGlobalScope('tenant')` but takes **only** the peer's `tenant_id`; no other peer field becomes reachable through this method.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -709,7 +730,7 @@ it('never exposes the peer record across tenants', function (): void {
 
     app(TenantManager::class)->setTenantId((string) $this->tenant->id);
 
-    expect(Cdr::query()->whereKey($a->b_leg_uuid)->exists())->toBeFalse()
+    expect(Cdr::query()->where('call_uuid', $a->b_leg_uuid)->exists())->toBeFalse()
         ->and($a->tenantDirection())->toBe('outbound');
 });
 ```
@@ -727,17 +748,45 @@ public function tenantDirection(): string
     return $this->tenantDirection ??= $this->resolveTenantDirection();
 }
 
+/**
+ * Batch-resolve peer tenant IDs for a collection/chunk of CDRs so list renders
+ * and CSV exports execute one peer lookup instead of N+1 queries.
+ *
+ * @param  iterable<int, self>  $records
+ */
+public static function preloadTenantDirections(iterable $records): void
+{
+    $records = collect($records);
+    $peerUuids = $records->pluck('b_leg_uuid')->filter()->unique()->values()->all();
+    $peerTenants = $peerUuids === []
+        ? []
+        : static::withoutGlobalScope('tenant')
+            ->whereIn('call_uuid', $peerUuids)
+            ->pluck('tenant_id', 'call_uuid')
+            ->all();
+
+    foreach ($records as $record) {
+        $peerTenantId = $record->b_leg_uuid !== null ? ($peerTenants[$record->b_leg_uuid] ?? null) : null;
+        $record->tenantDirection = $record->directionFromPeerTenant($peerTenantId !== null ? (int) $peerTenantId : null);
+    }
+}
+
 private function resolveTenantDirection(): string
 {
-    $peer = $this->b_leg_uuid === null ? null : static::withoutGlobalScope('tenant')
+    $peerTenantId = $this->b_leg_uuid === null ? null : static::withoutGlobalScope('tenant')
         ->where('call_uuid', $this->b_leg_uuid)
-        ->first(['id', 'tenant_id', 'leg']);
+        ->value('tenant_id');
 
-    if ($peer !== null && (int) $peer->tenant_id === (int) $this->tenant_id) {
+    return $this->directionFromPeerTenant($peerTenantId !== null ? (int) $peerTenantId : null);
+}
+
+private function directionFromPeerTenant(?int $peerTenantId): string
+{
+    if ($peerTenantId !== null && $peerTenantId === (int) $this->tenant_id) {
         return 'internal';
     }
 
-    if ($peer !== null) {
+    if ($peerTenantId !== null) {
         // The A-leg created the bridge, so its tenant placed the call; the
         // B-leg received it. This is what makes an A-to-B call outbound in A
         // and inbound in B, which a per-leg direction column cannot express.
@@ -753,9 +802,9 @@ private function resolveTenantDirection(): string
 
 Add a nullable `private ?string $tenantDirection = null;` memo property. Keep the stored `direction` column untouched: it is FreeSWITCH's channel direction, not the tenant-relative one, and the two differ for cross-tenant legs.
 
-- [ ] **Step 4: Show the tenant-relative direction in the panel**
+- [ ] **Step 4: Show the tenant-relative direction in the panel and CSV export**
 
-In `cdr-list.blade.php` replace the `$record->direction` badge with `$record->tenantDirection()`, and in `cdr-detail.blade.php` show it beside the stored channel direction with distinct labels (`admin.cdr_direction` for the tenant view, `admin.cdr_channel_direction` for the raw one). Add the new key to `app-modules/call-detail-records/lang/{en,es,fr}/admin.php` with the module's `cdr_` prefix.
+Call `Cdr::preloadTenantDirections($this->records)` in `CdrList::loadRecords()`, and batch-preload each chunk (e.g. `$query->chunk(1000, ...)` or `$query->lazy(1000)->chunk(1000)`) in `CdrList::exportCdrs()`. In `CdrList::exportCdrs()` (`L154`), export `$this->csvValue($record->tenantDirection())` so the CSV matches the list view. In `cdr-list.blade.php` replace the `$record->direction` badge with `$record->tenantDirection()`, and in `cdr-detail.blade.php` show it beside the stored channel direction with distinct labels (`admin.cdr_direction` for the tenant view, `admin.cdr_channel_direction` for the raw one). Add the new key to `app-modules/call-detail-records/lang/{en,es,fr}/admin.php` with the module's `cdr_` prefix.
 
 - [ ] **Step 5: Run the tests**
 
@@ -765,7 +814,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app-modules/call-detail-records/src/Models/Cdr.php app-modules/call-detail-records/resources/views app-modules/call-detail-records/lang app-modules/call-detail-records/tests/CdrTenantDirectionTest.php
+git add app-modules/call-detail-records/src/Models/Cdr.php app-modules/call-detail-records/src/Livewire/CdrList.php app-modules/call-detail-records/resources/views app-modules/call-detail-records/lang app-modules/call-detail-records/tests/CdrTenantDirectionTest.php
 git commit -m "feat(cdr): derive tenant-relative call direction from the paired leg"
 ```
 
@@ -782,11 +831,11 @@ Sequence matters inside this package: the journal precedes the claim logic, the 
 - Modify: `config/backup-storage.php`
 - Modify: `app-modules/backups/src/Providers/ModuleServiceProvider.php`
 - Modify: `app-modules/backups/src/Jobs/RestoreRunner.php`
-- Modify: `scripts/resources/tall.sh`, `scripts/tallpbx-queue.service`, `scripts/resources/tallpbx-restore.service`
+- Modify: `scripts/resources/tall.sh`, `scripts/resources/tallpbx-restore.service`
 - Test: `app-modules/backups/tests/RestoreJournalTest.php` (new)
 
 **Interfaces:**
-- Consumes: `config('backup-storage.journal_root')`, `Modules\Backups\Models\RestoreOperation`.
+- Consumes: `config('backup-storage.journal_root')`, `config('backup-storage.request_root')`, `Modules\Backups\Models\RestoreOperation`.
 - Produces:
   - `RestoreJournal::__construct(string $root)`
   - `RestoreJournal::write(string $operationId, array $entry): void` — atomic **and durable** (fsync the file and its directory, then `rename`)
@@ -856,19 +905,19 @@ Expected: FAIL — class not found.
 
 - [ ] **Step 3: Implement the journal**
 
-Add `'journal_root' => env('TALLPBX_RESTORE_JOURNAL', '/var/lib/tallpbx/restore-journal')` to `config/backup-storage.php`. The journal stores one `<uuid>.json` per operation in a **root-only** directory (`0700 root:root`, files `0600 root:root`). One process writes it: the privileged restore helper. The web and queue processes never do — they hand metadata to the helper through the request marker instead (Step 5).
+Add `'journal_root' => env('TALLPBX_RESTORE_JOURNAL', '/var/lib/tallpbx/restore-journal')` and `'request_root' => env('TALLPBX_RESTORE_REQUESTS', '/var/lib/tallpbx/restore-requests')` to `config/backup-storage.php`. The journal stores one `<uuid>.json` per operation in a **root-only** directory (`0700 root:root`, files `0600 root:root`). One process writes it: the privileged restore helper. The web and queue processes never do — they hand metadata to the helper through the request marker instead (Step 5).
 
 `write()` must be durable before a destructive phase, not merely atomic: `fopen($tmp, 'wb')`, `fwrite`, `fflush`, `fsync`, `fclose`, `chmod` 0600, `rename()` onto the target, then open the directory handle and `fsync` it so the rename itself survives an abrupt shutdown. `record()` reads, merges, stamps `phase_at` with `now()->toIso8601String()`, and writes. `seed()` takes the marker metadata and writes the initial `queued` entry. `terminalStatus()` returns `$entry['phase']` when it is `completed` or `failed`, otherwise `null`.
 
-- [ ] **Step 4: Install the directory and widen the sandbox**
+- [ ] **Step 4: Install the directory and harden the service**
 
-Next to the existing `install -d -m 0770 -o root -g www-data /var/lib/tallpbx/restore-requests` in `scripts/resources/tall.sh`, add `install -d -m 0700 -o root -g root /var/lib/tallpbx/restore-journal`. Add `/var/lib/tallpbx/restore-journal` to `ReadWritePaths=` in `scripts/resources/tallpbx-restore.service` only — not in `scripts/tallpbx-queue.service`, which must not be able to write journal state.
+Next to the existing `install -d -m 0770 -o root -g www-data /var/lib/tallpbx/restore-requests` in `scripts/resources/tall.sh`, add `install -d -m 0700 -o root -g root /var/lib/tallpbx/restore-journal`. Leave `scripts/tallpbx-queue.service` unchanged so the queue worker never gets write access to journal state. Note that `scripts/resources/tallpbx-restore.service` does not currently set `ProtectSystem=`; if you add `ProtectSystem=strict` there, include `/var/lib/tallpbx/restore-journal` in `ReadWritePaths=` (otherwise no `ReadWritePaths=` edit is needed).
 
 The installer alone is not enough: an existing appliance never re-runs `tall.sh`. Add the same `install -d` line to the upgrade path that `appliance:sync-host` and `tpbx permissions:repair` already use, so a host that updates rather than reinstalls creates the directory before its first restore. The service accounts must still be able to *read* the status view; that is a separate read-only projection, not write access to the directory.
 
 - [ ] **Step 5: Carry the metadata on the request marker**
 
-`RestoreRunner::handle()` runs as `www-data`, so it must not write the journal. Instead it writes the marker as JSON: `archive_path`, `archive_checksum`, `source_backup_id`, `scopes`, `requester` `{id, email, name}` read from the admin record, and `started_at`. The marker directory is already `0770 root:www-data`, so this preserves the unprivileged handoff while keeping journal state root-only. The helper seeds the journal from that payload in Task 2.2, then deletes the marker once the operation reaches a terminal phase.
+`RestoreRunner::handle()` runs as `www-data`, so it must not write the journal. Instead it reads `config('backup-storage.request_root')` (never a hardcoded `/var/lib/tallpbx/restore-requests`, so tests using a temp `request_root` never trigger the live `tallpbx-restore-dispatch.path` unit) and writes the marker as JSON: `archive_path`, `archive_checksum`, `source_backup_id`, `scopes`, `requester` `{id, email, name}` read from the admin record (via `Admin::query()->find($operation->requested_by_admin_id)`), and `started_at`. The marker directory is already `0770 root:www-data`, so this preserves the unprivileged handoff while keeping journal state root-only. The helper seeds the journal from that payload in Task 2.2, then deletes the marker once the operation reaches a terminal phase.
 
 - [ ] **Step 6: Bind it in the module provider**
 
@@ -884,7 +933,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add config/backup-storage.php app-modules/backups/src/Services/RestoreJournal.php app-modules/backups/src/Jobs/RestoreRunner.php app-modules/backups/src/Providers/ModuleServiceProvider.php scripts/resources/tall.sh scripts/tallpbx-queue.service scripts/resources/tallpbx-restore.service app-modules/backups/tests/RestoreJournalTest.php
+git add config/backup-storage.php app-modules/backups/src/Services/RestoreJournal.php app-modules/backups/src/Jobs/RestoreRunner.php app-modules/backups/src/Providers/ModuleServiceProvider.php scripts/resources/tall.sh scripts/resources/tallpbx-restore.service app-modules/backups/tests/RestoreJournalTest.php
 git commit -m "feat(backups): record restore lifecycle in an external journal"
 ```
 
@@ -893,6 +942,7 @@ git commit -m "feat(backups): record restore lifecycle in an external journal"
 **Files:**
 - Modify: `scripts/resources/tallpbx-restore-dispatch`
 - Modify: `app/Console/Commands/Backups/RestoreOperationCommand.php:24-61`
+- Modify: `app-modules/backups/tests/RestoreServiceTest.php:207-228`
 - Test: `app-modules/backups/tests/RestoreDispatchTest.php` (new)
 
 **Interfaces:**
@@ -959,7 +1009,7 @@ Keep `FAILURE` for everything else. A retried stale marker now retires itself in
 
 - [ ] **Step 5: Seed the journal from the claimed marker**
 
-`tallpbx-restore-dispatch` renames `<uuid>.request` to `<uuid>.claimed`, and `mv` preserves the JSON payload written in Task 2.1. The command reads `$requestDirectory.'/'.$operationId.'.claimed'`, `json_decode`s it, and calls `$journal->seed($operationId, $metadata)` before `$executor->execute($operation)`. A missing or unreadable marker fails the command rather than starting an unjournalled restore. When the operation reaches a terminal phase, delete the `.claimed` marker; a surviving claim whose unit is gone is then the only evidence of a crash and is triaged by the dispatcher's staleness rule.
+`tallpbx-restore-dispatch` renames `<uuid>.request` to `<uuid>.claimed`, and `mv` preserves the JSON payload written in Task 2.1. The command reads `rtrim((string) config('backup-storage.request_root'), '/').'/'.$operationId.'.claimed'`, `json_decode`s it, and calls `$journal->seed($operationId, $metadata)` before `$executor->execute($operation)`. A missing or unreadable marker fails the command rather than starting an unjournalled restore. Update `RestoreServiceTest.php:207-228` (`delegates a verified helper operation to the root restore executor`) to configure a temporary `backup-storage.request_root` and write the `<uuid>.claimed` JSON marker before invoking `backups:restore-operation`, and isolate `backup-storage.journal_root` in `RestoreServiceTest`'s `beforeEach`. When the operation reaches a terminal phase, delete the `.claimed` marker; a surviving claim whose unit is gone is then the only evidence of a crash and is triaged by the dispatcher's staleness rule.
 
 - [ ] **Step 6: Run the tests**
 
@@ -969,7 +1019,7 @@ Expected: PASS. Backup tests live only under `app-modules/backups/tests`; there 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add scripts/resources/tallpbx-restore-dispatch app/Console/Commands/Backups/RestoreOperationCommand.php app-modules/backups/tests/RestoreDispatchTest.php
+git add scripts/resources/tallpbx-restore-dispatch app/Console/Commands/Backups/RestoreOperationCommand.php app-modules/backups/tests/RestoreServiceTest.php app-modules/backups/tests/RestoreDispatchTest.php
 git commit -m "fix(backups): claim restore requests atomically and acknowledge terminal ones"
 ```
 
@@ -979,6 +1029,7 @@ git commit -m "fix(backups): claim restore requests atomically and acknowledge t
 - Create: `app/Console/Commands/Backups/ReconcileRestoreJournalCommand.php`
 - Create: `scripts/resources/tallpbx-restore-status`
 - Modify: `scripts/resources/tall.sh` (install the status reader)
+- Modify: `app-modules/backups/src/Models/RestoreOperation.php` (allow `'id'` assignment on reconcile)
 - Modify: `app-modules/backups/src/Services/RestoreOperationExecutor.php:25-74`
 - Modify: `tests/Feature/Architecture/ModuleArchitectureTest.php:25-57`
 - Test: `tests/Feature/Console/ReconcileRestoreJournalCommandTest.php` (new)
@@ -1015,7 +1066,7 @@ Expected: FAIL — the command does not exist.
 
 - [ ] **Step 3: Implement the projection command**
 
-For each journal entry, `RestoreOperation::updateOrCreate(['id' => $id], [...])` with `archive_path`, `archive_checksum`, `source_backup_id`, `scopes`, `status` (`$entry['phase']`), `failure_reason`, `pre_restore_snapshot_path`, `helper_log_path`, `started_at`, `completed_at`, `requested_by_admin_id` (`$entry['requester']['id']`). `requested_by_admin_id` is **not** a foreign key in `restore_operations`, so the original numeric ID is kept as an opaque audit snapshot even when the restored `admins` table has reused it. The panel must not join that column to `admins` for display; it renders the requester name from the journal. Note this in the command's docblock so the next reader does not "fix" it into a foreign key. Declare the command with the project's Laravel 13 attribute style (`#[Signature]`, `#[Description]`) as `RestoreOperationCommand` does, not `protected $signature`.
+Add `'id'` to `RestoreOperation::$fillable` (or instantiate with `forceFill(['id' => $id])` on insert) — without this, `RestoreOperation::updateOrCreate(['id' => $id], [...])` silently strips `'id'` during mass-assignment and `HasUuids` generates a random UUID instead of preserving `$id`. For each journal entry, `updateOrCreate(['id' => $id], [...])` with `archive_path`, `archive_checksum`, `source_backup_id`, `scopes`, `status` (`$entry['phase']`), `failure_reason`, `pre_restore_snapshot_path`, `helper_log_path`, `started_at`, `completed_at`, `requested_by_admin_id` (`$entry['requester']['id']`). `requested_by_admin_id` is **not** a foreign key in `restore_operations`, so the original numeric ID is kept as an opaque audit snapshot even when the restored `admins` table has reused it. The panel must not join that column to `admins` for display; it renders the requester name from the journal. Note this in the command's docblock so the next reader does not "fix" it into a foreign key. Declare the command with the project's Laravel 13 attribute style (`#[Signature]`, `#[Description]`) as `RestoreOperationCommand` does, not `protected $signature`.
 
 - [ ] **Step 4: Add the root-runnable status reader as a bootless script**
 
@@ -1045,7 +1096,7 @@ Expected: PASS. `RestoreStatusScriptTest` runs the script through `Symfony\Compo
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app/Console/Commands/Backups/ReconcileRestoreJournalCommand.php scripts/resources/tallpbx-restore-status scripts/resources/tall.sh app-modules/backups/src/Services/RestoreOperationExecutor.php tests/Feature/Architecture/ModuleArchitectureTest.php tests/Feature/Console/ReconcileRestoreJournalCommandTest.php app-modules/backups/tests/RestoreStatusScriptTest.php
+git add app/Console/Commands/Backups/ReconcileRestoreJournalCommand.php scripts/resources/tallpbx-restore-status scripts/resources/tall.sh app-modules/backups/src/Models/RestoreOperation.php app-modules/backups/src/Services/RestoreOperationExecutor.php tests/Feature/Architecture/ModuleArchitectureTest.php tests/Feature/Console/ReconcileRestoreJournalCommandTest.php app-modules/backups/tests/RestoreStatusScriptTest.php
 git commit -m "fix(backups): project the restore journal back into the restored database"
 ```
 
@@ -1188,13 +1239,18 @@ git commit -m "fix(backups): bound restore commands, the whole operation, and st
 **Files:**
 - Create: `app/Services/Appliance/RuntimeServiceReconciler.php`
 - Modify: `app-modules/backups/src/Services/RestoreOperationExecutor.php:327-338`
-- Test: `tests/Unit/Services/RuntimeServiceReconcilerTest.php` (new)
+- Test: `tests/Feature/Services/RuntimeServiceReconcilerTest.php` (new)
 
 **Interfaces:**
 - Consumes: `ProcessRunner::run(array $argv, ?string $cwd = null, ?int $timeoutSeconds = null, array $env = []): ProcessResult`.
-- Produces: `RuntimeServiceReconciler::reconcile(): array{restarted: list<string>, skipped: list<string>, failed: list<string>, warnings: list<string>, probes: array{ok: list<string>, failed: list<string>}}` — `failed` holds required units that are not running after the restart; `warnings` holds optional units that were running and did not come back; `probes` holds the functional checks below.
+- Produces:
+  - `RuntimeServiceReconciler::reconcile(): array{restarted: list<string>, skipped: list<string>, failed: list<string>, warnings: list<string>, probes: array{ok: list<string>, failed: list<string>}}` — `failed` holds required units that are not running after the restart; `warnings` holds optional units that were running and did not come back; `probes` holds the database, Redis, and FreeSWITCH checks.
+  - `RuntimeServiceReconciler::probeHttpHealth(): bool` — checks `GET http://127.0.0.1/up` returns 200 (run **after** leaving maintenance mode so `PreventRequestsDuringMaintenance` does not return 503).
+  - `RuntimeServiceReconciler::reconcileAfterUpdate(): array{restarted: list<string>, skipped: list<string>, failed: list<string>, warnings: list<string>, probes: array{ok: list<string>, failed: list<string>}}` — unprivileged worker reload (`artisan queue:restart` and `reverb:restart` when running as `www-data`; full unit reload only when running as root).
 
 - [ ] **Step 1: Write the failing test**
+
+Place the test under `tests/Feature/Services/` (not `tests/Unit/Services/`, because `tests/Pest.php` only boots `Tests\TestCase` and facades for three named files in `Unit/Services/`):
 
 ```php
 it('restarts every required unit and reports failures instead of swallowing them', function (): void {
@@ -1224,7 +1280,7 @@ it('warns instead of failing when an enabled optional unit does not return', fun
 
 - [ ] **Step 2: Run and confirm failure**
 
-Run: `./vendor/bin/pest tests/Unit/Services/RuntimeServiceReconcilerTest.php`
+Run: `./vendor/bin/pest tests/Feature/Services/RuntimeServiceReconcilerTest.php`
 Expected: FAIL — class not found.
 
 - [ ] **Step 3: Implement the shared inventory**
@@ -1233,18 +1289,20 @@ Required units: `mariadb`, `redis-server`, `php<MAJOR>.<MINOR>-fpm` (derived fro
 
 The exit status of `systemctl restart` is not a health signal. Record each unit's **expected** state first (`systemctl is-enabled --quiet` and `is-active --quiet`), restart the required ones, then confirm `is-active` afterwards. A unit that is enabled but inactive after the restart is `failed`; an optional unit that was inactive before the operation is `skipped` and is never started. Never throw from `reconcile()`.
 
+Also provide `reconcileAfterUpdate()`: when `posix_geteuid() !== 0` (the normal web-triggered `www-data` update path, which has no sudoers access to `systemctl`), run `php artisan queue:restart` (and `reverb:restart` if active) rather than calling `systemctl restart`, so web updates never fail on unprivileged `systemctl` calls or bounce MariaDB/FreeSWITCH mid-call.
+
 - [ ] **Step 4: Verify function, not just process state**
 
-`reconcile()` finishes with four bounded probes, each with its own short timeout so a hung dependency cannot consume the restore budget:
+`reconcile()` finishes with three bounded pre-`up` probes, and `probeHttpHealth()` verifies the web tier immediately after `artisan up`:
 
-| Probe | Check | Failure means |
-|---|---|---|
-| Database | `DB::select('select 1')` within 5 s | the restored schema is unusable |
-| Redis | `Redis::connection('default')->ping()` | cache, queues or the CDR stream are unreachable |
-| Web/PHP | `GET http://127.0.0.1/up` returns 200 (`bootstrap/app.php` health route) | the web tier never came back |
-| FreeSWITCH | `fs_cli -x status` reports `UP` | telephony is down even though the unit is active |
+| Probe | Check | When run | Failure means |
+|---|---|---|---|
+| Database | `DB::select('select 1')` within 5 s | Inside `reconcile()` (while down) | the restored schema is unusable |
+| Redis | `Redis::connection('default')->ping()` | Inside `reconcile()` (while down) | cache, queues or the CDR stream are unreachable |
+| FreeSWITCH | `fs_cli -x status` reports `UP` | Inside `reconcile()` (while down) | telephony is down even though the unit is active |
+| Web/PHP | `GET http://127.0.0.1/up` returns 200 (`bootstrap/app.php` health route) | `probeHttpHealth()` immediately after `artisan up` | the web tier never came back |
 
-A running process proves nothing on its own; these four do. Record the result in the journal and fail the operation on any required probe:
+Do **not** probe `GET /up` while `artisan down` is active: `PreventRequestsDuringMaintenance` intercepts `/up` with HTTP 503, which would lock every restore in maintenance mode. Instead:
 
 ```php
 $services = $this->services->reconcile();
@@ -1255,19 +1313,28 @@ $failed = [...$services['failed'], ...$services['probes']['failed']];
 if ($failed !== []) {
     throw new RuntimeException('Restore health checks failed: '.implode(', ', $failed));
 }
+
+$this->commandRunner->run(['php', 'artisan', 'up']);
+
+if (! $this->services->probeHttpHealth()) {
+    $this->commandRunner->run(['php', 'artisan', 'down']);
+    $journal->record($operation->id, 'health-check', ['http_up' => false]);
+
+    throw new RuntimeException('Restore health check failed: web tier did not return HTTP 200 on /up.');
+}
 ```
 
-The throw lands in the existing `catch`, marks the operation and journal `failed`, and leaves the application in maintenance mode. Change `finally` so it no longer calls `artisan up` unconditionally: bring the application up only when the try block completed or `$services['failed'] === []`; when required services did not return, keep maintenance mode active, record `'maintenance_locked' => true` in the journal, and let the operator recovery path in Task 7.2 take over. A half-restored runtime must never take live traffic.
+The throw lands in the existing `catch`, marks the operation and journal `failed`, records `'maintenance_locked' => true` in the journal, and leaves the application in maintenance mode. Remove the unconditional `artisan up` from `finally`: only bring the app up in the `try` path above once `reconcile()` passes, and re-apply `artisan down` if `probeHttpHealth()` fails. A half-restored runtime must never take live traffic.
 
 - [ ] **Step 5: Run the test and the backups suite**
 
-Run: `./vendor/bin/pest tests/Unit/Services/RuntimeServiceReconcilerTest.php app-modules/backups/tests`
+Run: `./vendor/bin/pest tests/Feature/Services/RuntimeServiceReconcilerTest.php app-modules/backups/tests`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add app/Services/Appliance/RuntimeServiceReconciler.php app-modules/backups/src/Services/RestoreOperationExecutor.php tests/Unit/Services/RuntimeServiceReconcilerTest.php
+git add app/Services/Appliance/RuntimeServiceReconciler.php app-modules/backups/src/Services/RestoreOperationExecutor.php tests/Feature/Services/RuntimeServiceReconcilerTest.php
 git commit -m "fix(backups): fail a restore whose required services did not restart"
 ```
 
@@ -1294,18 +1361,25 @@ it('requires the working set plus the reserve, not the reserve alone', function 
 
 it('refuses a volume that cannot hold the working set and the reserve', function (): void {
     // 30 GB free against a 35.2 GB requirement: the old reserve-only check
-    // (3.2 GB) would have admitted this restore.
-    $executor = makeExecutor(freeSpace: ['/var/lib/tallpbx/backups' => 30_000_000_000.0]);
+    // (3.2 GB) would have admitted this restore. makeExecutor stubs tar -tvf
+    // to report 32_000_000_000 bytes so no real 32 GB archive is needed on disk.
+    $executor = makeExecutor(
+        freeSpace: ['/var/lib/tallpbx/backups' => 30_000_000_000.0],
+        archiveMemberBytes: 32_000_000_000,
+    );
 
     expect(fn () => $executor->assertSpaceFor('/var/lib/tallpbx/backups/x.tar.gz', ['database']))
         ->toThrow(RuntimeException::class, 'insufficient free space');
 });
 
 it('refuses when a second volume is short even though the archive volume fits', function (): void {
-    $executor = makeExecutor(freeSpace: [
-        '/var/lib/tallpbx/backups' => 100_000_000_000.0,
-        storage_path('backups') => 1_000_000.0,
-    ]);
+    $executor = makeExecutor(
+        freeSpace: [
+            '/var/lib/tallpbx/backups' => 100_000_000_000.0,
+            storage_path('backups') => 1_000_000.0,
+        ],
+        archiveMemberBytes: 32_000_000_000,
+    );
 
     expect(fn () => $executor->assertSpaceFor('/var/lib/tallpbx/backups/x.tar.gz', ['database']))
         ->toThrow(RuntimeException::class, 'insufficient free space');
@@ -1361,15 +1435,28 @@ it('caps a direct archive upload at two decimal gigabytes', function (): void {
 });
 
 it('refuses an archive above the ceiling and accepts one below it', function (): void {
-    Livewire::test(RestoreArchive::class)
-        ->set('archive', UploadedFile::fake()->create('big.tar.gz', 2_100_000_000))
-        ->call('upload')
-        ->assertHasErrors('archive');
+    $admin = restoreArchiveAdmin();
+    $manifest = UploadedFile::fake()->createWithContent('backup-manifest.json', json_encode([
+        'format_version' => 1,
+        'scopes' => ['database'],
+        'archive' => ['sha256' => str_repeat('a', 64), 'bytes' => 1],
+    ], JSON_THROW_ON_ERROR));
 
-    Livewire::test(RestoreArchive::class)
-        ->set('archive', UploadedFile::fake()->create('ok.tar.gz', 1_900_000_000))
-        ->call('upload')
-        ->assertHasNoErrors('archive');
+    // UploadedFile::fake()->create() takes kilobytes, not bytes:
+    // 1_960_000 KB (~2.007 GB) exceeds 2_000_000_000 bytes; 1_900_000 KB (~1.946 GB) is below it.
+    Livewire::actingAs($admin, 'admin')
+        ->test(RestoreArchive::class)
+        ->set('archiveUpload', UploadedFile::fake()->create('big.tar.gz', 1_960_000))
+        ->set('manifestUpload', $manifest)
+        ->call('confirmUploadedRestore')
+        ->assertHasErrors('archiveUpload');
+
+    Livewire::actingAs($admin, 'admin')
+        ->test(RestoreArchive::class)
+        ->set('archiveUpload', UploadedFile::fake()->create('ok.tar.gz', 1_900_000))
+        ->set('manifestUpload', $manifest)
+        ->call('confirmUploadedRestore')
+        ->assertHasNoErrors('archiveUpload');
 });
 
 it('ships matching PHP and Nginx transport limits', function (): void {
@@ -1458,13 +1545,13 @@ Expected: FAIL — `resolveTarget()` does not exist and `commitsBehind()` return
 
 `resolveTarget()` tries `git -C <repo> rev-parse --verify --quiet refs/remotes/origin/<t>` (branch), then `refs/tags/<t>` (tag). `pull()` uses `checkout -B <name> origin/<name>` for a branch switch, `pull --ff-only origin <name>` when already on that branch, and `checkout --detach refs/tags/<name>` for a tag. Change `commitsBehind()` to `?int` in place and have it return `null` after a failed `rev-parse`, never a fabricated `0`; `incomingCommits()` uses `HEAD..<ref>` and returns `[]` only for a resolved ref with no incoming commits.
 
-The execution path is separate from `pull()` and must change too: `update()` calls `runUpdate()` (L365) → `runPipeline()` ([L430-448](../app/Services/GitUpdateService.php#L430-L448)), which builds its own `checkout -B $target origin/$target` / `pull --ff-only origin $target`. Resolve once at the top of `update()` and pass the `GitTarget` (or its ref) down, so a tag becomes `checkout --detach refs/tags/<name>` there as well. Without this, the preview reports correctly while the actual update still fails — the defect the task exists to fix.
+The execution path is separate from `pull()` and must change too: `update()` calls `runUpdate()` (L365) → `runPipeline()` ([L430-448](../app/Services/GitUpdateService.php#L430-L448)), which builds its own `checkout -B $target origin/$target` / `pull --ff-only origin $target`. Resolve once at the top of `update()` and pass the `GitTarget` (or its ref) down, so a tag becomes `checkout --detach refs/tags/<name>` there as well. In `rollback()`, handle detached-HEAD origins (`$preSwitchBranch === 'HEAD'`): run `checkout --detach $prePullHead` instead of `checkout HEAD` + `reset --hard`, which would move the newly created branch pointer instead of detaching back to the original tag/commit. Without these fixes, the preview reports correctly while the actual update or rollback fails.
 
 Two existing mocks break when `resolveTarget()` adds a `rev-parse` call: `tests/Feature/Services/GitUpdateServiceTest.php` L116 and L132 use `->once()`. Update both to expect the resolution call before the range query.
 
 - [ ] **Step 4: Update the two consumers of `commitsBehind()`**
 
-`app-modules/admin/src/Livewire/GitUpdate.php` declares `public int $commitsBehind = 0;` and assigns the service result at L222. Change the property to `public ?int $commitsBehind = 0;` and keep the assignment. In `resources/views/partials/git-channels.blade.php` L130, render an explicit unknown state — `@if ($commitsBehind === null)` → a `badge badge-warning` with "Unknown" rather than hiding the badge — so an unresolvable target is visible instead of silently reading as up to date. Update the two existing tests that mock `commitsBehind()` to return `?int`.
+`app-modules/admin/src/Livewire/GitUpdate.php` declares `public int $commitsBehind = 0;` and assigns the service result at L222. Change the property to `public ?int $commitsBehind = 0;` and keep the assignment. In `app-modules/admin/resources/views/partials/git-channels.blade.php` L129–139, check `@if ($commitsBehind === null)` **before** `@elseif ($selectedTarget === $currentBranch)` — rendering a `badge badge-warning` with "Unknown" — so an unresolvable tag or missing ref is visible instead of falling into the `Ready to switch` branch (`$selectedTarget !== $currentBranch`). Update `tests/Feature/Livewire/GitUpdateTest.php` mocks of `commitsBehind()` to return `?int` and add a test for `$commitsBehind === null`.
 
 - [ ] **Step 5: Run the tests**
 
@@ -1525,11 +1612,12 @@ git commit -m "fix(updater): rebuild rollback assets from the restored Node lock
 
 **Files:**
 - Modify: `app/Services/GitUpdateService.php:34` (constructor), `:430-471`
+- Modify: `tests/Feature/Services/GitUpdatePipelineTest.php:12-67`
 - Test: `tests/Feature/Services/GitUpdateServiceReconciliationTest.php` (new)
 
 **Interfaces:**
-- Consumes: `RuntimeServiceReconciler::reconcile()` from Task 2.6.
-- Produces: a `Reconcile services` step in the update result, and a failed update when a required unit fails.
+- Consumes: `RuntimeServiceReconciler::reconcileAfterUpdate()` from Task 2.6.
+- Produces: a `Reconcile services` step in the update result, and a failed update when a required unit/worker reload fails.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1566,7 +1654,7 @@ Expected: FAIL — no reconciliation step exists.
 
 - [ ] **Step 3: Inject the reconciler and add the step**
 
-Add `?RuntimeServiceReconciler $services = null` as the trailing constructor parameter, resolved through `app()` when null — `tests/Feature/Services/GitUpdateServiceTest.php` constructs `new GitUpdateService($runner)` at seven sites (L63-156), so a required parameter breaks the suite before this task's tests run. `update(string $target)` keeps its single argument. After the `$sequence` loop succeeds and before `return UpdateResult::success(...)`, call `reconcile()`, append a `Reconcile services` step whose status is `ok` when both lists are empty, `warn` when only `warnings` is non-empty, and `failed` when `failed` is non-empty. `addStep()` appends numerically (`$steps[] = [...]`, L684), so tests must read the step with `collect($result->steps)->firstWhere('label', 'Reconcile services')`, never `toHaveKey`. Return a failed `UpdateResult` only for `failed`. Do **not** roll back the code for a service failure: the new code is already migrated, and rollback without a schema reversal would be worse — report the failure and the operator action instead.
+Add `?RuntimeServiceReconciler $services = null` as the trailing constructor parameter, resolved through `app()` when null — `tests/Feature/Services/GitUpdateServiceTest.php` constructs `new GitUpdateService($runner)` at seven sites (L63-156), so a required parameter breaks the suite before this task's tests run. `update(string $target)` keeps its single argument. After the `$sequence` loop succeeds and before `return UpdateResult::success(...)`, call `$this->services->reconcileAfterUpdate()` (not `reconcile()`, because web-initiated updates run as `www-data` without `systemctl` privileges and must not restart MariaDB or FreeSWITCH mid-call), append a `Reconcile services` step whose status is `ok` when both lists are empty, `warn` when only `warnings` is non-empty, and `failed` when `failed` is non-empty. `addStep()` appends numerically (`$steps[] = [...]`, L684), so tests must read the step with `collect($result->steps)->firstWhere('label', 'Reconcile services')`, never `toHaveKey`. Update `tests/Feature/Services/GitUpdatePipelineTest.php` (`pipelineService()` binds a fake reconciler so existing pipeline tests do not shell out, and L66 accounts for the new `Reconcile services` step). Return a failed `UpdateResult` only for `failed`. Do **not** roll back the code for a service failure: the new code is already migrated, and rollback without a schema reversal would be worse — report the failure and the operator action instead.
 
 - [ ] **Step 4: Run the test**
 
@@ -1576,7 +1664,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/Services/GitUpdateService.php tests/Feature/Services/GitUpdateServiceReconciliationTest.php
+git add app/Services/GitUpdateService.php tests/Feature/Services/GitUpdatePipelineTest.php tests/Feature/Services/GitUpdateServiceReconciliationTest.php
 git commit -m "fix(updater): reload resident workers and report failed services"
 ```
 
@@ -1593,7 +1681,7 @@ git commit -m "fix(updater): reload resident workers and report failed services"
 
 **Interfaces:**
 - Consumes: `ExtensionServiceInterface::create/update/syncUsers`, `Modules\SipAccounts\Services\SipAccountServiceInterface::create/update`, `Modules\Voicemails\Services\VoicemailServiceInterface::create/update/findByMailbox`.
-- Produces: `ExtensionSaveService::save(array $data, array $userIds, ?string $password, bool $voicemailEnabled, string $voicemailPassword, ?Extension $existing = null): Extension` — one `DB::transaction`, returning `$extension->fresh()`.
+- Produces: `ExtensionSaveService::save(array $data, array $userIds, ?string $password, bool $voicemailEnabled, string $voicemailPassword, ?Extension $existing = null): Extension` — one `DB::transaction`, returning `$extension->fresh(['users'])` (eager-loading `users` so `Model::preventLazyLoading()` never throws when reading `$extension->users`).
 - Side effects: `VoicemailService::create()` provisions the mailbox directory, which no transaction can roll back. Accept the orphan directory — it is owner-scoped, idempotent, and reused by the next save — and assert only that no orphan **row** survives a rollback.
 
 - [ ] **Step 1: Write the failing test**
@@ -1623,12 +1711,12 @@ it('writes the extension, its users, its SIP account and its voicemail in one sa
     );
 
     expect($extension->users)->toHaveCount(1)
-        ->and($extension->sipAccount)->not->toBeNull()
+        ->and(SipAccount::where('extension_id', $extension->id)->exists())->toBeTrue()
         ->and(Voicemail::where('voicemail_id', '205')->exists())->toBeTrue();
 });
 ```
 
-`SipAccount` and `Voicemail` apply `BelongsToTenant`, which injects `whereRaw('1 = 0')` whenever `TenantManager::getTenantId()` is null ([BelongsToTenant.php:32-35](../app/Traits/BelongsToTenant.php#L32-L35)). Without an active context, `$extension->sipAccount` is `null` and `Voicemail::where(...)` is `false` even though the rows exist. Set it in `beforeEach` with `app(TenantManager::class)->setTenantId((string) $this->tenant->id)`, or assert through `withoutGlobalScope('tenant')`.
+`SipAccount` and `Voicemail` apply `BelongsToTenant`, which injects `whereRaw('1 = 0')` whenever `TenantManager::getTenantId()` is null ([BelongsToTenant.php:32-35](../app/Traits/BelongsToTenant.php#L32-L35)), and `Model::preventLazyLoading()` is active in tests (`AppServiceProvider.php:314`), so never lazy-load `$extension->sipAccount` on a `fresh()` instance. Set the context in `beforeEach` with `app(TenantManager::class)->setTenantId((string) $this->tenant->id)` (or query with `withoutGlobalScope('tenant')`).
 
 - [ ] **Step 2: Run and confirm failure**
 
@@ -1669,12 +1757,15 @@ git commit -m "fix(extensions): save the extension aggregate in one transaction"
 **Files:**
 - Modify: `app/Support/BaseEditComponent.php:94-109`
 - Modify: `app-modules/extensions/src/Livewire/ExtensionsEdit.php:285-296`
+- Modify: `app-modules/extensions/src/Livewire/ExtensionsBulkCreate.php:82-124`, `:165-179`
+- Modify: `app-modules/outbound-routes/src/Livewire/OutboundRoutesEdit.php:188-199`
+- Modify: `app-modules/extension-settings/src/Livewire/ExtensionSettingsEdit.php:68-78`
 - Test: `app-modules/extensions/tests/ExtensionTenantUserCreateTest.php` (new)
 - Test: `app-modules/call-blocks/tests/TenantUserCreateTest.php` (new, peer-form proof)
 
 **Interfaces:**
 - Consumes: `BaseEditComponent::resolveTenantId(): ?int`, `BaseEditComponent::isAdminGuard(): bool`.
-- Produces: `BaseEditComponent::hydrate(): void` — re-derives `tenantId` from the authorized context for every non-admin actor on each Livewire request, so a tampered payload cannot redirect a write. Applying it once in the base class covers **36** components that declare a required `tenantId`, not just `ExtensionsEdit`.
+- Produces: `BaseEditComponent::hydrate(): void` and `BaseEditComponent::updated(string $property): void` — re-derives `tenantId` from the authorized context for every non-admin actor on each Livewire request and after any `tenantId` property update, so a tampered payload cannot redirect a write or trigger a cross-tenant dropdown load. Using `updated(string $property)` instead of `updatedTenantId(mixed $value)` avoids PHP 8.5 fatal signature conflicts on subclasses (`HotDeskingEdit::updatedTenantId(): void`, `DevicesEdit::updatedTenantId(): void`, `OutboundRoutesEdit::updatedTenantId(int|string $value): void`, `ExtensionSettingsEdit::updatedTenantId($value): void`) and runs *before* those subclass hooks. Applying it once in the base class covers **36** components that declare a required `tenantId`, not just `ExtensionsEdit`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1701,7 +1792,7 @@ it('ignores a forged tenant id from a tenant user', function (): void {
 
 it('neutralises a tampered tenant id on a Livewire update', function (): void {
     // hydrate() runs before the payload is applied, so the guard that matters
-    // here is updatedTenantId(). The value must be replaced, not rejected.
+    // here is BaseEditComponent::updated(). The value must be replaced, not rejected.
     Livewire::actingAs($this->tenantUser, 'web')
         ->test(ExtensionsEdit::class)
         ->set('tenantId', $this->otherTenant->id)
@@ -1720,7 +1811,7 @@ it('lets a tenant user create a call block without touching tenant state', funct
 Run: `./vendor/bin/pest app-modules/extensions/tests/ExtensionTenantUserCreateTest.php app-modules/call-blocks/tests/TenantUserCreateTest.php`
 Expected: FAIL — `tenantId` is required, never rendered and never derived for tenant users.
 
-- [ ] **Step 3: Fix the root cause in `BaseEditComponent`**
+- [ ] **Step 3: Fix the root cause in `BaseEditComponent` and its overriding subclasses**
 
 ```php
 protected function loadTenants(): void
@@ -1747,23 +1838,26 @@ public function hydrate(): void
 }
 
 /**
- * Replace a client-supplied tenant after Livewire applies the update.
+ * Replace a client-supplied tenant after Livewire applies a property update.
  *
- * `hydrate()` runs before the payload is applied and `updatingTenantId()` runs
- * before Livewire assigns the value (`HandleComponents::updateProperty()` calls
- * the update hooks and then sets the property), so neither can re-pin it.
- * `updatedTenantId()` runs immediately after the assignment and before the
- * action — the only hook that can make the value stick.
+ * `hydrate()` runs before the payload is applied and `updating*()` runs
+ * before Livewire assigns the value, so neither can re-pin it. `updated()`
+ * runs immediately after assignment and before `updatedTenantId()` in
+ * subclasses, without colliding with subclass `updatedTenantId()` signatures.
  */
-public function updatedTenantId(mixed $value): void
+public function updated(string $property): void
 {
-    if (! $this->isAdminGuard()) {
+    if ($property === 'tenantId' && ! $this->isAdminGuard()) {
         $this->tenantId = $this->resolveTenantId();
     }
 }
 ```
 
-- [ ] **Step 4: Harden `ExtensionsEdit`'s own rules**
+Also update `OutboundRoutesEdit::updatedTenantId()` and `ExtensionSettingsEdit::updatedTenantId()` to resolve the tenant via `$this->resolveTenantId()` instead of reading client-supplied `$value` directly into `withoutGlobalScope('tenant')->where('tenant_id', ...)` queries.
+
+- [ ] **Step 4: Harden `ExtensionsEdit` and `ExtensionsBulkCreate` rules**
+
+In `ExtensionsEdit`:
 
 ```php
 $tenantId = $this->resolveTenantId();
@@ -1772,21 +1866,21 @@ $uniqueRule = Rule::unique('extensions', 'extension_number')->where('tenant_id',
 'tenantId' => $this->isAdminGuard() ? ['required', 'exists:tenants,id'] : ['nullable'],
 ```
 
-Keep the `ignore($this->extensionId)` branch for updates.
+Keep the `ignore($this->extensionId)` branch for updates. Apply the same `'tenantId' => $this->isAdminGuard() ? ['required', 'exists:tenants,id'] : ['nullable']` and `$this->resolveTenantId()` in `ExtensionsBulkCreate::rules()` and `ExtensionsBulkCreate::validateNoConflicts()` (`L168`, which currently reads `$this->tenantId`).
 
 - [ ] **Step 5: Fail closed at the write boundary**
 
-At the top of `save()`, `abort(403)` when `$this->resolveTenantId()` is `null`. Persist `'tenant_id' => $this->resolveTenantId()` (already the case) and never read `$this->tenantId` for a non-admin. All three layers stay: `hydrate()` repairs a stale snapshot, `updatedTenantId()` re-pins a crafted payload after Livewire assigns it, and the write boundary ignores the property entirely — any one alone leaves a gap the request lifecycle can reach.
+At the top of `save()`, `abort(403)` when `$this->resolveTenantId()` is `null`. Persist `'tenant_id' => $this->resolveTenantId()` (already the case) and never read `$this->tenantId` for a non-admin. All three layers stay: `hydrate()` repairs a stale snapshot, `updated()` re-pins a crafted payload after Livewire assigns it, and the write boundary ignores the property entirely — any one alone leaves a gap the request lifecycle can reach.
 
 - [ ] **Step 6: Run the tests**
 
-Run: `./vendor/bin/pest app-modules/extensions/tests app-modules/call-blocks/tests tests/Feature/Architecture`
+Run: `./vendor/bin/pest app-modules/extensions/tests app-modules/call-blocks/tests app-modules/hot-desking/tests app-modules/devices/tests app-modules/outbound-routes/tests app-modules/extension-settings/tests tests/Feature/Architecture`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add app/Support/BaseEditComponent.php app-modules/extensions/src/Livewire/ExtensionsEdit.php app-modules/extensions/tests/ExtensionTenantUserCreateTest.php app-modules/call-blocks/tests/TenantUserCreateTest.php
+git add app/Support/BaseEditComponent.php app-modules/extensions/src/Livewire/ExtensionsEdit.php app-modules/extensions/src/Livewire/ExtensionsBulkCreate.php app-modules/outbound-routes/src/Livewire/OutboundRoutesEdit.php app-modules/extension-settings/src/Livewire/ExtensionSettingsEdit.php app-modules/extensions/tests/ExtensionTenantUserCreateTest.php app-modules/call-blocks/tests/TenantUserCreateTest.php
 git commit -m "fix(extensions): derive the tenant from context in every edit form"
 ```
 
@@ -1812,7 +1906,7 @@ it('rejects a user who belongs only to another tenant', function (): void {
 
 it('accepts a member of the extension tenant and a user shared with two tenants', function (): void {
     $service->syncUsers($extension, [$member->id, $sharedUser->id]);
-    expect($extension->fresh()->users)->toHaveCount(2);
+    expect($extension->fresh('users')->users)->toHaveCount(2);
 });
 ```
 
@@ -1823,9 +1917,16 @@ Expected: FAIL — the foreign user is attached.
 
 - [ ] **Step 3: Validate at the service boundary**
 
+Query the `tenant_user` pivot directly via `DB::table` instead of `$extension->tenant->users()` so `Model::preventLazyLoading()` (`AppServiceProvider.php:314`) never throws when `$extension` does not have `tenant` loaded:
+
 ```php
-$allowed = $extension->tenant->users()->whereKey($userIds)->pluck('users.id')->all();
-$foreign = array_values(array_diff($userIds, $allowed));
+$allowed = DB::table('tenant_user')
+    ->where('tenant_id', $extension->tenant_id)
+    ->whereIn('user_id', $userIds)
+    ->pluck('user_id')
+    ->map(fn (mixed $id): int => (int) $id)
+    ->all();
+$foreign = array_values(array_diff(array_map('intval', $userIds), $allowed));
 
 if ($foreign !== []) {
     throw ValidationException::withMessages([
@@ -1862,8 +1963,9 @@ git commit -m "fix(extensions): require tenant membership for user assignment"
 - Modify: `app/Services/Cdr/CdrBatchWriter.php:39-51`
 - Modify: `app/Services/Cdr/CdrRedisIngest.php:74-104`
 - Modify: `app/Console/Commands/CdrDrainSpoolCommand.php:91-107`
+- Modify: `tests/Feature/Services/CdrRedisIngestDigestTest.php:162-192`
 - Test: `tests/Feature/Services/CdrPoisonRecordTest.php` (new)
-- Test: `tests/Feature/Console/CdrDrainSpoolCommandTest.php`
+- Test: `tests/Feature/Commands/CdrDrainSpoolCommandTest.php`
 
 **Interfaces:**
 - Produces: `CdrBatchWriter::write(array $rows): array` — returns the `id` values that were **not** written.
@@ -1912,6 +2014,8 @@ Expected: FAIL — `write()` returns `void` and the whole batch rolls back.
 
 Keep the batch transaction. Catch `Illuminate\Database\QueryException` and evaluate `(string) $exception->getCode()`: when it is `23000` (integrity constraint) or starts with `22` (data exception), roll back and retry **row by row** in individual transactions, collecting failed `id`s. Re-throw every other `QueryException` unchanged so an outage keeps all entries.
 
+Update `tests/Feature/Services/CdrRedisIngestDigestTest.php:162-192` (`keeps every entry when the MariaDB transaction fails`), which currently triggers a transaction failure with `'id' => null` (SQLSTATE `23000`); change that test to throw a transient `QueryException` (e.g. SQLSTATE `HY000` / connection lost from a `CdrBatchWriter` test double) so transient outages are still tested for re-throw and full stream retention.
+
 - [ ] **Step 4: Make the owner write-once on replay**
 
 `Cdr::upsert($rows, ['call_uuid','leg'], self::UPDATE_COLUMNS)` lists `tenant_id` among the columns it refreshes, so a delayed or replayed payload with a different resolved tenant would move an existing record into another tenant's CDR — the C02 defect returning through the replay path. Remove `tenant_id` from `UPDATE_COLUMNS`; ownership is assigned once, at first insert. The Step 1 replay test pins it. If a corrected attribution must ever be applied, it goes through an explicit, audited command, never a replay.
@@ -1931,13 +2035,13 @@ Keep the batch transaction. Catch `Illuminate\Database\QueryException` and evalu
 
 - [ ] **Step 7: Run the tests**
 
-Run: `./vendor/bin/pest tests/Feature/Services/CdrPoisonRecordTest.php tests/Feature/Services/CdrRedisIngestDigestTest.php tests/Feature/Console/CdrDrainSpoolCommandTest.php`
+Run: `./vendor/bin/pest tests/Feature/Services/CdrPoisonRecordTest.php tests/Feature/Services/CdrRedisIngestDigestTest.php tests/Feature/Commands/CdrDrainSpoolCommandTest.php`
 Expected: PASS.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add app/Services/Cdr/CdrBatchWriter.php app/Services/Cdr/CdrRedisIngest.php app/Console/Commands/CdrDrainSpoolCommand.php tests/Feature/Services/CdrPoisonRecordTest.php tests/Feature/Console/CdrDrainSpoolCommandTest.php
+git add app/Services/Cdr/CdrBatchWriter.php app/Services/Cdr/CdrRedisIngest.php app/Console/Commands/CdrDrainSpoolCommand.php tests/Feature/Services/CdrRedisIngestDigestTest.php tests/Feature/Services/CdrPoisonRecordTest.php tests/Feature/Commands/CdrDrainSpoolCommandTest.php
 git commit -m "fix(cdr): isolate deterministic database rejections without losing spooled records"
 ```
 
@@ -2052,8 +2156,8 @@ State explicitly that the *PBX* whitelist is managed by TallPBX and an ad-hoc `n
 
 - [ ] **Step 3: Verify no ordinary recipe calls raw nft**
 
-Run: `grep -rnE "nft (add|insert|delete|flush)" docs AGENTS.md load-testing/README.md`
-Expected: only the clearly labelled lockout-recovery commands in `docs/operations.md` and the prohibition text remain.
+Run: `grep -rnE "nft (add|insert|delete|flush)" docs AGENTS.md load-testing/README.md --exclude=misc-improvement-implementation-plan.md`
+Expected: only the clearly labelled lockout-recovery commands in `docs/operations.md`, `docs/architecture.md` (§16.3), and the prohibition text in `AGENTS.md` remain.
 
 - [ ] **Step 4: Commit**
 
@@ -2079,15 +2183,24 @@ For `FS_SERVER`, `FS_DEFAULT_SIP_REALM`, `FS_XML_HANDLER_ACL_CACHE_*`, and the p
 
 Describe `FS_SERVER` as the SIP registrar hostname/IP used by provisioning templates, with the `APP_URL` fallback stated as a fallback (not as recommended phone configuration). State `FS_DEFAULT_SIP_REALM` has **no** config default (`env('FS_DEFAULT_SIP_REALM')`) and is written by the installer.
 
-- [ ] **Step 3: Fix the `APP_URL` fallback in code**
+- [ ] **Step 3: Fix the `APP_URL` and `FS_SERVER` URL-scheme fallback in code**
 
-`'server' => env('FS_SERVER', env('APP_URL', 'pbx.example.com'))` hands a full URL (`https://pbx.example.com`) to a consumer that expects a hostname, so a host without `FS_SERVER` produces an unusable registrar. Change it to:
+`'server' => env('FS_SERVER', env('APP_URL', 'pbx.example.com'))` hands a full URL (`https://pbx.example.com` or `http://192.168.1.50` written by `tall.sh` / `.env.example`) to provisioning templates that expect a bare SIP registrar hostname/IP. Normalize both `FS_SERVER` and `APP_URL` in `config/freeswitch.php:68` through a tiny host extractor:
 
 ```php
-'server' => env('FS_SERVER') ?: (parse_url((string) env('APP_URL', ''), PHP_URL_HOST) ?: 'pbx.example.com'),
+'server' => (static function (): string {
+    $raw = (string) (env('FS_SERVER') ?: env('APP_URL', ''));
+    if ($raw === '') {
+        return 'pbx.example.com';
+    }
+
+    $host = parse_url($raw, PHP_URL_HOST);
+
+    return is_string($host) && $host !== '' ? $host : $raw;
+})(),
 ```
 
-Add the three cases to the existing [tests/Feature/Config/FreeswitchConfigTest.php](../tests/Feature/Config/FreeswitchConfigTest.php), which already boots the container and defines `setFsTestEnv()`: `FS_SERVER` set wins; a URL-shaped `APP_URL` yields a bare host; both absent yields `pbx.example.com`. Do **not** create `tests/Unit/Config/FreeswitchServerFallbackTest.php`: `tests/Pest.php` binds `Tests\TestCase` to `Feature`, `app-modules`, `Unit/Jobs` and three named Unit/Services files only, so a new `Unit/Config` directory gets the bare PHPUnit case and `config()` is unavailable. Refresh the existing fallback assertion in that file in the same step. Documenting the fallback without fixing it would leave the same bad value in every generated phone template.
+Add the cases to the existing [tests/Feature/Config/FreeswitchConfigTest.php](../tests/Feature/Config/FreeswitchConfigTest.php), which already boots the container and defines `setFsTestEnv()`: `FS_SERVER` set as a hostname or URL yields the bare host (update `FreeswitchConfigTest.php:41` from `'http://192.168.1.50'` to `'192.168.1.50'`); a URL-shaped `APP_URL` with `FS_SERVER` unset yields a bare host; both absent yields `pbx.example.com`. Do **not** create `tests/Unit/Config/FreeswitchServerFallbackTest.php`: `tests/Pest.php` binds `Tests\TestCase` to `Feature`, `app-modules`, `Unit/Jobs` and three named Unit/Services files only, so a new `Unit/Config` directory gets the bare PHPUnit case and `config()` is unavailable. Documenting the fallback without stripping the scheme would leave an `http://` URL in every generated phone template.
 
 - [ ] **Step 4: Rename the ACL cache keys**
 
@@ -2122,8 +2235,8 @@ Replace "TallPBX automatically creates and secures these credentials for you" wi
 
 - [ ] **Step 2: Verify no doc claims automatic generation**
 
-Run: `grep -rnE "automatic(ally)? (create|generat)" docs README.md`
-Expected: no remaining claim about SIP credential generation.
+Run: `grep -rnE "automatic(ally)? (create|generat)" docs README.md --exclude=misc-improvement-implementation-plan.md`
+Expected: no remaining claim about SIP credential generation (ignore `FS_AUTO_CREATE_SCHEMAS` in `docs/env-reference.md`).
 
 - [ ] **Step 3: Commit**
 
@@ -2139,6 +2252,7 @@ git commit -m "docs(concepts): match the extension form's credential behaviour"
 - Modify: `load-testing/configurations.md:3`, `:125-129`
 - Modify: `load-testing/README.md:110`
 - Modify: `load-testing/status.md`
+- Modify: `load-testing/scripts/pbx-sipp-validate.sh:14`, `:108-118`
 - Modify: `docs/telephony-capacity-scaling-guide.md`
 - Modify: `app/Console/Commands/PbxLoadTestSeedCommand.php:42`, `:61`
 - Test: `tests/Feature/Commands/PbxLoadTestSeedDomainTest.php` (new)
@@ -2147,7 +2261,7 @@ git commit -m "docs(concepts): match the extension form's credential behaviour"
 
 - [ ] **Step 1: Remove the literal realm default from the seeder**
 
-`PbxLoadTestSeedCommand` declares `{--domain=load.test.local}`, so deleting the flag from the procedure changes nothing. Change the option to `{--domain= : SIP realm/domain for the synthetic tenant (defaults to FS_DEFAULT_SIP_REALM)}` and resolve it as `$this->option('domain') ?: config('freeswitch.default_sip_realm')`, failing with a clear message when both are empty. Add `PbxLoadTestSeedDomainTest` asserting the config value is used and that an empty realm is refused.
+`PbxLoadTestSeedCommand` declares `{--domain=load.test.local}`, so deleting the flag from the procedure changes nothing. Change the option to `{--domain= : SIP realm/domain for the synthetic tenant (defaults to FS_DEFAULT_SIP_REALM)}` and resolve it as `$this->option('domain') ?: config('freeswitch.default_sip_realm')`, failing with a clear message when both are empty. Also update `load-testing/scripts/pbx-sipp-validate.sh:14,111` so `DOMAIN="${DOMAIN:-}"` defaults to empty and omits `--domain=...` when unset instead of forcing `load.test.local`. Add `PbxLoadTestSeedDomainTest` asserting the config value is used and that an empty realm is refused.
 
 - [ ] **Step 2: Pass the real realm in the procedure**
 
@@ -2171,7 +2285,7 @@ Expected: no `--variants`, and every named variant exists in `matrix.php`.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add load-testing/procedure.md load-testing/configurations.md load-testing/README.md load-testing/status.md docs/telephony-capacity-scaling-guide.md app/Console/Commands/PbxLoadTestSeedCommand.php tests/Feature/Commands/PbxLoadTestSeedDomainTest.php
+git add load-testing/procedure.md load-testing/configurations.md load-testing/README.md load-testing/status.md load-testing/scripts/pbx-sipp-validate.sh docs/telephony-capacity-scaling-guide.md app/Console/Commands/PbxLoadTestSeedCommand.php tests/Feature/Commands/PbxLoadTestSeedDomainTest.php
 git commit -m "docs(load-testing): align invocations with the matrix and split current status from history"
 ```
 
@@ -2179,9 +2293,9 @@ git commit -m "docs(load-testing): align invocations with the matrix and split c
 
 **Files:**
 - Modify: `docs/architecture.md:659`, `:676`
-- Modify: `.agents/skills/tallpbx-custom/SKILL.md:724`, `:727-731`, `:913`, `:949`
+- Modify: `.agents/skills/tallpbx-custom/SKILL.md:714`, `:724`, `:727-731`, `:913`, `:949`
 - Modify: `CHANGELOG.md:91`
-- Modify: `docs/telephony-capacity-scaling-guide.md` (the `config/freeswitch.php` link)
+- Modify: `docs/todays-commit-evaluation.md:197` (or mark historical report links)
 - Test: `tests/Feature/Commands/MakeModuleScaffoldTest.php` (new)
 
 **Interfaces:** none.
@@ -2192,13 +2306,13 @@ Point the two architecture links at `app-modules/security/src/Services/Firewall/
 
 - `CHANGELOG.md:91` links to `docs/load-testing-refresh-implementation-plan.md`, which was deleted; point it at `load-testing/README.md` or mark it historical.
 - `.agents/skills/tallpbx-custom/SKILL.md:913` and `:949` link to `README.md`, `INSTALL.md`, `CHANGELOG.md` and `docs/architecture.md` as if from the repository root; from that directory they need `../../../`.
-- `docs/telephony-capacity-scaling-guide.md` links `config/freeswitch.php` without `../`.
+- `docs/todays-commit-evaluation.md:197` quotes `[config/freeswitch.php](config/freeswitch.php)` as a markdown link (`docs/telephony-capacity-scaling-guide.md:172` already uses `../config/freeswitch.php`); convert the quoted example to inline code so link checkers do not treat it as a relative link.
 
-Leave archived historical documents alone beyond labelling them.
+Leave archived historical documents (`docs/changelog/*`) alone beyond labelling them.
 
 - [ ] **Step 2: Replace the route auto-registration and translation prose**
 
-State that every built-in module declares an explicit `routes/web.php` (enforced by `ModuleArchitectureTest`), and that auto-registration is retired. Keep the list of conditions under which a module adds *extra* routes. Then fix the adjacent contradiction at `SKILL.md:724`, which still shows `$this->loadTranslationsFrom(__DIR__.'/../../lang', 'email-connector')`; the modern contract is `protected function translationPaths(): array` with prefixed keys read through `__('admin.<prefix>_*')`.
+In `.agents/skills/tallpbx-custom/SKILL.md:714-734`, state that every built-in module declares an explicit `routes/web.php` (enforced by `ModuleArchitectureTest`), and that route auto-registration is retired (replace `auto-registers views, migrations, routes, ...` at L714 as well). Keep the list of conditions under which a module adds *extra* routes. Then fix the adjacent contradiction at `SKILL.md:724`: replace `$this->loadTranslationsFrom(__DIR__.'/../../lang', 'email-connector')` with the real base-provider contract in `app/Support/ModuleServiceProvider.php` (`protected function translationPath(): ?string` and `protected function hasTranslations(): bool`, which cascade `lang/` into the global dictionary so keys are prefixed and read through `__('admin.<prefix>_*')`).
 
 - [ ] **Step 3: Add the scaffold compliance test**
 
@@ -2206,7 +2320,7 @@ State that every built-in module declares an explicit `routes/web.php` (enforced
 
 So scope the test to what the scaffold actually guarantees, and assert the built-in convention separately:
 
-1. **Scaffold (custom module):** rebind the base path to a temporary directory (the technique `BackupsRouteIndependenceTest:145` uses), run `make:module`, and assert `module.json`, `src/Providers/ModuleServiceProvider.php` with `moduleName()`/`moduleNamespace()`, `lang/{en,es,fr}/admin.php`, `database/migrations`, and `config` exist. Delete the directory and clear `bootstrap/cache/modules.php` in `finally`.
+1. **Scaffold (custom module):** rebind the base path to a temporary directory (the technique `BackupsRouteIndependenceTest:145` uses), run `File::ensureDirectoryExists($tempDir.'/bootstrap/cache')` before calling `make:module` (because `MakeModuleCommand` invokes `module:cache`, which writes `base_path('bootstrap/cache/modules.php')` without creating the directory), and assert `module.json`, `src/Providers/ModuleServiceProvider.php` with `moduleName()`/`moduleNamespace()`, `lang/{en,es,fr}/admin.php`, `database/migrations`, and `config` exist. Delete the temporary directory in `finally` (and restore `app()->setBasePath($originalBasePath)`).
 2. **Built-in convention:** a second assertion iterates `app-modules/*` and requires `routes/web.php` — the same rule the architecture test already enforces, restated here so the skill's prose is pinned to a test.
 
 Do **not** extend `MakeModuleCommand` in this task. Changing the scaffold to satisfy a test would create a custom-module convention that no architecture test enforces.
@@ -2224,7 +2338,7 @@ Expected: no match.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add docs/architecture.md .agents/skills/tallpbx-custom/SKILL.md CHANGELOG.md docs/telephony-capacity-scaling-guide.md tests/Feature/Commands/MakeModuleScaffoldTest.php
+git add docs/architecture.md .agents/skills/tallpbx-custom/SKILL.md CHANGELOG.md docs/todays-commit-evaluation.md tests/Feature/Commands/MakeModuleScaffoldTest.php
 git commit -m "docs(dev): fix every broken local link and the module conventions"
 ```
 
@@ -2296,7 +2410,7 @@ Add a "Start here" table mapping reader task → entry document → authoritativ
 - [ ] **Step 5: Verify every linked path resolves relative to its own file**
 
 ```bash
-find README.md docs .agents -name '*.md' -print0 | while IFS= read -r -d '' file; do
+find README.md CHANGELOG.md docs .agents -name '*.md' -not -path 'docs/changelog/*' -not -path 'docs/misc-improvement-implementation-plan.md' -print0 | while IFS= read -r -d '' file; do
   dir=$(dirname "$file")
   grep -oE '\]\([^()]+\)' "$file" | sed 's/^](//;s/)$//' | while read -r target; do
     case "$target" in http*|https*|mailto:*|'#'*|file://*) continue;; esac
@@ -2306,7 +2420,7 @@ find README.md docs .agents -name '*.md' -print0 | while IFS= read -r -d '' file
 done
 ```
 
-Expected: no `MISSING` lines, and `grep -rn 'file:///' README.md docs .agents` returns nothing. Three details matter here: resolve from `dirname` of each file, never the repository root, or `docs/architecture.md` links of the form `config/freeswitch.php` falsely pass; match **every** relative link, not only `.md`; and strip the `#anchor` before testing the path — excluding `#` from the match skips anchored source links instead of checking them, which is the opposite of what this step is for.
+Expected: no `MISSING` lines, and `grep -rn 'file:///' README.md docs .agents --exclude=misc-improvement-implementation-plan.md` returns nothing. Three details matter here: resolve from `dirname` of each file, never the repository root, or `docs/architecture.md` links of the form `config/freeswitch.php` falsely pass; match **every** relative link, not only `.md`; and strip the `#anchor` before testing the path — excluding `#` from the match skips anchored source links instead of checking them, which is the opposite of what this step is for.
 
 - [ ] **Step 6: Commit**
 
@@ -2382,4 +2496,4 @@ These are **not** in this plan. Each needs a decision recorded before the relate
 3. Before each commit, run the targeted Pest files named in that task's steps, and `./vendor/bin/pint --dirty --test` when the task touched PHP. After each package, run `tpbx optimize:clear` and add the `## [Unreleased]` changelog entry in the same commit as the package's last code change.
 4. Run the full suite (`tpbx test --compact --parallel`) **once**, before the commit that closes packages 1–4 — the only change set that spans several subsystems. Do not run it after a documentation-only package, and never after every package.
 5. Run `./vendor/bin/pest tests/Browser` only for a package that changes a rendered create/edit journey. Package 4 (tenant create flow) is the only candidate here; packages 5–7 change no rendered view.
-6. Close `docs/gpt-evaluation.md` findings by ID in the changelog entry, and mark the audit report partially superseded once packages 0–4 are merged. Record in that entry which corrections came from each review document, so the provenance of every fix stays traceable.
+6. Close the audit findings (`T01`–`T03`, `C01`–`C05`, `O01`–`O08`, `D01`–`D10`, `M01`–`M02`) by ID in the changelog entry once packages 0–4 are merged, recording which corrections came from each review pass so the provenance of every fix stays traceable.
