@@ -49,11 +49,11 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
    scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv
    ```
    *(Note: Full multi-tier matrix benchmark series archive their raw per-cell outputs to `load-testing/results/<series>/` and commit consolidated cross-series data to `load-testing/results/consolidated/`).*
-4. **Whitelist PBX on Generator Firewall (`nftables`) If Running a Firewall**: When testing outbound gateway routing and media playback, FreeSWITCH bridges calls to the generator host (UAS ports UDP 5088, 5090, RTP 6000). Because these are unsolicited inbound UDP packets, stateful default-drop firewalls on the generator will block them. If the load generator host runs TallPBX or has an active default-drop `nftables` firewall, whitelist the PBX IP on the generator before testing:
-   ```bash
-   sudo nft add element inet tallpbx_filter whitelist_ips { <PBX_IP> }
-   ```
-   *(Note: On a clean, dedicated load generator VM with no firewall or an open `INPUT ACCEPT` policy, this step is not required).*
+4. **Allow the PBX on the Generator Firewall If One Is Running**: When testing outbound gateway routing and media playback, FreeSWITCH bridges calls to the generator host (UAS ports UDP 5088, 5090, RTP 6000). Because these are unsolicited inbound UDP packets, stateful default-drop firewalls on the generator will block them.
+
+   - **Generator running TallPBX**: add the PBX address through **Security Center → Firewall → Whitelist** (or persist the entry and run `tpbx security:apply`), then confirm it with `nft list set inet tallpbx_filter whitelist_ips`. A TallPBX-managed host rewrites its ruleset on the next apply, so an ad-hoc `nft add element` is discarded — never paste one into a managed host.
+   - **Generator with its own firewall (not TallPBX)**: configure that host with its own tooling, exactly as you would for any other service.
+   - **Dedicated generator VM with no firewall or an open `INPUT ACCEPT` policy**: nothing to do.
 5. **Use FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${destination}/${context}` rather than raw extension strings to avoid `CHAN_NOT_IMPLEMENTED` failures.
 6. **Terminate Background UAS Listeners Between Runs**: In multi-scenario scripts, clean up background UAS processes before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` socket binding collisions.
 7. **Allocate Dedicated Client Ports on Shared Hosts**: When the load generator host also runs FreeSWITCH, SIPp UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). Use local ports 5100+ (`EXTENDED_UAC_LOCAL_PORT=5100`).
