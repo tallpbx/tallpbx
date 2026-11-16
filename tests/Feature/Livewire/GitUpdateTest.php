@@ -231,3 +231,19 @@ it('does not render the session cache warning banner when session has dedicated 
         ->test(GitUpdate::class)
         ->assertDontSee(__('admin.git_session_cache_warning'));
 });
+
+it('renders an unresolvable target as unknown instead of up to date', function (): void {
+    $this->gitService->shouldReceive('fetch')->andReturn(true);
+    $this->gitService->shouldReceive('remoteTags')->andReturn(['v9.9.9']);
+    $this->gitService->shouldReceive('commitsBehind')->with('v9.9.9')->andReturn(null);
+    $this->gitService->shouldReceive('incomingCommits')->with('v9.9.9', 5)->andReturn([]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(GitUpdate::class)
+        ->call('fetch')
+        ->set('selectedTarget', 'v9.9.9')
+        ->call('refreshCommitStatus')
+        ->assertSet('commitsBehind', null)
+        ->assertSee(__('admin.git_target_unknown'))
+        ->assertDontSee(__('admin.git_up_to_date'));
+});

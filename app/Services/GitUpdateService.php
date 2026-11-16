@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\ProcessRunner;
+use App\Support\GitTarget;
 use App\Support\UpdateResult;
 use Illuminate\Support\Facades\Log;
 
@@ -134,27 +135,76 @@ class GitUpdateService
     }
 
     /**
-     * Count how many commits the current HEAD is behind the remote target.
+     * Resolve a selected target to an explicit branch or tag ref.
+     *
+     * A tag is not a remote branch: switching to `origin/<tag>` would fail.
+     * Resolution is the single place that decides which ref a name means, so
+     * the preview, the pipeline, and the rollback all agree.
      */
-    public function commitsBehind(string $target): int
+    public function resolveTarget(string $target): ?GitTarget
     {
-        $output = $this->runGitCommand(['rev-list', '--count', 'HEAD..origin/'.$target], $exitCode);
+        $branchRef = 'refs/remotes/origin/'.$target;
+
+        if ($this->refExists($branchRef)) {
+            return new GitTarget($target, GitTarget::KIND_BRANCH, $branchRef);
+        }
+
+        $tagRef = 'refs/tags/'.$target;
+
+        if ($this->refExists($tagRef)) {
+            return new GitTarget($target, GitTarget::KIND_TAG, $tagRef);
+        }
+
+        return null;
+    }
+
+    /**
+     * Report whether one ref resolves to a commit in this repository.
+     */
+    private function refExists(string $ref): bool
+    {
+        $this->runGitCommand(['rev-parse', '--verify', '--quiet', $ref], $exitCode);
+
+        return $exitCode === 0;
+    }
+
+    /**
+     * Count how many commits the current HEAD is behind the resolved target.
+     *
+     * Returns null when the target cannot be resolved. A fabricated zero would
+     * render an unknown tag as "up to date", the defect this replaces.
+     */
+    public function commitsBehind(string $target): ?int
+    {
+        $resolved = $this->resolveTarget($target);
+
+        if ($resolved === null) {
+            return null;
+        }
+
+        $output = $this->runGitCommand(['rev-list', '--count', 'HEAD..'.$resolved->ref], $exitCode);
 
         if ($exitCode !== 0) {
-            return 0;
+            return null;
         }
 
         return (int) trim($output);
     }
 
     /**
-     * Get recent incoming commit details for the target branch.
+     * Get recent incoming commit details for the resolved target.
      *
      * @return array<int, array{hash: string, author: string, time: string, message: string}>
      */
     public function incomingCommits(string $target, int $limit = 5): array
     {
-        $output = $this->runGitCommand(['log', 'HEAD..origin/'.$target, '-n', (string) $limit, '--format=%h|%an|%ar|%s'], $exitCode);
+        $resolved = $this->resolveTarget($target);
+
+        if ($resolved === null) {
+            return [];
+        }
+
+        $output = $this->runGitCommand(['log', 'HEAD..'.$resolved->ref, '-n', (string) $limit, '--format=%h|%an|%ar|%s'], $exitCode);
 
         if ($exitCode !== 0 || trim($output) === '') {
             return [];
@@ -201,25 +251,33 @@ class GitUpdateService
     }
 
     /**
-     * Pull or switch to the specified branch or tag.
+     * Pull or switch to the resolved target.
      *
-     * Uses --ff-only when on the same branch, or checkout -B when switching branches.
+     * A branch fast-forwards when it is already checked out and is recreated
+     * from its remote-tracking ref otherwise. A tag is always checked out
+     * detached at its commit, because no remote branch by that name exists.
      */
     public function pull(string $target): bool
     {
-        // Validate: target must be a known branch or tag from the remote
-        $validTargets = array_merge($this->remoteBranches(), $this->remoteTags());
+        $resolved = $this->resolveTarget($target);
 
-        if (! in_array($target, $validTargets, true)) {
+        if ($resolved === null) {
             return false;
         }
 
         $current = $this->currentBranch();
-        if ($current !== '' && $current !== $target) {
-            $this->runGitCommand(['checkout', '-B', $target, 'origin/'.$target], $exitCode);
+
+        if ($resolved->isTag()) {
+            $this->runGitCommand(['checkout', '--detach', $resolved->ref], $exitCode);
+
+            return $exitCode === 0;
+        }
+
+        if ($current !== '' && $current !== $resolved->name) {
+            $this->runGitCommand(['checkout', '-B', $resolved->name, $resolved->ref], $exitCode);
         } else {
             // Use --ff-only for safe fast-forward (no merge commits)
-            $this->runGitCommand(['pull', '--ff-only', 'origin', $target], $exitCode);
+            $this->runGitCommand(['pull', '--ff-only', 'origin', $resolved->name], $exitCode);
         }
 
         return $exitCode === 0;
@@ -377,6 +435,14 @@ class GitUpdateService
             return UpdateResult::failed($target, 'The selected target is not a known remote branch or tag.', $steps);
         }
 
+        $resolved = $this->resolveTarget($target);
+
+        if ($resolved === null) {
+            $this->addStep($steps, 'Preflight', 'failed', 'Target ref could not be resolved.');
+
+            return UpdateResult::failed($target, 'The selected target could not be resolved to a commit.', $steps);
+        }
+
         if (! file_exists(base_path('composer.lock')) || ! file_exists(base_path('package-lock.json'))) {
             $this->addStep($steps, 'Preflight', 'failed', 'Missing dependency lockfile.');
 
@@ -394,7 +460,7 @@ class GitUpdateService
         $this->addStep($steps, 'Preflight', 'ok', 'Clean tree, lockfiles present, target valid.');
 
         try {
-            return $this->runPipeline($target, $prePullHead, $steps, $preSwitchBranch);
+            return $this->runPipeline($resolved, $prePullHead, $steps, $preSwitchBranch);
         } catch (\Throwable $exception) {
             // Unexpected failures must never leave the app down with no
             // report: log and route into the rollback path.
@@ -427,12 +493,17 @@ class GitUpdateService
      *
      * @param  array<int, array{label: string, status: string, output: string}>  $steps
      */
-    private function runPipeline(string $target, string $prePullHead, array $steps, string $preSwitchBranch = ''): UpdateResult
+    private function runPipeline(GitTarget $resolved, string $prePullHead, array $steps, string $preSwitchBranch = ''): UpdateResult
     {
+        $target = $resolved->name;
         $isSwitch = $preSwitchBranch !== '' && $preSwitchBranch !== $target;
 
-        if ($isSwitch) {
-            $gitCmd = ['git', '-C', $this->repoPath, 'checkout', '-B', $target, 'origin/'.$target];
+        if ($resolved->isTag()) {
+            // A tag names a commit, not a remote branch: check it out detached.
+            $gitCmd = ['git', '-C', $this->repoPath, 'checkout', '--detach', $resolved->ref];
+            $gitLabel = 'Switch tag';
+        } elseif ($isSwitch) {
+            $gitCmd = ['git', '-C', $this->repoPath, 'checkout', '-B', $target, $resolved->ref];
             $gitLabel = 'Switch branch';
         } else {
             $gitCmd = ['git', '-C', $this->repoPath, 'pull', '--ff-only', 'origin', $target];
@@ -483,7 +554,11 @@ class GitUpdateService
     {
         $rollbackSteps = [];
 
-        if ($preSwitchBranch !== '' && $preSwitchBranch !== $target) {
+        if ($preSwitchBranch === 'HEAD') {
+            // The tree started on a detached tag/commit; detach back to it
+            // rather than moving the branch pointer the update just created.
+            $rollbackSteps['Rollback branch'] = ['git', '-C', $this->repoPath, 'checkout', '--detach', $prePullHead];
+        } elseif ($preSwitchBranch !== '' && $preSwitchBranch !== $target) {
             $rollbackSteps['Rollback branch'] = ['git', '-C', $this->repoPath, 'checkout', $preSwitchBranch];
         }
 

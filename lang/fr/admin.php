@@ -585,6 +585,7 @@ return [
     'git_custom_desc' => 'Sélectionnez une branche ou une balise distante spécifique',
     'git_current_version' => 'Version Actuelle',
     'git_up_to_date' => 'À jour avec le dépôt distant',
+    'git_target_unknown' => 'Cible introuvable',
     'git_update_available' => 'Mise à Jour Disponible',
     'git_commits_behind' => ':count commit(s) de retard sur :target',
     'git_incoming_commits' => 'Changements Entrants',

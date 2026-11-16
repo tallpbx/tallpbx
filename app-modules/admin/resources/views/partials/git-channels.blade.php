@@ -126,7 +126,10 @@
                         @endif
                     </div>
                     <div>
-                        @if ($selectedTarget === $currentBranch)
+                        @if ($commitsBehind === null)
+                            {{-- An unresolvable tag or missing ref must never render as "Ready to switch". --}}
+                            <span class="badge badge-warning badge-sm">{{ __('admin.git_target_unknown') }}</span>
+                        @elseif ($selectedTarget === $currentBranch)
                             @if ($commitsBehind > 0)
                                 <span class="badge badge-primary badge-sm">{{ __('admin.git_commits_behind', ['count' => $commitsBehind, 'target' => $selectedTarget]) }}</span>
                             @else

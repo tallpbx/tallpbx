@@ -111,6 +111,11 @@ it('categorizes branches into stable, development, and other', function (): void
 
 it('returns incoming commits parsed correctly', function (): void {
     $runner = Mockery::mock(ProcessRunner::class);
+    // 1. resolveTarget(): the branch ref exists.
+    $runner->shouldReceive('run')
+        ->with(Mockery::on(fn (array $argv): bool => in_array('--verify', $argv, true)))
+        ->once()
+        ->andReturn(new ProcessResult(0, str_repeat('a', 40)."\n"));
     $output = "abc1234|Jane Doe|2 hours ago|Fix telephony routing\ndef5678|John Smith|1 day ago|Add PBX feature\n";
     $runner->shouldReceive('run')
         ->once()
@@ -128,6 +133,12 @@ it('returns incoming commits parsed correctly', function (): void {
 
 it('returns commits behind count', function (): void {
     $runner = Mockery::mock(ProcessRunner::class);
+    // 1. resolveTarget(): the branch ref exists.
+    $runner->shouldReceive('run')
+        ->with(Mockery::on(fn (array $argv): bool => in_array('--verify', $argv, true)))
+        ->once()
+        ->andReturn(new ProcessResult(0, str_repeat('a', 40)."\n"));
+    // 2. The range count itself.
     $runner->shouldReceive('run')
         ->once()
         ->andReturn(new ProcessResult(0, "4\n"));
@@ -136,20 +147,37 @@ it('returns commits behind count', function (): void {
     expect($service->commitsBehind('main'))->toBe(4);
 });
 
-it('executes checkout -B when pulling a target different from current branch', function (): void {
+it('reports an unresolvable target as unknown instead of zero commits', function (): void {
     $runner = Mockery::mock(ProcessRunner::class);
-    // 1. currentBranch check
+    // Both the branch and the tag ref are missing (twice, because
+    // commitsBehind() resolves the target again).
     $runner->shouldReceive('run')
-        ->with(Mockery::on(fn (array $argv): bool => in_array('branch', $argv, true)))
-        ->andReturn(new ProcessResult(0, "origin/main\norigin/1.0\n"));
+        ->with(Mockery::on(fn (array $argv): bool => in_array('--verify', $argv, true)))
+        ->times(4)
+        ->andReturn(new ProcessResult(1, ''));
+
+    $service = new GitUpdateService($runner);
+
+    expect($service->resolveTarget('missing-tag'))->toBeNull()
+        ->and($service->commitsBehind('missing-tag'))->toBeNull();
+});
+
+it('executes checkout -B with the resolved remote ref when switching branches', function (): void {
+    $runner = Mockery::mock(ProcessRunner::class);
+    // 1. resolveTarget(): the remote-tracking branch exists.
     $runner->shouldReceive('run')
-        ->with(Mockery::on(fn (array $argv): bool => in_array('tag', $argv, true)))
-        ->andReturn(new ProcessResult(0, ''));
+        ->with(Mockery::on(fn (array $argv): bool => in_array('--verify', $argv, true)))
+        ->once()
+        ->andReturn(new ProcessResult(0, str_repeat('a', 40)."\n"));
+    // 2. currentBranch check.
     $runner->shouldReceive('run')
         ->with(Mockery::on(fn (array $argv): bool => in_array('--abbrev-ref', $argv, true)))
         ->andReturn(new ProcessResult(0, "main\n"));
+    // 3. The branch switch itself uses the resolved ref.
     $runner->shouldReceive('run')
-        ->with(Mockery::on(fn (array $argv): bool => in_array('checkout', $argv, true) && in_array('1.0', $argv, true) && in_array('origin/1.0', $argv, true)))
+        ->with(Mockery::on(fn (array $argv): bool => in_array('checkout', $argv, true)
+            && in_array('1.0', $argv, true)
+            && in_array('refs/remotes/origin/1.0', $argv, true)))
         ->once()
         ->andReturn(new ProcessResult(0, "Switched to a new branch '1.0'\n"));
 

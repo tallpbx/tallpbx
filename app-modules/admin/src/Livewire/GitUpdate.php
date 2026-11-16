@@ -54,7 +54,8 @@ class GitUpdate extends Component
     /** @var array<int, string> */
     public array $tags = [];
 
-    public int $commitsBehind = 0;
+    /** Null when the selected target cannot be resolved to a ref. */
+    public ?int $commitsBehind = 0;
 
     /** @var array<int, array{hash: string, author: string, time: string, message: string}> */
     public array $incomingCommits = [];

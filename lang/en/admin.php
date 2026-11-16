@@ -467,6 +467,7 @@ return [
     'git_custom_desc' => 'Select any specific remote branch or tag',
     'git_current_version' => 'Current Version',
     'git_up_to_date' => 'Up to date with remote',
+    'git_target_unknown' => 'Target not found',
     'git_update_available' => 'Update Available',
     'git_commits_behind' => ':count commit(s) behind :target',
     'git_incoming_commits' => 'Incoming Changes',

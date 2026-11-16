@@ -585,6 +585,7 @@ return [
     'git_custom_desc' => 'Seleccione cualquier rama o etiqueta remota específica',
     'git_current_version' => 'Versión Actual',
     'git_up_to_date' => 'Actualizado con el repositorio remoto',
+    'git_target_unknown' => 'Destino no encontrado',
     'git_update_available' => 'Actualización Disponible',
     'git_commits_behind' => ':count confirmación(es) detrás de :target',
     'git_incoming_commits' => 'Cambios Entrantes',
