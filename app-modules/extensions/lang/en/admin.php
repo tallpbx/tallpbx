@@ -47,4 +47,5 @@ return [
     'extension_outbound_caller_id_name' => 'Outbound Caller ID Name',
     'extension_outbound_caller_id_number' => 'Outbound Caller ID Number',
     'extension_voicemail_enabled' => 'Voicemail Enabled',
+    'extension_selected_users_not_in_tenant' => 'Every selected user must belong to the extension\'s tenant.',
 ];

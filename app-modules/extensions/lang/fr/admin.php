@@ -47,4 +47,5 @@ return [
     'extension_outbound_caller_id_name' => 'Nom de l\'Identifiant Sortant',
     'extension_outbound_caller_id_number' => 'Numéro de l\'Identifiant Sortant',
     'extension_voicemail_enabled' => 'Messagerie Vocale Activée',
+    'extension_selected_users_not_in_tenant' => 'Chaque utilisateur sélectionné doit appartenir au locataire de l’extension.',
 ];

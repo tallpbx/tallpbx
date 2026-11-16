@@ -78,6 +78,23 @@ class ExtensionService implements ExtensionServiceInterface
      */
     public function syncUsers(Extension $extension, array $userIds): Extension
     {
+        // Query the pivot directly: loading $extension->tenant would trip
+        // Model::preventLazyLoading() on callers that only pass the model.
+        $allowed = DB::table('tenant_user')
+            ->where('tenant_id', $extension->tenant_id)
+            ->whereIn('user_id', $userIds)
+            ->pluck('user_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $foreign = array_values(array_diff(array_map('intval', $userIds), $allowed));
+
+        if ($foreign !== []) {
+            throw ValidationException::withMessages([
+                'selectedUserIds' => [__('admin.extension_selected_users_not_in_tenant')],
+            ]);
+        }
+
         $extension->users()->sync($userIds);
 
         return $extension->fresh('users');

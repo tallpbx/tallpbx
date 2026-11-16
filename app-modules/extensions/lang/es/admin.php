@@ -47,4 +47,5 @@ return [
     'extension_outbound_caller_id_name' => 'Nombre de Identificador Saliente',
     'extension_outbound_caller_id_number' => 'Número de Identificador Saliente',
     'extension_voicemail_enabled' => 'Buzón de Voz Habilitado',
+    'extension_selected_users_not_in_tenant' => 'Cada usuario seleccionado debe pertenecer al inquilino de la extensión.',
 ];

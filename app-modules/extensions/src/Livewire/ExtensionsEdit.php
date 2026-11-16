@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Extensions\Livewire;
 
-use App\Models\User;
 use App\Support\BaseEditComponent;
 use App\Support\PanelActor;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Modules\Extensions\Models\Extension;
@@ -114,9 +112,6 @@ class ExtensionsEdit extends BaseEditComponent
     /** @var array<int, int> */
     public array $selectedUserIds = [];
 
-    /** @var Collection<int, User> */
-    public Collection $users;
-
     private ExtensionServiceInterface $extensionService;
 
     /**
@@ -133,7 +128,6 @@ class ExtensionsEdit extends BaseEditComponent
     public function mount(?string $extensionId = null): void
     {
         $this->loadTenants();
-        $this->users = User::query()->orderBy('name')->get();
 
         if ($extensionId !== null) {
             $this->extensionId = $extensionId;
