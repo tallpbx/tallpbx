@@ -79,6 +79,15 @@ sudo bash /var/www/tallpbx/scripts/resources/install-update-workers.sh
 Until that one-time step is done, the updater refuses to start a web update and
 reports the same command instead of leaving a half-reloaded appliance behind.
 
+### Backup & Restore Journey
+
+The complete operator journey — scope contents and exclusions, where archives
+live, how to verify one, the downtime window, the two time bounds, where
+progress appears, failure recovery at each stage, and restoring onto a
+replacement host — is in [backup-restore-guide.md](backup-restore-guide.md).
+Read it before confirming a restore: a restore replaces the database and the
+selected file trees and has no automatic rollback.
+
 ## Health Checks and Testing
 
 After installation — and at any time — run the smoke check to confirm the
