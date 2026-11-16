@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\ProcessRunner;
+use App\Services\Appliance\RuntimeServiceReconciler;
 use App\Support\GitTarget;
 use App\Support\UpdateResult;
 use Illuminate\Support\Facades\Log;
@@ -30,11 +31,19 @@ class GitUpdateService
     private string $repoPath;
 
     /**
+     * Runtime service reconciler, resolved through the container when omitted.
+     */
+    private readonly RuntimeServiceReconciler $services;
+
+    /**
      * Create the service and remember the application root where .git lives.
      */
-    public function __construct(private readonly ProcessRunner $runner)
-    {
+    public function __construct(
+        private readonly ProcessRunner $runner,
+        ?RuntimeServiceReconciler $services = null,
+    ) {
         $this->repoPath = base_path();
+        $this->services = $services ?? app(RuntimeServiceReconciler::class);
     }
 
     /**
@@ -443,6 +452,17 @@ class GitUpdateService
             return UpdateResult::failed($target, 'The selected target could not be resolved to a commit.', $steps);
         }
 
+        // The web updater may only take one privileged action: the bounded
+        // worker-restart helper. Check it before anything is mutated, so a
+        // missing helper never leaves a half-updated appliance.
+        $preflight = $this->services->preflightUpdate();
+
+        if ($preflight !== null) {
+            $this->addStep($steps, 'Preflight', 'failed', $preflight);
+
+            return UpdateResult::failed($target, $preflight, $steps);
+        }
+
         if (! file_exists(base_path('composer.lock')) || ! file_exists(base_path('package-lock.json'))) {
             $this->addStep($steps, 'Preflight', 'failed', 'Missing dependency lockfile.');
 
@@ -536,6 +556,37 @@ class GitUpdateService
             if (! $result->ok()) {
                 return $this->rollback($target, $prePullHead, $steps, "{$label} failed: {$result->output}", $preSwitchBranch);
             }
+        }
+
+        // Code, dependencies, schema, and assets changed; the resident PHP
+        // workers still run the old code until they are reloaded. Core services
+        // (database, Redis, Nginx, FreeSWITCH, PHP-FPM) are never bounced here.
+        $services = $this->services->reconcileAfterUpdate();
+        $failedServices = $services['failed'];
+        $warnings = $services['warnings'];
+
+        $summary = $failedServices === [] && $warnings === []
+            ? 'Resident PHP workers restarted and verified active.'
+            : 'Restarted: '.implode(', ', $services['restarted'])
+                .($warnings === [] ? '' : '; not running: '.implode(', ', $warnings))
+                .($failedServices === [] ? '' : '; failed: '.implode(', ', $failedServices));
+
+        $this->addStep(
+            $steps,
+            'Reconcile services',
+            $failedServices !== [] ? 'failed' : ($warnings === [] ? 'ok' : 'warn'),
+            $summary,
+        );
+
+        if ($failedServices !== []) {
+            // Do not roll back the code for a post-migration service failure:
+            // the schema is already new, and the operator needs to see which
+            // unit stayed down.
+            return UpdateResult::failed(
+                $target,
+                'The update completed its code steps, but these required services did not come back: '.implode(', ', $failedServices).'. Restart them manually and re-run the health check.',
+                $steps,
+            );
         }
 
         return UpdateResult::success($target, $steps);

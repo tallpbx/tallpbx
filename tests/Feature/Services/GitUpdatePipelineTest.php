@@ -3,15 +3,29 @@
 declare(strict_types=1);
 
 use App\Contracts\ProcessRunner;
+use App\Services\Appliance\RuntimeServiceReconciler;
 use App\Services\GitUpdateService;
 use Tests\Feature\Services\FakeProcessRunner;
 
 /**
  * Create the git update service under test with the given fake runner.
+ *
+ * A fake reconciler keeps non-root pipeline tests away from live host paths:
+ * the preflight always passes and the worker restart reports success.
  */
 function pipelineService(FakeProcessRunner $runner): GitUpdateService
 {
-    return new GitUpdateService($runner);
+    $reconciler = Mockery::mock(RuntimeServiceReconciler::class);
+    $reconciler->shouldReceive('preflightUpdate')->andReturn(null)->byDefault();
+    $reconciler->shouldReceive('reconcileAfterUpdate')->andReturn([
+        'restarted' => ['freeswitch-listener', 'tallpbx-queue', 'tallpbx-scheduler', 'tallpbx-cdr-worker', 'tallpbx-reverb'],
+        'skipped' => ['tallpbx-xml-worker'],
+        'failed' => [],
+        'warnings' => [],
+        'probes' => ['ok' => [], 'failed' => []],
+    ])->byDefault();
+
+    return new GitUpdateService($runner, $reconciler);
 }
 
 /**
@@ -63,7 +77,8 @@ it('runs the full pipeline in order on success', function (): void {
     sort($sorted);
 
     expect($positions)->toBe($sorted)
-        ->and($result->steps)->toHaveCount(count($order));
+        ->and($result->steps)->toHaveCount(count($order) + 1)
+        ->and(collect($result->steps)->firstWhere('label', 'Reconcile services'))->not->toBeNull();
 });
 
 it('aborts on a dirty working tree before anything changes', function (): void {

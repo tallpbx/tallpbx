@@ -1,0 +1,65 @@
+#!/bin/bash
+# Restarts only the allowlisted resident PHP workers after a web update.
+#
+# This helper is the only privileged action the web updater may take. It
+# accepts NO arguments: the unit list is compiled in, so a request can never
+# name a service, command, path, or shell fragment.
+#
+# It never restarts core services: PHP-FPM is serving the update request and
+# MariaDB, Redis, Nginx, and FreeSWITCH may be carrying live traffic.
+#
+# Output is a fixed-format status: one "ok <unit>", "skipped <unit>", or
+# "failed <unit>" line per unit, consumed by RuntimeServiceReconciler.
+set -u
+
+if [ "$#" -ne 0 ]; then
+    echo "tallpbx-update-workers accepts no arguments" >&2
+    exit 64
+fi
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+required_units=(freeswitch-listener tallpbx-queue tallpbx-scheduler tallpbx-cdr-worker tallpbx-reverb)
+optional_units=(tallpbx-xml-worker)
+failures=0
+
+# Record the optional unit's expected state first; never enable a worker that
+# an operator deliberately left disabled. Older hosts may not ship the unit at
+# all, which also reports "inactive" rather than aborting the sweep.
+xml_worker_was_active=0
+if systemctl is-active --quiet tallpbx-xml-worker >/dev/null 2>&1; then
+    xml_worker_was_active=1
+fi
+
+for unit in "${required_units[@]}"; do
+    # `systemctl restart` only reports that the request was accepted, so the
+    # unit's own state is checked afterwards.
+    if systemctl restart "$unit" >/dev/null 2>&1 && systemctl is-active --quiet "$unit" >/dev/null 2>&1; then
+        echo "ok $unit"
+    else
+        echo "failed $unit"
+        failures=$((failures + 1))
+    fi
+done
+
+for unit in "${optional_units[@]}"; do
+    if [ "$xml_worker_was_active" -ne 1 ]; then
+        echo "skipped $unit"
+
+        continue
+    fi
+
+    if systemctl restart "$unit" >/dev/null 2>&1 && systemctl is-active --quiet "$unit" >/dev/null 2>&1; then
+        echo "ok $unit"
+    else
+        echo "failed $unit"
+        failures=$((failures + 1))
+    fi
+done
+
+if [ "$failures" -gt 0 ]; then
+    exit 1
+fi
+
+exit 0

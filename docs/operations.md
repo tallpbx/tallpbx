@@ -59,6 +59,26 @@ sudo install -d -m 0700 -o root -g root /var/lib/tallpbx/restore-journal
 `sudo tallpbx-restore-status` prints one row per operation from the journal and
 touches no framework code, so it also works while the database is being replaced.
 
+### Web Updater Prerequisite
+
+After a web update the resident PHP workers (`freeswitch-listener`, `tallpbx-queue`,
+`tallpbx-scheduler`, `tallpbx-cdr-worker`, `tallpbx-reverb`, and an opt-in
+`tallpbx-xml-worker`) still run the previous code until they are restarted. The web
+updater takes exactly one privileged action to reload them: the bounded,
+root-owned helper `/usr/local/sbin/tallpbx-update-workers`, which accepts no
+arguments and names its unit list in the script. Core services (MariaDB, Redis,
+Nginx, FreeSWITCH, PHP-FPM) are never bounced by an update.
+
+A fresh install provides the helper. On an appliance installed before it existed,
+deploy the source that contains it and run the narrow installer once as root:
+
+```bash
+sudo bash /var/www/tallpbx/scripts/resources/install-update-workers.sh
+```
+
+Until that one-time step is done, the updater refuses to start a web update and
+reports the same command instead of leaving a half-reloaded appliance behind.
+
 ## Health Checks and Testing
 
 After installation — and at any time — run the smoke check to confirm the

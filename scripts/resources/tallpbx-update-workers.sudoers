@@ -1,0 +1,4 @@
+# TallPBX web updater: restart only the allowlisted resident PHP workers.
+# The trailing "" forbids arguments in sudoers(5), so a web request can never
+# pass a unit name, path, or shell fragment to the helper.
+www-data ALL=(root) NOPASSWD: /usr/local/sbin/tallpbx-update-workers ""

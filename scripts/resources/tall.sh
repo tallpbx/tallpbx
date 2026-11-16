@@ -401,6 +401,12 @@ if [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore-status ]; then
     install -m 0750 -o root -g root /var/www/tallpbx/scripts/resources/tallpbx-restore-status /usr/local/sbin/tallpbx-restore-status
 fi
 
+# Install the bounded worker-restart helper used by the web updater. The
+# installer is idempotent and validates its sudoers drop-in before use.
+if [ -f /var/www/tallpbx/scripts/resources/install-update-workers.sh ]; then
+    bash /var/www/tallpbx/scripts/resources/install-update-workers.sh
+fi
+
 # Install systemd service units for the background workers that TallPBX needs.
 # All unit files are copied first, then systemd is reloaded once, and finally
 # each service is enabled and started. This avoids redundant daemon-reload calls.
