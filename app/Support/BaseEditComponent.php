@@ -9,7 +9,6 @@ use App\Services\TenantManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -163,24 +162,6 @@ abstract class BaseEditComponent extends Component
      */
     protected function resolveViewName(): string
     {
-        $reflection = new \ReflectionClass(static::class);
-        $filePath = $reflection->getFileName();
-
-        // Support both new (app-modules/.../src/Livewire/) and legacy (modules/.../src/Http/Livewire/) paths
-        $pattern = '#(?:app-)?modules/([^/]+)/src/(Http/)?Livewire/(.+)\.php$#';
-
-        preg_match($pattern, $filePath, $m);
-
-        // Capture groups: 1 = module directory, 2 = legacy path marker, 3 = class name.
-        $moduleDir = $m[1] ?? '';
-        $isLegacy = ($m[2] ?? '') !== '';
-        $className = $m[3] ?? '';
-
-        $viewName = Str::of($className)->snake('-')->toString();
-
-        // Legacy modules have views in resources/views/livewire/, new ones in resources/views/
-        $prefix = $isLegacy ? 'livewire.' : '';
-
-        return "{$moduleDir}::{$prefix}{$viewName}";
+        return ModuleViewName::for(static::class);
     }
 }
