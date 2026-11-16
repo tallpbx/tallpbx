@@ -20,20 +20,33 @@ class PanelActor
     /**
      * Resolve the currently active unified-panel actor.
      *
-     * Impersonated sessions resolve the tenant user (web guard)
-     * rather than the underlying admin who initiated the impersonation.
+     * Impersonated sessions resolve the tenant user (web guard) rather than the
+     * underlying admin who initiated the impersonation. A disabled account
+     * resolves to null on every path, because this method is the single actor
+     * choke point for Livewire updates and Gate/Policy checks — neither of
+     * which passes through AuthPanelMiddleware.
      */
     public static function resolve(): Admin|User|null
     {
         if (self::isImpersonating()) {
             $user = Auth::guard('web')->user();
 
-            return $user instanceof User ? $user : null;
+            if (! $user instanceof User || ! $user->enabled) {
+                return null;
+            }
+
+            // The impersonated user can stay enabled while the supervising
+            // administrator is disabled mid-session. Livewire never passes
+            // through AuthPanelMiddleware, so the origin is checked here as
+            // well.
+            $admin = Admin::query()->find(session(ImpersonationService::SESSION_ORIGINAL_ADMIN_ID));
+
+            return $admin !== null && $admin->enabled ? $user : null;
         }
 
         $actor = Auth::guard('admin')->user() ?? Auth::guard('web')->user();
 
-        return ($actor instanceof Admin || $actor instanceof User) ? $actor : null;
+        return ($actor instanceof Admin || $actor instanceof User) && $actor->enabled ? $actor : null;
     }
 
     /**
