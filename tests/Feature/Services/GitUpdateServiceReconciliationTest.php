@@ -64,6 +64,11 @@ final class RecordingUpdateRunner implements ProcessRunner
     }
 }
 
+beforeEach(function (): void {
+    // Parallel workers must never contend for one update lock file.
+    config(['git-update.runtime_path' => sys_get_temp_dir().'/git-update-runtime-'.uniqid()]);
+});
+
 it('reconciles runtime services after the build and cache clear', function (): void {
     $runner = new RecordingUpdateRunner;
     $result = (new GitUpdateService($runner, fakeUpdateReconciler()))->update('5.x');

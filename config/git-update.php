@@ -15,4 +15,11 @@ return [
     */
 
     'step_timeout_seconds' => (int) env('GIT_UPDATE_STEP_TIMEOUT_SECONDS', 600),
+
+    /*
+     * Runtime artefacts (lock, status file, progress log). The defaults live
+     * under storage/framework; tests redirect them so parallel processes never
+     * contend for one lock file.
+     */
+    'runtime_path' => env('GIT_UPDATE_RUNTIME_PATH', storage_path('framework')),
 ];

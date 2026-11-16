@@ -366,11 +366,12 @@ class GitUpdateService
         // Atomic lock: two admins or two tabs must never interleave
         // composer/npm/migrate writes. The lock spans the whole pipeline
         // and is taken before anything else runs.
-        $lock = fopen(storage_path('framework/git-update.lock'), 'c');
+        $lockPath = $this->runtimePath().'/git-update.lock';
+        $lock = fopen($lockPath, 'c');
 
         if ($lock === false) {
             Log::error('Could not open the git update lock file.', [
-                'path' => storage_path('framework/git-update.lock'),
+                'path' => $lockPath,
             ]);
             $this->addStep($steps, 'Preflight', 'failed', 'Update lock unavailable.');
 
@@ -646,7 +647,22 @@ class GitUpdateService
      */
     public function statusFilePath(): string
     {
-        return storage_path('framework/git-update-status.json');
+        return $this->runtimePath().'/git-update-status.json';
+    }
+
+    /**
+     * Directory holding the update lock, status file, and progress log.
+     */
+    private function runtimePath(): string
+    {
+        $configured = (string) config('git-update.runtime_path', '');
+        $path = rtrim($configured !== '' ? $configured : storage_path('framework'), '/');
+
+        if (! is_dir($path)) {
+            @mkdir($path, 0775, true);
+        }
+
+        return $path;
     }
 
     /**
@@ -654,7 +670,7 @@ class GitUpdateService
      */
     public function logFilePath(): string
     {
-        return storage_path('framework/git-update.log');
+        return $this->runtimePath().'/git-update.log';
     }
 
     /**

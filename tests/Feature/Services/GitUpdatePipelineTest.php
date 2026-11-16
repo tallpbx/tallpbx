@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Contracts\ProcessRunner;
 use App\Services\Appliance\RuntimeServiceReconciler;
 use App\Services\GitUpdateService;
+use Illuminate\Support\Facades\File;
 use Tests\Feature\Services\FakeProcessRunner;
 
 /**
@@ -15,6 +16,9 @@ use Tests\Feature\Services\FakeProcessRunner;
  */
 function pipelineService(FakeProcessRunner $runner): GitUpdateService
 {
+    // Parallel workers must never contend for one update lock file.
+    config(['git-update.runtime_path' => sys_get_temp_dir().'/git-update-runtime-'.uniqid()]);
+
     $reconciler = Mockery::mock(RuntimeServiceReconciler::class);
     $reconciler->shouldReceive('preflightUpdate')->andReturn(null)->byDefault();
     $reconciler->shouldReceive('reconcileAfterUpdate')->andReturn([
@@ -159,7 +163,9 @@ it('passes target with metacharacters safely as an argv array element in the pul
 it('refuses to run while another update holds the lock', function (): void {
     $runner = pipelineRunner();
     $service = pipelineService($runner);
-    $lock = fopen(storage_path('framework/git-update.lock'), 'c');
+    $runtime = (string) config('git-update.runtime_path');
+    File::ensureDirectoryExists($runtime);
+    $lock = fopen($runtime.'/git-update.lock', 'c');
     flock($lock, LOCK_EX);
 
     try {
