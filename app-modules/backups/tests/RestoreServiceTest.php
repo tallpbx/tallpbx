@@ -6,6 +6,7 @@ use App\Models\Admin;
 use App\Models\Group;
 use App\Models\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
@@ -275,6 +276,9 @@ it('fails an operation before extraction when its archive lists a traversal path
     ]);
     $runner = mock(RestoreCommandRunnerInterface::class);
     $runner->shouldReceive('run')->once()->with(['tar', '-tf', '/tmp/restore.tar'])->andReturn('../outside');
+    // The failure path still leaves maintenance mode.
+    $runner->shouldReceive('run')->with(['php', 'artisan', 'up'])->andReturn('');
+    $runner->shouldReceive('run')->with(['php', 'artisan', 'backups:reconcile-restore-journal', '--operation=restore-operation-id'])->andReturn('');
 
     expect(fn () => (new RestoreOperationExecutor($runner))->execute($operation))
         ->toThrow(RuntimeException::class, 'unsafe path');
@@ -332,3 +336,81 @@ it('refuses to start an unjournalled restore when the claim marker is missing', 
 
     expect($operation->fresh()->status)->toBe('pending-helper');
 });
+
+it('records the failure in the journal and projects it after the database is replaced', function (): void {
+    $journalRoot = $this->restoreHandoff.'/journal';
+    $operation = RestoreOperation::create([
+        'requested_by_admin_id' => Admin::factory()->create()->id,
+        'archive_path' => '/tmp/restore.tar',
+        'archive_checksum' => hash('sha256', 'restore'),
+        'scopes' => ['database'],
+        'status' => 'pending-helper',
+    ]);
+
+    app(RestoreJournal::class)->write($operation->id, [
+        'phase' => 'importing',
+        'archive_path' => '/tmp/restore.tar',
+        'archive_checksum' => $operation->archive_checksum,
+        'scopes' => ['database'],
+        'requester' => ['id' => 7, 'email' => 'admin@example.test', 'name' => 'Admin'],
+    ]);
+
+    // The imported database does not contain the row any more.
+    RestoreOperation::query()->whereKey($operation->id)->delete();
+
+    $runner = new class implements RestoreCommandRunnerInterface
+    {
+        /**
+         * Simulate every phase, failing at the migration and reconciling in process.
+         *
+         * @param  array<int, string>  $command
+         * @param  array<string, string>  $environment
+         */
+        public function run(array $command, mixed $input = null, array $environment = []): string
+        {
+            if (($command[0] ?? null) === 'tar' && ($command[1] ?? null) === '-tf') {
+                return 'root/database.sql';
+            }
+
+            if (($command[0] ?? null) === 'tar' && str_starts_with((string) ($command[1] ?? ''), '-x')) {
+                $target = $command[(int) array_search('-C', $command, true) + 1];
+                File::ensureDirectoryExists($target.'/root');
+                file_put_contents($target.'/root/database.sql', 'CREATE TABLE x (id);');
+
+                return '';
+            }
+
+            if (($command[0] ?? null) === 'php' && ($command[2] ?? null) === 'migrate') {
+                throw new RuntimeException('Migration failed after import.');
+            }
+
+            if (($command[0] ?? null) === 'php' && ($command[2] ?? null) === 'backups:reconcile-restore-journal') {
+                Artisan::call('backups:reconcile-restore-journal', [
+                    '--operation' => str_replace('--operation=', '', (string) ($command[3] ?? '')),
+                ]);
+
+                return '';
+            }
+
+            return '';
+        }
+    };
+
+    $executor = new RestoreOperationExecutor($runner, app(RestoreJournal::class));
+
+    try {
+        expect(fn () => $executor->execute($operation))->toThrow(RuntimeException::class, 'Migration failed after import.');
+    } finally {
+        // The execution created an extraction workspace outside the journal.
+        File::deleteDirectory((string) config('backup-storage.root'));
+    }
+
+    expect(app(RestoreJournal::class)->read($operation->id)['phase'])->toBe('failed');
+
+    $this->assertDatabaseHas('restore_operations', [
+        'id' => $operation->id,
+        'status' => 'failed',
+        'requested_by_name' => 'Admin',
+        'requested_by_email' => 'admin@example.test',
+    ]);
+})->skip(fn (): bool => ! is_dir('/tmp'), 'Requires a writable temp root');

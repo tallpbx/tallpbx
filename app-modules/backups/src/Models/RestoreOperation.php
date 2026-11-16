@@ -15,7 +15,10 @@ class RestoreOperation extends Model
     use HasUuids;
 
     protected $fillable = [
+        'id',
         'requested_by_admin_id',
+        'requested_by_name',
+        'requested_by_email',
         'archive_path',
         'archive_checksum',
         'source_backup_id',

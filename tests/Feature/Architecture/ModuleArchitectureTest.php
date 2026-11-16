@@ -39,6 +39,7 @@ const ALLOWED_SHARED_KERNEL_MODULE_DEPENDENCIES = [
 
     // 4. Privileged System CLI Helpers
     'app/Console/Commands/Backups/RestoreOperationCommand.php' => 'CLI entry point invoked by privileged sudoers restore helper script',
+    'app/Console/Commands/Backups/ReconcileRestoreJournalCommand.php' => 'Privileged projection of restore journal state into the restored database',
     'app/Console/Commands/BroadcastReconcileOutcomesCommand.php' => 'Scheduled background worker reconciling expired broadcast outcomes',
     'app/Support/BroadcastSettlement.php' => 'Settlement rule shared between broadcast CLI sweeper and outcome handling',
 

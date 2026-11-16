@@ -395,6 +395,12 @@ if [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch ]; then
     install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch.path /etc/systemd/system/
 fi
 
+# Install the database-free status reader beside the restore helper. It runs
+# with sudo and reads the root-only journal, so it must stay root-owned.
+if [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore-status ]; then
+    install -m 0750 -o root -g root /var/www/tallpbx/scripts/resources/tallpbx-restore-status /usr/local/sbin/tallpbx-restore-status
+fi
+
 # Install systemd service units for the background workers that TallPBX needs.
 # All unit files are copied first, then systemd is reloaded once, and finally
 # each service is enabled and started. This avoids redundant daemon-reload calls.

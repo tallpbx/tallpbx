@@ -179,7 +179,7 @@ it('restores the custom-modules directory when the app files scope is selected',
     $originalBasePath = base_path();
 
     try {
-        // Point base_path at an isolated fixture root: restoreSelectedFiles
+        // Point base_path at an isolated fixture root: restoreFiles
         // resolves base_path('custom-modules'), and the developer's real
         // custom-modules directory must never be touched by a test.
         app()->setBasePath($fixtureRoot);
@@ -190,7 +190,7 @@ it('restores the custom-modules directory when the app files scope is selected',
         file_put_contents($archiveRoot.'/custom_modules/'.$token.'/restored.txt', 'restored content');
         file_put_contents($archiveRoot.'/custom_modules/.gitkeep', 'keep me');
 
-        $method = new ReflectionMethod($executor, 'restoreSelectedFiles');
+        $method = new ReflectionMethod($executor, 'restoreFiles');
         $method->invoke($executor, $archiveRoot, ['app_files']);
 
         expect(is_file($target.'/'.$token.'/restored.txt'))

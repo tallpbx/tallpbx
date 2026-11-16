@@ -15,57 +15,97 @@ use RuntimeException;
 class RestoreOperationExecutor
 {
     /**
+     * Authoritative lifecycle journal, resolved through the container when omitted.
+     */
+    private readonly RestoreJournal $journal;
+
+    /**
      * Create an executor with an argument-safe root command runner.
      */
-    public function __construct(private readonly RestoreCommandRunnerInterface $commandRunner) {}
+    public function __construct(
+        private readonly RestoreCommandRunnerInterface $commandRunner,
+        ?RestoreJournal $journal = null,
+    ) {
+        $this->journal = $journal ?? app(RestoreJournal::class);
+    }
 
     /**
      * Execute the bounded restore operation after the command has verified it.
      */
     public function execute(RestoreOperation $operation): void
     {
-        $this->assertArchiveIsSafe($operation->archive_path);
-
-        $extractionDirectory = rtrim((string) config('backup-storage.root'), '/').'/restore-extract/'.$operation->id;
-        File::deleteDirectory($extractionDirectory);
-        File::ensureDirectoryExists($extractionDirectory, 0700, true);
-        $extractCommand = str_ends_with($operation->archive_path, '.gz')
-            ? ['tar', '-xzf', $operation->archive_path, '--no-same-owner', '--no-same-permissions', '-C', $extractionDirectory]
-            : ['tar', '-xf', $operation->archive_path, '--no-same-owner', '--no-same-permissions', '-C', $extractionDirectory];
-        $this->commandRunner->run($extractCommand);
-
-        $snapshotDirectory = $this->snapshotDirectory($operation);
-        $this->snapshotSelectedFiles($snapshotDirectory, $operation->scopes);
-
-        $operation->update([
-            'status' => 'running',
-            'started_at' => now(),
-            'failure_reason' => null,
-            'pre_restore_snapshot_path' => $snapshotDirectory,
-        ]);
-
-        $this->commandRunner->run(['php', 'artisan', 'down']);
+        $operationId = $operation->id;
 
         try {
+            $this->assertArchiveIsSafe($operation->archive_path);
+
+            $extractionDirectory = rtrim((string) config('backup-storage.root'), '/').'/restore-extract/'.$operation->id;
+            File::deleteDirectory($extractionDirectory);
+            File::ensureDirectoryExists($extractionDirectory, 0700, true);
+            $this->journal->record($operationId, 'extracting');
+            $extractCommand = str_ends_with($operation->archive_path, '.gz')
+                ? ['tar', '-xzf', $operation->archive_path, '--no-same-owner', '--no-same-permissions', '-C', $extractionDirectory]
+                : ['tar', '-xf', $operation->archive_path, '--no-same-owner', '--no-same-permissions', '-C', $extractionDirectory];
+            $this->commandRunner->run($extractCommand);
+
+            $this->journal->record($operationId, 'snapshotting');
+            $snapshotDirectory = $this->snapshotDirectory($operation);
+            $this->snapshotSelectedFiles($snapshotDirectory, $operation->scopes);
+
+            $operation->update([
+                'status' => 'running',
+                'started_at' => now(),
+                'failure_reason' => null,
+                'pre_restore_snapshot_path' => $snapshotDirectory,
+            ]);
+            $this->journal->record($operationId, 'snapshotting', ['pre_restore_snapshot_path' => $snapshotDirectory]);
+
+            $this->commandRunner->run(['php', 'artisan', 'down']);
+
             $archiveRoot = $this->archiveRoot($extractionDirectory);
+            $this->journal->record($operationId, 'importing');
             $this->snapshotDatabase($snapshotDirectory, $operation->scopes);
             $this->restoreDatabase($archiveRoot, $operation->scopes);
             $this->reconcileRestoredBackupStatus($operation);
-            $this->restoreSelectedFiles($archiveRoot, $operation->scopes);
+            $this->journal->record($operationId, 'restoring-files');
+            $this->restoreFiles($archiveRoot, $operation->scopes);
+            $this->journal->record($operationId, 'migrating');
             $this->commandRunner->run(['php', 'artisan', 'migrate', '--force']);
+            $this->journal->record($operationId, 'reconciling');
+            $this->commandRunner->run(['php', 'artisan', 'backups:reconcile-restore-journal', '--operation='.$operationId]);
+            $operation->refresh();
             $this->commandRunner->run(['php', 'artisan', 'optimize:clear']);
             $this->restartRuntimeServices();
 
+            $this->journal->record($operationId, 'completed', ['completed_at' => now()->toIso8601String()]);
             $operation->update([
                 'status' => 'completed',
                 'completed_at' => now(),
             ]);
         } catch (\Throwable $exception) {
-            $operation->update([
-                'status' => 'failed',
+            // The journal is the only writer that survives a replaced database,
+            // so it records the failure first.
+            $this->journal->record($operationId, 'failed', [
                 'failure_reason' => $exception->getMessage(),
-                'completed_at' => now(),
+                'completed_at' => now()->toIso8601String(),
             ]);
+
+            // A reconcile failure must never mask the original exception.
+            try {
+                $this->commandRunner->run(['php', 'artisan', 'backups:reconcile-restore-journal', '--operation='.$operationId]);
+            } catch (\Throwable) {
+                // The journal already holds the authoritative failure.
+            }
+
+            try {
+                $operation->update([
+                    'status' => 'failed',
+                    'failure_reason' => $exception->getMessage(),
+                    'completed_at' => now(),
+                ]);
+            } catch (\Throwable) {
+                // The row may belong to the database the restore just replaced.
+            }
 
             throw $exception;
         } finally {
@@ -108,7 +148,22 @@ class RestoreOperationExecutor
         File::ensureDirectoryExists($snapshotDirectory, 0700, true);
 
         if (in_array('app_files', $scopes, true)) {
-            File::copyDirectory(storage_path('app'), $snapshotDirectory.'/app_files');
+            // Mirror the backup's exclusion list: the pre-restore snapshot must
+            // not duplicate the media and backup trees it protects, or every
+            // restore doubles the disk footprint the preflight reserves.
+            File::ensureDirectoryExists($snapshotDirectory.'/app_files', 0700, true);
+
+            foreach (File::directories(storage_path('app')) as $directory) {
+                if (in_array(basename($directory), ['recordings', 'voicemail', 'fax', 'backups'], true)) {
+                    continue;
+                }
+
+                File::copyDirectory($directory, $snapshotDirectory.'/app_files/'.basename($directory));
+            }
+
+            foreach (File::files(storage_path('app')) as $file) {
+                File::copy($file->getPathname(), $snapshotDirectory.'/app_files/'.$file->getFilename());
+            }
 
             // Mirror the backup: third-party custom modules ride with the
             // app-files scope so a rollback snapshot can bring them back.
@@ -166,15 +221,28 @@ class RestoreOperationExecutor
     /**
      * Replace only file trees explicitly included by the restore request.
      *
+     * Public so restored content is directly testable.
+     *
      * @param  list<string>  $scopes
      */
-    private function restoreSelectedFiles(string $archiveRoot, array $scopes): void
+    public function restoreFiles(string $archiveRoot, array $scopes): void
     {
         if (in_array('app_files', $scopes, true) && is_dir($archiveRoot.'/app_files')) {
             foreach (File::directories($archiveRoot.'/app_files') as $source) {
                 $destination = storage_path('app/'.basename($source));
                 File::deleteDirectory($destination);
                 File::copyDirectory($source, $destination);
+            }
+
+            // Mirror the backup's member list: a top-level file next to the
+            // directories must come back too. scandir (not the File facade)
+            // also sees dot files.
+            foreach (scandir($archiveRoot.'/app_files') ?: [] as $entry) {
+                if ($entry === '.' || $entry === '..' || is_dir($archiveRoot.'/app_files/'.$entry)) {
+                    continue;
+                }
+
+                File::copy($archiveRoot.'/app_files/'.$entry, storage_path('app/'.$entry));
             }
         }
 

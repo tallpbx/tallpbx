@@ -1,0 +1,58 @@
+#!/usr/bin/php
+<?php
+
+declare(strict_types=1);
+
+/*
+ * Prints the authoritative restore journal without booting Laravel.
+ *
+ * Every Artisan command boots the module registry, which queries the database,
+ * so it cannot answer during a restore that is replacing that database. This
+ * script only reads JSON files, so an operator can always see what the helper
+ * last recorded.
+ *
+ * Usage: tallpbx-restore-status [journal-directory]
+ *
+ * Exit status: 0 when every operation is terminal, 1 when any operation is
+ * still in flight or unreadable.
+ */
+
+$root = $argv[1] ?? (getenv('TALLPBX_RESTORE_JOURNAL') ?: '/var/lib/tallpbx/restore-journal');
+$root = rtrim($root, '/');
+$files = glob($root.'/*.json') ?: [];
+
+if ($files === []) {
+    fwrite(STDOUT, "No restore operations recorded in {$root}.\n");
+    exit(0);
+}
+
+$pending = 0;
+
+foreach ($files as $file) {
+    $entry = json_decode((string) @file_get_contents($file), true);
+
+    if (! is_array($entry)) {
+        fwrite(STDOUT, sprintf("%-36s  %s\n", basename($file, '.json'), 'unreadable'));
+        $pending++;
+
+        continue;
+    }
+
+    $phase = (string) ($entry['phase'] ?? 'unknown');
+
+    if (! in_array($phase, ['completed', 'failed'], true)) {
+        $pending++;
+    }
+
+    fwrite(STDOUT, sprintf(
+        "%s  phase=%s  phase_at=%s  archive=%s  snapshot=%s  failure=%s\n",
+        basename($file, '.json'),
+        $phase,
+        (string) ($entry['phase_at'] ?? '-'),
+        (string) ($entry['archive_path'] ?? '-'),
+        (string) ($entry['pre_restore_snapshot_path'] ?? '-'),
+        (string) ($entry['failure_reason'] ?? '-'),
+    ));
+}
+
+exit($pending === 0 ? 0 : 1);

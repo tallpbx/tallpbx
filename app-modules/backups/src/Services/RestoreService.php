@@ -41,6 +41,10 @@ class RestoreService
 
         $operation = RestoreOperation::create([
             'requested_by_admin_id' => $actor->id,
+            // Snapshot the requester now: a restore can replace the `admins`
+            // table, so this row must stay readable without a join.
+            'requested_by_name' => $actor->name,
+            'requested_by_email' => $actor->email,
             'archive_path' => $archivePath,
             'archive_checksum' => $manifest['archive']['sha256'],
             'source_backup_id' => $manifest['backup_id'] ?? null,
