@@ -65,7 +65,20 @@ return [
     | module to generate device configuration templates.
     |
     */
-    'server' => env('FS_SERVER', env('APP_URL', 'pbx.example.com')),
+    // Provisioning templates expect a bare registrar hostname or IP, never a
+    // URL. Both inputs may arrive as a full URL (the installer writes APP_URL
+    // that way), so the scheme and path are stripped here, once.
+    'server' => (static function (): string {
+        $raw = (string) (env('FS_SERVER') ?: env('APP_URL', ''));
+
+        if ($raw === '') {
+            return 'pbx.example.com';
+        }
+
+        $host = parse_url($raw, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : $raw;
+    })(),
 
     /*
     |--------------------------------------------------------------------------

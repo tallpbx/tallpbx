@@ -28,7 +28,7 @@ it('defines Sofia global defaults for XML configuration rendering', function () 
 });
 
 it('binds connection and SIP realm from canonical FS_ environment variables', function () {
-    setFsTestEnv('FS_SERVER', 'http://192.168.1.50');
+    setFsTestEnv('FS_SERVER', '192.168.1.50');
     setFsTestEnv('FS_DEFAULT_SIP_REALM', 'sip.domain.local');
     setFsTestEnv('FS_ESL_HOST', '192.168.1.50');
     setFsTestEnv('FS_ESL_PORT', '9021');
@@ -38,7 +38,7 @@ it('binds connection and SIP realm from canonical FS_ environment variables', fu
 
     $config = require config_path('freeswitch.php');
 
-    expect($config['server'])->toBe('http://192.168.1.50')
+    expect($config['server'])->toBe('192.168.1.50')
         ->and($config['default_sip_realm'])->toBe('sip.domain.local')
         ->and($config['esl']['host'])->toBe('192.168.1.50')
         ->and($config['esl']['port'])->toBe(9021)
@@ -54,6 +54,40 @@ it('binds connection and SIP realm from canonical FS_ environment variables', fu
     setFsTestEnv('FS_ESL_PASSWORD', null);
     setFsTestEnv('FS_ESL_RECONNECT_INTERVAL', null);
     setFsTestEnv('FS_ESL_TIMEOUT', null);
+});
+
+it('strips the scheme from a URL-shaped FS_SERVER', function () {
+    setFsTestEnv('FS_SERVER', 'https://pbx.example.test:8443/panel');
+    setFsTestEnv('APP_URL', null);
+
+    $config = require config_path('freeswitch.php');
+
+    setFsTestEnv('FS_SERVER', null);
+
+    // Provisioning templates need a bare registrar, never a URL.
+    expect($config['server'])->toBe('pbx.example.test');
+});
+
+it('falls back to a bare host from a URL-shaped APP_URL', function () {
+    setFsTestEnv('FS_SERVER', null);
+    setFsTestEnv('APP_URL', 'http://192.168.1.50');
+
+    try {
+        $config = require config_path('freeswitch.php');
+
+        expect($config['server'])->toBe('192.168.1.50');
+    } finally {
+        setFsTestEnv('APP_URL', null);
+    }
+});
+
+it('uses the example host when neither FS_SERVER nor APP_URL is set', function () {
+    setFsTestEnv('FS_SERVER', null);
+    setFsTestEnv('APP_URL', null);
+
+    $config = require config_path('freeswitch.php');
+
+    expect($config['server'])->toBe('pbx.example.com');
 });
 
 it('binds database and core switch settings from canonical FS_ environment variables', function () {

@@ -86,8 +86,8 @@ The FreeSWITCH telephony subsystem manages real-time call control, SIP signaling
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `FS_SERVER` | `string` | `http://127.0.0.1` | `freeswitch.server` | Base URL used by FreeSWITCH to communicate with TallPBX via HTTP (e.g. XML curl requests). In multi-host topologies, set to the internal reachable IP/hostname of the web application. |
-| `FS_DEFAULT_SIP_REALM` | `string` | `127.0.0.1` | `freeswitch.default_sip_realm` | Default SIP domain/realm used when authenticating registrations and generating directory XML when no tenant domain match is found. |
+| `FS_SERVER` | `string` | *(falls back to `APP_URL`, then `pbx.example.com`)* | `freeswitch.server` | SIP registrar hostname or IP that provisioned phones register to; provisioning templates embed it. The config strips any scheme, port, or path, so a URL-shaped value yields a bare host. The `APP_URL` fallback exists for single-host installs — it is a fallback, not recommended phone configuration; set `FS_SERVER` explicitly in multi-host topologies. |
+| `FS_DEFAULT_SIP_REALM` | `string` | *(no config default)* | `freeswitch.default_sip_realm` | Default SIP domain/realm used when authenticating registrations and generating directory XML when no tenant domain match is found. The config reads `env('FS_DEFAULT_SIP_REALM')` with no built-in default; the installer writes the hostname it detects during install. |
 | `FS_ESL_HOST` | `string` | `127.0.0.1` | `freeswitch.esl.host` | FreeSWITCH Event Socket Layer (ESL) TCP listening host. Default `127.0.0.1` binds exclusively to loopback. |
 | `FS_ESL_PORT` | `integer` | `8021` | `freeswitch.esl.port` | ESL TCP management port (standard FreeSWITCH default: `8021`). |
 | `FS_ESL_PASSWORD` | `string` | `ClueCon` | `freeswitch.esl.password` | **CRITICAL SECRET**: Authentication password for ESL connections (`autoload_configs/event_socket.conf.xml`). **Must be changed from `ClueCon` in production** to prevent unauthorized full remote code execution on the PBX. |
@@ -126,8 +126,8 @@ See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path
 | `FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL`| `integer` | *(master)* | `freeswitch.xml_handler.dialplan_contributor_cache_ttl` | Specific TTL in seconds for modular dialplan contributor fragments. |
 | `FS_XML_HANDLER_DIRECTORY_CACHE_STORE`| `string` | *(master)* | `freeswitch.xml_handler.directory_cache_store`| Specific cache store override for directory XML (user lookups, SIP credentials). |
 | `FS_XML_HANDLER_DIRECTORY_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.directory_cache_ttl` | Specific TTL in seconds for user directory XML. |
-| `FS_XML_HANDLER_ACL_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.configuration_cache_store` | Specific cache store override for configuration / IP Access Control List (ACL) configurations (`freeswitch.xml_handler.acl_cache_store`). |
-| `FS_XML_HANDLER_ACL_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.configuration_cache_ttl` | Specific TTL in seconds for configuration / ACL configurations (`freeswitch.xml_handler.acl_cache_ttl`). |
+| `FS_XML_HANDLER_ACL_CACHE_STORE` | `string` | *(master)* | `freeswitch.xml_handler.acl_cache_store` | Cache store override for directory IP ACL configurations. |
+| `FS_XML_HANDLER_ACL_CACHE_TTL` | `integer` | *(master)* | `freeswitch.xml_handler.acl_cache_ttl` | TTL in seconds for directory IP ACL configurations. |
 | `FS_XML_HANDLER_ROUTING_VERSION_STORE`| `string` | `null` | `freeswitch.xml_handler.routing_version_store` | Fast key-value store used to hold global routing invalidation version tags. Defaults to system cache store when omitted. |
 | `FS_XML_HANDLER_THROTTLE_ENABLED` | `boolean` | `true` | `freeswitch.xml_handler.throttle_enabled` | Enables rate limiting on `/api/v1/xml-handler` to protect against token brute forcing and denial of service. |
 | `FS_XML_HANDLER_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.xml_handler.throttle_limit` | Maximum allowed XML curl requests per minute per IP address. |
@@ -611,8 +611,8 @@ Governs zero-touch hardware provisioning for IP phones (Yealink, Polycom, Cisco,
 | :--- | :--- | :--- | :--- | :--- |
 | `PROVISIONING_ENABLED` | `boolean` | `false` | `provisioning.enabled` | Master gate for phone auto-provisioning. When `false`, all provisioning endpoints reject incoming requests. |
 | `PROVISIONING_CIDR` | `string` | `null` | `provisioning.cidr` | **NETWORK PERIMETER GUARD**: Comma-separated list of allowed IP subnets (CIDRs, e.g. `192.168.1.0/24,10.10.0.0/16`) permitted to request phone configurations. Requests outside these subnets are immediately dropped. |
-| `PROVISIONING_HTTP_AUTH_USERNAME`| `string`| `null` | `provisioning.http_auth_username`| HTTP Basic or Digest authentication username enforced on provisioning requests. |
-| `PROVISIONING_HTTP_AUTH_PASSWORD`| `string`| `null` | `provisioning.http_auth_password`| **CRITICAL SECRET**: HTTP authentication password enforced on provisioning requests. |
+| `PROVISIONING_HTTP_AUTH_USERNAME`| `string`| `null` | `provisioning.http_auth_username`| HTTP **Basic** authentication username enforced on provisioning requests (`ProvisioningAccess`). Each filled factor is required; blanking either disables that factor. |
+| `PROVISIONING_HTTP_AUTH_PASSWORD`| `string`| `null` | `provisioning.http_auth_password`| **CRITICAL SECRET**: HTTP **Basic** authentication password enforced on provisioning requests. |
 
 ---
 
