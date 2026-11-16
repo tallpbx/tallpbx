@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Backups\Services;
 
+use App\Contracts\ProcessRunner;
 use Illuminate\Contracts\Filesystem\Filesystem;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -29,12 +29,23 @@ use Modules\FileStores\Services\MediaStorageServiceInterface;
 class BackupService implements BackupServiceInterface
 {
     /**
+     * Process runner used for every external command (dump, tar, gzip).
+     */
+    private readonly ProcessRunner $runner;
+
+    /**
      * Create a backup service with access to the configured file store adapters.
      */
     public function __construct(
         private readonly FileStoreServiceInterface $fileStoreService,
         private readonly MediaStorageServiceInterface $mediaStorage,
-    ) {}
+        ?ProcessRunner $runner = null,
+    ) {
+        // Resolve lazily so two-argument constructions in existing tests keep
+        // working while production still runs every command through the bound
+        // process runner.
+        $this->runner = $runner ?? app(ProcessRunner::class);
+    }
 
     /**
      * Available backup scopes with human-readable labels.
@@ -248,37 +259,31 @@ class BackupService implements BackupServiceInterface
      * Build the mysqldump (or sqlite3 .dump) command for the current
      * database connection using values from config/database.php.
      */
-    public function buildDumpCommand(): string
+    public function buildDumpCommand(?string $destinationPath = null): array
     {
-        $driver = DB::getDriverName();
-        $connection = config('database.connections.'.DB::getDefaultConnection());
+        $connection = config('database.connections.'.config('database.default'));
+        $driver = (string) ($connection['driver'] ?? '');
 
         if ($driver === 'sqlite') {
-            $dbPath = database_path('database.sqlite');
-
-            return 'sqlite3 '.escapeshellarg($dbPath).' .dump > '.rtrim((string) config('backup-storage.root'), '/').'/database.sql';
+            // sqlite3 writes the dump to stdout and accepts no output flag, so
+            // the caller persists the runner output instead.
+            return ['sqlite3', database_path('database.sqlite'), '.dump'];
         }
 
-        // mariadb or mysql
-        $user = $connection['username'] ?? 'root';
-        $password = $connection['password'] ?? '';
-        $host = $connection['host'] ?? '127.0.0.1';
-        $port = $connection['port'] ?? '3306';
-        $database = $connection['database'] ?? 'tallpbx';
-
-        $passArg = $password !== '' && $password !== null
-            ? '-p'.escapeshellarg($password)
-            : '';
-
-        return sprintf(
-            'mysqldump -h %s -P %s -u %s %s --single-transaction --quick --routines --triggers %s > %s',
-            escapeshellarg($host),
-            escapeshellarg((string) $port),
-            escapeshellarg($user),
-            $passArg,
-            escapeshellarg($database),
-            rtrim((string) config('backup-storage.root'), '/').'/database.sql'
-        );
+        // mariadb or mysql. The password is deliberately absent: the caller
+        // passes it through MYSQL_PWD so it never reaches argv.
+        return [
+            'mysqldump',
+            '--host='.(string) ($connection['host'] ?? '127.0.0.1'),
+            '--port='.(string) ($connection['port'] ?? '3306'),
+            '--user='.(string) ($connection['username'] ?? 'root'),
+            '--single-transaction',
+            '--quick',
+            '--routines',
+            '--triggers',
+            '--result-file='.($destinationPath ?? rtrim((string) config('backup-storage.root'), '/').'/database.sql'),
+            (string) ($connection['database'] ?? 'tallpbx'),
+        ];
     }
 
     /**
@@ -286,17 +291,22 @@ class BackupService implements BackupServiceInterface
      */
     private function dumpDatabase(string $tempDir): void
     {
-        $dumpPath = $tempDir.'/database.sql';
-        $cmd = str_replace(
-            rtrim((string) config('backup-storage.root'), '/').'/database.sql',
-            $dumpPath,
-            $this->buildDumpCommand()
+        $connection = config('database.connections.'.config('database.default'));
+        $isSqlite = ((string) ($connection['driver'] ?? '')) === 'sqlite';
+
+        $result = $this->runner->run(
+            $this->buildDumpCommand($isSqlite ? null : $tempDir.'/database.sql'),
+            env: $isSqlite ? [] : ['MYSQL_PWD' => (string) ($connection['password'] ?? '')],
         );
 
-        exec($cmd, result_code: $exitCode);
+        if (! $result->ok()) {
+            throw new \RuntimeException('Database dump failed with exit code '.$result->exitCode);
+        }
 
-        if ($exitCode !== 0) {
-            throw new \RuntimeException('Database dump failed with exit code '.$exitCode);
+        // sqlite3 accepts no --result-file and writes the dump to stdout, so its
+        // output must be written here. mysqldump already wrote the file itself.
+        if ($isSqlite) {
+            File::put($tempDir.'/database.sql', $result->output);
         }
     }
 

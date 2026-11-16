@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Contracts\ProcessRunner;
+use App\Support\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Modules\Backups\Jobs\BackupRunner;
 use Modules\Backups\Models\Backup;
 use Modules\Backups\Services\BackupManifest;
@@ -312,13 +315,73 @@ it('generates correct dump command from database config', function (): void {
     /** @var BackupService $service */
     $service = app(BackupServiceInterface::class);
 
-    $command = $service->buildDumpCommand();
+    $argv = $service->buildDumpCommand();
 
     // In test environment (SQLite), expect sqlite3 .dump
     // In production (MySQL/MariaDB), expect mysqldump
-    expect($command)->toContain('>');
-    $hasDumpTool = str_contains($command, 'mysqldump') || str_contains($command, 'sqlite3');
-    expect($hasDumpTool)->toBeTrue();
+    expect($argv[0])->toBeIn(['mysqldump', 'sqlite3']);
+});
+
+it('never puts the database password on the dump command line', function (): void {
+    $previous = config('database.default');
+
+    config([
+        'database.default' => 'mysql',
+        'database.connections.mysql' => [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1', 'port' => '3306', 'database' => 'tallpbx',
+            'username' => 'tallpbx', 'password' => 'se cret',
+        ],
+    ]);
+
+    try {
+        $argv = app(BackupServiceInterface::class)->buildDumpCommand('/tmp/dump.sql');
+    } finally {
+        // Restore the real test connection so nothing after this test tries to
+        // reach the fictitious MySQL server above.
+        config(['database.default' => $previous]);
+    }
+
+    expect($argv[0])->toBe('mysqldump')
+        ->and(implode(' ', $argv))->not->toContain('se cret')
+        ->and($argv)->toContain('--result-file=/tmp/dump.sql');
+});
+
+it('persists the SQLite dump from the command output', function (): void {
+    // sqlite3 writes its dump to stdout and accepts no --result-file, so the
+    // runner output must become database.sql or the backup is empty.
+    config(['database.default' => 'sqlite']);
+
+    $runner = new class implements ProcessRunner
+    {
+        /** @var array<int, string> */
+        public array $argv = [];
+
+        /** @var array<string, string> */
+        public array $env = [];
+
+        public function run(
+            array $argv,
+            ?string $cwd = null,
+            ?int $timeoutSeconds = null,
+            array $env = [],
+        ): ProcessResult {
+            $this->argv = $argv;
+            $this->env = $env;
+
+            return new ProcessResult(0, 'CREATE TABLE x (id);');
+        }
+    };
+    $this->app->instance(ProcessRunner::class, $runner);
+
+    $tempDir = sys_get_temp_dir().'/tallpbx-dump-'.Str::random(8);
+    File::ensureDirectoryExists($tempDir);
+
+    $service = app(BackupServiceInterface::class);
+    (new ReflectionMethod($service, 'dumpDatabase'))->invoke($service, $tempDir);
+
+    expect(file_get_contents($tempDir.'/database.sql'))->toBe('CREATE TABLE x (id);')
+        ->and($runner->argv)->toBe(['sqlite3', database_path('database.sqlite'), '.dump']);
 });
 
 it('includes configured scopes in backup', function (): void {

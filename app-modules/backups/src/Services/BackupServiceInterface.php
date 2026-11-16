@@ -45,9 +45,15 @@ interface BackupServiceInterface
     public function run(Backup $backup): void;
 
     /**
-     * Build the mysqldump command string using current database config.
+     * Build the database dump command as an argument vector.
+     *
+     * The result never carries the database password: callers pass it through
+     * the process environment (`MYSQL_PWD`) so it cannot appear in the process
+     * table or a shell history.
+     *
+     * @return array<int, string>
      */
-    public function buildDumpCommand(): string;
+    public function buildDumpCommand(?string $destinationPath = null): array;
 
     /**
      * Get the list of available backup scopes with labels.
