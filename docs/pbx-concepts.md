@@ -72,7 +72,7 @@ graph TD
 * **What it is**: The secure username and cryptographic password used by the phone engine (FreeSWITCH) to authenticate calls.
 * **How it works**:
   - Just like your email client (like Outlook or Apple Mail) needs secret server credentials to fetch emails, a VoIP phone needs secret SIP credentials to place and receive phone calls.
-  - TallPBX automatically creates and secures these credentials for you.
+  - The extension form asks for the SIP password. The registration account is created when a password is supplied; a virtual or routing-only extension deliberately has none, so it can never register.
 * **Why it is separate**: 
   - **Security**: Your web login password should never be transmitted over phone lines or stored inside a phone sitting on an office desk. If an attacker stole a desk phone, they would never gain access to your web control panel.
   - **Multiple Devices**: By separating the SIP account from the extension, an employee can have a desk phone, a laptop softphone, and a mobile app all connected to the same extension without password collisions.
@@ -94,7 +94,7 @@ graph TD
 To see how straightforward this is in practice, here is what happens when a company hires a new employee named Alice:
 
 1. **Create the User**: The office manager adds Alice (`alice@acme.com`). Alice receives a welcome email to log in to the employee portal.
-2. **Create Extension 1001**: The manager creates extension `1001` with caller ID "Alice Smith" and assigns it to Alice. Behind the scenes, TallPBX automatically generates a secure **SIP Account**.
+2. **Create Extension 1001**: The manager creates extension `1001` with caller ID "Alice Smith", types a SIP password on the form, and assigns the extension to Alice. Saving the form creates the **SIP Account** with that password; leave the password blank for a routing-only extension that should never register.
 3. **Assign a Device**: The IT administrator takes a brand-new Yealink desk phone out of its box and types its MAC address into TallPBX, linking it to Alice's extension.
 4. **Plug & Play**: Alice plugs the phone into her desk Ethernet jack. The phone boots up, automatically downloads its setup from TallPBX, and lights up showing "Alice Smith - 1001".
 5. **Making Calls**: When a customer calls `1001`, Alice's desk phone rings. If she is away, she logs into the web portal from her home laptop using her **User** account to check her voicemail.
@@ -108,7 +108,7 @@ To see how straightforward this is in practice, here is what happens when a comp
 | **What is it?** | A human being | A dialed number | Security credentials | A piece of hardware / app |
 | **Identifier** | Email address | Number (e.g. `1001`) | Auth username | MAC address (`00:15:...`) |
 | **Primary Location** | Web browser / Portal | Dialplan / Routing | Telephony server engine | Office desk / Mobile phone |
-| **Can one exist without the others?** | Yes (Admins who don't need a phone) | Yes (Virtual extensions / IVR menus) | No (Always belongs to an extension) | Yes (Unassigned spare phones in stock) |
+| **Can one exist without the others?** | Yes (Admins who don't need a phone) | Yes (Virtual extensions / IVR menus) | Yes (A routing-only extension has no registration account) | Yes (Unassigned spare phones in stock) |
 
 ---
 
