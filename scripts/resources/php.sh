@@ -143,6 +143,24 @@ configure_php_fpm_pool() {
 
 configure_php_fpm_pool
 
+# Carry binary headroom above the application's 2 GB decimal upload ceiling so
+# PHP never rejects a restore archive before the Livewire rule sees it.
+configure_php_uploads() {
+    local conf_dir="/etc/php/$php_version/fpm/conf.d"
+
+    install -d -m 0755 "$conf_dir"
+    cat > "$conf_dir/99-tallpbx-uploads.ini" <<'INI'
+; TallPBX restore-archive uploads. The product ceiling is 2,000,000,000 bytes
+; (decimal) and is enforced by the application; these are binary transport
+; limits that must stay above it.
+upload_max_filesize = 2G
+post_max_size = 2G
+INI
+    chmod 0644 "$conf_dir/99-tallpbx-uploads.ini"
+}
+
+configure_php_uploads
+
 # Tell systemd about any newly installed service files, then restart PHP-FPM so
 # the web server can immediately use the installed PHP extensions and tuned pool settings.
 systemctl daemon-reload

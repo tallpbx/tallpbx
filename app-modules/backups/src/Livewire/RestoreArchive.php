@@ -108,7 +108,9 @@ class RestoreArchive extends BaseEditComponent
     public function confirmUploadedRestore(): void
     {
         $this->validate([
-            'archiveUpload' => ['required', 'file', 'max:1048576'],
+            // The product ceiling is decimal (2,000,000,000 bytes); Laravel's
+            // file `max` rule counts kilobytes.
+            'archiveUpload' => ['required', 'file', 'max:'.intdiv((int) config('backup-storage.max_upload_bytes', 2_000_000_000), 1024)],
             'manifestUpload' => ['required', 'file', 'max:1024'],
         ]);
 

@@ -55,4 +55,5 @@ return [
     'backup_encryption_tooltip' => 'Cifre el archivo de copia de seguridad con GPG mediante la clave de cifrado de la aplicación.',
     'backups_file_store' => 'Almacén de Archivos',
     'backups_select_destination' => 'Seleccionar un destino',
+    'backups_upload_ceiling' => 'Archivo de hasta 2 GB (decimal). Formatos aceptados: .tar y .tar.gz, cada uno con su backup-manifest.json correspondiente.',
 ];

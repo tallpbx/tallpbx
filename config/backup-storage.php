@@ -35,4 +35,10 @@ return [
      * a human to confirm a restore is outside it.
      */
     'restore_operation_deadline' => (int) env('TALLPBX_RESTORE_OPERATION_DEADLINE', 3600),
+
+    /*
+     * Decimal product ceiling for a direct restore-archive upload. The PHP and
+     * Nginx transport limits carry binary headroom above it.
+     */
+    'max_upload_bytes' => (int) env('TALLPBX_MAX_UPLOAD_BYTES', 2_000_000_000),
 ];

@@ -83,6 +83,7 @@
         <div>
             <h3 class="font-semibold">Restore from an uploaded archive</h3>
             <p class="mt-1 text-sm text-base-content/70">Upload the backup archive and its matching <code>backup-manifest.json</code>. Uploads are staged privately and are not retained as a File Store backup.</p>
+            <p class="mt-1 text-xs text-base-content/60">{{ __('admin.backups_upload_ceiling') }}</p>
         </div>
 
         <div class="space-y-4">

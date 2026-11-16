@@ -55,4 +55,5 @@ return [
     'modal_delete_backup_error_title' => 'Backup cannot be deleted',
     'backups_file_store' => 'File Store',
     'backups_select_destination' => 'Select a destination',
+    'backups_upload_ceiling' => 'Archive up to 2 GB (decimal). Accepted files: .tar and .tar.gz, each with its matching backup-manifest.json.',
 ];

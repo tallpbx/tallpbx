@@ -34,6 +34,10 @@ server {
     server_name _;
     root /var/www/tallpbx/public;
 
+    # Restore-archive uploads carry binary headroom above the application's
+    # 2,000,000,000-byte (decimal) product ceiling.
+    client_max_body_size 2000m;
+
     add_header X-Frame-Options "SAMEORIGIN";
     add_header X-Content-Type-Options "nosniff";
 
