@@ -11,7 +11,10 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOAD_TESTING_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOAD_GENERATOR_IP="${LOAD_GENERATOR_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 TENANT="${TENANT:-load-test-beta}"
-DOMAIN="${DOMAIN:-load.test.local}"
+# Default to the configured PBX realm; an empty value omits --domain entirely
+# so the seeder falls back to FS_DEFAULT_SIP_REALM instead of a literal realm
+# that would make every generated REGISTER fail.
+DOMAIN="${DOMAIN:-}"
 EXTENSIONS="${EXTENSIONS:-20}"
 START="${START:-2000}"
 PASSWORD="${PASSWORD:-LoadTest1234}"
@@ -108,7 +111,6 @@ if [[ "${SKIP_SEED}" != "1" && ( "${FORCE_SEED}" == "1" || ! -f "${CSV_ABSOLUTE}
   seed_args=(
     php artisan pbx:load-test:seed
     "--tenant=${TENANT}"
-    "--domain=${DOMAIN}"
     "--extensions=${EXTENSIONS}"
     "--start=${START}"
     "--password=${PASSWORD}"
@@ -116,6 +118,12 @@ if [[ "${SKIP_SEED}" != "1" && ( "${FORCE_SEED}" == "1" || ! -f "${CSV_ABSOLUTE}
     "--sipp-port=${SIPP_UAS_PORT}"
     "--output=${CSV_PATH}"
   )
+
+  # Only pass a realm when one was chosen; otherwise the seeder resolves the
+  # configured FS_DEFAULT_SIP_REALM.
+  if [[ -n "${DOMAIN}" ]]; then
+    seed_args+=("--domain=${DOMAIN}")
+  fi
 
   if [[ "${MEDIA_FLOW}" == "1" ]]; then
     seed_args+=(--include-media-fixtures)

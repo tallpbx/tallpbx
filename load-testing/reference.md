@@ -64,7 +64,7 @@ Every abbreviation and jargon term used in this directory, in plain language. No
 | **CPS** (calls per second) | Offered call rate in the SIP phases |
 | **TTL** (time to live) | How long a cached answer is kept before it is rebuilt |
 | **Profile** | A named load shape, such as `100x5` = 100 requests, 5 at a time |
-| **Variant** | One complete serving configuration (pool mode + entry file + Octane; active variants: `v-stock`, `v-fast`, `v-fast-default`, `v-octane`, `v-octane-swell`) |
+| **Variant** | One complete serving configuration (pool mode + entry file + Octane; active variants: `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, `v-octane`) |
 | **Tier** | A hardware size the series measures on |
 | **Cell** | One measurement: one variant × profile × cache policy × repeat |
 | **Repeat** | The same cell run again, to see how much the number moves on its own |

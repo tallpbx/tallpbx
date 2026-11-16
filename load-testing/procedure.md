@@ -61,9 +61,14 @@ The runner seeds once per tier. To do it by hand:
 
 ```bash
 ssh "$PBX_HOST" 'cd /var/www/tallpbx && php artisan pbx:load-test:seed \
-  --tenant=load-test-beta --domain=load.test.local \
+  --tenant=load-test-beta --domain="$PBX_HOST" \
   --extensions=20 --start=2000 --password=LoadTest1234 --reset'
 ```
+
+Omit `--domain` entirely to use the appliance's configured realm
+(`FS_DEFAULT_SIP_REALM`). A literal realm such as `load.test.local` is a
+different SIP domain from the one the PBX serves, so every generated REGISTER
+is rejected and the tier reports zero successful calls.
 
 **Checkpoint:** the command reports the tenant, realm, extension count and the SIPp CSV path. Use an alphanumeric password — an unescaped `!` survives a shell differently over SSH and produces a `403` on REGISTER.
 
@@ -106,7 +111,7 @@ bash load-testing/scripts/load-test-matrix.sh \
 
 ## Step 6 — Remaining variants
 
-One invocation per variant, each applying its own switches (or filter via `--variants v-stock-static,v-fast,v-fast-default,v-octane`):
+One invocation per variant, each applying its own switches. `matrix.php` defines exactly five variants — `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, and `v-octane` — and the runner accepts one `--variant=<name>` per invocation:
 
 ```bash
 for variant in v-stock-static v-fast v-fast-default v-octane; do

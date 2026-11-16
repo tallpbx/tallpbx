@@ -2,6 +2,21 @@
 
 Where the series stands right now. Updated when a phase completes, not continuously — if a number is not here, it is not measured yet.
 
+## Current support status
+
+**Supported serving modes** (defined in `load-testing/matrix.php`): `v-stock-dynamic` and `v-stock-static` (stock front controller), `v-fast` (fast XML controller with a static pool), `v-fast-default` (the shipped appliance default: dynamic pool sized from RAM plus the fast controller), and `v-octane` (opt-in resident RoadRunner worker on `127.0.0.1:8090`).
+
+**Measured tiers** on the current series are the shared-CPU appliance tiers — 1 vCPU / 1 GB, 1 vCPU / 2 GB, and 2 vCPU / 2 GB — plus loopback-only sanity numbers for the Octane worker. Supported call rates with the shipped PHP-FPM default are **5 calls/sec on 1 vCPU** and **10 calls/sec on 2 vCPU**; higher offered rates degrade because PHP-FPM saturates, and that boundary is documented per tier in the series tables below.
+
+**Open work**
+
+| Item | State |
+|:--|:--|
+| CDR transport benchmarks (the `9 — CDR transport benchmarks` deliverable) | **Not started.** This is a distinct deliverable from the completed fast-entry work below; the fast entry measured CDR through the existing transport, not alternative transports. |
+| Sustained rates above 10 calls/sec on multi-core hosts | Not measured. The `30–60+ CPS` figures in the scaling guide are projections, not measurements. |
+
+Everything below this block is the historical series record, newest first. Superseded series stay for provenance; they do not describe the current recommendation.
+
 ## Current series — `cdr-entry-20261108` (CDR fast entry)
 
 **Question:** what does serving CDR through `public/cdr-fast.php` (five providers) buy on the 1 vCPU tier, in calls completed and in CPU by process, against the same tests run with CDR through `index.php`?

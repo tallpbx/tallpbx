@@ -39,7 +39,7 @@ use Modules\Voicemails\Models\Voicemail;
  */
 #[Signature('pbx:load-test:seed
     {--tenant=load-test-beta : Synthetic tenant slug to create or update}
-    {--domain=load.test.local : SIP realm/domain for the synthetic tenant}
+    {--domain= : SIP realm/domain for the synthetic tenant (defaults to FS_DEFAULT_SIP_REALM)}
     {--extensions=20 : Number of extensions and SIP accounts to create}
     {--start=2000 : First extension number in the generated range}
     {--password=LoadTest1234 : Password assigned to every generated SIP account}
@@ -58,7 +58,23 @@ class PbxLoadTestSeedCommand extends Command
     public function handle(TenantDefaultsService $tenantDefaults, DialplanContext $dialplanContext): int
     {
         $slug = $this->stringOption('tenant');
-        $domain = $this->stringOption('domain');
+
+        // A literal realm default silently seeds a tenant whose SIP domain
+        // does not match the PBX host, so every REGISTER is rejected. Resolve
+        // the operator's value or the configured realm, and fail loudly when
+        // neither exists.
+        $domain = trim((string) ($this->option('domain') ?? ''));
+
+        if ($domain === '') {
+            $domain = trim((string) config('freeswitch.default_sip_realm'));
+        }
+
+        if ($domain === '') {
+            $this->error('No SIP realm is available. Pass --domain=<realm> or set FS_DEFAULT_SIP_REALM.');
+
+            return self::FAILURE;
+        }
+
         $extensionCount = $this->integerOption('extensions', minimum: 2, maximum: 10000);
         $start = $this->integerOption('start', minimum: 100, maximum: 999999);
         $password = $this->stringOption('password');

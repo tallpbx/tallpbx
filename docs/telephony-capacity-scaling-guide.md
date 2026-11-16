@@ -17,7 +17,13 @@ Based on empirical benchmarks conducted on a 1 vCPU / 1 GB RAM cloud host with a
 
 During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`) across four different XML routing architectures (Octane Lean XML Worker, Lua Redis Proxy [evaluated and retired in 5.0.0], Fast Controller, and Stock PHP-FPM), the following key facts were established:
 
-#### Head-to-Head Architecture Benchmark Comparison (1 vCPU, 5-Second Calls)
+#### Historical benchmark comparison — 2026, retired static pool (1 vCPU, 5-second calls)
+
+> These rows are the original 2026 measurement set, kept for provenance. They
+> were taken before the shipped dynamic PHP-FPM pool existed, so the
+> "Fast Controller Only" failure is a property of the retired static
+> five-worker pool, not of the current build. The current supported rates are
+> in the table immediately below this historical block.
 
 | Architecture | Peak Sustained Rate | 3 CPS Completion | 5 CPS Completion | 8 CPS Completion | 10 CPS Burst Completion | Call Setup Median (p50) | Primary Limiter / Failure Mode |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
@@ -88,7 +94,7 @@ The single most impactful step for scaling past 10 CPS is adding a second comput
 
 * **Single-Core Ceiling**: **5 calls/sec supported**, failing at 6 calls/sec (~30 concurrent active calls). Independent of pool shape: every worker count from one to five passes 5 and loses at least a third of the calls at 6.
 * **Dual-Core Sizing (2 vCPU / 2 GB RAM)**: Separates FreeSWITCH's real-time VoIP threads from background PHP daemons and database writes. **Doubles the supported rate to 10 calls/sec** (measured, 600/600), failing at 12 calls/sec — not the 15–20 calls/sec previously projected. Worker count is second-order here: five pool shapes measured within 34–44 % at the boundary, while PHP-FPM alone demanded 2.25 cores.
-* **Quad-Core Sizing (4 vCPU / 8 GB RAM, Cloud VPS / Appliance)**: Sized for **15–25 calls/sec sustained** under PHP-FPM baseline (`pm = dynamic`, dynamic ceiling 12 workers) and scaling to **30–60+ CPS** (~150–350 concurrent active calls) with the persistent Laravel Octane worker on port 8090.
+* **Quad-Core Sizing (4 vCPU / 8 GB RAM, Cloud VPS / Appliance)**: Sized for **15–25 calls/sec sustained** under PHP-FPM baseline (`pm = dynamic`, dynamic ceiling 12 workers). The `30–60+ CPS` (~150–350 concurrent active calls) figure with the persistent Laravel Octane worker on port 8090 is a **projection, not a measurement** — no published run covers that rate.
 
 ---
 
@@ -204,7 +210,7 @@ TallPBX configures a 3-tier binding ladder in `xml_curl.conf.xml`:
 | :--- | :---: | :---: | :--- | :--- |
 | **1 vCPU / 1 GB RAM** | **5 CPS** | **20 – 35 calls** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Optional Octane worker, `tmpfs` DB, `notice` logging, dynamic FPM (3 max). |
 | **2 vCPU / 2 GB RAM** | **10 CPS** baseline<br>*(25+ CPS with Octane)* | **75 – 120 calls** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max). |
-| **4 vCPU / 8 GB RAM (Cloud VPS / Appliance)** | **15–25 CPS** baseline<br>*(30–60+ CPS with Octane)* | **150 – 350 calls** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max). |
+| **4 vCPU / 8 GB RAM (Cloud VPS / Appliance)** | **15–25 CPS** baseline<br>*(30–60+ CPS with Octane — projected, unmeasured)* | **150 – 350 calls** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max). |
 | **8 vCPU / 16 GB Dedicated** | **60+ CPS** | **350+ calls** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), dedicated DB host. |
 
 ---

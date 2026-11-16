@@ -1,6 +1,6 @@
 # Configuration Switches
 
-Five variants (`v-stock`, `v-fast`, `v-fast-default`, `v-octane`, `v-octane-swell`) are built from three independent switches, plus the runtime settings used for ablations. Each switch is applied by `load-testing/scripts/lib/switch.sh`, which then calls its matching `assert_*` and reads the effective value back. A mismatch prints `SWITCH-FAILED <detail>` and returns non-zero, which fails that cell rather than producing a number.
+Five variants (`v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, `v-octane`) are built from three independent switches, plus the runtime settings used for ablations. `matrix.php` is the authority for this list. Each switch is applied by `load-testing/scripts/lib/switch.sh`, which then calls its matching `assert_*` and reads the effective value back. A mismatch prints `SWITCH-FAILED <detail>` and returns non-zero, which fails that cell rather than producing a number.
 
 ```bash
 bash load-testing/scripts/lib/switch.sh <command> [arguments]
@@ -122,11 +122,11 @@ lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 
 | Variant | FPM | XML path | Octane |
 |:--|:--|:--|:--|
-| `v-stock` | `static 5` (or dynamic installer default) | stock | off |
+| `v-stock-dynamic` | `dynamic` (Debian default) | stock | off |
+| `v-stock-static` | `static 5` | stock | off |
 | `v-fast` | `static 5` | **fast** | off |
 | `v-fast-default` | `dynamic` (installer default: 1–3 workers on 1 GB) | **fast** | off |
 | `v-octane` | `static 5` | stock | **on** |
-| `v-octane-swell` | `static` / worker concurrency swell | stock | **on** |
 
 > **Historical note:** The in-process Lua XML cache proxy variants (`v-lua-stock` and `v-lua-fast`) were evaluated and retired after benchmarking demonstrated that the fast front controller (`xml-handler-fast.php`) and persistent RoadRunner worker (`v-octane`) eliminated framework overhead without embedded script maintenance complexities.
 
