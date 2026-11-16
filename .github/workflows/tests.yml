@@ -1,11 +1,15 @@
 # TallPBX test pipeline.
 #
 # Purpose:
-# Run the complete Pest test suite (feature/unit plus Playwright browser tests)
-# on the main and release branches and on every pull request. This is the
-# automated enforcement of the "Mandatory Pre-Claim Verification" gate in
-# AGENTS.md, so a red suite can never reach a release again (v1.1.0 briefly
-# shipped with a MariaDB-only migration that broke every SQLite-backed test).
+# Manual (`workflow_dispatch`) environment-parity verification. It runs the
+# complete Pest suite (feature/unit plus Playwright browser tests) on a runner
+# that mirrors the production PHP toolchain.
+#
+# This workflow is NOT the release gate. Verification happens locally on the
+# appliance before every push — see the "Mandatory Pre-Commit Verification
+# Gate" in AGENTS.md and the release procedure in docs/release-checklist.md.
+# Use this workflow when a change needs checking against a clean runner, or to
+# confirm the toolchain assumption changed.
 #
 # Environment notes:
 # - `phpunit.xml` forces the in-memory SQLite connection, so no database service

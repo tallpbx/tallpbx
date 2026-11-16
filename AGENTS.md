@@ -84,6 +84,8 @@ tpbx test --compact --parallel   # Or tpbx app:test; only for significant archit
 tpbx route:list --name=<feature-name>
 ```
 
+When cutting a release, follow [`docs/release-checklist.md`](docs/release-checklist.md): it records the tested SHA, the commands run, the environment, and the results. The CI workflow is a manual parity check, not the release gate.
+
 ## CRITICAL — Laravel Pint Code Style & Syntax Linting (Scoping Rules)
 
 All PHP code (application source, modules, migrations, tests, commands, and language files) MUST adhere to Laravel code standards and formatting conventions using [Laravel Pint](https://laravel.com/docs/pint) (`./vendor/bin/pint`).
