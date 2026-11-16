@@ -1,14 +1,99 @@
 #!/bin/bash
 # Starts only UUID-named restore service instances requested by the web worker.
-set -euo pipefail
+#
+# One request is claimed by renaming it (mv is atomic on the same filesystem),
+# then started once. A claim is never replayed blindly: an import whose outcome
+# is unknown after a crash is moved aside for an operator to triage, and two
+# destructive restores are never allowed to overlap.
+set -uo pipefail
 
-request_directory=/var/lib/tallpbx/restore-requests
+request_directory="${TALLPBX_RESTORE_REQUEST_DIR:-/var/lib/tallpbx/restore-requests}"
+journal_directory="${TALLPBX_RESTORE_JOURNAL_DIR:-/var/lib/tallpbx/restore-journal}"
+systemctl_bin="${TALLPBX_SYSTEMCTL:-systemctl}"
+stale_claim_minutes="${TALLPBX_RESTORE_STALE_CLAIM_MINUTES:-30}"
+
+uuid_pattern='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+mkdir -p "$request_directory" 2>/dev/null || true
+mkdir -p "$request_directory/rejected" 2>/dev/null || true
+
+# One dispatcher at a time: a second trigger must not interleave with this one.
+exec 9>"$request_directory/.dispatch.lock" 2>/dev/null || exit 0
+flock -n 9 2>/dev/null || exit 0
 
 shopt -s nullglob
+
+# Report whether a restore unit for this UUID is currently active. `is-active`
+# accepts one exact unit name, never a glob, so the caller checks per id.
+unit_active() {
+    "$systemctl_bin" is-active --quiet "tallpbx-restore@${1}.service" >/dev/null 2>&1
+}
+
+# Report whether the journal already records a terminal phase for this UUID.
+journal_terminal() {
+    local entry="$journal_directory/${1}.json"
+
+    [ -f "$entry" ] || return 1
+    grep -Eq '"phase"[[:space:]]*:[[:space:]]*"(completed|failed)"' "$entry"
+}
+
+# 1. Concurrency guard. `systemctl is-active` does not expand globs, so list the
+#    active instances instead and stop before touching any marker. Two
+#    destructive restores must never overlap.
+active_units=$("$systemctl_bin" list-units --state=active --no-legend 'tallpbx-restore@*' 2>/dev/null || true)
+
+if [ -n "${active_units//[[:space:]]/}" ]; then
+    exit 0
+fi
+
+# 2. Stale claims. An abandoned claim is retried only when the journal proves the
+#    operation finished; otherwise an operator has to triage the unknown import.
+for claim_path in "$request_directory"/*.claimed; do
+    operation_id=$(basename "$claim_path" .claimed)
+
+    if [[ ! "$operation_id" =~ $uuid_pattern ]]; then
+        mv -f "$claim_path" "$request_directory/rejected/$(basename "$claim_path")" 2>/dev/null || true
+
+        continue
+    fi
+
+    if unit_active "$operation_id"; then
+        continue
+    fi
+
+    if journal_terminal "$operation_id"; then
+        rm -f "$claim_path"
+
+        continue
+    fi
+
+    if find "$claim_path" -maxdepth 0 -mmin +"$stale_claim_minutes" 2>/dev/null | grep -q .; then
+        mv -f "$claim_path" "$request_directory/${operation_id}.failed" 2>/dev/null || true
+    fi
+done
+
+# 3. Claim and start. The rename is the claim; a failed start leaves explicit
+#    evidence next to the request instead of a marker that looks untouched.
 for request_path in "$request_directory"/*.request; do
     operation_id=$(basename "$request_path" .request)
 
-    if [[ "$operation_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
-        systemctl start "tallpbx-restore@${operation_id}.service"
+    if [[ ! "$operation_id" =~ $uuid_pattern ]]; then
+        mv -f "$request_path" "$request_directory/rejected/$(basename "$request_path")" 2>/dev/null || true
+
+        continue
+    fi
+
+    if ! mv -f "$request_path" "$request_directory/${operation_id}.claimed" 2>/dev/null; then
+        continue
+    fi
+
+    if "$systemctl_bin" start "tallpbx-restore@${operation_id}.service" >/dev/null 2>&1; then
+        rm -f "$request_directory/${operation_id}.claimed"
+    else
+        mv -f "$request_directory/${operation_id}.claimed" "$request_directory/${operation_id}.failed" 2>/dev/null || true
     fi
 done
+
+# Always succeed: systemd's journal keeps the per-request failures visible, and
+# a non-zero exit would make the path unit look broken.
+exit 0

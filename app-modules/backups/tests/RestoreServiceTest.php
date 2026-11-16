@@ -9,18 +9,45 @@ use App\Models\User;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Modules\Backups\Jobs\RestoreRunner;
 use Modules\Backups\Models\RestoreOperation;
 use Modules\Backups\Services\BackupServiceInterface;
 use Modules\Backups\Services\RestoreCommandRunnerInterface;
+use Modules\Backups\Services\RestoreJournal;
 use Modules\Backups\Services\RestoreOperationExecutor;
 use Modules\Backups\Services\RestoreService;
 use Modules\Backups\Services\SymfonyRestoreCommandRunner;
 use Modules\FileStores\Models\FileStore;
 
+/**
+ * Write the claimed marker the dispatcher leaves for the root helper.
+ */
+function claimRestoreOperation(string $operationId, array $metadata = []): void
+{
+    $directory = (string) config('backup-storage.request_root');
+    File::ensureDirectoryExists($directory, 0770, true);
+
+    File::put($directory.'/'.$operationId.'.claimed', (string) json_encode(array_merge([
+        'archive_path' => '/tmp/restore.tar',
+        'archive_checksum' => hash('sha256', 'restore'),
+        'source_backup_id' => null,
+        'scopes' => ['database'],
+        'requester' => null,
+        'started_at' => now()->toIso8601String(),
+    ], $metadata), JSON_THROW_ON_ERROR));
+}
+
 beforeEach(function (): void {
     Queue::fake();
     app()->bind(RestoreCommandRunnerInterface::class, SymfonyRestoreCommandRunner::class);
+
+    // Isolate the helper handoff so no test reads or writes the appliance paths.
+    $this->restoreHandoff = sys_get_temp_dir().'/restore-handoff-'.Str::random(8);
+    config([
+        'backup-storage.request_root' => $this->restoreHandoff.'/requests',
+        'backup-storage.journal_root' => $this->restoreHandoff.'/journal',
+    ]);
 
     if (! Schema::hasTable('backups')) {
         foreach (glob(base_path('app-modules/backups/database/migrations/*.php')) as $file) {
@@ -28,6 +55,10 @@ beforeEach(function (): void {
             $migration->up();
         }
     }
+});
+
+afterEach(function (): void {
+    File::deleteDirectory($this->restoreHandoff);
 });
 
 it('rejects a restore request when the archive checksum does not match the manifest', function (): void {
@@ -195,6 +226,8 @@ it('records a failed helper operation when its staged archive is unavailable', f
         'status' => 'pending-helper',
     ]);
 
+    claimRestoreOperation($operation->id, ['archive_path' => $operation->archive_path]);
+
     $this->artisan('backups:restore-operation', ['operation' => $operation->id])
         ->assertFailed();
 
@@ -219,6 +252,11 @@ it('delegates a verified helper operation to the root restore executor', functio
         $executor = mock(RestoreOperationExecutor::class);
         $executor->shouldReceive('execute')->once()->withArgs(fn (RestoreOperation $received): bool => $received->is($operation));
         app()->instance(RestoreOperationExecutor::class, $executor);
+
+        claimRestoreOperation($operation->id, [
+            'archive_path' => $archivePath,
+            'archive_checksum' => hash_file('sha256', $archivePath),
+        ]);
 
         $this->artisan('backups:restore-operation', ['operation' => $operation->id])
             ->assertSuccessful();
@@ -253,4 +291,44 @@ it('stores rollback snapshots outside the restored application-files tree', func
     expect($snapshotDirectory)
         ->toBe(storage_path('backups/snapshots/restore-operation-id'))
         ->not->toStartWith(storage_path('app').DIRECTORY_SEPARATOR);
+});
+
+it('reports success without re-running an operation the journal already finished', function (): void {
+    $operation = RestoreOperation::create([
+        'requested_by_admin_id' => Admin::factory()->create()->id,
+        'archive_path' => '/tmp/restore.tar',
+        'archive_checksum' => hash('sha256', 'restore'),
+        'scopes' => ['database'],
+        'status' => 'pending-helper',
+    ]);
+
+    app(RestoreJournal::class)
+        ->write($operation->id, ['phase' => 'completed', 'phase_at' => now()->toIso8601String()]);
+
+    claimRestoreOperation($operation->id);
+
+    $executor = mock(RestoreOperationExecutor::class);
+    $executor->shouldNotReceive('execute');
+    app()->instance(RestoreOperationExecutor::class, $executor);
+
+    $this->artisan('backups:restore-operation', ['operation' => $operation->id])
+        ->assertSuccessful();
+
+    // The dispatcher's claim is retired so no stale marker survives.
+    expect(file_exists($this->restoreHandoff.'/requests/'.$operation->id.'.claimed'))->toBeFalse();
+});
+
+it('refuses to start an unjournalled restore when the claim marker is missing', function (): void {
+    $operation = RestoreOperation::create([
+        'requested_by_admin_id' => Admin::factory()->create()->id,
+        'archive_path' => '/tmp/restore.tar',
+        'archive_checksum' => hash('sha256', 'restore'),
+        'scopes' => ['database'],
+        'status' => 'pending-helper',
+    ]);
+
+    $this->artisan('backups:restore-operation', ['operation' => $operation->id])
+        ->assertFailed();
+
+    expect($operation->fresh()->status)->toBe('pending-helper');
 });
