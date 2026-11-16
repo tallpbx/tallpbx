@@ -46,6 +46,7 @@ beforeEach(function (): void {
     // Isolate the helper handoff so no test reads or writes the appliance paths.
     $this->restoreHandoff = sys_get_temp_dir().'/restore-handoff-'.Str::random(8);
     config([
+        'backup-storage.root' => $this->restoreHandoff.'/root',
         'backup-storage.request_root' => $this->restoreHandoff.'/requests',
         'backup-storage.journal_root' => $this->restoreHandoff.'/journal',
     ]);
@@ -396,13 +397,19 @@ it('records the failure in the journal and projects it after the database is rep
         }
     };
 
-    $executor = new RestoreOperationExecutor($runner, app(RestoreJournal::class));
+    $executor = new RestoreOperationExecutor(
+        $runner,
+        app(RestoreJournal::class),
+        null,
+        // Plenty of space; this test exercises the failure path, not preflight.
+        static fn (string $path): float => 1_000_000_000_000.0,
+    );
 
     try {
         expect(fn () => $executor->execute($operation))->toThrow(RuntimeException::class, 'Migration failed after import.');
     } finally {
-        // The execution created an extraction workspace outside the journal.
-        File::deleteDirectory((string) config('backup-storage.root'));
+        // The execution created an extraction workspace under the isolated root.
+        File::deleteDirectory($this->restoreHandoff.'/root');
     }
 
     expect(app(RestoreJournal::class)->read($operation->id)['phase'])->toBe('failed');

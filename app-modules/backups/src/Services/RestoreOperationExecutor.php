@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Backups\Services;
 
 use App\Services\Appliance\RuntimeServiceReconciler;
+use Closure;
 use Illuminate\Support\Facades\File;
 use Modules\Backups\Models\Backup;
 use Modules\Backups\Models\RestoreOperation;
@@ -26,15 +27,26 @@ class RestoreOperationExecutor
     private readonly RuntimeServiceReconciler $services;
 
     /**
+     * Free-space probe for one filesystem path, resolved when omitted.
+     */
+    private readonly Closure $freeSpace;
+
+    /**
      * Create an executor with an argument-safe root command runner.
      */
     public function __construct(
         private readonly RestoreCommandRunnerInterface $commandRunner,
         ?RestoreJournal $journal = null,
         ?RuntimeServiceReconciler $services = null,
+        ?Closure $freeSpace = null,
     ) {
         $this->journal = $journal ?? app(RestoreJournal::class);
         $this->services = $services ?? app(RuntimeServiceReconciler::class);
+        $this->freeSpace = $freeSpace ?? static function (string $path): float {
+            $free = @disk_free_space($path);
+
+            return is_float($free) ? $free : 0.0;
+        };
     }
 
     /**
@@ -49,6 +61,9 @@ class RestoreOperationExecutor
         try {
             $this->phase($operationId, 'extracting', $deadline);
             $this->assertArchiveIsSafe($operation->archive_path);
+            // The archive check is cheap and runs first; the space check needs
+            // the member listing and must never mask an unsafe-path error.
+            $this->assertSpaceFor($operation->archive_path, $operation->scopes);
 
             $extractionDirectory = rtrim((string) config('backup-storage.root'), '/').'/restore-extract/'.$operation->id;
             File::deleteDirectory($extractionDirectory);
@@ -142,6 +157,118 @@ class RestoreOperationExecutor
 
             throw $exception;
         }
+    }
+
+    /**
+     * Compute the disk requirement for a working set.
+     *
+     * The reserve covers the extraction overhead and leaves headroom for a
+     * partly written dump; it is never smaller than two decimal gigabytes.
+     *
+     * @return array{workingSet: int, reserve: int, required: int}
+     */
+    public function projectedRequirement(int $workingSetBytes): array
+    {
+        $reserve = max(2_000_000_000, (int) ceil($workingSetBytes * 0.10));
+
+        return [
+            'workingSet' => $workingSetBytes,
+            'reserve' => $reserve,
+            'required' => $workingSetBytes + $reserve,
+        ];
+    }
+
+    /**
+     * Refuse a restore whose working set and reserve do not fit.
+     *
+     * The bound is the archive's own uncompressed member list, checked against
+     * every filesystem the operation writes to: the extraction root, the
+     * snapshot root, and the media root when media is selected.
+     *
+     * @param  list<string>  $scopes
+     */
+    public function assertSpaceFor(string $archivePath, array $scopes): void
+    {
+        $members = $this->listArchiveMembers($archivePath);
+        $workingSet = array_sum($members);
+
+        // The database dump and the media tree are written a second time into
+        // the rollback snapshot, so their archived size counts twice.
+        if (in_array('database', $scopes, true)) {
+            $workingSet += $this->memberBytesMatching($members, '/database\\.sql$/');
+        }
+
+        if (in_array('media', $scopes, true)) {
+            $workingSet += $this->memberBytesMatching($members, '#(^|/)media/#');
+        }
+
+        $requirement = $this->projectedRequirement($workingSet);
+        $volumes = [
+            rtrim((string) config('backup-storage.root'), '/'),
+            storage_path('backups'),
+        ];
+
+        if (in_array('media', $scopes, true)) {
+            $volumes[] = rtrim((string) config('media-storage.store_root'), '/');
+        }
+
+        foreach (array_unique($volumes) as $volume) {
+            $available = ($this->freeSpace)($volume);
+
+            if ($available < $requirement['required']) {
+                throw new RuntimeException(sprintf(
+                    'Refusing the restore: insufficient free space on %s (%d bytes free, %d required).',
+                    $volume,
+                    (int) $available,
+                    $requirement['required'],
+                ));
+            }
+        }
+    }
+
+    /**
+     * List archive members with their uncompressed sizes.
+     *
+     * @return array<string, int> Path => size in bytes
+     */
+    private function listArchiveMembers(string $archivePath): array
+    {
+        $listCommand = str_ends_with($archivePath, '.gz')
+            ? ['tar', '-tvzf', $archivePath]
+            : ['tar', '-tvf', $archivePath];
+
+        $members = [];
+
+        foreach (preg_split('/\R/', trim($this->commandRunner->run($listCommand))) ?: [] as $line) {
+            $parts = preg_split('/\s+/', trim($line)) ?: [];
+
+            if (count($parts) < 6) {
+                continue;
+            }
+
+            // `tar -tv` is: mode links owner/group size date time name
+            $members[(string) ($parts[5] ?? '')] = (int) ($parts[2] ?? 0);
+        }
+
+        return $members;
+    }
+
+    /**
+     * Sum the sizes of members whose path matches the given pattern.
+     *
+     * @param  array<string, int>  $members
+     */
+    private function memberBytesMatching(array $members, string $pattern): int
+    {
+        $bytes = 0;
+
+        foreach ($members as $path => $size) {
+            if (preg_match($pattern, $path) === 1) {
+                $bytes += $size;
+            }
+        }
+
+        return $bytes;
     }
 
     /**
