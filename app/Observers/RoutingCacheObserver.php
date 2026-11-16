@@ -6,6 +6,7 @@ namespace App\Observers;
 
 use App\Models\TenantDomain;
 use App\Support\RoutingCacheVersion;
+use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Database\Eloquent\Model;
 use Modules\CallCenters\Models\Queue;
 use Modules\Dialplans\Models\Dialplan;
@@ -26,8 +27,12 @@ use Modules\SipAccounts\Models\SipAccount;
  *
  * Eliminates stale routing across all PBX feature modules without manual
  * cache flushing or waiting for TTL expiry.
+ *
+ * Invalidation waits for the transaction to commit: a concurrent FreeSWITCH
+ * XML lookup could otherwise repopulate the cache from pre-commit state and
+ * leave a stale dialplan behind even though the write eventually succeeded.
  */
-class RoutingCacheObserver
+class RoutingCacheObserver implements ShouldHandleEventsAfterCommit
 {
     /**
      * Handle the Model "saved" event (created or updated).

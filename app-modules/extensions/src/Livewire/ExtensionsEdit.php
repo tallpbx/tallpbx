@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Extensions\Livewire;
 
-use App\Models\TenantDomain;
 use App\Models\User;
 use App\Support\BaseEditComponent;
 use App\Support\PanelActor;
@@ -12,8 +11,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Modules\Extensions\Models\Extension;
+use Modules\Extensions\Services\ExtensionSaveService;
 use Modules\Extensions\Services\ExtensionServiceInterface;
-use Modules\SipAccounts\Models\SipAccount;
 use Modules\Voicemails\Models\Voicemail;
 
 /**
@@ -262,18 +261,23 @@ class ExtensionsEdit extends BaseEditComponent
             'enabled' => $this->enabled,
         ];
 
+        $existing = null;
+
         if ($this->extensionId !== null) {
-            $extension = Extension::withoutGlobalScope('tenant')->findOrFail($this->extensionId);
-            $this->assertCanAccessTenantRecord($extension);
-            $extension = $this->extensionService->update($extension, $data);
-            $this->extensionService->syncUsers($extension, $this->selectedUserIds);
-        } else {
-            $extension = $this->extensionService->create($data);
-            $this->extensionService->syncUsers($extension, $this->selectedUserIds);
+            $existing = Extension::withoutGlobalScope('tenant')->findOrFail($this->extensionId);
+            $this->assertCanAccessTenantRecord($existing);
         }
 
-        $this->syncSipAccount($extension);
-        $this->syncVoicemail($extension);
+        // One transaction owner writes the extension, its users, its SIP
+        // account, and its voicemail; a failure in any step leaves no orphan.
+        app(ExtensionSaveService::class)->save(
+            data: $data,
+            userIds: $this->selectedUserIds,
+            password: $this->password,
+            voicemailEnabled: $this->voicemailEnabled,
+            voicemailPassword: $this->voicemailPassword,
+            existing: $existing,
+        );
 
         $this->redirect(route('panel.extensions.index'));
     }
@@ -338,63 +342,6 @@ class ExtensionsEdit extends BaseEditComponent
     }
 
     /**
-     * Create or update the linked SIP account for this extension.
-     */
-    private function syncSipAccount(Extension $extension): void
-    {
-        /** @var SipAccount|null $sipAccount */
-        $sipAccount = SipAccount::withoutGlobalScope('tenant')
-            ->where('extension_id', $extension->id)
-            ->first();
-
-        // If no SIP account exists and no password was provided, don't create an unauthenticated account
-        if ($sipAccount === null && $this->password === '') {
-            return;
-        }
-
-        $tenantId = $this->resolveTenantId();
-        $tenantDomain = TenantDomain::where('tenant_id', $tenantId)->first();
-        $userContext = ! empty($this->userContext) ? $this->userContext : "tenant_{$tenantId}_internal";
-
-        if ($sipAccount !== null) {
-            $sipData = [
-                'tenant_id' => $tenantId,
-                'auth_username' => $this->extensionNumber,
-                'user_context' => $userContext,
-                'enabled' => $this->enabled,
-            ];
-
-            if ($this->password !== '') {
-                $sipData['auth_password'] = $this->password;
-            }
-
-            if ($tenantDomain !== null) {
-                $sipData['tenant_domain_id'] = $tenantDomain->id;
-                $sipData['identity_mode'] = 'domain_username';
-                $sipData['global_auth_key'] = "domain:{$tenantDomain->id}:{$this->extensionNumber}";
-            } else {
-                $sipData['global_auth_key'] = "global:{$this->extensionNumber}";
-            }
-
-            $sipAccount->update($sipData);
-        } else {
-            SipAccount::withoutGlobalScope('tenant')->create([
-                'tenant_id' => $tenantId,
-                'extension_id' => $extension->id,
-                'tenant_domain_id' => $tenantDomain?->id,
-                'identity_mode' => $tenantDomain !== null ? 'domain_username' : 'global_username',
-                'auth_username' => $this->extensionNumber,
-                'auth_password' => $this->password,
-                'global_auth_key' => $tenantDomain !== null
-                    ? "domain:{$tenantDomain->id}:{$this->extensionNumber}"
-                    : "global:{$this->extensionNumber}",
-                'user_context' => $userContext,
-                'enabled' => $this->enabled,
-            ]);
-        }
-    }
-
-    /**
      * Custom validation messages.
      */
     protected function messages(): array
@@ -402,43 +349,6 @@ class ExtensionsEdit extends BaseEditComponent
         return [
             'voicemailPassword.regex' => 'The voicemail password must only contain numbers.',
         ];
-    }
-
-    /**
-     * Create or update the voicemail mailbox when voicemail is enabled.
-     */
-    private function syncVoicemail(Extension $extension): void
-    {
-        $tenantId = $this->resolveTenantId();
-
-        if ($this->voicemailEnabled) {
-            $vmPassword = trim($this->voicemailPassword);
-            if ($vmPassword === '') {
-                $existingVm = Voicemail::withoutGlobalScope('tenant')
-                    ->where('tenant_id', $tenantId)
-                    ->where('voicemail_id', $this->extensionNumber)
-                    ->first();
-                $vmPassword = $existingVm?->password ?: $this->extensionNumber;
-            }
-
-            Voicemail::withoutGlobalScope('tenant')->updateOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'voicemail_id' => $this->extensionNumber,
-                ],
-                [
-                    'mailbox' => $this->extensionNumber,
-                    'name' => ($this->displayName ?: "Extension {$this->extensionNumber}").' Voicemail',
-                    'password' => $vmPassword,
-                    'enabled' => $this->enabled,
-                ],
-            );
-        } else {
-            Voicemail::withoutGlobalScope('tenant')
-                ->where('tenant_id', $tenantId)
-                ->where('voicemail_id', $this->extensionNumber)
-                ->update(['enabled' => false]);
-        }
     }
 
     /**
