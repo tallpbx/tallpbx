@@ -132,6 +132,9 @@ Instead of generating static XML files on disk, TallPBX serves dynamic configura
 
 ### Tenant Isolation & Phone Provisioning
 
+See the [Desk-Phone Provisioning Guide](docs/provisioning-guide.md) for the supported endpoint, the security settings, and the troubleshooting table.
+
+
 New to multi-tenancy? See **[Tenants & Multi-Tenancy](docs/multi-tenancy.md)** for what a tenant is, the customer vs. default tenant types, who can access each, and how admin impersonation works.
 
 Configuring a desk phone or softphone adapts to your deployment model:

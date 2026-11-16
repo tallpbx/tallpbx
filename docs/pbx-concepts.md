@@ -84,8 +84,9 @@ graph TD
 * **How it works**:
   - Every physical network device in the world has a permanent, unique serial identifier called a **MAC address** (looks like `00:15:65:4A:2B:11`, printed on the barcode sticker on the back of the phone).
 * **Zero-Touch Auto-Provisioning**:
-  - When an administrator enters the phone's MAC address into TallPBX, the system can automatically configure the phone.
+  - When an administrator enters the phone's MAC address into TallPBX and assigns it a template and a SIP account, the system can configure the phone over HTTP.
   - When the phone is plugged into power and an internet cable, it connects to TallPBX, downloads its settings and SIP Account credentials, and configures its own buttons and screen automatically—no manual typing required on the phone's small keypad!
+  - The step-by-step recipe, including what each setting means and the `404`/`401`/`403` failures, is in the [Desk-Phone Provisioning Guide](provisioning-guide.md).
 
 ---
 
