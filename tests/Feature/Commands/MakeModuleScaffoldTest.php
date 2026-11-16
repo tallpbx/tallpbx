@@ -15,7 +15,8 @@ use Illuminate\Support\Str;
 it('scaffolds a conforming custom module', function (): void {
     $originalBasePath = base_path();
     $tempRoot = sys_get_temp_dir().'/make-module-scaffold-'.Str::random(8);
-    $moduleName = 'scaffold-probe-'.Str::random(4);
+    // Module names are canonical kebab-case: lowercase letters, digits, hyphens.
+    $moduleName = 'scaffold-probe-'.strtolower(Str::random(6));
 
     File::ensureDirectoryExists($tempRoot.'/bootstrap/cache');
     app()->setBasePath($tempRoot);
