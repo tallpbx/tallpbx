@@ -566,6 +566,9 @@ class GitUpdateService
 
         $rollbackSteps['Rollback git'] = ['git', '-C', $this->repoPath, 'reset', '--hard', $prePullHead];
         $rollbackSteps['Rollback composer'] = ['composer', 'install', '--no-interaction', '--prefer-dist'];
+        // Rebuild the Node dependency graph from the restored lockfile before
+        // building: the failed version's node_modules may not match it.
+        $rollbackSteps['Rollback npm'] = ['npm', 'ci', '--ignore-scripts'];
         $rollbackSteps['Rollback build'] = ['npm', 'run', 'build'];
         $rollbackSteps['Rollback repair'] = $this->artisanCommand(['permissions:repair', '--scope='.$permissionsScope]);
         $rollbackSteps['Rollback clear'] = $this->artisanCommand(['optimize:clear']);
