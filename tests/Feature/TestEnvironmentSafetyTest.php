@@ -420,3 +420,13 @@ it('keeps the test-only compiled view folder out of git', function (): void {
     expect(file_get_contents(base_path('.gitignore')))
         ->toContain('/storage/framework/testing-views');
 });
+
+it('includes built-in module implementation in coverage scope', function (): void {
+    // Module sources carry most of the PBX behaviour; excluding them would
+    // report a coverage number that never touches the code under test.
+    $xml = simplexml_load_file(base_path('phpunit.xml'));
+    $directories = array_map('strval', $xml->xpath('//source/include/directory') ?: []);
+
+    expect($directories)->toContain('app')
+        ->and($directories)->toContain('app-modules/*/src');
+});

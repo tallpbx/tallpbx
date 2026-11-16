@@ -21,6 +21,7 @@
     <source>
         <include>
             <directory>app</directory>
+            <directory>app-modules/*/src</directory>
         </include>
     </source>
     <php>
