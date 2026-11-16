@@ -62,7 +62,10 @@ class FollowMeService extends CrudService implements ContextWideDialplanXmlContr
             $xml .= "          <action application=\"set\" data=\"call_timeout={$timeout}\"/>\n";
             $xml .= "          <action application=\"set\" data=\"hangup_after_bridge=true\"/>\n";
             $xml .= "          <action application=\"set\" data=\"continue_on_fail=true\"/>\n";
-            $xml .= "          <action application=\"bridge\" data=\"\${sofia_contact({$safeExt}@\${domain_name})}\"/>\n";
+            $xml .= "          <action application=\"bridge\" data=\"\${sofia_contact({$safeExt}@\${domain_name})}[tenant_id={$tenantId}]\"/>\n";
+            // An arbitrary forward target has no provable owner, so it stays
+            // unattributed: its CDR is quarantined rather than inherited from
+            // the caller's tenant.
             $xml .= "          <action application=\"bridge\" data=\"{$safeDest}\"/>\n";
             $xml .= "        </condition>\n";
             $xml .= "      </extension>\n";

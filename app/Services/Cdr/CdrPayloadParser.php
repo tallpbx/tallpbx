@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Cdr;
 
-use App\Models\TenantDomain;
+use App\Models\Tenant;
+use App\Services\DialplanContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -21,8 +22,9 @@ use JsonException;
  * human-readable stamp and as an epoch, of which only the epoch is parsed.
  *
  * Anything that cannot be mapped — malformed JSON, a missing call uuid, or a
- * domain no tenant owns — returns null so the digest cycle quarantines the
- * payload instead of inserting an incomplete or misattributed record.
+ * payload with no trustworthy call-time tenant identity — returns null so the
+ * digest cycle quarantines the payload instead of inserting an incomplete or
+ * misattributed record.
  */
 class CdrPayloadParser
 {
@@ -64,14 +66,12 @@ class CdrPayloadParser
         }
 
         $domain = $this->string($variables['domain_name'] ?? null);
-        $tenantId = $domain === null ? null : TenantDomain::query()->where('domain', $domain)->value('tenant_id');
+        $tenantId = $this->resolveTenantId($variables, $profile, $domain);
 
         if ($tenantId === null) {
-            // tenant_id is NOT NULL and constrained. The lookup is uncached on
-            // purpose: a cached domain answer could outlive a domain moving
-            // between tenants and misattribute records.
-            Log::warning('CDR payload domain does not belong to a tenant; quarantining.', ['domain' => $domain]);
-
+            // tenant_id is NOT NULL and constrained. The record is preserved in
+            // the quarantine for explicit operator review rather than inserted
+            // against a guessed owner.
             return null;
         }
 
@@ -101,6 +101,65 @@ class CdrPayloadParser
             'created_at' => $now,
             'updated_at' => $now,
         ];
+    }
+
+    /**
+     * Resolve the call-time tenant identity from the leg itself.
+     *
+     * Two call-time sources can name the owner: the channel variable the
+     * dialplan stamped on the leg, and the tenant context the channel executed.
+     * They must agree. `domain_name` is deliberately not consulted: a domain is
+     * diagnostic context, can be reassigned between hangup and ingestion, and
+     * can describe the caller on a cross-tenant B-leg.
+     *
+     * @param  array<string, mixed>  $variables
+     * @param  array<string, mixed>  $profile
+     */
+    private function resolveTenantId(array $variables, array $profile, ?string $domain): ?int
+    {
+        $variable = $this->string($variables['tenant_id'] ?? null);
+        $variableId = $variable !== null && is_numeric($variable) ? (int) $variable : null;
+
+        $context = $this->string($variables['context'] ?? null)
+            ?? $this->string($profile['context'] ?? null);
+        $parsedContextId = $context === null ? null : app(DialplanContext::class)->parseTenantId($context);
+        $contextId = $parsedContextId !== null && is_numeric($parsedContextId) ? (int) $parsedContextId : null;
+
+        $logContext = ['domain' => $domain, 'context' => $context];
+
+        if ($variableId !== null && $contextId !== null && $variableId !== $contextId) {
+            Log::warning('CDR payload carries conflicting tenant identity; quarantining.', [
+                ...$logContext,
+                'reason' => 'conflicting-identity',
+            ]);
+
+            return null;
+        }
+
+        // A non-tenant context is normal traffic, not an error: `null` here
+        // means "no context candidate", never "unresolved context".
+        $candidate = $variableId ?? $contextId;
+
+        if ($candidate === null) {
+            Log::warning('CDR payload has no call-time tenant identity; quarantining.', [
+                ...$logContext,
+                'reason' => 'missing-identity',
+            ]);
+
+            return null;
+        }
+
+        if (! Tenant::query()->whereKey($candidate)->exists()) {
+            Log::warning('CDR payload names a tenant that does not exist; quarantining.', [
+                ...$logContext,
+                'reason' => 'unknown-tenant',
+                'tenant_id' => $candidate,
+            ]);
+
+            return null;
+        }
+
+        return $candidate;
     }
 
     /**

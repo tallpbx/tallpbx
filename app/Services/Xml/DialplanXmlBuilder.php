@@ -85,6 +85,11 @@ class DialplanXmlBuilder
             $writer->openTag('extension', ['name' => 'capture_orig_caller', 'continue' => 'true'], 6);
             $writer->openTag('condition', [], 8);
             $writer->selfClosingTag('action', ['application' => 'export', 'data' => 'orig_caller_id_number=${caller_id_number}'], 10);
+            // Channel-local (not exported): this marks the channel executing
+            // the tenant context, and CDR ingestion reads it as call-time
+            // ownership evidence. Exporting it would mislabel a cross-tenant
+            // callee's leg with the caller's tenant.
+            $writer->selfClosingTag('action', ['application' => 'set', 'data' => 'tenant_id='.$tenantId], 10);
             $writer->closeTag('condition', 8);
             $writer->closeTag('extension', 6);
             $writer->newline();
@@ -218,7 +223,7 @@ class DialplanXmlBuilder
                 if ($detail->action) {
                     $actionAttrs = ['application' => $detail->action];
                     if ($detail->data) {
-                        $actionAttrs['data'] = $this->dialplanActionData($dialplan, $detail->data);
+                        $actionAttrs['data'] = $this->dialplanActionData($dialplan, $detail->data, $tenantId, $detail->action);
                     }
                     $writer->selfClosingTag('action', $actionAttrs, 10);
                 }
@@ -325,14 +330,30 @@ class DialplanXmlBuilder
 
     /**
      * Return runtime-safe action data for generated dialplan actions.
+     *
+     * A direct bridge creates the B-leg without evaluating the callee's
+     * directory entry or XML dialplan, so that leg never receives the
+     * channel-local `tenant_id` stamp. Inject the owning tenant into the
+     * leg's own variable block at render time; the stored DialplanDetail
+     * row keeps its provider-neutral value.
      */
-    private function dialplanActionData(Dialplan $dialplan, string $data): string
+    private function dialplanActionData(Dialplan $dialplan, string $data, int $tenantId, ?string $action = null): string
     {
         if ($dialplan->name === 'local_extension' && $data === 'user/$1@${domain_name}') {
-            return '${sofia_contact($1@${domain_name})}';
+            $data = '${sofia_contact($1@${domain_name})}';
         }
 
-        return $data;
+        if ($action !== 'bridge') {
+            return $data;
+        }
+
+        // Alternative destinations and data that already names its owner stay
+        // untouched: a single trailing block would mislabel the other legs.
+        if (trim($data) === '' || str_contains($data, '[') || str_contains($data, '|')) {
+            return $data;
+        }
+
+        return $data.'[tenant_id='.$tenantId.']';
     }
 
     /**

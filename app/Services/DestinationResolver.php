@@ -108,7 +108,7 @@ class DestinationResolver
             self::KIND_RING_GROUP => $this->resolveRingGroup($identifier, $tenantId),
             self::KIND_IVR => $this->resolveIvr($identifier, $tenantId),
             self::KIND_VOICEMAIL => $this->resolveVoicemail($identifier, $tenantId),
-            self::KIND_EXTERNAL => $this->resolveExternal($identifier),
+            self::KIND_EXTERNAL => $this->resolveExternal($identifier, $tenantId),
             self::KIND_CONFERENCE => $this->resolveConference($identifier, $tenantId),
             self::KIND_QUEUE => $this->resolveQueue($identifier, $tenantId),
             self::KIND_CUSTOM => $this->resolveCustom($identifier),
@@ -236,13 +236,15 @@ class DestinationResolver
     /**
      * Resolve an external number destination.
      *
-     * Bridges to the external number through the default SIP route.
+     * Bridges to the external number through the default SIP route. The leg
+     * belongs to the tenant that owns the route, so it carries that identity
+     * in its own variable block.
      */
-    private function resolveExternal(string $identifier): array
+    private function resolveExternal(string $identifier, int $tenantId): array
     {
         return [
             'application' => 'bridge',
-            'data' => "sofia/external/{$identifier}",
+            'data' => "sofia/external/{$identifier}[tenant_id={$tenantId}]",
         ];
     }
 

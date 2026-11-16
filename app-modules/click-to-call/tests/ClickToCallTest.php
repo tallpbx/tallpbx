@@ -51,7 +51,7 @@ it('originates a call successfully through FreeSwitchControlService when connect
     $freeSwitch->shouldReceive('isConnected')->andReturnTrue();
     $freeSwitch->shouldReceive('api')
         ->once()
-        ->with("originate {origination_caller_id_number=1001}user/1001@tenant_{$this->tenant->id}_internal &bridge(loopback/+15551234567/tenant_{$this->tenant->id}_internal)")
+        ->with("originate {origination_caller_id_number=1001}user/1001@tenant_{$this->tenant->id}_internal &bridge(loopback/+15551234567/tenant_{$this->tenant->id}_internal[tenant_id={$this->tenant->id}])")
         ->andReturn('+OK');
     app()->instance(FreeSwitchServiceInterface::class, $freeSwitch);
 

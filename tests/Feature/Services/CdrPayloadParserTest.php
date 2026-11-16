@@ -28,7 +28,7 @@ it('maps the captured a-leg onto a cdrs row', function () {
     TenantDomain::factory()->create(['tenant_id' => $tenant->id, 'domain' => 'capture.example']);
 
     $row = cdrParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid())
-        ->parse(cdrFixture('a', ['domain_name' => 'capture.example']));
+        ->parse(cdrFixture('a', ['domain_name' => 'capture.example', 'tenant_id' => (string) $tenant->id]));
 
     expect($row)->not->toBeNull()
         // The originating leg is identified by the verified originator markers.
@@ -58,7 +58,7 @@ it('classifies the bridged leg as the b-side and links it back', function () {
     TenantDomain::factory()->create(['tenant_id' => $tenant->id, 'domain' => 'capture.example']);
 
     $row = cdrParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid())
-        ->parse(cdrFixture('b', ['domain_name' => 'capture.example']));
+        ->parse(cdrFixture('b', ['domain_name' => 'capture.example', 'tenant_id' => (string) $tenant->id]));
 
     expect($row)->not->toBeNull()
         ->and($row['leg'])->toBe('b')
@@ -74,6 +74,7 @@ it('combines record_path and record_name into one path', function () {
 
     $row = cdrParser(sys_get_temp_dir().'/cdr-quarantine-'.uniqid())->parse(cdrFixture('a', [
         'domain_name' => 'capture.example',
+        'tenant_id' => (string) $tenant->id,
         'record_path' => '/var/lib/tallpbx/media/store/recordings',
         'record_name' => 'call-8682.wav',
     ]));
@@ -102,13 +103,14 @@ it('returns null and quarantines a payload without a call uuid', function () {
         ->and(glob($dir.'/*.json'))->toHaveCount(1);
 });
 
-it('returns null and quarantines a payload whose domain belongs to no tenant', function () {
+it('returns null and quarantines a payload with no call-time tenant identity', function () {
     $dir = sys_get_temp_dir().'/cdr-quarantine-'.uniqid();
     $parser = cdrParser($dir);
 
     // tenant_id is NOT NULL and constrained: an unattributable record is kept
-    // for review rather than inserted against the wrong tenant.
-    expect($parser->parse(cdrFixture('a', ['domain_name' => 'unknown.example'])))->toBeNull()
+    // for review rather than inserted against the wrong tenant. A domain
+    // mapping is diagnostic context, never an ownership source.
+    expect($parser->parse(cdrFixture('a', ['domain_name' => 'capture.example'])))->toBeNull()
         ->and($parser->quarantine('1-3', cdrFixture('a')))->toBeTrue()
         ->and(glob($dir.'/*.json'))->toHaveCount(1);
 });

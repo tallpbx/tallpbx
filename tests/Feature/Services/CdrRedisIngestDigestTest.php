@@ -101,11 +101,15 @@ function cdrDigestDriver(?CdrPayloadParser $parser = null): TestableCdrIngest
 }
 
 /**
- * One captured payload with a resolvable tenant domain overlaid.
+ * One captured payload carrying the call-time tenant identity the dialplan
+ * stamps on the channel. The domain stays as diagnostic context only.
  */
-function cdrDigestPayload(string $leg): string
+function cdrDigestPayload(string $leg, int $tenantId): string
 {
-    return cdrFixture($leg, ['domain_name' => 'digest.example']);
+    return cdrFixture($leg, [
+        'domain_name' => 'digest.example',
+        'tenant_id' => (string) $tenantId,
+    ]);
 }
 
 beforeEach(function () {
@@ -115,8 +119,8 @@ beforeEach(function () {
 
 it('commits both legs in one transaction and deletes entries only afterwards', function () {
     $driver = cdrDigestDriver();
-    $driver->stream->add('1-1', cdrDigestPayload('a'));
-    $driver->stream->add('1-2', cdrDigestPayload('b'));
+    $driver->stream->add('1-1', cdrDigestPayload('a', $this->tenant->id));
+    $driver->stream->add('1-2', cdrDigestPayload('b', $this->tenant->id));
     $driver->stream->add('1-3', 'not json at all');
 
     $processed = $driver->digest(100);
@@ -141,12 +145,13 @@ it('commits both legs in one transaction and deletes entries only afterwards', f
 
 it('updates instead of duplicating when the same record is digested again', function () {
     $driver = cdrDigestDriver();
-    $driver->stream->add('1-1', cdrDigestPayload('a'));
+    $driver->stream->add('1-1', cdrDigestPayload('a', $this->tenant->id));
     $driver->digest(100);
 
     // A crash between commit and XDEL replays the entry under the same id.
     $driver->stream->add('1-1', cdrFixture('a', [
         'domain_name' => 'digest.example',
+        'tenant_id' => (string) $this->tenant->id,
         'duration' => '42',
         'billsec' => '42',
     ]));
@@ -181,7 +186,7 @@ it('keeps every entry when the MariaDB transaction fails', function () {
     };
 
     $driver = cdrDigestDriver($parser);
-    $driver->stream->add('1-1', cdrDigestPayload('a'));
+    $driver->stream->add('1-1', cdrDigestPayload('a', $this->tenant->id));
 
     expect(fn () => $driver->digest(100))->toThrow(QueryException::class);
 
@@ -205,7 +210,7 @@ it('keeps an unparseable entry when the quarantine copy fails', function () {
 
 it('skips the cycle when another worker holds the digest lock', function () {
     $driver = cdrDigestDriver();
-    $driver->stream->add('1-1', cdrDigestPayload('a'));
+    $driver->stream->add('1-1', cdrDigestPayload('a', $this->tenant->id));
 
     $lock = Cache::lock(CdrRedisIngest::LOCK_NAME, 30);
     expect($lock->get())->toBeTrue();

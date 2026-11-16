@@ -144,7 +144,11 @@ class RingGroupService implements ContextWideDialplanXmlContributor, RingGroupSe
                     $extNumber = $ringExt->extension?->extension_number
                         ?? $ringExt->extension_uuid;
                     $safeExt = htmlspecialchars((string) $extNumber, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-                    $destinations[] = "\${sofia_contact({$safeExt}@\${domain_name})}";
+                    // Each direct bridge leg bypasses the callee's directory and
+                    // dialplan, so it carries the destination tenant in its own
+                    // variable block. The outer {…} prefix must stay tenant-free:
+                    // it would leak the caller's tenant onto every leg.
+                    $destinations[] = "\${sofia_contact({$safeExt}@\${domain_name})}[tenant_id={$tenantId}]";
                 }
 
                 $bridgeString = implode(',', $destinations);

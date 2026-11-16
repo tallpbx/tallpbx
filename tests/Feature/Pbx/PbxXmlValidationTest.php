@@ -73,7 +73,7 @@ describe('pbx xml handler smoke tests', function (): void {
             ->assertSee('<extension name="local_extension">', false)
             ->assertDontSee('application="limit" data="hiredis default pbx:${domain_name}:local_extension:active 100000"', false)
             ->assertDontSee('application="hiredis_raw" data="default set pbx:mod_hiredis:last_call:${uuid} ${caller_id_number}-&gt;${destination_number}"', false)
-            ->assertSee('data="${sofia_contact($1@${domain_name})}"', false)
+            ->assertSee('data="${sofia_contact($1@${domain_name})}[tenant_id='.$tenant->id.']"', false)
             ->assertSee('local_extension', false);
 
         config([

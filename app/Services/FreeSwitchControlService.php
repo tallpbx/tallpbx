@@ -220,6 +220,15 @@ class FreeSwitchControlService
             ? "loopback/{$destination}/{$context}"
             : "user/{$destination}@{$context}";
 
+        // The destination leg is created by &bridge() and never executes the
+        // tenant context itself, so name its owner in the leg's own variable
+        // block when the supplied context belongs to a tenant.
+        $tenantId = app(DialplanContext::class)->parseTenantId($context);
+
+        if ($tenantId !== null && is_numeric($tenantId)) {
+            $bridgeTarget .= '[tenant_id='.(int) $tenantId.']';
+        }
+
         return $this->run("originate {origination_caller_id_number={$source}}user/{$source}@{$context} &bridge({$bridgeTarget})");
     }
 

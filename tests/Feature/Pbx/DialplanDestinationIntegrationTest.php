@@ -103,7 +103,7 @@ it('resolves an external destination through the full dialplan path', function (
         ->assertOk()
         ->assertSee('external_did', false)
         ->assertSee('application="bridge"', false)
-        ->assertSee('data="sofia/external/15551230000"', false)
+        ->assertSee('data="sofia/external/15551230000[tenant_id='.$tenant->id.']"', false)
         ->assertDontSee('NO_ROUTE_DESTINATION');
 });
 
@@ -365,7 +365,7 @@ it('scopes hiredis limit and marker actions to local extension dialing only', fu
         ->assertOk()
         ->assertSee('application="limit" data="hiredis default pbx:${domain_name}:local_extension:active 100000"', false)
         ->assertSee('application="hiredis_raw" data="default set pbx:mod_hiredis:last_call:${uuid} ${caller_id_number}-&gt;${destination_number}"', false)
-        ->assertSee('data="${sofia_contact($1@${domain_name})}"', false);
+        ->assertSee('data="${sofia_contact($1@${domain_name})}[tenant_id='.$tenant->id.']"', false);
 
     // DID routing resolves through DestinationResolver and never inherits
     // the hiredis actions, even when they are enabled and a local_extension

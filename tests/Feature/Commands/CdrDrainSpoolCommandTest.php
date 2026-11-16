@@ -27,19 +27,23 @@ function spoolFile(string $dir, string $name, string $contents): void
 }
 
 /**
- * Build one captured payload with a resolvable tenant domain overlaid.
+ * Build one captured payload carrying the call-time tenant identity the
+ * dialplan stamps on the channel.
  */
-function spoolPayload(string $leg): string
+function spoolPayload(string $leg, int $tenantId): string
 {
-    return cdrFixture($leg, ['domain_name' => 'drain.example']);
+    return cdrFixture($leg, [
+        'domain_name' => 'drain.example',
+        'tenant_id' => (string) $tenantId,
+    ]);
 }
 
 beforeEach(function () {
     $this->spool = sys_get_temp_dir().'/cdr-spool-'.uniqid();
     $this->quarantine = sys_get_temp_dir().'/cdr-quarantine-'.uniqid();
 
-    $tenant = Tenant::factory()->create();
-    TenantDomain::factory()->create(['tenant_id' => $tenant->id, 'domain' => 'drain.example']);
+    $this->tenant = Tenant::factory()->create();
+    TenantDomain::factory()->create(['tenant_id' => $this->tenant->id, 'domain' => 'drain.example']);
 });
 
 /**
@@ -55,8 +59,8 @@ function runDrain(array $options = []): PendingCommand
 }
 
 it('drains spooled records into cdrs and removes the files', function () {
-    spoolFile($this->spool, '8682.cdr.json', spoolPayload('a'));
-    spoolFile($this->spool, '97a4.cdr.json', spoolPayload('b'));
+    spoolFile($this->spool, '8682.cdr.json', spoolPayload('a', $this->tenant->id));
+    spoolFile($this->spool, '97a4.cdr.json', spoolPayload('b', $this->tenant->id));
 
     runDrain(['--batch' => 100])
         ->expectsOutputToContain('Drained 2 spooled record(s)')
@@ -82,10 +86,11 @@ it('quarantines unparseable files instead of dropping them', function () {
         ->and(DB::table('cdrs')->count())->toBe(0);
 });
 
-it('quarantines records whose domain belongs to no tenant', function () {
+it('quarantines records with no call-time tenant identity', function () {
     // tenant_id is NOT NULL and constrained: an unattributable record is kept
-    // for review rather than inserted against the wrong tenant.
-    spoolFile($this->spool, 'no-tenant.cdr.json', cdrFixture('a', ['domain_name' => 'nobody.example']));
+    // for review rather than inserted against the wrong tenant. A domain
+    // mapping alone is not call-time identity.
+    spoolFile($this->spool, 'no-tenant.cdr.json', cdrFixture('a', ['domain_name' => 'drain.example']));
 
     runDrain()
         ->expectsOutputToContain('quarantined 1')
@@ -98,7 +103,7 @@ it('quarantines records whose domain belongs to no tenant', function () {
 it('skips files that may still be open', function () {
     // mod_json_cdr writes the file over several writes; a fresh mtime means
     // the file may not be complete yet.
-    spoolFile($this->spool, 'fresh.cdr.json', spoolPayload('a'));
+    spoolFile($this->spool, 'fresh.cdr.json', spoolPayload('a', $this->tenant->id));
 
     runDrain(['--grace' => 3600])
         ->expectsOutputToContain('Skipped 1 file(s)')
