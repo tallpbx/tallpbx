@@ -7,6 +7,7 @@ namespace Modules\Backups\Providers;
 use Modules\Backups\Services\BackupService;
 use Modules\Backups\Services\BackupServiceInterface;
 use Modules\Backups\Services\RestoreCommandRunnerInterface;
+use Modules\Backups\Services\RestoreJournal;
 use Modules\Backups\Services\SymfonyRestoreCommandRunner;
 
 /**
@@ -24,6 +25,18 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
         RestoreCommandRunnerInterface::class => SymfonyRestoreCommandRunner::class,
         BackupServiceInterface::class => BackupService::class,
     ];
+
+    /**
+     * Bind the restore journal to the configured appliance directory.
+     */
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->bind(RestoreJournal::class, fn (): RestoreJournal => new RestoreJournal(
+            (string) config('backup-storage.journal_root'),
+        ));
+    }
 
     /**
      * Kebab-case module identifier for view namespace, route prefix,

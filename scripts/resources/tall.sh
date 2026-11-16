@@ -387,6 +387,9 @@ fi
 # a restore operation.
 if [ -f /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch ]; then
     install -d -m 0770 -o root -g www-data /var/lib/tallpbx/restore-requests
+    # Authoritative restore state survives the database a restore replaces, so
+    # only the root helper may write it; the queue worker never gets access.
+    install -d -m 0700 -o root -g root /var/lib/tallpbx/restore-journal
     install -m 0700 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch /usr/local/sbin/tallpbx-restore-dispatch
     install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch.service /etc/systemd/system/
     install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore-dispatch.path /etc/systemd/system/

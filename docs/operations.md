@@ -36,6 +36,28 @@ TallPBX enforces a strict privilege boundary across its configuration paths usin
 | `/etc/tallpbx/geoip/` | `0750 root:www-data` | Pre-aggregated IPdeny Geo-IP country zone caches (`*.v4.zone`, `*.v6.zone`). |
 | `/var/www/tallpbx/` | `0755 root:www-data` | Web application source code, Artisan CLI commands, and web UI. |
 | `/var/lib/tallpbx/media/` | `2775 www-data:tallpbx-media` | Call recordings, voicemail audio, and tenant media files. |
+| `/var/lib/tallpbx/restore-requests/` | `0770 root:www-data` | Restore request handoff watched by `tallpbx-restore-dispatch.path`. |
+| `/var/lib/tallpbx/restore-journal/` | `0700 root:root` | Authoritative restore state, written only by the privileged restore helper. |
+
+### Privileged Restore State
+
+The restore journal lives outside the database on purpose: a restore replaces the
+very tables that would otherwise record its progress. Only the root restore helper
+writes it; the web panel and the queue worker read a projection stored in
+`restore_operations` instead.
+
+A fresh install creates the directory. An appliance installed before the journal
+existed is upgraded the first time the helper runs — it creates or validates
+`/var/lib/tallpbx/restore-journal` (`0700 root:root`) before any destructive phase
+and refuses to continue if the directory cannot be made safe. To prepare it in
+advance:
+
+```bash
+sudo install -d -m 0700 -o root -g root /var/lib/tallpbx/restore-journal
+```
+
+`sudo tallpbx-restore-status` prints one row per operation from the journal and
+touches no framework code, so it also works while the database is being replaced.
 
 ## Health Checks and Testing
 
