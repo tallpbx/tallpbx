@@ -73,20 +73,25 @@ it('fails when the stream backlog crosses the warning threshold', function (): v
     $stream = 'pbx:cdr:stream:test-'.Str::random(6);
 
     $redis = Redis::connection('cdr');
-    $redis->xadd($stream, '*', ['payload' => '{}']);
-    $redis->xadd($stream, '*', ['payload' => '{}']);
 
-    $this->artisan('cdr:health', [
-        '--spool-dir' => $spool,
-        '--stream' => $stream,
-        '--warn-pending' => 2,
-        '--nginx-error-log' => '/nonexistent/nginx-error.log',
-    ])
-        ->expectsOutputToContain('backlog=2')
-        ->assertFailed();
+    try {
+        $redis->xadd($stream, '*', ['payload' => '{}']);
+        $redis->xadd($stream, '*', ['payload' => '{}']);
 
-    $redis->del($stream);
-    rmdir($spool);
+        $this->artisan('cdr:health', [
+            '--spool-dir' => $spool,
+            '--stream' => $stream,
+            '--warn-pending' => 2,
+            '--nginx-error-log' => '/nonexistent/nginx-error.log',
+        ])
+            ->expectsOutputToContain('backlog=2')
+            ->assertFailed();
+    } finally {
+        // Unwind the stream and spool even when the assertion throws, so a
+        // failing run never leaves CDR state behind in the test database.
+        $redis->del($stream);
+        rmdir($spool);
+    }
 });
 
 it('fails when the nginx log records a failed post to the cdr endpoint', function (): void {

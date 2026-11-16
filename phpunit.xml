@@ -40,6 +40,8 @@
         <env name="REDIS_DB" value="15" force="true"/>
         <env name="REDIS_CACHE_DB" value="14" force="true"/>
         <env name="REDIS_SESSION_DB" value="13" force="true"/>
+        <env name="REDIS_CDR_DB" value="12" force="true"/>
+        <env name="REDIS_URL" value="" force="true"/>
         <env name="REDIS_PREFIX" value="tallpbx-test-" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
