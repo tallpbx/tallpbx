@@ -8,6 +8,7 @@ use App\Services\TenantManager;
 use App\Support\BaseListComponent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\View\View;
 use Modules\CallDetailRecords\Models\Cdr;
 use Modules\CallDetailRecords\Services\CdrService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -140,33 +141,56 @@ class CdrList extends BaseListComponent
 
             $written = 0;
 
-            foreach ($query->lazy(1000) as $record) {
-                if ($written >= self::EXPORT_ROW_LIMIT) {
-                    break;
+            // Resolve peer tenants for one bounded chunk at a time so a large
+            // export performs a batch lookup per chunk instead of per record.
+            $query->chunk(1000, function ($chunk) use ($handle, &$written): bool {
+                Cdr::preloadTenantDirections($chunk);
+
+                foreach ($chunk as $record) {
+                    if ($written >= self::EXPORT_ROW_LIMIT) {
+                        return false;
+                    }
+
+                    fputcsv($handle, [
+                        $record->start_stamp?->toIso8601String() ?? '',
+                        strtoupper((string) $record->leg),
+                        $this->csvValue($record->caller_id),
+                        $this->csvValue($record->caller_id_name),
+                        $this->csvValue($record->destination),
+                        $this->csvValue($record->tenantDirection()),
+                        (int) $record->duration,
+                        (int) $record->billsec,
+                        $this->csvValue($record->hangup_cause),
+                        $this->csvValue($record->call_uuid),
+                        $this->csvValue($record->b_leg_uuid),
+                    ]);
+
+                    $written++;
                 }
 
-                fputcsv($handle, [
-                    $record->start_stamp?->toIso8601String() ?? '',
-                    strtoupper((string) $record->leg),
-                    $this->csvValue($record->caller_id),
-                    $this->csvValue($record->caller_id_name),
-                    $this->csvValue($record->destination),
-                    $this->csvValue($record->direction),
-                    (int) $record->duration,
-                    (int) $record->billsec,
-                    $this->csvValue($record->hangup_cause),
-                    $this->csvValue($record->call_uuid),
-                    $this->csvValue($record->b_leg_uuid),
-                ]);
-
-                $written++;
-            }
+                return true;
+            });
 
             fclose($handle);
         }, 'call-detail-records-'.now()->format('Y-m-d').'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    /**
+     * Render the list with a tenant-relative direction on every row.
+     *
+     * The preload runs here, not only in `loadRecords()`: Livewire restores
+     * the public collection from model identifiers on every later request, so
+     * the models lose their private memo while `loadRecords()` is not called
+     * for actions such as opening the delete modal.
+     */
+    public function render(): View
+    {
+        Cdr::preloadTenantDirections($this->records);
+
+        return parent::render();
     }
 
     /**

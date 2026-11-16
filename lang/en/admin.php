@@ -495,6 +495,7 @@ return [
     'cdr_caller' => 'Caller',
     'cdr_destination' => 'Destination',
     'cdr_direction' => 'Direction',
+    'cdr_channel_direction' => 'Channel direction (FreeSWITCH)',
     'cdr_duration' => 'Duration',
     'cdr_billsec' => 'Billsec',
     'cdr_date' => 'Date',

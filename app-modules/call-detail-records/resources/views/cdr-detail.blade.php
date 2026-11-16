@@ -18,6 +18,10 @@
             </div>
             <div>
                 <dt class="text-xs text-base-content/60">{{ __('admin.cdr_direction') }}</dt>
+                <dd><span class="badge badge-ghost">{{ $cdr->tenantDirection() }}</span></dd>
+            </div>
+            <div>
+                <dt class="text-xs text-base-content/60">{{ __('admin.cdr_channel_direction') }}</dt>
                 <dd><span class="badge badge-ghost">{{ $cdr->direction }}</span></dd>
             </div>
             <div>

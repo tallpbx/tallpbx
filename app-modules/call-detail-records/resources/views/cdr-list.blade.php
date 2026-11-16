@@ -53,7 +53,7 @@
                             </td>
                             <td><span class="font-mono text-sm">{{ $record->destination }}</span></td>
                             <td>
-                                <span class="badge badge-ghost badge-sm">{{ $record->direction }}</span>
+                                <span class="badge badge-ghost badge-sm">{{ $record->tenantDirection() }}</span>
                             </td>
                             <td>
                                 <span class="badge badge-xs font-mono">{{ strtoupper((string) $record->leg) }}</span>

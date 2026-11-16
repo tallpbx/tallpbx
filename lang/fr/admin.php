@@ -497,6 +497,7 @@ return [
     'cdr_caller' => 'Appelant',
     'cdr_destination' => 'Destination',
     'cdr_direction' => 'Direction',
+    'cdr_channel_direction' => 'Direction du canal (FreeSWITCH)',
     'cdr_duration' => 'Durée',
     'cdr_billsec' => 'Secondes Facturées',
     'cdr_date' => 'Date',
