@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Backups\Services;
 
+use App\Services\Appliance\RuntimeServiceReconciler;
 use Illuminate\Support\Facades\File;
 use Modules\Backups\Models\Backup;
 use Modules\Backups\Models\RestoreOperation;
@@ -20,13 +21,20 @@ class RestoreOperationExecutor
     private readonly RestoreJournal $journal;
 
     /**
+     * Runtime service inspection and restart, resolved when omitted.
+     */
+    private readonly RuntimeServiceReconciler $services;
+
+    /**
      * Create an executor with an argument-safe root command runner.
      */
     public function __construct(
         private readonly RestoreCommandRunnerInterface $commandRunner,
         ?RestoreJournal $journal = null,
+        ?RuntimeServiceReconciler $services = null,
     ) {
         $this->journal = $journal ?? app(RestoreJournal::class);
+        $this->services = $services ?? app(RuntimeServiceReconciler::class);
     }
 
     /**
@@ -36,6 +44,7 @@ class RestoreOperationExecutor
     {
         $operationId = $operation->id;
         $deadline = new RestoreDeadline((int) config('backup-storage.restore_operation_deadline', 3600));
+        $maintenanceStarted = false;
 
         try {
             $this->phase($operationId, 'extracting', $deadline);
@@ -62,6 +71,7 @@ class RestoreOperationExecutor
             $this->journal->record($operationId, 'snapshotting', ['pre_restore_snapshot_path' => $snapshotDirectory]);
 
             $this->commandRunner->run(['php', 'artisan', 'down']);
+            $maintenanceStarted = true;
 
             $archiveRoot = $this->archiveRoot($extractionDirectory);
             $this->phase($operationId, 'importing', $deadline);
@@ -76,7 +86,27 @@ class RestoreOperationExecutor
             $this->commandRunner->run(['php', 'artisan', 'backups:reconcile-restore-journal', '--operation='.$operationId]);
             $operation->refresh();
             $this->commandRunner->run(['php', 'artisan', 'optimize:clear']);
-            $this->restartRuntimeServices();
+
+            // Prove the runtime, not just the exit codes. The web tier is
+            // probed only after leaving maintenance mode below.
+            $this->phase($operationId, 'health-check', $deadline);
+            $services = $this->services->reconcile();
+            $this->journal->record($operationId, 'health-check', ['services' => $services]);
+
+            $failed = [...$services['failed'], ...$services['probes']['failed']];
+
+            if ($failed !== []) {
+                throw new RuntimeException('Restore health checks failed: '.implode(', ', $failed));
+            }
+
+            $this->commandRunner->run(['php', 'artisan', 'up']);
+
+            if (! $this->services->probeHttpHealth()) {
+                $this->commandRunner->run(['php', 'artisan', 'down']);
+                $this->journal->record($operationId, 'health-check', ['http_up' => false]);
+
+                throw new RuntimeException('Restore health check failed: web tier did not return HTTP 200 on /up.');
+            }
 
             $this->journal->record($operationId, 'completed', ['completed_at' => now()->toIso8601String()]);
             $operation->update([
@@ -85,10 +115,12 @@ class RestoreOperationExecutor
             ]);
         } catch (\Throwable $exception) {
             // The journal is the only writer that survives a replaced database,
-            // so it records the failure first.
+            // so it records the failure first. A half-restored runtime must
+            // never take live traffic: the app stays down.
             $this->journal->record($operationId, 'failed', [
                 'failure_reason' => $exception->getMessage(),
                 'completed_at' => now()->toIso8601String(),
+                'maintenance_locked' => $maintenanceStarted,
             ]);
 
             // A reconcile failure must never mask the original exception.
@@ -109,8 +141,6 @@ class RestoreOperationExecutor
             }
 
             throw $exception;
-        } finally {
-            $this->commandRunner->run(['php', 'artisan', 'up']);
         }
     }
 
@@ -424,21 +454,5 @@ class RestoreOperationExecutor
     private function databaseEnvironment(array $connection): array
     {
         return ['MYSQL_PWD' => (string) ($connection['password'] ?? '')];
-    }
-
-    /**
-     * Restart known runtime units without failing when an optional unit is absent.
-     */
-    private function restartRuntimeServices(): void
-    {
-        foreach (['php8.5-fpm', 'nginx', 'freeswitch-listener', 'freeswitch'] as $service) {
-            try {
-                $this->commandRunner->run(['systemctl', 'try-restart', $service]);
-            } catch (RuntimeException) {
-                // A missing optional service must not obscure the restore result.
-            }
-        }
-
-        $this->commandRunner->run(['php', 'artisan', 'queue:restart']);
     }
 }
