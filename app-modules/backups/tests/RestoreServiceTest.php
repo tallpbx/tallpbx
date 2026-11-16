@@ -408,8 +408,10 @@ it('records the failure in the journal and projects it after the database is rep
     try {
         expect(fn () => $executor->execute($operation))->toThrow(RuntimeException::class, 'Migration failed after import.');
     } finally {
-        // The execution created an extraction workspace under the isolated root.
+        // The execution created an extraction workspace under the isolated root
+        // and a rollback snapshot next to the stored backups.
         File::deleteDirectory($this->restoreHandoff.'/root');
+        File::deleteDirectory(storage_path('backups/snapshots/'.$operation->id));
     }
 
     expect(app(RestoreJournal::class)->read($operation->id)['phase'])->toBe('failed');

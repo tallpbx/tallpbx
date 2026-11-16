@@ -32,6 +32,9 @@ CLAUDE.md
 /storage/pail
 /storage/framework/composer
 /storage/framework/testing-views
+# Restore rollback snapshots are runtime data written on the appliance (and by
+# tests); they must never be committed.
+/storage/backups/
 /vendor
 _ide_helper.php
 Homestead.json
