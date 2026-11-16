@@ -212,6 +212,14 @@ class ExtensionsEdit extends BaseEditComponent
             abort_unless(PanelActor::can($this->extensionId === null ? 'extensions.create' : 'extensions.edit'), 403);
 
         }
+
+        // The write boundary ignores the public property entirely: a tenant
+        // user's tenant comes from the authorized context or not at all. An
+        // admin's missing selection is a validation error, not a 403.
+        if (! $this->isAdminGuard()) {
+            abort_if($this->resolveTenantId() === null, 403);
+        }
+
         $this->validate($this->rules());
 
         $data = [
@@ -288,15 +296,17 @@ class ExtensionsEdit extends BaseEditComponent
      */
     protected function rules(): array
     {
+        $tenantId = $this->resolveTenantId();
+
         $uniqueRule = Rule::unique('extensions', 'extension_number')
-            ->where('tenant_id', $this->tenantId);
+            ->where('tenant_id', $tenantId);
 
         if ($this->extensionId !== null) {
             $uniqueRule->ignore($this->extensionId);
         }
 
         return [
-            'tenantId' => ['required', 'exists:tenants,id'],
+            'tenantId' => $this->isAdminGuard() ? ['required', 'exists:tenants,id'] : ['nullable'],
             'extensionNumber' => ['required', 'string', 'max:50', $uniqueRule],
             'numberAlias' => ['nullable', 'string', 'max:50'],
             'displayName' => ['nullable', 'string', 'max:255'],

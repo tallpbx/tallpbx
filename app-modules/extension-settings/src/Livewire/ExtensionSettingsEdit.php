@@ -67,9 +67,13 @@ class ExtensionSettingsEdit extends BaseEditComponent
      */
     public function updatedTenantId($value): void
     {
-        if ($value) {
+        // A tenant user's scope comes from the authorized context, never from
+        // the client-supplied payload.
+        $tenantId = $this->resolveTenantId();
+
+        if ($tenantId !== null) {
             $this->extensions = Extension::withoutGlobalScope('tenant')
-                ->where('tenant_id', $value)
+                ->where('tenant_id', $tenantId)
                 ->orderBy('extension_number')
                 ->get();
         } else {

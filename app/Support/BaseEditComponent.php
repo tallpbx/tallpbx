@@ -106,6 +106,35 @@ abstract class BaseEditComponent extends Component
         }
 
         $this->tenants = new Collection;
+        $this->tenantId = $this->resolveTenantId();
+    }
+
+    /**
+     * Re-derive the tenant on every Livewire request.
+     *
+     * Public properties are client-writable after mount, so a non-admin
+     * `tenantId` must never be trusted from the snapshot payload.
+     */
+    public function hydrate(): void
+    {
+        if (! $this->isAdminGuard()) {
+            $this->tenantId = $this->resolveTenantId();
+        }
+    }
+
+    /**
+     * Replace a client-supplied tenant after Livewire applies a property update.
+     *
+     * `hydrate()` runs before the payload is applied and `updating*()` runs
+     * before Livewire assigns the value, so neither can re-pin it. `updated()`
+     * runs immediately after assignment and before any subclass
+     * `updatedTenantId()` hook, without colliding with subclass signatures.
+     */
+    public function updated(string $property): void
+    {
+        if ($property === 'tenantId' && ! $this->isAdminGuard()) {
+            $this->tenantId = $this->resolveTenantId();
+        }
     }
 
     /**

@@ -114,7 +114,7 @@ class ExtensionsBulkCreate extends BaseEditComponent
     protected function rules(): array
     {
         return [
-            'tenantId' => ['required', 'exists:tenants,id'],
+            'tenantId' => $this->isAdminGuard() ? ['required', 'exists:tenants,id'] : ['nullable'],
             'startExtension' => ['required', 'integer', 'min:1', 'max:999999999'],
             'endExtension' => ['required', 'integer', 'gte:startExtension', 'max:999999999'],
             'increment' => ['required', 'integer', 'min:1', 'max:1000'],
@@ -165,7 +165,7 @@ class ExtensionsBulkCreate extends BaseEditComponent
     private function validateNoConflicts(array $numbers): void
     {
         $conflicts = Extension::withoutGlobalScope('tenant')
-            ->where('tenant_id', $this->tenantId)
+            ->where('tenant_id', $this->resolveTenantId())
             ->whereIn('extension_number', $numbers)
             ->orderBy('extension_number')
             ->pluck('extension_number')

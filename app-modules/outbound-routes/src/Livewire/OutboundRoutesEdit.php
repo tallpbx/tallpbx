@@ -189,12 +189,16 @@ class OutboundRoutesEdit extends BaseEditComponent
     {
         $this->gatewayId = null;
 
-        if ($value === '') {
+        // Never trust the client-supplied value: a tenant user's scope comes
+        // from the authorized context, and an admin's from the dropdown.
+        $tenantId = $this->resolveTenantId();
+
+        if ($tenantId === null) {
             $this->availableGateways = [];
 
             return;
         }
 
-        $this->loadGateways((int) $value);
+        $this->loadGateways($tenantId);
     }
 }
