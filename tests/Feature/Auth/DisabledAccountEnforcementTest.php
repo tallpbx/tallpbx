@@ -125,3 +125,52 @@ it('resolves the impersonated user only while both accounts stay enabled', funct
         ->and($resolved->getKey())->toBe($user->getKey())
         ->and($resolved instanceof Admin)->toBeFalse();
 });
+
+it('rotates the remember token when an account is disabled', function (): void {
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $before = $admin->remember_token;
+
+    $admin->update(['enabled' => false]);
+
+    expect($admin->fresh()->remember_token)->not->toBe($before)
+        ->and($admin->fresh()->remember_token)->toHaveLength(60);
+});
+
+it('leaves the remember token alone when other fields change', function (): void {
+    $admin = Admin::factory()->create(['enabled' => true]);
+    $before = $admin->remember_token;
+
+    $admin->update(['name' => 'Renamed']);
+
+    expect($admin->fresh()->remember_token)->toBe($before);
+});
+
+it('rejects a remember-me cookie issued before the account was disabled', function (): void {
+    $user = User::factory()->create(['enabled' => true]);
+    $user->tenants()->attach(Tenant::factory()->create());
+
+    $login = $this->post(route('panel.login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'remember' => '1',
+    ]);
+
+    $recaller = collect($login->headers->getCookies())
+        ->first(fn ($cookie) => $cookie->getName() === Auth::guard('web')->getRecallerName());
+
+    expect($recaller)->not->toBeNull();
+
+    $user->update(['enabled' => false]);
+
+    $this->flushSession()
+        ->withCookie($recaller->getName(), $recaller->getValue());
+
+    // Drop the in-memory guard left over from the login request so the next
+    // request can only authenticate through the recaller cookie itself.
+    $this->app['auth']->forgetGuards();
+
+    $this->get(route('panel.dashboard'))
+        ->assertRedirect(route('panel.login'));
+
+    expect(Auth::guard('web')->check())->toBeFalse();
+});

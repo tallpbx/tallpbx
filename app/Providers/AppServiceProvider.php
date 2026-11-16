@@ -26,6 +26,7 @@ use App\Models\Admin;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\User;
+use App\Observers\AccountEnablementObserver;
 use App\Observers\DashboardStatsObserver;
 use App\Observers\RoutingCacheObserver;
 use App\Services\DialplanXmlCollector;
@@ -243,6 +244,11 @@ class AppServiceProvider extends ServiceProvider
         // Keep dashboard monitoring reactive: broadcast stats updates when models or FreeSWITCH channels change
         User::observe(DashboardStatsObserver::class);
         Tenant::observe(DashboardStatsObserver::class);
+
+        // Disabling an account invalidates every remember-me cookie issued
+        // while it was enabled.
+        User::observe(AccountEnablementObserver::class);
+        Admin::observe(AccountEnablementObserver::class);
 
         // Keep dialplan XML routing caches reactive: invalidate on telephony model mutations
         $this->registerRoutingCacheObservers();
