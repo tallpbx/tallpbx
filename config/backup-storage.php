@@ -22,4 +22,17 @@ return [
      * host path, so no `.env` setting advertises an alternate location.
      */
     'request_root' => '/var/lib/tallpbx/restore-requests',
+
+    /*
+     * Per-command ceiling for one restore subprocess. A dump or import that
+     * streams to a file has no console output, so an idle timer is not a
+     * progress signal; this catches a hung client instead.
+     */
+    'restore_command_timeout' => (float) env('TALLPBX_RESTORE_COMMAND_TIMEOUT', 900),
+
+    /*
+     * Whole-operation budget covering machine work only. Time spent waiting for
+     * a human to confirm a restore is outside it.
+     */
+    'restore_operation_deadline' => (int) env('TALLPBX_RESTORE_OPERATION_DEADLINE', 3600),
 ];

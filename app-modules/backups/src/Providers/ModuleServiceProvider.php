@@ -22,12 +22,11 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
 {
     /** @var array<class-string, class-string> */
     public $bindings = [
-        RestoreCommandRunnerInterface::class => SymfonyRestoreCommandRunner::class,
         BackupServiceInterface::class => BackupService::class,
     ];
 
     /**
-     * Bind the restore journal to the configured appliance directory.
+     * Bind the restore journal and the bounded command runner.
      */
     public function register(): void
     {
@@ -35,6 +34,11 @@ class ModuleServiceProvider extends \App\Support\ModuleServiceProvider
 
         $this->app->bind(RestoreJournal::class, fn (): RestoreJournal => new RestoreJournal(
             (string) config('backup-storage.journal_root'),
+        ));
+
+        // A 900-second ceiling by default instead of Symfony's 60-second one.
+        $this->app->bind(RestoreCommandRunnerInterface::class, fn (): SymfonyRestoreCommandRunner => new SymfonyRestoreCommandRunner(
+            (float) config('backup-storage.restore_command_timeout', 900.0),
         ));
     }
 

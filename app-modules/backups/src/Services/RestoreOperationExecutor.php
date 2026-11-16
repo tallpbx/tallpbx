@@ -35,20 +35,21 @@ class RestoreOperationExecutor
     public function execute(RestoreOperation $operation): void
     {
         $operationId = $operation->id;
+        $deadline = new RestoreDeadline((int) config('backup-storage.restore_operation_deadline', 3600));
 
         try {
+            $this->phase($operationId, 'extracting', $deadline);
             $this->assertArchiveIsSafe($operation->archive_path);
 
             $extractionDirectory = rtrim((string) config('backup-storage.root'), '/').'/restore-extract/'.$operation->id;
             File::deleteDirectory($extractionDirectory);
             File::ensureDirectoryExists($extractionDirectory, 0700, true);
-            $this->journal->record($operationId, 'extracting');
             $extractCommand = str_ends_with($operation->archive_path, '.gz')
                 ? ['tar', '-xzf', $operation->archive_path, '--no-same-owner', '--no-same-permissions', '-C', $extractionDirectory]
                 : ['tar', '-xf', $operation->archive_path, '--no-same-owner', '--no-same-permissions', '-C', $extractionDirectory];
             $this->commandRunner->run($extractCommand);
 
-            $this->journal->record($operationId, 'snapshotting');
+            $this->phase($operationId, 'snapshotting', $deadline);
             $snapshotDirectory = $this->snapshotDirectory($operation);
             $this->snapshotSelectedFiles($snapshotDirectory, $operation->scopes);
 
@@ -63,15 +64,15 @@ class RestoreOperationExecutor
             $this->commandRunner->run(['php', 'artisan', 'down']);
 
             $archiveRoot = $this->archiveRoot($extractionDirectory);
-            $this->journal->record($operationId, 'importing');
+            $this->phase($operationId, 'importing', $deadline);
             $this->snapshotDatabase($snapshotDirectory, $operation->scopes);
             $this->restoreDatabase($archiveRoot, $operation->scopes);
             $this->reconcileRestoredBackupStatus($operation);
-            $this->journal->record($operationId, 'restoring-files');
+            $this->phase($operationId, 'restoring-files', $deadline);
             $this->restoreFiles($archiveRoot, $operation->scopes);
-            $this->journal->record($operationId, 'migrating');
+            $this->phase($operationId, 'migrating', $deadline);
             $this->commandRunner->run(['php', 'artisan', 'migrate', '--force']);
-            $this->journal->record($operationId, 'reconciling');
+            $this->phase($operationId, 'reconciling', $deadline);
             $this->commandRunner->run(['php', 'artisan', 'backups:reconcile-restore-journal', '--operation='.$operationId]);
             $operation->refresh();
             $this->commandRunner->run(['php', 'artisan', 'optimize:clear']);
@@ -322,6 +323,19 @@ class RestoreOperationExecutor
     }
 
     /**
+     * Refuse a spent budget and record the phase with its remaining time.
+     */
+    private function phase(string $operationId, string $phase, RestoreDeadline $deadline): void
+    {
+        $deadline->assertRemaining();
+
+        $this->journal->record($operationId, $phase, [
+            'deadline_at' => $deadline->expiresAt()->toIso8601String(),
+            'remaining_seconds' => $deadline->remainingSeconds(),
+        ]);
+    }
+
+    /**
      * Export the current MySQL or MariaDB database before a database restore.
      *
      * @param  list<string>  $scopes
@@ -333,11 +347,21 @@ class RestoreOperationExecutor
         }
 
         $connection = config('database.connections.'.config('database.default'));
+        $isSqlite = ((string) ($connection['driver'] ?? '')) === 'sqlite';
         $database = (string) ($connection['database'] ?? '');
         $snapshotPath = $snapshotDirectory.'/database.sql';
-        $command = ['mysqldump', '--host='.(string) ($connection['host'] ?? '127.0.0.1'), '--port='.(string) ($connection['port'] ?? '3306'), '--user='.(string) ($connection['username'] ?? 'root'), '--single-transaction', '--quick', '--routines', '--triggers', $database];
-        $output = $this->commandRunner->run($command, environment: $this->databaseEnvironment($connection));
-        File::put($snapshotPath, $output);
+
+        if ($isSqlite) {
+            // sqlite3 writes its dump to stdout and accepts no output flag.
+            $output = $this->commandRunner->run(['sqlite3', $database, '.dump']);
+            File::put($snapshotPath, $output);
+
+            return;
+        }
+
+        // The client writes the file itself, so the dump never lives in memory.
+        $command = ['mysqldump', '--host='.(string) ($connection['host'] ?? '127.0.0.1'), '--port='.(string) ($connection['port'] ?? '3306'), '--user='.(string) ($connection['username'] ?? 'root'), '--single-transaction', '--quick', '--routines', '--triggers', '--result-file='.$snapshotPath, $database];
+        $this->commandRunner->run($command, environment: $this->databaseEnvironment($connection));
     }
 
     /**
@@ -359,7 +383,20 @@ class RestoreOperationExecutor
 
         $connection = config('database.connections.'.config('database.default'));
         $command = ['mysql', '--host='.(string) ($connection['host'] ?? '127.0.0.1'), '--port='.(string) ($connection['port'] ?? '3306'), '--user='.(string) ($connection['username'] ?? 'root'), (string) ($connection['database'] ?? '')];
-        $this->commandRunner->run($command, File::get($dumpPath), $this->databaseEnvironment($connection));
+
+        // Stream the dump through a file handle: Symfony's Process::setInput()
+        // accepts a resource, so a multi-gigabyte dump never enters PHP memory.
+        $handle = fopen($dumpPath, 'rb');
+
+        if ($handle === false) {
+            throw new RuntimeException('The restore database dump could not be opened.');
+        }
+
+        try {
+            $this->commandRunner->run($command, $handle, $this->databaseEnvironment($connection));
+        } finally {
+            fclose($handle);
+        }
     }
 
     /**

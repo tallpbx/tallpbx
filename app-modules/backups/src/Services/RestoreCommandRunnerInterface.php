@@ -13,6 +13,9 @@ interface RestoreCommandRunnerInterface
      * Run an argument-safe command and return its standard output.
      *
      * @param  list<string>  $command
+     * @param  string|resource|null  $input  A stream is forwarded to the process
+     *                                       unchanged; `resource` is not a legal
+     *                                       native parameter type.
      */
-    public function run(array $command, ?string $input = null, array $environment = []): string;
+    public function run(array $command, mixed $input = null, array $environment = []): string;
 }
