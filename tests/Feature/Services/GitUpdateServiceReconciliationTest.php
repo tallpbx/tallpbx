@@ -43,6 +43,9 @@ final class RecordingUpdateRunner implements ProcessRunner
     /** @var list<array<int, string>> */
     public array $commands = [];
 
+    /**
+     * Serve a clean, up-to-date repository for every git query.
+     */
     public function run(array $argv, ?string $cwd = null, ?int $timeoutSeconds = null, array $env = []): ProcessResult
     {
         $this->commands[] = $argv;

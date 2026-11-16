@@ -151,11 +151,12 @@ it('rejects an empty payload', function () {
     expect($this->spy->ingested)->toBe([]);
 });
 
-it('isolates the stream on redis database 3 without a key prefix', function () {
-    // The unprefixed key keeps the stream literally "pbx:cdr:stream" for
-    // operational tooling sees the literal stream key.
+it('isolates the stream on its own redis database without a key prefix', function () {
+    // The unprefixed key keeps the stream literally "pbx:cdr:stream" so
+    // operational tooling sees the literal stream key. Tests run against the
+    // dedicated test workspace (12), never the appliance's database 3.
     expect(config('database.redis.cdr'))->toMatchArray([
-        'database' => '3',
+        'database' => '12',
         'prefix' => '',
     ]);
 });

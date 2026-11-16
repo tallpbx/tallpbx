@@ -360,6 +360,9 @@ it('persists the SQLite dump from the command output', function (): void {
         /** @var array<string, string> */
         public array $env = [];
 
+        /**
+         * Capture the dump command and return a scripted SQL payload.
+         */
         public function run(
             array $argv,
             ?string $cwd = null,

@@ -8,7 +8,6 @@ use App\Services\Cdr\CdrBatchWriter;
 use App\Services\Cdr\CdrPayloadParser;
 use App\Services\Cdr\CdrRedisIngest;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 /*
@@ -78,7 +77,8 @@ class TestableCdrIngest extends CdrRedisIngest
      */
     public function __construct(CdrPayloadParser $parser, public FakeCdrStream $stream)
     {
-        parent::__construct($parser, new CdrBatchWriter);
+        // Resolve through the container so a test can bind a scripted writer.
+        parent::__construct($parser, app(CdrBatchWriter::class));
     }
 
     /**
@@ -164,28 +164,29 @@ it('updates instead of duplicating when the same record is digested again', func
         ->and($rows->first()->billsec)->toBe(42);
 });
 
-it('keeps every entry when the MariaDB transaction fails', function () {
-    // A row that cannot be inserted aborts the whole batch transaction.
-    $parser = new class('') extends CdrPayloadParser
+it('keeps every entry when the MariaDB transaction fails transiently', function () {
+    // A lost connection (SQLSTATE HY000) is not a record defect: the whole
+    // batch must be re-thrown so every source entry is retried.
+    $this->app->instance(CdrBatchWriter::class, new class extends CdrBatchWriter
     {
         /**
-         * Return a row that cannot be inserted, to abort the batch transaction.
+         * Simulate a transient outage on every write.
+         *
+         * @param  array<int, array<string, mixed>>  $rows
+         * @return array<int, string>
          */
-        public function parse(string $rawJson): ?array
+        public function write(array $rows): array
         {
-            return [
-                'id' => null,
-                'tenant_id' => 1,
-                'call_uuid' => 'not-insertable',
-                'leg' => 'a',
-                'json_data' => $rawJson,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ];
+            throw new QueryException(
+                'sqlite',
+                'insert into "cdrs" ...',
+                [],
+                new PDOException('SQLSTATE[HY000]: General error: connection lost', 2006),
+            );
         }
-    };
+    });
 
-    $driver = cdrDigestDriver($parser);
+    $driver = cdrDigestDriver();
     $driver->stream->add('1-1', cdrDigestPayload('a', $this->tenant->id));
 
     expect(fn () => $driver->digest(100))->toThrow(QueryException::class);

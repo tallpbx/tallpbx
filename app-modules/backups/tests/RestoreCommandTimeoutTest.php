@@ -65,6 +65,9 @@ it('streams the database dump into the client instead of buffering it', function
         /** @var array<int, bool> */
         public array $streamed = [];
 
+        /**
+         * Record whether the input arrived as a stream.
+         */
         public function run(array $command, mixed $input = null, array $environment = []): string
         {
             // Recorded while the handle is still open: the executor closes it

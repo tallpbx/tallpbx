@@ -682,8 +682,11 @@ it('installs the restore request dispatcher without granting the web worker syst
 
     expect($tallScript)->toContain('install -d -m 0770 -o root -g www-data /var/lib/tallpbx/restore-requests')
         ->and($tallScript)->toContain('systemctl enable --now tallpbx-restore-dispatch.path')
-        ->and($dispatcher)->toContain('systemctl start "tallpbx-restore@${operation_id}.service"')
+        ->and($dispatcher)->toContain('start "tallpbx-restore@${operation_id}.service"')
         ->and($dispatcher)->toContain('*.request')
+        // The dispatcher takes its systemctl binary from the environment so it
+        // can be exercised with a fake service manager in tests.
+        ->and($dispatcher)->toContain('TALLPBX_SYSTEMCTL')
         ->and($pathUnit)->toContain('PathChanged=/var/lib/tallpbx/restore-requests');
 });
 

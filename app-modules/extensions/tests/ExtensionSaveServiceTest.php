@@ -32,18 +32,30 @@ afterEach(function (): void {
 it('rolls the whole save back when the SIP account step fails', function (): void {
     $this->app->instance(SipAccountServiceInterface::class, new class implements SipAccountServiceInterface
     {
+        /**
+         * Fail the provisioning step.
+         */
         public function create(array $data): SipAccount
         {
             throw new RuntimeException('SIP account provisioning failed.');
         }
 
+        /**
+         * Fail the provisioning step.
+         */
         public function update(SipAccount $account, array $data): SipAccount
         {
             throw new RuntimeException('SIP account provisioning failed.');
         }
 
+        /**
+         * Nothing to delete in this fake.
+         */
         public function delete(SipAccount $account): void {}
 
+        /**
+         * No accounts exist in this fake.
+         */
         public function getByTenant(int $tenantId): Collection
         {
             return new Collection;

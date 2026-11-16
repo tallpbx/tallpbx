@@ -19,6 +19,9 @@ it('reinstalls Node dependencies from the restored lockfile before rebuilding', 
         /** @var list<array<int, string>> */
         public array $commands = [];
 
+        /**
+         * Record the command and fail the build step.
+         */
         public function run(array $argv, ?string $cwd = null, ?int $timeoutSeconds = null, array $env = []): ProcessResult
         {
             $this->commands[] = $argv;

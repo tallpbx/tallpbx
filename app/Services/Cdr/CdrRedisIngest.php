@@ -73,9 +73,12 @@ class CdrRedisIngest
 
             $batch = [];
             $processedIds = [];
+            $rawByEntry = [];
+            $rowByEntry = [];
 
             foreach ($entries as $entryId => $fields) {
                 $raw = $fields['data'] ?? '';
+                $rawByEntry[(string) $entryId] = $raw;
                 $row = $this->parser->parse($raw);
 
                 if ($row === null) {
@@ -88,12 +91,35 @@ class CdrRedisIngest
                 }
 
                 $batch[] = $row;
+                $rowByEntry[(string) $entryId] = $row;
                 $processedIds[] = (string) $entryId;
             }
 
-            // One transaction for the batch; a failure keeps every entry so
-            // the next cycle retries the same records.
-            $this->writer->write($batch);
+            // One transaction for the batch; a transient failure keeps every
+            // entry so the next cycle retries the same records. A deterministic
+            // rejection reports the offending ids instead.
+            $failedIds = $this->writer->write($batch);
+
+            if ($failedIds !== []) {
+                $failed = array_flip(array_map('strval', $failedIds));
+
+                $processedIds = array_values(array_filter(
+                    $processedIds,
+                    fn (string $entryId): bool => ! isset($failed[(string) ($rowByEntry[$entryId]['id'] ?? '')]),
+                ));
+
+                // Preserve each rejected payload on disk before retiring its
+                // entry. An entry whose copy failed stays in the stream.
+                foreach ($rowByEntry as $entryId => $row) {
+                    if (! isset($failed[(string) ($row['id'] ?? '')])) {
+                        continue;
+                    }
+
+                    if ($this->parser->quarantine((string) $entryId, $rawByEntry[$entryId] ?? '{}')) {
+                        $processedIds[] = (string) $entryId;
+                    }
+                }
+            }
 
             // Deleting only after the commit is what makes a crash between
             // commit and XDEL a replay instead of data loss.

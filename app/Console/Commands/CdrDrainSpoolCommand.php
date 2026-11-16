@@ -52,6 +52,7 @@ class CdrDrainSpoolCommand extends Command
 
         $rows = [];
         $drainable = [];
+        $rowIdByFile = [];
         $quarantined = 0;
         $skipped = 0;
 
@@ -86,21 +87,38 @@ class CdrDrainSpoolCommand extends Command
 
             $rows[] = $row;
             $drainable[] = $file;
+            $rowIdByFile[$file] = (string) ($row['id'] ?? '');
         }
 
         try {
-            // One transaction for the batch: a failure keeps every file so the
-            // next run retries the same records.
-            $writer->write($rows);
+            // One transaction for the batch: a transient failure keeps every
+            // file so the next run retries the same records.
+            $failedIds = $writer->write($rows);
         } catch (Throwable $exception) {
             $this->error('CDR spool drain failed: '.$exception->getMessage());
 
             return self::FAILURE;
         }
 
+        $failed = array_flip($failedIds);
         $drained = 0;
 
         foreach ($drainable as $file) {
+            if (isset($failed[$rowIdByFile[$file] ?? ''])) {
+                // A record the database rejected on its own merits is preserved
+                // in quarantine, exactly like an unparseable payload. Deleting
+                // it here would lose it without a trace.
+                if ($parser->quarantine(basename($file), (string) file_get_contents($file)) && @unlink($file)) {
+                    $quarantined++;
+
+                    continue;
+                }
+
+                Log::warning('CDR spool quarantine failed; rejected file kept.', ['file' => $file]);
+
+                continue;
+            }
+
             if (@unlink($file)) {
                 $drained++;
             } else {

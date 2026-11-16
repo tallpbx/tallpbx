@@ -113,6 +113,9 @@ it('warns instead of failing when an enabled optional unit does not return', fun
 
         private int $isActiveCalls = 0;
 
+        /**
+         * Serve the scripted systemd and fs_cli responses.
+         */
         public function run(array $argv, ?string $cwd = null, ?int $timeoutSeconds = null, array $env = []): ProcessResult
         {
             $this->commands[] = $argv;

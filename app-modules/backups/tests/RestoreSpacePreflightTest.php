@@ -21,8 +21,14 @@ function makeRestoreSpaceExecutor(float $archiveMemberBytes, array $freeSpace): 
 {
     $runner = new class($archiveMemberBytes) implements RestoreCommandRunnerInterface
     {
+        /**
+         * Remember the member size this listing reports.
+         */
         public function __construct(private readonly float $bytes) {}
 
+        /**
+         * Report one archive member with the configured size.
+         */
         public function run(array $command, mixed $input = null, array $environment = []): string
         {
             return sprintf(
