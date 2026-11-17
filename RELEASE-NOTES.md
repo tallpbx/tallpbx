@@ -7,6 +7,33 @@ every operational detail (migrations, `.env` keys, service restarts), lives in
 release prepends its section here at cut time; the GitHub Release body for a
 tag is its section from this file.
 
+## v5.3.0 (2026-11-16)
+
+Closes the full 2026-11 audit remediation (`T01`–`T03`, `C01`–`C05`, `O01`–`O08`, `D01`–`D10`, `M01`–`M02`) and subsequent implementation hardening across authentication, multi-tenant call records, backup and restore, updates, extension management, documentation, and test safety.
+
+**Authentication and multi-tenant isolation**
+
+- Disabled administrators and tenant users are now rejected consistently across panel requests, Livewire actions, impersonation sessions, and authorization gates, and disabling an account rotates its remember-me token so prior cookies cannot restore access.
+- Every tenant edit form now derives and re-pins the tenant from the authorized context across mounts, Livewire requests, and property updates, and extension user assignment is bounded to the extension's own tenant.
+- Saving an extension now writes the extension, portal users, SIP account, and voicemail in a single database transaction before invalidating routing caches.
+
+**Call detail records (CDR)**
+
+- CDR tenant ownership now relies strictly on call-time identity (channel-local `tenant_id` and tenant dialplan context) rather than current domain mappings, while direct bridge legs carry explicit per-leg `[tenant_id=<id>]` variables and unattributable or conflicting payloads are quarantined.
+- Call records now show a tenant-relative direction (`internal`, `inbound`, or `outbound`) derived from the paired leg in the CDR list, detail view, and CSV export, using batch peer preloading to avoid N+1 queries; unpaired B-legs report `unknown`.
+- Poison CDR records with deterministic database constraint errors are isolated and quarantined individually while valid neighbours commit, and `tenant_id` is write-once on replay.
+
+**Backup, restore, and appliance updates**
+
+- Privileged restores now maintain an external, root-only journal (`/var/lib/tallpbx/restore-journal/`) with an offline status command (`sudo tallpbx-restore-status`) and post-import database reconciliation (`backups:reconcile-restore-journal`), atomic request claiming with crash recovery, streamed SQL dumps using `MYSQL_PWD` off argv, pre-flight disk-space checks, a 2 GB decimal upload ceiling, top-level app-file restoration, per-command and whole-operation deadlines, and maintenance-mode protection if post-restore service health checks fail.
+- Web updates now resolve explicit branch/tag refs cleanly, restore the Node dependency graph (`npm ci`) before rollback builds, and restart resident PHP workers (`freeswitch-listener`, `tallpbx-queue`, `tallpbx-scheduler`, `tallpbx-cdr-worker`, `tallpbx-reverb`, and optional `tallpbx-xml-worker`) through a bounded, no-argument root helper (`/usr/local/sbin/tallpbx-update-workers`), reporting failures rather than returning false success.
+- **Upgrade notes**: run `tpbx migrate` for the new `restore_operations` requester-snapshot columns; run `sudo bash /var/www/tallpbx/scripts/resources/install-update-workers.sh` once on existing appliances before using the web updater; and reinstall `tallpbx-restore@.service` from `scripts/resources/tallpbx-restore.service` with `systemctl daemon-reload` for the restore unit hard stop.
+
+**Documentation, architecture, and test isolation**
+
+- Added `docs/provisioning-guide.md`, `docs/backup-restore-guide.md`, `docs/developer-guide.md`, and `docs/release-checklist.md`, plus a README audience map, and aligned environment, firewall, load-testing, and module-convention documentation with actual behaviour (`FS_SERVER` scheme stripping, `pbx:load-test:seed` realm fallback, explicit module routes, consolidated `ModuleViewName`).
+- Isolated Pest CDR Redis tests on `REDIS_CDR_DB=12` and expanded PHPUnit coverage scope to include `app-modules/*/src`.
+
 ## v5.2.0 (2026-11-12)
 
 - New optional `.env` key `PHP_FPM_MAX_CHILDREN` pins the PHP worker ceiling so a published benchmark tier can be reproduced on differently sized hardware; left unset, nothing changes.
