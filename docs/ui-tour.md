@@ -32,7 +32,7 @@ TallPBX uses a single unified panel architecture (`/panel/`) for both system adm
 Users can customize their navigation layout and color theme (Light, Dark, System) via the unified display settings menu in the header. Preferences are instantly dispatched to Alpine.js, rendered with zero flicker, and saved to the database.
 
 ### Mode A: Full Sidebar Navigation (`w-64`)
-The default desktop layout provides an expansive sidebar organized by functional PBX domains (Accounts, Connectivity, Call Routing, PBX Features, Media, Operations, and Administration) with preserved scroll position across navigation.
+The default desktop layout provides an expansive sidebar organized by functional PBX domains (Accounts, Connectivity, Call Routing, Features, Media, Advanced, and Monitoring) with preserved scroll position across navigation.
 
 ![TallPBX Dashboard — Full Sidebar Layout](images/dashboard-full-sidebar.png)
 

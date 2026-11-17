@@ -170,7 +170,7 @@ During module boot, `App\Support\ModuleServiceProvider` validates that module la
 - **Fail-Fast Enforcement**:
   - In `local` and `testing` environments: throws a `LogicException`:
     ```
-    Module [gateways] language file [admin] collides with root dictionary for key(s): [save, delete]. Refusing to load.
+    Module [gateways] language file collides with root dictionary for key(s): [save, delete]. Refusing to load module cascading path.
     ```
   - In `production`: logs a critical alert to `Log::critical()` and skips loading the colliding module file, protecting the integrity of the root dictionary.
 
@@ -361,12 +361,12 @@ This pattern ensures keys remain compact, fixed-length strings in Redis DB 1 whi
 
 #### 4. Separation of Roles: Invalidation Correctness vs. TTL Memory Bounding
 TallPBX decouples cache freshness from cache expiration:
-- **The Version Bump Owns Correctness**: When any telephony record (extension, dialplan, gateway, translation, limit, PIN) is created, updated, or deleted, `RoutingCacheObserver` or the corresponding service invokes `RoutingCacheVersion::bump($tenantId)`. This atomically increments the tenant's integer version in Redis (`tallpbx:cache:routing-version:{tenantId}`). Because the current version is embedded directly into the SHA-1 key hash, all existing keys for that tenant are instantly bypassed on the next request. Lookups immediately result in a cache miss, rebuilding fresh XML from MariaDB with zero stale reads. Administrative and API changes take effect on the very next call leg.
+- **The Version Bump Owns Correctness**: When any telephony record (extension, dialplan, gateway, translation, limit, PIN) is created, updated, or deleted, `RoutingCacheObserver` or the corresponding service invokes `RoutingCacheVersion::bump($tenantId)`. This atomically increments the tenant's integer version under `freeswitch:routing-version:{tenantId}` (with `CACHE_PREFIX`/`REDIS_PREFIX`). Because the current version is embedded directly into the SHA-1 key hash, all existing keys for that tenant are instantly bypassed on the next request. Lookups immediately result in a cache miss, rebuilding fresh XML from MariaDB with zero stale reads. Administrative and API changes take effect on the very next call leg.
 - **The TTL Bounds Memory and Garbage Collection**: The time-to-live (TTL) serves solely to bound memory consumption in Redis and evict abandoned or superseded keys via standard Redis expiration (`volatile-lru`). Telephony routing edits never wait for the TTL window to expire.
 
 In v4.2.0, the default `FS_XML_HANDLER_CACHE_TTL` was raised from 5 seconds to 60 seconds because versioned cache invalidation guarantees instant freshness on writes. For configuration details and environment variables, refer to [Environment Reference Guide §2.2](env-reference.md#22-telephony-xml-handler--dynamic-dialplan-engine); for benchmark methodologies and production tuning guidance, see the load-testing documentation ([Load Testing Results](load-testing-results.md) and [Load Testing Guide](load-testing-guide.md)).
 
-**Identity answers need their own epoch.** The cached answer to *which tenant owns this username* — `TenantIdentity` in DB 1 — cannot embed a tenant revision, because that answer is what selects the tenant. It carried only a 60-second TTL, so a SIP account or tenant domain moved to another tenant could keep resolving to its previous owner until the TTL expired: a cross-tenant boundary rather than a stale document. Both keys now embed the **global routing revision as an identity epoch** (`…:e<epoch>`); `RoutingCacheObserver` bumps the global revision on every `SipAccount` and `TenantDomain` write, and a missing or non-numeric epoch is a miss, never a default. The accepted cost is that the global revision also salts dialplan keys, so an account or domain edit invalidates each tenant's dialplan once on its next request. `TenantIdentityResolverTest` covers account and domain re-homing, and `RoutingCacheObserverTest` covers the bumps.
+**Identity answers need their own epoch.** The cached answer to *which tenant owns this username* — `TenantIdentity` in DB 1 — cannot embed a tenant revision, because that answer is what selects the tenant. It carried only a 60-second TTL, so a SIP account or tenant domain moved to another tenant could keep resolving to its previous owner until the TTL expired: a cross-tenant boundary rather than a stale document. Both keys (`freeswitch:tenant-identity:{type}:{sha1}`) hash the **global routing revision** into the SHA-1 digest; `RoutingCacheObserver` bumps the global revision on every `SipAccount` and `TenantDomain` write, and `RoutingCacheVersion::getGlobal()` defaults to `0` when no revision key is cached yet. The accepted cost is that the global revision also salts dialplan keys, so an account or domain edit invalidates each tenant's dialplan once on its next request. `TenantIdentityResolverTest` covers account and domain re-homing, and `RoutingCacheObserverTest` covers the bumps.
 
 #### 5. Request Flow & Invalidation Sequence
 
@@ -444,10 +444,10 @@ TallPBX compiles an optimized, multi-stage Linux kernel firewall ruleset using n
 
 ## 9. Inbound Pipeline Stages Detailed
 
-The Linux kernel evaluates rules strictly in order across **13 deterministic stages**:
+The Linux kernel evaluates rules strictly in order across the compiled `chain input` pipeline (`SecurityConfigGenerator`):
 
-### 1. Pre-Filter Pipeline (Stages 1–8)
-Toggled as an administrative unit in the **Firewall Rules** tab. Rule 1 (Loopback) is pinned first as an immutable kernel invariant; the next six stages (rules 2–7) are reorderable by administrators (with safety guards preventing drop stages from preceding the whitelist), and the Geo-Blocking row is the fixed 8th pre-filter rule:
+### 1. Pre-Filter Pipeline (Stages 1–7)
+Toggled as an administrative unit in the **Firewall Rules** tab. Rule 1 (Loopback) is pinned first as an immutable kernel invariant; the next six stages (rules 2–7) are reorderable by administrators (with safety guards preventing drop stages from preceding the whitelist). *(In the UI, the Geo-Blocking row is displayed alongside this table, though in the compiled ruleset it runs after ICMP and TFTP so disabling the Pre-Filters switch never turns off country blocking.)*
 1. **Loopback Interface (`iif "lo" accept`)**: Unconditional access for server processes (PHP-FPM to MariaDB, Redis, and FreeSWITCH ESL). Pinned first with a lock icon; cannot be reordered.
 2. **Trusted Whitelist (`@whitelist_ips accept`)**: Admin IPs, office subnets, and SIP carrier interconnects bypass all lower drop checks.
 3. **Invalid Packet State (`ct state invalid drop`)**: Corrupted headers and illegal TCP flag combinations are discarded immediately.
@@ -455,14 +455,14 @@ Toggled as an administrative unit in the **Firewall Rules** tab. Rule 1 (Loopbac
 5. **Permanent Blacklist (`@blacklist_ips drop`)**: Explicitly forbidden IPs/CIDRs dropped at line rate via kernel interval trees.
 6. **Active Intrusion Bans (`@banned_ips drop`)**: Dynamic hardware-timed bans triggered by authentication failures or scanner probes.
 7. **External Blocklists (`@external_blocklist_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL) dropped at the perimeter.
-8. **Geo-Blocking Perimeter (`jump geo_perimeter`)**: Pure drop filter that traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through; it never issues an unconditional accept.
 
-### 2. Diagnostics, Protocol Defense & Perimeter Filtering (Kernel Stages 9–10)
-9. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
-10. **Hardened TFTP Defense Profile (UDP 69)**: Protects phone provisioning by dropping upload requests (WRQ opcode 2), directory traversal probes (`../`, `/x`), and flood requests.
+### 2. Diagnostics, Protocol Defense & Geo-Perimeter (Stages 8–9.5)
+8. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
+9. **Hardened TFTP Defense Profile (UDP 69)**: Protects phone provisioning by dropping upload requests (WRQ opcode 2), directory traversal probes (`../`, `/x`), and flood requests.
+10. **Geo-Blocking Perimeter (`jump geo_perimeter`)**: Compiled after TFTP defense outside `$prefilterEnabled`; traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through; it never issues an unconditional accept.
 
-### 3. Service Catalog & Fallback (Kernel Stages 11–13)
-11. **Core PBX Port Catalog**: Explicit allow rules for SIP (5060/5061/5080), RTP Audio (16384–32768), Web Admin (80/443), and SSH (22).
+### 3. Service Catalog & Fallback (Stages 10–12)
+11. **Core PBX Port Catalog**: Explicit allow rules for SIP (5060/5061/5080), RTP Audio (16384–32768), Web Admin (80/443), Reverb WebSockets (8080), WebRTC WSS (7443), TFTP Provisioning (69), and SSH (22).
 12. **Custom Sequential Rules**: User-defined rules evaluated in assigned priority order (first match wins).
 13. **Default Inbound Policy**: Final fallback verdict (`Drop` or `Accept`; forced to `Accept` in Global Observe Mode).
 
@@ -524,15 +524,15 @@ sequenceDiagram
 ### 11.1 Redis Decoupling & Graceful Degradation
 
 - **Standalone Redis 4-Tier Keyspace Isolation**: TallPBX structures its Redis deployment across isolated database indexes:
-  - **DB 0 — Coordination, Queues, Locks, Rate Limiters, & Security State (`REDIS_DB=0`)**: Default connection used for atomic distributed mutex locks (`tallpbx_database_lock:*`), queue jobs, intrusion detection sliding-window counters, scanner dedup sets, and event broadcasting.
-  - **DB 1 — Disposable Application Cache (`REDIS_CACHE_DB=1`)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`tallpbx-cache-` prefix, `allkeys-lru` eviction). Cleared aggressively during `tpbx optimize:clear` or XML cache sweeps without touching session or security state. See §7.5 for the complete layered cache architecture, key composition, and `RoutingCacheVersion` immediate invalidation flow.
+  - **DB 0 — Coordination, Queues, Locks, Rate Limiters, & Security State (`REDIS_DB=0`)**: Default connection (`tallpbx-database-` prefix) used for atomic distributed mutex locks, optional Redis queue jobs, intrusion detection sliding-window counters, scanner dedup sets, and event broadcasting.
+  - **DB 1 — Disposable Application Cache (`REDIS_CACHE_DB=1`)**: Telephony XML dialplan caches, contributor fragments, and general application caches (`tallpbx-cache-` prefix). Cleared aggressively during `tpbx optimize:clear` or XML cache sweeps without touching session or security state. See §7.5 for the complete layered cache architecture, key composition, and `RoutingCacheVersion` immediate invalidation flow.
   - **DB 2 — Stateful HTTP Sessions (`REDIS_SESSION_DB=2`)**: User and administrator web sessions (`SESSION_CONNECTION=session`). Completely decoupled from cache flushes so background sweeps, module syncs, and web Git updates never evict active logins.
   - **DB 3 — Durable CDR Ingestion Stream (`REDIS_CDR_DB=3`)**: Hosts the `pbx:cdr:stream` Redis Stream written by `public/cdr-fast.php` and consumed by `tpbx cdr:work`.
-  - **DB 13–15 (Isolated Test Workspaces)**: Confined execution for automated unit, feature, and browser test suites (`tallpbx-test-*`), ensuring tests never mutate or wipe production keyspaces.
+  - **DB 12–15 (Isolated Test Workspaces)**: Confined execution for automated unit, feature, and browser test suites (`tallpbx-test-`: `REDIS_CDR_DB=12`, `REDIS_SESSION_DB=13`, `REDIS_CACHE_DB=14`, `REDIS_DB=15`), ensuring tests never mutate or wipe production keyspaces.
 - **Direct Redis Communication**: TallPBX's intrusion detection engine (`SecurityIncidentService`) talks directly to Redis via `Illuminate\Support\Facades\Redis` facade (`Redis::incr()`, `expire()`), bypassing Laravel's general `CACHE_STORE`. Configuring `CACHE_STORE=file` or `database` in `.env` does not alter or disable intrusion tracking.
 - **Zero Database Load**: In-flight failure counters live strictly in Redis memory, preventing MariaDB lock contention during brute-force floods.
 - **Memory Ceiling & LRU Eviction Policy**: Fresh installs configure Redis with `maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`. Each sliding-window attack key has an automatic 10-minute TTL and is deleted immediately once an IP is banned. If a distributed botnet floods millions of attack packets, Redis evicts expired and least-recently-used volatile keys, keeping memory bounded without rejecting commands or risking host OOM events.
-- **Asynchronous Incident Broadcasting**: Real-time intrusion events (`SecurityIncidentLogged`) implement `ShouldBroadcast` and are queued asynchronously over Redis/Laravel queues rather than dispatched synchronously. This decouples intrusion logging from WebSocket handshakes, ensuring attack floods never consume or stall PHP-FPM web workers.
+- **Asynchronous Incident Broadcasting**: Real-time intrusion events (`SecurityIncidentLogged`) implement `ShouldBroadcast` and are queued asynchronously via Laravel queues (`QUEUE_CONNECTION=database` by default) rather than dispatched synchronously. This decouples intrusion logging from WebSocket handshakes, ensuring attack floods never consume or stall PHP-FPM web workers.
 - **Bounded Active Ban Retrieval in Management UI**: In the Security Center (`/panel/security?tab=attackers`), active ban table queries are bounded to the 100 most recent entries (`getActiveBans(100)`), paired with a lightweight database aggregation (`totalActiveBans()`) for the header counter badge. This prevents web process memory spikes when tens of thousands of active IP bans exist simultaneously.
 - **Fail-Open Resilience**: If Redis is stopped or unreachable, PBX and telephony operations continue uninterrupted (no 500 errors). Kernel firewall rules, whitelists, and manual bans remain 100% active. Sliding-window counters and automated bans automatically resume when Redis is restored.
 
@@ -562,7 +562,7 @@ Pinned directly above the tab strip for immediate visibility:
 
 ### The Five Security Center Tabs
 
-#### Tab 1: Firewall Rules (`?tab=rules`)
+#### Tab 1: Firewall Rules (`?tab=firewall-rules`)
 * **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (pinned loopback rule 1 with lock icon, rules 2–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the fixed Geo-Blocking rule 8 companion row):
   - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
   - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon (cannot be moved or reordered), guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
@@ -574,7 +574,7 @@ Pinned directly above the tab strip for immediate visibility:
 * **Custom Sequential Rules**: Custom port and network rules with priority reordering (Up/Down buttons). Viewport-sticky horizontal floating arrows and header quick-scroll buttons assist in navigation on wide viewports.
 * **Default Inbound Policy**: Final fallback decision (`Drop` or `Accept`).
 
-#### Tab 2: Allow & Block Lists (`?tab=lists`)
+#### Tab 2: Allow & Block Lists (`?tab=block-allow`)
 * **Trusted Whitelist**: IP addresses and subnets exempt from all packet filtering (`@whitelist_ips` / `@whitelist_ips6`). Includes a 1-click self-protection button to automatically whitelist the current administrator's connection IP.
 * **Permanent Blacklist**: Forbidden IP addresses and CIDR subnets dropped at line rate via kernel interval trees (`@blacklist_ips` / `@blacklist_ips6`). Features CIDR mask validation and instant search.
 
@@ -589,7 +589,7 @@ Pinned directly above the tab strip for immediate visibility:
 * **Incident History & Audit Trail**: Real-time log of security events and threshold triggers.
 * **Queue Worker Requirement**: Security incident listeners (`LogFailedSipAuthListener`, `LogSipScannerListener`) run asynchronously via Laravel queued events (`ShouldQueue`) routed to `FS_ESL_QUEUE_NAME`. The host background worker (`tallpbx-queue`) must remain running (`systemctl status tallpbx-queue`) with active listeners on `--queue=freeswitch-events,default` to guarantee that detected attack thresholds trigger automated kernel bans (`@banned_ips` and `@banned_ips6`).
 
-#### Tab 4: External Blocklists (`?tab=blocklists` or `?tab=feeds`)
+#### Tab 4: External Blocklists (`?tab=external-blocklists` or `?tab=threat-feeds`)
 * **Public Threat Feeds (VoIPBL)**: Automated ingestion of public blocklists identifying active VoIP fraud and brute-force scanning networks.
 * **Fail-Open Contract**: Feed downloads are memory-bounded and stream-parsed. If a download fails or is malformed, existing kernel entries remain untouched so the server is never left unprotected.
 * **Drop Counters & Emergency Escape**: Live per-feed kernel drop counters, on-demand "Sync Now" action, and a prominent "Remove all feed blocks" button in case of upstream false positives.

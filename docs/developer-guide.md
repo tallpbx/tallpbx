@@ -44,9 +44,9 @@ The application is a modular monolith under `app-modules/<name>/`.
 | :--- | :--- |
 | Provider | Extends `App\Support\ModuleServiceProvider` and overrides `moduleName()` and `moduleNamespace()` |
 | Manifest | `module.json` declares `name`, `version`, `category`, `protected`, and `requirements.modules` for every cross-module class reference |
-| Routes | Every built-in module ships `routes/web.php` with `web`, `auth.panel`, and a throttle; auto-registration is retired |
+| Routes | Every built-in module ships `routes/web.php` (`web`, `auth.panel`, and a throttle on panel routes; core modules whose routes live in root `routes/web.php` keep a stub file); auto-registration is retired |
 | Views | Resolved as `{module-dir}::{kebab-view}` from the Livewire class name |
-| Translations | `lang/{en,es,fr}/admin.php`, module-prefixed keys, merged into the global `admin` group, never `module::admin.*` |
+| Translations | When the module defines translations, `lang/{en,es,fr}/admin.php` with module-prefixed keys, merged into the global `admin` group, never `module::admin.*` |
 | Tests | `app-modules/<name>/tests/*Test.php`, discovered by the `phpunit.xml` glob; cross-module integration tests live in root `tests/` |
 | Navigation | `module.json` `category` must equal the sidebar `parent` in the provider |
 

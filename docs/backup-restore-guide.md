@@ -115,7 +115,7 @@ requester's name and email captured at request time.
 | :--- | :--- | :--- |
 | Preflight | Nothing was touched | Not needed |
 | Extract or snapshot | Nothing destructive ran; maintenance mode was never entered | Not needed |
-| Import | Database and/or files replaced; maintenance mode is **on** and stays on | **Manual** — restore the snapshot from `pre_restore_snapshot_path`, then `tpbx artisan up` |
+| Import | Database and/or files replaced; maintenance mode is **on** and stays on | **Manual** — restore the snapshot from `pre_restore_snapshot_path`, then `tpbx up` |
 | After import (migrate, reconcile, health check) | Database replaced, health check failed | **Manual** — the row and journal both say `failed`; inspect the reason, correct the service or schema, re-run the health check by repeating the restore |
 | Web tier did not answer `/up` | The app was put back into maintenance mode deliberately | **Manual** — fix the web tier, then `php artisan up` |
 

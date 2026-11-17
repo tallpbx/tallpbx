@@ -277,6 +277,6 @@ fs_cli -x "fsctl loglevel"
 systemctl status tallpbx-xml-worker
 
 # 4. Execute the call capacity ladder test from generator
-PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> bash load-testing/scripts/load-test-matrix.sh --series <date>-<slug> --tier 2c2g --variants v-octane --phase all
+PBX_HOST=<PBX_IP> SIPP_HOST=<GEN_IP> SERIES=<date>-<slug> bash load-testing/scripts/load-test-matrix.sh --tier=h2-2c2g --variant=v-octane
 ```
 

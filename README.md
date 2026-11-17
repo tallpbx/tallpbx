@@ -124,7 +124,7 @@ Scaffold a new custom module in `custom-modules/`:
 tpbx make:module my-crm-connector \
     --display-name="My CRM Connector" \
     --description="Third-party CRM integration for customer lookups" \
-    --category="Integrations"
+    --category="custom"
 ```
 
 Manage modules from the command line:
@@ -217,7 +217,7 @@ tpbx app:test --full
 tpbx test --filter=AdminAuthTest
 ```
 
-All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (13–15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `tpbx config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
+All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (12–15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `tpbx config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
 
 ## Performance & Load Testing
 
@@ -247,7 +247,7 @@ TallPBX follows the **[Laravel framework versioning model](https://laravel.com/d
   - **`2.0`**: Maintenance release series for 2.x deployments.
   - **`1.1`**: Maintenance release series for 1.1.x deployments.
   - **`1.0`**: Frozen maintenance branch for critical security fixes only.
-- **In-Place Updates**: In-place updates via the web updater panel (**System Settings → Updates**) and CLI (`scripts/update.sh`) are supported within the same release series branch. For detailed deployment notes, see [INSTALL.md](INSTALL.md), and for a complete historical record of releases, see [CHANGELOG.md](CHANGELOG.md).
+- **In-Place Updates**: In-place updates via the web updater panel (**Git Update**, `/panel/git-update`) and CLI (`tpbx app:git-update <target>`) are supported within the same release series branch. For detailed deployment notes, see [INSTALL.md](INSTALL.md), and for a complete historical record of releases, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Tech Stack
 

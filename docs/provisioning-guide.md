@@ -11,7 +11,11 @@ Provisioning is off by default: `/provision/{mac}` answers `404` until the
 master switch is on. Set the key and clear the configuration cache:
 
 ```bash
-sudo sed -i 's/^PROVISIONING_ENABLED=.*/PROVISIONING_ENABLED=true/' /var/www/tallpbx/.env
+if grep -q '^PROVISIONING_ENABLED=' /var/www/tallpbx/.env; then
+    sudo sed -i 's/^PROVISIONING_ENABLED=.*/PROVISIONING_ENABLED=true/' /var/www/tallpbx/.env
+else
+    echo 'PROVISIONING_ENABLED=true' | sudo tee -a /var/www/tallpbx/.env >/dev/null
+fi
 cd /var/www/tallpbx && tpbx optimize:clear
 ```
 
@@ -33,12 +37,13 @@ middleware, so a phone configured for Digest must be pointed at Basic instead.
 
 ## 2. Assign a template and a SIP account
 
-1. Open **Devices** and edit (or create) the device for the phone's MAC
+1. Open **Accounts → Devices** and edit (or create) the device for the phone's MAC
    address. The MAC is the identifier in the provisioning URL, so it must
    match the sticker exactly.
 2. Choose a **provisioning template** for the vendor. Built-in templates ship
-   for Yealink, Polycom, Cisco, Grandstream, Snom, Avaya, and Fanvil under
-   **Provision → Templates**; the template editor shows the generated file.
+   for 12 vendors (`aastra`, `algo`, `avaya`, `cisco`, `fanvil`, `flyingvoice`,
+   `grandstream`, `htek`, `poly`, `polycom`, `snom`, and `yealink`); manage
+   template records and file paths under **Features → Device Provisioning**.
 3. Select the **SIP account** the phone registers with. A device without a SIP
    account downloads a configuration with no credentials and will not register.
 4. Save. The generated template embeds `freeswitch.server` as the SIP registrar
@@ -62,7 +67,7 @@ Reboot or re-request provisioning on the phone.
 ## 4. Expected result
 
 - The phone downloads the configuration and reboots once.
-- The account registers: **Devices** shows the device registered, and the
+- The account registers: **Monitoring → Registrations** shows the device registered, and the
   extension's SIP account shows a contact in `fs_cli -x "sofia status profile internal reg"`.
 - An internal call to the extension rings the handset.
 

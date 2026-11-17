@@ -98,10 +98,10 @@ The FreeSWITCH telephony subsystem manages real-time call control, SIP signaling
 | `FS_ESL_EVENT_PROFILE` | `string` | `essential` | `freeswitch.event_profile` | Event subscription profile for `freeswitch:listen` (`essential` subscribes to 10 lifecycle/keepalive events; `full` or `all` subscribes to all 25 events). |
 | `FS_ESL_SUBSCRIBE` | `string` | `null` | `freeswitch.subscribe` | Comma-separated list of explicit FreeSWITCH event names to override the active event profile. |
 | `FS_BROADCAST_THROTTLE_MS` | `integer` | `500` | `freeswitch.broadcasting.throttle_ms` | Sliding debounce window in milliseconds for Reverb WebSocket broadcasts (`DashboardStatsUpdated`, `TelephonyUpdated`), preventing event flooding during call bursts. Set to `0` to disable throttling. |
-| `FS_SOFIA_LOG_LEVEL` | `integer` | `0` | `freeswitch.sofia.log_level` | Debug verbosity level for Sofia SIP engine (0–9). Level 0 disables verbose packet logging; higher values log full SIP packet traces to `/var/log/freeswitch/freeswitch.log`. |
+| `FS_SOFIA_LOG_LEVEL` | `string` | `'0'` | `freeswitch.sofia.log_level` | Debug verbosity level for Sofia SIP engine (0–9). Level `'0'` disables verbose packet logging; higher values log full SIP packet traces to `/var/log/freeswitch/freeswitch.log`. |
 | `FS_SOFIA_AUTO_RESTART` | `boolean` | `true` | `freeswitch.sofia.auto_restart` | Whether to automatically restart Sofia SIP profiles upon runtime reload or configuration mutation. |
 | `FS_SOFIA_DEBUG_PRESENCE` | `boolean` | `false` | `freeswitch.sofia.debug_presence` | Enables detailed debugging logs for BLF (Busy Lamp Field) and SIP SUBSCRIBE/NOTIFY dialog presence. |
-| `FS_SOFIA_CAPTURE_SERVER` | `string` | `null` | `freeswitch.sofia.capture_server` | Remote HEP/Homer capture server destination (e.g. `udp:10.0.0.50:9060`) for centralized SIP packet inspection. |
+| `FS_SOFIA_CAPTURE_SERVER` | `string` | `''` | `freeswitch.sofia.capture_server` | Remote HEP/Homer capture server destination (e.g. `udp:10.0.0.50:9060`) for centralized SIP packet inspection. |
 | `FS_SOFIA_INBOUND_REG_THREAD`| `boolean` | `true` | `freeswitch.sofia.inbound_reg_in_new_thread` | Spawns a dedicated thread for each inbound SIP REGISTER transaction, significantly increasing registration concurrency under heavy traffic. |
 | `FS_SOFIA_MAX_REG_THREADS` | `integer` | `8` | `freeswitch.sofia.max_reg_threads` | Maximum concurrent worker threads allocated for inbound SIP registration processing. |
 
@@ -133,7 +133,8 @@ See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path
 | `FS_XML_HANDLER_THROTTLE_LIMIT` | `integer` | `6000` | `freeswitch.xml_handler.throttle_limit` | Maximum allowed XML curl requests per minute per IP address. |
 | `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle_decay_minutes` | Decay window in minutes for XML handler rate limiting. |
 | `FS_XML_HANDLER_TIMING_HEADERS` | `boolean` | `false` | `freeswitch.xml_handler.timing_headers` | When enabled, XML handler responses include app-side timing headers for callers sending `X-TallPBX-Timing: 1`. Used for load testing; keep disabled in production. |
-| `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` by `scripts/resources/systemd/tallpbx-xml-worker.service` and evaluated by `App\Support\MinimalBootstrap` (`App\Support\TelephonyWorkerProviders::isSlimBoot()`). While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
+| `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` in `scripts/resources/systemd/tallpbx-xml-worker.service` (and temporarily by `App\Support\MinimalBootstrap::handle()` around slim-boot requests) and evaluated by `App\Support\TelephonyWorkerProviders::isSlimBoot()`. While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
+| `OCTANE_ROADRUNNER_HTTP_MIDDLEWARE` | `string` | `static` | `octane.roadrunner.http_middleware` | Comma-separated RoadRunner HTTP middleware pipeline enabled when running the Octane/RoadRunner XML worker (`static` by default). |
 
 ---
 
@@ -150,13 +151,13 @@ Configures FreeSWITCH's internal state storage engine (Sofia registrations, acti
 | `FS_DB_PORT` | `integer` | `3306` | `freeswitch.database.port` | Database port for FreeSWITCH runtime tables. |
 | `FS_DB_NAME` | `string` | `freeswitch` | `freeswitch.database.database` | Database name dedicated to FreeSWITCH runtime tables. |
 | `FS_DB_USERNAME` | `string` | `freeswitch` | `freeswitch.database.username` | Database user for FreeSWITCH runtime tables. |
-| `FS_DB_PASSWORD` | `string` | `null` | `freeswitch.database.password` | Database password for FreeSWITCH runtime tables. |
-| `FS_DB_OPTIONS` | `string` | `null` | `freeswitch.database.options` | Optional database driver options string appended to DSN. |
+| `FS_DB_PASSWORD` | `string` | `''` | `freeswitch.database.password` | Database password for FreeSWITCH runtime tables. |
+| `FS_DB_OPTIONS` | `string` | `''` | `freeswitch.database.options` | Optional database driver options string appended to DSN. |
 | `FS_CORE_DB_NAME` | `string` | `null` | `freeswitch.database.core_db_name` | Custom path or database name for core FreeSWITCH SQLite database (`/var/lib/freeswitch/db/core.db`). |
 | `FS_AUTO_CREATE_SCHEMAS` | `boolean` | `true` | `freeswitch.database.auto_create_schemas` | Whether FreeSWITCH automatically creates missing schema tables in external database on startup. |
 | `FS_CORE_NON_SQLITE_DB_REQUIRED`| `boolean`| `false` | `freeswitch.database.core_non_sqlite_db_required` | Forces FreeSWITCH to halt startup if a non-SQLite external database is unavailable. |
 | `FS_ODBC_SKIP_AUTOCOMMIT_FLIP` | `boolean`| `false` | `freeswitch.database.odbc_skip_autocommit_flip` | Skips ODBC autocommit flipping for specialized database drivers. |
-| `FS_AUTO_CLEAR_SQL` | `boolean` | `false` | `freeswitch.database.auto_clear_sql` | Automatically drops and recreates runtime SQL tables on system reboot. |
+| `FS_AUTO_CLEAR_SQL` | `boolean` | `null` | `freeswitch.database.auto_clear_sql` | Optional override to drop and recreate runtime SQL tables on startup when configured. |
 
 > [!NOTE]
 > `FS_DB_DRIVER=sqlite` (on disk at `/var/lib/freeswitch/db`) is the shipped default. Switching to `FS_DB_DRIVER=mariadb` moves `switch.conf`, `db.conf`, `fifo.conf`, `sofia.conf` profiles, `callcenter.conf`, and `voicemail.conf` onto a separate `freeswitch` MariaDB schema using native `mod_mariadb` (no unixODBC required), and can also be provisioned at install time via `FSPBX_FREESWITCH_DB_DRIVER=mariadb`. See [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) for setup steps and benchmarking notes.
@@ -182,14 +183,10 @@ Configures automated outbound dialing, campaign pacing, and outcome tracking.
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `CALL_BROADCAST_SIMULATE` | `boolean` | `false` | `call-broadcast.simulate` | Dry-run simulation mode for testing broadcast campaigns without originating actual calls. |
-| `CALL_BROADCAST_MAX_CONCURRENT` | `integer` | `10` | `call-broadcast.default_max_concurrent` | Default maximum concurrent outbound call channels allocated for broadcast campaigns. |
-| `CALL_BROADCAST_RETRY_DELAY` | `integer` | `60` | `call-broadcast.retry_delay_seconds` | Delay in seconds before re-attempting failed or uncompleted broadcast recipient calls. |
-| `CALL_BROADCAST_ORIGINATE_DELAY_MS` | `integer` | `200` | `call-broadcast.originate_delay_ms` | Delay in milliseconds between consecutive originate requests to smooth out telephony burst load. |
-| `FS_CALL_BROADCAST_CALLER_ID` | `string` | `0000000000` | `call-broadcast.caller_id` | Default outbound caller ID number utilized for campaigns if unspecified. |
-| `FS_CALL_BROADCAST_MEDIA` | `string` | `ivr/ivr-welcome.wav` | `call-broadcast.media` | Default audio prompt played to recipients upon call answer. |
-| `FS_CALL_BROADCAST_PACING_SECONDS` | `integer` | `1` | `call-broadcast.pacing_seconds` | Interval in seconds between sequential outbound campaign call originations. |
-| `FS_CALL_BROADCAST_OUTCOME_WINDOW_MINUTES` | `integer` | `120` | `call-broadcast.outcome_window_minutes` | Time window in minutes before unanswered or orphaned broadcast calls expire. |
+| `FS_CALL_BROADCAST_MEDIA` | `string` | `'tone_stream://%(1000,0,640)'` | `call-broadcast.media` | Default audio prompt or `tone_stream://` played to recipients upon call answer. |
+| `FS_CALL_BROADCAST_CALLER_ID` | `string` | `''` | `call-broadcast.caller_id_number` | Default outbound caller ID number utilized for campaigns if unspecified. |
+| `FS_CALL_BROADCAST_PACING_SECONDS` | `integer` | `0` | `call-broadcast.pacing_seconds` | Interval in seconds between sequential outbound campaign call originations (`0` disables extra delay). |
+| `FS_CALL_BROADCAST_OUTCOME_WINDOW_MINUTES` | `integer` | `15` | `call-broadcast.outcome_window_minutes` | Time window in minutes before unanswered or orphaned broadcast calls expire. |
 
 ---
 
@@ -251,7 +248,7 @@ Manages core Laravel application lifecycle, encryption keys, admin authenticatio
 | `APP_FALLBACK_LOCALE` | `string` | `en` | `app.fallback_locale` | Fallback language when a specific translation string is missing in the chosen locale. |
 | `APP_FAKER_LOCALE` | `string` | `en_US` | `app.faker_locale` | Locale used for generating test and factory data. |
 | `APP_MAINTENANCE_DRIVER` | `string` | `file` | `app.maintenance.driver` | Maintenance mode lock storage driver (`file`, `cache`). |
-| `APP_MAINTENANCE_STORE` | `string` | `null` | `app.maintenance.store` | Specific cache store used when maintenance driver is set to `cache`. |
+| `APP_MAINTENANCE_STORE` | `string` | `database` | `app.maintenance.store` | Specific cache store used when maintenance driver is set to `cache`. |
 | `PHP_FPM_MAX_CHILDREN` | `integer` | `null` | `php-fpm.max_children` | Optional override for the PHP-FPM worker ceiling. Empty derives the ceiling from detected physical memory (3 workers on 1 GB, 6 on 2 GB, 12 on 4 GB+). Set it only to reproduce a published benchmark tier on hardware of a different size; both the installer and `appliance:sync-host` honour it, and an invalid value is ignored with a warning. `pm.max_requests` still recycles each worker after 10,000 requests. |
 
 ---
@@ -274,7 +271,7 @@ Manages core Laravel application lifecycle, encryption keys, admin authenticatio
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `TALLPBX_PRIMARY_DATABASE` | `string` | `tallpbx` | `app.primary_database` | **SAFETY GUARD**: Name of the primary live database. TallPBX's database protection middleware rejects destructive Artisan commands (`migrate:fresh`, `db:wipe`) if executed against this database. |
+| `TALLPBX_PRIMARY_DATABASE` | `string` | `tallpbx` | `app.primary_database` | **SAFETY GUARD**: Name of the primary live database. `App\Support\PrimaryDatabaseSafety` (via `DB::prohibitDestructiveCommands()` and `App\Database\SafeMigrator`) rejects destructive Artisan commands (`migrate:fresh`, `db:wipe`) when targeting this database. |
 
 ---
 
@@ -304,10 +301,8 @@ TallPBX utilizes MariaDB or MySQL for application data, tenant configuration, ca
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `MYSQL_ATTR_SSL_CA` | `path` | `null` | `database.connections.mysql.options.MYSQL_ATTR_SSL_CA` | File path to SSL CA certificate bundle for encrypted database connections. |
+| `MYSQL_ATTR_SSL_CA` | `path` | `null` | `database.connections.mysql.options` (`Mysql::ATTR_SSL_CA`) | File path to SSL CA certificate bundle for encrypted database connections. |
 | `DB_SSLMODE` | `string` | `prefer` | `database.connections.pgsql.sslmode` | SSL connection mode for PostgreSQL (`disable`, `prefer`, `require`, `verify-ca`, `verify-full`). |
-| `DB_TRUST_SERVER_CERTIFICATE` | `boolean`| `false` | `database.connections.sqlsrv.trust_server_certificate`| Whether to trust self-signed database certificates in SQL Server connections. |
-| `DB_ENCRYPT` | `string` | `'yes'` | `database.connections.sqlsrv.encrypt` | Connection encryption flag for SQL Server. |
 
 ---
 
@@ -328,11 +323,11 @@ TallPBX relies heavily on Redis for high-throughput XML response caching, sessio
 | `REDIS_PREFIX` | `string` | `tallpbx-database-` | `database.redis.options.prefix` | Key prefix for database Redis connections. |
 | `REDIS_URL` | `string` | `null` | `database.redis.default.url` | Redis connection URL string. |
 | `REDIS_PERSISTENT` | `boolean` | `false` | `database.redis.options.persistent`| Maintains persistent socket connections across HTTP requests, eliminating TCP handshake overhead. |
-| `REDIS_TIMEOUT` | `float` | `null` | `database.redis.default.timeout` | Connection timeout in seconds. |
+| `REDIS_TIMEOUT` | `integer` | `60` | `reverb.servers.reverb.scaling.server.timeout` | Redis scaling connection timeout in seconds used by Laravel Reverb. |
 | `REDIS_MAX_RETRIES` | `integer` | `3` | `database.redis.default.max_retries` | Maximum command retry attempts upon transient Redis connection drop. |
 | `REDIS_BACKOFF_ALGORITHM`| `string` | `decorrelated_jitter` | `database.redis.default.backoff_algorithm` | Exponential backoff algorithm for Redis connection retries. |
 | `REDIS_BACKOFF_BASE` | `integer` | `100` | `database.redis.default.backoff_base` | Base backoff duration in milliseconds. |
-| `REDIS_BACKOFF_CAP` | `integer` | `2000` | `database.redis.default.backoff_cap` | Maximum backoff cap duration in milliseconds. |
+| `REDIS_BACKOFF_CAP` | `integer` | `1000` | `database.redis.default.backoff_cap` | Maximum backoff cap duration in milliseconds. |
 | `REDIS_CLUSTER` | `string` | `redis` | `database.redis.options.cluster` | Redis cluster driver name when deploying clustered topologies. |
 | `REDIS_CACHE_DB` | `integer` | `1` | `database.redis.cache.database` | Redis database index isolated specifically for application and XML cache keys. |
 | `REDIS_SESSION_DB` | `integer` | `2` | `database.redis.session.database` | Redis database index isolated specifically for stateful HTTP user and admin sessions. |
@@ -348,12 +343,12 @@ TallPBX relies heavily on Redis for high-throughput XML response caching, sessio
 | :--- | :--- | :--- | :--- | :--- |
 | `CACHE_STORE` | `string` | `redis` | `cache.default` | Application cache backend (`redis`, `file`, `database`, `memcached`, `array`). |
 | `CACHE_PREFIX` | `string` | `tallpbx-cache-` | `cache.prefix` | Global namespace prefix prepended to all cache keys to avoid collision on shared Redis servers. |
-| `CACHE_STORAGE_DISK` | `string` | `null` | `cache.stores.file.disk` | Storage disk allocated for file-based caching. |
-| `CACHE_STORAGE_PATH` | `path` | `null` | `cache.stores.file.path` | Custom local filesystem directory path for file-based cache artifacts. |
+| `CACHE_STORAGE_DISK` | `string` | `null` | `cache.stores.storage.disk` | Storage disk allocated for `storage`-driver caching. |
+| `CACHE_STORAGE_PATH` | `path` | `'framework/cache/data'` | `cache.stores.storage.path` | Relative path inside the `storage` cache disk for cached artifacts. |
 | `DB_CACHE_CONNECTION` | `string` | `null` | `cache.stores.database.connection` | SQL database connection used when `CACHE_STORE=database`. |
 | `DB_CACHE_TABLE` | `string` | `cache` | `cache.stores.database.table` | Database table name storing serialized cache items. |
 | `DB_CACHE_LOCK_CONNECTION`| `string` | `null` | `cache.stores.database.lock_connection` | Database connection used for database-backed locks. |
-| `DB_CACHE_LOCK_TABLE` | `string` | `cache_locks` | `cache.stores.database.lock_table` | Database table storing atomic lock records. |
+| `DB_CACHE_LOCK_TABLE` | `string` | `null` | `cache.stores.database.lock_table` | Optional custom database table storing atomic lock records. |
 
 ---
 
@@ -363,8 +358,8 @@ TallPBX relies heavily on Redis for high-throughput XML response caching, sessio
 | :--- | :--- | :--- | :--- | :--- |
 | `MEMCACHED_HOST` | `string` | `127.0.0.1` | `cache.stores.memcached.servers.0.host` | Memcached server hostname. |
 | `MEMCACHED_PORT` | `integer` | `11211` | `cache.stores.memcached.servers.0.port` | Memcached server TCP port. |
-| `MEMCACHED_USERNAME` | `string` | `null` | `cache.stores.memcached.options.OPT_USERNAME` | SASL username for Memcached authentication. |
-| `MEMCACHED_PASSWORD` | `string` | `null` | `cache.stores.memcached.options.OPT_PASSWORD` | SASL password for Memcached authentication. |
+| `MEMCACHED_USERNAME` | `string` | `null` | `cache.stores.memcached.sasl.0` | SASL username for Memcached authentication. |
+| `MEMCACHED_PASSWORD` | `string` | `null` | `cache.stores.memcached.sasl.1` | SASL password for Memcached authentication. |
 | `MEMCACHED_PERSISTENT_ID`| `string` | `null` | `cache.stores.memcached.persistent_id` | Persistent connection ID for Memcached client pooling. |
 | `DYNAMODB_CACHE_TABLE` | `string` | `cache` | `cache.stores.dynamodb.table` | AWS DynamoDB table name for distributed cloud caching. |
 | `DYNAMODB_ENDPOINT` | `string` | `null` | `cache.stores.dynamodb.endpoint` | Custom AWS DynamoDB endpoint URL (e.g. for local DynamoDB testing). |
@@ -389,7 +384,7 @@ TallPBX utilizes Laravel Reverb and Laravel Echo for real-time push updates acro
 | `REVERB_SERVER` | `string` | `reverb` | `reverb.default` | Reverb server execution driver. |
 | `REVERB_SERVER_HOST` | `string` | `0.0.0.0` | `reverb.servers.reverb.host` | Network interface IP bound by the `tpbx reverb:start` daemon (`0.0.0.0` binds all interfaces). |
 | `REVERB_SERVER_PORT` | `integer` | `8080` | `reverb.servers.reverb.port` | Local TCP port bound by the Reverb daemon. |
-| `REVERB_SERVER_PATH` | `string` | `""` | `reverb.servers.reverb.options.path` | Optional URL subpath prefix for WebSocket connections. |
+| `REVERB_SERVER_PATH` | `string` | `""` | `reverb.servers.reverb.path` | Optional URL subpath prefix for WebSocket connections. |
 | `REVERB_APP_PING_INTERVAL` | `integer` | `60` | `reverb.apps.apps.0.ping_interval` | Ping heartbeat interval in seconds to keep WebSocket connections alive across stateful firewalls. |
 | `REVERB_APP_ACTIVITY_TIMEOUT` | `integer` | `30` | `reverb.apps.apps.0.activity_timeout` | Duration in seconds of client inactivity before closing disconnected sockets. |
 | `REVERB_APP_MAX_CONNECTIONS` | `integer` | `null` | `reverb.apps.apps.0.max_connections` | Hard ceiling on concurrent client WebSocket connections (unlimited if null). |
@@ -405,7 +400,7 @@ TallPBX utilizes Laravel Reverb and Laravel Echo for real-time push updates acro
 | `REVERB_APP_RATE_LIMITING_ENABLED` | `boolean` | `false` | `reverb.apps.apps.0.rate_limiting.enabled` | Enables client message rate limiting. |
 | `REVERB_APP_RATE_LIMIT_MAX_ATTEMPTS` | `integer` | `60` | `reverb.apps.apps.0.rate_limiting.max_attempts` | Maximum client messages allowed within decay window. |
 | `REVERB_APP_RATE_LIMIT_DECAY_SECONDS` | `integer` | `60` | `reverb.apps.apps.0.rate_limiting.decay_seconds` | Decay window in seconds for message rate limiter. |
-| `REVERB_APP_RATE_LIMIT_TERMINATE` | `boolean` | `false` | `reverb.apps.apps.0.rate_limiting.terminate_connection` | Immediately disconnects clients that breach rate limits. |
+| `REVERB_APP_RATE_LIMIT_TERMINATE` | `boolean` | `false` | `reverb.apps.apps.0.rate_limiting.terminate_on_limit` | Immediately disconnects clients that breach rate limits. |
 | `REVERB_APP_ACCEPT_CLIENT_EVENTS_FROM` | `string` | `members` | `reverb.apps.apps.0.accept_client_events_from` | Restricts client-side whisper events (`members` requires channel presence). |
 | `REVERB_SCALING_ENABLED` | `boolean` | `false` | `reverb.servers.reverb.scaling.enabled` | Enables horizontal multi-server Reverb scaling using Redis Pub/Sub. |
 | `REVERB_SCALING_CHANNEL` | `string` | `reverb` | `reverb.servers.reverb.scaling.channel` | Redis Pub/Sub channel used to fan out WebSocket broadcasts across PBX nodes. |
@@ -439,7 +434,11 @@ Configures local storage directories and cloud object storage integrations for a
 | :--- | :--- | :--- | :--- | :--- |
 | `FILESYSTEM_DISK` | `string` | `local` | `filesystems.default` | Default application storage disk (`local`, `public`, `s3`). |
 | `TALLPBX_MEDIA_ROOT` | `path` | `/var/lib/tallpbx/media` | `media-storage.store_root`, `media-storage.spool_root` | Base root filesystem path for all PBX media (`store/` and `spool/`). Configured as `media-storage.store_root` (`<root>/store`) and `media-storage.spool_root` (`<root>/spool`). Standard permissions: `2775 www-data:tallpbx-media`. |
-| `TALLPBX_BACKUP_ROOT` | `path` | `/var/lib/tallpbx/backups`| `backup-storage.root` | Authoritative root filesystem path for disaster recovery archive archives. Standard permissions: `2770 root:www-data`. |
+| `TALLPBX_BACKUP_ROOT` | `path` | `/var/lib/tallpbx/backups`| `backup-storage.root` | Authoritative root filesystem path for disaster recovery archives. Standard permissions: `2770 root:www-data`. |
+| `TALLPBX_RESTORE_JOURNAL` | `path` | `/var/lib/tallpbx/restore-journal` | `backup-storage.journal_root` | Root-only directory holding authoritative restore operation journal entries (`0700 root:root`). |
+| `TALLPBX_RESTORE_COMMAND_TIMEOUT` | `float` | `900` | `backup-storage.restore_command_timeout` | Per-command timeout in seconds (default 15 minutes) for each restore subprocess. |
+| `TALLPBX_RESTORE_OPERATION_DEADLINE` | `integer` | `3600` | `backup-storage.restore_operation_deadline` | Whole-operation time budget in seconds (default 1 hour) for machine restore work. |
+| `TALLPBX_MAX_UPLOAD_BYTES` | `integer` | `2000000000` | `backup-storage.max_upload_bytes` | Maximum direct restore-archive upload size in decimal bytes (`2 GB`). |
 
 ---
 
@@ -553,7 +552,7 @@ Configures application error reporting, log rotation, security telemetry, and re
 | `LOG_DAILY_DAYS` | `integer` | `14` | `logging.channels.daily.days` | Number of daily rotated log files retained before automatic deletion. |
 | `LOG_STDERR_FORMATTER` | `string` | `null` | `logging.channels.stderr.formatter` | Custom log formatter class applied to stderr stream outputs. |
 | `LOG_SYSLOG_FACILITY` | `integer` | `LOG_USER` | `logging.channels.syslog.facility` | POSIX syslog facility level used when dispatching events to host `rsyslog` or `systemd-journald`. |
-| `LOG_DEPRECATIONS_CHANNEL` | `string` | `null` | `logging.deprecations.channel` | Dedicated log channel for PHP or framework deprecation warnings. |
+| `LOG_DEPRECATIONS_CHANNEL` | `string` | `'null'` | `logging.deprecations.channel` | Dedicated log channel for PHP or framework deprecation warnings. |
 | `LOG_DEPRECATIONS_TRACE` | `boolean` | `false` | `logging.deprecations.trace` | Appends full stack traces to deprecation entries. |
 
 ---
@@ -598,8 +597,7 @@ Manages transactional emails (password resets, voicemail notifications with audi
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `POSTMARK_API_KEY` | `string` | `null` | `services.postmark.token` | Server API token for Postmark transactional delivery. |
-| `POSTMARK_MESSAGE_STREAM_ID` | `string` | `null` | `mail.mailers.postmark.message_stream_id` | Postmark message stream identifier. |
+| `POSTMARK_API_KEY` | `string` | `null` | `services.postmark.key` | Server API token for Postmark transactional delivery. |
 | `RESEND_API_KEY` | `string` | `null` | `services.resend.key` | API access key for Resend transactional email transport. |
 | `SLACK_BOT_USER_OAUTH_TOKEN`| `string` | `null` | `services.slack.notifications.bot_user_oauth_token` | Slack Bot OAuth token for posting alerts to administrative channels. |
 | `SLACK_BOT_USER_DEFAULT_CHANNEL` | `string` | `null` | `services.slack.notifications.channel` | Default Slack channel ID (e.g. `#pbx-alerts`) receiving notifications. |
@@ -612,7 +610,7 @@ Governs zero-touch hardware provisioning for IP phones (Yealink, Polycom, Cisco,
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `PROVISIONING_ENABLED` | `boolean` | `false` | `provisioning.enabled` | Master gate for phone auto-provisioning. When `false`, all provisioning endpoints reject incoming requests. |
+| `PROVISIONING_ENABLED` | `boolean` | `false` | `provisioning.enabled` | Master gate for phone auto-provisioning. When `false`, `/provision/{mac}` returns HTTP `404`. |
 | `PROVISIONING_CIDR` | `string` | `null` | `provisioning.cidr` | **NETWORK PERIMETER GUARD**: Comma-separated list of allowed IP subnets (CIDRs, e.g. `192.168.1.0/24,10.10.0.0/16`) permitted to request phone configurations. Requests outside these subnets are immediately dropped. |
 | `PROVISIONING_HTTP_AUTH_USERNAME`| `string`| `null` | `provisioning.http_auth_username`| HTTP **Basic** authentication username enforced on provisioning requests (`ProvisioningAccess`). Each filled factor is required; blanking either disables that factor. |
 | `PROVISIONING_HTTP_AUTH_PASSWORD`| `string`| `null` | `provisioning.http_auth_password`| **CRITICAL SECRET**: HTTP **Basic** authentication password enforced on provisioning requests. |
@@ -626,6 +624,7 @@ Manages git-based self-updating, preflight checks, database migrations, asset re
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
 | `GIT_UPDATE_STEP_TIMEOUT_SECONDS` | `integer` | `600` | `git-update.step_timeout_seconds` | Execution timeout in seconds (default 10 minutes) allocated to individual updater pipeline operations (`git pull`, `composer install`, `tpbx migrate`). |
+| `GIT_UPDATE_RUNTIME_PATH` | `path` | `storage/framework` | `git-update.runtime_path` | Directory holding updater lock, status JSON, and progress log artifacts (`git-update.lock`, `git-update-status.json`, `git-update.log`). |
 
 ---
 
@@ -637,7 +636,7 @@ Variables utilized by installation scripts, frontend build tooling, and test run
 
 | Variable | Type | Default | Consumed By | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `FSPBX_ADMIN_USERNAME` | `string` | `admin` | `ConfigureInitialAdminCommand` | Initial super-administrator username seeded during headless installer execution. |
+| `FSPBX_ADMIN_USERNAME` | `string` | `null` *(installer prompts `admin@tallpbx.local`)* | `ConfigureInitialAdminCommand` | Initial super-administrator email/username seeded when `FSPBX_INITIAL_ADMIN_MODE=installer` (required in non-interactive installer mode). |
 | `FSPBX_ADMIN_PASSWORD` | `string` | `null` | `ConfigureInitialAdminCommand` | **CRITICAL SECRET**: Initial super-administrator password seeded during headless installer execution. |
 | `FSPBX_DEVELOPMENT_MODE` | `boolean` | `false` | Installer scripts (`install.sh`) | When `true`, configures the server for local development with verbose debugging, developer tools, and hot reloading. |
 | `PHP_CLI_SERVER_WORKERS` | `integer` | `4` | `tpbx serve` | Worker process concurrency count when running PHP's built-in development CLI server. |

@@ -147,7 +147,7 @@ TallPBX protects the server using an in-kernel Linux firewall (`nftables`). Inco
 2. **Trusted Whitelist**: Administrator IP addresses, office networks, and VPNs bypass all blocklists.
 3. **Established Connections**: Active phone calls and existing web sessions pass immediately.
 4. **Permanent Blacklist & Active Bans**: Known abusive IPs, country geo-blocks, threat feeds, and brute-force attackers are dropped at line rate.
-5. **Legitimate PBX Services**: Approved traffic is accepted for SIP signaling (ports 5060/5061/5080), voice audio (RTP ports 16384-32768), web admin (ports 80/443), and SSH (port 22).
+5. **Legitimate PBX Services**: Approved traffic is accepted for SIP signaling (ports 5060/5061/5080), voice audio (RTP ports 16384-32768), web admin (ports 80/443), Reverb WebSockets (port 8080), WebRTC WSS (port 7443), TFTP provisioning (UDP port 69), and SSH (port 22).
 6. **Custom Rules & Default Drop**: Any administrator-defined custom rules run next, and unrecognized traffic falls through to the default drop policy.
 
 For complete low-level packet flow diagrams and kernel-level specifications, see the [System Architecture & Security Guide](architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering).
@@ -167,7 +167,7 @@ When Observe Mode is enabled, the ruleset compiler performs a dynamic transforma
 * The chain default inbound policy is forced from `drop` to `accept`.
 * Every drop action across built-in pre-filters and custom rules is replaced with:
   ```nftables
-  counter log prefix "tallpbx-observe:<stage> " limit rate 100/minute burst 5 packets
+  counter log prefix "tallpbx-observe:<stage> " limit rate 100/minute
   ```
 * Standard `accept` rules remain completely untouched, ensuring legitimate services stay accessible.
 

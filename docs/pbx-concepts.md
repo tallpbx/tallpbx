@@ -36,7 +36,7 @@ graph TD
 
     User["👤 User (Human Being)<br/>Logs into the web panel<br/><i>e.g. alice@acme.com</i>"]:::person
     Ext["📞 Extension (Dialed Number)<br/>Routing rules & voicemail<br/><i>e.g. Ext 1001 ('Alice Smith')</i>"]:::number
-    Sip["🔑 SIP Account (Security Credentials)<br/>Secure username & password for telephony<br/><i>e.g. ext_1001 (auto-generated)</i>"]:::secret
+    Sip["🔑 SIP Account (Security Credentials)<br/>Secure username & password for telephony<br/><i>e.g. 1001 (created when SIP password is set)</i>"]:::secret
     Device["📠 Device (Physical Phone or App)<br/>Hardware identified by MAC address<br/><i>e.g. Yealink T46U desk phone</i>"]:::phone
 
     User -->|"assigned to"| Ext

@@ -214,7 +214,7 @@ Once the installation finishes, complete these initial setup steps:
    administrator account.
 2. **Configure HTTPS & TLS**: Secure web access and SIP/WebRTC encryption using Let's Encrypt or your own SSL certificates (see [docs/operations.md](docs/operations.md#tls-certificate-management--httpswss-lifecycle)).
 3. **Configure Outgoing Mail (Email Connector)**: In the web panel, navigate to **Email Connector** to set up SMTP or OAuth 2.0 (Google Workspace or Microsoft 365) so password resets, voicemail notifications, and system alerts are delivered (see [docs/operations.md](docs/operations.md#outgoing-mail--notifications-email-connector)).
-4. **Connect Carriers & Trunks**: Add SIP gateways under **PBX > Gateways** for outbound calling and configure inbound DIDs under **PBX > Inbound Routes**.
+4. **Connect Carriers & Trunks**: Add SIP gateways under **Accounts → Gateways** for outbound calling and configure inbound DIDs under **Call Routing → Inbound Routes**.
 
 ### Re-Running the Installer
 
@@ -317,9 +317,12 @@ The installer configures the Linux kernel firewall for these services by default
 | :--- | :--- |
 | SSH | `22/tcp` |
 | HTTP / HTTPS | `80/tcp`, `443/tcp` |
+| TFTP provisioning | `69/udp` |
 | SIP internal | `5060/udp,tcp` |
 | SIP over TLS | `5061/tcp` |
 | SIP external (carriers) | `5080/udp,tcp` |
+| WebRTC WSS | `7443/tcp` |
+| Reverb WebSockets | `8080/tcp` |
 | RTP media | `16384-32768/udp` |
 
 Automated intrusion detection protects against failed authentication attempts across SIP, Web, and SSH by applying dynamic kernel bans to offending IP addresses. You can monitor status and manage active bans from the web panel's **Security Center** or the terminal:
@@ -419,10 +422,11 @@ tpbx migrate --force
 tpbx module:sync --only-local
 tpbx permissions:sync
 
-# 4. Refresh caches, permissions, and FreeSWITCH configuration.
+# 4. Refresh caches, permissions, FreeSWITCH configuration, and resident PHP workers.
 tpbx optimize:clear
 sudo tpbx permissions:repair --scope=full
 fs_cli -x "reloadxml"
+sudo /usr/local/sbin/tallpbx-update-workers
 ```
 
 After upgrading, confirm that the panel opens, FreeSWITCH is running, and a

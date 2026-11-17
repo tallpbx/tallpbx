@@ -37,8 +37,8 @@ Before starting, ensure you have:
 ## Step 1: Create an Extension in TallPBX
 
 1. Open your browser and log in to the TallPBX Panel at `http://<your-server-ip>/panel/login`.
-2. In the navigation sidebar (or top menu in horizontal mode), go to **PBX → Extensions** (`/panel/extensions`).
-3. Click the **+ Create Extension** button in the top right corner.
+2. In the navigation sidebar (or top menu in horizontal mode), go to **Accounts → Extensions** (`/panel/extensions`).
+3. Click the **Create Extension** button in the top right corner.
 4. Fill in the required fields:
 
 | Field | Recommended Value | Description |
@@ -48,9 +48,9 @@ Before starting, ensure you have:
 | **Effective Caller ID Number** | `1001` | The caller ID number sent with outbound calls. |
 | **SIP Password** | *(Enter a secure password)* | Password the SIP device will use to register and authenticate. |
 | **Voicemail Enabled** | Checked (Optional) | Creates a voicemail box for this extension. |
-| **Status / Enabled** | Checked | Ensures the extension is active in the directory. |
+| **Enabled** | Checked | Ensures the extension is active in the directory. |
 
-5. Click **Save**.
+5. Click **Create**.
 
 TallPBX instantly generates the directory mapping for FreeSWITCH. No server reload or restart is required.
 
@@ -63,7 +63,7 @@ still the first thing you read.
 ```
 ┌─────────────────┐         SIP Signaling (UDP 5060)         ┌─────────────────┐
 │                 │ ───────────────────────────────────────> │                 │
-│   SIP Client    │             Basic / digest              │     TallPBX     │
+│   SIP Client    │              SIP Digest Auth               │     TallPBX     │
 │   (Softphone)   │ <─────────────────────────────────────── │   (FreeSWITCH)  │
 │                 │                                          │                 │
 │                 │         RTP Media Stream (Audio)         │                 │
@@ -107,7 +107,7 @@ Open your softphone application (e.g. **MicroSIP** or **Linphone**).
 3. Click **Use**.
 
 > [!NOTE]
-> This example uses the standard Default Tenant (Single Company) configuration. If configuring phones for a separate tenant sharing this server's IP address or domain name, your **Login (Auth Username)** will include the tenant prefix (e.g., `acme_1001`), while the extension number stays `1001`. See [Tenant Isolation & Phone Provisioning](../README.md#tenant-isolation--phone-provisioning) and [Tenants & Multi-Tenancy](multi-tenancy.md).
+> This example uses the standard Default Tenant (Single Company) configuration. Creating an extension writes its extension number (for example, `1001`) as the initial SIP authentication username. If separate tenants share the same IP address or domain name and both define extension `1001`, give each SIP account a distinct authentication username (such as `acme_1001`) under **Accounts → SIP Accounts** while keeping the extension number `1001`. See [Tenants & Multi-Tenancy](multi-tenancy.md).
 
 ---
 
@@ -117,7 +117,7 @@ Open your softphone application (e.g. **MicroSIP** or **Linphone**).
 Within a second or two, your softphone's status icon should change from grey/red to **green** with the status **"Online"** or **"Connected"**.
 
 ### 2. In the TallPBX Panel
-1. In the TallPBX panel, navigate to **PBX → Registrations** (`/panel/registrations`).
+1. In the TallPBX panel, navigate to **Monitoring → Registrations** (`/panel/registrations`).
 2. You will see extension `1001` listed with:
    - **User**: `1001@<server-ip>`
    - **IP Address**: Your client device IP
@@ -176,7 +176,7 @@ Now that basic signaling and audio are verified:
    - Follow the voice prompts to record your greeting or listen to messages.
 
 3. **Explore Feature Codes**:
-   - Go to **PBX → Feature Codes** (`/panel/feature-codes`) to see standard dial codes:
+   - Go to **Features → Feature Codes** (`/panel/feature-codes`) to see standard dial codes:
      - `*9196` — Echo Test
      - `*97` — Check Voicemail
      - `*732` / `*733` — Start / Stop On-Demand Call Recording
@@ -185,8 +185,8 @@ Now that basic signaling and audio are verified:
      - `*55` — Conference Bridge
 
 4. **Connect External Phone Numbers (DIDs)**:
-   - Add a SIP trunk gateway in **PBX → Gateways**.
-   - Create an **Inbound Route** to direct incoming calls to your extension or an IVR menu.
+   - Add a SIP trunk gateway in **Accounts → Gateways**.
+   - Create an inbound route in **Call Routing → Inbound Routes** to direct incoming calls to your extension or an IVR menu.
 
 ---
 
@@ -197,4 +197,4 @@ Now that basic signaling and audio are verified:
 | **Registration Timeout / Could not connect** | Firewall blocking SIP signaling on UDP port 5060. | Ensure SIP Signaling is enabled under **Security → Firewall Rules** (`/panel/security`), or verify the client IP is whitelisted. Check that server IP is reachable via `ping <server-ip>`. |
 | **403 Forbidden / Bad Credentials** | Extension number or password mismatch. | Verify the username is only the extension digits (`1001`), and re-enter the password in softphone settings. |
 | **Call connects, but no sound is heard** | RTP media UDP ports blocked or asymmetric NAT. | FreeSWITCH uses RTP ports `16384-32768` (UDP). Ensure the **RTP Media** service is enabled under **Security → Firewall Rules** (`/panel/security`). |
-| **Call rejected with "User not found" or "No Route"** | Extension or dialplan context misconfiguration. | Verify the tenant has baseline dialplans provisioned under **PBX → Dialplans**. |
+| **Call rejected with "User not found" or "No Route"** | Extension or dialplan context misconfiguration. | Verify the tenant has baseline dialplans provisioned under **Call Routing → Dialplans**. |
