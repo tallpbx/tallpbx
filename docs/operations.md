@@ -696,17 +696,20 @@ To confirm the handler is responding at all, a `403` means the token check is wo
 
 ## Switching Between the Stock, Fast and Octane XML Paths
 
-Three XML paths exist, and only one kind of switch needs FreeSWITCH restarted.
+Three XML paths exist. In day-to-day operation, switching between **Octane** and **Fast** only starts or stops `tallpbx-xml-worker`; FreeSWITCH only needs a restart if you edit `xml_curl.conf.xml` to add or remove a binding itself.
 
 | Path | What answers FreeSWITCH's XML lookups | How it is selected |
 | --- | --- | --- |
-| **Octane** | Resident RoadRunner worker on `127.0.0.1:8090` | The `tallpbx-octane` binding is active in `xml_curl.conf.xml` **and** the worker is running |
-| **Fast** (default) | `xml-handler-fast.php` behind nginx | The `tallpbx-octane` binding is commented out and the nginx location points at the fast controller |
-| **Stock** | `index.php`, the whole application, behind nginx | Same binding as Fast, but the nginx location falls through to `index.php` |
+| **Octane** | Resident RoadRunner worker on `127.0.0.1:8090` | The `tallpbx-octane` binding is active in `xml_curl.conf.xml` **and** `tallpbx-xml-worker` is running |
+| **Fast** (default) | `xml-handler-fast.php` behind nginx | `tallpbx-xml-worker` is stopped (default) or `tallpbx-octane` is commented out, and the nginx location points at the fast controller |
+| **Stock** | `index.php`, the whole application, behind nginx | Same binding state as Fast, but the nginx location falls through to `index.php` |
 
-### Switching To or From Octane Requires a FreeSWITCH Restart
+### Stopping/Starting the Worker vs. Editing Bindings
 
-Enabling or disabling the Octane binding edits `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`, and FreeSWITCH reads that file only when `mod_xml_curl` loads. Apply the change with a restart:
+Because [scripts/resources/freeswitch.sh](../scripts/resources/freeswitch.sh) ships all three `mod_xml_curl` bindings enabled in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` with `tallpbx-xml-worker` disabled by default:
+
+- **Switching between Fast and Octane requires only `systemctl`:** `sudo systemctl enable --now tallpbx-xml-worker` switches to Octane, and `sudo systemctl disable --now tallpbx-xml-worker` returns to Fast (lookups hit closed port `8090` and fall through to `tallpbx-fallback`). No `xml_curl.conf.xml` edit or FreeSWITCH restart is needed.
+- **Commenting out or restoring the `tallpbx-octane` binding is optional** (to eliminate even the refused loopback connection to `:8090`), and **editing `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` requires a FreeSWITCH restart** because FreeSWITCH reads that file only when `mod_xml_curl` loads:
 
 ```bash
 sudo systemctl restart freeswitch
@@ -719,7 +722,7 @@ The restart loads the module with the new binding list while no lookup is in fli
 
 ### Fast to Stock Is an nginx Change Only
 
-Fast and Stock share the same binding URL, so moving between them only rewrites the nginx `location` block documented below. Apply it with:
+Fast and Stock share the same binding URL, so moving between them only rewrites the nginx `location` block documented above. Apply it with:
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
@@ -736,7 +739,7 @@ systemctl is-active tallpbx-xml-worker
 grep -A5 'location = /api/v1/xml-handler {' /etc/nginx/sites-available/pbx
 ```
 
-A count of `1` with an active worker means Octane answers first; `0` means lookups fall through to the nginx location, which then decides between the fast controller and `index.php`.
+A binding count of `1` **and** `tallpbx-xml-worker` reporting `active` means Octane answers first; if the worker is `inactive` (or the binding count is `0`), lookups fall through to the nginx location, which then decides between `xml-handler-fast.php` and `index.php`.
 
 ## Call Detail Records (CDR) Pipeline
 
