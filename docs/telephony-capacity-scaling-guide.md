@@ -27,7 +27,7 @@ During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`)
 
 | Architecture | Peak Sustained Rate | 3 CPS Completion | 5 CPS Completion | 8 CPS Completion | 10 CPS Burst Completion | Call Setup Median (p50) | Primary Limiter / Failure Mode |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Octane Lean Worker**<br>*(Port 8090, 1 worker, RAM DB)* | **6.23 CPS** | **100%** (180/180) | **100%** (300/300) | **94.8%** (455/480) | **99.3%** (596/600) | **82 – 118 ms** | FreeSWITCH + ESL + Reverb saturate CPU core (0% idle) |
+| **Octane Lean Worker**<br>*(Port 8090, 1 worker, RAM DB — historical setup; shipped default is disk)* | **6.23 CPS** | **100%** (180/180) | **100%** (300/300) | **94.8%** (455/480) | **99.3%** (596/600) | **82 – 118 ms** | FreeSWITCH + ESL + Reverb saturate CPU core (0% idle) |
 | **Lua Proxy Only** *(retired in 5.0.0)*<br>*(In-process Lua + Redis)* | **4.60 CPS** | **100%** (39/39) | **100%** (66/66) | **94.8%** (95/100) | **83.6%** (94/111) | **56 – 60 ms** | Redis connection contention + CPU starvation at 10 CPS |
 | **Fast Controller + Lua Proxy** *(retired in 5.0.0)*<br>*(Lua cached + Fast fallback)* | **3.30 CPS** | **100%** (33/33) | **100%** (66/66) | **100%** (105/105) | **73.5%** (91/122) | **56 – 504 ms** | CPU context switching between FreeSWITCH Lua & FPM |
 | **Fast Controller Only**<br>*(xml-handler-fast.php via FPM)* | **~1.5 CPS** | **Failed / Stalled**<br>(worker queue limit) | Not viable | Not viable | Not viable | **> 3,200 ms** | Worker pool exhaustion (`pm.max_children = 5` queueing past 5s curl timeout) |
@@ -71,7 +71,7 @@ During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`)
  │ CORE 0: DEDICATED TELEPHONY REAL-TIME ENGINE (FreeSWITCH)                     │
  │  - Real-time SIP stack & Sofia worker threads                                │
  │  - mod_xml_curl (3-tier ladder: Octane :8090 opt-in, :80 default, :80 stock)  │
- │  - Runtime SQLite databases in tmpfs RAM (/var/lib/freeswitch/db)            │
+ │  - Runtime SQLite databases on disk (/var/lib/freeswitch/db, shipped default) │
  │  - FreeSWITCH logging set to 'notice' (zero disk I/O lock wait)              │
  └─────────────────┬─────────────────────────────────────────────────────────────┘
                    │ mod_xml_curl HTTP (1.78 ms lookup)
@@ -156,17 +156,60 @@ When multiple channel events occur in rapid succession, [`BroadcastDashboardStat
 
 ---
 
-### Phase 3: Runtime Database & Disk I/O Decoupling (Implemented & Verified)
+### Phase 3: Runtime Database and Persistence Options (Disk SQLite Default vs. MariaDB)
 
-Under concurrent call volume, FreeSWITCH records active registrations, channels, and dialogs into internal SQLite tables (`core.db`, `sofia_reg_internal.db`). On physical SSDs or cloud virtual disks, SQLite table write-locks cause Sofia threads to block (`SQLite is BUSY`).
+**Shipped Default — Disk-Backed SQLite:** TallPBX leaves FreeSWITCH's `/var/lib/freeswitch/db` directory on local disk with `FS_DB_DRIVER=sqlite` (see [../config/freeswitch.php](../config/freeswitch.php) and [../load-testing/remote-setup.md](../load-testing/remote-setup.md#10-freeswitch-runtime-database-disk-or-tmpfs)). Current shipped benchmarks achieve **5 CPS** (1 vCPU) and **10 CPS** (2 vCPU) on disk-backed SQLite, bounded by full-stack CPU saturation rather than disk I/O, and the `2026-11-05` disk-vs-`tmpfs` ablation confirmed `tmpfs` did not raise the capacity ceiling.
 
-#### Required Configuration:
-Mount FreeSWITCH's database directory to a `tmpfs` RAM disk:
-```bash
-# Add to /etc/fstab for persistent RAM disk
-tmpfs /var/lib/freeswitch/db tmpfs defaults,noatime,nosuid,nodev,noexec,mode=0770,uid=freeswitch,gid=tallpbx-media,size=128M 0 0
-```
-*Impact*: Completely eliminates `switch_core_db.c:92 SQLite is BUSY` lock wait states, ensuring instant thread unlock during concurrent SIP transactions.
+**Why `/var/lib/freeswitch/db` is NOT mounted on `tmpfs` by default:**
+1. **Reboot data loss:** `/var/lib/freeswitch/db` holds persistent and operational databases alongside `core.db` — including `voicemail_default.db`, `sofia_reg_internal.db`, `sofia_reg_external.db`, `callcenter.db`, `fifo.db`, and `call_limit.db`. Mounting the directory on a bare `tmpfs` wipes voicemail index data and active state across every reboot.
+2. **Memory headroom:** Small appliances (`1 vCPU / 1 GB RAM`) run with roughly 340 MB of available RAM after resident services start; dedicating RAM to `tmpfs` shrinks headroom and can trigger swap pressure.
+
+#### Option 1 (Recommended for High Concurrency): Using MariaDB Instead of SQLite
+
+If a high-concurrency deployment encounters real SQLite lock contention (`SQLite is BUSY`) or needs shared external storage, move FreeSWITCH's runtime database to **MariaDB** rather than volatile `tmpfs` RAM:
+
+1. **Install and enable `mod_mariadb` in FreeSWITCH:**
+   - **Packaged Debian installs:**
+     ```bash
+     sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb
+     ```
+   - **Source builds:** Install `libmariadb-dev` before compiling FreeSWITCH so `mod_mariadb` is built.
+   - Edit `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml` and uncomment `<load module="mod_mariadb"/>` so the driver is loaded before `switch.conf` opens its DSN.
+
+2. **Create a dedicated MariaDB database and user for FreeSWITCH** (separate from TallPBX's `tallpbx` Laravel database; `scripts/resources/mariadb.sh` creates only the Laravel schema):
+   ```sql
+   CREATE DATABASE freeswitch CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE USER 'freeswitch'@'127.0.0.1' IDENTIFIED BY '<strong-password>';
+   GRANT ALL PRIVILEGES ON freeswitch.* TO 'freeswitch'@'127.0.0.1';
+   FLUSH PRIVILEGES;
+   ```
+
+3. **Configure TallPBX `.env`:**
+   ```dotenv
+   FS_DB_DRIVER=mariadb
+   FS_DB_HOST=127.0.0.1
+   FS_DB_PORT=3306
+   FS_DB_NAME=freeswitch
+   FS_DB_USERNAME=freeswitch
+   FS_DB_PASSWORD=<strong-password>
+   FS_AUTO_CREATE_SCHEMAS=true
+   # Fail startup instead of silently falling back to SQLite if MariaDB is unreachable:
+   FS_CORE_NON_SQLITE_DB_REQUIRED=true
+   ```
+   *(Alternatively, supply a full connection string in `FS_DB_DSN`, e.g. `mariadb://Server=127.0.0.1;Port=3306;Database=freeswitch;Uid=freeswitch;Pwd=<strong-password>;`, or use `FS_DB_DRIVER=pgsql` / `odbc`. Full key reference: [env-reference.md](env-reference.md#23-freeswitch-runtime-database--dsn).)*
+
+4. **Apply and verify:**
+   ```bash
+   tpbx optimize:clear
+   sudo systemctl restart freeswitch
+   fs_cli -x "module_exists mod_mariadb"   # expects: true
+   ```
+   With `FS_AUTO_CREATE_SCHEMAS=true`, FreeSWITCH creates its core/runtime tables inside the `freeswitch` MariaDB database at startup.
+
+   > **Scope note:** TallPBX's `mod_xml_curl` generator (`SofiaConfigXmlBuilder`) emits `core-db-dsn` (`switch.conf`) and `odbc-dsn` (`db.conf`, `fifo.conf`) when `FS_DB_DRIVER` is `mariadb`. Module configurations that do not render `odbc-dsn` (`sofia.conf` profiles, `callcenter.conf`, and static `voicemail.conf.xml`) continue using local SQLite unless `<param name="odbc-dsn" .../>` is also configured on those modules. Alternatively, to keep everything on SQLite while moving only `core.db`, set `FS_CORE_DB_NAME`.
+
+#### Option 2 (Non-Default / Benchmarking Only): `tmpfs` Ablation Mode
+Reserved for controlled load-test comparisons (`load-testing/scripts/lib/switch.sh apply_fs_db_mode tmpfs`) or ephemeral hosts whose persistent FreeSWITCH state lives outside `/var/lib/freeswitch/db`.
 
 ---
 
@@ -208,10 +251,10 @@ TallPBX configures a 3-tier binding ladder in `xml_curl.conf.xml`:
 
 | Hardware Tier | Recommended CPS | Target Concurrent Calls | Primary Architectural Constraints | Recommended Settings |
 | :--- | :---: | :---: | :--- | :--- |
-| **1 vCPU / 1 GB RAM** | **5 CPS** | **20 – 35 calls** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Optional Octane worker, `tmpfs` DB, `notice` logging, dynamic FPM (3 max). |
-| **2 vCPU / 2 GB RAM** | **10 CPS** baseline<br>*(25+ CPS with Octane)* | **75 – 120 calls** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max). |
-| **4 vCPU / 8 GB RAM (Cloud VPS / Appliance)** | **15–25 CPS** baseline<br>*(30–60+ CPS with Octane — projected, unmeasured)* | **150 – 350 calls** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max). |
-| **8 vCPU / 16 GB Dedicated** | **60+ CPS** | **350+ calls** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), dedicated DB host. |
+| **1 vCPU / 1 GB RAM** | **5 CPS** | **20 – 35 calls** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Disk SQLite (default), `notice` logging, dynamic FPM (3 max), optional Octane worker. |
+| **2 vCPU / 2 GB RAM** | **10 CPS** baseline<br>*(25+ CPS with Octane)* | **75 – 120 calls** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max); optional `FS_DB_DRIVER=mariadb` if SQLite lock contention appears. |
+| **4 vCPU / 8 GB RAM (Cloud VPS / Appliance)** | **15–25 CPS** baseline<br>*(30–60+ CPS with Octane — projected, unmeasured)* | **150 – 350 calls** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max); optional `FS_DB_DRIVER=mariadb`. |
+| **8 vCPU / 16 GB Dedicated** | **60+ CPS** | **350+ calls** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), `FS_DB_DRIVER=mariadb` or dedicated DB host. |
 
 ---
 
@@ -220,8 +263,11 @@ TallPBX configures a 3-tier binding ladder in `xml_curl.conf.xml`:
 To verify call capacity scalability without regressions, run the standardized capacity ladder from the load generator:
 
 ```bash
-# 1. Verify FreeSWITCH DB is mounted in RAM
-mountpoint /var/lib/freeswitch/db
+# 1. Confirm FreeSWITCH runtime database filesystem (disk-backed ext4/xfs by default)
+findmnt -n -o FSTYPE --target /var/lib/freeswitch/db
+
+# Optional (if FS_DB_DRIVER=mariadb is enabled): confirm mod_mariadb is loaded
+fs_cli -x "module_exists mod_mariadb"
 
 # 2. Verify FreeSWITCH production logging level
 fs_cli -x "fsctl loglevel"

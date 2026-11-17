@@ -478,6 +478,19 @@ You can check and adjust the session rate immediately at runtime via `fs_cli` wi
   ```
   *(Note: Dynamic `fsctl sps` adjustments take effect instantly in memory. To ensure the new rate persists across service restarts, also update `FS_SESSIONS_PER_SECOND` in `.env`.)*
 
+## FreeSWITCH Runtime Database (SQLite Default vs. MariaDB)
+
+FreeSWITCH uses disk-backed SQLite in `/var/lib/freeswitch/db` (`FS_DB_DRIVER=sqlite`) by default. TallPBX intentionally keeps `/var/lib/freeswitch/db` on disk rather than `tmpfs` so persistent tables such as `voicemail_default.db` survive reboots without consuming appliance RAM.
+
+To move FreeSWITCH runtime tables (`switch.conf`, `db.conf`, `fifo.conf`) to MariaDB when needed for high-concurrency deployments:
+
+1. Install `freeswitch-mod-mariadb` (`sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb` on packaged installs, or `libmariadb-dev` when building from source) and uncomment `<load module="mod_mariadb"/>` in `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml`.
+2. Create a dedicated `freeswitch` database and user in MariaDB (separate from the `tallpbx` application database) and grant privileges on `freeswitch.*`.
+3. Set `FS_DB_DRIVER=mariadb` and the `FS_DB_*` credentials (`FS_DB_HOST`, `FS_DB_PORT`, `FS_DB_NAME`, `FS_DB_USERNAME`, `FS_DB_PASSWORD`, optionally `FS_CORE_NON_SQLITE_DB_REQUIRED=true`) in `/var/www/tallpbx/.env`.
+4. Run `tpbx optimize:clear && sudo systemctl restart freeswitch`, then verify with `fs_cli -x "module_exists mod_mariadb"`.
+
+For the full SQL setup, verification commands, and which FreeSWITCH modules still use SQLite unless configured with `odbc-dsn`, see [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) and [Environment Reference §2.3](env-reference.md#23-freeswitch-runtime-database--dsn).
+
 ## FreeSWITCH XML Gateway & Security Token (mod_xml_curl)
 
 FreeSWITCH fetches its user directory (phone extensions, SIP passwords), dialplans (call routing), and core switch configuration dynamically from Laravel via `mod_xml_curl`. To prevent unauthorized HTTP access to phone credentials or dialplans, every lookup must include the shared secret token (`FS_XML_HANDLER_TOKEN`).

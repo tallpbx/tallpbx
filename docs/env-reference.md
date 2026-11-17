@@ -158,6 +158,9 @@ Configures FreeSWITCH's internal state storage engine (Sofia registrations, acti
 | `FS_ODBC_SKIP_AUTOCOMMIT_FLIP` | `boolean`| `false` | `freeswitch.database.odbc_skip_autocommit_flip` | Skips ODBC autocommit flipping for specialized database drivers. |
 | `FS_AUTO_CLEAR_SQL` | `boolean` | `false` | `freeswitch.database.auto_clear_sql` | Automatically drops and recreates runtime SQL tables on system reboot. |
 
+> [!NOTE]
+> `FS_DB_DRIVER=sqlite` (on disk at `/var/lib/freeswitch/db`) is the shipped default. Switching to `FS_DB_DRIVER=mariadb` also requires installing and preloading `mod_mariadb` (`freeswitch-mod-mariadb` in `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml`) and creating a dedicated `freeswitch` MariaDB database and user; see [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) for setup steps and module scope.
+
 ---
 
 ### 2.4 Core Telephony Engine, Performance & Hiredis
