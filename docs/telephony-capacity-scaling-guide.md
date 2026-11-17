@@ -166,47 +166,48 @@ When multiple channel events occur in rapid succession, [`BroadcastDashboardStat
 
 #### Option 1 (Recommended for High Concurrency): Using MariaDB Instead of SQLite
 
-If a high-concurrency deployment encounters real SQLite lock contention (`SQLite is BUSY`) or needs shared external storage, move FreeSWITCH's runtime database to **MariaDB** rather than volatile `tmpfs` RAM:
+If a deployment encounters SQLite lock contention (`SQLite is BUSY`) or needs shared external state, you can replace SQLite across FreeSWITCH with a **dedicated `freeswitch` MariaDB database** (separate from TallPBX's `tallpbx` schema) using FreeSWITCH's native `mod_mariadb` driver. Note that in FreeSWITCH XML, modules still name the parameter `odbc-dsn` even when given a native `mariadb://...` URI (no unixODBC is required).
 
-1. **Install and enable `mod_mariadb` in FreeSWITCH:**
-   - **Packaged Debian installs:**
-     ```bash
-     sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb
+When `FS_DB_DRIVER=mariadb`, TallPBX automatically emits the `mariadb://...` DSN across `switch.conf` (`core.db`), `db.conf` (`call_limit.db`), `fifo.conf` (`fifo.db`), `sofia.conf` profiles (`sofia_reg_*.db`, unless overridden in profile settings), `callcenter.conf` (`callcenter.db`), and `voicemail.conf` (`voicemail_default.db`). Load testing comparing `FS_DB_DRIVER=mariadb` against the disk-backed SQLite default has not yet been run and is scheduled for future benchmarking.
+
+- **New installations (opt-in; `sqlite` remains the default):**
+  Set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`) before running `scripts/install.sh`. The installer creates the dedicated `freeswitch` database and user, writes `FS_DB_*` into `.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` on source builds), and enables `<load module="mod_mariadb"/>` in `pre_load_modules.conf.xml`.
+
+- **Existing installations:**
+  1. **Install `mod_mariadb` in FreeSWITCH:**
+     - **Packaged Debian installs:**
+       ```bash
+       sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb
+       ```
+     - **Source builds:** Already compiled if installed with updated `scripts/resources/freeswitch.sh` (`libmariadb-dev` + `databases/mod_mariadb`); otherwise install `libmariadb-dev`, enable `databases/mod_mariadb` in `modules.conf`, and run `make mod_mariadb-install`.
+  2. **Create the dedicated `freeswitch` MariaDB database and user** (separate from TallPBX's `tallpbx` database; `scripts/resources/mariadb.sh` creates only `tallpbx` unless `FSPBX_FREESWITCH_DB_DRIVER=mariadb` or `FS_DB_DRIVER=mariadb`):
+     ```sql
+     CREATE DATABASE freeswitch CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+     CREATE USER 'freeswitch'@'127.0.0.1' IDENTIFIED BY '<strong-password>';
+     GRANT ALL PRIVILEGES ON freeswitch.* TO 'freeswitch'@'127.0.0.1';
+     FLUSH PRIVILEGES;
      ```
-   - **Source builds:** Install `libmariadb-dev` before compiling FreeSWITCH so `mod_mariadb` is built.
-   - Edit `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml` and uncomment `<load module="mod_mariadb"/>` so the driver is loaded before `switch.conf` opens its DSN.
-
-2. **Create a dedicated MariaDB database and user for FreeSWITCH** (separate from TallPBX's `tallpbx` Laravel database; `scripts/resources/mariadb.sh` creates only the Laravel schema):
-   ```sql
-   CREATE DATABASE freeswitch CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   CREATE USER 'freeswitch'@'127.0.0.1' IDENTIFIED BY '<strong-password>';
-   GRANT ALL PRIVILEGES ON freeswitch.* TO 'freeswitch'@'127.0.0.1';
-   FLUSH PRIVILEGES;
-   ```
-
-3. **Configure TallPBX `.env`:**
-   ```dotenv
-   FS_DB_DRIVER=mariadb
-   FS_DB_HOST=127.0.0.1
-   FS_DB_PORT=3306
-   FS_DB_NAME=freeswitch
-   FS_DB_USERNAME=freeswitch
-   FS_DB_PASSWORD=<strong-password>
-   FS_AUTO_CREATE_SCHEMAS=true
-   # Fail startup instead of silently falling back to SQLite if MariaDB is unreachable:
-   FS_CORE_NON_SQLITE_DB_REQUIRED=true
-   ```
-   *(Alternatively, supply a full connection string in `FS_DB_DSN`, e.g. `mariadb://Server=127.0.0.1;Port=3306;Database=freeswitch;Uid=freeswitch;Pwd=<strong-password>;`, or use `FS_DB_DRIVER=pgsql` / `odbc`. Full key reference: [env-reference.md](env-reference.md#23-freeswitch-runtime-database--dsn).)*
-
-4. **Apply and verify:**
-   ```bash
-   tpbx optimize:clear
-   sudo systemctl restart freeswitch
-   fs_cli -x "module_exists mod_mariadb"   # expects: true
-   ```
-   With `FS_AUTO_CREATE_SCHEMAS=true`, FreeSWITCH creates its core/runtime tables inside the `freeswitch` MariaDB database at startup.
-
-   > **Scope note:** TallPBX's `mod_xml_curl` generator (`SofiaConfigXmlBuilder`) emits `core-db-dsn` (`switch.conf`) and `odbc-dsn` (`db.conf`, `fifo.conf`) when `FS_DB_DRIVER` is `mariadb`. Module configurations that do not render `odbc-dsn` (`sofia.conf` profiles, `callcenter.conf`, and static `voicemail.conf.xml`) continue using local SQLite unless `<param name="odbc-dsn" .../>` is also configured on those modules. Alternatively, to keep everything on SQLite while moving only `core.db`, set `FS_CORE_DB_NAME`.
+  3. **Configure TallPBX `.env`:**
+     ```dotenv
+     FS_DB_DRIVER=mariadb
+     FS_DB_HOST=127.0.0.1
+     FS_DB_PORT=3306
+     FS_DB_NAME=freeswitch
+     FS_DB_USERNAME=freeswitch
+     FS_DB_PASSWORD=<strong-password>
+     FS_AUTO_CREATE_SCHEMAS=true
+     # Fail startup instead of silently falling back to SQLite if MariaDB is unreachable:
+     FS_CORE_NON_SQLITE_DB_REQUIRED=true
+     ```
+     *(Alternatively, supply a full connection string in `FS_DB_DSN`, e.g. `mariadb://Server=127.0.0.1;Port=3306;Database=freeswitch;Uid=freeswitch;Pwd=<strong-password>;`, or use `FS_DB_DRIVER=pgsql` / `odbc`. Full key reference: [env-reference.md](env-reference.md#23-freeswitch-runtime-database--dsn).)*
+  4. **Enable `mod_mariadb` preload, apply config, and verify:**
+     ```bash
+     sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only
+     tpbx optimize:clear
+     sudo systemctl restart freeswitch
+     fs_cli -x "module_exists mod_mariadb"   # expects: true
+     ```
+     (`freeswitch.sh --configure-only` uncomments `<load module="mod_mariadb"/>` in `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml` so `mod_mariadb` loads before `switch.conf` opens its DSN.) With `FS_AUTO_CREATE_SCHEMAS=true`, FreeSWITCH creates its tables inside the `freeswitch` database at startup. To keep everything on SQLite while moving only `core.db`, leave `FS_DB_DRIVER=sqlite` and set `FS_CORE_DB_NAME`.
 
 #### Option 2 (Non-Default / Benchmarking Only): `tmpfs` Ablation Mode
 Reserved for controlled load-test comparisons (`load-testing/scripts/lib/switch.sh apply_fs_db_mode tmpfs`) or ephemeral hosts whose persistent FreeSWITCH state lives outside `/var/lib/freeswitch/db`.

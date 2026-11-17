@@ -167,6 +167,46 @@ configure_freeswitch_switch_defaults() {
     verbose "FreeSWITCH core defaults configured: sessions-per-second=${sessions_per_second}, loglevel=${log_level}"
 }
 
+# Resolve whether FreeSWITCH is configured to use MariaDB or the default SQLite backend.
+freeswitch_database_driver() {
+    local app_dir="/var/www/tallpbx"
+    local env_file="${app_dir}/.env"
+    local state_file="${PBX_INSTALLER_STATE_FILE:-/etc/default/tallpbx}"
+    local driver="${FSPBX_FREESWITCH_DB_DRIVER:-}"
+
+    if [ -z "$driver" ] && [ -f "$env_file" ]; then
+        driver="$(get_env_value "$env_file" FS_DB_DRIVER)"
+    fi
+
+    if [ -z "$driver" ] && [ -f "$state_file" ]; then
+        driver="$(get_env_value "$state_file" FSPBX_FREESWITCH_DB_DRIVER)"
+    fi
+
+    printf '%s\n' "${driver:-sqlite}"
+}
+
+# Toggle mod_mariadb in pre_load_modules.conf.xml to match FS_DB_DRIVER while
+# keeping SQLite as the shipped default.
+configure_freeswitch_database_driver() {
+    local conf_dir=""
+    local preload_conf=""
+    local driver=""
+
+    conf_dir="$(freeswitch_conf_dir)"
+    preload_conf="${conf_dir}/autoload_configs/pre_load_modules.conf.xml"
+    driver="$(freeswitch_database_driver)"
+
+    if [ "$driver" = "mariadb" ]; then
+        ensure_freeswitch_module_enabled "$preload_conf" "mod_mariadb" "<!-- Databases -->"
+
+        if [ ! -f /usr/lib/freeswitch/mod/mod_mariadb.so ] && [ ! -f /usr/local/freeswitch/mod/mod_mariadb.so ]; then
+            warning "FS_DB_DRIVER=mariadb is selected, but mod_mariadb.so is missing (install freeswitch-mod-mariadb or build with libmariadb-dev)"
+        fi
+    else
+        disable_freeswitch_module "$preload_conf" "mod_mariadb"
+    fi
+}
+
 # Set the default FreeSWITCH sound prompt language in vars.xml.
 configure_freeswitch_sound_defaults() {
     local conf_dir=""
@@ -580,6 +620,7 @@ if [ "${1:-}" = "--configure-only" ]; then
     configure_tallpbx_media_root
     configure_freeswitch_systemd_dependencies
     configure_freeswitch_switch_defaults
+    configure_freeswitch_database_driver
     configure_freeswitch_sound_defaults
     configure_dynamic_xml
     configure_json_cdr
@@ -621,7 +662,7 @@ install_freeswitch_source_dependencies() {
     apt_get_with_lock_wait install -y autoconf automake build-essential cmake curl flac g++ git \
         libavformat-dev libswscale-dev libcurl4-openssl-dev libedit-dev libgdbm-dev libjpeg-dev \
         libldns-dev liblua5.2-dev libmemcached-dev libmp3lame-dev libmpg123-dev \
-        libncurses-dev libopus-dev libpcre2-dev libperl-dev libpq-dev libshout3-dev \
+        libncurses-dev libopus-dev libpcre2-dev libperl-dev libpq-dev libmariadb-dev libshout3-dev \
         libsndfile1-dev libspeex-dev libspeexdsp-dev libsqlite3-dev libssl-dev \
         libtiff-dev libtool libtool-bin libuv1-dev libvpx-dev libhiredis-dev make \
         nasm pkg-config sox swig uuid-dev wget yasm
@@ -699,7 +740,7 @@ enable_tallpbx_source_modules() {
     # Keep source builds functionally aligned with the package profile. These
     # entries are intentionally the FreeSWITCH source-tree module paths.
     for module in applications/mod_callcenter applications/mod_dptools applications/mod_voicemail \
-        applications/mod_hiredis endpoints/mod_sofia event_handlers/mod_json_cdr formats/mod_av \
+        applications/mod_hiredis databases/mod_mariadb endpoints/mod_sofia event_handlers/mod_json_cdr formats/mod_av \
         formats/mod_local_stream formats/mod_sndfile xml_int/mod_xml_curl \
         say/mod_say_es say/mod_say_fr; do
         sed -i "s|^#${module}|${module}|" "$modules_file"
@@ -977,6 +1018,10 @@ elif [ "$freeswitch_install_method" = "packages" ]; then
         freeswitch-mod-xml-curl \
         freeswitch-sounds-en-us-callie
 
+    if [ "$(freeswitch_database_driver)" = "mariadb" ]; then
+        apt_get_with_lock_wait install -y freeswitch-mod-mariadb
+    fi
+
     install_freeswitch_hiredis_package
 
     # The package ships its default configuration under
@@ -1057,6 +1102,7 @@ if [ -f /lib/systemd/system/freeswitch.service ]; then
 fi
 
 configure_freeswitch_switch_defaults
+configure_freeswitch_database_driver
 configure_freeswitch_sound_defaults
 configure_dynamic_xml
 configure_json_cdr

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Modules\Acl\Models\AccessControl;
+use Modules\CallCenters\Models\Queue;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
 use Modules\Extensions\Models\Extension;
@@ -1608,4 +1609,106 @@ it('disables xml-handler rate limiting only when explicitly opted out', function
     $limit = RateLimiter::limiter('xml-handler')(Request::create('/api/v1/xml-handler', 'POST'));
 
     expect($limit->maxAttempts)->toBe(PHP_INT_MAX); // Limit::none() sentinel = unlimited
+});
+
+it('injects native mariadb odbc-dsn into sofia profiles, callcenter.conf, and voicemail.conf without breaking sqlite defaults', function () {
+    $tenant = Tenant::factory()->create();
+    $domain = TenantDomain::factory()->create([
+        'tenant_id' => $tenant->id,
+        'domain' => 'fs-db.example.test',
+        'enabled' => true,
+    ]);
+
+    SipProfile::factory()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'internal',
+        'settings' => ['sip-port' => 5060],
+        'enabled' => true,
+    ]);
+
+    SipProfile::factory()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'custom_dsn',
+        'settings' => ['sip-port' => 5080, 'odbc-dsn' => 'mariadb://Server=custom;Database=custom;Uid=u;Pwd=p;'],
+        'enabled' => true,
+    ]);
+
+    Queue::factory()->create([
+        'tenant_id' => $tenant->id,
+        'name' => 'support_queue',
+        'enabled' => true,
+    ]);
+
+    // Default SQLite mode keeps all three untouched.
+    config([
+        'freeswitch.database.driver' => 'sqlite',
+        'freeswitch.database.dsn' => null,
+        'freeswitch.database.odbc_dsn' => null,
+    ]);
+
+    $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'configuration',
+        'key_name' => 'name',
+        'key_value' => 'sofia.conf',
+        'domain' => $domain->domain,
+    ]))->assertOk()->assertDontSee('mariadb://Server=127.0.0.1', false);
+
+    $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'configuration',
+        'key_name' => 'name',
+        'key_value' => 'callcenter.conf',
+        'domain' => $domain->domain,
+    ]))->assertOk()->assertDontSee('odbc-dsn', false);
+
+    $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'configuration',
+        'key_name' => 'name',
+        'key_value' => 'voicemail.conf',
+        'domain' => $domain->domain,
+    ]))->assertOk()->assertDontSee('<configuration name="voicemail.conf"', false);
+
+    // Opt-in MariaDB mode replaces SQLite across sofia, callcenter, and voicemail.
+    config([
+        'freeswitch.database.driver' => 'mariadb',
+        'freeswitch.database.host' => '127.0.0.1',
+        'freeswitch.database.port' => 3306,
+        'freeswitch.database.database' => 'freeswitch',
+        'freeswitch.database.username' => 'freeswitch',
+        'freeswitch.database.password' => 'secret',
+    ]);
+
+    $expectedDsn = 'mariadb://Server=127.0.0.1;Port=3306;Database=freeswitch;Uid=freeswitch;Pwd=secret;';
+
+    $sofiaXml = $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'configuration',
+        'key_name' => 'name',
+        'key_value' => 'sofia.conf',
+        'domain' => $domain->domain,
+    ]))->assertOk()->content();
+
+    expect($sofiaXml)
+        ->toContain('<param name="odbc-dsn" value="'.$expectedDsn.'"/>')
+        ->toContain('<param name="odbc-dsn" value="mariadb://Server=custom;Database=custom;Uid=u;Pwd=p;"/>');
+    expect(substr_count($sofiaXml, 'name="odbc-dsn"'))->toBe(2);
+
+    $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'configuration',
+        'key_name' => 'name',
+        'key_value' => 'callcenter.conf',
+        'domain' => $domain->domain,
+    ]))
+        ->assertOk()
+        ->assertSee('<param name="odbc-dsn" value="'.$expectedDsn.'"/>', false)
+        ->assertSee('<queue name="support_queue@default">', false);
+
+    $this->get('/api/v1/xml-handler?'.http_build_query([
+        'section' => 'configuration',
+        'key_name' => 'name',
+        'key_value' => 'voicemail.conf',
+        'domain' => $domain->domain,
+    ]))
+        ->assertOk()
+        ->assertSee('<configuration name="voicemail.conf" description="Voicemail">', false)
+        ->assertSee('<param name="odbc-dsn" value="'.$expectedDsn.'"/>', false)
+        ->assertSee('<profile name="default">', false);
 });

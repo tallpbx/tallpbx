@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\SipProfiles\Services;
 
+use App\Support\FreeSwitchDatabaseDsn;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\Gateways\Services\GatewayServiceInterface;
 use Modules\SipProfiles\Models\SipProfile;
@@ -88,6 +89,15 @@ class SipProfileService implements SipProfileServiceInterface
                 $xml .= '    <param name="'.e($key).'" value="'.e(implode(',', $value)).'"/>'."\n";
             } else {
                 $xml .= '    <param name="'.e($key).'" value="'.e((string) $value).'"/>'."\n";
+            }
+        }
+
+        // Direct external database DSN (e.g. mariadb://...) so Sofia
+        // registration and dialog state leave SQLite when FS_DB_DRIVER is set.
+        if (! array_key_exists('odbc-dsn', $settings)) {
+            $moduleDsn = FreeSwitchDatabaseDsn::moduleDsn();
+            if ($moduleDsn !== null) {
+                $xml .= '    <param name="odbc-dsn" value="'.htmlspecialchars($moduleDsn, ENT_XML1 | ENT_QUOTES, 'UTF-8').'"/>'."\n";
             }
         }
 

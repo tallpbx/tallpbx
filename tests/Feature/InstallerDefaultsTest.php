@@ -1252,3 +1252,63 @@ it('configures letsencrypt port 80 server block with root directive, unescaped p
     expect(substr_count($script, 'fastcgi_param HTTP_AUTHORIZATION \$http_authorization;'))
         ->toBeGreaterThanOrEqual(8);
 });
+
+it('keeps sqlite as the default freeswitch runtime database while supporting opt-in mariadb provisioning', function (): void {
+    $config = (string) file_get_contents(base_path('scripts/resources/config.sh'));
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+    $mariadb = (string) file_get_contents(base_path('scripts/resources/mariadb.sh'));
+    $tall = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+    $freeswitch = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    expect($config)
+        ->toContain('freeswitch_db_driver=sqlite')
+        ->toContain('freeswitch_db_name=freeswitch')
+        ->toContain('freeswitch_db_username=freeswitch');
+
+    expect($installer)
+        ->toContain('FSPBX_FREESWITCH_DB_DRIVER')
+        ->toContain('sqlite|mariadb');
+
+    expect($mariadb)
+        ->toContain('fs_db_driver')
+        ->toContain('CREATE DATABASE IF NOT EXISTS $fs_db_name')
+        ->toContain('GRANT ALL PRIVILEGES ON $fs_db_name.*');
+
+    expect($tall)
+        ->toContain('FS_DB_DRIVER')
+        ->toContain('FS_CORE_NON_SQLITE_DB_REQUIRED');
+
+    expect($freeswitch)
+        ->toContain('configure_freeswitch_database_driver')
+        ->toContain('pre_load_modules.conf.xml')
+        ->toContain('freeswitch-mod-mariadb')
+        ->toContain('libmariadb-dev')
+        ->toContain('databases/mod_mariadb');
+});
+
+it('resolves an alternate password key from installer state without breaking DB_PASSWORD callers', function (): void {
+    $temporaryDirectory = sys_get_temp_dir().'/pbx-fs-db-state-'.bin2hex(random_bytes(8));
+    $statePath = $temporaryDirectory.'/installer.env';
+    $envPath = $temporaryDirectory.'/app.env';
+    mkdir($temporaryDirectory, 0755, true);
+    file_put_contents($statePath, "DB_PASSWORD=appsecret\nFS_DB_PASSWORD=fssecret\n");
+    file_put_contents($envPath, "FS_DB_PASSWORD=oldfssecret\n");
+
+    try {
+        $command = implode("\n", [
+            '. '.escapeshellarg(base_path('scripts/resources/environment.sh')),
+            sprintf('app_pw=$(resolve_database_password random %s %s)', escapeshellarg($statePath), escapeshellarg($envPath)),
+            sprintf('fs_pw=$(resolve_database_password random %s %s FS_DB_PASSWORD)', escapeshellarg($statePath), escapeshellarg($envPath)),
+            'printf "%s|%s\n" "$app_pw" "$fs_pw"',
+        ]);
+
+        exec('bash -lc '.escapeshellarg($command), $output, $status);
+
+        expect($status)->toBe(0)
+            ->and(implode("\n", $output))->toBe('appsecret|fssecret');
+    } finally {
+        @unlink($statePath);
+        @unlink($envPath);
+        @rmdir($temporaryDirectory);
+    }
+});

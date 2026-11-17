@@ -422,6 +422,12 @@ validate_config_value () {
 validate_config_value "database_name" "$database_name"
 validate_config_value "database_username" "$database_username"
 validate_config_value "database_host" "$database_host"
+freeswitch_db_driver="${freeswitch_db_driver:-sqlite}"
+freeswitch_db_name="${freeswitch_db_name:-freeswitch}"
+freeswitch_db_username="${freeswitch_db_username:-freeswitch}"
+freeswitch_db_password="${freeswitch_db_password:-random}"
+validate_config_value "freeswitch_db_name" "$freeswitch_db_name"
+validate_config_value "freeswitch_db_username" "$freeswitch_db_username"
 
 # --- Preflight questionnaire ---
 # Ask every installer question before changing packages, services, or database
@@ -476,6 +482,42 @@ fi
 validate_config_value "database_password" "$database_password"
 set_secure_env_value "$INSTALLER_STATE_FILE" DB_PASSWORD "$database_password"
 export FSPBX_DB_PASSWORD="$database_password"
+
+# FreeSWITCH runtime database defaults to SQLite; allow opt-in MariaDB via
+# environment, saved installer state, or existing .env without altering standard installs.
+saved_freeswitch_db_driver=$(get_env_value /var/www/tallpbx/.env FS_DB_DRIVER)
+if [ -z "$saved_freeswitch_db_driver" ]; then
+    saved_freeswitch_db_driver=$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_DB_DRIVER)
+fi
+FSPBX_FREESWITCH_DB_DRIVER="${FSPBX_FREESWITCH_DB_DRIVER:-${saved_freeswitch_db_driver:-$freeswitch_db_driver}}"
+case "$FSPBX_FREESWITCH_DB_DRIVER" in
+    sqlite|mariadb) ;;
+    *)
+        error "Invalid FSPBX_FREESWITCH_DB_DRIVER '$FSPBX_FREESWITCH_DB_DRIVER'. Use sqlite or mariadb."
+        exit 1
+        ;;
+esac
+set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_DB_DRIVER "$FSPBX_FREESWITCH_DB_DRIVER"
+export FSPBX_FREESWITCH_DB_DRIVER
+export FSPBX_FREESWITCH_DB_NAME="$freeswitch_db_name"
+export FSPBX_FREESWITCH_DB_USERNAME="$freeswitch_db_username"
+
+if [ "$FSPBX_FREESWITCH_DB_DRIVER" = "mariadb" ]; then
+    saved_freeswitch_db_password="${FSPBX_FREESWITCH_DB_PASSWORD:-}"
+    if [ -z "$saved_freeswitch_db_password" ]; then
+        saved_freeswitch_db_password=$(resolve_database_password \
+            "$freeswitch_db_password" \
+            "$INSTALLER_STATE_FILE" \
+            /var/www/tallpbx/.env \
+            FS_DB_PASSWORD)
+    fi
+    if [ -z "$saved_freeswitch_db_password" ]; then
+        saved_freeswitch_db_password=$(od -An -N10 -tx1 /dev/urandom | tr -d ' \n')
+    fi
+    validate_config_value "freeswitch_db_password" "$saved_freeswitch_db_password"
+    set_secure_env_value "$INSTALLER_STATE_FILE" FS_DB_PASSWORD "$saved_freeswitch_db_password"
+    export FSPBX_FREESWITCH_DB_PASSWORD="$saved_freeswitch_db_password"
+fi
 
 # Decide how FreeSWITCH will be installed before any package work begins. The
 # saved selection is used as the default on re-runs so pressing Enter preserves

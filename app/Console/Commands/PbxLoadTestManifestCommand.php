@@ -220,9 +220,9 @@ class PbxLoadTestManifestCommand extends Command
     /**
      * Determine whether FreeSWITCH runs its runtime database on disk or tmpfs.
      *
-     * The scaling guide moves the SQLite runtime database to tmpfs; a cell
-     * measured with the disk-backed default is not comparable to one that is
-     * not, so both the mount state and the filesystem type are recorded.
+     * Cells run on the disk-backed default or an explicit tmpfs ablation and are
+     * not comparable across modes, so both mount state and filesystem type are
+     * recorded.
      *
      * @return array{mode: string, path: string, mounted: bool, filesystem: string|null}
      */

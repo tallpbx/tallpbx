@@ -159,7 +159,7 @@ Configures FreeSWITCH's internal state storage engine (Sofia registrations, acti
 | `FS_AUTO_CLEAR_SQL` | `boolean` | `false` | `freeswitch.database.auto_clear_sql` | Automatically drops and recreates runtime SQL tables on system reboot. |
 
 > [!NOTE]
-> `FS_DB_DRIVER=sqlite` (on disk at `/var/lib/freeswitch/db`) is the shipped default. Switching to `FS_DB_DRIVER=mariadb` also requires installing and preloading `mod_mariadb` (`freeswitch-mod-mariadb` in `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml`) and creating a dedicated `freeswitch` MariaDB database and user; see [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) for setup steps and module scope.
+> `FS_DB_DRIVER=sqlite` (on disk at `/var/lib/freeswitch/db`) is the shipped default. Switching to `FS_DB_DRIVER=mariadb` moves `switch.conf`, `db.conf`, `fifo.conf`, `sofia.conf` profiles, `callcenter.conf`, and `voicemail.conf` onto a separate `freeswitch` MariaDB schema using native `mod_mariadb` (no unixODBC required), and can also be provisioned at install time via `FSPBX_FREESWITCH_DB_DRIVER=mariadb`. See [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) for setup steps and benchmarking notes.
 
 ---
 

@@ -16,7 +16,7 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `tallpbx-scheduler` | Scheduled tasks and sweeps |
 | `tallpbx-reverb` | Real-time WebSocket server |
 | `tallpbx-cdr-worker` | Call detail record processor (see [Call Detail Records](#call-detail-records-cdr-pipeline)) |
-| `tallpbx-xml-worker` | Opt-in persistent XML worker serving FreeSWITCH lookups via Octane/RoadRunner (`127.0.0.1:8090`, installed disabled by default; see [Telephony XML Worker](#telephony-xml-worker-octane--roadrunner)) |
+| `tallpbx-xml-worker` | Opt-in persistent XML worker serving FreeSWITCH lookups via Octane/RoadRunner (`127.0.0.1:8090`, installed disabled by default; see [Octane XML Worker](#octane-xml-worker-optional-performance-mode)) |
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
@@ -482,14 +482,16 @@ You can check and adjust the session rate immediately at runtime via `fs_cli` wi
 
 FreeSWITCH uses disk-backed SQLite in `/var/lib/freeswitch/db` (`FS_DB_DRIVER=sqlite`) by default. TallPBX intentionally keeps `/var/lib/freeswitch/db` on disk rather than `tmpfs` so persistent tables such as `voicemail_default.db` survive reboots without consuming appliance RAM.
 
-To move FreeSWITCH runtime tables (`switch.conf`, `db.conf`, `fifo.conf`) to MariaDB when needed for high-concurrency deployments:
+You can opt into a separate `freeswitch` MariaDB database (`FS_DB_DRIVER=mariadb`) to completely replace SQLite across `switch.conf`, `db.conf`, `fifo.conf`, `sofia.conf` profiles, `callcenter.conf`, and `voicemail.conf` using FreeSWITCH's native `mod_mariadb` module (note that FreeSWITCH names the XML parameter `odbc-dsn`, even when passing a native `mariadb://...` URI without unixODBC):
 
-1. Install `freeswitch-mod-mariadb` (`sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb` on packaged installs, or `libmariadb-dev` when building from source) and uncomment `<load module="mod_mariadb"/>` in `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml`.
-2. Create a dedicated `freeswitch` database and user in MariaDB (separate from the `tallpbx` application database) and grant privileges on `freeswitch.*`.
-3. Set `FS_DB_DRIVER=mariadb` and the `FS_DB_*` credentials (`FS_DB_HOST`, `FS_DB_PORT`, `FS_DB_NAME`, `FS_DB_USERNAME`, `FS_DB_PASSWORD`, optionally `FS_CORE_NON_SQLITE_DB_REQUIRED=true`) in `/var/www/tallpbx/.env`.
-4. Run `tpbx optimize:clear && sudo systemctl restart freeswitch`, then verify with `fs_cli -x "module_exists mod_mariadb"`.
+- **New installations:** Set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`) before running `scripts/install.sh`. The installer creates the dedicated `freeswitch` database and user, writes `.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` for source builds), and enables `<load module="mod_mariadb"/>` in `pre_load_modules.conf.xml`. Standard installs stay on `sqlite`.
+- **Existing servers:**
+  1. Install `freeswitch-mod-mariadb` (`sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb` on packaged installs, or build `mod_mariadb` with `libmariadb-dev` from source).
+  2. Create a dedicated `freeswitch` database and user in MariaDB (separate from `tallpbx`), or set `FS_DB_DRIVER=mariadb` in `.env` and run `scripts/resources/mariadb.sh`.
+  3. Set `FS_DB_DRIVER=mariadb`, `FS_DB_*` credentials, and `FS_CORE_NON_SQLITE_DB_REQUIRED=true` in `/var/www/tallpbx/.env`.
+  4. Run `sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only`, `tpbx optimize:clear`, and `sudo systemctl restart freeswitch`, then verify with `fs_cli -x "module_exists mod_mariadb"`.
 
-For the full SQL setup, verification commands, and which FreeSWITCH modules still use SQLite unless configured with `odbc-dsn`, see [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) and [Environment Reference §2.3](env-reference.md#23-freeswitch-runtime-database--dsn).
+For full SQL setup and capacity guidance (load testing of `FS_DB_DRIVER=mariadb` vs. disk SQLite is planned as future work), see [Telephony Scaling Guide → Phase 3](telephony-capacity-scaling-guide.md#phase-3-runtime-database-and-persistence-options-disk-sqlite-default-vs-mariadb) and [Environment Reference §2.3](env-reference.md#23-freeswitch-runtime-database--dsn).
 
 ## FreeSWITCH XML Gateway & Security Token (mod_xml_curl)
 

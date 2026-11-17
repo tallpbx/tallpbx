@@ -196,6 +196,38 @@ set_env_value .env DB_DATABASE "$database_name"
 set_env_value .env DB_USERNAME "$database_username"
 set_env_value .env DB_PASSWORD "$database_password"
 
+# Preserve existing FreeSWITCH runtime DB settings on re-runs unless MariaDB
+# mode was explicitly selected by the installer. Default remains sqlite.
+INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/default/tallpbx}"
+fs_db_driver="${FSPBX_FREESWITCH_DB_DRIVER:-$(get_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_DB_DRIVER)}"
+fs_db_driver="${fs_db_driver:-$(get_env_value .env FS_DB_DRIVER)}"
+fs_db_driver="${fs_db_driver:-${freeswitch_db_driver:-sqlite}}"
+fs_db_name="${FSPBX_FREESWITCH_DB_NAME:-${freeswitch_db_name:-freeswitch}}"
+fs_db_user="${FSPBX_FREESWITCH_DB_USERNAME:-${freeswitch_db_username:-freeswitch}}"
+fs_db_password="${FSPBX_FREESWITCH_DB_PASSWORD:-$(get_env_value "$INSTALLER_STATE_FILE" FS_DB_PASSWORD)}"
+
+if [ "$fs_db_driver" = "mariadb" ]; then
+    set_env_value .env FS_DB_DRIVER mariadb
+    set_env_value .env FS_DB_HOST "${database_host:-127.0.0.1}"
+    set_env_value .env FS_DB_PORT 3306
+    set_env_value .env FS_DB_NAME "$fs_db_name"
+    set_env_value .env FS_DB_USERNAME "$fs_db_user"
+    if [ -n "$fs_db_password" ]; then
+        set_env_value .env FS_DB_PASSWORD "$fs_db_password"
+    fi
+    grep -q "^FS_AUTO_CREATE_SCHEMAS=" .env 2>/dev/null || echo "FS_AUTO_CREATE_SCHEMAS=true" >> .env
+    set_env_value .env FS_CORE_NON_SQLITE_DB_REQUIRED true
+else
+    grep -q "^FS_DB_DRIVER=" .env 2>/dev/null || echo "FS_DB_DRIVER=sqlite" >> .env
+    grep -q "^FS_DB_HOST=" .env 2>/dev/null || echo "FS_DB_HOST=127.0.0.1" >> .env
+    grep -q "^FS_DB_PORT=" .env 2>/dev/null || echo "FS_DB_PORT=3306" >> .env
+    grep -q "^FS_DB_NAME=" .env 2>/dev/null || echo "FS_DB_NAME=${fs_db_name}" >> .env
+    grep -q "^FS_DB_USERNAME=" .env 2>/dev/null || echo "FS_DB_USERNAME=${fs_db_user}" >> .env
+    grep -q "^FS_DB_PASSWORD=" .env 2>/dev/null || echo "FS_DB_PASSWORD=" >> .env
+    grep -q "^FS_AUTO_CREATE_SCHEMAS=" .env 2>/dev/null || echo "FS_AUTO_CREATE_SCHEMAS=true" >> .env
+    grep -q "^FS_CORE_NON_SQLITE_DB_REQUIRED=" .env 2>/dev/null || echo "FS_CORE_NON_SQLITE_DB_REQUIRED=false" >> .env
+fi
+
 # Set the application name shown in Laravel notifications and page titles.
 set_env_value .env APP_NAME TallPBX
 

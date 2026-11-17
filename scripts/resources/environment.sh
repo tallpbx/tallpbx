@@ -137,6 +137,7 @@ resolve_database_password () {
     local configured_password="$1"
     local state_file="$2"
     local application_environment_file="$3"
+    local password_key="${4:-DB_PASSWORD}"
     local saved_password
 
     if [ "$configured_password" != "random" ]; then
@@ -144,10 +145,10 @@ resolve_database_password () {
         return
     fi
 
-    saved_password=$(get_env_value "$state_file" DB_PASSWORD)
+    saved_password=$(get_env_value "$state_file" "$password_key")
 
     if [ -z "$saved_password" ]; then
-        saved_password=$(get_env_value "$application_environment_file" DB_PASSWORD)
+        saved_password=$(get_env_value "$application_environment_file" "$password_key")
     fi
 
     printf '%s\n' "$saved_password"

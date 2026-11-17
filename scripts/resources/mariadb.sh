@@ -63,3 +63,47 @@ EOF
 verbose "Database: $database_name"
 verbose "Username: $database_username"
 verbose "Password: stored securely in installer state"
+
+# Provision the separate FreeSWITCH runtime schema only when MariaDB is opted in.
+# Standard installations keep SQLite (FS_DB_DRIVER=sqlite) and touch only $database_name.
+INSTALLER_STATE_FILE="${PBX_INSTALLER_STATE_FILE:-/etc/default/tallpbx}"
+fs_db_driver="${FSPBX_FREESWITCH_DB_DRIVER:-$(get_env_value /var/www/tallpbx/.env FS_DB_DRIVER)}"
+fs_db_driver="${fs_db_driver:-${freeswitch_db_driver:-sqlite}}"
+
+if [ "$fs_db_driver" = "mariadb" ]; then
+    fs_db_name="${FSPBX_FREESWITCH_DB_NAME:-${freeswitch_db_name:-freeswitch}}"
+    fs_db_user="${FSPBX_FREESWITCH_DB_USERNAME:-${freeswitch_db_username:-freeswitch}}"
+    fs_db_password="${FSPBX_FREESWITCH_DB_PASSWORD:-}"
+
+    if [ -z "$fs_db_password" ]; then
+        fs_db_password=$(resolve_database_password \
+            "${freeswitch_db_password:-random}" \
+            "$INSTALLER_STATE_FILE" \
+            /var/www/tallpbx/.env \
+            FS_DB_PASSWORD)
+    fi
+
+    if [ -z "$fs_db_password" ]; then
+        fs_db_password=$(od -An -N10 -tx1 /dev/urandom | tr -d ' \n')
+        set_secure_env_value "$INSTALLER_STATE_FILE" FS_DB_PASSWORD "$fs_db_password"
+    fi
+
+    for pair in "fs_db_name:$fs_db_name" "fs_db_user:$fs_db_user" "fs_db_password:$fs_db_password"; do
+        key="${pair%%:*}"
+        value="${pair#*:}"
+        if [[ ! "$value" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+            error "Invalid FreeSWITCH database config value for '$key'"
+            exit 1
+        fi
+    done
+
+    mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS $fs_db_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$fs_db_user'@'$database_host' IDENTIFIED BY '$fs_db_password';
+ALTER USER '$fs_db_user'@'$database_host' IDENTIFIED BY '$fs_db_password';
+GRANT ALL PRIVILEGES ON $fs_db_name.* TO '$fs_db_user'@'$database_host';
+FLUSH PRIVILEGES;
+EOF
+
+    verbose "FreeSWITCH runtime database: $fs_db_name (user: $fs_db_user)"
+fi

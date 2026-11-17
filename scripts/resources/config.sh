@@ -21,6 +21,12 @@ database_password=random                     # Ask once, then save the chosen pa
 database_host=127.0.0.1                      # MariaDB server address on this same machine
 db_version=11.8                              # MariaDB version the installer configures
 
+# FreeSWITCH Runtime Database Settings (optional MariaDB backend; sqlite stays default)
+freeswitch_db_driver=sqlite                  # 'sqlite' (default) or 'mariadb' (opt-in)
+freeswitch_db_name=freeswitch                # Separate MariaDB schema when freeswitch_db_driver=mariadb
+freeswitch_db_username=freeswitch            # Dedicated MariaDB user when freeswitch_db_driver=mariadb
+freeswitch_db_password=random                # Generated/saved separately when freeswitch_db_driver=mariadb
+
 # FreeSWITCH Settings
 switch_branch=stable                         # FreeSWITCH Git branch when source installation is selected
 switch_tls=true                              # Keep TLS support enabled for FreeSWITCH

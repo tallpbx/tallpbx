@@ -8,6 +8,7 @@ use App\Models\TenantDomain;
 use App\Services\TenantManager;
 use App\Support\AclConfigurationCache;
 use App\Support\Concerns\EscapesXml;
+use App\Support\FreeSwitchDatabaseDsn;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\Acl\Models\AccessControl;
 use Modules\CallCenters\Models\Queue;
@@ -54,6 +55,7 @@ class SofiaConfigXmlBuilder
             'ivr.conf' => $this->buildIvrConfigurationXml($includeAllTenantConfiguration),
             'conference.conf' => $this->buildConferenceConfigurationXml($includeAllTenantConfiguration),
             'callcenter.conf' => $this->buildCallCenterConfigurationXml($includeAllTenantConfiguration),
+            'voicemail.conf' => $this->buildVoicemailConfigurationXml(),
             'local_stream.conf' => $this->buildLocalStreamConfigurationXml(),
             'acl.conf' => $this->buildAclConfigurationXml(),
             default => $this->buildPlaceholderConfigurationXml($keyName, $keyValue),
@@ -469,6 +471,14 @@ class SofiaConfigXmlBuilder
         $xml .= '<document type="freeswitch/xml">'."\n";
         $xml .= '  <section name="configuration">'."\n";
         $xml .= '    <configuration name="callcenter.conf" description="Call Center">'."\n";
+
+        $moduleDsn = $this->freeSwitchModuleDatabaseDsn();
+        if ($moduleDsn !== null) {
+            $xml .= '      <settings>'."\n";
+            $xml .= '        <param name="odbc-dsn" value="'.$this->escapeXml($moduleDsn).'"/>'."\n";
+            $xml .= '      </settings>'."\n";
+        }
+
         $xml .= '      <queues>'."\n";
 
         /** @var Collection<int, Queue> $queues */
@@ -498,6 +508,94 @@ class SofiaConfigXmlBuilder
         }
 
         $xml .= '      </queues>'."\n";
+        $xml .= '    </configuration>'."\n";
+        $xml .= '  </section>'."\n";
+        $xml .= '</document>';
+
+        return $xml;
+    }
+
+    /**
+     * Build voicemail.conf dynamically when an external FreeSWITCH DB DSN is active.
+     *
+     * Leaves SQLite setups on the static voicemail.conf.xml file so custom disk
+     * templates/settings continue to apply untouched.
+     */
+    private function buildVoicemailConfigurationXml(): string
+    {
+        $dsn = $this->freeSwitchModuleDatabaseDsn();
+
+        if ($dsn === null) {
+            return $this->buildPlaceholderConfigurationXml('name', 'voicemail.conf');
+        }
+
+        $params = [
+            'odbc-dsn' => $dsn,
+            'file-extension' => 'wav',
+            'terminator-key' => '#',
+            'max-login-attempts' => '3',
+            'digit-timeout' => '10000',
+            'min-record-len' => '3',
+            'max-record-len' => '300',
+            'max-retries' => '3',
+            'tone-spec' => '%(1000, 0, 640)',
+            'callback-dialplan' => 'XML',
+            'callback-context' => 'default',
+            'play-new-messages-key' => '1',
+            'play-saved-messages-key' => '2',
+            'login-keys' => '0',
+            'main-menu-key' => '0',
+            'config-menu-key' => '5',
+            'record-greeting-key' => '1',
+            'choose-greeting-key' => '2',
+            'change-pass-key' => '6',
+            'record-name-key' => '3',
+            'record-file-key' => '3',
+            'listen-file-key' => '1',
+            'save-file-key' => '2',
+            'delete-file-key' => '7',
+            'undelete-file-key' => '8',
+            'email-key' => '4',
+            'pause-key' => '0',
+            'restart-key' => '1',
+            'ff-key' => '6',
+            'rew-key' => '4',
+            'skip-greet-key' => '#',
+            'previous-message-key' => '1',
+            'next-message-key' => '3',
+            'skip-info-key' => '*',
+            'repeat-message-key' => '0',
+            'record-silence-threshold' => '200',
+            'record-silence-hits' => '2',
+            'web-template-file' => 'web-vm.tpl',
+            'db-password-override' => 'false',
+            'allow-empty-password-auth' => 'true',
+            'operator-extension' => 'operator XML default',
+            'operator-key' => '9',
+            'vmain-extension' => 'vmain XML default',
+            'vmain-key' => '*',
+        ];
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        $xml .= '<document type="freeswitch/xml">'."\n";
+        $xml .= '  <section name="configuration">'."\n";
+        $xml .= '    <configuration name="voicemail.conf" description="Voicemail">'."\n";
+        $xml .= '      <settings/>'."\n";
+        $xml .= '      <profiles>'."\n";
+        $xml .= '        <profile name="default">'."\n";
+
+        foreach ($params as $name => $value) {
+            $xml .= '          <param name="'.$this->escapeXml($name).'" value="'.$this->escapeXml($value).'"/>'."\n";
+        }
+
+        $xml .= '          <email>'."\n";
+        $xml .= '            <param name="template-file" value="voicemail.tpl"/>'."\n";
+        $xml .= '            <param name="notify-template-file" value="notify-voicemail.tpl"/>'."\n";
+        $xml .= '            <param name="date-fmt" value="%A, %B %d %Y, %I %M %p"/>'."\n";
+        $xml .= '            <param name="email-from" value="${voicemail_account}@${voicemail_domain}"/>'."\n";
+        $xml .= '          </email>'."\n";
+        $xml .= '        </profile>'."\n";
+        $xml .= '      </profiles>'."\n";
         $xml .= '    </configuration>'."\n";
         $xml .= '  </section>'."\n";
         $xml .= '</document>';
@@ -583,7 +681,7 @@ class SofiaConfigXmlBuilder
      */
     private function freeSwitchDatabaseDriver(): string
     {
-        return strtolower((string) config('freeswitch.database.driver', 'sqlite'));
+        return FreeSwitchDatabaseDsn::driver();
     }
 
     /**
@@ -591,17 +689,7 @@ class SofiaConfigXmlBuilder
      */
     private function freeSwitchDatabaseDsn(): ?string
     {
-        $configuredDsn = $this->nullableConfigString('freeswitch.database.dsn');
-        if ($configuredDsn !== null) {
-            return $configuredDsn;
-        }
-
-        return match ($this->freeSwitchDatabaseDriver()) {
-            'mariadb', 'mysql' => $this->buildMariaDbDsn(),
-            'pgsql', 'postgres', 'postgresql' => $this->buildPostgresDsn(),
-            'odbc' => $this->nullableConfigString('freeswitch.database.odbc_dsn'),
-            default => null,
-        };
+        return FreeSwitchDatabaseDsn::coreDsn();
     }
 
     /**
@@ -609,37 +697,7 @@ class SofiaConfigXmlBuilder
      */
     private function freeSwitchModuleDatabaseDsn(): ?string
     {
-        return $this->nullableConfigString('freeswitch.database.odbc_dsn')
-            ?? $this->freeSwitchDatabaseDsn();
-    }
-
-    /**
-     * Build a native MariaDB DSN from configured connection parts.
-     */
-    private function buildMariaDbDsn(): string
-    {
-        $host = (string) config('freeswitch.database.host', '127.0.0.1');
-        $port = (int) config('freeswitch.database.port', 3306);
-        $database = (string) config('freeswitch.database.database', 'freeswitch');
-        $username = (string) config('freeswitch.database.username', 'freeswitch');
-        $password = (string) config('freeswitch.database.password', '');
-
-        return "mariadb://Server={$host};Port={$port};Database={$database};Uid={$username};Pwd={$password};";
-    }
-
-    /**
-     * Build a native PostgreSQL DSN from configured connection parts.
-     */
-    private function buildPostgresDsn(): string
-    {
-        $host = (string) config('freeswitch.database.host', '127.0.0.1');
-        $port = (int) config('freeswitch.database.port', 5432);
-        $database = (string) config('freeswitch.database.database', 'freeswitch');
-        $username = (string) config('freeswitch.database.username', 'freeswitch');
-        $password = (string) config('freeswitch.database.password', '');
-        $options = (string) config('freeswitch.database.options', '');
-
-        return "pgsql://hostaddr={$host} port={$port} dbname={$database} user={$username} password={$password} options={$options}";
+        return FreeSwitchDatabaseDsn::moduleDsn();
     }
 
     /**
