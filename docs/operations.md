@@ -722,13 +722,13 @@ The restart loads the module with the new binding list while no lookup is in fli
 
 ### Fast to Stock Is an nginx Change Only
 
-Fast and Stock share the same binding URL, so moving between them only rewrites the nginx `location` block documented above. Apply it with:
+Fast and Stock share the same `tallpbx-fallback` binding URL (`/api/v1/xml-handler`), so switching between them only requires editing the `location = /api/v1/xml-handler` block in `/etc/nginx/sites-available/pbx` (see [Disabling It (Rollback to Stock Mode)](#disabling-it-rollback-to-stock-mode) and [Enabling It Again](#enabling-it-again)). Once that nginx configuration edit is saved, validate and reload nginx to apply it:
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-No FreeSWITCH restart and no binding change are involved in that direction.
+No FreeSWITCH restart and no `xml_curl.conf.xml` binding change are involved.
 
 ### Confirm Which Path Is Live
 
