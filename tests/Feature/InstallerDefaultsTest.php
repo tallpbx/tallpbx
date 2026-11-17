@@ -657,6 +657,8 @@ it('installs the root-owned restore helper and its systemd template', function (
         ->and($restoreHelper)->toContain('invalid restore operation UUID')
         ->and($restoreUnit)->toContain('ExecStart=/usr/local/sbin/tallpbx-restore %i')
         ->and($restoreUnit)->toContain('User=root')
+        ->and($restoreUnit)->toContain('TimeoutStartSec=3599s')
+        ->and($restoreUnit)->toContain('TimeoutStopSec=1s')
         ->and($tallScript)->toContain('install -m 0700 /var/www/tallpbx/scripts/resources/tallpbx-restore /usr/local/sbin/tallpbx-restore')
         ->and($tallScript)->toContain('install -m 0644 /var/www/tallpbx/scripts/resources/tallpbx-restore.service /etc/systemd/system/tallpbx-restore@.service')
         ->and($tallScript)->toContain('systemctl daemon-reload');

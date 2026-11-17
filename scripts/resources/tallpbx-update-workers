@@ -8,8 +8,8 @@
 # It never restarts core services: PHP-FPM is serving the update request and
 # MariaDB, Redis, Nginx, and FreeSWITCH may be carrying live traffic.
 #
-# Output is a fixed-format status: one "ok <unit>", "skipped <unit>", or
-# "failed <unit>" line per unit, consumed by RuntimeServiceReconciler.
+# Output is a fixed-format status: required units report "ok" or "failed";
+# the optional worker reports "ok", "skipped", or "warning".
 set -u
 
 if [ "$#" -ne 0 ]; then
@@ -53,8 +53,7 @@ for unit in "${optional_units[@]}"; do
     if systemctl restart "$unit" >/dev/null 2>&1 && systemctl is-active --quiet "$unit" >/dev/null 2>&1; then
         echo "ok $unit"
     else
-        echo "failed $unit"
-        failures=$((failures + 1))
+        echo "warning $unit"
     fi
 done
 

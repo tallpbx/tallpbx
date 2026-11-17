@@ -66,7 +66,9 @@ class CdrPayloadParser
         }
 
         $domain = $this->string($variables['domain_name'] ?? null);
-        $tenantId = $this->resolveTenantId($variables, $profile, $domain);
+        $bond = $this->string($variables['bridge_uuid'] ?? null) ?? $this->string($variables['signal_bond'] ?? null);
+        $isBridgedCallee = $bond !== null && ! $this->originated($variables);
+        $tenantId = $this->resolveTenantId($variables, $profile, $domain, $isBridgedCallee);
 
         if ($tenantId === null) {
             // tenant_id is NOT NULL and constrained. The record is preserved in
@@ -75,7 +77,6 @@ class CdrPayloadParser
             return null;
         }
 
-        $bond = $this->string($variables['bridge_uuid'] ?? null) ?? $this->string($variables['signal_bond'] ?? null);
         $now = Carbon::now();
 
         return [
@@ -84,7 +85,7 @@ class CdrPayloadParser
             'tenant_id' => (int) $tenantId,
             'call_uuid' => $callUuid,
             'b_leg_uuid' => $bond,
-            'leg' => $this->originated($variables) ? 'a' : ($bond !== null ? 'b' : 'a'),
+            'leg' => $isBridgedCallee ? 'b' : 'a',
             'caller_id' => $this->string($profile['caller_id_number'] ?? null) ?? $this->string($variables['caller_id_number'] ?? null),
             'caller_id_name' => $this->string($profile['caller_id_name'] ?? null) ?? $this->string($variables['caller_id_name'] ?? null),
             'destination' => $this->string($profile['destination_number'] ?? null) ?? $this->string($variables['destination_number'] ?? null),
@@ -108,20 +109,22 @@ class CdrPayloadParser
      *
      * Two call-time sources can name the owner: the channel variable the
      * dialplan stamped on the leg, and the tenant context the channel executed.
-     * They must agree. `domain_name` is deliberately not consulted: a domain is
-     * diagnostic context, can be reassigned between hangup and ingestion, and
-     * can describe the caller on a cross-tenant B-leg.
+     * They must agree when both belong to the channel. A bridged B-leg can
+     * inherit the A-leg's caller-profile context without executing that
+     * dialplan, so only its own channel context or stamped variable can name
+     * its tenant. `domain_name` is diagnostic and never assigns ownership.
      *
      * @param  array<string, mixed>  $variables
      * @param  array<string, mixed>  $profile
      */
-    private function resolveTenantId(array $variables, array $profile, ?string $domain): ?int
+    private function resolveTenantId(array $variables, array $profile, ?string $domain, bool $isBridgedCallee): ?int
     {
         $variable = $this->string($variables['tenant_id'] ?? null);
         $variableId = $variable !== null && is_numeric($variable) ? (int) $variable : null;
 
-        $context = $this->string($variables['context'] ?? null)
-            ?? $this->string($profile['context'] ?? null);
+        $channelContext = $this->string($variables['context'] ?? null);
+        $context = $channelContext
+            ?? ($isBridgedCallee ? null : $this->string($profile['context'] ?? null));
         $parsedContextId = $context === null ? null : app(DialplanContext::class)->parseTenantId($context);
         $contextId = $parsedContextId !== null && is_numeric($parsedContextId) ? (int) $parsedContextId : null;
 

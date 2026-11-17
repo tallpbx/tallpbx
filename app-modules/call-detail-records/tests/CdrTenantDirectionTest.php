@@ -75,6 +75,19 @@ it('falls back to the FreeSWITCH direction for a leg with no peer', function ():
         ->and(Cdr::factory()->create(['tenant_id' => $this->tenant->id, 'direction' => 'outbound', 'b_leg_uuid' => null])->tenantDirection())->toBe('outbound');
 });
 
+it('does not treat an unpaired B-leg channel direction as tenant-relative direction', function (): void {
+    $callee = Cdr::factory()->create([
+        'tenant_id' => $this->otherTenant->id,
+        'leg' => 'b',
+        'b_leg_uuid' => fake()->uuid(),
+        'direction' => 'outbound',
+    ]);
+
+    expect($callee->tenantDirection())->toBe('unknown');
+    Cdr::preloadTenantDirections(collect([$callee]));
+    expect($callee->tenantDirection())->toBe('unknown');
+});
+
 it('never exposes the peer record across tenants', function (): void {
     [$a] = bridgedPair(tenant: $this->tenant, peerTenant: $this->otherTenant);
 

@@ -192,7 +192,7 @@ it('seeds callable PBX defaults for the customer tenant', function () {
         ->assertSee('<extension name="local_extension">', false)
         ->assertDontSee('application="limit" data="hiredis default pbx:${domain_name}:local_extension:active 100000"', false)
         ->assertDontSee('application="hiredis_raw" data="default set pbx:mod_hiredis:last_call:${uuid} ${caller_id_number}-&gt;${destination_number}"', false)
-        ->assertSee('data="${sofia_contact($1@${domain_name})}[tenant_id='.$tenant->id.']"', false);
+        ->assertSee('data="[tenant_id=${user_data($1@${domain_name} var tenant_id)}]${sofia_contact($1@${domain_name})}"', false);
 
     config([
         'freeswitch.xml_handler.hiredis_limit_enabled' => true,

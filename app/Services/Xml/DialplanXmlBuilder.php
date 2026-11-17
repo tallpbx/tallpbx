@@ -223,7 +223,7 @@ class DialplanXmlBuilder
                 if ($detail->action) {
                     $actionAttrs = ['application' => $detail->action];
                     if ($detail->data) {
-                        $actionAttrs['data'] = $this->dialplanActionData($dialplan, $detail->data, $tenantId, $detail->action);
+                        $actionAttrs['data'] = $this->dialplanActionData($dialplan, $detail->data, $detail->action);
                     }
                     $writer->selfClosingTag('action', $actionAttrs, 10);
                 }
@@ -333,11 +333,11 @@ class DialplanXmlBuilder
      *
      * A direct bridge creates the B-leg without evaluating the callee's
      * directory entry or XML dialplan, so that leg never receives the
-     * channel-local `tenant_id` stamp. Inject the owning tenant into the
-     * leg's own variable block at render time; the stored DialplanDetail
-     * row keeps its provider-neutral value.
+     * channel-local `tenant_id` stamp. Look up the dialed account's tenant
+     * when the number is known at call time; the executing context can belong
+     * to another tenant. The stored DialplanDetail stays provider-neutral.
      */
-    private function dialplanActionData(Dialplan $dialplan, string $data, int $tenantId, ?string $action = null): string
+    private function dialplanActionData(Dialplan $dialplan, string $data, ?string $action = null): string
     {
         if ($dialplan->name === 'local_extension' && $data === 'user/$1@${domain_name}') {
             $data = '${sofia_contact($1@${domain_name})}';
@@ -347,13 +347,15 @@ class DialplanXmlBuilder
             return $data;
         }
 
-        // Alternative destinations and data that already names its owner stay
-        // untouched: a single trailing block would mislabel the other legs.
-        if (trim($data) === '' || str_contains($data, '[') || str_contains($data, '|')) {
+        // Only this tenant's built-in local-extension route proves the
+        // destination owner. Arbitrary stored bridges may cross tenants and
+        // must not inherit the caller's identity.
+        if ($dialplan->name !== 'local_extension'
+            || $data !== '${sofia_contact($1@${domain_name})}') {
             return $data;
         }
 
-        return $data.'[tenant_id='.$tenantId.']';
+        return '[tenant_id=${user_data($1@${domain_name} var tenant_id)}]'.$data;
     }
 
     /**

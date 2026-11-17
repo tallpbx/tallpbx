@@ -12,8 +12,8 @@ use RuntimeException;
  *
  * The per-command ceiling in SymfonyRestoreCommandRunner bounds one hung
  * subprocess; this bounds a sequence of individually healthy commands. It is
- * created once per operation and never reset between phases or retries, so a
- * restore never begins an import it cannot finish.
+ * created once per operation and never reset between phases. Subprocesses
+ * share this budget, while systemd provides the hard stop for file copying.
  */
 final class RestoreDeadline
 {
@@ -33,7 +33,16 @@ final class RestoreDeadline
      */
     public function remainingSeconds(): int
     {
-        return max(0, (int) round(Carbon::now()->diffInSeconds($this->expiresAt, false)));
+        return max(0, (int) ceil($this->remainingTimeoutSeconds()));
+    }
+
+    /**
+     * Sub-second precision prevents a command from being granted time past
+     * the operation deadline when less than one second remains.
+     */
+    public function remainingTimeoutSeconds(): float
+    {
+        return max(0.0, Carbon::now()->diffInSeconds($this->expiresAt, false));
     }
 
     /**
@@ -43,7 +52,7 @@ final class RestoreDeadline
      */
     public function assertRemaining(): void
     {
-        if ($this->remainingSeconds() <= 0) {
+        if ($this->remainingTimeoutSeconds() <= 0) {
             throw new RuntimeException('The restore budget exhausted before the next phase could start.');
         }
     }

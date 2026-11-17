@@ -148,7 +148,14 @@ class RingGroupService implements ContextWideDialplanXmlContributor, RingGroupSe
                     // dialplan, so it carries the destination tenant in its own
                     // variable block. The outer {…} prefix must stay tenant-free:
                     // it would leak the caller's tenant onto every leg.
-                    $destinations[] = "\${sofia_contact({$safeExt}@\${domain_name})}[tenant_id={$tenantId}]";
+                    $destinationTenantId = $ringExt->extension?->tenant_id;
+                    $endpoint = "\${sofia_contact({$safeExt}@\${domain_name})}";
+
+                    // Keep older/dangling members dialable, but never guess
+                    // their CDR owner from the ring group's tenant.
+                    $destinations[] = $destinationTenantId === null
+                        ? $endpoint
+                        : "[tenant_id={$destinationTenantId}]{$endpoint}";
                 }
 
                 $bridgeString = implode(',', $destinations);

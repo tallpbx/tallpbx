@@ -58,6 +58,10 @@ class RestoreOperationExecutor
         $deadline = new RestoreDeadline((int) config('backup-storage.restore_operation_deadline', 3600));
         $maintenanceStarted = false;
 
+        if ($this->commandRunner instanceof RestoreDeadlineAwareRunner) {
+            $this->commandRunner->setDeadline($deadline);
+        }
+
         try {
             $this->phase($operationId, 'extracting', $deadline);
             $this->assertArchiveIsSafe($operation->archive_path);
@@ -213,7 +217,16 @@ class RestoreOperationExecutor
         }
 
         foreach (array_unique($volumes) as $volume) {
-            $available = ($this->freeSpace)($volume);
+            $probe = $volume;
+
+            // Fresh appliances need not have created the snapshot or media
+            // directory yet. Its nearest existing parent is on the filesystem
+            // where the directory will be created.
+            while (! is_dir($probe) && dirname($probe) !== $probe) {
+                $probe = dirname($probe);
+            }
+
+            $available = ($this->freeSpace)($probe);
 
             if ($available < $requirement['required']) {
                 throw new RuntimeException(sprintf(

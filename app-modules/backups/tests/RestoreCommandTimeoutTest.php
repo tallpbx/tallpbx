@@ -28,6 +28,14 @@ it('applies the configured per-command ceiling instead of inheriting sixty secon
         ->toThrow(ProcessTimedOutException::class);
 });
 
+it('caps each subprocess to the remaining whole-operation budget', function (): void {
+    $runner = new SymfonyRestoreCommandRunner(timeout: 900);
+    $runner->setDeadline(new RestoreDeadline(seconds: 1));
+
+    expect(fn () => $runner->run(['sleep', '2']))
+        ->toThrow(ProcessTimedOutException::class);
+});
+
 it('reserves a fifteen minute command ceiling and a one hour operation budget', function (): void {
     expect((float) config('backup-storage.restore_command_timeout'))->toBe(900.0)
         ->and((int) config('backup-storage.restore_operation_deadline'))->toBe(3600);

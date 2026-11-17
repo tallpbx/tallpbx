@@ -27,6 +27,18 @@ it('refuses every argument before touching systemctl', function (): void {
     expect($process->getExitCode())->toBe(64);
 });
 
+it('reports an optional XML worker restart failure without failing required workers', function (): void {
+    // The exported shell function intercepts every systemctl call. This test
+    // does not inspect or change any live service on the host.
+    $script = base_path('scripts/resources/tallpbx-update-workers');
+    $process = new Process(['bash', '-c', 'systemctl() { if [ "$1" = restart ] && [ "$2" = tallpbx-xml-worker ]; then return 1; fi; return 0; }; export -f systemctl; bash "$1"', 'test', $script]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(0)
+        ->and($process->getOutput())->toContain('warning tallpbx-xml-worker')
+        ->not->toContain('failed tallpbx-xml-worker');
+});
+
 it('restarts exactly the allowlisted PHP units and never a core service', function (): void {
     $script = (string) file_get_contents(base_path('scripts/resources/tallpbx-update-workers'));
 

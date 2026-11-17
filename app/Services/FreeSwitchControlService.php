@@ -226,7 +226,7 @@ class FreeSwitchControlService
         $tenantId = app(DialplanContext::class)->parseTenantId($context);
 
         if ($tenantId !== null && is_numeric($tenantId)) {
-            $bridgeTarget .= '[tenant_id='.(int) $tenantId.']';
+            $bridgeTarget = '[tenant_id='.(int) $tenantId.']'.$bridgeTarget;
         }
 
         return $this->run("originate {origination_caller_id_number={$source}}user/{$source}@{$context} &bridge({$bridgeTarget})");

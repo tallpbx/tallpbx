@@ -155,6 +155,37 @@ it('quarantines a payload whose dialplan context and tenant variable disagree', 
     ], 'tenant_'.$first->id.'_public'))->toBeNull();
 });
 
+it('uses the stamped callee tenant when a bridged B-leg inherits the caller profile context', function (): void {
+    [$caller, $callee] = cdrAttributionTenants();
+
+    $payload = json_decode(cdrAttributionPayload([
+        'tenant_id' => (string) $callee->id,
+        'bridge_uuid' => (string) Str::uuid(),
+        'domain_name' => 'shared.test',
+    ], 'tenant_'.$caller->id.'_internal'), true);
+    unset($payload['variables']['context']);
+
+    $row = (new CdrPayloadParser(sys_get_temp_dir().'/cdr-attribution-'.uniqid()))
+        ->parse((string) json_encode($payload, JSON_UNESCAPED_SLASHES));
+
+    expect($row)->not->toBeNull()
+        ->and($row['leg'])->toBe('b')
+        ->and($row['tenant_id'])->toBe($callee->id);
+});
+
+it('quarantines a bridged B-leg without a stamp instead of borrowing its caller context', function (): void {
+    [$caller] = cdrAttributionTenants();
+
+    $payload = json_decode(cdrAttributionPayload([
+        'bridge_uuid' => (string) Str::uuid(),
+        'domain_name' => 'shared.test',
+    ], 'tenant_'.$caller->id.'_internal'), true);
+    unset($payload['variables']['context']);
+
+    expect((new CdrPayloadParser(sys_get_temp_dir().'/cdr-attribution-'.uniqid()))
+        ->parse((string) json_encode($payload, JSON_UNESCAPED_SLASHES)))->toBeNull();
+});
+
 it('keeps the callee tenant when a cross-tenant B-leg names the caller domain', function (): void {
     // The domain resolves only to the first tenant, but the direct bridge
     // stamped the second tenant on the B-leg, which never entered a tenant

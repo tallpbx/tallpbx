@@ -10,12 +10,22 @@ use Symfony\Component\Process\Process;
 /**
  * Executes root-helper restore commands without shell interpolation.
  */
-class SymfonyRestoreCommandRunner implements RestoreCommandRunnerInterface
+class SymfonyRestoreCommandRunner implements RestoreCommandRunnerInterface, RestoreDeadlineAwareRunner
 {
+    private ?RestoreDeadline $deadline = null;
+
     /**
      * Create the runner with an optional per-command ceiling in seconds.
      */
     public function __construct(private readonly ?float $timeout = null) {}
+
+    /**
+     * Share the whole-operation deadline with every command in this runner.
+     */
+    public function setDeadline(RestoreDeadline $deadline): void
+    {
+        $this->deadline = $deadline;
+    }
 
     /**
      * Run one command and raise its captured error output on failure.
@@ -32,7 +42,14 @@ class SymfonyRestoreCommandRunner implements RestoreCommandRunnerInterface
         // the last console write, and dump/import commands produce no output
         // because they stream to a file, so an idle timeout would kill a
         // healthy dump that is making progress.
-        $process->setTimeout($this->timeout ?? (float) config('backup-storage.restore_command_timeout', 900.0));
+        $timeout = $this->timeout ?? (float) config('backup-storage.restore_command_timeout', 900.0);
+
+        if ($this->deadline !== null) {
+            $this->deadline->assertRemaining();
+            $timeout = min($timeout, $this->deadline->remainingTimeoutSeconds());
+        }
+
+        $process->setTimeout($timeout);
         $process->run(env: $environment);
 
         if (! $process->isSuccessful()) {

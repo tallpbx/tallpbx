@@ -137,7 +137,7 @@ class RuntimeServiceReconciler
         $warnings = [];
 
         try {
-            $output = $this->runner->run($this->helperCommand())->output;
+            $helperResult = $this->runner->run($this->helperCommand());
         } catch (Throwable $exception) {
             return [
                 'restarted' => [],
@@ -149,7 +149,9 @@ class RuntimeServiceReconciler
             ];
         }
 
-        foreach (preg_split('/\R/', trim($output)) ?: [] as $line) {
+        $reported = [];
+
+        foreach (preg_split('/\R/', trim($helperResult->output)) ?: [] as $line) {
             $parts = preg_split('/\s+/', trim($line)) ?: [];
 
             if (count($parts) < 2) {
@@ -157,6 +159,24 @@ class RuntimeServiceReconciler
             }
 
             [$status, $unit] = $parts;
+
+            if (! in_array($unit, [...self::residentPhpUnits(), ...self::optionalUnits()], true)) {
+                continue;
+            }
+
+            $optional = in_array($unit, self::optionalUnits(), true);
+
+            if (! in_array($status, $optional ? ['ok', 'skipped', 'failed', 'warning'] : ['ok', 'failed'], true)) {
+                continue;
+            }
+
+            $reported[$unit] = true;
+
+            if ($optional && in_array($status, ['failed', 'warning'], true)) {
+                $warnings[] = $unit;
+
+                continue;
+            }
 
             match ($status) {
                 'ok' => $restarted[] = $unit,
@@ -168,9 +188,13 @@ class RuntimeServiceReconciler
 
         // The helper reports what it did; the unit's own state is the truth.
         foreach (self::residentPhpUnits() as $unit) {
-            if (! $this->isActive($unit) && ! in_array($unit, $failed, true)) {
+            if ((! isset($reported[$unit]) || ! $this->isActive($unit)) && ! in_array($unit, $failed, true)) {
                 $failed[] = $unit;
             }
+        }
+
+        if (! $helperResult->ok() && $failed === [] && $warnings === []) {
+            $failed = self::residentPhpUnits();
         }
 
         foreach (self::optionalUnits() as $unit) {
@@ -178,7 +202,7 @@ class RuntimeServiceReconciler
                 continue;
             }
 
-            if (! $this->isActive($unit) && ! in_array($unit, $failed, true)) {
+            if (! $this->isActive($unit) && ! in_array($unit, $warnings, true)) {
                 $warnings[] = $unit;
             }
         }

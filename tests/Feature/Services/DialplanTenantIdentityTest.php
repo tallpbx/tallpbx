@@ -11,6 +11,7 @@ use Illuminate\Testing\TestResponse;
 use Modules\Dialplans\Models\Dialplan;
 use Modules\Dialplans\Models\DialplanDetail;
 use Modules\Extensions\Models\Extension;
+use Modules\FollowMe\Models\FollowMe;
 use Modules\RingGroups\Models\RingGroup;
 use Modules\RingGroups\Models\RingGroupExtension;
 
@@ -103,7 +104,7 @@ it('stamps a direct local-extension bridge with the destination tenant', functio
 
     dialplanIdentityRequest($internal)
         ->assertOk()
-        ->assertSee('data="${sofia_contact($1@${domain_name})}[tenant_id='.$tenant->id.']"', false);
+        ->assertSee('data="[tenant_id=${user_data($1@${domain_name} var tenant_id)}]${sofia_contact($1@${domain_name})}"', false);
 });
 
 it('leaves the stored dialplan detail unchanged while stamping the rendered bridge', function (): void {
@@ -162,7 +163,7 @@ it('keeps the opt-in hiredis actions beside the stamped bridge', function (): vo
         ->assertOk()
         ->assertSee('application="limit" data="hiredis default pbx:${domain_name}:local_extension:active 100000"', false)
         ->assertSee('application="hiredis_raw"', false)
-        ->assertSee('data="${sofia_contact($1@${domain_name})}[tenant_id='.$tenant->id.']"', false);
+        ->assertSee('data="[tenant_id=${user_data($1@${domain_name} var tenant_id)}]${sofia_contact($1@${domain_name})}"', false);
 });
 
 it('stamps each ring-group leg with the destination tenant, never a global prefix', function (): void {
@@ -204,9 +205,72 @@ it('stamps each ring-group leg with the destination tenant, never a global prefi
 
     // One variable block per leg, each naming the destination tenant.
     expect(substr_count($xml, '[tenant_id='.$tenant->id.']'))->toBe(2)
-        ->and($xml)->toContain('${sofia_contact(2101@${domain_name})}[tenant_id='.$tenant->id.']')
-        ->and($xml)->toContain('${sofia_contact(2102@${domain_name})}[tenant_id='.$tenant->id.']')
+        ->and($xml)->toContain('[tenant_id='.$tenant->id.']${sofia_contact(2101@${domain_name})}')
+        ->and($xml)->toContain('[tenant_id='.$tenant->id.']${sofia_contact(2102@${domain_name})}')
         // The shared outer block must not carry the tenant: it would leak the
         // caller's tenant onto every leg of a cross-tenant bridge.
         ->and($xml)->not->toContain('ignore_early_media=true,tenant_id');
+});
+
+it('uses a foreign ring-group member owner rather than the ring-group tenant', function (): void {
+    $caller = dialplanIdentityTenant();
+    $callee = dialplanIdentityTenant();
+    $foreignExtension = Extension::factory()->create([
+        'tenant_id' => $callee->id,
+        'extension_number' => '3101',
+        'enabled' => true,
+    ]);
+    $group = RingGroup::factory()->create([
+        'tenant_id' => $caller->id,
+        'name' => 'cross_tenant_team',
+        'enabled' => true,
+    ]);
+    RingGroupExtension::factory()->create([
+        'ring_group_id' => $group->id,
+        'extension_uuid' => $foreignExtension->id,
+    ]);
+
+    $xml = (string) dialplanIdentityRequest(app(DialplanContext::class)->internal((string) $caller->id))->getContent();
+
+    expect($xml)->toContain('[tenant_id='.$callee->id.']${sofia_contact(3101@${domain_name})}')
+        ->not->toContain('[tenant_id='.$caller->id.']${sofia_contact(3101@${domain_name})}');
+});
+
+it('does not assign the current tenant to an arbitrary stored bridge', function (): void {
+    $caller = dialplanIdentityTenant();
+    $internal = app(DialplanContext::class)->internal((string) $caller->id);
+    $dialplan = Dialplan::factory()->create([
+        'tenant_id' => $caller->id,
+        'name' => 'custom_bridge',
+        'context' => $internal,
+        'enabled' => true,
+    ]);
+    DialplanDetail::factory()->create([
+        'dialplan_id' => $dialplan->id,
+        'tag' => 'condition',
+        'field' => 'destination_number',
+        'expression' => '^9999$',
+        'action' => 'bridge',
+        'data' => 'user/9999@tenant_2_internal',
+    ]);
+
+    $xml = (string) dialplanIdentityRequest($internal, '9999')->getContent();
+
+    expect($xml)->toContain('data="user/9999@tenant_2_internal"')
+        ->not->toContain('[tenant_id='.$caller->id.']user/9999@tenant_2_internal');
+});
+
+it('looks up a follow-me source account owner instead of assuming the rule tenant', function (): void {
+    $caller = dialplanIdentityTenant();
+    FollowMe::factory()->create([
+        'tenant_id' => $caller->id,
+        'extension' => '3101',
+        'destination' => '15551234567',
+        'enabled' => true,
+    ]);
+
+    $xml = (string) dialplanIdentityRequest(app(DialplanContext::class)->internal((string) $caller->id), '3101')->getContent();
+
+    expect($xml)->toContain('[tenant_id=${user_data(3101@${domain_name} var tenant_id)}]${sofia_contact(3101@${domain_name})}')
+        ->not->toContain('[tenant_id='.$caller->id.']${sofia_contact(3101@${domain_name})}');
 });

@@ -244,7 +244,7 @@ class DestinationResolver
     {
         return [
             'application' => 'bridge',
-            'data' => "sofia/external/{$identifier}[tenant_id={$tenantId}]",
+            'data' => "[tenant_id={$tenantId}]sofia/external/{$identifier}",
         ];
     }
 

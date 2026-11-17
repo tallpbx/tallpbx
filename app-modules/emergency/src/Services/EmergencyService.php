@@ -116,9 +116,9 @@ class EmergencyService implements ContextWideDialplanXmlContributor, EmergencySe
         if ($gateway !== null) {
             $safeHost = htmlspecialchars($gateway->host, ENT_XML1 | ENT_QUOTES, 'UTF-8');
             $safePort = $gateway->port;
-            $xml .= "          <action application=\"bridge\" data=\"sofia/external/\${destination_number}@{$safeHost}:{$safePort}[tenant_id={$tenantId}]\"/>\n";
+            $xml .= "          <action application=\"bridge\" data=\"[tenant_id={$tenantId}]sofia/external/\${destination_number}@{$safeHost}:{$safePort}\"/>\n";
         } else {
-            $xml .= "          <action application=\"bridge\" data=\"sofia/external/\${destination_number}[tenant_id={$tenantId}]\"/>\n";
+            $xml .= "          <action application=\"bridge\" data=\"[tenant_id={$tenantId}]sofia/external/\${destination_number}\"/>\n";
         }
         $xml .= "        </condition>\n";
         $xml .= "      </extension>\n";

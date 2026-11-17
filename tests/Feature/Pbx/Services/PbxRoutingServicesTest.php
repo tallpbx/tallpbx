@@ -216,7 +216,7 @@ describe('destination resolver', function (): void {
 
         expect($result)->toBe([
             'application' => 'bridge',
-            'data' => 'sofia/external/16175551234[tenant_id='.$this->tenant->id.']',
+            'data' => '[tenant_id='.$this->tenant->id.']sofia/external/16175551234',
         ]);
     });
 

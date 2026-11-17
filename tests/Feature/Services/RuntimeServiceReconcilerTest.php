@@ -33,6 +33,7 @@ final class ReconcilerProcessRunner implements ProcessRunner
         private readonly array $inactive = [],
         private readonly string $fsStatus = 'UP 0 calls',
         private readonly string $helperOutput = '',
+        private readonly int $helperExitCode = 0,
     ) {}
 
     /**
@@ -51,7 +52,7 @@ final class ReconcilerProcessRunner implements ProcessRunner
         }
 
         if (str_contains($joined, 'tallpbx-update-workers')) {
-            return new ProcessResult(0, $this->helperOutput);
+            return new ProcessResult($this->helperExitCode, $this->helperOutput);
         }
 
         if (($argv[0] ?? null) === 'systemctl') {
@@ -157,6 +158,25 @@ it('reloads every resident PHP unit after a web update without touching call or 
     foreach (['mariadb', 'redis-server', 'freeswitch ', 'nginx', 'fpm'] as $forbidden) {
         expect(implode("\n", $commands))->not->toContain('restart '.$forbidden);
     }
+});
+
+it('treats a failed optional XML worker as a warning after a web update', function (): void {
+    $runner = new ReconcilerProcessRunner(
+        inactive: ['tallpbx-xml-worker'],
+        helperOutput: "ok freeswitch-listener\nok tallpbx-queue\nok tallpbx-scheduler\nok tallpbx-cdr-worker\nok tallpbx-reverb\nfailed tallpbx-xml-worker\n",
+        helperExitCode: 1,
+    );
+
+    $result = (new RuntimeServiceReconciler($runner))->reconcileAfterUpdate();
+
+    expect($result['failed'])->toBe([])
+        ->and($result['warnings'])->toBe(['tallpbx-xml-worker']);
+});
+
+it('fails a web update when the worker helper exits without reporting required units', function (): void {
+    $result = (new RuntimeServiceReconciler(new ReconcilerProcessRunner(helperExitCode: 127)))->reconcileAfterUpdate();
+
+    expect($result['failed'])->toBe(RuntimeServiceReconciler::residentPhpUnits());
 });
 
 it('reports a missing update helper as an operator-actionable failure', function (): void {

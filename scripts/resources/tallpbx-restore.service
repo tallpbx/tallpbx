@@ -5,6 +5,10 @@ After=network.target mariadb.service redis-server.service
 
 [Service]
 Type=oneshot
+# A whole restore, including file copies, must stop within one hour. systemd
+# bounds work even when PHP is blocked inside a filesystem operation.
+TimeoutStartSec=3599s
+TimeoutStopSec=1s
 User=root
 Group=root
 WorkingDirectory=/var/www/tallpbx

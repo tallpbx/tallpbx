@@ -137,7 +137,7 @@ class OutboundRouteService implements ContextWideDialplanXmlContributor, Outboun
                 $xml .= "          <action application=\"set\" data=\"effective_caller_id_number={$safeCidNum}\"/>\n";
             }
 
-            $xml .= "          <action application=\"bridge\" data=\"{$bridgeData}[tenant_id={$tenantId}]\"/>\n";
+            $xml .= "          <action application=\"bridge\" data=\"[tenant_id={$tenantId}]{$bridgeData}\"/>\n";
             $xml .= "        </condition>\n";
             $xml .= "      </extension>\n";
         }

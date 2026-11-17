@@ -44,7 +44,7 @@ function makeRestoreSpaceExecutor(float $archiveMemberBytes, array $freeSpace): 
         $runner,
         $journal,
         null,
-        fn (string $path): float => $freeSpace[$path] ?? 1_000_000_000_000.0,
+        fn (string $path): float => $freeSpace[$path] ?? 0.0,
     );
 }
 
@@ -89,5 +89,19 @@ it('admits a volume that holds the working set and the reserve', function (): vo
     ]);
 
     expect(fn () => $executor->assertSpaceFor('/var/lib/tallpbx/backups/x.tar.gz', ['database']))
+        ->not->toThrow(RuntimeException::class);
+});
+
+it('probes an existing parent when a fresh media directory has not been created yet', function (): void {
+    $missingRoot = sys_get_temp_dir().'/tallpbx-restore-media-'.uniqid();
+    config(['media-storage.store_root' => $missingRoot]);
+
+    $executor = makeRestoreSpaceExecutor(1_000_000, [
+        (string) config('backup-storage.root') => 100_000_000_000.0,
+        storage_path('backups') => 100_000_000_000.0,
+        sys_get_temp_dir() => 100_000_000_000.0,
+    ]);
+
+    expect(fn () => $executor->assertSpaceFor('/var/lib/tallpbx/backups/x.tar.gz', ['media']))
         ->not->toThrow(RuntimeException::class);
 });

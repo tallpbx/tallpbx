@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Backups\Services;
 
+use Closure;
 use RuntimeException;
+use Throwable;
 
 /**
  * Authoritative restore state kept outside the database the restore replaces.
@@ -20,10 +22,27 @@ final class RestoreJournal
     /** Phases that end an operation and are never overwritten by later work. */
     private const TERMINAL_PHASES = ['completed', 'failed'];
 
+    private readonly Closure $writeBytes;
+
+    private readonly Closure $flushFile;
+
+    private readonly Closure $syncHandle;
+
     /**
-     * Create a journal rooted at the given directory.
+     * Create a journal rooted at the given directory. The optional I/O hooks
+     * let tests simulate short writes and sync failures without altering the
+     * production filesystem or replacing PHP's global stream functions.
      */
-    public function __construct(private readonly string $root) {}
+    public function __construct(
+        private readonly string $root,
+        ?Closure $writeBytes = null,
+        ?Closure $flushFile = null,
+        ?Closure $syncHandle = null,
+    ) {
+        $this->writeBytes = $writeBytes ?? static fn ($handle, string $bytes): int|false => fwrite($handle, $bytes);
+        $this->flushFile = $flushFile ?? static fn ($handle): bool => fflush($handle);
+        $this->syncHandle = $syncHandle ?? static fn ($handle): bool => fsync($handle);
+    }
 
     /**
      * Write a complete entry atomically and durably.
@@ -37,34 +56,48 @@ final class RestoreJournal
         $target = $this->path($operationId);
         $temporary = $target.'.tmp';
 
-        $handle = fopen($temporary, 'wb');
-
-        if ($handle === false) {
-            throw new RuntimeException('The restore journal file could not be created.');
-        }
-
         try {
-            $encoded = json_encode($entry, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $handle = @fopen($temporary, 'wb');
 
-            if (fwrite($handle, $encoded) === false) {
-                throw new RuntimeException('The restore journal entry could not be written.');
+            if ($handle === false) {
+                throw new RuntimeException('The restore journal file could not be created.');
             }
 
-            fflush($handle);
-            fsync($handle);
-        } finally {
-            fclose($handle);
-        }
+            $encoded = json_encode($entry, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+            $offset = 0;
 
-        @chmod($temporary, 0600);
+            try {
+                while ($offset < strlen($encoded)) {
+                    $bytes = ($this->writeBytes)($handle, substr($encoded, $offset));
 
-        if (! @rename($temporary, $target)) {
+                    if ($bytes === false || $bytes === 0) {
+                        throw new RuntimeException('The restore journal entry could not be written completely.');
+                    }
+
+                    $offset += $bytes;
+                }
+
+                if (! ($this->flushFile)($handle) || ! ($this->syncHandle)($handle)) {
+                    throw new RuntimeException('The restore journal entry could not be synced to disk.');
+                }
+            } finally {
+                fclose($handle);
+            }
+
+            if (! @chmod($temporary, 0600)) {
+                throw new RuntimeException('The restore journal file permissions could not be set.');
+            }
+
+            if (! @rename($temporary, $target)) {
+                throw new RuntimeException('The restore journal entry could not be published.');
+            }
+
+            $this->syncDirectory();
+        } catch (Throwable $exception) {
             @unlink($temporary);
 
-            throw new RuntimeException('The restore journal entry could not be published.');
+            throw $exception;
         }
-
-        $this->syncDirectory();
     }
 
     /**
@@ -215,10 +248,15 @@ final class RestoreJournal
         $handle = @fopen($this->root, 'r');
 
         if ($handle === false) {
-            return;
+            throw new RuntimeException('The restore journal directory could not be opened for syncing.');
         }
 
-        @fsync($handle);
-        fclose($handle);
+        try {
+            if (! ($this->syncHandle)($handle)) {
+                throw new RuntimeException('The restore journal directory could not be synced to disk.');
+            }
+        } finally {
+            fclose($handle);
+        }
     }
 }

@@ -66,7 +66,7 @@ it('originates a call to a selected extension with the permission', function () 
     $fs->shouldReceive('isConnected')->twice()->andReturn(true);
     $fs->shouldReceive('api')->with('show channels as json')->once()->andReturn('{"row_count": 0}');
     $fs->shouldReceive('api')->with(
-        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge(user/2001@tenant_1_internal[tenant_id=1])',
+        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge([tenant_id=1]user/2001@tenant_1_internal)',
     )->once()->andReturn('+OK');
     $this->app->instance(FreeSwitchServiceInterface::class, $fs);
 

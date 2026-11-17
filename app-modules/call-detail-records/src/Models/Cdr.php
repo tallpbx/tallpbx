@@ -127,6 +127,13 @@ class Cdr extends Model
             return $this->leg === 'a' ? 'outbound' : 'inbound';
         }
 
+        // A B-leg's raw FreeSWITCH direction often says outbound even when
+        // its tenant received a cross-tenant call. Without the peer we cannot
+        // prove whether it was internal, inbound, or an outgoing gateway leg.
+        if ($this->leg === 'b') {
+            return 'unknown';
+        }
+
         // No bridge partner (gateway call, voicemail deposit, failed call).
         return in_array($this->direction, ['inbound', 'outbound'], true)
             ? $this->direction

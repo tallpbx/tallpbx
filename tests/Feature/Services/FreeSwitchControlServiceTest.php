@@ -106,7 +106,7 @@ it('originates a call from the operator panel', function (): void {
     $mock->shouldReceive('isConnected')->once()->andReturn(true);
     // FusionPBX pattern: originate the source leg and bridge to the destination.
     $mock->shouldReceive('api')->once()->with(
-        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge(user/2001@tenant_1_internal[tenant_id=1])',
+        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge([tenant_id=1]user/2001@tenant_1_internal)',
     )->andReturn('+OK');
 
     $result = controlService($mock)->originate('1001', '2001', 'tenant_1_internal');
@@ -118,7 +118,7 @@ it('originates a call to an external phone number via loopback', function (): vo
     $mock = Mockery::mock(FreeSwitchServiceInterface::class);
     $mock->shouldReceive('isConnected')->once()->andReturn(true);
     $mock->shouldReceive('api')->once()->with(
-        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge(loopback/+15551234567/tenant_1_internal[tenant_id=1])',
+        'originate {origination_caller_id_number=1001}user/1001@tenant_1_internal &bridge([tenant_id=1]loopback/+15551234567/tenant_1_internal)',
     )->andReturn('+OK');
 
     $result = controlService($mock)->originate('1001', '+15551234567', 'tenant_1_internal');

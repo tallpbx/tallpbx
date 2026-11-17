@@ -76,11 +76,14 @@ mid-import still reports where it stopped.
 | Bound | Value | Reset? |
 | :--- | :--- | :--- |
 | One restore command | 15 minutes (`TALLPBX_RESTORE_COMMAND_TIMEOUT`, default 900 s) | Per command |
-| The whole operation | 1 hour (`TALLPBX_RESTORE_OPERATION_DEADLINE`, default 3600 s) | Never — checked before every phase |
+| The whole operation | 1 hour (`TALLPBX_RESTORE_OPERATION_DEADLINE`, default 3600 s) | Never — checked before phases and inside subprocesses; systemd stops blocked file work |
 
 The per-command ceiling catches one hung client; the operation budget stops a
-sequence of individually healthy commands from running for hours. Time spent
-waiting for a human to confirm is outside both.
+sequence of individually healthy commands from running for hours. The systemd
+service also enforces a one-hour hard limit on in-process file work. A hard
+stop may leave the journal at its last nonterminal phase; treat that as an
+interrupted restore requiring manual triage. Time spent waiting for a human to
+confirm is outside both.
 
 **Expected downtime:** the panel is unavailable from step 4 to step 8. For a
 small appliance with a database-only archive this is typically a couple of
