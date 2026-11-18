@@ -218,21 +218,7 @@ server {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
         fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
-        fastcgi_read_timeout 2s;
-        fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
-    }
-    # Third tier: FreeSWITCH re-sends the complete request here when the fast
-    # entry fails at the HTTP layer (5xx or timeout). It forwards the request
-    # to the full application while keeping the canonical handler URI so
-    # Laravel routes it, and logs every fallback it serves so a silent
-    # degradation is visible to monitoring.
-    location = /api/v1/xml-handler-stock {
-        access_log /var/log/nginx/xml-stock-fallback.log;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
-        fastcgi_param REQUEST_URI /api/v1/xml-handler\$is_args\$args;
-        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
-        fastcgi_read_timeout 3s;
+        fastcgi_read_timeout 5s;
         fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
     }
 
@@ -345,21 +331,7 @@ server {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
         fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
-        fastcgi_read_timeout 2s;
-        fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
-    }
-    # Third tier: FreeSWITCH re-sends the complete request here when the fast
-    # entry fails at the HTTP layer (5xx or timeout). It forwards the request
-    # to the full application while keeping the canonical handler URI so
-    # Laravel routes it, and logs every fallback it serves so a silent
-    # degradation is visible to monitoring.
-    location = /api/v1/xml-handler-stock {
-        access_log /var/log/nginx/xml-stock-fallback.log;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root/index.php;
-        fastcgi_param REQUEST_URI /api/v1/xml-handler\$is_args\$args;
-        fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
-        fastcgi_read_timeout 3s;
+        fastcgi_read_timeout 5s;
         fastcgi_pass unix:/var/run/php/php${php_version:-8.5}-fpm.sock;
     }
 

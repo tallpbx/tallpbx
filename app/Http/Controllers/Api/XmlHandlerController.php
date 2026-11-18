@@ -41,13 +41,7 @@ use Illuminate\Support\Facades\Log;
  *         <param name="gateway-url"
  *           value="http://127.0.0.1/api/v1/xml-handler?token=YOUR_TOKEN"
  *           bindings="directory|dialplan|configuration"/>
- *         <param name="timeout" value="2"/>
- *       </binding>
- *       <binding name="tallpbx-stock">
- *         <param name="gateway-url"
- *           value="http://127.0.0.1/api/v1/xml-handler-stock?token=YOUR_TOKEN"
- *           bindings="directory|dialplan|configuration"/>
- *         <param name="timeout" value="3"/>
+ *         <param name="timeout" value="5"/>
  *       </binding>
  *     </bindings>
  *   </configuration>

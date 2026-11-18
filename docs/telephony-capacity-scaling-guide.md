@@ -43,7 +43,7 @@ Empirical server-to-server SIP capacity testing established three core facts (fo
  ┌─────────────────▼───────────────────────────────────────────▼─────────────────┐
  │ CORE 0: DEDICATED TELEPHONY REAL-TIME ENGINE (FreeSWITCH)                     │
  │  - Real-time SIP stack & Sofia worker threads                                │
- │  - mod_xml_curl (3-tier ladder: Octane :8090 opt-in, :80 default, :80 stock)  │
+ │  - mod_xml_curl (2-tier ladder: Octane :8090 opt-in, :80 fast controller)     │
  │  - Runtime SQLite databases on disk (/var/lib/freeswitch/db, shipped default) │
  │  - FreeSWITCH logging set to 'notice' (zero disk I/O lock wait)              │
  └─────────────────┬─────────────────────────────────────────────────────────────┘
@@ -209,12 +209,11 @@ FreeSWITCH's stock configuration defaults to verbose debug logging (`<param name
 
 ---
 
-### Phase 5: XML Handler Persistence & 3-Tier Binding Ladder
+### Phase 5: XML Handler Persistence & 2-Tier Binding Ladder
 
-TallPBX configures a 3-tier binding ladder in `xml_curl.conf.xml`:
+TallPBX configures a 2-tier binding ladder in `xml_curl.conf.xml`:
 1. **`tallpbx-octane`** (`http://127.0.0.1:8090`, timeout 1s): Opt-in persistent RoadRunner/Octane lean XML worker (`tallpbx-xml-worker.service`) using `--workers=auto` (matches host vCPU count). Serves lookups in 1–2 ms from memory.
-2. **`tallpbx-fallback`** (`http://127.0.0.1:80/api/v1/xml-handler`, timeout 2s): The shipped production default front controller (`public/xml-handler-fast.php`) executing via Nginx and PHP-FPM.
-3. **`tallpbx-stock`** (`http://127.0.0.1:80/api/v1/xml-handler-stock`, timeout 3s): Full Laravel framework routing fallback if the fast front controller encounters an unhandled exception or syntax error.
+2. **`tallpbx-fallback`** (`http://127.0.0.1:80/api/v1/xml-handler`, timeout 5s): The shipped production default front controller (`public/xml-handler-fast.php`) executing via Nginx and PHP-FPM, with in-process `Throwable` fallback to `index.php` for code errors.
 
 ---
 

@@ -108,19 +108,16 @@ it('serves the XML handler through the fast controller while keeping the stock b
     }
 });
 
-it('ships a logged stock fallback location for the third binding tier', function (): void {
-    // FreeSWITCH's xml_curl gateway posts the lookup fields, so an nginx
-    // error_page redirect would lose the POST body. The third tier is
-    // therefore a real FreeSWITCH binding that re-sends the full request to
-    // this location, which forwards it to index.php with the canonical
-    // handler URI so Laravel routes it - and logs every fallback it serves.
+it('bounds fast XML handler reads at 5s without a separate stock HTTP fallback location', function (): void {
+    // public/xml-handler-fast.php already catches Throwable in-process and
+    // degrades to index.php. A separate tallpbx-stock HTTP tier would only
+    // amplify PHP-FPM queue saturation by retrying timeouts into index.php.
     foreach (['letsencrypt.sh', 'nginx.sh'] as $resourceScript) {
         $script = (string) file_get_contents(base_path("scripts/resources/{$resourceScript}"));
 
-        expect($script)->toContain('location = /api/v1/xml-handler-stock {')
-            ->toContain('fastcgi_param REQUEST_URI /api/v1/xml-handler\\$is_args\\$args;')
-            ->toContain('/var/log/nginx/xml-stock-fallback.log')
-            ->toContain('fastcgi_read_timeout 2s;');
+        expect($script)->not->toContain('location = /api/v1/xml-handler-stock {')
+            ->not->toContain('/var/log/nginx/xml-stock-fallback.log')
+            ->toContain('fastcgi_read_timeout 5s;');
     }
 });
 
@@ -1253,7 +1250,7 @@ it('configures letsencrypt port 80 server block with root directive, unescaped p
         ->toContain("    listen 80;\n    listen [::]:80;\n    server_name \${CERT_DOMAIN};\n    root /var/www/tallpbx/public;");
 
     expect(substr_count($script, 'fastcgi_param HTTP_AUTHORIZATION \$http_authorization;'))
-        ->toBeGreaterThanOrEqual(8);
+        ->toBeGreaterThanOrEqual(6);
 });
 
 it('keeps sqlite as the default freeswitch runtime database while supporting opt-in mariadb provisioning', function (): void {

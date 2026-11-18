@@ -43,14 +43,12 @@ it('configures FreeSWITCH to query the persistent lean worker on port 8090 and i
         ->and($script)->toContain('systemctl daemon-reload')
         ->and($script)->toContain('<binding name="tallpbx-octane">')
         ->and($script)->toContain('<binding name="tallpbx-fallback">')
-        // The ladder's third tier: FreeSWITCH re-sends the full request to a
-        // stock location, so POST bodies survive - bounded by short timeouts
-        // (worker 1s, fast controller 2s, stock 3s instead of 3s/5s).
-        ->and($script)->toContain('<binding name="tallpbx-stock">')
-        ->and($script)->toContain('${xml_path}-stock?token=${xml_token}')
+        // Code exceptions fall back in-process inside xml-handler-fast.php;
+        // omit tallpbx-stock so saturation timeouts never retry into index.php.
+        ->and($script)->not->toContain('<binding name="tallpbx-stock">')
+        ->and($script)->not->toContain('${xml_path}-stock?token=${xml_token}')
         ->and($script)->toContain('<param name="timeout" value="1"/>')
-        ->and($script)->toContain('<param name="timeout" value="2"/>')
-        ->and($script)->toContain('<param name="timeout" value="3"/>')
+        ->and($script)->toContain('<param name="timeout" value="5"/>')
         // CDR always uses PHP-FPM: the worker must stay free for XML.
         ->and($script)->not->toContain('8090/api/v1/cdr');
 });

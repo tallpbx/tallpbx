@@ -532,11 +532,7 @@ configure_dynamic_xml() {
     </binding>
     <binding name="tallpbx-fallback">
       <param name="gateway-url" value="http://127.0.0.1${xml_path}?token=${xml_token}" bindings="directory|dialplan|configuration"/>
-      <param name="timeout" value="2"/>
-    </binding>
-    <binding name="tallpbx-stock">
-      <param name="gateway-url" value="http://127.0.0.1${xml_path}-stock?token=${xml_token}" bindings="directory|dialplan|configuration"/>
-      <param name="timeout" value="3"/>
+      <param name="timeout" value="5"/>
     </binding>
   </bindings>
 </configuration>

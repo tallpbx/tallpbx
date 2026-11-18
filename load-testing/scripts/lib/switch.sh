@@ -650,6 +650,7 @@ xml_location_body() {
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME \$realpath_root/xml-handler-fast.php;
         fastcgi_param HTTP_AUTHORIZATION \$http_authorization;
+        fastcgi_read_timeout 5s;
         fastcgi_pass unix:${socket};
 BODY
         return 0

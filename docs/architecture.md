@@ -408,19 +408,18 @@ sequenceDiagram
 
 #### 6. Persistent Telephony XML Worker (Octane / RoadRunner)
 
-> **Status:** an optional performance mode. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH falling through the three-tier ladder (worker 1 s, fast controller 2 s, stock full application 3 s).
+> **Status:** an optional performance mode. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
 
 **The cost it removes.** Under PHP-FPM every lookup pays Composer autoloading, provider registration, and container construction before Redis is asked — roughly 44 ms of a ~55 ms hit on the reference 1 vCPU host (§7.5.6). The worker keeps the framework, Eloquent connections, and module contributors in memory, so the same lookup only runs the controller. Measured on the 4-core reference appliance (baseline: PHP-FPM with 12 static workers on the same host): 33.9 requests/second at 100×5 and 66.6 requests/second at 500×25 with zero failed requests, against 10.95 and 3.59 requests/second for the pool. Those figures come from a CLI harness that adds per-batch connection overhead, so they understate an in-process client; the 2,500 req/s design target was not demonstrated.
 
-**How FreeSWITCH reaches it.** The installer writes three `mod_xml_curl` bindings, all authenticated with the same token and tried in file order:
+**How FreeSWITCH reaches it.** The installer writes two `mod_xml_curl` bindings, both authenticated with the same token and tried in file order:
 
 | Binding | Target | Timeout | Role |
 | :--- | :--- | :--- | :--- |
 | `tallpbx-octane` | `http://127.0.0.1:8090/api/v1/xml-handler` | 1 s | Primary when the worker is running |
-| `tallpbx-fallback` | `http://127.0.0.1/api/v1/xml-handler` (nginx → the fast controller) | 2 s | The shipped default; also used while the worker is down, restarting, or crash-looping |
-| `tallpbx-stock` | `http://127.0.0.1/api/v1/xml-handler-stock` (nginx → `index.php`) | 3 s | Last line of defence; writes one line per fall-through to `/var/log/nginx/xml-stock-fallback.log` |
+| `tallpbx-fallback` | `http://127.0.0.1/api/v1/xml-handler` (nginx → the fast controller) | 5 s | The shipped default; also used while the worker is down, restarting, or crash-looping; catches `Throwable` in-process to fall back to `index.php` |
 
-The second and third bindings are what make a worker restart or crash safe: lookups degrade to the PHP paths instead of failing registrations. The binding set is read only when `mod_xml_curl` loads, so changing which tiers are active requires a FreeSWITCH restart — never a module reload, which frees the binding a live lookup may still be using (operational rule in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*).
+The second binding makes a worker restart or crash safe: lookups degrade to PHP-FPM instead of failing registrations, while omitting a separate stock HTTP tier avoids retrying saturation timeouts into `index.php`. The binding set is read only when `mod_xml_curl` loads, so changing which tiers are active requires a FreeSWITCH restart — never a module reload, which frees the binding a live lookup may still be using (operational rule in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*).
 
 **Lean scope.** The systemd unit starts `octane:start --server=roadrunner` with `TALLPBX_WORKER_ROLE=telephony`. `ModuleServiceProvider` then registers only `App\Support\TelephonyWorkerProviders` — 24 telephony module providers instead of all 60 — so panel, Livewire, Reverb, and billing code never enters worker memory. The panel keeps its own PHP-FPM workers, so call volume cannot starve the administrative UI.
 

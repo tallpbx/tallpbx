@@ -507,7 +507,7 @@ The token is synchronized between two locations:
 
 2. **FreeSWITCH Dynamic XML Gateway Configuration**:
    * File: `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`
-   * Structure (3-tier binding ladder):
+   * Structure (2-tier binding ladder):
      ```xml
      <configuration name="xml_curl.conf" description="cURL XML Gateway">
        <bindings>
@@ -517,11 +517,7 @@ The token is synchronized between two locations:
          </binding>
          <binding name="tallpbx-fallback">
            <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
-           <param name="timeout" value="2"/>
-         </binding>
-         <binding name="tallpbx-stock">
-           <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler-stock?token=<64-character-hex-secret>" bindings="directory|dialplan|configuration"/>
-           <param name="timeout" value="3"/>
+           <param name="timeout" value="5"/>
          </binding>
        </bindings>
      </configuration>
@@ -629,7 +625,7 @@ The next lookup falls through to the fast controller automatically — the bindi
 
 A normal request boots the whole application — roughly 90 service providers, including every module — even though a directory lookup needs almost none of that. The fast front controller (`public/xml-handler-fast.php`) boots a small allowlist instead; the controller, the XML builders, and the cache are unchanged, so the response is byte-identical.
 
-**It is the shipped default.** `scripts/resources/nginx.sh` and the Let's Encrypt site templates serve `/api/v1/xml-handler` from `xml-handler-fast.php`, and FreeSWITCH's second `mod_xml_curl` binding — the one used whenever the optional Octane worker is disabled or down — lands there. If the fast entry itself fails at the HTTP layer (5xx or a 2 s read timeout), FreeSWITCH's third binding re-sends the request to `/api/v1/xml-handler-stock`, which forwards it to `index.php` with the canonical handler URI and writes one line per fallback to `/var/log/nginx/xml-stock-fallback.log` — an empty file means the stock tier has never been needed.
+**It is the shipped default.** `scripts/resources/nginx.sh` and the Let's Encrypt site templates serve `/api/v1/xml-handler` from `xml-handler-fast.php`, and FreeSWITCH's second `mod_xml_curl` binding — the one used whenever the optional Octane worker is disabled or down — lands there. Code exceptions inside `xml-handler-fast.php` are caught in-process (`catch (Throwable)`) and served by `index.php` (logged to the PHP error log), without retrying saturation timeouts over HTTP.
 
 Measured on the 1 vCPU / 967 MB reference host (100 requests at 5 concurrent, dialplan render, median of three runs, 2026-11-05 slim-boot code): throughput **30.1 → 43.1 requests/second**, p50 **154 → 108 ms**, p95 172 → 120 ms, peak memory per request **32 → 26 MB**. Under call load, call completion at 5 calls/sec rose from 34 % (stock path, 2026-11-04) to **92 %**, and 8 calls/sec completes at **100 %** with 108–128 ms p50 setup time. CDR ingestion remains on PHP-FPM, where `POST /api/v1/cdr` is served by the dedicated 5-provider `public/cdr-fast.php` entry (`App\Support\CdrFastBootstrap`) to buffer records directly into Redis without full framework boot overhead; at sustained 5+ calls/sec these posts share PHP-FPM workers with XML lookups — see the Octane worker section for the trade-off and the option that frees PHP-FPM by moving XML to the worker.
 

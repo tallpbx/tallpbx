@@ -192,9 +192,9 @@ location = /api/v1/xml-handler {
 
 ---
 
-## 8. Octane binding and port 8090 (`xml_curl.conf.xml` Multi-Binding Fallback)
+## 8. Octane binding and port 8090 (`xml_curl.conf.xml` Two-Binding Fallback)
 
-`xml_curl.conf.xml` ships with the complete **three-tier** binding ladder. FreeSWITCH consults the gateways in file order:
+`xml_curl.conf.xml` ships with the **two-tier** binding ladder. FreeSWITCH consults the gateways in file order:
 
 ```xml
 <configuration name="xml_curl.conf" description="cURL XML Gateway">
@@ -205,22 +205,17 @@ location = /api/v1/xml-handler {
     </binding>
     <binding name="tallpbx-fallback">
       <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler?token=…" bindings="directory|dialplan|configuration"/>
-      <param name="timeout" value="2"/>
-    </binding>
-    <binding name="tallpbx-stock">
-      <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler-stock?token=…" bindings="directory|dialplan|configuration"/>
-      <param name="timeout" value="3"/>
+      <param name="timeout" value="5"/>
     </binding>
   </bindings>
 </configuration>
 ```
 
-The Octane worker serves the XML handler route on `:8090`, the fast controller serves on `/api/v1/xml-handler`, and the stock framework handler serves on `/api/v1/xml-handler-stock`. All endpoints return `403` without a token, which proves each route is live and secure:
+The Octane worker serves the XML handler route on `:8090`, and the fast controller serves `/api/v1/xml-handler` on PHP-FPM (catching `Throwable` in-process to fall back to `index.php` on code errors without retrying saturation timeouts over HTTP). Both endpoints return `403` without a token, which proves each route is live and secure:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8090/api/v1/xml-handler -d '<xml/>'
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-handler  -d '<xml/>'
-curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-handler-stock -d '<xml/>'
 ```
 
 **Apply:** `load-testing/scripts/lib/switch.sh apply_octane_binding on|off` (validates with `tpbx freeswitch:validate-xml-curl` and restarts FreeSWITCH via `systemctl restart freeswitch`, never reloading `mod_xml_curl` while lookups are live).
