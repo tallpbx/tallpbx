@@ -928,3 +928,56 @@ This section supersedes the earlier production rule in the 1 vCPU section above 
 **Data limitation.** The four sweep cells shared one artifact directory (`…/2vcpu-20261109-sweep/h2-2c2g/v-fast/sip-cps12`), so each run overwrote the previous `cpu.csv`. Completion, CDR reconciliation and per-call setup latency survived for all four (latency files were attributed by row count, which matched each cell's completed-call count exactly), but per-service CPU and RAM survive only for the three ladder cells. The consolidated rows for the sweep therefore carry blank CPU columns rather than reconstructed values. The harness should include the pool shape in the artifact path before any further sweep.
 
 *Artifacts: consolidated rows tagged `2vcpu-20261109` (ladder), `2vcpu-20261109-sweep` (worker sweep) and `2vcpu-20261109-octane` (persistent worker) in `load-testing/results/consolidated/worker-sweep-20261108-*.csv`. Raw fragments stay git-ignored on the host.*
+
+---
+
+### November 2026 Refresh: SQLite vs. MariaDB (`mod_mariadb`), Option 1 (2-Tier XML), and 2 vCPU Baselines (2026-11-17)
+
+**Scope & Architecture Change.** Fresh Debian 13 interactive install (`2fbac077`) with Reverb + ESL listener active, default `nftables` firewall (no IP whitelisting), `FS_LOG_LEVEL=notice`, and the 2-tier `mod_xml_curl` ladder (`tallpbx-octane` `1s` -> `tallpbx-fallback` `5s`, removing `tallpbx-stock` so PHP-FPM saturation timeouts never amplify into `index.php`). Evaluated on `1 vCPU / 1 GB` (`h1-1c1g`) and resized in place to `2 vCPU / 2 GB` (`h2-2c2g`, `pm.max_children = 6`).
+
+#### 1. XML Throughput (`--section=mixed`, `production-60`, `sqlite`)
+
+| Tier | Variant | Profile | Req/Sec | `p50` | `p95` | `max` |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: |
+| `1 vCPU / 1 GB` | `v-fast-default` (`dynamic 3`) | `100x5` `dialplan` (3 runs) | 39.74–42.90 | 74.3–86.7 ms | 115.5–127.0 ms | 163.1 ms |
+| `1 vCPU / 1 GB` | `v-fast-default` (`dynamic 3`) | `100x5` `mixed` (3 runs) | 39.20–41.16 | 76.7–90.7 ms | 121.4–129.9 ms | 173.0 ms |
+| `2 vCPU / 2 GB` | `v-fast-default` (`dynamic 6`) | `100x5` `mixed` (3 runs) | 61.85–66.99 | 46.7–60.2 ms | 73.6–89.6 ms | 101.9 ms |
+| `2 vCPU / 2 GB` | `v-fast-default` (`dynamic 6`) | `500x25` `mixed` | 82.37 | 181.4 ms | 293.8 ms | 336.2 ms |
+| `2 vCPU / 2 GB` | `v-octane` (`:8090`) | `100x5` `mixed` (3 runs) | **297.62–320.38** | **8.9–9.2 ms** | **13.2–16.3 ms** | 32.0 ms |
+| `2 vCPU / 2 GB` | `v-octane` (`:8090`) | `500x25` `mixed` | **381.45** | **31.9 ms** | **56.3 ms** | 65.1 ms |
+
+#### 2. SIP Capacity (`15s` smoke vs. `60s` sustained, `30` registered endpoints)
+
+| Tier | Variant | Cell | Offered | Completed | Setup `p50` / `p95` |
+| :--- | :--- | :--- | ---: | ---: | ---: |
+| `1 vCPU / 1 GB` | `v-fast-default` | `4 CPS` (`15s` smoke) | 60 | **60 (100 %)** | 212 / 1,156 ms |
+| `1 vCPU / 1 GB` | `v-fast-default` | `4 CPS` (`60s`) | 240 | 117 (48.8 %) | 1,292 / 13,416 ms |
+| `1 vCPU / 1 GB` | `v-fast-default` | `5 CPS` (`60s`) | 300 | 90 (30.0 %) | 448 / 13,528 ms |
+| `2 vCPU / 2 GB` | `v-fast-default` | `10 CPS` (`15s` smoke) | 150 | **150 (100 %)** | 160 / 2,660 ms |
+| `2 vCPU / 2 GB` | `v-fast-default` | `10 CPS` (`60s`) | 600 | 218 (36.3 %) | 788 / 16,080 ms |
+| `2 vCPU / 2 GB` | `v-octane` (`:8090`) | `12 CPS` (`15s` smoke) | 180 | **180 (100 %)** | 84 / 468 ms |
+| `2 vCPU / 2 GB` | `v-octane` (`:8090`) | `12 CPS` (`60s`) | 720 | 613 (85.1 %) | 1,868 / 8,028 ms |
+
+#### 3. FreeSWITCH Runtime Database: `sqlite` vs. `mariadb` (`mod_mariadb`)
+
+* **Functional & Media Parity (`2 vCPU / 2 GB`, `FS_DB_DRIVER=mariadb`, `MEDIA_FLOW=1 EXTENDED=1`):** Passed 100 % (`register`, `extension-calls`, `outbound-calls`, `recording-media`, `moh-media`, `announcement-media` RTP captures, plus all 8 extended parity scenarios: `ring-group`, `voicemail`, `conference`, `call-forward`, `time-condition`, `follow-me`, `emergency`, `call-block`).
+* **Concurrent Multi-Writer Contention (`fs-db-contention.sh`, 60s + voicemail + `REGISTER` churn + 1s `fs_cli` polling):**
+
+| Tier | Workload | Driver | Calls Completed | `REGISTER` Churn | `SQLite is BUSY` Hits | CDR Delta | Setup `p50` / `p95` | `freeswitch` / `mariadb` Mean CPU |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `1 vCPU / 1 GB` | `2 CPS` + `2 req/s` reg + `1 CPS` vm | `sqlite` | **120 / 120 (100 %)** | 120 / 120 | **0** | `+268` | 352 / 1,356 ms | 12.1 % / 3.1 % |
+| `1 vCPU / 1 GB` | `2 CPS` + `2 req/s` reg + `1 CPS` vm | `mariadb` | 114 / 120 (95.0 %) | 120 / 120 | **0** | `+268` | 320 / 2,048 ms | 10.7 % / **6.7 %** |
+| `2 vCPU / 2 GB` | `8 CPS` + `8 req/s` reg + `1 CPS` vm (`v-fast-default`) | `sqlite` | **480 / 480 (100 %)** | 480 / 480 | **10** | `+988` | 1,204 / 2,680 ms | 40.2 % / 8.8 % |
+| `2 vCPU / 2 GB` | `8 CPS` + `8 req/s` reg + `1 CPS` vm (`v-fast-default`) | `mariadb` | **480 / 480 (100 %)** | 480 / 480 | **0** | `+988` | 1,836 / 3,264 ms | **30.4 %** / **15.8 %** |
+| `2 vCPU / 2 GB` | `10 CPS` + `8 req/s` reg + `1 CPS` vm (`v-fast-default`) | `sqlite` | 333 / 600 (55.5 %) | 475 / 480 | **4** | `+694` | 6,180 / 17,548 ms | 33.6 % / 9.2 % |
+| `2 vCPU / 2 GB` | `10 CPS` + `8 req/s` reg + `1 CPS` vm (`v-fast-default`) | `mariadb` | **417 / 600 (69.5 %)** | 474 / 480 | **0** | **`+865`** | 5,440 / 16,488 ms | **29.9 %** / **16.8 %** |
+| `2 vCPU / 2 GB` | `10 CPS` + `8 req/s` reg + `1 CPS` vm (`v-octane`) | `sqlite` | 583 / 600 (97.2 %) | 480 / 480 | **19** | `+1,193` | 964 / 5,100 ms | 50.8 % / 8.1 % |
+| `2 vCPU / 2 GB` | `10 CPS` + `8 req/s` reg + `1 CPS` vm (`v-octane`) | `mariadb` | **600 / 600 (100 %)** | 480 / 480 | 27* | **`+1,228`** | **300 / 2,116 ms** | 49.8 % / 6.5 % |
+| `2 vCPU / 2 GB` | `12 CPS` + `8 req/s` reg + `1 CPS` vm (`v-octane`) | `mariadb` | 526 / 720 (73.1 %) | 471 / 480 | 6* | `+1,086` | 2,084 / 7,176 ms | 49.6 % / 9.9 % |
+
+**Findings:**
+1. **Keep `sqlite` on `1 vCPU`:** At `2 CPS` contention on a single core (`0` SQLite busy hits), MariaDB adds **+3.6 % mean CPU**, raising tail setup latency (`p95` `1,356 -> 2,048 ms`).
+2. **MariaDB eliminates `SQLite is BUSY` and raises the `10 CPS` crossover on `2 vCPU / 2 GB`:** Under `8 CPS` contention (`v-fast-default`), SQLite hit **10** `SQLite is BUSY` warnings while `mariadb` logged **0**. At `10 CPS` (`v-fast-default`), `mariadb` held roughly **10s / +104 calls longer** (`417/600` vs `333/600`, first failure at Call #393 vs #289) before PHP-FPM saturated. With PHP-FPM bypassed (`v-octane`), **`sqlite` failed `10 CPS` (`583/600`) while `mariadb` passed `10 CPS` `100 %` (`600/600`, `p50` `300 ms` vs `964 ms`)**, before reaching the 2-vCPU hardware ceiling at `12 CPS` (`526/720`).
+3. **Operational note when switching drivers with Octane running:** `tallpbx-xml-worker` caches `.env` / `config('freeswitch.db_driver')` in memory at boot; restart `tallpbx-xml-worker` alongside `freeswitch` when changing `FS_DB_DRIVER` so `sofia.conf` does not stay on `sqlite` (`*` in the table above).
+
+*Artifacts: `load-testing/results/consolidated/refresh-20261117-cells.csv`.*

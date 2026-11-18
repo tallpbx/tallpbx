@@ -74,7 +74,7 @@ Everything below this block is the historical series record, newest first. Super
 | 4 — Matrix runner | Complete, including per-variant URL, lookup probe, `--ttl` filter and archive step |
 | 5 — XML battery | **In progress.** All six variants measured at `production-60` with 3 repeats; the baseline also has the full six-policy sweep. Not yet measured: the failure ramp, the directory section, and the other load profiles |
 | 6 — SIPp validation and ladder | **In progress.** The first cell passes end to end (20 registrations, 15 calls, 0 failures, CDR gate ok). The CDR gate the plan asked for now exists and is applied to every SIP cell. The other five variants and the call-rate ladder are still to run |
-| 7 — Ablations | Not started (design exists: `fs-loglevel`, `fs-db`, plus the proposed ESL and throttle ablations) |
+| 7 — Ablations | **In progress.** `fs-db` (`sqlite` vs. `mariadb` via `mod_mariadb`) completed on `h1-1c1g` (`2 CPS`) and `h2-2c2g` (`8 CPS`, `0` busy hits on MariaDB vs. `10` on SQLite); remaining: `fs-loglevel`, ESL, and throttle ablations |
 | 8 — Saturation profiling | Not started |
 | 9–13 — Gate, registers, report, doc reconciliation | Not started |
 
