@@ -29,7 +29,7 @@ ssh "$PBX_HOST" 'cd /var/www/tallpbx && git rev-parse --short HEAD && git branch
 
 **Expected:** the branch is `5.x`, the commit equals `origin/5.x`, and `git status --porcelain` prints nothing. A dirty tree blocks the installer's own fast-forward, so it must be resolved first.
 
-> If the host was created from a snapshot of another appliance, its address changes and §14 must run before anything is measured.
+> If the host was created from a snapshot of another appliance, its address changes and §13 must run before anything is measured.
 
 ---
 
@@ -187,13 +187,7 @@ location = /api/v1/xml-handler {
 
 ---
 
-## 8. Lua XML cache proxy (retired)
-
-The optional Lua XML cache proxy was evaluated and retired in the 5.x series. Its handler, binding template, mirror writers, and switch commands were removed from the product; the historical measurements live under `load-testing/results/` and `load-testing/status.md`, and the retired design is recorded in `docs/architecture.md` §6.
-
----
-
-## 9. Octane binding and port 8090 (`xml_curl.conf.xml` Multi-Binding Fallback)
+## 8. Octane binding and port 8090 (`xml_curl.conf.xml` Multi-Binding Fallback)
 
 `xml_curl.conf.xml` ships with the complete **three-tier** binding ladder. FreeSWITCH consults the gateways in file order:
 
@@ -231,20 +225,21 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-han
 
 ---
 
-## 10. FreeSWITCH runtime database: disk baseline and test-only tmpfs ablation
+## 9. FreeSWITCH runtime database: SQLite baseline vs. MariaDB (`mod_mariadb`)
 
 ```bash
+grep -E '^FS_DB_DRIVER=' /var/www/tallpbx/.env
 mountpoint /var/lib/freeswitch/db && findmnt -n -o FSTYPE --target /var/lib/freeswitch/db
 ```
 
-Disk-backed is the shipped default. The tmpfs switch is for controlled benchmark reproduction only, not for appliance deployment.
+Disk-backed SQLite (`FS_DB_DRIVER=sqlite`) is the shipped default; MariaDB (`FS_DB_DRIVER=mariadb`) is the opt-in external runtime database via `mod_mariadb`. (`tmpfs` remains supported in `switch.sh` only for reproducing historical storage ablations, not as a deployment choice.)
 
-**Apply:** `scripts/lib/switch.sh apply_fs_db_mode disk|tmpfs` (stops FreeSWITCH, copies, mounts, starts).
-**Prove:** `scripts/lib/switch.sh assert_fs_db_mode disk|tmpfs`.
+**Apply:** `scripts/lib/switch.sh apply_fs_db_mode sqlite|mariadb` (or `disk|tmpfs`).  
+**Prove:** `scripts/lib/switch.sh assert_fs_db_mode sqlite|mariadb` (or `disk|tmpfs`).
 
 ---
 
-## 11. XML cache TTLs
+## 10. XML cache TTLs
 
 ```bash
 grep -E '^FS_XML_HANDLER_(DIALPLAN|CONTRIBUTOR|DIRECTORY|ACL)_CACHE_TTL=' /var/www/tallpbx/.env
@@ -257,7 +252,7 @@ Four lifetimes: `dialplan` (the finished answer), `contributor` (shared building
 
 ---
 
-## 12. Firewall: verify, never change
+## 11. Firewall: verify, never change
 
 ```bash
 nft list ruleset | grep -E 'policy|dport'
@@ -275,7 +270,7 @@ udp dport 16384-32768 accept
 
 ---
 
-## 13. Load generator preparation
+## 12. Load generator preparation
 
 The generator must not be the bottleneck.
 
@@ -353,7 +348,7 @@ The SIP phases run `load-testing/scripts/pbx-sipp-validate.sh` **locally**, with
 
 ---
 
-## 14. Snapshot restore onto a new address
+## 13. Snapshot restore onto a new address
 
 A PBX cloned from a snapshot still carries the previous address in three places. Two of them are in `.env`; the third is a database row. Getting this wrong produces a host that looks healthy but whose SIP realm points at a machine that no longer exists.
 

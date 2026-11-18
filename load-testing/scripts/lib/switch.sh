@@ -39,7 +39,6 @@ FS_AUTOLOAD_DIR="${FS_CONF_DIR}/autoload_configs"
 
 # Absolute paths of the files each switch rewrites.
 FS_XML_CURL_CONF="${FS_CONF_DIR}/autoload_configs/xml_curl.conf.xml"
-FS_JSON_CDR_CONF="${FS_CONF_DIR}/autoload_configs/json_cdr.conf.xml"
 
 # ------------------------------------------------------------------------------
 # Logging and failure helpers
@@ -388,9 +387,16 @@ assert_fs_loglevel() {
 # FreeSWITCH runtime database placement
 # ------------------------------------------------------------------------------
 
-# Report whether the runtime database directory is tmpfs-backed or on disk.
+# Report the active FreeSWITCH runtime database mode (sqlite, mariadb, or tmpfs).
 fs_db_mode() {
-    local fs_type
+    local driver fs_type
+
+    driver="$(env_get FS_DB_DRIVER)"
+
+    if [ "$driver" = "mariadb" ]; then
+        printf 'mariadb'
+        return 0
+    fi
 
     fs_type="$(findmnt -n -o FSTYPE --target "$FS_DB_PATH" 2>/dev/null || true)"
 
@@ -399,7 +405,7 @@ fs_db_mode() {
         return 0
     fi
 
-    printf 'disk'
+    printf 'sqlite'
 }
 
 # Stop FreeSWITCH and wait for the daemon to exit.
@@ -432,14 +438,15 @@ fs_start() {
     return 1
 }
 
-# Move the FreeSWITCH runtime database between disk and tmpfs, preserving data.
+# Switch the FreeSWITCH runtime database between sqlite (disk), mariadb, or tmpfs.
 apply_fs_db_mode() {
-    local mode="${1:-}" current
+    local mode="${1:-}" normalized current preload_conf
 
     case "$mode" in
-        disk | tmpfs) ;;
+        sqlite | disk) normalized="sqlite" ;;
+        mariadb | tmpfs) normalized="$mode" ;;
         *)
-            fail_switch "fs db mode must be disk or tmpfs (got '${mode}')"
+            fail_switch "fs db mode must be sqlite, mariadb, disk, or tmpfs (got '${mode}')"
             return 1
             ;;
     esac
@@ -450,8 +457,20 @@ apply_fs_db_mode() {
         printf '%s' "$current" > "${STATE_DIR}/fs-db-mode.baseline"
     fi
 
-    if [ "$current" = "$mode" ]; then
-        log "FreeSWITCH runtime database already ${mode}"
+    preload_conf="${FS_AUTOLOAD_DIR}/pre_load_modules.conf.xml"
+    snapshot_once fs-preload-conf "$preload_conf"
+
+    if [ ! -f "${STATE_DIR}/fs-db-env.baseline" ]; then
+        : > "${STATE_DIR}/fs-db-env.baseline"
+        local env_key env_line
+        for env_key in FS_DB_DRIVER FS_DB_HOST FS_DB_PORT FS_DB_NAME FS_DB_USERNAME FS_DB_PASSWORD FS_AUTO_CREATE_SCHEMAS FS_CORE_NON_SQLITE_DB_REQUIRED; do
+            env_line="$(grep -E "^#?[[:space:]]*${env_key}=" "${APP_DIR}/.env" 2>/dev/null | tail -n 1 || true)"
+            printf '%s\t%s\n' "$env_key" "$env_line" >> "${STATE_DIR}/fs-db-env.baseline"
+        done
+    fi
+
+    if [ "$current" = "$normalized" ]; then
+        log "FreeSWITCH runtime database already ${normalized}"
         assert_fs_db_mode "$mode"
         return
     fi
@@ -461,7 +480,55 @@ apply_fs_db_mode() {
         return 1
     fi
 
-    if [ "$mode" = "tmpfs" ]; then
+    if [ "$normalized" = "mariadb" ]; then
+        local db_host db_port db_name db_user db_pass
+        db_host="$(env_get FS_DB_HOST)"
+        db_port="$(env_get FS_DB_PORT)"
+        db_name="$(env_get FS_DB_NAME)"
+        db_user="$(env_get FS_DB_USERNAME)"
+        db_pass="$(env_get FS_DB_PASSWORD)"
+
+        db_host="${db_host:-127.0.0.1}"
+        db_port="${db_port:-3306}"
+        db_name="${db_name:-freeswitch}"
+        db_user="${db_user:-freeswitch}"
+
+        if [ -z "$db_pass" ]; then
+            db_pass="$(od -An -N10 -tx1 /dev/urandom | tr -d ' \n')"
+        fi
+
+        if ! mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${db_user}'@'${db_host}' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'${db_host}' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'${db_host}';
+FLUSH PRIVILEGES;
+EOF
+        then
+            fs_start || true
+            fail_switch "failed provisioning MariaDB schema '${db_name}'"
+            return 1
+        fi
+
+        env_set FS_DB_DRIVER mariadb
+        env_set FS_DB_HOST "$db_host"
+        env_set FS_DB_PORT "$db_port"
+        env_set FS_DB_NAME "$db_name"
+        env_set FS_DB_USERNAME "$db_user"
+        env_set FS_DB_PASSWORD "$db_pass"
+        env_set FS_AUTO_CREATE_SCHEMAS true
+        env_set FS_CORE_NON_SQLITE_DB_REQUIRED true
+
+        if ! FSPBX_FREESWITCH_DB_DRIVER=mariadb bash "${APP_DIR}/scripts/resources/freeswitch.sh" --configure-only >/dev/null 2>&1; then
+            fs_start || true
+            fail_switch "freeswitch.sh --configure-only failed for mariadb"
+            return 1
+        fi
+    elif [ "$normalized" = "tmpfs" ]; then
+        env_set FS_DB_DRIVER sqlite
+        env_set FS_CORE_NON_SQLITE_DB_REQUIRED false
+        FSPBX_FREESWITCH_DB_DRIVER=sqlite bash "${APP_DIR}/scripts/resources/freeswitch.sh" --configure-only >/dev/null 2>&1 || true
+
         rm -rf "${STATE_DIR}/fs-db-copy"
         mkdir -p "${STATE_DIR}/fs-db-copy" "$FS_DB_PATH"
         cp -a "${FS_DB_PATH}/." "${STATE_DIR}/fs-db-copy/" 2>/dev/null || true
@@ -475,14 +542,25 @@ apply_fs_db_mode() {
         cp -a "${STATE_DIR}/fs-db-copy/." "$FS_DB_PATH/" 2>/dev/null || true
         chown -R freeswitch:freeswitch "$FS_DB_PATH" 2>/dev/null || true
     else
-        if ! umount "$FS_DB_PATH"; then
-            fs_start || true
-            fail_switch "umount failed for ${FS_DB_PATH}"
-            return 1
+        if [ "$current" = "tmpfs" ]; then
+            if ! umount "$FS_DB_PATH"; then
+                fs_start || true
+                fail_switch "umount failed for ${FS_DB_PATH}"
+                return 1
+            fi
+
+            cp -a "${STATE_DIR}/fs-db-copy/." "$FS_DB_PATH/" 2>/dev/null || true
+            chown -R freeswitch:freeswitch "$FS_DB_PATH" 2>/dev/null || true
         fi
 
-        cp -a "${STATE_DIR}/fs-db-copy/." "$FS_DB_PATH/" 2>/dev/null || true
-        chown -R freeswitch:freeswitch "$FS_DB_PATH" 2>/dev/null || true
+        env_set FS_DB_DRIVER sqlite
+        env_set FS_CORE_NON_SQLITE_DB_REQUIRED false
+
+        if ! FSPBX_FREESWITCH_DB_DRIVER=sqlite bash "${APP_DIR}/scripts/resources/freeswitch.sh" --configure-only >/dev/null 2>&1; then
+            fs_start || true
+            fail_switch "freeswitch.sh --configure-only failed for sqlite"
+            return 1
+        fi
     fi
 
     if ! fs_start; then
@@ -490,18 +568,27 @@ apply_fs_db_mode() {
         return 1
     fi
 
-    log "applied FreeSWITCH runtime database mode ${mode}"
+    log "applied FreeSWITCH runtime database mode ${normalized}"
     assert_fs_db_mode "$mode"
 }
 
-# Prove the runtime database directory is backed by the requested filesystem.
+# Prove FreeSWITCH is running with the requested runtime database driver/placement.
 assert_fs_db_mode() {
-    local mode="${1:-}" current
+    local mode="${1:-}" expected current mod_mariadb db_name table_count
+
+    case "$mode" in
+        sqlite | disk) expected="sqlite" ;;
+        mariadb | tmpfs) expected="$mode" ;;
+        *)
+            fail_switch "fs db mode must be sqlite, mariadb, disk, or tmpfs (got '${mode}')"
+            return 1
+            ;;
+    esac
 
     current="$(fs_db_mode)"
 
-    if [ "$current" != "$mode" ]; then
-        fail_switch "fs db mode expected ${mode} but ${FS_DB_PATH} is ${current}"
+    if [ "$current" != "$expected" ]; then
+        fail_switch "fs db mode expected ${expected} but runtime is ${current}"
         return 1
     fi
 
@@ -510,7 +597,25 @@ assert_fs_db_mode() {
         return 1
     fi
 
-    log "asserted FreeSWITCH runtime database mode ${mode}"
+    mod_mariadb="$(fs_cli -x "module_exists mod_mariadb" 2>/dev/null | tr -d '[:space:]' || true)"
+
+    if [ "$expected" = "mariadb" ]; then
+        if [ "$mod_mariadb" != "true" ]; then
+            fail_switch "mod_mariadb is not loaded (module_exists returned '${mod_mariadb:-empty}')"
+            return 1
+        fi
+
+        db_name="$(env_get FS_DB_NAME)"
+        db_name="${db_name:-freeswitch}"
+        table_count="$(mysql -N -u root -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${db_name}';" 2>/dev/null || printf '0')"
+
+        if [ "${table_count:-0}" -lt 1 ]; then
+            fail_switch "MariaDB database '${db_name}' has no FreeSWITCH tables"
+            return 1
+        fi
+    fi
+
+    log "asserted FreeSWITCH runtime database mode ${expected}"
 }
 
 # ------------------------------------------------------------------------------
@@ -1096,75 +1201,6 @@ assert_ttl() {
 }
 
 # ------------------------------------------------------------------------------
-# CDR ingestion transport
-# ------------------------------------------------------------------------------
-
-# Return the ingestion URL configured for one transport id.
-cdr_transport_url() {
-    case "$1" in
-        fpm) printf 'http://127.0.0.1/api/v1/cdr' ;;
-        octane) printf 'http://127.0.0.1:8090/api/v1/cdr' ;;
-        *) return 1 ;;
-    esac
-}
-
-# Point mod_json_cdr at the FPM or the Octane ingestion endpoint.
-apply_cdr_transport() {
-    local transport="${1:-}" url
-
-    if ! url="$(cdr_transport_url "$transport")"; then
-        fail_switch "cdr transport must be fpm or octane (got '${transport}')"
-        return 1
-    fi
-
-    if [ ! -f "$FS_JSON_CDR_CONF" ]; then
-        fail_switch "json_cdr.conf.xml not found at ${FS_JSON_CDR_CONF}"
-        return 1
-    fi
-
-    snapshot_once json-cdr-conf "$FS_JSON_CDR_CONF"
-
-    sed -i -E "s|<param name=\"url\"[[:space:]]+value=\"[^\"]*\"|<param name=\"url\" value=\"${url}\"|" "$FS_JSON_CDR_CONF"
-
-    if ! fs_cli -x "reload mod_json_cdr" >/dev/null 2>&1; then
-        fail_switch "FreeSWITCH rejected 'reload mod_json_cdr'"
-        return 1
-    fi
-
-    log "applied CDR transport ${transport} (${url})"
-    assert_cdr_transport "$transport"
-}
-
-# Prove the module config points at the transport and the endpoint is alive.
-assert_cdr_transport() {
-    local transport="${1:-}" url configured code
-
-    if ! url="$(cdr_transport_url "$transport")"; then
-        fail_switch "cdr transport must be fpm or octane (got '${transport}')"
-        return 1
-    fi
-
-    configured="$(grep -oE '<param name="url"[[:space:]]+value="[^"]*"' "$FS_JSON_CDR_CONF" 2>/dev/null || true)"
-
-    if ! printf '%s' "$configured" | grep -qF "$url"; then
-        fail_switch "cdr transport expected ${url} but json_cdr.conf.xml has '${configured:-nothing}'"
-        return 1
-    fi
-
-    # 401 proves the route is reachable and the shared token is still enforced;
-    # 404 means the worker never loaded routes/api.php.
-    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' -X POST "$url" \
-        -H 'Content-Type: application/json' -d '{}' || true)"
-
-    if [ "$code" != "401" ]; then
-        fail_switch "cdr endpoint ${url} answered ${code:-no response}, expected 401"
-        return 1
-    fi
-
-    log "asserted CDR transport ${transport}"
-}
-
-# ------------------------------------------------------------------------------
 # .env helpers
 # ------------------------------------------------------------------------------
 
@@ -1288,7 +1324,7 @@ restore_baseline() {
 
     log "restoring baseline configuration"
 
-    local file level mode xml_before xml_after json_before json_after
+    local file level mode xml_before xml_after
     local esl_before throttle_before esl_after throttle_after
 
     esl_before="$(env_get FS_ESL_EVENT_PROFILE)"
@@ -1312,15 +1348,6 @@ restore_baseline() {
     xml_after="$(sha256sum "$FS_XML_CURL_CONF" 2>/dev/null | awk '{print $1}')"
     if [ "$xml_before" != "$xml_after" ]; then
         restart_freeswitch_for_binding_change >/dev/null 2>&1 || log "binding restart after restore failed"
-    fi
-
-    # The CDR module reads its configuration on load as well, so reload it
-    # only when the restore actually changed the file.
-    json_before="$(sha256sum "$FS_JSON_CDR_CONF" 2>/dev/null | awk '{print $1}')"
-    restore_file json-cdr-conf
-    json_after="$(sha256sum "$FS_JSON_CDR_CONF" 2>/dev/null | awk '{print $1}')"
-    if [ "$json_before" != "$json_after" ]; then
-        fs_cli -x "reload mod_json_cdr" >/dev/null 2>&1 || true
     fi
 
     # nginx files keep their backup next to the original; the recorded list
@@ -1349,6 +1376,20 @@ restore_baseline() {
         fi
     fi
 
+    if [ -f "${STATE_DIR}/fs-db-env.baseline" ]; then
+        local db_key db_line
+        while IFS=$'\t' read -r db_key db_line; do
+            [ -n "$db_key" ] || continue
+            sed -i -E "/^#?[[:space:]]*${db_key}=/d" "${APP_DIR}/.env"
+            if [ -n "$db_line" ]; then
+                printf '%s\n' "$db_line" >> "${APP_DIR}/.env"
+            fi
+        done < "${STATE_DIR}/fs-db-env.baseline"
+        (cd "$APP_DIR" && php artisan config:clear >/dev/null 2>&1) || true
+    fi
+
+    restore_file fs-preload-conf
+
     if nginx -t >/dev/null 2>&1; then
         systemctl reload nginx >/dev/null 2>&1 || true
     fi
@@ -1367,11 +1408,10 @@ Usage: switch.sh <command> [arguments]
 
   apply_fpm_profile <static|dynamic> <children>   assert_fpm_profile <static|dynamic> <children>
   apply_fs_loglevel <debug|info|notice|warning|err|crit|alert>   assert_fs_loglevel <level>
-  apply_fs_db_mode <disk|tmpfs>                   assert_fs_db_mode <disk|tmpfs>
+  apply_fs_db_mode <sqlite|mariadb|disk|tmpfs>    assert_fs_db_mode <sqlite|mariadb|disk|tmpfs>
   apply_xml_path <stock|fast>                     assert_xml_path <stock|fast>
   apply_octane_binding <on|off>                   assert_octane_binding <on|off>
   apply_ttl <dialplan> <contributor> [directory] [acl]   assert_ttl <dialplan> <contributor> [directory] [acl]
-  apply_cdr_transport <fpm|octane>                assert_cdr_transport <fpm|octane>
   apply_esl_profile <essential|full>              assert_esl_profile <essential|full> [before]
   apply_broadcast_throttle <ms>                   assert_broadcast_throttle <ms> [before]
   probe_lookup <extension> <domain> [count]
@@ -1403,8 +1443,6 @@ main() {
         assert_octane_binding | assert-octane-binding) assert_octane_binding "$@" ;;
         apply_ttl | apply-ttl) apply_ttl "$@" ;;
         assert_ttl | assert-ttl) assert_ttl "$@" ;;
-        apply_cdr_transport | apply-cdr-transport) apply_cdr_transport "$@" ;;
-        assert_cdr_transport | assert-cdr-transport) assert_cdr_transport "$@" ;;
         apply_broadcast_throttle | apply-broadcast-throttle) apply_broadcast_throttle "$@" ;;
         assert_broadcast_throttle | assert-broadcast-throttle) assert_broadcast_throttle "$@" ;;
         apply_esl_profile | apply-esl-profile) apply_esl_profile "$@" ;;

@@ -61,8 +61,6 @@ describe('load test switch helpers', function (): void {
             'assert_xml_path',
             'apply_ttl',
             'assert_ttl',
-            'apply_cdr_transport',
-            'assert_cdr_transport',
             'restore_baseline',
         );
     });
@@ -113,8 +111,7 @@ describe('load test switch helpers', function (): void {
     it('measures a FreeSWITCH lookup with the CLI overhead subtracted', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 
-        // A Lua hit never reaches nginx or PHP, so the HTTP client cannot see
-        // it. find_user_xml is the only probe that asks FreeSWITCH itself.
+        // find_user_xml is the probe that measures FreeSWITCH's own lookup cost.
         expect($script)->toContain('probe_lookup')
             ->and($script)->toContain('find_user_xml')
             ->and($script)->toContain('status');
@@ -144,7 +141,7 @@ describe('load test switch helpers', function (): void {
     });
 });
 
-it('no longer carries the retired lua proxy switches', function (): void {
+it('no longer carries the retired lua proxy or cdr-octane transport switches', function (): void {
     $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
     $matrix = (string) file_get_contents(base_path('load-testing/matrix.php'));
 
@@ -153,6 +150,13 @@ it('no longer carries the retired lua proxy switches', function (): void {
         ->and($script)->not->toContain('coherent_baseline')
         ->and($script)->not->toContain('restart_xml_worker')
         ->and($script)->not->toContain('redis_pattern_present')
+        ->and($script)->not->toContain('apply_cdr_transport')
+        ->and($script)->not->toContain('assert_cdr_transport')
+        ->and($script)->not->toContain('cdr_transport_url')
+        ->and($script)->toContain('sqlite | disk)')
+        ->and($script)->toContain('mariadb | tmpfs)')
         ->and($matrix)->not->toContain('v-lua')
-        ->and($matrix)->not->toContain("'lua:");
+        ->and($matrix)->not->toContain("'lua:")
+        ->and($matrix)->not->toContain('cdr-octane')
+        ->and($matrix)->not->toContain('cdr_transports');
 });

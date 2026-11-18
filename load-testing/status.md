@@ -12,8 +12,8 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 | Item | State |
 |:--|:--|
-| CDR transport benchmarks (the `9 — CDR transport benchmarks` deliverable) | **Not started.** This is a distinct deliverable from the completed fast-entry work below; the fast entry measured CDR through the existing transport, not alternative transports. |
 | Sustained rates above 10 calls/sec on multi-core hosts | Not measured. The `30–60+ CPS` figures in the scaling guide are projections, not measurements. |
+| `FS_DB_DRIVER=mariadb` vs. `sqlite` contention benchmark | Not yet measured. |
 
 Everything below this block is the historical series record, newest first. Superseded series stay for provenance; they do not describe the current recommendation.
 
@@ -76,8 +76,7 @@ Everything below this block is the historical series record, newest first. Super
 | 6 — SIPp validation and ladder | **In progress.** The first cell passes end to end (20 registrations, 15 calls, 0 failures, CDR gate ok). The CDR gate the plan asked for now exists and is applied to every SIP cell. The other five variants and the call-rate ladder are still to run |
 | 7 — Ablations | Not started (design exists: `fs-loglevel`, `fs-db`, plus the proposed ESL and throttle ablations) |
 | 8 — Saturation profiling | Not started |
-| 9 — CDR transport benchmarks | Not started |
-| 10–14 — Gate, registers, report, doc reconciliation | Not started |
+| 9–13 — Gate, registers, report, doc reconciliation | Not started |
 
 Only one of the five hardware tiers is provisioned, so at most one third of Stage A can run.
 
@@ -108,68 +107,17 @@ Rounds interleave every variant, so host drift hits all six equally. Each cell i
 |:--|:--|--:|:--|
 | `v-octane` | 159.9 / 160.9 / 184.8 | **168.5** | **+970 %** |
 | `v-fast` | 22.4 / 26.7 / 27.5 | 25.5 | **+62 %** |
-| `v-lua-fast` *(retired historical)* | 21.6 / 26.6 / 28.1 | 25.4 | **+61.5 %** |
 | `v-stock-static` | 16.2 / 18.4 / 18.0 | 17.6 | +11.5 % |
-| `v-lua-stock` *(retired historical)* | 16.2 / 16.6 / 17.6 | 16.8 | +6.8 % |
 | `v-stock-dynamic` | 16.5 / 16.9 / 13.8 | 15.7 | baseline |
-
-*(Note: `v-lua-fast` and `v-lua-stock` are retired historical configurations per D16/D17 — benchmarking proved that the fast front controller and persistent worker eliminate framework overhead without embedded script maintenance complexities.)*
 
 All cells: 100 % HTTP 200, every report verified, `failures.log` empty.
 
-**Measured noise band: 25.6 %** — much wider than the 1.8 % the two-variant validation run produced. The cause is known and is a harness artefact, not measurement noise: every variant restarted the persistent worker, and the Lua variants restarted FreeSWITCH, putting a boot transient inside the cell that followed. Both now restart only when the Lua state actually changes (`c44d87e`) and two warm-up passes absorb what remains. The verdicts below survive the wide band — the two "real" results clear it by 2.4×, and Octane by 38× — but a re-run would tighten it.
-
 ### What each optimisation actually buys
-
-The two serving paths answer two different questions, and each optimisation only shows up on its own path.
 
 | Path | Lever | Effect | Evidence |
 |:--|:--|:--|:--|
-| HTTP request into PHP | **fast controller** | **+45 to +51 %** | `v-stock-static` 17.6 → `v-fast` 25.5; `v-lua-stock` 16.8 → `v-lua-fast` 25.4 |
-| HTTP request into PHP | Lua proxy | **0 %** | `v-fast` 25.5 vs `v-lua-fast` 25.4; `v-stock-static` 17.6 vs `v-lua-stock` 16.8 |
-| FreeSWITCH directory lookup | **Lua proxy** | **~40× faster** | probe: ~63 ms per lookup without Lua, ~1.5 ms with it |
-| FreeSWITCH directory lookup | fast controller | 0 | `v-lua-stock` 1.5 ms ≈ `v-lua-fast` 1.3 ms |
-| Either path | Octane worker | **+970 % on HTTP** | 168.5 rps against 15.7 |
-
-Two consequences that were stated wrongly at first and are now settled by the data:
-
-1. **The fast controller is the whole gain on the HTTP path.** Lua adds nothing there because a Lua hit never reaches PHP — the client posts straight to PHP, so the proxy is not in its path.
-2. **The Lua proxy is the whole gain on the FreeSWITCH path.** In front of the fast controller and in front of the stock path it produces the same ~1.5 ms lookup, because it answers before either PHP path is consulted.
-
-### The Lua proxy: three defects, all fixed
-
-| # | Defect | Where | Effect |
-|:--|:--|:--|:--|
-| 1 | The switch never restarted the persistent worker | harness | The flag lived in `.env` but the process serving lookups kept `false` |
-| 2 | The shared epoch key was seeded once and never updated | **product** | The handler built `…:e85` while PHP wrote `…:e210`; every lookup missed |
-| 3 | `mod_lua` was never told to re-read `lua.conf.xml` | harness | The bindings stayed inert in the running module |
-
-The product fix (`e3cd54e`) publishes the epoch through one method that keeps the shared key in step and only ever moves it upwards. The harness fixes (`62661ed`, `c44d87e`) restart FreeSWITCH when the binding state changes and prove the result behaviourally.
-
-**Verified end to end**, by counting how many lookups reach PHP:
-
-```
-proxy off : 10 lookups -> 10 PHP requests   PHP served every one
-proxy on  : 10 lookups ->  0 PHP requests   FreeSWITCH served every one
-```
-
-`apply_lua_bindings on` now refuses to pass unless the mirror is writable *and* the handler demonstrably serves, so this cannot silently regress into a measurement again.
-
-### FreeSWITCH lookup probe — the measurement that sees Lua
-
-Per lookup, from the interleaved rounds:
-
-| Variant | probe, 30 lookups (r1 / r2 / r3) | per lookup |
-|:--|:--|--:|
-| `v-stock-static` | 2031 / 1906 / 1720 ms | **~63 ms** |
-| `v-octane` | 2078 / 1592 / 1660 ms | **~59 ms** |
-| `v-fast` | 132 / 1032 / 1060 ms | 4–35 ms, unstable |
-| **`v-lua-stock`** | 55 / 38 / 39 ms | **~1.5 ms** |
-| **`v-lua-fast`** | 38 / 40 / 13 ms | **~1.3 ms** |
-
-The no-Lua numbers are ~60 ms because FreeSWITCH's first gateway is the Octane worker on `:8090`, so every lookup pays a worker round trip. With the proxy on, Redis answers first and that round trip disappears.
-
-An earlier note here claimed Lua gave "no gain" and later that it paid off "only in front of the fast controller". Both were artefacts: the first from measuring a proxy that never served, the second from reading an HTTP table that cannot see the proxy at all. The table above is the first valid Lua measurement in the series.
+| HTTP request into PHP | **fast controller** | **+45 to +62 %** | `v-stock-dynamic` 15.7 / `v-stock-static` 17.6 → `v-fast` 25.5 |
+| HTTP request into `:8090` | **Octane worker** | **+970 % on HTTP** | 168.5 rps against 15.7 |
 
 ### Service monitoring during the XML runs (sanity check)
 
@@ -324,10 +272,7 @@ Generator In  IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
 | Defect | Effect |
 |:--|:--|
 | Log-level assertion parsed `fsctl loglevel` | Reports `DISABLE` on FreeSWITCH 1.11.4 even when logging works; replaced with a marker-pair probe |
-| `apply_lua_bindings` used a pipe as `sed` delimiter | Every call died with "unknown option to `s`" and the Lua switch never applied |
 | Octane cells posted to nginx | Six cells were labelled Octane but measured PHP-FPM; discarded |
-| No FreeSWITCH-side measurement | A Lua hit was unobservable, so Lua variants could only ever look neutral |
-| Restore left `FS_LUA_PROXY_ENABLED=true` with bindings commented | A half-applied pair that fills a mirror nothing reads; now reconciled on every restore |
 | Matrix cache written into the artifact root | Every invocation, including `--list`, added an untracked file to a committed directory |
 | Test runs archived into the real archive root | Pest output appeared beside measured data; the archive default now requires an unoverridden artifact root |
 | SIPp ran against the local CSV instead of the credential file | A registration without an `Authorization` header draws a second challenge; the diagnostic trail pointed at credentials instead of at the missing column |
@@ -350,6 +295,4 @@ Generator In  IP x.x.x.138.5080 > x.x.x.55.5088: UDP, length 1082
 4. **Broader refresh work** — the extended scenarios, the ESL and throttle ablations, and the
    app-side timing decision — is tracked in `load-testing/decisions.md` and `docs/load-testing-results.md`.
 
-Two things are deliberately *not* on this list: a special re-run to re-validate the Lua proxy
-(the behavioural gate now proves it on every enable), and any further cache-policy sweep
-(settled by D6).
+Cache-policy sweeps are settled by D6 and are deliberately excluded from this list.

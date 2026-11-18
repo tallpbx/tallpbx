@@ -37,7 +37,7 @@ ssh "$SIPP_HOST" 'hostname; nproc; command -v sipp'
 
 ## Step 2 — Host baseline
 
-Apply every setting in `remote-setup.md` §3–§11 and keep the proof from each section. At minimum confirm:
+Apply every setting in `remote-setup.md` §3–§10 and keep the proof from each section. At minimum confirm:
 
 ```bash
 ssh "$PBX_HOST" 'cd /var/www/tallpbx && \

@@ -30,7 +30,7 @@ Read the scripts only when the documents do not answer a question:
 | `load-testing/scripts/load-test-matrix.sh` | Orchestrator: lists, dry-runs and executes cells; applies and asserts each switch remotely; pulls artifacts; restores the baseline |
 | `load-testing/scripts/lib/switch.sh` | The switches themselves. One `apply_*` per setting, each with a matching `assert_*` that reads the value back |
 | `load-testing/scripts/lib/manifest.sh` | Writes and reads `manifest.json`; verifies host sizing against the matrix |
-| `load-testing/scripts/drivers/` | Execution drivers for automated ladders and matrices (`run-ladder.sh`, `run-sqlite-ladder.sh`, `run-cdr-matrix.sh`) |
+| `load-testing/scripts/drivers/` | Execution drivers for automated ladders (`run-ladder.sh`, `run-sqlite-ladder.sh`) |
 | `load-testing/scripts/pbx-sipp-validate.sh` | End-to-end SIPp scenario validation harness |
 | `load-testing/scripts/run-cache-sweep.sh` | Dialplan cache TTL policy sweep runner |
 | `load-testing/scripts/tools/cpuwatch.sh` | Attributes CPU to each service over a time window |
@@ -110,7 +110,7 @@ Series narrative reports live in `docs/load-testing-results.md` (as a new dated 
 | Axis | Options | Where defined |
 |:--|:--|:--|
 | Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `load-testing/matrix.php` → `tiers` |
-| XML-serving variant | `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, `v-octane` (note `v-lua-stock` and `v-lua-fast` were retired in `5.0.0`) | → `variants` |
+| XML-serving variant | `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, `v-octane` | → `variants` |
 | Load profile | `25x1`, `100x5`, `500x25`, `1000x25` (`--rates=5,10,15,20,25`), `1000x25-8020` | → `xml_profiles` |
 | Cache policy / TTL presets | `default` (`300s / 60s`), `tuned` (`1800s / 600s`), `production-60` (`60s / 60s`), `extended-30` (`30s / 30s`), `cold`, `dialplan-off`, `cache-hit-60`, `uncached-redis` (`0s / 0s`, store `redis`), `uncached-db` (`0s / 0s`, store `null`) | → `cache_ttl_profiles` |
 | SIP scenarios | 14 feature scenarios plus a call-rate ladder | → `sip_scenarios` |

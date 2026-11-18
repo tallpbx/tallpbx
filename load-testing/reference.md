@@ -31,9 +31,8 @@ Every abbreviation and jargon term used in this directory, in plain language. No
 | **Laravel** | The application framework. "Booting the framework" is the expensive part of answering a simple request |
 | **nginx** | The web server in front of PHP. It decides which PHP file handles a URL |
 | **Entry file** | The PHP file nginx hands a request to. `index.php` boots the whole framework; `xml-handler-fast.php` skips most of it |
-| **Octane** | A long-lived PHP worker (served by RoadRunner) that keeps the application in memory between requests, so there is no per-request boot |
+| **Octane** | A long-lived PHP worker (served by RoadRunner) that keeps the application in memory between requests, so there is no per-request boot (used for XML only; CDR stays on `public/cdr-fast.php` via PHP-FPM) |
 | **RoadRunner** | The process supervisor that keeps those Octane workers alive and connects them to port 8090 |
-| **Lua** | (Retired in 5.0.0) Formerly evaluated as an in-process XML cache proxy script in FreeSWITCH; retired after benchmarking |
 | **Redis** | The in-memory key/value store holding cached lookups and the CDR queue |
 | **MariaDB** | The database |
 
@@ -99,7 +98,7 @@ bash load-testing/scripts/load-test-matrix.sh [options]
 | `--tier=<id>` | Restrict to one hardware tier. Required to execute |
 | `--variant=<id>` | Restrict to one XML-serving variant |
 | `--phase=xml\|sip\|ablation` | Restrict to one phase |
-| `--ablation=<id>` | Restrict to one ablation experiment (`fs-loglevel`, `broadcast-throttle`, `cdr-pipeline`, etc.) |
+| `--ablation=<id>` | Restrict to one ablation experiment (`fs-db`, `fs-loglevel`, `esl-subscriptions`, `broadcast-throttle`, etc.) |
 | `--section=dialplan\|directory\|mixed` | Restrict the XML battery to one request section |
 | `--profile=<id>` / `--profiles=<list>` | Restrict to one or more load profiles (default `1000x25,1000x25-8020`; also `25x1`, `100x5`, `500x25`) |
 | `--ttl=<id>` | Restrict to one cache policy (`production-60`, `cold`, …) |
@@ -165,7 +164,7 @@ An unknown tier, variant, phase or cache policy exits non-zero before anything r
 | `OUTBOUND_CALL_RATE` | `1` | Gateway round-trip pacing |
 | `RUN_DIR` | — | Where the scenario logs and SIPp statistics are written |
 
-The generator's kernel and socket preparation, the port map in context, and the two pitfalls (stray UAS on rebind, short registration lease) are in [`remote-setup.md` §13](remote-setup.md).
+The generator's kernel and socket preparation, the port map in context, and the two pitfalls (stray UAS on rebind, short registration lease) are in [`remote-setup.md` §12](remote-setup.md).
 
 ---
 
@@ -312,7 +311,6 @@ bash -n load-testing/scripts/lib/switch.sh
 | `xml_sections` | `dialplan`, `directory`, `mixed` |
 | `sip_scenarios` | The 14 SIPp feature scenarios |
 | `ablations` | Single-knob experiments and their values |
-| `cdr_transports` | `cdr-fpm` and `cdr-octane` |
 
 Adding a variant means editing this file only; the runner, the tests and these documents read from it.
 

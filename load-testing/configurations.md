@@ -19,8 +19,7 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 | `apply_octane_binding` | `on\|off` | Which `xml_curl` gateway FreeSWITCH consults |
 | `apply_ttl` | `<dialplan> <contributor> [directory] [acl]` | XML cache lifetimes |
 | `apply_fs_loglevel` | `debug\|info\|notice\|warning\|err` | FreeSWITCH file log ceiling |
-| `apply_fs_db_mode` | `disk\|tmpfs` | Test-only disk-versus-memory ablation; not a deployment choice |
-| `apply_cdr_transport` | `fpm\|octane` | Which endpoint `mod_json_cdr` posts records to |
+| `apply_fs_db_mode` | `sqlite\|mariadb\|disk\|tmpfs` | FreeSWITCH runtime database driver (`sqlite` default vs. `mariadb`; `disk`/`tmpfs` kept for storage ablations) |
 | `apply_esl_profile` | `essential\|full` | How many event types the ESL listener subscribes to |
 | `apply_broadcast_throttle` | `<milliseconds>` | Reverb debounce window; `0` disables it |
 | `probe_lookup` | `<extension> <domain> [count]` | Nothing — it measures one directory lookup |
@@ -70,17 +69,10 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` hav
 
 ## `apply_fs_db_mode`
 
-- **Argument:** `disk` or `tmpfs`.
-- **Effect:** whether runtime database writes hit disk or memory.
-- **Assertion:** `mountpoint` plus the filesystem type.
-- **Caveat:** switching stops and starts FreeSWITCH. This is a controlled benchmark ablation, not a supported appliance storage choice; disk is the shipped baseline.
-
-## `apply_cdr_transport`
-
-- **Argument:** `fpm` or `octane`.
-- **File:** the `url` in `json_cdr.conf.xml`, then `reload mod_json_cdr`.
-- **Assertion:** the URL and a probe of the endpoint (a `401` proves the route is live and the token is enforced).
-- **Effect:** where CDR records are posted, and therefore whether CDR traffic competes with XML traffic in the same workers.
+- **Argument:** `sqlite`, `mariadb`, `disk`, or `tmpfs`.
+- **Effect:** switches FreeSWITCH runtime databases (`core.db`, `sofia_reg_*.db`, `callcenter.db`, `voicemail_default.db`, `call_limit.db`, `fifo.db`) between local SQLite (`FS_DB_DRIVER=sqlite`) and MariaDB (`FS_DB_DRIVER=mariadb` via `mod_mariadb`), or moves SQLite storage between disk and tmpfs.
+- **Assertion:** checks `.env` `FS_DB_DRIVER`, `module_exists mod_mariadb` and MariaDB schema creation for `mariadb`, or `findmnt` and `mod_mariadb` disabled for `sqlite`/`disk`/`tmpfs`.
+- **Caveat:** switching stops and starts FreeSWITCH, and snapshots `.env` / `pre_load_modules.conf.xml` so `restore_baseline` returns the host cleanly.
 
 ## `apply_esl_profile`
 
@@ -127,8 +119,6 @@ lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 | `v-fast` | `static 5` | **fast** | off |
 | `v-fast-default` | `dynamic` (installer default: 1–3 workers on 1 GB) | **fast** | off |
 | `v-octane` | `static 5` | stock | **on** |
-
-> **Historical note:** The in-process Lua XML cache proxy variants (`v-lua-stock` and `v-lua-fast`) were evaluated and retired after benchmarking demonstrated that the fast front controller (`xml-handler-fast.php`) and persistent RoadRunner worker (`v-octane`) eliminated framework overhead without embedded script maintenance complexities.
 
 `load-testing/matrix.php` is the authority; the runner reads the `requires` list per variant and applies each entry in order.
 

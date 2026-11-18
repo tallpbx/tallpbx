@@ -33,7 +33,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 | FreeSWITCH runtime DB | disk |
 | Cache TTLs | unset (config defaults) |
 
-**Why:** these are what the installer ships on a fresh appliance, so they are what a customer actually gets. The fast controller (`xml-handler-fast.php`) is the shipped default in 5.x; the in-process Lua XML proxy was evaluated and retired in `a5db9c5` after benchmarking.
+**Why:** these are what the installer ships on a fresh appliance, so they are what a customer actually gets. The fast controller (`xml-handler-fast.php`) is the shipped default in 5.x.
 
 **Rejected:** treating the scaling-guide optimisations as prerequisites. A prerequisite that is itself being measured cannot also be the baseline.
 
@@ -171,7 +171,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 **Decision:** A setting is changed only through `load-testing/scripts/lib/switch.sh`, and every `apply_*` has an `assert_*` that reads the effective value back. A mismatch fails that cell (`SWITCH-FAILED`).
 
-**Why:** three separate defects produced plausible numbers from configurations that had not actually been applied — a `sed` delimiter collision that silently failed the Lua switch, the restore leaving the Lua flag and bindings disagreeing, and the Octane variant measuring the wrong server. An assertion turns each of those from a wrong result into a failed cell.
+**Why:** earlier harness runs produced plausible numbers from configurations that had not actually been applied — for example, the Octane variant measuring nginx instead of port 8090. An assertion turns a silent mismatch from a wrong result into a failed cell.
 
 **Status:** settled.
 

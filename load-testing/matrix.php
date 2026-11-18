@@ -151,26 +151,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | CDR Ingestion Transports
-    |--------------------------------------------------------------------------
-    |
-    | Both transports hit the same controller, throttle and Redis stream; the
-    | switch is only the URL FreeSWITCH posts to (json_cdr.conf.xml).
-    */
-
-    'cdr_transports' => [
-        'cdr-fpm' => [
-            'label' => 'nginx + PHP-FPM (shipped default)',
-            'url' => 'http://127.0.0.1/api/v1/cdr',
-        ],
-        'cdr-octane' => [
-            'label' => 'Persistent RoadRunner worker',
-            'url' => 'http://127.0.0.1:8090/api/v1/cdr',
-        ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | XML Load Profiles
     |--------------------------------------------------------------------------
     |
@@ -321,8 +301,8 @@ return [
         ],
         'fs-db' => [
             'label' => 'FreeSWITCH runtime database',
-            'values' => ['disk', 'tmpfs'],
-            'question' => 'SQLITE_BUSY cost under call load',
+            'values' => ['sqlite', 'mariadb'],
+            'question' => 'SQLite lock contention vs. MariaDB (mod_mariadb) under call and registration load',
         ],
         'esl-subscriptions' => [
             'label' => 'ESL event subscriptions',
@@ -338,11 +318,6 @@ return [
             'label' => 'Reverb broadcasting',
             'values' => ['on', 'off'],
             'question' => 'WebSocket broadcast cost during calls',
-        ],
-        'cdr-pipeline' => [
-            'label' => 'CDR pipeline',
-            'values' => ['off', 'cdr-fpm', 'cdr-octane'],
-            'question' => 'Whether the pipeline caps call capacity at the tier boundary',
         ],
         'opcache-jit' => [
             'label' => 'OPcache JIT',

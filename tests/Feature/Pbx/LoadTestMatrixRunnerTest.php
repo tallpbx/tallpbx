@@ -635,12 +635,6 @@ XML);
         expect($lib)->toContain('php-fpm already');
     });
 
-    it('reloads the cdr module only when its configuration changed', function (): void {
-        $lib = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
-
-        expect($lib)->toContain('json_before');
-    });
-
     it('resolves local_run_dir, ladder.csv, smoke_gate, and ablation cpu.csv through variant_dir', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 

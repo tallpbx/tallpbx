@@ -43,8 +43,12 @@ describe('load test matrix configuration', function (): void {
             ->toBe(['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-fast-default', 'v-octane']);
     });
 
-    it('defines both CDR ingestion transports', function (): void {
-        expect(array_keys(loadTestMatrix()['cdr_transports']))->toBe(['cdr-fpm', 'cdr-octane']);
+    it('does not define retired cdr transport or lua proxy configurations', function (): void {
+        $matrix = loadTestMatrix();
+
+        expect($matrix)->not->toHaveKey('cdr_transports')
+            ->and($matrix['ablations'])->not->toHaveKey('cdr-pipeline')
+            ->and(array_keys($matrix['variants']))->not->toContain('v-lua-stock', 'v-lua-fast');
     });
 
     it('keeps the capacity ladder ascending and complete', function (): void {
