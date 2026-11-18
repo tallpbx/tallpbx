@@ -215,9 +215,9 @@ Configures high-throughput CDR ingestion (`mod_json_cdr`) and Redis Stream buffe
 
 ---
 
-### 2.8 Octane / RoadRunner Persistent XML Worker Engine
+### 2.8 Laravel Octane Persistent XML Worker Engine
 
-Configures the optional persistent RoadRunner worker daemon serving FreeSWITCH XML curl requests on loopback port 8090.
+Configures the optional persistent **Laravel Octane worker** (a persistent PHP application server that keeps Laravel booted in memory across requests) serving FreeSWITCH XML curl requests on loopback port 8090.
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |

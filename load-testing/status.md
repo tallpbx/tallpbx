@@ -4,7 +4,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 ## Current support status
 
-**Supported serving modes** (defined in `load-testing/matrix.php`): `v-stock-dynamic` and `v-stock-static` (stock front controller), `v-fast` (fast XML controller with a static pool), `v-fast-default` (the shipped appliance default: dynamic pool sized from RAM plus the fast controller), and `v-octane` (opt-in resident RoadRunner worker on `127.0.0.1:8090`).
+**Supported serving modes** (defined in `load-testing/matrix.php`): `v-stock-dynamic` and `v-stock-static` (stock front controller), `v-fast` (fast XML controller with a static pool), `v-fast-default` (the shipped appliance default: dynamic pool sized from RAM plus the fast controller), and `v-octane` (opt-in resident **Laravel Octane worker** — a persistent PHP application server that keeps Laravel booted in memory across requests — on `127.0.0.1:8090`).
 
 **Measured tiers** on the current series are the shared-CPU appliance tiers — 1 vCPU / 1 GB, 1 vCPU / 2 GB, and 2 vCPU / 2 GB — plus loopback-only sanity numbers for the Octane worker. Supported call rates with the shipped PHP-FPM default are **5 calls/sec on 1 vCPU** and **10 calls/sec on 2 vCPU**; higher offered rates degrade because PHP-FPM saturates, and that boundary is documented per tier in the series tables below.
 
@@ -28,7 +28,7 @@ Everything below this block is the historical series record, newest first. Super
 | Deploy to the PBX | **Done.** Fast CDR entry live; POST 200 with no `Access-Control-Allow-Origin` header, which only the full application adds |
 | XML battery, `v-fast`, 100x5, production-60 | **Done.** 32.1 / 32.6 / 31.4 req/s, p50 114 ms, 100 % HTTP 200 — against 25.5 req/s mean in `refresh-20261103` |
 | CPS ladder, `v-fast`, fast CDR arm | **Done.** 5 CPS: **300/300 calls, 601 CDR rows** against 276/300 and 46/552 before the fast entry. 8 CPS 102/480, 10 CPS 62/600, 15 CPS 53/847 — all three completed with the CDR gate passing and **zero FreeSWITCH restarts**; they previously could not finish at all |
-| Octane sanity (XML only) | **Complete.** Resident RoadRunner/Octane worker benchmarked on 2 vCPU (286 req/s) and 4 vCPU shared (140.5 req/s sustained, 85 ms p50) on loopback :8090 |
+| Octane sanity (XML only) | **Complete.** Resident Octane worker benchmarked on 2 vCPU (286 req/s) and 4 vCPU shared (140.5 req/s sustained, 85 ms p50) on loopback :8090 |
 | Pool-split decision (UI vs v-fast+CDR) | **Settled.** Evaluated and resolved by adopting a single dynamic pool with memory ceilings (`pm = dynamic`, `max_children = 3 / 6 / 12`, `pm.max_requests = 10000`) in the installer, eliminating the need for a split socket or separate pools |
 
 **Rate ceiling on this tier:** 5 CPS serves 300/300; every rate above it degrades sharply (8 CPS 21 %, 10 CPS 10 %, 15 CPS 6 % of offered calls completed). The degradation tracks PHP-FPM worker saturation, not CDR ingestion, and it is the reason the comparison anchor is 5 CPS.
@@ -160,12 +160,12 @@ Resident services, largest first. The two columns are **RAM held** (the kernel's
 | `freeswitch:listen` (ESL) | 85.9 MB | 58.8 MB |
 | `queue:work` | 65.2 MB | 43.2 MB |
 | `cdr:work` | 60.6 MB | 38.6 MB |
-| `roadrunner-worker` (Octane) | 59.8 MB | 35.9 MB |
+| `octane-worker` (Octane worker process) | 59.8 MB | 35.9 MB |
 | `php-fpm` worker (busiest of five) | 61.1 MB | 17.9 MB |
 | `php-fpm` worker (typical of the other four) | ~57 MB | ~14.6 MB |
 | `schedule:work` | 47.9 MB | 25.1 MB |
 | `php-fpm` master | 44.7 MB | 9.8 MB |
-| `rr` (RoadRunner supervisor) | 26.4 MB | 26.4 MB |
+| `octane` (Octane supervisor) | 26.4 MB | 26.4 MB |
 
 Summing RSS gives ~768 MB, which exceeds the 627 MB the kernel reports as used: shared pages — the PHP binary and the vendor tree every Laravel process maps in — are counted in full by each process. Summing PSS gives **~375 MB**, the real footprint of these processes.
 

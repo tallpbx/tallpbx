@@ -31,8 +31,7 @@ Every abbreviation and jargon term used in this directory, in plain language. No
 | **Laravel** | The application framework. "Booting the framework" is the expensive part of answering a simple request |
 | **nginx** | The web server in front of PHP. It decides which PHP file handles a URL |
 | **Entry file** | The PHP file nginx hands a request to. `index.php` boots the whole framework; `xml-handler-fast.php` skips most of it |
-| **Octane** | A long-lived PHP worker (served by RoadRunner) that keeps the application in memory between requests, so there is no per-request boot (used for XML only; CDR stays on `public/cdr-fast.php` via PHP-FPM) |
-| **RoadRunner** | The process supervisor that keeps those Octane workers alive and connects them to port 8090 |
+| **Laravel Octane** (then **Octane** / **Octane worker**) | A persistent PHP application server that keeps Laravel booted in memory between requests, eliminating per-request framework boot overhead (used for XML on port 8090; CDR stays on `public/cdr-fast.php` via PHP-FPM) |
 | **Redis** | The in-memory key/value store holding cached lookups and the CDR queue |
 | **MariaDB** | The database |
 

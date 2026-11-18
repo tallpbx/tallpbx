@@ -406,9 +406,9 @@ sequenceDiagram
     Note over Handler,Redis: Next mod_xml_curl computes key with v=2 -> instant cache miss
 ```
 
-#### 6. Persistent Telephony XML Worker (Octane / RoadRunner)
+#### 6. Persistent Telephony XML Worker (**Laravel Octane** — backed by RoadRunner)
 
-> **Status:** an optional performance mode. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
+> **Status:** an optional performance mode. **Laravel Octane** is a persistent PHP application server (running on the RoadRunner server driver in TallPBX) that keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (Octane worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
 
 **The cost it removes.** Under PHP-FPM every lookup pays Composer autoloading, provider registration, and container construction before Redis is asked — roughly 44 ms of a ~55 ms hit on the reference 1 vCPU host (§7.5.6). The worker keeps the framework, Eloquent connections, and module contributors in memory, so the same lookup only runs the controller. Measured on the 4-core reference appliance (baseline: PHP-FPM with 12 static workers on the same host): 33.9 requests/second at 100×5 and 66.6 requests/second at 500×25 with zero failed requests, against 10.95 and 3.59 requests/second for the pool. Those figures come from a CLI harness that adds per-batch connection overhead, so they understate an in-process client; the 2,500 req/s design target was not demonstrated.
 

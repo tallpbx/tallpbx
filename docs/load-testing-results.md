@@ -61,7 +61,7 @@ Capacity scales with cores, and the ceiling is **CPU**, not the pool and not CDR
 
 ### The persistent worker removes the boundary at both tiers
 
-Same rate, same warm cache, same firewall — only the XML serving path changes from PHP-FPM to the optional RoadRunner worker on port 8090:
+Same rate, same warm cache, same firewall — only the XML serving path changes from PHP-FPM to the optional **Laravel Octane worker** (a persistent PHP application server that keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead) on port 8090:
 
 | Host | Rate | Shipped FPM pool | **Octane worker** | FPM setup p50 | Octane setup p50 |
 |:--|:--|:--|:--|:--|:--|
@@ -71,7 +71,7 @@ Same rate, same warm cache, same firewall — only the XML serving path changes 
 Both Octane cells passed the CDR gate (721 and 1 441 rows) with zero failed calls, so the call-rate boundary documented above is a property of the **PHP-FPM XML path**, not of the hardware. Median setup latency falls 13× at the same rate.
 
 > [!NOTE]
-> Per-process CPU in the Octane cells is not trustworthy: the sampler reports the RoadRunner child processes under the `php-fpm` class, so the split between `php-fpm` and `octane-worker` is distorted even though the totals are correct. Completion, CDR reconciliation and latency are unaffected. A p95 of 3 948 ms at 12 calls/sec also shows a tail worth investigating if Octane is ever promoted from option to default.
+> Per-process CPU in the Octane cells is not trustworthy: the sampler reports the Octane worker child processes under the `php-fpm` class, so the split between `php-fpm` and `octane-worker` is distorted even though the totals are correct. Completion, CDR reconciliation and latency are unaffected. A p95 of 3 948 ms at 12 calls/sec also shows a tail worth investigating if Octane is ever promoted from option to default.
 
 ### How the pool shape matters — the same experiment at each tier's own boundary
 
@@ -130,14 +130,14 @@ XML throughput and latency across moderate bursts (`100 x 5`: 100 requests at 5 
 
 **Key Architectural Takeaways:**
 1. **The Shared-Core Baseline (~24–26 req/sec with Dynamic Pool)**: On a 1-core shared-CPU instance with dynamic PHP-FPM auto-tuning (`pm = dynamic`, max 3 workers), XML throughput reaches 26.4 req/sec under burst concurrency, and sustains 26.0 req/sec across 1,000 queries with zero errors.
-2. **Quad-Core Shared Scaling & Octane Multipliers**: Moving to 4 shared vCPUs with dynamic workers (`pm.max_children = 12`) increases PHP-FPM burst throughput to **45.1 req/sec** under saturation, with 0 dropped requests. Enabling the resident RoadRunner/Octane worker unleashes **140.5 req/sec** sustained with median latency under 85 ms (a **3.1× to 3.8× speedup** over PHP-FPM).
+2. **Quad-Core Shared Scaling & Octane Multipliers**: Moving to 4 shared vCPUs with dynamic workers (`pm.max_children = 12`) increases PHP-FPM burst throughput to **45.1 req/sec** under saturation, with 0 dropped requests. Enabling the resident Octane worker unleashes **140.5 req/sec** sustained with median latency under 85 ms (a **3.1× to 3.8× speedup** over PHP-FPM).
 3. **Database vs. Cache Scaling**: Redis contributor and dialplan caching shield MariaDB during high-concurrency bursts, keeping average response times under 240 ms on entry hardware and under 70 ms on dedicated instances.
 
 ---
 
 ### Default Configuration (Fast Controller) vs. Performance Option (Laravel Octane)
 
-Direct comparison across measured cloud VPS hardware tiers between the **default configuration** (shipped dynamic PHP-FPM fast controller, `v-fast-default`) and the **performance option** (opt-in resident RoadRunner/Octane XML worker, `v-octane` on loopback `:8090`):
+Direct comparison across measured cloud VPS hardware tiers between the **default configuration** (shipped dynamic PHP-FPM fast controller, `v-fast-default`) and the **performance option** (opt-in resident Octane worker, `v-octane` on loopback `:8090`):
 
 | Hardware Tier | Configuration Mode | Concurrency Profile | XML Throughput | Latency (Average / Median) | Live Call Capacity | Failure Bottleneck & Domain Isolation |
 | :--- | :--- | :--- | ---: | ---: | :---: | :--- |
@@ -159,7 +159,7 @@ Think of incoming phone calls like customers arriving at a busy drive-through re
 
 ##### 2. The Linux System Administrator View (Processes, Sockets & Interrupts)
 - **Default Configuration Process Model**: PHP-FPM operates a dynamic pool of worker processes (`pm = dynamic`, ceiling of 3 on 1 GB, 6 on 2 GB, 12 on 4 GB). Under concurrency, once all workers are busy, incoming HTTP requests from `mod_xml_curl` queue against the Unix socket backlog. When queue wait exceeds Nginx's `fastcgi_read_timeout` (2s), Nginx returns `504 Gateway Timeout` and FreeSWITCH drops or retries the call.
-- **Performance Option Event Loop**: Managed via systemd (`tallpbx-xml-worker.service`), the performance option uses RoadRunner to hold a fixed pool of persistent PHP CLI worker processes listening directly on `127.0.0.1:8090`. Framework bootstrap state stays pre-warmed in RAM, completely bypassing Nginx FastCGI process spawning overhead.
+- **Performance Option Event Loop**: Managed via systemd (`tallpbx-xml-worker.service`), the performance option uses Octane to hold a fixed pool of persistent PHP CLI worker processes listening directly on `127.0.0.1:8090`. Framework bootstrap state stays pre-warmed in RAM, completely bypassing Nginx FastCGI process spawning overhead.
 - **CPU Scheduling & Context Switching**:
   - *1 vCPU*: The performance option answers XML requests at 168 req/s, but live call capacity is capped at ~6.2 CPS because the single core is 100% busy dividing time between FreeSWITCH's Sofia SIP threads (33%), ESL JSON event processing (33%), and WebSocket broadcasting (25%).
   - *2 vCPU*: Adding a second core eliminates the thread lock contention between VoIP packet processing and PHP/MariaDB, jumping XML throughput to **286 req/s** and call capacity to **25+ CPS**.
@@ -168,7 +168,7 @@ Think of incoming phone calls like customers arriving at a busy drive-through re
 
 ##### 3. The PHP / Laravel Developer View (Bootstrap Lifecycle & Memory Safety)
 - **Default Configuration Bootstrap Lifecycle**: Standard PHP-FPM evaluates `bootstrap/app.php`, boots service providers, configures DI containers, and tears down the entire object graph upon script termination. The default Fast Controller (`xml-handler-fast.php`) optimizes this by booting only 24 telephony providers instead of 90 (`MinimalBootstrap`).
-- **Performance Option In-Memory Execution**: RoadRunner boots Laravel once into persistent memory. Subsequent HTTP requests execute through `Application::handle()`, executing in 1.7 ms to 10 ms (`handler_ms`).
+- **Performance Option In-Memory Execution**: Octane boots Laravel once into persistent memory. Subsequent HTTP requests execute through `Application::handle()`, executing in 1.7 ms to 10 ms (`handler_ms`).
 - **State Safety & Tenant Isolation**: Because memory persists across requests, state leakage is prevented by `ClearTenantContext` and `VerifyCleanDatabaseState` event listeners firing on request termination, ensuring tenant scoping and DB connections remain completely clean.
 - **Cache Stampede Protection**: Atomic Redis locks (`Cache::lock`) serialize cold-key builds so only one worker compiles dynamic routing XML while concurrent requests wait and read the cached result.
 
@@ -223,7 +223,7 @@ Unlike a standard website where PHP only serves human page clicks in a browser, 
   ```bash
   tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"
   ```
-  If this warning appears during peak calling periods, verify whether CPU is saturated before raising `pm.max_children`, or consider enabling the persistent RoadRunner/Octane worker (`tallpbx-xml-worker`) on port 8090.
+  If this warning appears during peak calling periods, verify whether CPU is saturated before raising `pm.max_children`, or consider enabling the persistent Octane worker (`tallpbx-xml-worker`) on port 8090.
 
 ---
 
@@ -383,16 +383,16 @@ Direct benchmarks of the web and database routing engine. Evaluates raw HTTP req
 ### 2 vCPU / 2 GB RAM (Dual-Core)
 
 - **Host**: Cloud VPS (`x.x.x.149`), resized in place. 2 shared vCPUs, 1,973 MB RAM, 2 GB swap (0 MB used).
-- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 6`), Laravel Octane / RoadRunner 2024.3.5 (`tallpbx-xml-worker.service` on loopback `:8090`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
-- **Finding**: Adding a second core doubled compute headroom. Under PHP-FPM, throughput sustained ~25 req/sec with latency cut in half vs single-core. When enabling the persistent **Octane XML worker** on port 8090, throughput exploded from 24.9 req/sec to **286.26 req/sec** (+1,050% / 11.5x speedup), with concurrency 25 response latency plunging from 590.3 ms to **42.2 ms** (14x latency reduction).
+- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, `pm.max_children = 6`), Laravel Octane (`tallpbx-xml-worker.service` on loopback `:8090`), MariaDB 10.11, Redis 7.0, active `nftables` default firewall.
+- **Finding**: Adding a second core doubled compute headroom. Under PHP-FPM, throughput sustained ~25 req/sec with latency cut in half vs single-core. When enabling the persistent **Octane worker** on port 8090, throughput exploded from 24.9 req/sec to **286.26 req/sec** (+1,050% / 11.5x speedup), with concurrency 25 response latency plunging from 590.3 ms to **42.2 ms** (14x latency reduction).
 
 #### Persistent Octane Worker vs. PHP-FPM Throughput (2 vCPU / 2 GB)
 
 | Scenario Profile | Execution Engine | Concurrency | Throughput (Req/Sec) | Avg Latency | Fastest / Slowest | Throughput Multiplier |
 | :--- | :--- | ---: | ---: | ---: | ---: | :---: |
 | `500 x 25` (mixed) | **PHP-FPM** (dynamic, ceiling 6) | 25 | 24.897 req/sec | 590.3 ms | 110.8 ms / 1,294.3 ms | 1.0x (baseline) |
-| `500 x 25` (mixed) | **Laravel Octane / RoadRunner** | 25 | **286.262 req/sec** | **42.2 ms** | 5.6 ms / 287.6 ms | **11.5x speedup** |
-| `100 x 5` (cache-hit) | **Laravel Octane / RoadRunner** | 5 | **137.545 req/sec** | **20.3 ms** | 6.7 ms / 51.1 ms | **Peak responsiveness** |
+| `500 x 25` (mixed) | **Octane worker** | 25 | **286.262 req/sec** | **42.2 ms** | 5.6 ms / 287.6 ms | **11.5x speedup** |
+| `100 x 5` (cache-hit) | **Octane worker** | 5 | **137.545 req/sec** | **20.3 ms** | 6.7 ms / 51.1 ms | **Peak responsiveness** |
 
 #### Extended Telephony Feature Scenarios (Dual-Core Verification)
 
@@ -485,9 +485,9 @@ All 14 extended feature scenarios passed end-to-end under SIPp validation with 1
 ### 4 vCPU Shared / 8 GB RAM (Cloud VPS / Appliance)
 
 - **Host**: Cloud VPS (`x.x.x.149`), resized in place. 4 shared vCPUs, 8 GB RAM (7,947 MB total), 2 GB swap (0 MB used).
-- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, dynamic ceiling `pm.max_children = 12`), Laravel Octane / RoadRunner 2024.3.5 (`tallpbx-xml-worker.service` on loopback `:8090`), FreeSWITCH 1.11.4, MariaDB 10.11, Redis 7.0, active `nftables` default stateful firewall.
+- **Stack**: Nginx 1.26, PHP 8.5-FPM (`pm = dynamic`, dynamic ceiling `pm.max_children = 12`), Laravel Octane (`tallpbx-xml-worker.service` on loopback `:8090`), FreeSWITCH 1.11.4, MariaDB 10.11, Redis 7.0, active `nftables` default stateful firewall.
 - **Role**: High-Density Appliance / Call Center (150–350+ extensions).
-- **Finding**: On 4 shared vCPUs with dynamic pool tuning (`pm.max_children = 12`), the fast front controller sustained **45.08 req/sec** under saturation (1,000 queries at concurrency 25, 0 errors, 336 ms avg latency). Activating the persistent RoadRunner / Octane worker on port 8090 boosted sustained throughput to **140.54 req/sec** (a **3.1× throughput gain** over PHP-FPM) and slashed median latency to **85.2 ms** (a **3.8× drop**).
+- **Finding**: On 4 shared vCPUs with dynamic pool tuning (`pm.max_children = 12`), the fast front controller sustained **45.08 req/sec** under saturation (1,000 queries at concurrency 25, 0 errors, 336 ms avg latency). Activating the persistent Octane worker on port 8090 boosted sustained throughput to **140.54 req/sec** (a **3.1× throughput gain** over PHP-FPM) and slashed median latency to **85.2 ms** (a **3.8× drop**).
 
 #### XML Throughput & Concurrency Scaling (PHP-FPM Shipped Dynamic Pool)
 
@@ -500,26 +500,26 @@ All 14 extended feature scenarios passed end-to-end under SIPp validation with 1
 
 #### Persistent Octane Worker (4-core Reference Appliance)
 
-The resident RoadRunner worker (`tallpbx-xml-worker.service`) runs with `TALLPBX_WORKER_ROLE=telephony` listening on loopback `127.0.0.1:8090`. In-memory bootstrap caching eliminates the per-request PHP lifecycle overhead, delivering sub-100ms response times even under heavy concurrency.
+The resident Octane worker (`tallpbx-xml-worker.service`) runs with `TALLPBX_WORKER_ROLE=telephony` listening on loopback `127.0.0.1:8090`. In-memory bootstrap caching eliminates the per-request PHP lifecycle overhead, delivering sub-100ms response times even under heavy concurrency.
 
 #### Persistent Octane Worker vs. PHP-FPM Comparison (4 vCPU Shared / 8 GB RAM)
 
 | Scenario Profile | Execution Engine | Concurrency | Throughput (Req/Sec) | Avg Latency | p50 (Median) | Max Latency | Throughput Multiplier |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :---: |
 | `100 x 5` (mixed) | **PHP-FPM** (dynamic, ceiling 12) | 5 | 20.12 req/sec | 174.3 ms | 152.2 ms | 476.1 ms | 1.0x (baseline) |
-| `100 x 5` (mixed) | **Laravel Octane / RoadRunner** | 5 | **67.20 req/sec** | **46.4 ms** | **43.2 ms** | **117.3 ms** | **3.3x speedup** |
+| `100 x 5` (mixed) | **Octane worker** | 5 | **67.20 req/sec** | **46.4 ms** | **43.2 ms** | **117.3 ms** | **3.3x speedup** |
 | `500 x 25` (mixed) | **PHP-FPM** (dynamic, ceiling 12) | 25 | 37.97 req/sec | 389.5 ms | 368.7 ms | 1,133.0 ms | 1.0x (baseline) |
-| `500 x 25` (mixed) | **Laravel Octane / RoadRunner** | 25 | **102.54 req/sec** | **126.0 ms** | **113.7 ms** | **322.4 ms** | **2.7x speedup** |
+| `500 x 25` (mixed) | **Octane worker** | 25 | **102.54 req/sec** | **126.0 ms** | **113.7 ms** | **322.4 ms** | **2.7x speedup** |
 | `1,000 x 25` (mixed) | **PHP-FPM** (dynamic, ceiling 12) | 25 | 45.08 req/sec | 336.3 ms | 330.8 ms | 1,020.0 ms | 1.0x (baseline) |
-| `1,000 x 25` (mixed) | **Laravel Octane / RoadRunner** | 25 | **140.54 req/sec** | **89.6 ms** | **85.2 ms** | **213.2 ms** | **3.1x speedup** |
+| `1,000 x 25` (mixed) | **Octane worker** | 25 | **140.54 req/sec** | **89.6 ms** | **85.2 ms** | **213.2 ms** | **3.1x speedup** |
 | `100 x 5` (cache-hit) | **PHP-FPM** (dynamic, ceiling 12) | 5 | 15.60 req/sec | 246.4 ms | 224.0 ms | 817.0 ms | 1.0x (baseline) |
-| `100 x 5` (cache-hit) | **Laravel Octane / RoadRunner** | 5 | **47.36 req/sec** | **83.7 ms** | **31.8 ms** | **1,155.9 ms** | **3.0x speedup** |
+| `100 x 5` (cache-hit) | **Octane worker** | 5 | **47.36 req/sec** | **83.7 ms** | **31.8 ms** | **1,155.9 ms** | **3.0x speedup** |
 | `500 x 25` (cache-hit) | **PHP-FPM** (dynamic, ceiling 12) | 25 | 35.08 req/sec | 424.9 ms | 411.1 ms | 1,121.7 ms | 1.0x (baseline) |
-| `500 x 25` (cache-hit) | **Laravel Octane / RoadRunner** | 25 | **122.24 req/sec** | **102.6 ms** | **98.0 ms** | **263.3 ms** | **3.5x speedup** |
+| `500 x 25` (cache-hit) | **Octane worker** | 25 | **122.24 req/sec** | **102.6 ms** | **98.0 ms** | **263.3 ms** | **3.5x speedup** |
 | `1,000 x 25` (cache-hit) | **PHP-FPM** (dynamic, ceiling 12) | 25 | 48.64 req/sec | 334.7 ms | 336.8 ms | 608.3 ms | 1.0x (baseline) |
-| `1,000 x 25` (cache-hit) | **Laravel Octane / RoadRunner** | 25 | **138.82 req/sec** | **93.2 ms** | **90.0 ms** | **249.1 ms** | **2.9x speedup** |
+| `1,000 x 25` (cache-hit) | **Octane worker** | 25 | **138.82 req/sec** | **93.2 ms** | **90.0 ms** | **249.1 ms** | **2.9x speedup** |
 | `100 x 5` (directory) | **PHP-FPM** (dynamic, ceiling 12) | 5 | 18.90 req/sec | 211.5 ms | 203.7 ms | 371.9 ms | 1.0x (baseline) |
-| `100 x 5` (directory) | **Laravel Octane / RoadRunner** | 5 | **67.51 req/sec** | **49.6 ms** | **43.6 ms** | **116.6 ms** | **3.6x speedup** |
+| `100 x 5` (directory) | **Octane worker** | 5 | **67.51 req/sec** | **49.6 ms** | **43.6 ms** | **116.6 ms** | **3.6x speedup** |
 
 #### Cache Policy Optimization Tests (`100 x 5` on 4 Shared vCPUs)
 
@@ -923,7 +923,7 @@ This section supersedes the earlier production rule in the 1 vCPU section above 
 3. **Worker count is second-order on two cores.** Completion across five pool shapes spans 34–44 % — 10 points — and the ordering is non-monotonic (1 > 4 > dynamic > 2 > 5). One run each, so the differences are not separable from run-to-run noise. On 1 vCPU the same comparison spanned 59 points and was strictly ordered.
 4. **Latency still degrades monotonically with more workers.** Median setup rises 4 624 → 4 892 → 4 924 → 5 436 ms as workers go 1 → 2 → 4 → 5, so the queue-depth mechanism survives even though it no longer decides the outcome.
 5. **The shipped dynamic pool is the right default on this tier.** Mid-pack completion with the best median setup time of the five shapes (3 844 ms), and it needs no tuning per host.
-6. **The Octane worker clears the boundary entirely.** The same 12 calls/sec cell that defeated every PHP-FPM shape completed **720/720 (100 %)** through the persistent worker on port 8090, with 1 441 CDR rows and a median setup of **284 ms** versus 3 844 ms — a 13× improvement that matches the 1 vCPU result (360/360 at 6 calls/sec where FPM scored 70 %). The call-rate ceiling is therefore a property of the PHP-FPM XML path, not of the host, at both tiers. One caveat: the sampler books RoadRunner child processes under `php-fpm`, so the per-service CPU split for this cell is unreliable.
+6. **The Octane worker clears the boundary entirely.** The same 12 calls/sec cell that defeated every PHP-FPM shape completed **720/720 (100 %)** through the persistent Octane worker on port 8090, with 1 441 CDR rows and a median setup of **284 ms** versus 3 844 ms — a 13× improvement that matches the 1 vCPU result (360/360 at 6 calls/sec where FPM scored 70 %). The call-rate ceiling is therefore a property of the PHP-FPM XML path, not of the host, at both tiers. One caveat: the sampler books Octane worker child processes under `php-fpm`, so the per-service CPU split for this cell is unreliable.
 
 **Data limitation.** The four sweep cells shared one artifact directory (`…/2vcpu-20261109-sweep/h2-2c2g/v-fast/sip-cps12`), so each run overwrote the previous `cpu.csv`. Completion, CDR reconciliation and per-call setup latency survived for all four (latency files were attributed by row count, which matched each cell's completed-call count exactly), but per-service CPU and RAM survive only for the three ladder cells. The consolidated rows for the sweep therefore carry blank CPU columns rather than reconstructed values. The harness should include the pool shape in the artifact path before any further sweep.
 

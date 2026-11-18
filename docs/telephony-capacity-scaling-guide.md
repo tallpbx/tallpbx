@@ -18,7 +18,7 @@ Based on empirical benchmarks conducted on a 1 vCPU / 1 GB RAM cloud host with a
 Empirical server-to-server SIP capacity testing established three core facts (for the complete tier tables, per-service CPU numbers, and historical static-pool runs, see [`load-testing-results.md`](load-testing-results.md)):
 
 - **Shipped default capacity scales linearly with CPU cores:** With the shipped dynamic PHP-FPM pool (`pm.max_children` = `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and fast XML/CDR entry points, TallPBX completes **5 calls/sec** (300/300) on 1 vCPU / 1 GB and **10 calls/sec** (600/600) on 2 vCPU / 2 GB.
-- **XML generation is NOT the bottleneck:** The optional **Octane Lean Worker** (`tallpbx-xml-worker.service` on port 8090) serves 150+ XML req/sec and clears the PHP-FPM call-rate boundary on both 1 vCPU (6 calls/sec, 360/360) and 2 vCPU (12 calls/sec, 720/720). Even with near-zero XML latency, 1 vCPU still hits a hard core ceiling between ~6 and 10 CPS.
+- **XML generation is NOT the bottleneck:** The optional **Laravel Octane worker** (a persistent PHP application server that keeps Laravel booted in memory across requests; `tallpbx-xml-worker.service` on port 8090) serves 150+ XML req/sec and clears the PHP-FPM call-rate boundary on both 1 vCPU (6 calls/sec, 360/360) and 2 vCPU (12 calls/sec, 720/720). Even with near-zero XML latency, 1 vCPU still hits a hard core ceiling between ~6 and 10 CPS.
 - **The 10 CPS wall on 1 vCPU is full-stack CPU exhaustion:**
    At 10 CPS with 50 concurrent in-flight calls, profiling on a 1 vCPU host revealed **0.0% idle CPU** (100% saturation):
    - **`freeswitch:listen` (33.3% CPU)**: Reads, deserializes, and dispatches hundreds of FreeSWITCH ESL JSON events per second across 25 subscribed event types into the Laravel application and database.
@@ -50,7 +50,7 @@ Empirical server-to-server SIP capacity testing established three core facts (fo
                    │ mod_xml_curl HTTP (1.78 ms lookup)
  ┌─────────────────▼─────────────────────────────────────────────────────────────┐
  │ CORE 1+: WEB APPLICATION, EVENT BUS, & DATA STACK (Laravel / Octane / DB)     │
- │  - tallpbx-xml-worker (Octane/RoadRunner on port 8090, 1 worker per app core) │
+ │  - tallpbx-xml-worker (Octane worker on port 8090, 1 worker per app core)     │
  │  - freeswitch:listen (Streamlined: filtered to 10 essential call events only) │
  │  - MariaDB & Redis servers                                                    │
  │  - Nginx & PHP-FPM (Dedicated to Admin Web Panel & REST APIs)                 │
@@ -141,7 +141,7 @@ When multiple channel events occur in rapid succession, [`BroadcastDashboardStat
 
 If a deployment encounters SQLite lock contention (`SQLite is BUSY`) or needs shared external state, you can replace SQLite across FreeSWITCH with a **dedicated `freeswitch` MariaDB database** (separate from TallPBX's `tallpbx` schema) using FreeSWITCH's native `mod_mariadb` driver. Note that in FreeSWITCH XML, modules still name the parameter `odbc-dsn` even when given a native `mariadb://...` URI (no unixODBC is required).
 
-When `FS_DB_DRIVER=mariadb`, TallPBX automatically emits the `mariadb://...` DSN across `switch.conf` (`core.db`), `db.conf` (`call_limit.db`), `fifo.conf` (`fifo.db`), `sofia.conf` profiles (`sofia_reg_*.db`, unless overridden in profile settings), `callcenter.conf` (`callcenter.db`), and `voicemail.conf` (`voicemail_default.db`). In November 2026 contention benchmarks ([`load-testing-results.md`](load-testing-results.md#november-2026-refresh-sqlite-vs-mariadb-mod_mariadb-option-1-2-tier-xml-and-2-vcpu-baselines)), `1 vCPU / 1 GB` at `2 CPS` favored disk SQLite (`120/120`, `0` lock errors, lower MariaDB CPU), whereas `2 vCPU / 2 GB` under `8 CPS` calls + `8 req/s` registration churn + voicemail + `fs_cli` polling triggered `10` `SQLite is BUSY` warnings on SQLite versus **`0` on MariaDB** (`480/480` calls, `480/480` registrations, and full `MEDIA_FLOW=1 EXTENDED=1` parity), and at `10 CPS` with `v-octane`, SQLite failed (`583/600`) while MariaDB passed **`600/600` (`100%`, `300 ms` p50)**. (If `tallpbx-xml-worker` is running, restart it alongside `freeswitch` after changing `FS_DB_DRIVER` so RoadRunner does not serve cached SQLite `sofia.conf` DSNs.)
+When `FS_DB_DRIVER=mariadb`, TallPBX automatically emits the `mariadb://...` DSN across `switch.conf` (`core.db`), `db.conf` (`call_limit.db`), `fifo.conf` (`fifo.db`), `sofia.conf` profiles (`sofia_reg_*.db`, unless overridden in profile settings), `callcenter.conf` (`callcenter.db`), and `voicemail.conf` (`voicemail_default.db`). In November 2026 contention benchmarks ([`load-testing-results.md`](load-testing-results.md#november-2026-refresh-sqlite-vs-mariadb-mod_mariadb-option-1-2-tier-xml-and-2-vcpu-baselines)), `1 vCPU / 1 GB` at `2 CPS` favored disk SQLite (`120/120`, `0` lock errors, lower MariaDB CPU), whereas `2 vCPU / 2 GB` under `8 CPS` calls + `8 req/s` registration churn + voicemail + `fs_cli` polling triggered `10` `SQLite is BUSY` warnings on SQLite versus **`0` on MariaDB** (`480/480` calls, `480/480` registrations, and full `MEDIA_FLOW=1 EXTENDED=1` parity), and at `10 CPS` with `v-octane`, SQLite failed (`583/600`) while MariaDB passed **`600/600` (`100%`, `300 ms` p50)**. (If `tallpbx-xml-worker` is running, restart it alongside `freeswitch` after changing `FS_DB_DRIVER` so the Octane worker does not serve cached SQLite `sofia.conf` DSNs.)
 
 - **New installations (opt-in; `sqlite` remains the default):**
   Set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`) before running `scripts/install.sh`. The installer creates the dedicated `freeswitch` database and user, writes `FS_DB_*` into `.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` on source builds), and enables `<load module="mod_mariadb"/>` in `pre_load_modules.conf.xml`.
@@ -212,7 +212,7 @@ FreeSWITCH's stock configuration defaults to verbose debug logging (`<param name
 ### Phase 5: XML Handler Persistence & 2-Tier Binding Ladder
 
 TallPBX configures a 2-tier binding ladder in `xml_curl.conf.xml`:
-1. **`tallpbx-octane`** (`http://127.0.0.1:8090`, timeout 1s): Opt-in persistent RoadRunner/Octane lean XML worker (`tallpbx-xml-worker.service`) using `--workers=auto` (matches host vCPU count). Serves lookups in 1–2 ms from memory.
+1. **`tallpbx-octane`** (`http://127.0.0.1:8090`, timeout 1s): Opt-in persistent Octane worker (`tallpbx-xml-worker.service`) using `--workers=auto` (matches host vCPU count). Serves lookups in 1–2 ms from memory.
 2. **`tallpbx-fallback`** (`http://127.0.0.1:80/api/v1/xml-handler`, timeout 5s): The shipped production default front controller (`public/xml-handler-fast.php`) executing via Nginx and PHP-FPM, with in-process `Throwable` fallback to `index.php` for code errors.
 
 ---

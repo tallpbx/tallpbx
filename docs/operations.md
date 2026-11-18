@@ -16,7 +16,7 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `tallpbx-scheduler` | Scheduled tasks and sweeps |
 | `tallpbx-reverb` | Real-time WebSocket server |
 | `tallpbx-cdr-worker` | Call detail record processor (see [Call Detail Records](#call-detail-records-cdr-pipeline)) |
-| `tallpbx-xml-worker` | Opt-in persistent XML worker serving FreeSWITCH lookups via Octane/RoadRunner (`127.0.0.1:8090`, installed disabled by default; see [Octane XML Worker](#octane-xml-worker-optional-performance-mode)) |
+| `tallpbx-xml-worker` | Opt-in persistent **Laravel Octane worker** (keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead; serves FreeSWITCH XML lookups on `127.0.0.1:8090`, installed disabled by default; see [Octane XML Worker](#octane-xml-worker-optional-performance-mode)) |
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
@@ -552,9 +552,9 @@ If editing configuration files by hand:
 
 ## Octane XML Worker (Optional Performance Mode)
 
-FreeSWITCH's directory, dialplan, and configuration lookups can be answered by a resident RoadRunner worker on `127.0.0.1:8090` instead of by PHP-FPM. The worker keeps the application warm between requests and keeps the XML load off PHP-FPM entirely.
+FreeSWITCH's directory, dialplan, and configuration lookups can be answered by a resident Octane worker on `127.0.0.1:8090` instead of by PHP-FPM. The worker keeps the application warm between requests and keeps the XML load off PHP-FPM entirely.
 
-**It is optional and ships disabled.** The default installation serves XML through the fast controller (next section). The installer always installs the worker's systemd unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions the `rr` binary, and writes the three `mod_xml_curl` bindings that form the XML ladder: the worker first (**1 s** timeout), the fast controller behind nginx (**2 s**), then the stock full application behind nginx (**3 s**). FreeSWITCH re-sends the complete request to each binding, so the POST lookup fields survive every fall-through, and starting or stopping the worker **as a running service** needs **no FreeSWITCH change**. Retiring the binding itself — so lookups never try port 8090 — edits `xml_curl.conf.xml` and does require a FreeSWITCH restart; see [Switching Between the Stock, Fast and Octane XML Paths](#switching-between-the-stock-fast-and-octane-xml-paths).
+**It is optional and ships disabled.** The default installation serves XML through the fast controller (next section). The installer always installs the worker's systemd unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions its application server binary, and writes the two `mod_xml_curl` bindings that form the XML ladder: the Octane worker first (**1 s** timeout), then the fast controller behind nginx (**5 s**). FreeSWITCH re-sends the complete request to each binding, so the POST lookup fields survive every fall-through, and starting or stopping the worker **as a running service** needs **no FreeSWITCH change**. Retiring the binding itself — so lookups never try port 8090 — edits `xml_curl.conf.xml` and does require a FreeSWITCH restart; see [Switching Between the Stock, Fast and Octane XML Paths](#switching-between-the-stock-fast-and-octane-xml-paths).
 
 ### Enabling It
 
@@ -696,7 +696,7 @@ Three XML paths exist. In day-to-day operation, switching between **Octane** and
 
 | Path | What answers FreeSWITCH's XML lookups | How it is selected |
 | --- | --- | --- |
-| **Octane** | Resident RoadRunner worker on `127.0.0.1:8090` | The `tallpbx-octane` binding is active in `xml_curl.conf.xml` **and** `tallpbx-xml-worker` is running |
+| **Octane** | Resident Octane worker on `127.0.0.1:8090` | The `tallpbx-octane` binding is active in `xml_curl.conf.xml` **and** `tallpbx-xml-worker` is running |
 | **Fast** (default) | `xml-handler-fast.php` behind nginx | `tallpbx-xml-worker` is stopped (default) or `tallpbx-octane` is commented out, and the nginx location points at the fast controller |
 | **Stock** | `index.php`, the whole application, behind nginx | Same binding state as Fast, but the nginx location falls through to `index.php` |
 
