@@ -37,6 +37,7 @@ REGISTER_CHURN_PORT="${REGISTER_CHURN_PORT:-5072}"
 VOICEMAIL_UAC_PORT="${VOICEMAIL_UAC_PORT:-5074}"
 
 RUN_DIR="${RUN_DIR:-${APP_DIR}/storage/app/load-tests/fs-db-contention-$(date +%Y%m%d-%H%M%S)}"
+SKIP_PBX_SSH="${SKIP_PBX_SSH:-0}"
 SSH_PORT="${SSH_PORT:-22}"
 SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10}"
 
@@ -96,7 +97,10 @@ pbx_exec() {
 }
 
 # Record baseline FreeSWITCH log line count before the contention window.
-log_lines_before="$(pbx_exec 'wc -l < /var/log/freeswitch/freeswitch.log 2>/dev/null || echo 0' 2>/dev/null || echo 0)"
+log_lines_before=0
+if [ "$SKIP_PBX_SSH" != "1" ]; then
+    log_lines_before="$(pbx_exec 'wc -l < /var/log/freeswitch/freeswitch.log 2>/dev/null || echo 0' 2>/dev/null || echo 0)"
+fi
 
 # 1. Initial registration of the call endpoints on UAS_LOCAL_PORT.
 (cd "$RUN_DIR" && timeout 120 sipp "${PBX_HOST}:${PBX_PORT}" \
@@ -152,14 +156,16 @@ if [ "$VOICEMAIL_RATE" -gt 0 ] && [ "$vm_total" -gt 0 ] && [ -f "${LOAD_TESTING_
 fi
 
 # 5. Poll fs_cli read queries against core/sofia DBs during the load window.
-(
-    end_ts=$(( $(date +%s) + DURATION_SECONDS ))
-    while [ "$(date +%s)" -lt "$end_ts" ]; do
-        pbx_exec 'fs_cli -x "show channels count" >/dev/null 2>&1; fs_cli -x "sofia status profile internal reg" >/dev/null 2>&1' || true
-        sleep "$FS_CLI_POLL_INTERVAL"
-    done
-) > "${RUN_DIR}/fs-cli-poll.log" 2>&1 &
-poll_pid="$!"
+if [ "$SKIP_PBX_SSH" != "1" ] && [ "$FS_CLI_POLL_INTERVAL" -gt 0 ]; then
+    (
+        end_ts=$(( $(date +%s) + DURATION_SECONDS ))
+        while [ "$(date +%s)" -lt "$end_ts" ]; do
+            pbx_exec 'fs_cli -x "show channels count" >/dev/null 2>&1; fs_cli -x "sofia status profile internal reg" >/dev/null 2>&1' || true
+            sleep "$FS_CLI_POLL_INTERVAL"
+        done
+    ) > "${RUN_DIR}/fs-cli-poll.log" 2>&1 &
+    poll_pid="$!"
+fi
 
 # 6. Run main call workload for DURATION_SECONDS.
 call_total=$((CALL_RATE * DURATION_SECONDS))
@@ -181,7 +187,10 @@ set -e
 [ -n "$poll_pid" ] && wait "$poll_pid" 2>/dev/null || true
 
 # Scan newly appended FreeSWITCH logs for SQLite lock or DB driver errors.
-lock_errors="$(pbx_exec "tail -n +$((log_lines_before + 1)) /var/log/freeswitch/freeswitch.log 2>/dev/null | grep -ciE 'SQLite is BUSY|database is locked|SQL ERR|mariadb.*error|CORE_DB' || true" 2>/dev/null || echo unknown)"
+lock_errors="skipped"
+if [ "$SKIP_PBX_SSH" != "1" ]; then
+    lock_errors="$(pbx_exec "tail -n +$((log_lines_before + 1)) /var/log/freeswitch/freeswitch.log 2>/dev/null | grep -ciE 'SQLite is BUSY|database is locked|SQL ERR|mariadb.*error|CORE_DB' || true" 2>/dev/null || echo unknown)"
+fi
 
 {
     echo "# FreeSWITCH Runtime DB Contention Run"

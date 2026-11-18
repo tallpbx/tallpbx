@@ -519,6 +519,12 @@ EOF
         env_set FS_AUTO_CREATE_SCHEMAS true
         env_set FS_CORE_NON_SQLITE_DB_REQUIRED true
 
+        if [ ! -f /usr/lib/freeswitch/mod/mod_mariadb.so ] && [ ! -f /usr/local/freeswitch/mod/mod_mariadb.so ]; then
+            if command -v apt-get >/dev/null 2>&1; then
+                DEBIAN_FRONTEND=noninteractive apt-get -o "DPkg::Lock::Timeout=300" install -y freeswitch-mod-mariadb >/dev/null 2>&1 || true
+            fi
+        fi
+
         if ! FSPBX_FREESWITCH_DB_DRIVER=mariadb bash "${APP_DIR}/scripts/resources/freeswitch.sh" --configure-only >/dev/null 2>&1; then
             fs_start || true
             fail_switch "freeswitch.sh --configure-only failed for mariadb"
