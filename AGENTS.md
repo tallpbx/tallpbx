@@ -251,6 +251,7 @@ bash scripts/fix-generated-permissions.sh
 - Authenticate browser tests through the `loginAs()` session bridge. The in-process server shares one session across visits, so switch identities sequentially (`loginAs(A)` → assert as A → `loginAs(B)` → assert as B); two users can never be active at the same time within one test.
 - Assertions retry until a timeout, but `script()` returns the evaluated value and breaks fluent chains when it returns `null` — run void snippets as standalone statements.
 - Documentation screenshots under `docs/images/` are captured on demand only: normal `bash scripts/test-browser.sh` runs never touch them. To recapture after a UI change run `TALLPBX_CAPTURE_DOCS=1 bash scripts/test-browser.sh` and commit only the images whose pages actually changed (the capture step copies an image only when its content differs).
+- **Remote / live appliance UI verification from a headless orchestrator:** Pest 4's `visit()` targets an in-process local test server, not remote hosts. When verifying a remote server's live UI (e.g. completing `/panel/setup` with an activation code after a remote interactive install when Chrome DevTools MCP is unavailable), use `/var/www/tallpbx/node_modules/playwright/index.mjs` directly in headless Chromium (`chromium.launch({ headless: true })`), capturing `pageerror` and `console.error` events rather than bypassing the UI with `curl` or Tinker.
 
 ## Linux Command Execution & Privileged Host Helper Policy
 

@@ -41,6 +41,11 @@ ssh "$PBX_HOST" 'wget -qO- https://raw.githubusercontent.com/tallpbx/tallpbx/5.x
 
 **Prove idempotency** by running it twice and comparing a state fingerprint (file hashes, service states, migration counts, row counts) between the two passes. Identical fingerprints mean the installer converged.
 
+**Completing UI initial admin setup (`Activation code`) from a headless orchestrator:** When testing the interactive installer on a remote VM with browser activation-code setup (`Setup method [2]`) and no Chrome DevTools MCP session is attached, drive the repo's headless Playwright Chromium (`node_modules/playwright/index.mjs`, the same engine used by Pest 4's browser plugin) against `http://$PBX_HOST/panel/setup`:
+
+- Fill `email`, `activation_code`, `password`, and `password_confirmation`, click **Create administrator**, and assert the redirect reaches `/panel/dashboard`.
+- Record any `pageerror` or `console.error` events emitted on the live dashboard (this catches fresh-install runtime issues such as missing `.env` keys before load tests begin).
+
 After any install, confirm the pieces a measurement depends on:
 
 ```bash
