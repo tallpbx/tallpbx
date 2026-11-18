@@ -288,6 +288,26 @@ elif [ -z "$(grep -E '^PBX_DEFAULT_SIP_PASSWORD=' .env | tail -1 | cut -d= -f2- 
     sed -i "s/^PBX_DEFAULT_SIP_PASSWORD=.*/PBX_DEFAULT_SIP_PASSWORD=$(php -r 'echo bin2hex(random_bytes(12));')/" .env
 fi
 
+# Generate Reverb WebSocket app credentials when absent or blank before Vite
+# builds browser assets so VITE_REVERB_APP_KEY is baked with a valid key.
+ensure_random_hex_env () {
+    local key="$1"
+    local bytes="$2"
+    local value
+
+    if ! grep -q "^${key}=" .env 2>/dev/null; then
+        value="$(php -r "echo bin2hex(random_bytes(${bytes}));")"
+        echo "${key}=${value}" >> .env
+    elif [ -z "$(grep -E "^${key}=" .env | tail -1 | cut -d= -f2- | sed 's/^"//; s/"$//')" ]; then
+        value="$(php -r "echo bin2hex(random_bytes(${bytes}));")"
+        sed -i "s|^${key}=.*|${key}=${value}|" .env
+    fi
+}
+
+ensure_random_hex_env REVERB_APP_KEY 16
+ensure_random_hex_env REVERB_APP_SECRET 32
+grep -q "^VITE_REVERB_APP_KEY=" .env 2>/dev/null || echo 'VITE_REVERB_APP_KEY="${REVERB_APP_KEY}"' >> .env
+
 # Use Redis for cache and sessions. It avoids filesystem/database I/O on
 # concurrent panel and XML-handler requests, and matches the project defaults.
 grep -q "^CACHE_STORE=" .env 2>/dev/null \

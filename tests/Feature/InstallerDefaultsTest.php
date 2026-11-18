@@ -762,6 +762,9 @@ it('configures Laravel XML handler defaults before reconciling FreeSWITCH XML cu
         ->and($envExample)->toContain('FS_HIREDIS_LIMIT_MAX=100000')
         ->and($envExample)->toContain('FS_HIREDIS_MARKER_ENABLED=false')
         ->and($envExample)->toContain('PBX_DEFAULT_SIP_PASSWORD=')
+        ->and($script)->toContain('ensure_random_hex_env REVERB_APP_KEY 16')
+        ->and($script)->toContain('ensure_random_hex_env REVERB_APP_SECRET 32')
+        ->and($script)->toContain('VITE_REVERB_APP_KEY')
         ->and($installer)->toContain("FreeSWITCH:   fs_cli -x 'status'")
         ->and($installer)->not->toContain('Configure FreeSWITCH integration');
 });
