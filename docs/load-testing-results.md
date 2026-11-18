@@ -1,12 +1,13 @@
 # PBX SIP Load Testing & Benchmark Results
 
-Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deployments. This document records empirical benchmark results from datacenter VPS testing across shared and dedicated CPU profiles.
+Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deployments. **Part I** gives the current measured baseline, hardware sizing matrix, and production tuning defaults. **Part II** preserves the detailed and historical benchmark series for reference.
 
 > [!NOTE]
-> For the operational manual, lab topology setup, seeding instructions, and test runner options, see the companion **[SIP Load Testing Guide](load-testing-guide.md)**.
+> Looking to run tests yourself? See **[`load-testing-guide.md`](load-testing-guide.md)** for the administrator testing manual, or **[`load-testing/README.md`](../load-testing/README.md)** for the automated capacity-matrix harness.
 
 ## Contents
 
+**Part I — Current Sizing & Production Guidance**
 - [Current Baseline: Measured Capacity & PHP-FPM Defaults](#current-baseline-measured-capacity--php-fpm-defaults)
 - [Executive Summary & Hardware Sizing Matrix](#executive-summary--hardware-sizing-matrix)
   - [Datacenter Telephony Capacity Comparison](#datacenter-telephony-capacity-comparison)
@@ -19,20 +20,13 @@ Authoritative capacity benchmarks and hardware sizing guidance for TallPBX deplo
   - [Testing Notation & Concurrency Concepts](#testing-notation--concurrency-concepts)
   - [Performance Metrics & Statistics](#performance-metrics--statistics)
   - [Cache Profiles & Telephony Scenarios](#cache-profiles--telephony-scenarios)
+
+**Part II — Detailed & Historical Benchmark Archive**
 - [Dialplan & Cache Engine Benchmarks (XML Throughput)](#dialplan--cache-engine-benchmarks-xml-throughput)
-  - [1 vCPU / 1 GB RAM (Entry Baseline)](#1-vcpu--1-gb-ram-entry-baseline)
-  - [1 vCPU / 2 GB RAM (Memory-Scaled)](#1-vcpu--2-gb-ram-memory-scaled)
-  - [2 vCPU / 2 GB RAM (Dual-Core)](#2-vcpu--2-gb-ram-dual-core)
-  - [2 vCPU Dedicated / 8 GB RAM (Dedicated Compute Node)](#2-vcpu-dedicated--8-gb-ram-dedicated-compute-node)
-  - [4 vCPU Shared / 8 GB RAM (Cloud VPS / Appliance)](#4-vcpu-shared--8-gb-ram-cloud-vps--appliance)
-  - [XML Serving Configurations: Four-Way Comparison (1 vCPU)](#xml-serving-configurations-four-way-comparison-1-vcpu)
 - [CDR Fast Entry Series (1 vCPU, 2026-11-08)](#cdr-fast-entry-series-1-vcpu-2026-11-08)
 - [Live Call Capacity & Telephony Feature Validation (SIP Signaling)](#live-call-capacity--telephony-feature-validation-sip-signaling)
   - [End-to-End Functional Feature Validation (All Tiers)](#end-to-end-functional-feature-validation-all-tiers)
-  - [1 vCPU / 1 GB RAM Live Call Capacity](#1-vcpu--1-gb-ram-live-call-capacity)
-  - [1 vCPU / 2 GB RAM Live Call Capacity](#1-vcpu--2-gb-ram-live-call-capacity)
-  - [2 vCPU / 2 GB RAM Live Call Capacity](#2-vcpu--2-gb-ram-live-call-capacity)
-  - [4 vCPU Shared / 8 GB RAM Live Call Capacity & Extended Validation](#4-vcpu-shared--8-gb-ram-live-call-capacity--extended-validation)
+  - [Pre-5.0.0 Static-Pool Tier Benchmarks](#1-vcpu--1-gb-ram-live-call-capacity)
   - [Cross-Architecture Call Capacity (Octane vs Lua vs Fast Controller)](#cross-architecture-call-capacity-octane-vs-lua-vs-fast-controller)
   - [PHP-FPM Static Worker Sweep on Minimal Hardware (1 vCPU / 1 GB, 2026-11-08)](#php-fpm-static-worker-sweep-on-minimal-hardware-1-vcpu--1-gb-2026-11-08)
   - [Pre-2vCPU Verification Block and Default Selection (1 vCPU / 1 GB, 2026-11-09)](#pre-2vcpu-verification-block-and-default-selection-1-vcpu--1-gb-2026-11-09)
@@ -238,10 +232,10 @@ Unlike a standard website where PHP only serves human page clicks in a browser, 
 
 1. **XML throughput scales with CPU count, not memory.** Doubling RAM from 1 GB to 2 GB on a single core eliminated swap but did not increase XML throughput. Adding a second core roughly doubled burst capability and cut peak tail latency from ~1.7s to ~0.4s. On 4 shared vCPUs, PHP-FPM delivered 45.1 req/sec sustained, while enabling the persistent Octane worker surged throughput to 140.5 req/sec with sub-90ms median latency.
 2. **Do not size calls directly from XML numbers.** A complete call requires SIP signaling, a second call leg, FreeSWITCH state tracking, and teardown work that an HTTP XML test never touches.
-3. **Expected call capacity:**
-   - 1 vCPU ≈ 3 calls/sec sustained (~20–35 concurrent active calls).
-   - 2 vCPU ≈ 5–8 calls/sec sustained (10 calls/sec burst ceiling; 25+ CPS with Octane).
-   - 4 vCPU Shared ≈ 15–25 calls/sec sustained (Octane scales to 30–60+ CPS).
+3. **Expected call capacity (shipped dynamic PHP-FPM default):**
+   - 1 vCPU (1–2 GB): **5 calls/sec** supported (~20–35 concurrent active calls); fails at 6 calls/sec.
+   - 2 vCPU (2 GB): **10 calls/sec** supported; fails at 12 calls/sec (enabling the optional Octane worker clears 12 calls/sec cleanly; 25+ CPS is a projection).
+   - 4 vCPU Shared (8 GB): **15–25 calls/sec** sustained (30–60+ CPS with Octane is a projection, not yet measured).
 4. **Plan for CPU headroom.** Measured ceilings occurred at 95–98% CPU utilization. Do not plan production capacity above ~80% sustained CPU load.
 5. **Check `sessions-per-second` before blaming hardware.** The default of 60 allows roughly 30 two-leg calls/sec. When hit, FreeSWITCH returns `503 Maximum Calls In Progress`. Adjust via `FS_SESSIONS_PER_SECOND` in `.env` or dynamically with `fs_cli -x "fsctl sps <val>"`.
 6. **Media capacity is separate.** These numbers measure call setup, answer, and teardown signaling. Continuous RTP audio quality and transcoding capacity require dedicated RTP load testing.
@@ -292,6 +286,9 @@ This centralized reference defines all testing notation, metrics, and scenario t
 - **Layered XML Caching**: Contributor fragments and full dialplan responses are cached hierarchically in Redis DB 1. See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path-layered-caching--versioned-invalidation) for layer semantics, key composition, and `RoutingCacheVersion` invalidation.
 
 ---
+
+> **Part II — Detailed & Historical Benchmark Archive**  
+> The sections below preserve the detailed per-tier runs, CDR fast-entry benchmarks, and 2026 worker sweeps that produced the summary figures in Part I.
 
 ## Dialplan & Cache Engine Benchmarks (XML Throughput)
 

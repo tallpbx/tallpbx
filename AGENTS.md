@@ -12,7 +12,7 @@
 
 ## Load Testing Harness
 
-All capacity-test documentation and scripts live in [`load-testing/`](load-testing/README.md). Before running, changing, or reasoning about a load test, read `load-testing/README.md` and follow its reading order. Consolidated benchmark CSVs are committed under load-testing/results/consolidated/ (raw per-cell fragments under load-testing/results/<series>/ and storage/app/load-tests/ are git-ignored).
+The reproducible capacity-series harness (procedures, host setup, switch library, scripts, and consolidated benchmark CSVs under `load-testing/results/consolidated/`) lives in [`load-testing/`](load-testing/README.md). Human-facing documentation lives in [`docs/load-testing-guide.md`](docs/load-testing-guide.md) (administrator manual) and [`docs/load-testing-results.md`](docs/load-testing-results.md) (published benchmark results and sizing). Before running, changing, or reasoning about a capacity series or harness script, read `load-testing/README.md` and follow its reading order. Raw per-cell fragments under `load-testing/results/<series>/` and `storage/app/load-tests/` are git-ignored.
 
 ## CRITICAL — Laravel Boost MCP Priority & Tool Usage
 

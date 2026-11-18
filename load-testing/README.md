@@ -1,10 +1,13 @@
 # TallPBX Load Testing
 
-Everything needed to reproduce the TallPBX capacity series lives in this directory: the procedure, the host configuration, the switch reference, the scripts, the decisions behind them, and the raw results.
+Everything needed to reproduce the TallPBX capacity series lives in this directory: the procedure, the host configuration, the switch reference, the scripts, the engineering decisions, and the consolidated cross-series CSV datasets under `results/consolidated/`. Raw per-cell run outputs stay local and git-ignored.
 
-**This directory is the single source of truth for load testing.** If a fact about capacity measurement exists somewhere else in the repository, this directory wins; the older copies are kept for history and are reconciled later.
+This directory is the **reproducible benchmark harness** (structured so an AI agent or engineer can run a full capacity matrix cleanly). For human-facing documentation, see:
 
-It is written so that a human operator **or** an AI agent can be pointed at this directory and follow it without reading anyone's earlier session.
+- [`docs/load-testing-guide.md`](../docs/load-testing-guide.md) — Administrator manual for ad-hoc XML/SIPp testing, two-host lab setup, and troubleshooting.
+- [`docs/load-testing-results.md`](../docs/load-testing-results.md) — Published benchmark summaries, hardware sizing guidance, and dated series reports.
+
+If a harness rule or capacity-measurement detail conflicts with another document, this directory wins.
 
 ---
 

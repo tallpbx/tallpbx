@@ -18,8 +18,7 @@ Operational manual for benchmarking, stress testing, and validating telephony pe
   - [Two-Host Architecture](#two-host-architecture)
   - [Network Reachability & WireGuard (NAT Traversal)](#network-reachability--wireguard-nat-traversal)
   - [Required PBX Runtime State](#required-pbx-runtime-state)
-  - [Provisioning a Remote Test Server](#provisioning-a-remote-test-server)
-- [Automated Refresh Harness (Matrix Runner)](#automated-refresh-harness-matrix-runner)
+- [Reproducing Full Capacity Matrices](#reproducing-full-capacity-matrices)
 - [Seed Data Generation](#seed-data-generation)
 - [Executing Test 1: Dynamic Dialplan XML Throughput](#executing-test-1-dynamic-dialplan-xml-throughput)
   - [Running the Test](#running-the-test)
@@ -44,11 +43,10 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 
 1. **Obfuscate Public IP Addresses**: In all test reports, public documentation, and committed logs, obfuscate public IP addresses to show only the last octet (e.g. `x.x.x.200` or `...YYY`).
 2. **Avoid Special Characters in Remote Passwords**: When seeding a remote PBX over SSH (`tpbx pbx:load-test:seed` or `tallpbx`, which wrap native `artisan pbx:load-test:seed`), avoid unescaped shell metacharacters (such as `!`) in the password argument (e.g., use alphanumeric `LoadTest1234`). In this guide, `tpbx` is used. Unescaped exclamation points are stripped by Bash history expansion, causing credential mismatches that result in `403 Forbidden` on SIP REGISTER.
-3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `storage/app/load-tests/sipp-users.csv` on the PBX filesystem. `storage/app/load-tests/` is dedicated scratch space on the PBX for individual Artisan commands and single-run CSV/XML outputs (git-ignored). Before running `load-testing/scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the load generator, copy the CSV to the generator host:
+3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `storage/app/load-tests/sipp-users.csv` on the PBX filesystem (`storage/app/load-tests/` is local scratch space). Before running `load-testing/scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the load generator, copy the CSV to the generator host:
    ```bash
    scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv
    ```
-   *(Note: Full multi-tier matrix benchmark series archive their raw per-cell outputs to `load-testing/results/<series>/` and commit consolidated cross-series data to `load-testing/results/consolidated/`).*
 4. **Allow the PBX on the Generator Firewall If One Is Running**: When testing outbound gateway routing and media playback, FreeSWITCH bridges calls to the generator host (UAS ports UDP 5088, 5090, RTP 6000). Because these are unsolicited inbound UDP packets, stateful default-drop firewalls on the generator will block them.
 
    - **Generator running TallPBX**: add the PBX address through **Security Center → Firewall → Whitelist** (or persist the entry and run `tpbx security:apply`), then confirm it with `nft list set inet tallpbx_filter whitelist_ips`. A TallPBX-managed host rewrites its ruleset on the next apply, so an ad-hoc `nft add element` is discarded — never paste one into a managed host.
@@ -57,7 +55,7 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 5. **Use FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${destination}/${context}` rather than raw extension strings to avoid `CHAN_NOT_IMPLEMENTED` failures.
 6. **Terminate Background UAS Listeners Between Runs**: In multi-scenario scripts, clean up background UAS processes before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` socket binding collisions.
 7. **Allocate Dedicated Client Ports on Shared Hosts**: When the load generator host also runs FreeSWITCH, SIPp UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). Use local ports 5100+ (`EXTENDED_UAC_LOCAL_PORT=5100`).
-8. **Tune PHP-FPM Worker Pools**: TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` as a dynamic pool: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, and `pm.max_children = 3` on 1 GB systems (`6` on 2 GB, `12` on 4 GB+), plus `pm.max_requests = 10000`. The 2026-11-08 worker sweep showed more workers lose calls at the failure boundary on minimal hardware (38 % of calls completed with 5 workers versus 97 % with 1) and that Debian's stock values churn at burst edges. **Measure the host you are tuning instead of assuming that rule holds everywhere**: the 2026-11-09 re-measurement on 2 vCPU / 2 GB found worker count second-order, with five shapes spread across 34–44 % at the 12 calls/sec boundary. Supported rates with the shipped default are 5 calls/sec on 1 vCPU and 10 calls/sec on 2 vCPU (see [`load-testing-results.md`](load-testing-results.md)).
+8. **Keep PHP-FPM Worker Defaults**: TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` as a dynamic pool sized from detected RAM (`pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` on 1 GB, `6` on 2 GB, `12` on 4 GB+, `pm.max_requests = 10000`). Do not raise `pm.max_children` blindly — on single-core hosts, extra PHP workers deepen CPU queueing and reduce completed calls. Supported baseline rates are **5 calls/sec on 1 vCPU** and **10 calls/sec on 2 vCPU** (see [`load-testing-results.md`](load-testing-results.md)).
 9. **Set Long Registration Leases**: The SIP registration scenario (`load-testing/tools/sipp/register.xml`) must use a 1-hour lease (`Expires: 3600`) so registrations do not expire mid-test.
 
 ---
@@ -104,12 +102,12 @@ For routine benchmarking, run tests in this logical sequence:
 4. **Execute Test 2 (Basic SIPp Call Flow)**: Verify registration, extension-to-extension calls, and outbound routing.
 5. **Execute Test 2 (Media Flow)**: Verify call recording (`*732`), music-on-hold, and IVR announcements.
 6. **Execute Test 2 (Extended Parity)**: Verify ring groups, voicemail, conferences, call forwards, and time conditions.
-7. **Review Results**: Check `summary.md` and log files in PBX scratch storage (`storage/app/load-tests/`). (For full automated matrix series benchmarks, results are stored in `load-testing/results/<series>/` and consolidated comparison datasets in `load-testing/results/consolidated/`).
+7. **Review Results**: Check `summary.md` and log files in `storage/app/load-tests/` on the PBX.
 
 ### Quick Commands
 
 ```bash
-# 1. Seed 100 test extensions on the PBX (use PBX IP or configured SIP realm per Decision D15)
+# 1. Seed 100 test extensions on the PBX (matching the PBX's configured SIP realm)
 tpbx pbx:load-test:seed \
   --tenant=load-test-beta --domain=<PBX_IP> \
   --extensions=100 --start=2000 --password='LoadTest1234' --reset
@@ -220,52 +218,11 @@ fs_cli -x 'sofia status'
 ss -lunp | grep -E ':5060|:5080'
 ```
 
-### Provisioning a Remote Test Server
-
-When a test requires real datacenter behavior, provision a **fresh Debian 13
-(amd64)** host sized to the tier under test (for example 1 shared vCPU /
-1 GB RAM / 2 GB swap for the minimal tier) and install TallPBX exactly the way
-an end user would:
-
-```bash
-wget -O- https://raw.githubusercontent.com/tallpbx/tallpbx/<branch>/scripts/bootstrap.sh | bash
-```
-
-- **Run the install interactively from a terminal.** Do not pre-seed installer
-  environment variables or `/etc/default/tallpbx`; answer the prompts in the
-  order they appear (Clean data, Production, Random database password,
-  FreeSWITCH packages, SignalWire PAT, English prompts, Setup admin now). The
-  interactive path is what validates the real end-user experience.
-- **Enter the SignalWire PAT at the interactive prompt.** Never pre-install or
-  pre-write the token to a setup file as a shortcut. If the token must not
-  remain in the installer state file afterward, remove the `SWITCH_TOKEN`
-  entry once installation completes.
-- **Keep host-specific details out of documentation and reports.** Obfuscate
-  public IP addresses to their last octet, and never record SSH key names or
-  paths, administrator credentials, or tokens in docs, plans, or test reports.
-- **Reuse the existing test host for feature comparisons.** Measuring the same
-  features twice on different hosts produces numbers that cannot be compared.
-  A fresh host is only needed when the point of the exercise is validating the
-  installer itself.
-
 ---
 
-## Automated Refresh Harness (Matrix Runner)
+## Reproducing Full Capacity Matrices
 
-For automated capacity refreshes across multiple hardware tiers, XML serving variants, and call ladders, use the dedicated matrix harness in [`load-testing/`](../load-testing/README.md).
-
-The matrix runner orchestrates remote test execution, applies configuration switches with readback assertions (`load-testing/scripts/lib/switch.sh`), captures machine-readable host manifests (`tpbx pbx:load-test:manifest`), and restores baseline configuration via teardown traps:
-
-```bash
-# List all matrix combinations or dry-run a specific cell
-bash load-testing/scripts/load-test-matrix.sh --list
-bash load-testing/scripts/load-test-matrix.sh --dry-run --tier=h1-1c1g --variant=v-octane --phase=xml
-
-# Execute a complete benchmark series against a remote appliance (uses ambient SSH config)
-PBX_HOST=<PBX_IP> bash load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --repeats=3
-```
-
-Raw per-cell artifacts land under `load-testing/results/<series>/<tier>/<variant>/` (git-ignored), while permanent cross-series datasets are consolidated in `load-testing/results/consolidated/`. For the complete execution procedure, host configuration reference, and script documentation, see **[`load-testing/README.md`](../load-testing/README.md)**.
+The commands below run individual XML or SIPp tests against a single host. If you want to reproduce the multi-tier TallPBX capacity series (or run automated sweeps across PHP-FPM, Fast Controller, and Octane variants with verified configuration switches), use the dedicated benchmark harness in **[`load-testing/README.md`](../load-testing/README.md)** (and [`load-testing/remote-setup.md`](../load-testing/remote-setup.md) for provisioning a clean Debian 13 benchmark host).
 
 ---
 
@@ -286,7 +243,7 @@ tpbx pbx:load-test:seed \
 ```
 
 > [!NOTE]
-> **SIP Realm Selection (Decision D15)**: Always pass `--domain=<PBX_IP>` (or `<DOMAIN>`), matching the PBX appliance's configured `FS_DEFAULT_SIP_REALM`. FreeSWITCH resolves user authentication under the realm configured on its Sofia profile. If seeded with an arbitrary domain (such as `load.test.local`), SIP registrations will fail with `403 Forbidden` (`Can't find user`).
+> **Match the PBX's SIP Realm**: Always pass `--domain=<PBX_IP>` (or `<DOMAIN>`), matching the PBX appliance's configured `FS_DEFAULT_SIP_REALM` (or omit `--domain` to read the appliance default automatically). FreeSWITCH resolves user authentication under the realm configured on its Sofia profile. If seeded with an arbitrary domain (such as `load.test.local`), SIP registrations will fail with `403 Forbidden` (`Can't find user`).
 
 ### 2. Seeding for Test 2 (SIPp Live Calls & Media)
 
@@ -305,7 +262,7 @@ tpbx pbx:load-test:seed \
   --reset
 ```
 
-- `--output=storage/app/load-tests/sipp-users.csv`: Writes the endpoint credential CSV to PBX scratch space (`storage/app/load-tests/`, git-ignored). In automated multi-tier matrix runs, artifact management is handled by the matrix runner.
+- `--output=storage/app/load-tests/sipp-users.csv`: Writes the endpoint credential CSV to `storage/app/load-tests/` on the PBX.
 - `--include-media-fixtures`: Creates the callcenter queue `load_test_moh` (`local_stream://moh`) and IVR announcement `load_test_announcement`.
 - `--include-extended-fixtures`: Creates ring group 2400, voicemail 2003, conference 2500, call forward 2001 &rarr; 2000, time condition 2401, follow-me 2002, emergency 911, and call blocking fixtures.
 
@@ -340,7 +297,7 @@ tpbx pbx:load-test:dialplan \
 
 ### Telemetry & Output Reports
 
-The dialplan test command streams live progress, prints a summary table to the console, and (when `--report` is specified) writes a comprehensive JSON benchmark report to PBX scratch storage (e.g. `storage/app/load-tests/dialplan-500x25.json`, git-ignored). In automated multi-tier matrix runs, per-cell reports are archived under `load-testing/results/<series>/<tier>/<variant>/` and permanent comparisons are distilled into `load-testing/results/consolidated/`:
+The dialplan test command streams live progress, prints a summary table to the console, and (when `--report` is specified) writes a JSON benchmark report (e.g. `storage/app/load-tests/dialplan-500x25.json`):
 - **Throughput & Latency**: Measures requests per second, mean, min, max, median (`p50`), 95th percentile (`p95`), and 99th percentile (`p99`) response latencies.
 - **HTTP Status Codes**: Tracks total counts of `200 OK`, `4xx` client errors, and `5xx` server/gateway errors.
 - **System Environment**: Records PHP version, OPcache status, CPU core count, and system load averages (`1m`, `5m`, `15m`).
@@ -425,7 +382,7 @@ MEDIA_FLOW=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/p
 EXTENDED=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 ```
 
-A successful run exits `0` and creates a detailed artifact directory in PBX scratch storage under `storage/app/load-tests/sipp-e2e-*` (git-ignored) containing `summary.md`, CSV timings, and error logs. (For multi-tier matrix series, raw artifacts are archived to `load-testing/results/<series>/` and long-term comparison datasets to `load-testing/results/consolidated/`).
+A successful run exits `0` and creates an artifact directory under `storage/app/load-tests/sipp-e2e-*` containing `summary.md`, CSV timings, and error logs.
 
 ### Runner Configuration Variables
 

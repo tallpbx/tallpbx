@@ -15,45 +15,18 @@ Based on empirical benchmarks conducted on a 1 vCPU / 1 GB RAM cloud host with a
 
 ### What We Learned from Empirical Load Testing
 
-During live server-to-server SIP capacity testing (`uac-extension-capacity.xml`) across four different XML routing architectures (Octane Lean XML Worker, Lua Redis Proxy [evaluated and retired in 5.0.0], Fast Controller, and Stock PHP-FPM), the following key facts were established:
+Empirical server-to-server SIP capacity testing established three core facts (for the complete tier tables, per-service CPU numbers, and historical static-pool runs, see [`load-testing-results.md`](load-testing-results.md)):
 
-#### Historical benchmark comparison — 2026, retired static pool (1 vCPU, 5-second calls)
-
-> These rows are the original 2026 measurement set, kept for provenance. They
-> were taken before the shipped dynamic PHP-FPM pool existed, so the
-> "Fast Controller Only" failure is a property of the retired static
-> five-worker pool, not of the current build. The current supported rates are
-> in the table immediately below this historical block.
-
-| Architecture | Peak Sustained Rate | 3 CPS Completion | 5 CPS Completion | 8 CPS Completion | 10 CPS Burst Completion | Call Setup Median (p50) | Primary Limiter / Failure Mode |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Octane Lean Worker**<br>*(Port 8090, 1 worker; historical RAM-backed SQLite experiment, not a deployment mode)* | **6.23 CPS** | **100%** (180/180) | **100%** (300/300) | **94.8%** (455/480) | **99.3%** (596/600) | **82 – 118 ms** | FreeSWITCH + ESL + Reverb saturate CPU core (0% idle) |
-| **Lua Proxy Only** *(retired in 5.0.0)*<br>*(In-process Lua + Redis)* | **4.60 CPS** | **100%** (39/39) | **100%** (66/66) | **94.8%** (95/100) | **83.6%** (94/111) | **56 – 60 ms** | Redis connection contention + CPU starvation at 10 CPS |
-| **Fast Controller + Lua Proxy** *(retired in 5.0.0)*<br>*(Lua cached + Fast fallback)* | **3.30 CPS** | **100%** (33/33) | **100%** (66/66) | **100%** (105/105) | **73.5%** (91/122) | **56 – 504 ms** | CPU context switching between FreeSWITCH Lua & FPM |
-| **Fast Controller Only**<br>*(xml-handler-fast.php via FPM)* | **~1.5 CPS** | **Failed / Stalled**<br>(worker queue limit) | Not viable | Not viable | Not viable | **> 3,200 ms** | Worker pool exhaustion (`pm.max_children = 5` queueing past 5s curl timeout) |
-
-1. **XML Generation is NOT the Scaling Bottleneck**:
-   - The **Octane Lean Worker** (`tallpbx-xml-worker.service`) delivers over **150 XML req/sec** sustained with sub-10ms response times.
-   - Even when XML resolution cost was reduced to near-zero, the 1 vCPU system consistently hit a ceiling between **6.2 and 10 CPS**.
-
-> **The "Fast Controller Only" row above is superseded.** It was measured with the retired static five-worker pool, where lookups queued behind a fixed child count and the 5-second curl limit killed calls. The shipped default is now a dynamic pool that starts one worker and grows to a per-memory ceiling, and with it the fast controller is fully viable — measured on the current build:
->
-> | Host | Supported rate (100 % completion) | First failing rate | Completion at that rate |
-> | :--- | :--- | :--- | :--- |
-> | 1 vCPU / 1 GB | **5 calls/sec** (300/300) | 6 calls/sec | 70 % (252/360) |
-> | 2 vCPU / 2 GB | **10 calls/sec** (600/600) | 12 calls/sec | 41.5 % (299/720) |
->
-> The 1 vCPU figure covers every pool shape from one to five workers, which all pass 5 calls/sec; the failure boundary itself is full-stack CPU saturation, not XML generation. Full method and per-service CPU: [`load-testing-results.md`](load-testing-results.md).
-
-2. **The 10 CPS Wall on 1 vCPU is Full-Stack CPU Exhaustion**:
-   At 10 CPS with 50 concurrent in-flight calls, top profiling on the 1 vCPU host revealed **0.0% idle CPU** (100% saturation):
+- **Shipped default capacity scales linearly with CPU cores:** With the shipped dynamic PHP-FPM pool (`pm.max_children` = `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and fast XML/CDR entry points, TallPBX completes **5 calls/sec** (300/300) on 1 vCPU / 1 GB and **10 calls/sec** (600/600) on 2 vCPU / 2 GB.
+- **XML generation is NOT the bottleneck:** The optional **Octane Lean Worker** (`tallpbx-xml-worker.service` on port 8090) serves 150+ XML req/sec and clears the PHP-FPM call-rate boundary on both 1 vCPU (6 calls/sec, 360/360) and 2 vCPU (12 calls/sec, 720/720). Even with near-zero XML latency, 1 vCPU still hits a hard core ceiling between ~6 and 10 CPS.
+- **The 10 CPS wall on 1 vCPU is full-stack CPU exhaustion:**
+   At 10 CPS with 50 concurrent in-flight calls, profiling on a 1 vCPU host revealed **0.0% idle CPU** (100% saturation):
    - **`freeswitch:listen` (33.3% CPU)**: Reads, deserializes, and dispatches hundreds of FreeSWITCH ESL JSON events per second across 25 subscribed event types into the Laravel application and database.
    - **`freeswitch` Core Engine (33.3% CPU)**: Sofia SIP UDP socket processing, timer threads, SDP offer/answer negotiation, RTP media socket management, and dialplan state-machine execution.
    - **`reverb:start` (25.0% CPU)**: Broadcasts real-time call state updates to the administrative web panel over WebSockets.
    - **Kernel Software Interrupts & UDP Context Switching (8.3% – 16% CPU)**: Network interface processing for incoming/outgoing SIP and RTP UDP packets (`ksoftirqd`).
-
-3. **Static XML Files Do Not Solve the Bottleneck**:
-   Static XML files on disk would only add disk I/O wait cycles (`wa%`). Because Octane and memory caches already serve dynamic XML from memory faster than disk reads (the Lua Redis proxy was evaluated here and retired in 5.0.0 in favor of Octane), changing the format of dialplans does not reduce the 80%+ of CPU spent on SIP signaling, RTP streams, ESL event consumption, and WebSockets.
+- **Static XML files do not solve the bottleneck:**
+   Static XML files on disk only add disk I/O wait cycles (`wa%`). Because Octane and memory caches already serve dynamic XML from memory faster than disk reads, changing the format of dialplans does not reduce the 80%+ of CPU spent on SIP signaling, RTP streams, ESL event consumption, and WebSockets.
 
 ---
 
@@ -245,14 +218,16 @@ TallPBX configures a 3-tier binding ladder in `xml_curl.conf.xml`:
 
 ---
 
-## 4. Capacity Progression Sizing Matrix
+## 4. Capacity Progression & Tuning Matrix
 
-| Hardware Tier | Recommended CPS | Target Concurrent Calls | Primary Architectural Constraints | Recommended Settings |
-| :--- | :---: | :---: | :--- | :--- |
-| **1 vCPU / 1 GB RAM** | **5 CPS** | **20 – 35 calls** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Disk SQLite (default), `notice` logging, dynamic FPM (3 max), optional Octane worker. |
-| **2 vCPU / 2 GB RAM** | **10 CPS** baseline<br>*(25+ CPS with Octane)* | **75 – 120 calls** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max); optional `FS_DB_DRIVER=mariadb` if SQLite lock contention appears. |
-| **4 vCPU / 8 GB RAM (Cloud VPS / Appliance)** | **15–25 CPS** baseline<br>*(30–60+ CPS with Octane — projected, unmeasured)* | **150 – 350 calls** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max); optional `FS_DB_DRIVER=mariadb`. |
-| **8 vCPU / 16 GB Dedicated** | **60+ CPS** | **350+ calls** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), `FS_DB_DRIVER=mariadb` or dedicated DB host. |
+For measured throughput and latency figures per tier, see [`load-testing-results.md`](load-testing-results.md#production-sizing--configuration-matrix). The architectural constraints and tuning levers at each scale are:
+
+| Hardware Tier | Primary Architectural Constraints | Recommended Settings |
+| :--- | :--- | :--- |
+| **1 vCPU / 1 GB RAM** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Disk SQLite (default), `notice` logging, dynamic FPM (3 max), optional Octane worker. |
+| **2 vCPU / 2 GB RAM** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max); optional `FS_DB_DRIVER=mariadb` if SQLite lock contention appears. |
+| **4 vCPU / 8 GB RAM** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max); optional `FS_DB_DRIVER=mariadb`. |
+| **8 vCPU / 16 GB Dedicated** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), `FS_DB_DRIVER=mariadb` or dedicated DB host. |
 
 ---
 
