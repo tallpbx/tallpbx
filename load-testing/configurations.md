@@ -19,7 +19,7 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 | `apply_octane_binding` | `on\|off` | Which `xml_curl` gateway FreeSWITCH consults |
 | `apply_ttl` | `<dialplan> <contributor> [directory] [acl]` | XML cache lifetimes |
 | `apply_fs_loglevel` | `debug\|info\|notice\|warning\|err` | FreeSWITCH file log ceiling |
-| `apply_fs_db_mode` | `disk\|tmpfs` | Where FreeSWITCH keeps its runtime SQLite database |
+| `apply_fs_db_mode` | `disk\|tmpfs` | Test-only disk-versus-memory ablation; not a deployment choice |
 | `apply_cdr_transport` | `fpm\|octane` | Which endpoint `mod_json_cdr` posts records to |
 | `apply_esl_profile` | `essential\|full` | How many event types the ESL listener subscribes to |
 | `apply_broadcast_throttle` | `<milliseconds>` | Reverb debounce window; `0` disables it |
@@ -73,7 +73,7 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` hav
 - **Argument:** `disk` or `tmpfs`.
 - **Effect:** whether runtime database writes hit disk or memory.
 - **Assertion:** `mountpoint` plus the filesystem type.
-- **Caveat:** switching stops and starts FreeSWITCH. It is an ablation, not a prerequisite — disk is the shipped baseline.
+- **Caveat:** switching stops and starts FreeSWITCH. This is a controlled benchmark ablation, not a supported appliance storage choice; disk is the shipped baseline.
 
 ## `apply_cdr_transport`
 

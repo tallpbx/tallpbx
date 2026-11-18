@@ -41,11 +41,11 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 
 ---
 
-## D3 — Disk-backed SQLite is the baseline; tmpfs is a variant
+## D3 — Disk-backed SQLite is the baseline; tmpfs is a test-only ablation
 
-**Decision:** `/var/lib/freeswitch/db` on disk is the baseline. tmpfs is one configuration under comparison, not a setup step.
+**Decision:** `/var/lib/freeswitch/db` on disk is the baseline. tmpfs exists only to reproduce a controlled comparison; it is not a deployment option or a setup step.
 
-**Why:** this reversed an earlier recommendation that scored "not a mountpoint" as a broken precondition. Disk is the shipped default. Measuring tmpfs as a variant answers the question; enforcing it as a prerequisite destroys the comparison.
+**Why:** this reversed an earlier recommendation that scored "not a mountpoint" as a broken precondition. Disk is the shipped default. The tmpfs comparison answered a measurement question; enforcing it as a prerequisite would have destroyed the baseline.
 
 **Rejected:** making tmpfs a prerequisite (no baseline left to compare against).
 

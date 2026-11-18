@@ -480,7 +480,7 @@ You can check and adjust the session rate immediately at runtime via `fs_cli` wi
 
 ## FreeSWITCH Runtime Database (SQLite Default vs. MariaDB)
 
-FreeSWITCH uses disk-backed SQLite in `/var/lib/freeswitch/db` (`FS_DB_DRIVER=sqlite`) by default. TallPBX intentionally keeps `/var/lib/freeswitch/db` on disk rather than `tmpfs` so persistent tables such as `voicemail_default.db` survive reboots without consuming appliance RAM.
+FreeSWITCH uses disk-backed SQLite in `/var/lib/freeswitch/db` (`FS_DB_DRIVER=sqlite`) by default. TallPBX keeps that directory on disk so persistent tables such as `voicemail_default.db` survive reboots. RAM-backed SQLite is not a supported deployment mode.
 
 You can opt into a separate `freeswitch` MariaDB database (`FS_DB_DRIVER=mariadb`) to completely replace SQLite across `switch.conf`, `db.conf`, `fifo.conf`, `sofia.conf` profiles, `callcenter.conf`, and `voicemail.conf` using FreeSWITCH's native `mod_mariadb` module (note that FreeSWITCH names the XML parameter `odbc-dsn`, even when passing a native `mariadb://...` URI without unixODBC):
 

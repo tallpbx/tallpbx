@@ -231,13 +231,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-han
 
 ---
 
-## 10. FreeSWITCH runtime database: disk or tmpfs
+## 10. FreeSWITCH runtime database: disk baseline and test-only tmpfs ablation
 
 ```bash
 mountpoint /var/lib/freeswitch/db && findmnt -n -o FSTYPE --target /var/lib/freeswitch/db
 ```
 
-Disk-backed is the shipped default. tmpfs is one configuration under comparison, not a prerequisite.
+Disk-backed is the shipped default. The tmpfs switch is for controlled benchmark reproduction only, not for appliance deployment.
 
 **Apply:** `scripts/lib/switch.sh apply_fs_db_mode disk|tmpfs` (stops FreeSWITCH, copies, mounts, starts).
 **Prove:** `scripts/lib/switch.sh assert_fs_db_mode disk|tmpfs`.

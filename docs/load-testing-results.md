@@ -875,7 +875,7 @@ While the XML throughput benchmarks above measure raw handler performance, this 
 
 | Architecture | Peak Sustained Rate | 3 CPS Ladder | 5 CPS Ladder | 8 CPS Ladder | 10 CPS Burst | Call Setup Median (p50) | Failure Mode / Bottleneck |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Octane Lean Worker**<br>*(Port 8090, 1 worker, RAM DB)* | **6.23 CPS** | **100%** (180/180) | **100%** (300/300) | **94.8%** (455/480) | **99.3%** (596/600) | **82 – 118 ms** | Total 1 vCPU exhaustion (33% ESL, 33% FS, 25% Reverb, 8% softirq) |
+| **Octane Lean Worker**<br>*(Port 8090, 1 worker; RAM-backed SQLite experiment, not a deployment mode)* | **6.23 CPS** | **100%** (180/180) | **100%** (300/300) | **94.8%** (455/480) | **99.3%** (596/600) | **82 – 118 ms** | Total 1 vCPU exhaustion (33% ESL, 33% FS, 25% Reverb, 8% softirq) |
 | **Lua Proxy Only**<br>*(In-process Lua + Redis)* | **4.60 CPS** | **100%** (39/39) | **100%** (66/66) | **94.8%** (95/100) | **83.6%** (94/111) | **56 – 60 ms** | In-process Lua thread contention and Redis connection limits under concurrency |
 | **Fast Controller + Lua Proxy**<br>*(Lua cached + Fast fallback)* | **3.30 CPS** | **100%** (33/33) | **100%** (66/66) | **100%** (105/105) | **73.5%** (91/122) | **56 – 504 ms** | CPU context switching overhead between Lua interpreter and FPM fallbacks |
 | **Fast Controller Only**<br>*(xml-handler-fast.php via FPM)* | **~1.5 CPS** | **Failed / Stalled** | Not viable | Not viable | Not viable | **> 3,200 ms** | Worker pool exhaustion (`pm.max_children = 5` queueing past 5s curl timeout) |

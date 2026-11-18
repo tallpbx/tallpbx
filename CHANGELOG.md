@@ -16,7 +16,7 @@ Older releases (1.0.0 through 4.2.1) are archived in [docs/changelog/CHANGELOG-1
 
 ### Changed
 - GitHub Releases now link to the cumulative release notes and detailed changelog at each release's tag, keeping the release page focused on that version while preserving access to the history available when it shipped.
-- Installation, environment, operations, and scaling guides now distinguish the default disk-backed SQLite runtime database from the optional MariaDB mode and clarify the Fast/Stock XML-handler switch, its Nginx requirement, and related configuration details.
+- Installation, environment, operations, and scaling guides now distinguish the default disk-backed SQLite runtime database from the optional MariaDB mode, make clear that RAM-backed SQLite is a historical benchmark experiment rather than a deployment option, and clarify the Fast/Stock XML-handler switch, its Nginx requirement, and related configuration details.
 
 ### Removed
 - The completed audit-remediation implementation plan was removed from the live documentation; its contents remain in the v5.3.0 Git history.

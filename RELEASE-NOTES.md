@@ -10,7 +10,7 @@ tag uses its section from this file and links to both complete files at that tag
 ## v5.4.0 (2026-11-17)
 
 - FreeSWITCH can now use a separate MariaDB database for its own runtime data. Disk-backed SQLite remains the default, so existing installations do not change unless an administrator opts in. The operations guide explains setup and the required FreeSWITCH restart; performance testing of this option is still planned.
-- Installation and operations documentation now makes the SQLite/MariaDB choice and the Fast/Stock XML-handler switch clearer.
+- Installation and operations documentation now makes the SQLite/MariaDB choice and the Fast/Stock XML-handler switch clearer. RAM-backed SQLite is no longer presented as a deployment option; its old measurements remain available as historical benchmarks.
 - Each GitHub Release links to the cumulative release notes and detailed changelog as they stood at that release's tag.
 
 ## v5.3.0 (2026-11-16)
