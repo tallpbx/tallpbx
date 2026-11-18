@@ -2,7 +2,8 @@
 #
 # Purpose:
 # Turn every pushed vX.Y.Z tag into a GitHub Release whose body is that
-# version's RELEASE-NOTES.md section — the plain-language, end-user summary.
+# version's RELEASE-NOTES.md section — the plain-language, end-user summary —
+# followed by tag-pinned links to the complete release notes and changelog.
 # CHANGELOG.md stays the single source of truth for the complete record;
 # RELEASE-NOTES.md is the curated summary prepended at each cut, newest
 # first, mirroring the release practice of the superpowers project.
@@ -52,6 +53,14 @@ jobs:
       # non-zero, which fails this step and therefore the whole workflow.
       - name: Extract the release notes for this tag
         run: bash scripts/release-notes.sh "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/release-notes.md"
+
+      # Link to the files as they existed at this tag, so an older release
+      # never points at release history that was written after it shipped.
+      - name: Link the complete release history
+        run: |
+          release_files="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}"
+          printf '\n[Cumulative release notes](%s/RELEASE-NOTES.md) | [Detailed changelog](%s/CHANGELOG.md)\n' \
+            "$release_files" "$release_files" >> "${RUNNER_TEMP}/release-notes.md"
 
       - name: Publish the release
         env:

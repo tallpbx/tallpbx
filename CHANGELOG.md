@@ -9,9 +9,21 @@ Older releases (1.0.0 through 4.2.1) are archived in [docs/changelog/CHANGELOG-1
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-11-17
+
+### Added
+- **Optional MariaDB Storage for FreeSWITCH Runtime Data**: FreeSWITCH can now use a dedicated MariaDB database through native `mod_mariadb` instead of its disk-backed SQLite runtime databases. SQLite remains the default. New installations can select MariaDB with `FSPBX_FREESWITCH_DB_DRIVER=mariadb`; existing appliances must provision the separate database and module, set `FS_DB_DRIVER=mariadb` and the `FS_DB_*` credentials, then reconfigure and restart FreeSWITCH as described in the [operations guide](docs/operations.md#freeswitch-runtime-database-sqlite-default-vs-mariadb). The FreeSWITCH settings cover core, FIFO, Sofia, call-center, and voicemail runtime storage. No Laravel migration is required. Capacity testing of this optional mode remains future work.
+
+### Changed
+- GitHub Releases now link to the cumulative release notes and detailed changelog at each release's tag, keeping the release page focused on that version while preserving access to the history available when it shipped.
+- Installation, environment, operations, and scaling guides now distinguish the default disk-backed SQLite runtime database from the optional MariaDB mode and clarify the Fast/Stock XML-handler switch, its Nginx requirement, and related configuration details.
+
+### Removed
+- The completed audit-remediation implementation plan was removed from the live documentation; its contents remain in the v5.3.0 Git history.
+
 ## [5.3.0] - 2026-11-16
 
-Closes the audit findings `T01`–`T03`, `C01`–`C05`, `O01`–`O08`, `D01`–`D10`, and `M01`–`M02`. Every correction below came from the plan's own review rounds; the provenance of each fix stays traceable to `docs/misc-improvement-implementation-plan.md`.
+Closes the audit findings `T01`–`T03`, `C01`–`C05`, `O01`–`O08`, `D01`–`D10`, and `M01`–`M02`. Every correction below came from the plan's own review rounds; the completed implementation plan and its provenance remain available in the v5.3.0 Git history.
 
 ### Added
 - **Authoritative Restore Journal and Database-Free Status Reader (O02)**: Each privileged restore now records its lifecycle in `/var/lib/tallpbx/restore-journal/` (`0700 root:root`), a directory that survives the database the restore replaces. Entries are written atomically and durably (sync the complete temporary file, rename it, then sync its directory) by the root helper only; the queue worker hands metadata over on the request marker instead. `sudo tallpbx-restore-status` prints one row per operation without booting Laravel, so it works while the database is being replaced. A new `backups:reconcile-restore-journal` command (with a `--operation=` filter) projects the journal back into `restore_operations` after the import, recreating the row and a snapshot of the requester's name and email. **Upgrade note**: a fresh install creates the journal directory; an existing appliance is prepared automatically on the first restore, or in advance with `sudo install -d -m 0700 -o root -g root /var/lib/tallpbx/restore-journal`. Run `tpbx migrate` for the new requester-snapshot columns.

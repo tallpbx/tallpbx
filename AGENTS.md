@@ -200,10 +200,11 @@ When reproducing or executing SIP load tests (`tpbx pbx:load-test:*`, `load-test
 - `RELEASE-NOTES.md` is the cumulative, end-user summary: one section per release, newest first, headed `## vX.Y.Z (YYYY-MM-DD)`, prepended at cut time in the same commit as the changelog cut.
 - Each section is a short plain-language summary distilled from that version's `CHANGELOG.md` section — highlights an administrator or end user will notice, without the operational detail (migrations, `.env` keys, restarts) that belongs to the changelog.
 - `scripts/release-notes.sh` refuses to publish a tag that is missing from either file, so the two can never drift apart on a published release.
+- Each GitHub Release shows only its own section, followed by links to `RELEASE-NOTES.md` and `CHANGELOG.md` at that release's tag so readers can reach the complete history as it stood when the release shipped.
 - History starts at `v5.0.0`; earlier majors are summarised in `CHANGELOG.md` only.
 
 ### Changelog Pruning Rules
-- `CHANGELOG.md` keeps the current major series complete, plus the final release of the previous major so an upgrade path is readable.
+- `CHANGELOG.md` keeps the current major series complete, plus the final release of the previous major for historical context. TallPBX 4.x to 5.x requires a fresh install, so the retained 4.x entry is context, not upgrade instructions.
 - Everything older lives in `docs/changelog/` with a one-line pointer at the top of `CHANGELOG.md`. Never delete history: git and the archive file keep it.
 - First applied at `v5.2.0` (2026-11-12): 1.0.0 through 4.2.1 moved to `docs/changelog/CHANGELOG-1.x-4.2.x.md`. Prune again when the active file grows past the current major series.
 

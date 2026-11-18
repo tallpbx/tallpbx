@@ -5,7 +5,13 @@ summary written for administrators and end users; the complete record, with
 every operational detail (migrations, `.env` keys, service restarts), lives in
 [CHANGELOG.md](CHANGELOG.md), which remains the single source of truth. A new
 release prepends its section here at cut time; the GitHub Release body for a
-tag is its section from this file.
+tag uses its section from this file and links to both complete files at that tag.
+
+## v5.4.0 (2026-11-17)
+
+- FreeSWITCH can now use a separate MariaDB database for its own runtime data. Disk-backed SQLite remains the default, so existing installations do not change unless an administrator opts in. The operations guide explains setup and the required FreeSWITCH restart; performance testing of this option is still planned.
+- Installation and operations documentation now makes the SQLite/MariaDB choice and the Fast/Stock XML-handler switch clearer.
+- Each GitHub Release links to the cumulative release notes and detailed changelog as they stood at that release's tag.
 
 ## v5.3.0 (2026-11-16)
 
