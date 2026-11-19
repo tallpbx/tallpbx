@@ -387,20 +387,15 @@ JS);
         JS);
         $page->wait(0.5);
 
-        $images = [
-            'security-dashboard-light.png',
-            'security-dashboard-full.png', // Maintain backwards compatibility for existing links
-        ];
-        foreach ($images as $imgName) {
-            $src = base_path("tests/Browser/Screenshots/{$imgName}");
-            $dest = base_path("docs/images/{$imgName}");
+        $lightImgName = 'security-dashboard-light.png';
+        $srcLight = base_path("tests/Browser/Screenshots/{$lightImgName}");
+        $destLight = base_path("docs/images/{$lightImgName}");
 
-            $page->screenshot(filename: $imgName);
+        $page->screenshot(filename: $lightImgName);
 
-            if (file_exists($src) && (! file_exists($dest) || md5_file($src) !== md5_file($dest))) {
-                copy($src, $dest);
-                fwrite(STDOUT, "Updated documentation image: docs/images/{$imgName}".PHP_EOL);
-            }
+        if (file_exists($srcLight) && (! file_exists($destLight) || md5_file($srcLight) !== md5_file($destLight))) {
+            copy($srcLight, $destLight);
+            fwrite(STDOUT, "Updated documentation image: docs/images/{$lightImgName}".PHP_EOL);
         }
 
         // 2. Dark Theme Capture
