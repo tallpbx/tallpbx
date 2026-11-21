@@ -9,6 +9,9 @@ namespace Modules\Security\Support;
  */
 class ObserveMetricsParser
 {
+    // Existing kernel rules and journal entries can still use the previous prefix.
+    private const LOG_PREFIX_PATTERN = '(?:tpbx|tallpbx)-observe:';
+
     /**
      * Parse live nftables kernel ruleset status into structured Observe Mode counters.
      *
@@ -79,12 +82,7 @@ class ObserveMetricsParser
         foreach ($lines as $line) {
             $line = trim($line);
 
-            if (! str_contains($line, 'tallpbx-observe:')) {
-                continue;
-            }
-
-            // Extract packets and bytes from: counter packets N bytes M log prefix "tallpbx-observe:<stage> "
-            if (preg_match('/counter packets (\d+) bytes (\d+) log prefix "tallpbx-observe:([a-z_]+)\s*"/', $line, $matches) !== 1) {
+            if (preg_match('/counter packets (\d+) bytes (\d+) log prefix "'.self::LOG_PREFIX_PATTERN.'([a-z_]+)\s*"/', $line, $matches) !== 1) {
                 continue;
             }
 
@@ -165,12 +163,14 @@ class ObserveMetricsParser
 
         foreach ($lines as $line) {
             $line = trim($line);
-            if ($line === '' || ! str_contains($line, 'tallpbx-observe:')) {
+            if (preg_match('/'.self::LOG_PREFIX_PATTERN.'([a-z_]+)?/', $line, $stageMatch) !== 1) {
                 continue;
             }
 
+            $stage = $stageMatch[1] ?? 'unknown';
+
             // Example line:
-            // 2026-10-08T22:44:33-07:00 host kernel: tallpbx-observe:tftp IN=veth-host OUT= MAC=... SRC=10.254.254.2 DST=10.254.254.1 LEN=47 ... PROTO=UDP SPT=43032 DPT=69
+            // 2026-10-08T22:44:33-07:00 host kernel: tpbx-observe:tftp IN=veth-host OUT= MAC=... SRC=10.254.254.2 DST=10.254.254.1 LEN=47 ... PROTO=UDP SPT=43032 DPT=69
             $timestamp = '';
             $rawTimestamp = '';
             if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})/', $line, $tsMatch) === 1) {
@@ -179,11 +179,6 @@ class ObserveMetricsParser
             } elseif (preg_match('/^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})/', $line, $tsMatch) === 1) {
                 $rawTimestamp = $tsMatch[1];
                 $timestamp = $rawTimestamp;
-            }
-
-            $stage = 'unknown';
-            if (preg_match('/tallpbx-observe:([a-z_]+)/', $line, $sMatch) === 1) {
-                $stage = $sMatch[1];
             }
 
             $interface = '';

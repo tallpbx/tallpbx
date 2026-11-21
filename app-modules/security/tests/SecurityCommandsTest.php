@@ -453,7 +453,7 @@ it('runs security:observe when observe mode is active and displays hit counters 
     $mockExecutor = Mockery::mock(SecurityExecutorInterface::class);
     $mockExecutor->shouldReceive('status')
         ->once()
-        ->andReturn("table inet tallpbx_filter {\n chain input {\n ip saddr @banned_ips counter packets 42 bytes 2100 log prefix \"tallpbx-observe:bans \" limit rate 100/minute\n }\n}");
+        ->andReturn("table inet tallpbx_filter {\n chain input {\n ip saddr @banned_ips counter packets 42 bytes 2100 log prefix \"tpbx-observe:bans \" limit rate 100/minute\n }\n}");
     $mockExecutor->shouldReceive('observeEvents')
         ->once()
         ->with(20)

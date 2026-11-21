@@ -258,6 +258,35 @@ it('self-reports the helper capability version marker', function (): void {
         ->and($process->getOutput())->toContain('tallpbx-helper-version: 3');
 });
 
+it('reads Observe Mode journal entries with both log prefixes', function (): void {
+    $stubDir = sys_get_temp_dir().'/tallpbx_journalctl_test_'.uniqid();
+    mkdir($stubDir, 0700);
+    $stub = $stubDir.'/journalctl';
+    file_put_contents($stub, <<<'BASH'
+#!/bin/bash
+grep -E -- "$3" <<'LOG'
+tallpbx-observe:invalid
+tpbx-observe:bans
+unrelated:message
+LOG
+BASH);
+    chmod($stub, 0755);
+
+    try {
+        $process = new Process(
+            ['bash', base_path('scripts/resources/tallpbx-security'), 'observe-events'],
+            null,
+            ['PATH' => $stubDir.':'.getenv('PATH')],
+        );
+        $process->mustRun();
+
+        expect(trim($process->getOutput()))->toBe("tallpbx-observe:invalid\ntpbx-observe:bans");
+    } finally {
+        unlink($stub);
+        rmdir($stubDir);
+    }
+});
+
 it('update-external-blocklist requires the canonical pending file', function (): void {
     $scriptPath = base_path('scripts/resources/tallpbx-security');
 

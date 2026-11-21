@@ -245,7 +245,7 @@ class BlocklistCompiler
     public function dropStatement(string $stage, bool $observeMode, bool $withCounter = false): string
     {
         if ($observeMode) {
-            return 'counter log prefix "tallpbx-observe:'.$stage.' " limit rate 100/minute';
+            return 'counter log prefix "tpbx-observe:'.$stage.' " limit rate 100/minute';
         }
 
         return $withCounter ? 'counter drop' : 'drop';

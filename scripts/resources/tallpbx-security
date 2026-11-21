@@ -446,7 +446,8 @@ case "$ACTION" in
         if ! [[ "$LIMIT" =~ ^[0-9]{1,4}$ ]] || [ "$LIMIT" -lt 1 ] || [ "$LIMIT" -gt 200 ]; then
             LIMIT=50
         fi
-        journalctl -k -g tallpbx-observe --no-pager -n "$LIMIT" -o short-iso 2>/dev/null || true
+        # Include entries from rules loaded before the log prefix changed.
+        journalctl -k -g '(tpbx|tallpbx)-observe:' --no-pager -n "$LIMIT" -o short-iso 2>/dev/null || true
         ;;
 
     *)

@@ -618,15 +618,15 @@ it('converts every drop rule into a rate-limited counter log without verdicts', 
         ->and($nft)->toContain('icmp type echo-request limit rate 5/second burst 5 packets accept');
 
     expect($nft)->not->toContain('ct state invalid drop')
-        ->and($nft)->toContain('ct state invalid counter log prefix "tallpbx-observe:invalid " limit rate 100/minute')
+        ->and($nft)->toContain('ct state invalid counter log prefix "tpbx-observe:invalid " limit rate 100/minute')
         ->and($nft)->not->toContain('ip saddr @blacklist_ips drop')
-        ->and($nft)->toContain('ip saddr @blacklist_ips counter log prefix "tallpbx-observe:blacklist " limit rate 100/minute')
-        ->and($nft)->toContain('ip6 saddr @blacklist_ips6 counter log prefix "tallpbx-observe:blacklist " limit rate 100/minute')
-        ->and($nft)->toContain('ip saddr @banned_ips counter log prefix "tallpbx-observe:bans " limit rate 100/minute')
-        ->and($nft)->toContain('ip saddr @external_blocklist_ips counter log prefix "tallpbx-observe:threat_feeds " limit rate 100/minute');
+        ->and($nft)->toContain('ip saddr @blacklist_ips counter log prefix "tpbx-observe:blacklist " limit rate 100/minute')
+        ->and($nft)->toContain('ip6 saddr @blacklist_ips6 counter log prefix "tpbx-observe:blacklist " limit rate 100/minute')
+        ->and($nft)->toContain('ip saddr @banned_ips counter log prefix "tpbx-observe:bans " limit rate 100/minute')
+        ->and($nft)->toContain('ip saddr @external_blocklist_ips counter log prefix "tpbx-observe:threat_feeds " limit rate 100/minute');
 
     expect($nft)->not->toContain('udp dport 3000 drop')
-        ->and($nft)->toContain('ip saddr 192.0.2.0/24 udp dport 3000 counter log prefix "tallpbx-observe:custom " limit rate 100/minute');
+        ->and($nft)->toContain('ip saddr 192.0.2.0/24 udp dport 3000 counter log prefix "tpbx-observe:custom " limit rate 100/minute');
 });
 
 it('forces the chain policy to accept and validates against the real nft parser', function (): void {
@@ -1011,9 +1011,9 @@ it('observes the tftp defense rules without verdicts in global observe mode', fu
         ->and($nft)->not->toContain('0x2e2e2f counter drop')
         ->and($nft)->not->toContain('0x2f78 counter drop')
         ->and($nft)->not->toContain('} counter drop')
-        ->and($nft)->toContain('udp dport 69 @th,64,16 0x0002 counter log prefix "tallpbx-observe:tftp " limit rate 100/minute')
-        ->and($nft)->toContain('udp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter log prefix "tallpbx-observe:tftp " limit rate 100/minute')
-        ->and($nft)->toContain('udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter log prefix "tallpbx-observe:tftp " limit rate 100/minute');
+        ->and($nft)->toContain('udp dport 69 @th,64,16 0x0002 counter log prefix "tpbx-observe:tftp " limit rate 100/minute')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood4 { ip saddr limit rate over 10/minute burst 20 packets } counter log prefix "tpbx-observe:tftp " limit rate 100/minute')
+        ->and($nft)->toContain('udp dport 69 update @tftp_flood6 { ip6 saddr limit rate over 10/minute burst 20 packets } counter log prefix "tpbx-observe:tftp " limit rate 100/minute');
 });
 
 it('merges the reserved custom pattern setting into the read-request rules', function (): void {

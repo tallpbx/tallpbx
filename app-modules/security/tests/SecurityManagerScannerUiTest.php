@@ -355,7 +355,7 @@ it('explains in the UI where banned IPs are put in the firewall', function (): v
 it('renders the observe banner with live packet hits when observe mode is active', function (): void {
     SecuritySetting::set('firewall_observe_mode', true);
 
-    $this->statusOutput = "table inet tallpbx_filter {\n chain input {\n ip saddr @banned_ips counter packets 15 bytes 750 log prefix \"tallpbx-observe:bans \" limit rate 100/minute\n }\n}";
+    $this->statusOutput = "table inet tallpbx_filter {\n chain input {\n ip saddr @banned_ips counter packets 15 bytes 750 log prefix \"tpbx-observe:bans \" limit rate 100/minute\n }\n}";
 
     Livewire::actingAs($this->admin, 'admin')
         ->test(SecurityManager::class)

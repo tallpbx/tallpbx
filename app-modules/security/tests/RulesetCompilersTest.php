@@ -54,7 +54,7 @@ it('BlocklistCompiler rejects invalid IP entries with informative error', functi
 it('BlocklistCompiler generates observe and enforcing drop statements', function (): void {
     $compiler = new BlocklistCompiler;
 
-    expect($compiler->dropStatement('test_stage', observeMode: true))->toContain('counter log prefix "tallpbx-observe:test_stage "')
+    expect($compiler->dropStatement('test_stage', observeMode: true))->toContain('counter log prefix "tpbx-observe:test_stage "')
         ->and($compiler->dropStatement('test_stage', observeMode: false, withCounter: true))->toBe('counter drop')
         ->and($compiler->dropStatement('test_stage', observeMode: false, withCounter: false))->toBe('drop');
 });

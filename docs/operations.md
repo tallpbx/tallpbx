@@ -167,7 +167,7 @@ When Observe Mode is enabled, the ruleset compiler performs a dynamic transforma
 * The chain default inbound policy is forced from `drop` to `accept`.
 * Every drop action across built-in pre-filters and custom rules is replaced with:
   ```nftables
-  counter log prefix "tallpbx-observe:<stage> " limit rate 100/minute
+  counter log prefix "tpbx-observe:<stage> " limit rate 100/minute
   ```
 * Standard `accept` rules remain completely untouched, ensuring legitimate services stay accessible.
 
@@ -204,21 +204,22 @@ When Observe Mode is enabled, the ruleset compiler performs a dynamic transforma
 Because `nftables` logs are emitted directly by the Linux kernel, you can also view raw packet logs via standard systemd journal commands:
 ```bash
 # Follow live:
-journalctl -k -f -g tallpbx-observe
+journalctl -k -f -g tpbx-observe
 
 # Inspect the last 50 events:
-journalctl -k -g tallpbx-observe -n 50 --no-pager
+journalctl -k -g tpbx-observe -n 50 --no-pager
 ```
 
 #### 3. Log Stage Prefixes
-Kernel log entries contain standard stage tags indicating which rule matched:
-* `tallpbx-observe:invalid` — Out-of-window TCP segments or malformed packets.
-* `tallpbx-observe:blacklist` — Matches against permanent blacklist IPs or CIDR subnets.
-* `tallpbx-observe:bans` — Matches against dynamic brute-force intruder bans.
-* `tallpbx-observe:threat_feeds` — Matches against VoIPBL automated fraud lists.
-* `tallpbx-observe:geo_blocking` — Matches against country-level geo perimeter rules.
-* `tallpbx-observe:tftp` — Unauthorized TFTP write requests (`WRQ`), directory traversal (`../`), or floods.
-* `tallpbx-observe:custom` — Matches against administrator-defined custom drop rules.
+Use `tpbx security:observe` to see which firewall rule stage matched each recent event. The raw kernel logs show those stages as `tpbx-observe:` tags.
+
+* `tpbx-observe:invalid` — Out-of-window TCP segments or malformed packets.
+* `tpbx-observe:blacklist` — Matches against permanent blacklist IPs or CIDR subnets.
+* `tpbx-observe:bans` — Matches against dynamic brute-force intruder bans.
+* `tpbx-observe:threat_feeds` — Matches against VoIPBL automated fraud lists.
+* `tpbx-observe:geo_blocking` — Matches against country-level geo perimeter rules.
+* `tpbx-observe:tftp` — Unauthorized TFTP write requests (`WRQ`), directory traversal (`../`), or floods.
+* `tpbx-observe:custom` — Matches against administrator-defined custom drop rules.
 
 #### 4. The Loopback Floor Invariant (`iif "lo" accept`)
 When testing Observe Mode, remember that packets sent from the PBX console to itself (e.g. `ping 127.0.0.1` or `curl http://<pbx-ip>`) **will not trigger observe rules**.
