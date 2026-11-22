@@ -9,7 +9,7 @@ This directory is the **reproducible benchmark harness** (structured so an AI ag
 
 If a harness rule or capacity-measurement detail conflicts with another document, this directory wins.
 
-TallPBX uses a fast PHP-FPM handler by default to answer FreeSWITCH's XML lookups for accounts and call routes. It loads only the telephony modules. Laravel Octane is an optional performance mode that loads the same list and keeps the application in memory between requests. On a standard install, FreeSWITCH falls back to PHP-FPM when Octane is unavailable. If the fast PHP-FPM handler catches an application error, its worker runs the full Laravel application used by the web panel. [XML worker setup](../docs/operations.md#octane-xml-worker-optional-performance-mode).
+TallPBX uses a fast PHP-FPM handler by default to answer FreeSWITCH's XML lookups for accounts and call routes. It loads only the telephony modules. [Laravel Octane](https://laravel.com/docs/octane) is an optional performance mode that loads the same list and keeps the application in memory between requests. On a standard install, FreeSWITCH falls back to PHP-FPM when Octane is unavailable. If the fast PHP-FPM handler catches an application error, its worker runs the full Laravel application used by the web panel. [XML worker setup](../docs/operations.md#octane-xml-worker-optional-performance-mode).
 
 ---
 

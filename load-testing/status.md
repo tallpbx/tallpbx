@@ -4,7 +4,7 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 ## Current support status
 
-**Supported serving modes** (defined in `load-testing/matrix.php`): `v-stock-dynamic` and `v-stock-static` (stock front controller), `v-fast` (fast XML controller with a static pool), `v-fast-default` (the shipped appliance default: dynamic pool sized from RAM plus the fast controller), and `v-octane` (opt-in resident **Laravel Octane worker** — a persistent PHP application server that keeps Laravel booted in memory across requests — on `127.0.0.1:8090`).
+**Supported serving modes** (defined in `load-testing/matrix.php`): `v-stock-dynamic` and `v-stock-static` (stock front controller), `v-fast` (fast XML controller with a static pool), `v-fast-default` (the shipped appliance default: dynamic pool sized from RAM plus the fast controller), and `v-octane` (opt-in resident [**Laravel Octane**](https://laravel.com/docs/octane) worker — a persistent PHP application server that keeps Laravel booted in memory across requests — on `127.0.0.1:8090`).
 
 **Measured tiers** on the current series are the shared-CPU appliance tiers — 1 vCPU / 1 GB, 1 vCPU / 2 GB, and 2 vCPU / 2 GB — plus loopback-only sanity numbers for the Octane worker. Supported call rates with the shipped PHP-FPM default are **5 calls/sec on 1 vCPU** and **10 calls/sec on 2 vCPU**; higher offered rates degrade because PHP-FPM saturates, and that boundary is documented per tier in the series tables below.
 

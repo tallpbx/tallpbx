@@ -196,7 +196,7 @@ location = /api/v1/xml-handler {
 
 ## 8. Laravel Octane binding and port 8090 (`xml_curl.conf.xml` Two-Binding Fallback)
 
-**Laravel Octane** (a persistent PHP application server that keeps Laravel booted in memory across requests) is an opt-in XML worker on `:8090`. `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` ships with the **two-tier** binding ladder. FreeSWITCH consults the gateways in file order:
+[**Laravel Octane**](https://laravel.com/docs/octane) (a persistent PHP application server that keeps Laravel booted in memory across requests) is an opt-in XML worker on `:8090`. `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` ships with the **two-tier** binding ladder. FreeSWITCH consults the gateways in file order:
 
 ```xml
 <configuration name="xml_curl.conf" description="cURL XML Gateway">

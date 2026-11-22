@@ -408,7 +408,7 @@ sequenceDiagram
 
 #### 6. Persistent Telephony XML Worker (**Laravel Octane** — backed by RoadRunner)
 
-> **Status:** an optional performance mode. **Laravel Octane** is a persistent PHP application server (running on the [RoadRunner](#what-roadrunner-is) server driver in TallPBX) that keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (Octane worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
+> **Status:** an optional performance mode. [**Laravel Octane**](https://laravel.com/docs/octane) is a persistent PHP application server (running on the [RoadRunner](#what-roadrunner-is) server driver in TallPBX) that keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (Octane worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
 
 ##### What RoadRunner Is
 

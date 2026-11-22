@@ -9,7 +9,7 @@ Use [documentation-writer](../documentation-writer/SKILL.md) to choose an audien
 
 ## Write for the reader's goal
 
-Assume readers are new to TallPBX and Laravel, even in the architecture guide. Lead with what the reader came to find. Explain product-specific terms in plain language on first use, then use the same names throughout.
+Assume readers are new to TallPBX and Laravel, even in the architecture guide. Lead with what the reader came to find. On first mention in each document, introduce unfamiliar stack or product terms by their full name with a brief plain-language explanation of their role in TallPBX and a link to the authoritative TallPBX section or unversioned official documentation (for example, `https://laravel.com/docs/octane` or `docs/architecture.md#what-roadrunner-is`), then use consistent names throughout.
 
 - **README** introduces TallPBX, basic requirements, and how to get started. Link to setup, capacity results, and design details where readers need more.
 - **Load testing results** help readers evaluate capacity and choose hardware. Put one readable comparison table near the top and link to dated reports and data for the full test conditions.
@@ -21,7 +21,7 @@ Assume readers are new to TallPBX and Laravel, even in the architecture guide. L
 At the first substantial discussion of the XML handlers in each document, explain what FreeSWITCH asks TallPBX for, such as account and call-routing information. Then describe the serving paths in plain language.
 
 1. **PHP-FPM is the default.** It runs the PHP code that answers XML requests. TallPBX's fast handler loads only the telephony modules needed for the lookup and skips web panel setup.
-2. **Laravel Octane is an optional performance mode.** It uses the same list of telephony modules and keeps Laravel loaded in memory between requests.
+2. **[Laravel Octane](https://laravel.com/docs/octane) is an optional performance mode.** It uses the same list of telephony modules and keeps Laravel loaded in memory between requests. Always write **Laravel Octane** (never bare `Octane`) on first mention in every document, explain its TallPBX role in plain language, and link it to the unversioned official documentation (`https://laravel.com/docs/octane`) — never assume readers know what it is. Subsequent mentions in the same document may use either `Laravel Octane` or `Octane`.
 3. **The fast handler can fall back to the full application.** If it catches an application exception, it handles the same request through the standard Laravel entry point used by the web panel, in the same PHP-FPM worker.
 
 Keep the port, binding order, and restart details where the reader needs them. FreeSWITCH falls back from Octane to the fast PHP-FPM handler when the optional worker is unavailable. With both XML endpoints already configured and loaded, starting or stopping the worker takes effect on subsequent lookups. Changing the endpoints in `xml_curl.conf.xml` requires a FreeSWITCH restart. [Operations guide](../../../docs/operations.md#octane-xml-worker-optional-performance-mode) · [Shared module list](../../../config/freeswitch.php) · [Fast PHP-FPM fallback](../../../public/xml-handler-fast.php).

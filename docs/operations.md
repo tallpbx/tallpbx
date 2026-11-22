@@ -16,7 +16,7 @@ TallPBX runs as systemd services. Check or restart any of them with
 | `tallpbx-scheduler` | Scheduled tasks and sweeps |
 | `tallpbx-reverb` | Real-time WebSocket server |
 | `tallpbx-cdr-worker` | Call detail record processor (see [Call Detail Records](#call-detail-records-cdr-pipeline)) |
-| `tallpbx-xml-worker` | Opt-in persistent **Laravel Octane worker** (keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead; serves FreeSWITCH XML lookups on `127.0.0.1:8090`, installed disabled by default; see [Octane XML Worker](#octane-xml-worker-optional-performance-mode)) |
+| `tallpbx-xml-worker` | Opt-in persistent [**Laravel Octane**](https://laravel.com/docs/octane) worker (keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead; serves FreeSWITCH XML lookups on `127.0.0.1:8090`, installed disabled by default; see [Octane XML Worker](#octane-xml-worker-optional-performance-mode)) |
 | `redis-server` | In-memory storage |
 | `nftables` | Kernel firewall |
 
@@ -551,7 +551,7 @@ If editing configuration files by hand:
 
 ## Octane XML Worker (Optional Performance Mode)
 
-**PHP-FPM is the default.** On a fresh install, nginx and PHP-FPM answer FreeSWITCH's directory, dialplan, and configuration lookups through the fast XML handler. The optional Laravel Octane worker uses [RoadRunner](architecture.md#what-roadrunner-is) to keep Laravel booted in memory between lookups. Reusing that application state reduces lookup latency and can increase completed calls per second when XML processing is the bottleneck. The web panel and call detail record (CDR) ingestion continue to use PHP-FPM. [Laravel Octane documentation](https://laravel.com/docs/13.x/octane#introduction).
+**PHP-FPM is the default.** On a fresh install, nginx and PHP-FPM answer FreeSWITCH's directory, dialplan, and configuration lookups through the fast XML handler. The optional Laravel Octane worker uses [RoadRunner](architecture.md#what-roadrunner-is) to keep Laravel booted in memory between lookups. Reusing that application state reduces lookup latency and can increase completed calls per second when XML processing is the bottleneck. The web panel and call detail record (CDR) ingestion continue to use PHP-FPM. [Laravel Octane documentation](https://laravel.com/docs/octane).
 
 The installer sets up the `tallpbx-xml-worker` systemd service and leaves it disabled on fresh installs. It also configures two XML bindings. A binding tells FreeSWITCH which HTTP endpoint to ask for directory, dialplan, or configuration XML. FreeSWITCH tries Octane on `127.0.0.1:8090` first, then retries the full lookup through nginx and PHP-FPM if Octane is unavailable or fails to return usable XML. When the worker is stopped, the loopback connection is normally refused immediately. A slow Octane request can take up to one second to time out before FreeSWITCH tries PHP-FPM, whose timeout is five seconds.
 

@@ -29,7 +29,7 @@ Status values: **settled** (do not revisit without new evidence), **provisional*
 | Broadcast throttle | unset (500 ms) |
 | PHP-FPM | Installer default on 1 GB: `pm = dynamic` with `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` |
 | XML entry file | fast (`xml-handler-fast.php`) |
-| Octane binding | as installed (both gateways declared) |
+| [Laravel Octane](https://laravel.com/docs/octane) binding | as installed (both gateways declared) |
 | FreeSWITCH runtime DB | disk |
 | Cache TTLs | unset (config defaults) |
 

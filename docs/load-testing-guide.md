@@ -135,7 +135,7 @@ PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-valid
 
 ## Testing the Optional Laravel Octane Worker
 
-TallPBX's default fast PHP-FPM handler loads only the telephony modules required to answer FreeSWITCH's XML lookups. Laravel Octane is an optional performance mode that loads the same list and keeps the application in memory between requests. FreeSWITCH uses PHP-FPM when Octane is unavailable. If the fast PHP-FPM handler catches an application error, its worker falls back to the full Laravel application used by the web panel.
+TallPBX's default fast PHP-FPM handler loads only the telephony modules required to answer FreeSWITCH's XML lookups. [Laravel Octane](https://laravel.com/docs/octane) is an optional performance mode that loads the same list and keeps the application in memory between requests. FreeSWITCH uses PHP-FPM when Octane is unavailable. If the fast PHP-FPM handler catches an application error, its worker falls back to the full Laravel application used by the web panel.
 
 For a quick manual check on a test PBX, start Octane with `sudo systemctl start tallpbx-xml-worker` and return to PHP-FPM with `sudo systemctl stop tallpbx-xml-worker`. The installed FreeSWITCH configuration already knows both addresses. If you edit `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`, restart FreeSWITCH before measuring SIP calls so it reads the new endpoints. [Octane setup and verification](operations.md#octane-xml-worker-optional-performance-mode).
 

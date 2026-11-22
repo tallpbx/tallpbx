@@ -17,7 +17,7 @@ When invoking a switch by hand, run it from `/var/www/tallpbx` on the PBX. The m
 | `apply_fpm_profile` | `static\|dynamic <children>` | PHP-FPM pool mode and worker count. A dynamic profile also applies the installer's idle floor (`pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`) so a cell measuring "the shipped default" is faithful |
 | `apply_xml_path` | `stock\|fast` | nginx entry file for `/api/v1/xml-handler` |
 | `apply_octane_binding` | `on\|off\|only` | Which XML endpoint FreeSWITCH can use |
-| `apply_xml_worker` | `off\|only` | Octane service state and the selected endpoint for a test |
+| `apply_xml_worker` | `off\|only` | [Laravel Octane](https://laravel.com/docs/octane) service state and the selected endpoint for a test |
 | `apply_ttl` | `<dialplan> <contributor> [directory] [acl]` | XML cache lifetimes |
 | `apply_fs_loglevel` | `debug\|info\|notice\|warning\|err` | FreeSWITCH file log ceiling |
 | `apply_fs_db_mode` | `sqlite\|mariadb\|disk\|tmpfs` | FreeSWITCH runtime database driver (`sqlite` default vs. `mariadb`; `disk`/`tmpfs` kept for storage ablations) |

@@ -6,7 +6,7 @@ This report records how two server sizes handled call setup, how quickly they an
 
 The tests used a fresh Debian 13 install of TallPBX 5.x at commit `2fbac077`, with the event listener and Reverb running, FreeSWITCH logging at `notice`, and the default firewall rules active. The test host was resized from 1 vCPU / 1 GB RAM to 2 vCPU / 2 GB RAM. The default PHP-FPM pool had a limit of three workers on the smaller host and six on the larger host.
 
-FreeSWITCH asks TallPBX for account and routing information in XML. The default fast PHP-FPM handler loads only the telephony modules needed for those requests. Optional Laravel Octane loads the same telephony module list and keeps the application loaded in memory between requests. FreeSWITCH uses PHP-FPM while Octane is unavailable. If the fast handler catches an application error, the same PHP-FPM worker handles the request through the full application used by the web panel. [How the XML handlers work](architecture.md#6-persistent-telephony-xml-worker-laravel-octane--backed-by-roadrunner).
+FreeSWITCH asks TallPBX for account and routing information in XML. The default fast PHP-FPM handler loads only the telephony modules needed for those requests. Optional [Laravel Octane](https://laravel.com/docs/octane) loads the same telephony module list and keeps the application loaded in memory between requests. FreeSWITCH uses PHP-FPM while Octane is unavailable. If the fast handler catches an application error, the same PHP-FPM worker handles the request through the full application used by the web panel. [How the XML handlers work](architecture.md#6-persistent-telephony-xml-worker-laravel-octane--backed-by-roadrunner).
 
 ## Call Completion
 

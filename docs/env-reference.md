@@ -134,7 +134,7 @@ See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path
 | `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle_decay_minutes` | Decay window in minutes for XML handler rate limiting. |
 | `FS_XML_HANDLER_TIMING_HEADERS` | `boolean` | `false` | `freeswitch.xml_handler.timing_headers` | When enabled, XML handler responses include app-side timing headers for callers sending `X-TallPBX-Timing: 1`. Used for load testing; keep disabled in production. |
 | `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` in `scripts/resources/systemd/tallpbx-xml-worker.service` (and temporarily by `App\Support\MinimalBootstrap::handle()` around slim-boot requests) and evaluated by `App\Support\TelephonyWorkerProviders::isSlimBoot()`. While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
-| `OCTANE_ROADRUNNER_HTTP_MIDDLEWARE` | `string` | `static` | `octane.roadrunner.http_middleware` | Comma-separated [RoadRunner](architecture.md#what-roadrunner-is) HTTP middleware pipeline enabled when running the optional Laravel Octane XML worker (`static` by default). |
+| `OCTANE_ROADRUNNER_HTTP_MIDDLEWARE` | `string` | `static` | `octane.roadrunner.http_middleware` | Comma-separated [RoadRunner](architecture.md#what-roadrunner-is) HTTP middleware pipeline enabled when running the optional [Laravel Octane](https://laravel.com/docs/octane) XML worker (`static` by default). |
 
 ---
 

@@ -7,7 +7,7 @@ Use these TallPBX 5.x benchmarks to see how much call traffic different server s
 
 ## Measured Call Capacity
 
-FreeSWITCH asks TallPBX for phone account and call-routing information in XML. By default, **PHP-FPM** runs the fast XML handler, which loads only the telephony modules the lookup needs. **Laravel Octane** is an optional performance mode. It loads the same telephony module list and keeps the application loaded in memory between requests.
+FreeSWITCH asks TallPBX for phone account and call-routing information in XML. By default, **PHP-FPM** runs the fast XML handler, which loads only the telephony modules the lookup needs. [**Laravel Octane**](https://laravel.com/docs/octane) is an optional performance mode. It loads the same telephony module list and keeps the application loaded in memory between requests.
 
 FreeSWITCH uses PHP-FPM when Octane is unavailable. If the fast handler catches an application error, the same PHP-FPM worker handles the request through the full application used by the web panel. [Enable, verify, or disable Octane](operations.md#octane-xml-worker-optional-performance-mode).
 

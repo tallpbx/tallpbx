@@ -237,7 +237,7 @@ Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per second
 
 PHP-FPM serves the web panel, call detail records, and FreeSWITCH XML lookups by default. The installer detects host RAM and automatically tunes the PHP-FPM worker pool in `/etc/php/8.5/fpm/pool.d/www.conf`.
 
-The installer also sets up the optional Laravel Octane XML worker and leaves it disabled on fresh installs. [Octane setup and verification](docs/operations.md#octane-xml-worker-optional-performance-mode).
+The installer also sets up the optional [Laravel Octane](https://laravel.com/docs/octane) XML worker (which keeps Laravel loaded in memory between FreeSWITCH lookups) and leaves it disabled on fresh installs. [Octane setup and verification](docs/operations.md#octane-xml-worker-optional-performance-mode).
 
 **Every setting the installer writes, in full:**
 
