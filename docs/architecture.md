@@ -408,7 +408,19 @@ sequenceDiagram
 
 #### 6. Persistent Telephony XML Worker (**Laravel Octane** — backed by RoadRunner)
 
-> **Status:** an optional performance mode. **Laravel Octane** is a persistent PHP application server (running on the RoadRunner server driver in TallPBX) that keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (Octane worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
+> **Status:** an optional performance mode. **Laravel Octane** is a persistent PHP application server (running on the [RoadRunner](#what-roadrunner-is) server driver in TallPBX) that keeps Laravel booted in memory across requests to eliminate per-request bootstrap overhead. The unit is installed but disabled on fresh installs; the default XML path is the trimmed fast controller, with FreeSWITCH using a two-tier ladder (Octane worker 1 s, fast controller 5 s; code exceptions fall back in-process inside `public/xml-handler-fast.php` rather than retrying timeouts into `index.php`).
+
+##### What RoadRunner Is
+
+**RoadRunner** is an open-source application server and process manager written in Go that sits in front of PHP and keeps long-running PHP worker processes alive in memory between HTTP requests. Under standard PHP-FPM, PHP loads the framework and tears down application state on every request; RoadRunner instead accepts incoming HTTP connections itself and dispatches them to already-booted PHP workers.
+
+Laravel Octane is the Laravel package that bridges the framework to a persistent server driver. TallPBX uses RoadRunner as Octane's driver because it ships as a single standalone binary with no additional PHP extensions to compile or maintain:
+
+- **Binary:** The installer downloads the standalone RoadRunner binary to `/var/www/tallpbx/rr`.
+- **Service:** `tallpbx-xml-worker.service` starts `artisan octane:start --server=roadrunner`, which runs RoadRunner listening on loopback `127.0.0.1:8090` and supervising PHP workers (`vendor/bin/roadrunner-worker`).
+- **Lifecycle & limits:** RoadRunner automatically recycles workers after `10,000` requests (`--max-requests=10000`) or when a worker exceeds the per-worker memory limit configured in `/var/www/tallpbx/.rr.yaml` (`max_worker_memory: 128` MB).
+
+See the [official RoadRunner documentation](https://docs.roadrunner.dev/) for upstream details, and [Octane XML Worker](operations.md#octane-xml-worker-optional-performance-mode) for how to enable, check, or disable it on a TallPBX host.
 
 **The cost it removes.** Under PHP-FPM every lookup pays Composer autoloading, provider registration, and container construction before Redis is asked — roughly 44 ms of a ~55 ms hit on the reference 1 vCPU host (§7.5.6). The worker keeps the framework, Eloquent connections, and module contributors in memory, so the same lookup only runs the controller. Measured on the 4-core reference appliance (baseline: PHP-FPM with 12 static workers on the same host): 33.9 requests/second at 100×5 and 66.6 requests/second at 500×25 with zero failed requests, against 10.95 and 3.59 requests/second for the pool. Those figures come from a CLI harness that adds per-batch connection overhead, so they understate an in-process client; the 2,500 req/s design target was not demonstrated.
 

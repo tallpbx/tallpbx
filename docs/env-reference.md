@@ -134,7 +134,7 @@ See [Architecture Guide §7.5](architecture.md#75-telephony-xml-handler-hot-path
 | `FS_XML_HANDLER_THROTTLE_DECAY_MINUTES`| `integer` | `1` | `freeswitch.xml_handler.throttle_decay_minutes` | Decay window in minutes for XML handler rate limiting. |
 | `FS_XML_HANDLER_TIMING_HEADERS` | `boolean` | `false` | `freeswitch.xml_handler.timing_headers` | When enabled, XML handler responses include app-side timing headers for callers sending `X-TallPBX-Timing: 1`. Used for load testing; keep disabled in production. |
 | `TALLPBX_WORKER_ROLE` | `string` | *(unset)* | *(systemd unit environment)* | Set to `telephony` in `scripts/resources/systemd/tallpbx-xml-worker.service` (and temporarily by `App\Support\MinimalBootstrap::handle()` around slim-boot requests) and evaluated by `App\Support\TelephonyWorkerProviders::isSlimBoot()`. While set, `ModuleServiceProvider` registers only `App\Support\TelephonyWorkerProviders` (24 telephony module providers) instead of every enabled module, so the resident worker never loads panel, Livewire, Reverb, or billing code. It belongs in the worker unit only — never in `.env`, the web environment, or the queue workers. |
-| `OCTANE_ROADRUNNER_HTTP_MIDDLEWARE` | `string` | `static` | `octane.roadrunner.http_middleware` | Comma-separated RoadRunner HTTP middleware pipeline enabled when running the Octane/RoadRunner XML worker (`static` by default). |
+| `OCTANE_ROADRUNNER_HTTP_MIDDLEWARE` | `string` | `static` | `octane.roadrunner.http_middleware` | Comma-separated [RoadRunner](architecture.md#what-roadrunner-is) HTTP middleware pipeline enabled when running the optional Laravel Octane XML worker (`static` by default). |
 
 ---
 
@@ -221,12 +221,12 @@ These settings configure the optional Laravel Octane worker, which keeps Laravel
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `OCTANE_SERVER` | `string` | `roadrunner` | `octane.server` | Application server driver used by Octane (`roadrunner`, `swoole`, `frankenphp`). |
+| `OCTANE_SERVER` | `string` | `roadrunner` | `octane.server` | Application server driver used by Octane ([RoadRunner](architecture.md#what-roadrunner-is) by default; `roadrunner`, `swoole`, `frankenphp`). |
 | `OCTANE_HOST` | `string` | `127.0.0.1` | `octane.host` | Loopback IP address bound by the Octane worker. TallPBX binds strictly to loopback. |
 | `OCTANE_PORT` | `integer` | `8090` | `octane.port` | Loopback TCP port targeted by FreeSWITCH's primary `tallpbx-octane` binding in `xml_curl.conf.xml`. |
 | `OCTANE_HTTPS` | `boolean` | `false` | `octane.https` | Controls whether absolute URLs generated inside Octane use HTTPS scheme. |
 | `OCTANE_STATE_FILE` | `path` | `storage/logs/octane-server-state.json` | `octane.state_file` | File path recording Octane daemon process PID and running state. |
-| `OCTANE_ROADRUNNER_COMMAND` | `string` | `vendor/bin/roadrunner-worker` | `octane.roadrunner.command` | RoadRunner worker process execution command. |
+| `OCTANE_ROADRUNNER_COMMAND` | `string` | `vendor/bin/roadrunner-worker` | `octane.roadrunner.command` | [RoadRunner](architecture.md#what-roadrunner-is) worker process execution command. |
 
 ---
 
