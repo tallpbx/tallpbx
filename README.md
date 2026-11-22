@@ -64,11 +64,11 @@ the modules needed to answer phone system requests and skips the web panel setup
 If it catches an application error, the same PHP-FPM process handles the request
 through the same entry point as the web panel, loading the full TallPBX application.
 
-**Laravel Octane** is an optional performance mode. It uses the same telephony
-module list and keeps the application loaded in memory between requests. This reduces
-startup work for each lookup and can improve call setup when XML processing is
-the bottleneck. FreeSWITCH uses the default PHP-FPM handler when Octane is
-unavailable. [Enable, verify, or disable Octane](docs/operations.md#octane-xml-worker-optional-performance-mode).
+**Laravel Octane** is an optional performance mode. It loads the same telephony
+module list as the PHP-FPM fast XML handler and keeps the application loaded in
+memory between requests. This reduces startup work for each lookup and can improve
+call setup when XML processing is the bottleneck. FreeSWITCH uses the default
+PHP-FPM handler when Octane is unavailable. [Enable, verify, or disable Octane](docs/operations.md#octane-xml-worker-optional-performance-mode).
 
 - See [benchmark results and hardware sizing](docs/load-testing-results.md) for
   how many calls the test servers completed and under what conditions.
