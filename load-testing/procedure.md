@@ -174,7 +174,7 @@ PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" \
   bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h4-4c8g --series="$SERIES"
 ```
 
-The ladder checks each mode separately. It moves on until both handlers complete under 95% of offered calls at three consecutive rates or the configured rates run out. A missing result, setup failure, or failed call-detail record check stops the ladder with an error. For one rate, use `load-testing/scripts/load-test-matrix.sh --tier=h4-4c8g --compare-xml-handlers --phase=sip --cps=10`.
+The ladder uses each tier's targeted `cps_ladder` from `load-testing/matrix.php` (for example `[2, 4, 5, 6, 8]` on `h1-1c1g`, `[5, 8, 10, 12, 15, 20]` on `h2-2c2g`, and `[5, 10, 15, 20, 25, 30, 40]` on `h4-4c8g`), ensuring every tier captures a light baseline, a true 100%-completed apples-to-apples rate just below PHP-FPM's ceiling, the PHP-FPM/Octane crossover, and Octane's upper boundary. It checks each mode separately and stops once both handlers complete under 95% of offered calls at two consecutive rates, or immediately if both drop below 80%. A missing result, setup failure, or failed call-detail record check stops the ladder with an error. For one rate, use `load-testing/scripts/load-test-matrix.sh --tier=h4-4c8g --compare-xml-handlers --phase=sip --cps=10`.
 
 Every SIP capacity cell records both **call setup latency** (`INVITE` → `200 OK`) and **call teardown latency** (`BYE` → `200 OK`) in SIPp's `*_rtt.csv` traces and summarizes `setup_p50_ms`, `setup_p95_ms`, `setup_max_ms`, `teardown_p50_ms`, `teardown_p95_ms`, and `teardown_max_ms` into each handler's `ladder.csv`. You can also summarize any cell directory directly with:
 

@@ -60,9 +60,12 @@ The charts and tables below compare **PHP-FPM** against **Laravel Octane** acros
 - **Individual call setup latency:** Measured per call by SIPp from the initial `INVITE` through SIP authentication (`407`), FreeSWITCH XML lookups, and `200 OK` answer. **Median (p50)** reflects a typical call; **p95** shows the slowest 5% of completed calls. Call teardown (`BYE` → `200 OK`) is verified on every completed call, though teardown duration is not separately timed in the current datasets.
 - **XML lookup latency:** Direct HTTP response time for FreeSWITCH directory and dialplan lookups without SIP signaling or call audio.
 
-### Individual call setup latency (PHP-FPM vs. Octane)
+### Individual call setup latency at PHP-FPM boundary rates (PHP-FPM vs. Octane)
 
-Each pair in the chart and first table compares both handlers on the same server at the same offered call rate over 60 seconds. Under these rates, PHP-FPM queues lookups and drops calls while Octane keeps typical call setup well under one second.
+Each pair in the chart and first table compares both handlers on the same server at the same offered call rate over 60 seconds.
+
+> [!NOTE]
+> All three currently available same-rate SIP pairs were measured at **PHP-FPM's saturation boundary** (where PHP-FPM was already queueing and dropping 30%–58% of calls). Those figures show overload queueing delay, **not** an apples-to-apples non-dropping comparison. Matched 100%-completed Octane vs. PHP-FPM pairs at non-dropping rates (such as 4–5 CPS on 1 vCPU and 8–10 CPS on 2 vCPU) have not been measured yet and will replace this chart on the next unified series.
 
 ```mermaid
 ---
@@ -72,7 +75,7 @@ config:
       plotColorPalette: "#2563eb, #f97316"
 ---
 xychart-beta
-    title "Median Call Setup Latency: Octane vs. PHP-FPM (ms, lower is better)"
+    title "Boundary Median Call Setup Latency (PHP-FPM Overloaded): Octane vs. PHP-FPM (ms, lower is better)"
     x-axis ["1 vCPU 6 CPS", "2 vCPU 12 CPS", "2 vCPU 10 CPS+"]
     y-axis "Median Setup Latency (ms)" 0 --> 6500
     bar [2108, 3844, 6180]

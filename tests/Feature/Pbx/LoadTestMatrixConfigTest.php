@@ -52,10 +52,19 @@ describe('load test matrix configuration', function (): void {
     });
 
     it('keeps the capacity ladder ascending and complete', function (): void {
-        $ladder = loadTestMatrix()['cps_ladder'];
+        $matrix = loadTestMatrix();
+        $ladder = $matrix['cps_ladder'];
 
         expect($ladder)->toBe([2, 3, 5, 8, 10, 15, 20, 25, 30, 40])
-            ->and($ladder)->toBe(collect($ladder)->sort()->values()->all());
+            ->and($ladder)->toBe(collect($ladder)->sort()->values()->all())
+            ->and($matrix['tiers']['h1-1c1g']['cps_ladder'])->toBe([2, 4, 5, 6, 8])
+            ->and($matrix['tiers']['h2-2c2g']['cps_ladder'])->toBe([5, 8, 10, 12, 15, 20])
+            ->and($matrix['tiers']['h4-4c8g']['cps_ladder'])->toBe([5, 10, 15, 20, 25, 30, 40]);
+
+        foreach ($matrix['tiers'] as $tierId => $tier) {
+            expect($tier)->toHaveKey('cps_ladder')
+                ->and($tier['cps_ladder'])->toBe(collect($tier['cps_ladder'])->sort()->values()->all(), $tierId);
+        }
     });
 
     it('resolves the shipped dynamic baseline to the installer ceiling', function (): void {

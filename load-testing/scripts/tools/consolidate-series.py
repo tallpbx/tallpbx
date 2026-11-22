@@ -316,9 +316,14 @@ def build_markdown(
         if row["phase"] == "sip":
             sip_by_tier_cps.setdefault((row["tier"], int(row["rate_cps"])), {})[row["variant"]] = row
 
+    clean_chart_labels: list[str] = []
+    clean_fpm_values: list[str] = []
+    clean_oct_values: list[str] = []
+
     for tier in tiers:
         label = f"{tier_meta[tier]['vcpu']} vCPU / {tier_meta[tier]['ram_mb'] // 1024} GB RAM"
         rates = sorted(cps for (t, cps) in sip_by_tier_cps if t == tier)
+        highest_clean_pair: tuple[int, dict[str, str], dict[str, str]] | None = None
         for cps in rates:
             pair = sip_by_tier_cps[(tier, cps)]
             fpm = pair.get("v-fast-default")
@@ -331,6 +336,66 @@ def build_markdown(
             oct_td = f"{oct_row['teardown_p50_ms']} / {oct_row['teardown_p95_ms']} ms" if oct_row else "—"
             lines.append(
                 f"| {label} | {cps} calls/sec | {fpm_comp} | {oct_comp} | {fpm_setup} | {oct_setup} | {fpm_td} | {oct_td} |"
+            )
+            if fpm and oct_row and fpm["failed"] == "0" and oct_row["failed"] == "0":
+                highest_clean_pair = (cps, fpm, oct_row)
+
+        if highest_clean_pair is not None:
+            clean_cps, clean_fpm, clean_oct = highest_clean_pair
+            clean_chart_labels.append(f'"{tier_meta[tier]["vcpu"]} vCPU {clean_cps} CPS"')
+            clean_fpm_values.append(clean_fpm["p50_ms"])
+            clean_oct_values.append(clean_oct["p50_ms"])
+
+    if clean_chart_labels:
+        fpm_floats = [float(v) for v in clean_fpm_values]
+        oct_floats = [float(v) for v in clean_oct_values]
+        max_y = max(fpm_floats + oct_floats)
+        y_top = int(((max_y // 50) + 2) * 50)
+        can_overlay = all(f >= o for f, o in zip(fpm_floats, oct_floats))
+        if can_overlay:
+            lines.extend(
+                [
+                    "",
+                    "#### Non-Dropping Call Setup Latency (100% Completed for Both Handlers)",
+                    "",
+                    "```mermaid",
+                    "---",
+                    "config:",
+                    "  themeVariables:",
+                    "    xyChart:",
+                    '      plotColorPalette: "#2563eb, #f97316"',
+                    "---",
+                    "xychart-beta",
+                    '    title "Non-Dropping Median Call Setup Latency: Octane vs. PHP-FPM (ms, lower is better)"',
+                    f"    x-axis [{', '.join(clean_chart_labels)}]",
+                    f'    y-axis "Median Setup Latency (ms)" 0 --> {y_top}',
+                    f"    bar [{', '.join(clean_fpm_values)}]",
+                    f"    bar [{', '.join(clean_oct_values)}]",
+                    "```",
+                    "",
+                    "🟧 **Laravel Octane** *(median latency)* · 🟦 **PHP-FPM** *(additional latency; full bar height = PHP-FPM total)*",
+                ]
+            )
+        else:
+            paired_labels = []
+            paired_vals = []
+            for lbl, fv, ov in zip(clean_chart_labels, clean_fpm_values, clean_oct_values):
+                raw = lbl.strip('"')
+                paired_labels.extend([f'"{raw} FPM"', f'"{raw} Octane"'])
+                paired_vals.extend([fv, ov])
+            lines.extend(
+                [
+                    "",
+                    "#### Non-Dropping Call Setup Latency (100% Completed for Both Handlers)",
+                    "",
+                    "```mermaid",
+                    "xychart-beta",
+                    '    title "Non-Dropping Median Call Setup Latency: PHP-FPM vs. Octane (ms, lower is better)"',
+                    f"    x-axis [{', '.join(paired_labels)}]",
+                    f'    y-axis "Median Setup Latency (ms)" 0 --> {y_top}',
+                    f"    bar [{', '.join(paired_vals)}]",
+                    "```",
+                ]
             )
 
     lines.append("")

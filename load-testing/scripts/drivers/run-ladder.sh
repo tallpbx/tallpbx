@@ -28,7 +28,8 @@ ladder_rates="$(php -r '
         fwrite(STDERR, "Unknown tier: ".$argv[2].PHP_EOL);
         exit(2);
     }
-    echo implode(PHP_EOL, $matrix["cps_ladder"]);
+    $rates = $matrix["tiers"][$argv[2]]["cps_ladder"] ?? $matrix["cps_ladder"];
+    echo implode(PHP_EOL, $rates);
 ' load-testing/matrix.php "$tier")"
 
 : "${PBX_HOST:?Set PBX_HOST to the target PBX IP or hostname}"
@@ -81,7 +82,7 @@ read_completion() {
         END {
             if (rows != 1 || total_calls <= 0) exit 1
             percentage = 100 * done_calls / total_calls
-            printf "%.1f\t%d\t%s\t%s\t%s\t%s\n", percentage, (percentage < 95), setup_p50, setup_p95, teardown_p50, teardown_p95
+            printf "%.1f\t%d\t%d\t%s\t%s\t%s\t%s\n", percentage, (percentage < 95), (percentage < 80), setup_p50, setup_p95, teardown_p50, teardown_p95
         }
     ' "${labels[0]}"
 }
@@ -123,22 +124,27 @@ while IFS= read -r cps; do
         exit 1
     fi
 
-    IFS=$'\t' read -r fpm_pct fpm_below fpm_sp50 fpm_sp95 fpm_tp50 fpm_tp95 <<< "$fpm"
-    IFS=$'\t' read -r oct_pct oct_below oct_sp50 oct_sp95 oct_tp50 oct_tp95 <<< "$octane"
+    IFS=$'\t' read -r fpm_pct fpm_below95 fpm_below80 fpm_sp50 fpm_sp95 fpm_tp50 fpm_tp95 <<< "$fpm"
+    IFS=$'\t' read -r oct_pct oct_below95 oct_below80 oct_sp50 oct_sp95 oct_tp50 oct_tp95 <<< "$octane"
 
     printf '%s calls/sec: PHP-FPM %s, Octane %s\n' \
         "$cps" \
         "$(format_handler_summary "$fpm_pct" "$fpm_sp50" "$fpm_sp95" "$fpm_tp50" "$fpm_tp95")" \
         "$(format_handler_summary "$oct_pct" "$oct_sp50" "$oct_sp95" "$oct_tp50" "$oct_tp95")"
 
-    if [ "$fpm_below" = "1" ] && [ "$oct_below" = "1" ]; then
+    if [ "$fpm_below80" = "1" ] && [ "$oct_below80" = "1" ]; then
+        printf 'Both handlers dropped below 80%% completion at %s calls/sec; stopping ladder.\n' "$cps"
+        break
+    fi
+
+    if [ "$fpm_below95" = "1" ] && [ "$oct_below95" = "1" ]; then
         consecutive=$((consecutive + 1))
     else
         consecutive=0
     fi
 
-    if [ "$consecutive" -ge 3 ]; then
-        printf 'Both handlers completed under 95%% of calls at three consecutive rates.\n'
+    if [ "$consecutive" -ge 2 ]; then
+        printf 'Both handlers completed under 95%% of calls at two consecutive rates.\n'
         break
     fi
 done <<< "$ladder_rates"

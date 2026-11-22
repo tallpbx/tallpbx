@@ -118,7 +118,9 @@ describe('load test matrix runner', function (): void {
                     printf 'recorded_at,cps,successful,failed,label\n' > "$dir/ladder.csv"
                 fi
                 completed=80
-                if [ "$variant" = v-octane ] && [ "$rate" -le 8 ]; then
+                if [ "$FIXTURE_MODE" = 'both below 80' ]; then
+                    completed=70
+                elif [ "$variant" = v-octane ] && [ "$rate" -le 10 ]; then
                     completed=100
                 fi
                 printf 'fixture,%s,%s,%s,h4-4c8g/%s/sip-cps%s\n' \
@@ -138,17 +140,21 @@ describe('load test matrix runner', function (): void {
 
         if ($mode === 'missing Octane') {
             expect($process->getExitCode())->toBe(1)
-                ->and($process->getErrorOutput())->toContain('Missing or ambiguous comparison result at 2 calls/sec');
+                ->and($process->getErrorOutput())->toContain('Missing or ambiguous comparison result at 5 calls/sec');
         } elseif ($mode === 'runner error') {
             expect($process->getExitCode())->toBe(1)
-                ->and($process->getErrorOutput())->toContain('Comparison failed at 2 calls/sec');
+                ->and($process->getErrorOutput())->toContain('Comparison failed at 5 calls/sec');
+        } elseif ($mode === 'both below 80') {
+            expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+                ->and($process->getOutput())->toContain('Both handlers dropped below 80% completion at 5 calls/sec')
+                ->not->toContain('10 calls/sec');
         } else {
             expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
-                ->and($process->getOutput())->toContain('8 calls/sec: PHP-FPM 80.0%, Octane 100.0%')
+                ->and($process->getOutput())->toContain('10 calls/sec: PHP-FPM 80.0%, Octane 100.0%')
                 ->toContain('20 calls/sec: PHP-FPM 80.0%, Octane 80.0%')
                 ->not->toContain('25 calls/sec');
         }
-    })->with(['paired results', 'missing Octane', 'runner error']);
+    })->with(['paired results', 'missing Octane', 'runner error', 'both below 80']);
 
     it('lists every tier and variant for each phase', function (): void {
         $process = matrixRunnerProcess(['--list'], $this->artifactRoot);
@@ -983,6 +989,9 @@ XML);
             ->and(File::get($mdOut))->toContain('Unified Comparison Series')
             ->and(File::get($mdOut))->toContain('xychart-beta')
             ->and(File::get($mdOut))->toContain('plotColorPalette: "#2563eb, #f97316"')
+            ->and(File::get($mdOut))->toContain('Non-Dropping Call Setup Latency (100% Completed for Both Handlers)')
+            ->and(File::get($mdOut))->toContain('bar [220.0, 220.0, 220.0]')
+            ->and(File::get($mdOut))->toContain('bar [45.0, 45.0, 45.0]')
             ->and(File::get($mdOut))->toContain('🟧 **Laravel Octane**')
             ->and(File::get($mdOut))->toContain('🟦 **PHP-FPM**')
             ->and(File::get($mdOut))->toContain('bar [75.0, 75.0, 75.0]')

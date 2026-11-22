@@ -53,6 +53,7 @@ return [
             'fpm_children' => 5,
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 3,
+            'cps_ladder' => [2, 4, 5, 6, 8],
         ],
         'h1-1c2g' => [
             'stage' => 'a',
@@ -64,6 +65,7 @@ return [
             'fpm_children' => 6,
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 6,
+            'cps_ladder' => [2, 4, 5, 6, 8],
         ],
         'h2-2c2g' => [
             'stage' => 'a',
@@ -75,6 +77,7 @@ return [
             'fpm_children' => 6,
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 6,
+            'cps_ladder' => [5, 8, 10, 12, 15, 20],
         ],
         'h4-4c8g' => [
             'stage' => 'a',
@@ -86,6 +89,7 @@ return [
             'fpm_children' => 12,
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 12,
+            'cps_ladder' => [5, 10, 15, 20, 25, 30, 40],
         ],
         'h2d-2c8g' => [
             'stage' => 'b',
@@ -97,6 +101,7 @@ return [
             'fpm_children' => 12,
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 12,
+            'cps_ladder' => [5, 10, 15, 20, 25, 30],
         ],
         'h4d-4c16g' => [
             'stage' => 'b',
@@ -108,6 +113,7 @@ return [
             'fpm_children' => 24,
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 12,
+            'cps_ladder' => [10, 15, 20, 25, 30, 40, 50],
         ],
     ],
 
