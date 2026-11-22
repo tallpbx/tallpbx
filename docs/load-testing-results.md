@@ -69,7 +69,7 @@ Each pair in the chart and first table compares both handlers on the same server
 config:
   themeVariables:
     xyChart:
-      plotColorPalette: "#f97316, #2563eb"
+      plotColorPalette: "#2563eb, #f97316"
 ---
 xychart-beta
     title "Median Call Setup Latency: Octane vs. PHP-FPM (ms, lower is better)"
@@ -79,7 +79,7 @@ xychart-beta
     bar [280, 284, 964]
 ```
 
-*Blue (bottom): Laravel Octane median latency · Orange (above): additional PHP-FPM latency (full bar height = PHP-FPM total).*
+🟧 **Laravel Octane** *(median latency)* · 🟦 **PHP-FPM** *(additional latency; full bar height = PHP-FPM total)*
 
 | Test server | Date | Workload (60 sec) | PHP-FPM median / p95 | Octane median / p95 |
 | --- | --- | --- | ---: | ---: |
@@ -116,7 +116,7 @@ Direct HTTP lookup benchmarks isolate how fast TallPBX answers FreeSWITCH direct
 config:
   themeVariables:
     xyChart:
-      plotColorPalette: "#f97316, #2563eb"
+      plotColorPalette: "#2563eb, #f97316"
 ---
 xychart-beta
     title "Median XML Lookup Latency: Octane vs. PHP-FPM (ms, lower is better)"
@@ -126,7 +126,7 @@ xychart-beta
     bar [14, 31.9, 43.2, 113.7]
 ```
 
-*Blue (bottom): Laravel Octane median latency · Orange (above): additional PHP-FPM latency (full bar height = PHP-FPM total).*
+🟧 **Laravel Octane** *(median latency)* · 🟦 **PHP-FPM** *(additional latency; full bar height = PHP-FPM total)*
 
 | Test server | Date | Workload | PHP-FPM median / p95 | Octane median / p95 |
 | --- | --- | --- | ---: | ---: |

@@ -268,7 +268,7 @@ def build_markdown(
                     "config:",
                     "  themeVariables:",
                     "    xyChart:",
-                    '      plotColorPalette: "#f97316, #2563eb"',
+                    '      plotColorPalette: "#2563eb, #f97316"',
                     "---",
                     "xychart-beta",
                     '    title "Median XML Lookup Latency at 500x25 Mixed: Octane vs. PHP-FPM (ms, lower is better)"',
@@ -278,7 +278,7 @@ def build_markdown(
                     f"    bar [{', '.join(xml_oct_values)}]",
                     "```",
                     "",
-                    "*Blue (bottom): Laravel Octane median latency · Orange (above): additional PHP-FPM latency (full bar height = PHP-FPM total).*",
+                    "🟧 **Laravel Octane** *(median latency)* · 🟦 **PHP-FPM** *(additional latency; full bar height = PHP-FPM total)*",
                 ]
             )
         else:

@@ -982,7 +982,9 @@ XML);
             ->and(File::get($csvOut))->toContain('teardown_p95_ms')
             ->and(File::get($mdOut))->toContain('Unified Comparison Series')
             ->and(File::get($mdOut))->toContain('xychart-beta')
-            ->and(File::get($mdOut))->toContain('plotColorPalette: "#f97316, #2563eb"')
+            ->and(File::get($mdOut))->toContain('plotColorPalette: "#2563eb, #f97316"')
+            ->and(File::get($mdOut))->toContain('🟧 **Laravel Octane**')
+            ->and(File::get($mdOut))->toContain('🟦 **PHP-FPM**')
             ->and(File::get($mdOut))->toContain('bar [75.0, 75.0, 75.0]')
             ->and(File::get($mdOut))->toContain('bar [12.0, 12.0, 12.0]')
             ->and(File::get($mdOut))->toContain('4 vCPU / 8 GB RAM');
