@@ -51,6 +51,77 @@ The November 4 numbers average three runs per handler on build `62661edf` with t
 
 On 4 shared vCPU, PHP-FPM used a dynamic pool capped at 12 workers. At 1,000 requests, the median response took **331 ms** with PHP-FPM and **85 ms** with Octane. The November 10 report also records a pass across 14 calling and media scenarios. It gives neither the running build SHA nor a 60-second call-rate comparison for that host. [November 10 lookup tests](https://github.com/tallpbx/tallpbx/blob/5d643e31c7d5a06c27491d448103c834e4b4d9f3/docs/load-testing-results.md#persistent-octane-worker-vs-php-fpm-comparison-4-vcpu-shared--8-gb-ram) · [November 10 calling scenarios](https://github.com/tallpbx/tallpbx/blob/5d643e31c7d5a06c27491d448103c834e4b4d9f3/docs/load-testing-results.md#4-vcpu-shared--8-gb-ram-live-call-capacity--extended-validation).
 
+## Latency Comparison
+
+Call capacity is only half the picture. An individual caller experiences latency directly as **post-dial delay**—the pause between dialing and hearing ringback or an answer. Even before a server starts dropping calls, worker queueing can push individual call setup times from roughly a tenth of a second to several seconds.
+
+The charts and tables below compare **PHP-FPM** against **Laravel Octane** across measured server sizes for two metrics:
+
+- **Individual call setup latency:** Measured per call by SIPp from the initial `INVITE` through SIP authentication (`407`), FreeSWITCH XML lookups, and `200 OK` answer. **Median (p50)** reflects a typical call; **p95** shows the slowest 5% of completed calls. Call teardown (`BYE` → `200 OK`) is verified on every completed call, though teardown duration is not separately timed in the current datasets.
+- **XML lookup latency:** Direct HTTP response time for FreeSWITCH directory and dialplan lookups without SIP signaling or call audio.
+
+### Individual call setup latency (PHP-FPM vs. Octane)
+
+Each pair in the chart and first table compares both handlers on the same server at the same offered call rate over 60 seconds. Under these rates, PHP-FPM queues lookups and drops calls while Octane keeps typical call setup well under one second.
+
+```mermaid
+xychart-beta
+    title "Median Call Setup Latency: PHP-FPM vs. Octane (ms, lower is better)"
+    x-axis ["1c 6CPS FPM", "1c 6CPS Octane", "2c 12CPS FPM", "2c 12CPS Octane", "2c 10CPS+ FPM", "2c 10CPS+ Octane"]
+    y-axis "Median Setup Latency (ms)" 0 --> 6500
+    bar [2108, 280, 3844, 284, 6180, 964]
+```
+
+| Test server | Date | Workload (60 sec) | PHP-FPM median / p95 | Octane median / p95 |
+| --- | --- | --- | ---: | ---: |
+| 1 vCPU / 1 GB RAM | Nov 8–9 | 6 calls/sec, 20 accounts | 2,108 / 7,008 ms *(70% completed)* | **280 / 2,588 ms** *(100% completed)* |
+| 2 vCPU / 2 GB RAM | Nov 9 | 12 calls/sec, 20 accounts | 3,844 / 6,860 ms *(42% completed)* | **284 / 3,972 ms** *(100% completed)* |
+| 2 vCPU / 2 GB RAM | Nov 17 | 10 calls/sec + 8 reg/sec + 1 vm/sec, SQLite (`10CPS+`) | 6,180 / 17,548 ms *(56% completed)* | **964 / 5,100 ms** *(97% completed)* |
+| 4 shared vCPU / 8 GB RAM | — | No verified 60-second call comparison | — | — |
+
+Latency is reported for completed calls only. On the November 8–9 sweeps, PHP-FPM used a dynamic pool when serving XML and a fixed-size pool alongside Octane.
+
+#### How individual call setup time changes with load (100% completed calls)
+
+Even when every call succeeds, setup latency climbs sharply as PHP-FPM approaches its ceiling. Use this table to see what an individual caller experiences at light load versus busy load on each server size:
+
+| Test server | Date | Handler | Offered workload (60 sec, 100% completed) | Setup median / p95 |
+| --- | --- | --- | --- | ---: |
+| 1 vCPU / 1 GB RAM | Nov 10 | PHP-FPM (`dynamic 3`) | 3 calls/sec, 20 accounts | **124 / 300 ms** |
+| 1 vCPU / 1 GB RAM | Nov 17 | PHP-FPM (`dynamic 3`) | 2 calls/sec + 2 reg/sec + 1 vm/sec (SQLite) | **352 / 1,356 ms** |
+| 1 vCPU / 1 GB RAM | Nov 8 | PHP-FPM (`dynamic 3`) | 5 calls/sec, 20 accounts | 928 / 4,376 ms |
+| 1 vCPU / 1 GB RAM | Nov 9 | **Octane** | 6 calls/sec, 20 accounts | **280 / 2,588 ms** |
+| 2 vCPU / 2 GB RAM | Nov 9 | PHP-FPM (`dynamic 6`) | 6 calls/sec, 20 accounts | **120 / 232 ms** |
+| 2 vCPU / 2 GB RAM | Nov 17 | PHP-FPM (`dynamic 6`) | 8 calls/sec + 8 reg/sec + 1 vm/sec (SQLite) | 1,204 / 2,680 ms |
+| 2 vCPU / 2 GB RAM | Nov 9 | PHP-FPM (`dynamic 6`) | 10 calls/sec, 20 accounts | 1,664 / 3,860 ms |
+| 2 vCPU / 2 GB RAM | Nov 9 | **Octane** | 12 calls/sec, 20 accounts | **284 / 3,972 ms** |
+
+[Worker sweep data](../load-testing/results/consolidated/worker-sweep-20261108-cells.csv) · [November 17 data](../load-testing/results/consolidated/refresh-20261117-cells.csv).
+
+### XML lookup latency (PHP-FPM vs. Octane)
+
+Direct HTTP lookup benchmarks isolate how fast TallPBX answers FreeSWITCH directory and dialplan requests without call audio or SIP signaling overhead.
+
+```mermaid
+xychart-beta
+    title "Median XML Lookup Latency: PHP-FPM vs. Octane (ms, lower is better)"
+    x-axis ["1c 100x5 FPM", "1c 100x5 Octane", "2c 500x25 FPM", "2c 500x25 Octane", "4c 100x5 FPM", "4c 100x5 Octane", "4c 500x25 FPM", "4c 500x25 Octane"]
+    y-axis "Median Lookup Latency (ms)" 0 --> 400
+    bar [108, 14, 181.4, 31.9, 152.2, 43.2, 368.7, 113.7]
+```
+
+| Test server | Date | Workload | PHP-FPM median / tail | Octane median / tail |
+| --- | --- | --- | ---: | ---: |
+| 1 vCPU / 1 GB RAM | Nov 5 | 100 dialplan lookups, 5 at a time (3 runs) | 108 / 120 ms *(p95)* | **14 / 25 ms** *(p95)* |
+| 1 vCPU / 1 GB RAM | Nov 17 | 100 mixed lookups, 5 at a time (3 runs) | 76.7–90.7 / 121.4–129.9 ms *(p95)* | — *(no Nov 17 1 vCPU run)* |
+| 2 vCPU / 2 GB RAM | Nov 17 | 100 mixed lookups, 5 at a time (3 runs) | 46.7–60.2 / 73.6–89.6 ms *(p95)* | **8.9–9.2 / 13.2–16.3 ms** *(p95)* |
+| 2 vCPU / 2 GB RAM | Nov 17 | 500 mixed lookups, 25 at a time | 181.4 / 293.8 ms *(p95)* | **31.9 / 56.3 ms** *(p95)* |
+| 4 shared vCPU / 8 GB RAM | Nov 10 | 100 mixed lookups, 5 at a time | 152.2 / 476.1 ms *(max)* | **43.2 / 117.3 ms** *(max)* |
+| 4 shared vCPU / 8 GB RAM | Nov 10 | 500 mixed lookups, 25 at a time | 368.7 / 1,133.0 ms *(max)* | **113.7 / 322.4 ms** *(max)* |
+| 4 shared vCPU / 8 GB RAM | Nov 10 | 1,000 mixed lookups, 25 at a time | 330.8 / 1,020.0 ms *(max)* | **85.2 / 213.2 ms** *(max)* |
+
+Compare handlers within each row rather than across dates: the November 5 (build `5cbc700`), November 10 (4 shared vCPU host, max latency reported instead of p95), and November 17 (build `2fbac077`) series ran on different builds, cloud hosts, and request mixes. Across every matched pair, Octane cut median XML lookup latency by roughly **3× to 7×**. [November 5 1 vCPU summary](operations.md#expected-gain-1-vcpu--967-mb-reference-tier) · [November 10 lookup tests](https://github.com/tallpbx/tallpbx/blob/5d643e31c7d5a06c27491d448103c834e4b4d9f3/docs/load-testing-results.md#persistent-octane-worker-vs-php-fpm-comparison-4-vcpu-shared--8-gb-ram) · [November 17 lookup results](load-testing-2026-11-17.md#xml-lookup-throughput).
+
 <a name="november-2026-refresh-sqlite-vs-mariadb-mod_mariadb-option-1-2-tier-xml-and-2-vcpu-baselines"></a>
 
 ## Detailed Benchmark Reports
