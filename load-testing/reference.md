@@ -197,9 +197,23 @@ load-testing/results/<series>/<tier>/
     └── probe-<profile>-<ttl>.txt               one lookup probe
 ```
 
-Variant directories follow `<variant>` or `<variant>-fpm-<mode><children>` naming when documenting explicit PHP-FPM pool sizing (for example `v-fast-fpm-dynamic3` or `v-stock-fpm-static5`).
+Variant directories follow `<variant>` or `<variant>-fpm-<mode><children>` naming when documenting explicit PHP-FPM pool sizing (for example `v-fast-default-fpm-dynamic12` or `v-octane-fpm-dynamic12`).
 
 Example: `h1-1c1g/v-stock-dynamic/100x5-production-60-dialplan-r2.json` is repeat 2 of the 100-request/5-concurrent dialplan cell under the production cache policy.
+
+### SIP ladder CSV (`ladder.csv`), RTT traces, and series consolidation
+
+Each SIP rung appends one row to `<tier>/<variant-dir>/ladder.csv`:
+
+```csv
+recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms
+```
+
+- `setup_p50_ms` / `setup_p95_ms` / `setup_max_ms`: individual call setup latency (initial `INVITE` through `407` auth, XML lookups, and `200 OK` answer) summarized from SIPp's `setup` RTD rows in `*_rtt.csv`.
+- `teardown_p50_ms` / `teardown_p95_ms` / `teardown_max_ms`: individual call teardown latency (`BYE` → `200 OK`) summarized from SIPp's `teardown` RTD rows in `*_rtt.csv`.
+- Inspect any SIP cell directory directly with `python3 load-testing/scripts/tools/rtt-stats.py --rtd=setup <cell-dir>` and `--rtd=teardown <cell-dir>`.
+- Run the single uniform `standard_comparison` contract (`100x5`, `500x25`, `1000x25` `mixed` XML + 60-second SIP ladder with `EXTENSIONS=30` + 14-scenario extended/media validation) for each tier under a shared `SERIES` with `bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=<id> --series=<name>`.
+- Validate cross-tier build parity & completeness across `h1-1c1g`, `h2-2c2g`, and `h4-4c8g` and generate one standardized consolidated CSV + Markdown tables/charts with `python3 load-testing/scripts/tools/consolidate-series.py load-testing/results/<series> --csv-out=... --markdown-out=...`.
 
 ---
 

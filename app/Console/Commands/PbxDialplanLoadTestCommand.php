@@ -151,6 +151,8 @@ class PbxDialplanLoadTestCommand extends Command
             ['Elapsed seconds', (string) $report['elapsed_seconds']],
             ['Requests/sec', (string) $report['requests_per_second']],
             ['Average ms', (string) $report['latency_ms']['average']],
+            ['Median (p50) ms', (string) $report['latency_ms']['p50']],
+            ['p95 ms', (string) $report['latency_ms']['p95']],
             ['Fastest ms', (string) $report['latency_ms']['min']],
             ['Slowest ms', (string) $report['latency_ms']['max']],
             ['Passed thresholds', $report['passed'] ? 'yes' : 'no'],

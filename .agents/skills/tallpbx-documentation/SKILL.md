@@ -30,7 +30,7 @@ Keep the port, binding order, and restart details where the reader needs them. F
 
 Read the [load testing harness guide](../../../load-testing/README.md) before reasoning about a run. Tie every published capacity figure to a dated report or consolidated CSV. For call tests, show the hardware, software build and serving mode, workload, offered call rate, duration, and calls completed. Keep the conditions that materially affect comparison close to the figure and link to the full setup.
 
-Label short smoke tests, sustained SIP runs, XML-only throughput, and projections clearly. When two runs differ, present the results with their conditions and verify the numbers against the source. Use the capacity reported for an older build or configuration only as dated evidence. Keep current figures in one place and link to it from summaries.
+Label short smoke tests, sustained SIP runs, XML-only throughput, and projections clearly. When two runs differ, present the results with their conditions and verify the numbers against the source. Use the capacity reported for an older build or configuration only as dated evidence. Keep current figures in one place and link to it from summaries. When a full uniform comparison series passes `load-testing/scripts/tools/consolidate-series.py` across all standard tiers (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`) on one clean commit SHA, replace older piecemeal multi-date tables in `docs/load-testing-results.md` with that single consistent dataset rather than cobbling together comparisons across dates, pools, or mismatched metrics.
 
 ## Upstream skills
 

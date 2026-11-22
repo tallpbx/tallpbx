@@ -1556,16 +1556,39 @@ run_sip_phase() {
         return 1
     fi
 
+    # Extract individual call setup and teardown latency percentiles from SIPp's
+    # RTT traces so every ladder rung captures caller experience alongside call
+    # completion counts.
+    local setup_p50="" setup_p95="" setup_max="" teardown_p50="" teardown_p95="" teardown_max="" rtt_row=""
+
+    if command -v python3 >/dev/null 2>&1 && [ -f "${TOOLS_DIR}/rtt-stats.py" ]; then
+        rtt_row="$(python3 "${TOOLS_DIR}/rtt-stats.py" --rtd=setup "$local_run_dir" 2>/dev/null || true)"
+        if [ -n "$rtt_row" ]; then
+            setup_p50="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $4}')"
+            setup_p95="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $6}')"
+            setup_max="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $7}')"
+        fi
+
+        rtt_row="$(python3 "${TOOLS_DIR}/rtt-stats.py" --rtd=teardown "$local_run_dir" 2>/dev/null || true)"
+        if [ -n "$rtt_row" ]; then
+            teardown_p50="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $4}')"
+            teardown_p95="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $6}')"
+            teardown_max="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $7}')"
+        fi
+    fi
+
     # One row per rung: the stop rule (three consecutive rungs under 95 %
     # completion) is applied from this record, not from memory.
     ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
     mkdir -p "$(dirname "$ladder_file")"
 
     if [ ! -f "$ladder_file" ]; then
-        printf 'recorded_at,cps,successful,failed,label\n' > "$ladder_file"
+        printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$ladder_file"
     fi
 
-    printf '%s,%s,%s,%s,%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" >> "$ladder_file"
+    printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" \
+        "$setup_p50" "$setup_p95" "$setup_max" "$teardown_p50" "$teardown_p95" "$teardown_max" >> "$ladder_file"
 
     return 0
 }

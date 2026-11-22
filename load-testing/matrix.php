@@ -290,6 +290,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Standard Publishable Comparison Contract
+    |--------------------------------------------------------------------------
+    |
+    | Single uniform test matrix executed across every required tier on the
+    | same build SHA so docs/load-testing-results.md is generated from one
+    | consistent series instead of cobbled together across dates and pools.
+    */
+
+    'standard_comparison' => [
+        'tiers' => ['h1-1c1g', 'h2-2c2g', 'h4-4c8g'],
+        'variants' => ['v-fast-default', 'v-octane'],
+        'xml_profiles' => ['100x5', '500x25', '1000x25'],
+        'xml_section' => 'mixed',
+        'xml_ttl' => 'production-60',
+        'xml_repeats' => 3,
+        'sip_extensions' => 30,
+        'sip_duration_seconds' => 60,
+        'include_extended_validation' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Single-Knob Ablations (Stage A tiers only)
     |--------------------------------------------------------------------------
     |

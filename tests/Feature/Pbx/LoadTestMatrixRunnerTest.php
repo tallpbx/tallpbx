@@ -54,7 +54,12 @@ describe('load test matrix runner', function (): void {
     });
 
     it('is a syntactically valid bash script', function (): void {
-        foreach (['load-testing/scripts/load-test-matrix.sh', 'load-testing/scripts/lib/manifest.sh', 'load-testing/scripts/drivers/run-ladder.sh'] as $script) {
+        foreach ([
+            'load-testing/scripts/load-test-matrix.sh',
+            'load-testing/scripts/lib/manifest.sh',
+            'load-testing/scripts/drivers/run-ladder.sh',
+            'load-testing/scripts/drivers/run-tier-comparison.sh',
+        ] as $script) {
             $process = new Process(['bash', '-n', base_path($script)], base_path());
             $process->run();
 
@@ -808,5 +813,192 @@ XML);
             ->toContain('${SIPP_APP_DIR}/load-testing/scripts')
             ->toContain('${SIPP_HOST}:${SIPP_APP_DIR}/load-testing/tools/')
             ->toContain('${SIPP_HOST}:${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh');
+    });
+
+    it('times both call setup and call teardown in the SIPp capacity scenario and rtt-stats.py', function (): void {
+        $scenario = (string) file_get_contents(base_path('load-testing/tools/sipp/uac-extension-capacity.xml'));
+
+        expect($scenario)
+            ->toContain('start_rtd="setup"')
+            ->toContain('rtd="setup"')
+            ->toContain('start_rtd="teardown"')
+            ->toContain('rtd="teardown"');
+
+        $traceDir = $this->artifactRoot.'/rtt-fixture';
+        File::ensureDirectoryExists($traceDir);
+        File::put($traceDir.'/uac-extension-capacity_1_rtt.csv', implode("\n", [
+            'Date_ms;response_time_ms;rtd_no',
+            '100.0;120.0;setup',
+            '150.0;14.0;teardown',
+            '200.0;240.0;setup',
+            '250.0;26.0;teardown',
+            '300.0;360.0;setup',
+            '350.0;38.0;teardown',
+        ])."\n");
+
+        $setup = new Process(['python3', base_path('load-testing/scripts/tools/rtt-stats.py'), '--rtd=setup', $traceDir], base_path());
+        $setup->run();
+        $teardown = new Process(['python3', base_path('load-testing/scripts/tools/rtt-stats.py'), '--rtd=teardown', $traceDir], base_path());
+        $teardown->run();
+
+        expect($setup->isSuccessful())->toBeTrue($setup->getErrorOutput())
+            ->and(trim($setup->getOutput()))->toContain("\t3\t240.0\t240.0\t")
+            ->and($teardown->isSuccessful())->toBeTrue($teardown->getErrorOutput())
+            ->and(trim($teardown->getOutput()))->toContain("\t3\t26.0\t26.0\t");
+    });
+
+    it('records and reports per-call setup and teardown latency in ladder runs', function (): void {
+        $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
+        expect($script)
+            ->toContain('recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms')
+            ->toContain('rtt-stats.py');
+
+        $bin = $this->artifactRoot.'/bin-latency';
+        File::ensureDirectoryExists($bin);
+        File::put($bin.'/bash', <<<'BASH'
+            #!/bin/bash
+            set -eu
+            rate="${5#--cps=}"
+            for variant in v-fast-default v-octane; do
+                dir="$ARTIFACT_ROOT/h4-4c8g/$variant-fpm-dynamic12"
+                mkdir -p "$dir"
+                if [ ! -f "$dir/ladder.csv" ]; then
+                    printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$dir/ladder.csv"
+                fi
+                if [ "$variant" = v-octane ]; then
+                    printf 'fixture,%s,80,20,h4-4c8g/%s/sip-cps%s,42.5,91.0,140.0,8.2,15.4,24.0\n' "$rate" "$variant" "$rate" >> "$dir/ladder.csv"
+                else
+                    printf 'fixture,%s,80,20,h4-4c8g/%s/sip-cps%s,215.0,640.0,980.0,19.5,41.0,72.0\n' "$rate" "$variant" "$rate" >> "$dir/ladder.csv"
+                fi
+            done
+            BASH);
+        chmod($bin.'/bash', 0755);
+
+        $process = new Process(['/bin/bash', base_path('load-testing/scripts/drivers/run-ladder.sh'), '--tier=h4-4c8g'], base_path(), [
+            'PATH' => $bin.':'.getenv('PATH'),
+            'ARTIFACT_ROOT' => $this->artifactRoot.'/results-latency',
+            'PBX_HOST' => 'fixture-pbx.test',
+            'SIPP_HOST' => 'fixture-generator.test',
+        ]);
+        $process->run();
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+            ->and($process->getOutput())
+            ->toContain('PHP-FPM 80.0% (setup p50=215.0ms p95=640.0ms, teardown p50=19.5ms p95=41.0ms)')
+            ->toContain('Octane 80.0% (setup p50=42.5ms p95=91.0ms, teardown p50=8.2ms p95=15.4ms)');
+    });
+
+    it('plans the identical standard comparison matrix across every tier under one shared series', function (): void {
+        foreach (['h1-1c1g', 'h2-2c2g', 'h4-4c8g'] as $tier) {
+            $process = new Process([
+                'bash',
+                base_path('load-testing/scripts/drivers/run-tier-comparison.sh'),
+                '--tier='.$tier,
+                '--series=series-20261121',
+                '--dry-run',
+            ], base_path());
+            $process->run();
+
+            expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+                ->and($process->getOutput())
+                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=100x5 --ttl=production-60 --section=mixed --repeats=3')
+                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=500x25 --ttl=production-60 --section=mixed --repeats=3')
+                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=1000x25 --ttl=production-60 --section=mixed --repeats=3')
+                ->toContain('EXTENSIONS=30 LADDER_SECONDS=60 bash load-testing/scripts/drivers/run-ladder.sh --tier='.$tier)
+                ->toContain('EXTENDED=1 MEDIA_FLOW=1')
+                ->toContain('consolidate-series.py');
+        }
+    });
+
+    it('consolidates a uniform multi-tier series and rejects mismatched commits or missing tiers', function (): void {
+        $seriesDir = $this->artifactRoot.'/series-20261121';
+        $commit = str_repeat('a', 40);
+        $tierPool = ['h1-1c1g' => 'dynamic3', 'h2-2c2g' => 'dynamic6', 'h4-4c8g' => 'dynamic12'];
+
+        foreach ($tierPool as $tier => $pool) {
+            $tierDir = $seriesDir.'/'.$tier;
+            File::ensureDirectoryExists($tierDir);
+            File::put($tierDir.'/failures.log', '');
+            File::put($tierDir.'/manifest.json', json_encode([
+                'recorded_at' => '2026-11-21T19:00:00Z',
+                'build' => ['branch' => '5.x', 'commit' => $commit, 'dirty' => false],
+                'configuration' => ['freeswitch' => ['runtime_db' => ['mode' => 'sqlite']]],
+            ]));
+
+            foreach (['v-fast-default', 'v-octane'] as $variant) {
+                $vdir = $tierDir.'/'.$variant.'-fpm-'.$pool;
+                File::ensureDirectoryExists($vdir);
+
+                foreach (['100x5' => 100, '500x25' => 500, '1000x25' => 1000] as $profile => $reqs) {
+                    for ($r = 1; $r <= 3; $r++) {
+                        $isOctane = $variant === 'v-octane';
+                        File::put("{$vdir}/{$profile}-production-60-mixed-r{$r}.json", json_encode([
+                            'total_requests' => $reqs,
+                            'successful_responses' => $reqs,
+                            'failed_responses' => 0,
+                            'success_rate_percent' => 100.0,
+                            'requests_per_second' => $isOctane ? 250.0 : 50.0,
+                            'latency_ms' => [
+                                'p50' => $isOctane ? 12.0 : 75.0,
+                                'p95' => $isOctane ? 24.0 : 140.0,
+                                'max' => $isOctane ? 40.0 : 210.0,
+                            ],
+                        ]));
+                    }
+                }
+
+                $isOctane = $variant === 'v-octane';
+                File::put("{$vdir}/ladder.csv", implode("\n", [
+                    'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms',
+                    sprintf(
+                        '2026-11-21T19:05:00Z,5,300,0,%s/%s/sip-cps5,%s,%s,%s,%s,%s,%s',
+                        $tier,
+                        $variant,
+                        $isOctane ? '45.0' : '220.0',
+                        $isOctane ? '95.0' : '610.0',
+                        $isOctane ? '150.0' : '900.0',
+                        $isOctane ? '9.0' : '18.0',
+                        $isOctane ? '16.0' : '38.0',
+                        $isOctane ? '25.0' : '60.0',
+                    ),
+                ])."\n");
+            }
+        }
+
+        $csvOut = $this->artifactRoot.'/out/consolidated.csv';
+        $mdOut = $this->artifactRoot.'/out/report.md';
+
+        $ok = new Process([
+            'python3',
+            base_path('load-testing/scripts/tools/consolidate-series.py'),
+            $seriesDir,
+            '--csv-out='.$csvOut,
+            '--markdown-out='.$mdOut,
+        ], base_path());
+        $ok->run();
+
+        expect($ok->isSuccessful())->toBeTrue($ok->getErrorOutput())
+            ->and(File::exists($csvOut))->toBeTrue()
+            ->and(File::get($csvOut))->toContain('teardown_p95_ms')
+            ->and(File::get($mdOut))->toContain('Unified Comparison Series')
+            ->and(File::get($mdOut))->toContain('xychart-beta')
+            ->and(File::get($mdOut))->toContain('4 vCPU / 8 GB RAM');
+
+        // Mutate one tier's commit SHA: consolidation must reject mixed-build cobbling.
+        File::put($seriesDir.'/h4-4c8g/manifest.json', json_encode([
+            'recorded_at' => '2026-11-21T19:00:00Z',
+            'build' => ['branch' => '5.x', 'commit' => str_repeat('b', 40), 'dirty' => false],
+            'configuration' => ['freeswitch' => ['runtime_db' => ['mode' => 'sqlite']]],
+        ]));
+
+        $mismatch = new Process([
+            'python3',
+            base_path('load-testing/scripts/tools/consolidate-series.py'),
+            $seriesDir,
+        ], base_path());
+        $mismatch->run();
+
+        expect($mismatch->isSuccessful())->toBeFalse()
+            ->and($mismatch->getErrorOutput())->toContain('different git commits');
     });
 });

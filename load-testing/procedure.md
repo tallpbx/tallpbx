@@ -113,17 +113,20 @@ bash load-testing/scripts/load-test-matrix.sh \
 
 The default fast PHP-FPM handler loads only the telephony modules needed to answer FreeSWITCH's routing and account lookups. Optional Laravel Octane loads the same modules and keeps the application in memory between requests. In production, FreeSWITCH can fall back to PHP-FPM if Octane is unavailable. The fast PHP-FPM handler itself can hand a request to the full Laravel application used by the web panel if it catches an application error.
 
-Run both handlers on every hardware tier with the same build, database, XML workload, cache policy, and PHP-FPM pool. From the TallPBX checkout root on the orchestrator, run:
+Run both handlers on **every** standard hardware tier (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`, plus any provisioned dedicated tier) under **one shared `SERIES` name** with the exact same Git commit SHA, database, XML workload (`100x5`, `500x25`, and `1000x25` `mixed`, `production-60`, 3 repeats — declared in `standard_comparison` in `load-testing/matrix.php`), and dynamic PHP-FPM pool. Never run different XML profiles or sections on different tiers. From the TallPBX checkout root on the orchestrator, preview or run:
 
 ```bash
-bash load-testing/scripts/load-test-matrix.sh --list --compare-xml-handlers
+export SERIES="series-$(date -u +%Y%m%d)"
 
-bash load-testing/scripts/load-test-matrix.sh \
-  --tier=h1-1c1g --compare-xml-handlers --phase=xml \
-  --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
+# Preview the exact standard comparison plan for one tier:
+bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h4-4c8g --series="$SERIES" --dry-run
+
+# Run XML lookup comparisons alone for one tier:
+PBX_HOST="$PBX_HOST" bash load-testing/scripts/drivers/run-tier-comparison.sh \
+  --tier=h4-4c8g --series="$SERIES" --skip-sip --skip-extended
 ```
 
-Repeat the command with the matching `PBX_HOST` and `--tier` for each hardware configuration. Use `--variant` for separate diagnostic runs. Check that both comparison handlers produced all requested reports and that `failures.log` is empty. The Octane reports use `127.0.0.1:8090`, and the PHP-FPM reports use the nginx endpoint.
+Repeat with the matching `PBX_HOST` and `--tier` for each hardware configuration (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`) using the **same `SERIES`**. Use `--variant` only for separate diagnostic runs. Check that both comparison handlers produced all requested reports (including `latency_ms.p50`, `latency_ms.p95`, and `latency_ms.max`) and that `failures.log` is empty. The Octane reports use `127.0.0.1:8090`, and the PHP-FPM reports use the nginx endpoint.
 
 On the test host, the harness starts or stops the Octane service and temporarily selects one XML endpoint in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`. Isolating the endpoint keeps a SIP test from silently falling back to the other handler. The harness restarts FreeSWITCH whenever it changes that file and restores the original settings and worker state on exit. On a standard appliance, starting or stopping Octane uses the bindings already in memory. [Operations guide for binding changes](../docs/operations.md#stoppingstarting-the-worker-vs-editing-bindings).
 
@@ -161,15 +164,35 @@ The recorded run is in `monitoring/` beside the tier artifacts.
 
 ## Step 8 — Compare call capacity
 
-From the TallPBX checkout root on the orchestrator, set `PBX_HOST` to the test server and `SIPP_HOST` to the load generator. Run the ladder once per hardware tier. Both handlers place the same calls at each offered rate, using the same 60-second test window by default.
+From the TallPBX checkout root on the orchestrator, set `SERIES` (shared across all tiers), `PBX_HOST`, and `SIPP_HOST`. Run the full uniform tier comparison (XML `100x5`/`500x25`/`1000x25` + 60-second SIP ladder with `EXTENSIONS=30` + 14-scenario extended/media validation) once per hardware tier — covering **`h1-1c1g`**, **`h2-2c2g`**, and **`h4-4c8g`** on the **exact same commit SHA**. Both handlers place the same calls at each offered rate over the same 60-second window.
 
 ```bash
-bash load-testing/scripts/drivers/run-ladder.sh --tier=h1-1c1g
+export SERIES="series-$(date -u +%Y%m%d)"
+
+# Full uniform comparison for one tier (run for h1-1c1g, h2-2c2g, and h4-4c8g under the same SERIES):
+PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" \
+  bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h4-4c8g --series="$SERIES"
 ```
 
-The ladder checks each mode separately. It moves on until both handlers complete under 95% of offered calls at three consecutive rates or the configured rates run out. A missing result, setup failure, or failed call-detail record check stops the ladder with an error. For one rate, use `load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --compare-xml-handlers --phase=sip --cps=5`.
+The ladder checks each mode separately. It moves on until both handlers complete under 95% of offered calls at three consecutive rates or the configured rates run out. A missing result, setup failure, or failed call-detail record check stops the ladder with an error. For one rate, use `load-testing/scripts/load-test-matrix.sh --tier=h4-4c8g --compare-xml-handlers --phase=sip --cps=10`.
 
-Check both `ladder.csv` files and `failures.log` under `load-testing/results/<series>/<tier>/` before reporting a comparison. For sizing, report the highest tested rate that completed every call and state the run duration and workload. Keep lower completion rates in the detailed report.
+Every SIP capacity cell records both **call setup latency** (`INVITE` → `200 OK`) and **call teardown latency** (`BYE` → `200 OK`) in SIPp's `*_rtt.csv` traces and summarizes `setup_p50_ms`, `setup_p95_ms`, `setup_max_ms`, `teardown_p50_ms`, `teardown_p95_ms`, and `teardown_max_ms` into each handler's `ladder.csv`. You can also summarize any cell directory directly with:
+
+```bash
+python3 load-testing/scripts/tools/rtt-stats.py --rtd=setup <cell-dir>
+python3 load-testing/scripts/tools/rtt-stats.py --rtd=teardown <cell-dir>
+```
+
+Once all standard tiers (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`) finish under the same `SERIES`, validate build parity and completeness and export the unified comparison CSV and Markdown tables:
+
+```bash
+python3 load-testing/scripts/tools/consolidate-series.py \
+  "load-testing/results/${SERIES}" \
+  --csv-out="load-testing/results/consolidated/${SERIES}-comparison.csv" \
+  --markdown-out="/tmp/${SERIES}-tables.md"
+```
+
+`consolidate-series.py` refuses to pass if any tier is missing, ran on a different commit SHA, had a dirty tree, had non-empty `failures.log`, missed an XML profile, or missed setup/teardown latency.
 
 ---
 
@@ -246,7 +269,7 @@ Series summaries and written analyses are recorded as new dated sections in `doc
 
 Every table in the report cites the `load-testing/results/<series>/…` path its numbers came from, so any figure can be traced back to a cell file and from there to a manifest.
 
-For each hardware tier in a capacity series, record both handlers at the same offered rates. Mark any missing run explicitly and include the date, build, hardware, registered account count, offered duration, completion count, cache policy, and runtime database in the comparison or its linked report.
+When a complete uniform series (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`, plus any dedicated tier tested) passes `consolidate-series.py` on one clean commit SHA, **replace** the older piecemeal multi-date tables and charts in `docs/load-testing-results.md` with that single unified dataset (retiring older ad-hoc CSVs/tables to Git history instead of cobbling comparisons across dates, pool shapes, or mismatched metrics). Include the series name, date, exact build commit SHA, hardware sizing, registered account count (`30`), offered duration (`60s`), cache policy (`production-60`), runtime database, XML `req/sec` + `p50`/`p95`, and SIP completion + individual call `setup` and `teardown` `p50`/`p95` latency.
 
 ---
 

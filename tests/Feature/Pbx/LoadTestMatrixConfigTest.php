@@ -100,4 +100,18 @@ describe('load test matrix configuration', function (): void {
 
         expect(collect(loadTestMatrix()['sip_scenarios'])->sort()->values()->all())->toBe($files);
     });
+
+    it('defines one uniform standard comparison contract across all shared tiers', function (): void {
+        $std = loadTestMatrix()['standard_comparison'];
+
+        expect($std['tiers'])->toBe(['h1-1c1g', 'h2-2c2g', 'h4-4c8g'])
+            ->and($std['variants'])->toBe(['v-fast-default', 'v-octane'])
+            ->and($std['xml_profiles'])->toBe(['100x5', '500x25', '1000x25'])
+            ->and($std['xml_section'])->toBe('mixed')
+            ->and($std['xml_ttl'])->toBe('production-60')
+            ->and($std['xml_repeats'])->toBe(3)
+            ->and($std['sip_extensions'])->toBe(30)
+            ->and($std['sip_duration_seconds'])->toBe(60)
+            ->and($std['include_extended_validation'])->toBeTrue();
+    });
 });

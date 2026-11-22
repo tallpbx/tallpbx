@@ -110,17 +110,19 @@ xychart-beta
     bar [108, 14, 181.4, 31.9, 152.2, 43.2, 368.7, 113.7]
 ```
 
-| Test server | Date | Workload | PHP-FPM median / tail | Octane median / tail |
+| Test server | Date | Workload | PHP-FPM median / p95 | Octane median / p95 |
 | --- | --- | --- | ---: | ---: |
-| 1 vCPU / 1 GB RAM | Nov 5 | 100 dialplan lookups, 5 at a time (3 runs) | 108 / 120 ms *(p95)* | **14 / 25 ms** *(p95)* |
-| 1 vCPU / 1 GB RAM | Nov 17 | 100 mixed lookups, 5 at a time (3 runs) | 76.7–90.7 / 121.4–129.9 ms *(p95)* | — *(no Nov 17 1 vCPU run)* |
-| 2 vCPU / 2 GB RAM | Nov 17 | 100 mixed lookups, 5 at a time (3 runs) | 46.7–60.2 / 73.6–89.6 ms *(p95)* | **8.9–9.2 / 13.2–16.3 ms** *(p95)* |
-| 2 vCPU / 2 GB RAM | Nov 17 | 500 mixed lookups, 25 at a time | 181.4 / 293.8 ms *(p95)* | **31.9 / 56.3 ms** *(p95)* |
-| 4 shared vCPU / 8 GB RAM | Nov 10 | 100 mixed lookups, 5 at a time | 152.2 / 476.1 ms *(max)* | **43.2 / 117.3 ms** *(max)* |
-| 4 shared vCPU / 8 GB RAM | Nov 10 | 500 mixed lookups, 25 at a time | 368.7 / 1,133.0 ms *(max)* | **113.7 / 322.4 ms** *(max)* |
-| 4 shared vCPU / 8 GB RAM | Nov 10 | 1,000 mixed lookups, 25 at a time | 330.8 / 1,020.0 ms *(max)* | **85.2 / 213.2 ms** *(max)* |
+| 1 vCPU / 1 GB RAM | Nov 5 | 100 dialplan lookups, 5 at a time (3 runs) | 108 / 120 ms | **14 / 25 ms** |
+| 1 vCPU / 1 GB RAM | Nov 17 | 100 mixed lookups, 5 at a time (3 runs) | 76.7–90.7 / 121.4–129.9 ms | — *(no Nov 17 1 vCPU run)* |
+| 2 vCPU / 2 GB RAM | Nov 17 | 100 mixed lookups, 5 at a time (3 runs) | 46.7–60.2 / 73.6–89.6 ms | **8.9–9.2 / 13.2–16.3 ms** |
+| 2 vCPU / 2 GB RAM | Nov 17 | 500 mixed lookups, 25 at a time | 181.4 / 293.8 ms | **31.9 / 56.3 ms** |
+| 4 shared vCPU / 8 GB RAM | Nov 10 | 100 mixed lookups, 5 at a time | 152.2 / — ms[^nov10-p95] | **43.2 / — ms**[^nov10-p95] |
+| 4 shared vCPU / 8 GB RAM | Nov 10 | 500 mixed lookups, 25 at a time | 368.7 / — ms[^nov10-p95] | **113.7 / — ms**[^nov10-p95] |
+| 4 shared vCPU / 8 GB RAM | Nov 10 | 1,000 mixed lookups, 25 at a time | 330.8 / — ms[^nov10-p95] | **85.2 / — ms**[^nov10-p95] |
 
-Compare handlers within each row rather than across dates: the November 5 (build `5cbc700`), November 10 (4 shared vCPU host, max latency reported instead of p95), and November 17 (build `2fbac077`) series ran on different builds, cloud hosts, and request mixes. Across every matched pair, Octane cut median XML lookup latency by roughly **3× to 7×**. [November 5 1 vCPU summary](operations.md#expected-gain-1-vcpu--967-mb-reference-tier) · [November 10 lookup tests](https://github.com/tallpbx/tallpbx/blob/5d643e31c7d5a06c27491d448103c834e4b4d9f3/docs/load-testing-results.md#persistent-octane-worker-vs-php-fpm-comparison-4-vcpu-shared--8-gb-ram) · [November 17 lookup results](load-testing-2026-11-17.md#xml-lookup-throughput).
+[^nov10-p95]: The November 10 report recorded median and **max** (single slowest request, not p95): PHP-FPM max was 476.1 ms (`100×5`), 1,133.0 ms (`500×25`), and 1,020.0 ms (`1,000×25`), versus Octane max of 117.3 ms, 322.4 ms, and 213.2 ms. The next `h4-4c8g` run will record p95 directly.
+
+Compare handlers within each row rather than across dates: the November 5 (build `5cbc700`), November 10 (4 shared vCPU host), and November 17 (build `2fbac077`) series ran on different builds, cloud hosts, and request mixes. Across every matched pair, Octane cut median XML lookup latency by roughly **3× to 7×**. [November 5 1 vCPU summary](operations.md#expected-gain-1-vcpu--967-mb-reference-tier) · [November 10 lookup tests](https://github.com/tallpbx/tallpbx/blob/5d643e31c7d5a06c27491d448103c834e4b4d9f3/docs/load-testing-results.md#persistent-octane-worker-vs-php-fpm-comparison-4-vcpu-shared--8-gb-ram) · [November 17 lookup results](load-testing-2026-11-17.md#xml-lookup-throughput).
 
 <a name="november-2026-refresh-sqlite-vs-mariadb-mod_mariadb-option-1-2-tier-xml-and-2-vcpu-baselines"></a>
 

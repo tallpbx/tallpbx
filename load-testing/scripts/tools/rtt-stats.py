@@ -2,16 +2,17 @@
 """Summarize SIPp RTT traces per call cell.
 
 Each SIPp run with `-trace_rtt` writes one CSV row per scenario response
-(`Date_ms;response_time_ms;rtd_no`). The `setup` rows are the call-setup
-response times — the number that answers "how long did call completion take".
+(`Date_ms;response_time_ms;rtd_no`). Capacity runs emit `setup` (initial INVITE
+through 200 OK) and `teardown` (BYE through 200 OK) timers.
 
 Usage:
-    rtt-stats.py CELL_DIR [CELL_DIR ...]
+    rtt-stats.py [--rtd=setup|teardown] CELL_DIR [CELL_DIR ...]
 
 Prints one tab-separated line per cell:
     label  samples  avg_ms  p50_ms  p90_ms  p95_ms  max_ms
 """
 
+import argparse
 import statistics
 import sys
 from pathlib import Path
@@ -31,14 +32,14 @@ def percentile(values: list[float], p: float) -> float:
     return values[lower] + (values[upper] - values[lower]) * weight
 
 
-def read_setup_times(path: Path) -> list[float]:
-    """Return the call-setup response times recorded in one RTT trace."""
+def read_rtd_times(path: Path, rtd_name: str = "setup") -> list[float]:
+    """Return the response times recorded in one RTT trace for the given RTD timer."""
     samples: list[float] = []
 
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         parts = line.strip().split(";")
 
-        if len(parts) != 3 or parts[2] != "setup":
+        if len(parts) != 3 or parts[2] != rtd_name:
             continue
 
         try:
@@ -51,7 +52,16 @@ def read_setup_times(path: Path) -> list[float]:
 
 def main() -> int:
     """Summarize every cell directory or trace file given on the command line."""
-    for cell in sys.argv[1:]:
+    parser = argparse.ArgumentParser(description="Summarize SIPp RTT traces per call cell.")
+    parser.add_argument(
+        "--rtd",
+        default="setup",
+        help="Named SIPp RTD timer to summarize (default: setup; also supports teardown).",
+    )
+    parser.add_argument("cells", nargs="+", help="Cell directories or *_rtt.csv files.")
+    args = parser.parse_args()
+
+    for cell in args.cells:
         path = Path(cell)
 
         if path.is_file():
@@ -67,10 +77,10 @@ def main() -> int:
 
         samples: list[float] = []
         for trace in files:
-            samples.extend(read_setup_times(trace))
+            samples.extend(read_rtd_times(trace, args.rtd))
 
         if not samples:
-            print(f"{cell}\t(no setup rows)", file=sys.stderr)
+            print(f"{cell}\t(no {args.rtd} rows)", file=sys.stderr)
             continue
 
         print(

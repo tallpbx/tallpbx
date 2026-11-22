@@ -99,7 +99,7 @@ Content-Length: 0
 
   <pause/>
 
-  <send retrans="500">
+  <send retrans="500" start_rtd="teardown">
     <![CDATA[
 
 BYE sip:[field3]@[field2] SIP/2.0
@@ -115,5 +115,5 @@ Content-Length: 0
     ]]>
   </send>
 
-  <recv response="200"/>
+  <recv response="200" rtd="teardown"/>
 </scenario>

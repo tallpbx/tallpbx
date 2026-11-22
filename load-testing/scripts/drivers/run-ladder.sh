@@ -43,14 +43,16 @@ fi
 : "${ARTIFACT_ROOT:=${ROOT_DIR}/load-testing/results/${SERIES}}"
 export SERIES ARTIFACT_ROOT
 
-# Claim a fresh tier directory. Old rows must never pass a current rung.
-mkdir -p "$ARTIFACT_ROOT"
-if ! mkdir "${ARTIFACT_ROOT}/${tier}"; then
+# Claim a fresh ladder run for this tier. Old ladder rows must never pass a
+# current rung, while sharing the tier directory with XML artifacts from the
+# same series stays allowed.
+mkdir -p "${ARTIFACT_ROOT}/${tier}"
+logdir="${ARTIFACT_ROOT}/${tier}/driver-logs"
+existing_ladders=("${ARTIFACT_ROOT}/${tier}"/*/ladder.csv)
+if [ -e "${existing_ladders[0]}" ] || ! mkdir "$logdir" 2>/dev/null; then
     printf 'Use a fresh SERIES or artifact directory for %s.\n' "$tier" >&2
     exit 1
 fi
-logdir="${ARTIFACT_ROOT}/${tier}/driver-logs"
-mkdir "$logdir"
 
 read_completion() {
     local variant="$1" cps="$2"
@@ -61,17 +63,49 @@ read_completion() {
     fi
 
     awk -F, -v rate="$cps" -v expected="${tier}/${variant}/sip-cps${cps}" '
-        NR > 1 && $2 == rate && $5 == expected {
+        NR == 1 {
+            for (i = 1; i <= NF; i++) {
+                col[$i] = i
+            }
+            next
+        }
+        $2 == rate && $5 == expected {
             rows++
             done_calls = $3
             total_calls = $3 + $4
+            setup_p50 = (col["setup_p50_ms"] ? $(col["setup_p50_ms"]) : "")
+            setup_p95 = (col["setup_p95_ms"] ? $(col["setup_p95_ms"]) : "")
+            teardown_p50 = (col["teardown_p50_ms"] ? $(col["teardown_p50_ms"]) : "")
+            teardown_p95 = (col["teardown_p95_ms"] ? $(col["teardown_p95_ms"]) : "")
         }
         END {
             if (rows != 1 || total_calls <= 0) exit 1
             percentage = 100 * done_calls / total_calls
-            printf "%.1f %d\n", percentage, (percentage < 95)
+            printf "%.1f\t%d\t%s\t%s\t%s\t%s\n", percentage, (percentage < 95), setup_p50, setup_p95, teardown_p50, teardown_p95
         }
     ' "${labels[0]}"
+}
+
+format_handler_summary() {
+    local pct="$1" setup_p50="$2" setup_p95="$3" teardown_p50="$4" teardown_p95="$5"
+    local detail=""
+
+    if [ -n "$setup_p50" ] && [ -n "$setup_p95" ]; then
+        detail="setup p50=${setup_p50}ms p95=${setup_p95}ms"
+    fi
+
+    if [ -n "$teardown_p50" ] && [ -n "$teardown_p95" ]; then
+        if [ -n "$detail" ]; then
+            detail="${detail}, "
+        fi
+        detail="${detail}teardown p50=${teardown_p50}ms p95=${teardown_p95}ms"
+    fi
+
+    if [ -n "$detail" ]; then
+        printf '%s%% (%s)' "$pct" "$detail"
+    else
+        printf '%s%%' "$pct"
+    fi
 }
 
 consecutive=0
@@ -89,9 +123,15 @@ while IFS= read -r cps; do
         exit 1
     fi
 
-    printf '%s calls/sec: PHP-FPM %s%%, Octane %s%%\n' "$cps" "${fpm% *}" "${octane% *}"
+    IFS=$'\t' read -r fpm_pct fpm_below fpm_sp50 fpm_sp95 fpm_tp50 fpm_tp95 <<< "$fpm"
+    IFS=$'\t' read -r oct_pct oct_below oct_sp50 oct_sp95 oct_tp50 oct_tp95 <<< "$octane"
 
-    if [ "${fpm##* }" = "1" ] && [ "${octane##* }" = "1" ]; then
+    printf '%s calls/sec: PHP-FPM %s, Octane %s\n' \
+        "$cps" \
+        "$(format_handler_summary "$fpm_pct" "$fpm_sp50" "$fpm_sp95" "$fpm_tp50" "$fpm_tp95")" \
+        "$(format_handler_summary "$oct_pct" "$oct_sp50" "$oct_sp95" "$oct_tp50" "$oct_tp95")"
+
+    if [ "$fpm_below" = "1" ] && [ "$oct_below" = "1" ]; then
         consecutive=$((consecutive + 1))
     else
         consecutive=0

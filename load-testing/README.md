@@ -32,10 +32,12 @@ Read the scripts only when the documents do not answer a question:
 | `load-testing/scripts/load-test-matrix.sh` | Orchestrator: lists, dry-runs and executes cells; applies and asserts each switch remotely; pulls artifacts; restores the baseline |
 | `load-testing/scripts/lib/switch.sh` | The switches themselves. One `apply_*` per setting, each with a matching `assert_*` that reads the value back |
 | `load-testing/scripts/lib/manifest.sh` | Writes and reads `manifest.json`; verifies host sizing against the matrix |
-| `load-testing/scripts/drivers/` | Execution drivers for automated ladders (`run-ladder.sh`, `run-sqlite-ladder.sh`) |
+| `load-testing/scripts/drivers/` | Execution drivers for paired tier comparisons (`run-tier-comparison.sh`), automated call-rate ladders (`run-ladder.sh`), and SQLite ladders (`run-sqlite-ladder.sh`) |
 | `load-testing/scripts/pbx-sipp-validate.sh` | End-to-end SIPp scenario validation harness |
 | `load-testing/scripts/run-cache-sweep.sh` | Dialplan cache TTL policy sweep runner |
 | `load-testing/scripts/tools/cpuwatch.sh` | Attributes CPU to each service over a time window |
+| `load-testing/scripts/tools/rtt-stats.py` | Summarizes per-call SIPp `setup` and `teardown` latency (`p50`/`p90`/`p95`/`max`) from `*_rtt.csv` |
+| `load-testing/scripts/tools/consolidate-series.py` | Validates cross-tier build/completeness parity across `h1-1c1g`, `h2-2c2g`, and `h4-4c8g` and emits one uniform consolidated CSV + Markdown tables/charts |
 | `load-testing/scripts/tools/ab-esl-reverb.sh` | Alternating on/off runs of the ESL listener and Reverb |
 
 ---
@@ -77,7 +79,32 @@ PBX_HOST="$PBX_HOST" bash load-testing/scripts/load-test-matrix.sh \
 
 The run writes a manifest, applies each switch and asserts it, runs the cell, records a lookup probe, pulls the artifacts, restores the baseline, and prints where the data went.
 
-Run the PHP-FPM and Octane comparison on every hardware tier. For SIP capacity, use `PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" bash load-testing/scripts/drivers/run-ladder.sh --tier=h1-1c1g`, then repeat for each tier with its own PBX host. `bash load-testing/scripts/load-test-matrix.sh --list --compare-xml-handlers` shows the full comparison matrix. Publish both results or mark the comparison incomplete. [Call capacity procedure](procedure.md#step-8--compare-call-capacity).
+Run the **single uniform comparison contract** (`standard_comparison` in `load-testing/matrix.php`) under **one shared `SERIES` name** on **one clean Git commit SHA** across **every** standard tier — **`h1-1c1g`**, **`h2-2c2g`**, and **`h4-4c8g`** (plus dedicated tiers `h2d-2c8g` / `h4d-4c16g` when provisioned):
+
+```bash
+export SERIES="series-$(date -u +%Y%m%d)"
+
+# Repeat once per tier against its matching PBX_HOST, keeping the SAME SERIES and build SHA:
+PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" \
+  bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h1-1c1g --series="$SERIES"
+PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" \
+  bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h2-2c2g --series="$SERIES"
+PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" \
+  bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h4-4c8g --series="$SERIES"
+
+# Verify cross-tier build parity & completeness, and emit one unified CSV + Markdown report:
+python3 load-testing/scripts/tools/consolidate-series.py \
+  "load-testing/results/${SERIES}" \
+  --csv-out="load-testing/results/consolidated/${SERIES}-comparison.csv" \
+  --markdown-out="/tmp/${SERIES}-tables.md"
+```
+
+Every tier runs the exact same matched PHP-FPM (`v-fast-default`) vs. Octane (`v-octane`) battery with identical dynamic PHP-FPM pools:
+1. **XML lookup throughput & latency:** `100x5`, `500x25`, and `1000x25` (`mixed`, `production-60`, 3 repeats) recording `req/sec`, `p50`, `p95`, and `max`.
+2. **60-second SIP call capacity & per-call latency ladder (`run-ladder.sh`, `EXTENSIONS=30`):** completion %, CDR gate, per-service CPU, and individual call `setup` (`INVITE` → `200 OK`) + `teardown` (`BYE` → `200 OK`) `p50`/`p95`/`max` latency in `ladder.csv`.
+3. **14-scenario functional & media pass (`EXTENDED=1 MEDIA_FLOW=1`).**
+
+Once `consolidate-series.py` passes with zero errors across all standard tiers, **replace** older piecemeal multi-date tables in `docs/load-testing-results.md` with that single consistent dataset so comparisons are never cobbled together from different dates, pools, or builds. [Call capacity procedure](procedure.md#step-8--compare-call-capacity).
 
 ---
 

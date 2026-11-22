@@ -12,8 +12,9 @@ Where the series stands right now. Updated when a phase completes, not continuou
 
 | Item | State |
 |:--|:--|
-| Sustained rates above 10 calls/sec on multi-core hosts | Not measured. The `30–60+ CPS` figures in the scaling guide are projections, not measurements. |
-| `FS_DB_DRIVER=mariadb` vs. `sqlite` contention benchmark | Not yet measured. |
+| **Single unified replacement series across `h1-1c1g`, `h2-2c2g`, and `h4-4c8g`** | **Next required series.** Run `SERIES=series-YYYYMMDD PBX_HOST=<host> SIPP_HOST=<host> bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=<id>` on all three standard tiers (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`) on **one clean commit SHA**, validate with `consolidate-series.py`, and **replace** all older multi-date cobbled tables in `docs/load-testing-results.md` (covering XML `100x5`/`500x25`/`1000x25` `p50`/`p95`, 60s SIP completion, per-call `setup` + `teardown` `p50`/`p95` latency, and 14-scenario validation). |
+| Dedicated multi-core tiers (`h2d-2c8g`, `h4d-4c16g`) | Not measured. Run the same `run-tier-comparison.sh` contract when provisioned; `30–60+ CPS` figures in the scaling guide remain projections until measured. |
+| `FS_DB_DRIVER=mariadb` vs. `sqlite` contention benchmark | **Complete** (2026-11-17; see `docs/load-testing-2026-11-17.md` and `load-testing/results/consolidated/refresh-20261117-cells.csv`). |
 
 Everything below this block is the historical series record, newest first. Superseded series stay for provenance; they do not describe the current recommendation.
 
