@@ -1,266 +1,124 @@
 # TallPBX
 
-TallPBX is a self-hosted business phone system named after its foundation on the **TALL stack** (**T**ailwind CSS, **A**lpine.js, **L**ivewire, and **L**aravel). It gives an administrator a web control panel for setting up and managing phones, extensions, call routing, voicemail, recordings, and other everyday PBX features. It runs on your own Debian server and uses FreeSWITCH® to handle calls.
+TallPBX is an open-source business phone system you run on your own Debian server.
+Use the web panel to connect phones, set up extensions, route calls, and manage
+voicemail and recordings. FreeSWITCH is the phone engine that handles the calls.
 
 ## Start Here
 
-| If you want to… | Start with | Authoritative detail |
-| :--- | :--- | :--- |
-| Install the appliance | [INSTALL.md](INSTALL.md) | [Operations & Maintenance](docs/operations.md) |
-| Make your first phone call | [PBX "Hello World"](docs/pbx-hello-world.md) | [PBX Concepts](docs/pbx-concepts.md) |
-| Configure a desk phone | [Desk-Phone Provisioning Guide](docs/provisioning-guide.md) | [Environment Reference](docs/env-reference.md) |
-| Back up or restore the appliance | [Backup & Restore Journey](docs/backup-restore-guide.md) | [Operations & Maintenance](docs/operations.md) |
-| Operate, tune, or recover a host | [Operations & Maintenance](docs/operations.md) | [System Architecture](docs/architecture.md) |
-| Scale call capacity | [Scaling Guide](docs/telephony-capacity-scaling-guide.md) | [`load-testing/`](load-testing/README.md) |
-| Understand tenants and isolation | [Tenants & Multi-Tenancy](docs/multi-tenancy.md) | [System Architecture](docs/architecture.md) |
-| Change the code | [Developer Guide](docs/developer-guide.md) | [System Architecture](docs/architecture.md) |
-| Cut a release | [Release Checklist](docs/release-checklist.md) | [CHANGELOG.md](CHANGELOG.md) |
+- [Install TallPBX](INSTALL.md) on a new server.
+- [Connect a phone and make your first call](docs/pbx-hello-world.md) after installation.
+- [Compare tested call capacity](docs/load-testing-results.md) when choosing hardware.
 
 ## What You Can Do With It
 
-- Create extensions and connect desk phones or softphones.
-- Route incoming calls to people, ring groups, menus, queues, voicemail, or
-  conferences.
-- Configure outbound calling through a SIP trunk or gateway.
-- Manage voicemail, call recordings, music on hold, announcements, and fax.
-- Deliver voicemail notifications, password resets, and system alerts via standard username/password SMTP authentication or OAuth 2.0 (Google, Microsoft 365, or custom providers).
-- Operate one or more customer or business tenants from the same system.
-- Keep backups and restore approved backup operations.
-- Defend the PBX with a native Linux kernel firewall (`nftables`), real-time intrusion prevention across SIP, Web, and SSH vectors, automatic ban management, and zero-lockout protection ([System Architecture & Packet Flow Guide →](docs/architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering)).
+- Connect desk phones and calling apps, and assign an extension to each user.
+- Route incoming calls to a person, a group of phones, a menu, a queue, a conference, or voicemail.
+- Manage voicemail, call recordings, announcements, music on hold, and fax.
+- Send voicemail notifications, password resets, and system alerts by email.
+- Manage several businesses or customers on one server, each with its own phone accounts and routing.
+- Manage backups, firewall rules, and sign-in protection from the web panel.
 
-TallPBX is the phone-system software, not a telephone carrier. You need a SIP
-trunk or gateway from a provider if you want to place or receive public phone
-network calls.
+To make and receive calls on the public telephone network, connect TallPBX to a
+phone service provider through a SIP trunk. The provider supplies the connection
+between TallPBX and the public network.
 
-## Community First
-
-TallPBX is a community-first project, released under the [Apache 2.0 license](https://opensource.org/licenses/Apache-2.0). Encouraging third-party development is the primary goal — integrations, modules, and contributions from the community are always welcome. Commercial use is also welcome.
-
-## Parity with FusionPBX & FreePBX®
-
-Built to eliminate the steep learning curve and dated interfaces of legacy PBX platforms without compromising the raw carrier power of FreeSWITCH®, TallPBX delivers feature and function parity with established open-source systems on a modern Laravel 13, Livewire 4, and Tailwind CSS architecture:
-
-| Feature | TallPBX | FusionPBX | FreePBX® |
-| :--- | :--- | :--- | :--- |
-| **Telephony Engine** | **FreeSWITCH 1.11** (`mod_sofia`, `mod_callcenter`) | **FreeSWITCH 1.11** | Asterisk 20+ (PJSIP, chan_sip) |
-| **Web Architecture** | **Laravel 13, Livewire 4, Tailwind v4** | Custom procedural/OOP PHP | BMO (custom procedural PHP) |
-| **Database** | **MariaDB / MySQL** (SQLite in testing) | PostgreSQL / SQLite / MariaDB | MariaDB / MySQL |
-| **Configuration** | **Dynamic `mod_xml_curl`** (zero static XML on disk) | Dynamic `mod_xml_curl` (PHP scripts) | Static `.conf` files on disk |
-| **Multi-Tenancy** | **Native Multi-Tenant** (isolated contexts or domains) | Native Multi-Tenant (domain only) | Single-Tenant Core |
-| **User Impersonation** | **1-Click Native Impersonation** (audit trail & banner) | Limited (domain switching only) | None |
-| **Multi-Lingual** | **Native English, Spanish, French** (instant switcher) | Partial / community arrays | Partial gettext / PO files |
-| **Firewall & Defense** | **In-Kernel `nftables` + Real-Time Threat Defense** | Fail2ban / iptables scripts | Basic iptables / Fail2ban |
-| **Host Security** | **Hardened Bounded Sudoers** (zero web shells or raw SQL) | Web shell (`app/exec`) & raw SQL | Sudoers entries for Asterisk/Apache |
-| **Automated Tests** | **2,900+ Pest tests incl. Pest Browser tests** | Minimal / community scripts | Minimal unit tests |
-| **Licensing** | **Apache 2.0** (100% open source) | MPL 1.1 (Open source) | GPLv3 (Core) + Commercial closed modules |
-
-See the [Feature and Function Parity Guide](docs/parity-comparison.md) for a domain-by-domain breakdown across all 60 PBX modules, the [PBX Concepts & Fundamentals Guide](docs/pbx-concepts.md) for the Users/Extensions/SIP Accounts/Devices model, and the [System Architecture Guide](docs/architecture.md) for technical modular and security details.
-
-## User Interface & Switchable Themes
-
-TallPBX is built on the **TALL stack** (Tailwind CSS v4, Alpine.js, Livewire 4, Laravel 13) with DaisyUI components, offering a modern responsive control panel with light, dark, and system themes, three switchable navigation layouts, and mobile-friendly responsive drawers:
-
-| Public Landing (Light Theme) | Public Landing (Dark Theme) |
-| :---: | :---: |
-| [![TallPBX Landing Page (Light)](docs/images/landing-light.png)](docs/ui-tour.md#1-public-guest-landing-page) | [![TallPBX Landing Page (Dark)](docs/images/landing-dark.png)](docs/ui-tour.md#1-public-guest-landing-page) |
-
-### Unified Panel & Flexible Navigation Layouts
-
-The single unified panel (`/panel/`) adapts to administrator preference with instant theme and layout toggles:
-- **Switchable Themes (Light, Dark, System)**: Instant toggle saved per-user with zero-flicker loading.
-- **Collapsible Sidebar (Mini Rail)**: Collapse navigation down to a compact 64px icon rail to maximize screen space for wide PBX data tables (CDRs, call routing, extensions).
-- **Horizontal Topbar**: Optional top dropdown layout for administrators accustomed to classic PBX interfaces.
-- **Mobile Responsive Drawer**: Compact slide-over menu on mobile screens and tablets.
-- **Scroll Preservation**: Keeps your exact scroll position across page transitions.
-
-| Full Sidebar (`w-64`) | Mini Icon Rail (`w-16`) | Horizontal Topbar |
-| :---: | :---: | :---: |
-| [![Full Sidebar](docs/images/dashboard-full-sidebar.png)](docs/ui-tour.md#mode-a-full-sidebar-navigation-w-64) | [![Mini Rail](docs/images/dashboard-compressed-sidebar.png)](docs/ui-tour.md#mode-b-mini-icon-rail-sidebar-w-16) | [![Horizontal Menu](docs/images/dashboard-horizontal-menu.png)](docs/ui-tour.md#mode-c-horizontal-topbar-navigation) |
-
-👉 **[Explore the Complete Visual Tour (Tenants, Extensions, Devices, Impersonation, Multi-Language & Layouts) →](docs/ui-tour.md)**
+[Compare features with FusionPBX and FreePBX](docs/parity-comparison.md) ·
+[Learn the basics of a business phone system](docs/pbx-concepts.md)
 
 ## System Requirements
 
-- **Operating System**: Debian 13 server (64-bit)
-- **Access**: Root / sudo access with internet connectivity
-- **Hardware Tiers**:
-  - **Production (Minimum)**: 1 vCPU (2+ recommended), 1 GB RAM, 2 GB swap, 25 GB disk (40 GB+ for recordings/voicemail).
-  - **Development / High-Volume**: 4 vCPUs, 4 GB RAM, 2 GB swap, 40 GB disk.
+| What you need | Minimum for installation |
+| --- | --- |
+| Operating system | 64-bit Debian 13 |
+| CPU | 1 core, 2 or more recommended |
+| Memory | 1 GB RAM and 2 GB swap |
+| Disk | 25 GB. Plan for 40 GB or more if you keep voicemail and recordings. |
+| Access | An internet connection and administrator access to the server (`root` or `sudo`) |
+
+These are installation requirements. Use the [benchmark results](docs/load-testing-results.md)
+to see how the tested servers handled different call loads.
 
 ## Quick Start
 
-1. Set up a Debian 13 server matching the requirements above.
-2. Follow the [Installation Guide](INSTALL.md) to install TallPBX, FreeSWITCH, Nginx, MariaDB, and Redis with a single command.
-3. Open the server's IP address in your browser and log in with your administrator credentials.
-4. Follow the [PBX "Hello World" Guide](docs/pbx-hello-world.md) to create your first extension, register a phone (MicroSIP, Linphone, or desk phone), and place a test echo call (`*9196`).
-5. Consult the [Operations Guide](docs/operations.md) for production settings, including sound prompt languages, email notifications, capacity tuning, and backups.
+1. Follow the [Installation Guide](INSTALL.md) to set up the server and run the installer.
+2. Open the TallPBX web panel and sign in with your administrator account.
+3. Use the [First Call Guide](docs/pbx-hello-world.md) to create an extension,
+   connect a phone, and dial `*9196`. You should hear your own voice echoed back.
 
-The installer is safe to re-run at any time without touching your existing data. [Full installation guide →](INSTALL.md)
+## User Interface
 
-## Modular Architecture (Domain-Driven Modular Monolith)
+The web panel supports light and dark themes, three navigation layouts, and
+English, Spanish, and French. [Take the web panel tour](docs/ui-tour.md).
 
-TallPBX is built as a **Domain-Driven Modular Monolith** — an architectural term that simply means:
-
-> **All features are organized into dedicated, self-contained building blocks (domains) inside one unified, reliable application (monolith).**
-
-### What This Means in Plain English
-- **Organized by Business Feature, Not Technical Type**: In traditional apps, code is scattered across generic folders (all models together, all controllers together). In TallPBX, each distinct telephony feature (like Extensions, Voicemail, Gateways, or Security) keeps everything it needs — database tables, business rules, web screens, and translations — packaged together in its own self-contained module folder (`app-modules/`).
-- **One Unified System (Monolith)**: Everything runs together as a single, rock-solid application. You don't have to manage dozens of separate microservices, network connections between containers, or fragile external packages. When you update TallPBX, the entire system updates together cleanly and reliably.
-- **Easy to Turn Features On or Off**: If your organization does not need certain telephony features (like Call Center Queues or Ring Groups), administrators can toggle them off with one click in the panel without touching server files or risking system stability.
-- **Safe Custom Modules**: Developers can add third-party integrations or custom business tools in a dedicated folder (`custom-modules/`) or install them as standard Composer packages (`composer require`) without modifying core system files or risking future updates.
-
-### Key Highlights
-- **Built-in Core Modules (`app-modules/`)**: All 60 built-in telephony and administration domains reside in `app-modules/<domain-name>/`. They autoload directly via standard PHP autoloading, update atomically via Git, and are protected against accidental file deletion.
-- **Third-Party & Custom Modules (`custom-modules/` & Composer Packages)**: Community add-ons and integrations can live in the untracked `custom-modules/<name>/` directory or install via Composer (`vendor/`), allowing you to add custom capabilities that never interfere with core system updates.
-- **Pre-Flight Collision Guards**: External modules are automatically verified so they cannot conflict with core routes, database tables, module names, or permissions.
-- **Detailed Technical Specification**: For developers and system architects interested in bounded contexts and service provider internals, see the [System Architecture & Developer Guide →](docs/architecture.md).
-
-Scaffold a new custom module in `custom-modules/`:
-
-> [!TIP]
-> TallPBX includes a global appliance CLI. Commands can be run from any directory on the server using `tpbx <command>` or `tallpbx <command>`, which wrap Laravel's native `artisan` command (`artisan <command>` also works for developers familiar with Laravel). In this documentation, `tpbx` is used.
-
-```bash
-tpbx make:module my-crm-connector \
-    --display-name="My CRM Connector" \
-    --description="Third-party CRM integration for customer lookups" \
-    --category="custom"
-```
-
-Manage modules from the command line:
-
-```bash
-tpbx module:list            # List installed modules and their status
-tpbx module:sync            # Sync module manifests into the database registry
-tpbx module:cache           # Build the module manifest cache for fast loading
-```
-
-## Telephony Integration (mod_xml_curl)
-
-Instead of generating static XML files on disk, TallPBX serves dynamic configurations to FreeSWITCH on demand over HTTP using `mod_xml_curl`:
-
-- **Dynamic Configuration Delivery**: Extension directories, dialplans, and configurations are generated via the XML Handler API (`/api/v1/xml-handler`).
-- **Real-Time Telephony Events**: Call states, connections, and security alerts stream in real time via FreeSWITCH's Event Socket Layer (`tpbx freeswitch:listen`).
-- **Redis XML Caching**: Routing lookups are cached in Redis (`FS_XML_HANDLER_CACHE_TTL=60`), protecting the database and ensuring sub-millisecond call setup under heavy load. Web panel changes invalidate active caches immediately.
-- **Audio & Media Storage**: Call recordings, voicemails, and greetings are stored on disk under `/var/lib/tallpbx/media/` while metadata remains in the database.
-
-### Tenant Isolation & Phone Provisioning
-
-See the [Desk-Phone Provisioning Guide](docs/provisioning-guide.md) for the supported endpoint, the security settings, and the troubleshooting table.
-
-
-New to multi-tenancy? See **[Tenants & Multi-Tenancy](docs/multi-tenancy.md)** for what a tenant is, the customer vs. default tenant types, who can access each, and how admin impersonation works.
-
-Configuring a desk phone or softphone adapts to your deployment model:
-
-| Deployment Mode | Server Address on Phone | Extension on Phone | Login (Auth Username) | How Separation Works |
-| :--- | :--- | :--- | :--- | :--- |
-| **1. Single Company (Default Tenant)** | `x.x.x.x` (or domain) | `101` | `101` | **No separation needed.** All phones register in the Default tenant with clean internal extensions. |
-| **2. Multi-Tenant by Domain** | `subdomain.yourpbx.com` (or `someuniquedomain.com`) | `101` | `101` | **Separated by Domain.** Each tenant has its own domain or subdomain, allowing duplicate extension numbers across companies. |
-| **3. Multi-Tenant on Shared IP or Domain** | `x.x.x.x` (or domain) | `101` | `acme_101` | **Separated by Username.** A tenant prefix on the login ID ensures unique authentication while the phone displays `101`. |
-
-Once registered, FreeSWITCH isolates all call flows, transfers, and voicemails within each tenant's private dialplan context (`tenant_{id}_internal`).
-
-## Integrated Security & Threat Defense
-
-TallPBX includes a first-party Security module (`app-modules/security`) providing defense across telephony, web, and network layers:
-
-- **Linux Kernel Firewall (`nftables`)**: High-performance in-kernel sets (`@whitelist_ips`, `@whitelist_ips6`, `@blacklist_ips`, `@blacklist_ips6`, `@banned_ips`, `@banned_ips6`, `@external_blocklist_ips`, `@external_blocklist_ips6`, `@geo_blocked_ips`, `@geo_blocked_ips6`, `@geo_allowed_ips`, `@geo_allowed_ips6`) with preflight validation (`nft -c -f`) ensuring broken rules are never applied.
-- **Dedicated Geo-Blocking (IPdeny Aggregated Zones)**: Pure-drop kernel perimeter (`geo_perimeter`) covering all 249 ISO 3166-1 alpha-2 countries and territories with IPv4 and IPv6 support, dual *Block Selected Countries* and *Block All Except Selected* modes, fail-closed allow-set protection, and automated weekly synchronization.
-- **Real-Time Intrusion Defense**: Scans FreeSWITCH SIP authentication failures in real time via the Event Socket Layer (ESL), intercepts web login and SSH brute-force attempts, and enforces temporary rate-based bans in Redis.
-- **Zero-Lockout Safety Guard**: Prevents administrators from locking themselves out by verifying remote IP, active sessions, and local loopback services (database and Redis connections) before restrictive policies apply.
-- **Hardened System Architecture**: Web processes run under the restricted web user (`www-data`). Privileged firewall operations run through a dedicated root helper (`/usr/local/sbin/tallpbx-security`) with strict input validation.
-
-Manage security from the web panel's **Security Center** or directly from the terminal:
-
-```bash
-tpbx security:status              # Check firewall status, active sets, and banned IPs
-tpbx security:apply               # Atomically recompile and apply pending firewall rules
-tpbx security:unban <IP_ADDRESS>  # Immediately unban an IP address
-tpbx security:sync-geoip          # Synchronize IPdeny country zones for Geo-Blocking
-tpbx security:sync-threat-feeds   # Synchronize external VoIP fraud threat feeds
-```
-
-For packet flow diagrams and architecture details, see [docs/architecture.md](docs/architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering).
-
-## Running the Application
-
-```bash
-# Serve the Laravel app (development)
-tpbx serve
-
-# Compile frontend assets (in a new terminal)
-npm run dev
-```
-
-In production, Nginx serves the application automatically. After making code changes, clear application caches:
-
-```bash
-tpbx optimize:clear
-```
-
-## Running Tests
-
-Tests use Pest with a tiered runner for speed:
-
-```bash
-# Smoke — critical-path verification (~20s)
-tpbx app:test --smoke
-
-# Default — all feature tests, parallel by default (~65s)
-tpbx app:test
-
-# Full — features + Pest 4 browser tests via Playwright
-tpbx app:test --full
-
-# Filter a specific test file or class
-tpbx test --filter=AdminAuthTest
-```
-
-All automated feature and browser tests execute inside an isolated in-memory SQLite database and an array cache store. Redis operations during tests are confined to dedicated test databases (12–15, key prefix `tallpbx-test-`), and compiled views are written to a test-only folder away from the live panel's cache. Test runners stop immediately when a stale cached configuration would point them at the production database (the message asks you to run `tpbx config:clear`), destructive migration commands are prevented by `PrimaryDatabaseSafety`, and FreeSWITCH commands that could affect live calls are blocked by the test guard (the non-call-control `chat`, `fifo`, and `lcr` families are deliberately left unblocked) — monitoring pages may still query FreeSWITCH read-only during test runs.
+[![TallPBX admin dashboard showing the sidebar and phone system overview](docs/images/dashboard-full-sidebar.png)](docs/ui-tour.md)
 
 ## Performance & Load Testing
 
-TallPBX is built to handle busy phone systems smoothly. When phones register or place calls, FreeSWITCH asks TallPBX for user account and routing rules. TallPBX keeps frequently used rules in high-speed memory (Redis), allowing calls to connect almost instantly (sub-millisecond lookups) without straining the database even during heavy call bursts.
+When a phone connects or someone places a call, FreeSWITCH asks TallPBX for account
+details and routing rules. TallPBX returns those answers as XML and keeps
+frequently requested answers in Redis, an in-memory cache.
 
-- **Built-in Benchmarking**: Test tooling (`tpbx pbx:load-test:dialplan`) measures call routing speed and capacity.
-- **End-to-End SIP Validation**: The test harness (`load-testing/scripts/pbx-sipp-validate.sh`) verifies phone registrations, outbound calls, audio echo, call forwarding, ring groups, and voicemail.
-- **Hardware Capacity**: Tested to sustain 25+ calls/sec and 250+ concurrent channels on standard 4 GB instances.
+**PHP-FPM** runs TallPBX's fast XML handler by default. The handler loads only
+the modules needed to answer phone system requests and skips the web panel setup.
+If it catches an application error, the same PHP-FPM process handles the request
+through the same entry point as the web panel, loading the full TallPBX application.
 
-For complete benchmarking instructions, PHP-FPM pool sizing, and empirical performance metrics across hardware tiers:
-- 👉 **[Load Testing Guide (docs/load-testing-guide.md)](docs/load-testing-guide.md)** — Operational runbook for running dialplan and SIPp tests.
-- 👉 **[Benchmark Results & Hardware Sizing (docs/load-testing-results.md)](docs/load-testing-results.md)** — Empirical measurements, latency percentiles, and production hardware recommendations.
+**Laravel Octane** is an optional performance mode. It uses the same telephony
+module list and keeps the application loaded in memory between requests. This reduces
+startup work for each lookup and can improve call setup when XML processing is
+the bottleneck. FreeSWITCH uses the default PHP-FPM handler when Octane is
+unavailable. [Enable, verify, or disable Octane](docs/operations.md#octane-xml-worker-optional-performance-mode).
+
+- See [benchmark results and hardware sizing](docs/load-testing-results.md) for
+  how many calls the test servers completed and under what conditions.
+- [Load Testing Guide](docs/load-testing-guide.md) explains how to measure routing
+  lookups and run end-to-end call tests on your own server.
+
+## Tenant Isolation & Phone Provisioning
+
+A **tenant** is a separate phone system workspace for a business or customer.
+Use the default tenant for a single business. When several businesses share a
+server, give each tenant a separate domain or use a prefix on phone login names
+to tell accounts apart on a shared domain.
+
+[Set up tenants](docs/multi-tenancy.md) ·
+[Configure desk phones or calling apps](docs/provisioning-guide.md)
+
+## Security & Operations
+
+Use the web panel's **Security Center** to manage firewall rules and automated
+blocking of repeated sign-in failures. The Operations guide covers day-to-day
+administration, updates, and troubleshooting. [Operations & Maintenance](docs/operations.md) ·
+[Backup & Restore](docs/backup-restore-guide.md) ·
+[Security architecture](docs/architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering)
+
+## For Developers
+
+TallPBX takes its name from Tailwind CSS, Alpine.js, Livewire, and Laravel.
+Laravel is the PHP framework that runs the web application. Built-in features
+such as extensions and voicemail are organized in `app-modules/`. Developers can
+add integrations through `custom-modules/` or as Composer packages.
+
+- [Developer Guide](docs/developer-guide.md) covers local setup, modules, and tests.
+- [System Architecture](docs/architecture.md) explains how the phone engine,
+  web application, and security controls work together.
+- [Release Checklist](docs/release-checklist.md) covers verification and publishing.
+
+### Running Tests
+
+After following the developer setup, run `tpbx app:test --smoke` for a quick check
+or `tpbx app:test` for the feature suite. [Development and test setup](docs/developer-guide.md#1-reproducible-setup).
 
 ## Versioning & Release Strategy
 
-TallPBX follows the **[Laravel framework versioning model](https://laravel.com/docs/releases#versioning-scheme)** and adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)** (`MAJOR.MINOR.PATCH`):
-
-- **Versioned Series Branches**: Following the pattern used by Laravel, the repository does not maintain a perpetual `main` or `master` branch. Instead, active development takes place directly on versioned series branches representing release lines (e.g. `1.1`, `2.0`, `3.x`, `4.x`, `5.x`).
-- **Release Strategy**:
-  - **Major Releases (`MAJOR.0.0`)**: Represent significant architectural milestones or breaking changes. For example, the `5.x` series introduces the Pulse-style Redis Stream CDR pipeline, is not backwards compatible with `4.x`, and requires a fresh install rather than an in-place upgrade from earlier major lines (`4.x`, `3.x`, `2.0`, `1.x`).
-  - **Minor Releases (`MAJOR.MINOR.0`)**: Introduce new features, modules, and backwards-compatible enhancements within a release series.
-  - **Patch Releases (`MAJOR.MINOR.PATCH`)**: Deliver targeted bug fixes, security patches, and performance improvements.
-- **Active Release Branches**:
-  - **`5.x`**: Current primary development branch for 5.x features and releases (not backwards compatible with 4.x; requires a fresh install).
-  - **`4.x`**: Maintenance release series for 4.x deployments (requires a fresh install when upgrading to 5.x).
-  - **`3.x`**: Maintenance release series for 3.x deployments.
-  - **`2.0`**: Maintenance release series for 2.x deployments.
-  - **`1.1`**: Maintenance release series for 1.1.x deployments.
-  - **`1.0`**: Frozen maintenance branch for critical security fixes only.
-- **In-Place Updates**: In-place updates via the web updater panel (**Git Update**, `/panel/git-update`) and CLI (`tpbx app:git-update <target>`) are supported within the same release series branch. For detailed deployment notes, see [INSTALL.md](INSTALL.md), and for a complete historical record of releases, see [CHANGELOG.md](CHANGELOG.md).
-
-## Tech Stack
-
-| Component | Version |
-|---|---|
-| Laravel | 13 |
-| Livewire | 4 |
-| Tailwind CSS | 4 |
-| DaisyUI | latest |
-| Alpine.js | 3 (via Livewire) |
-| Laravel Boost | 2 (dev) |
-| Pest | 4 |
+TallPBX follows [Laravel's release-series model](https://laravel.com/docs/releases#versioning-scheme)
+and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). The active release
+series is `5.x`. The web updater supports updates within that series. Moving from
+an earlier major release requires a fresh installation.
+[Release notes](RELEASE-NOTES.md) · [Changelog](CHANGELOG.md)
 
 ## License
 
-Open-sourced under the [Apache 2.0 license](https://opensource.org/licenses/Apache-2.0).
+TallPBX is released under the [Apache 2.0 license](LICENSE). Contributions and
+commercial use are welcome.
