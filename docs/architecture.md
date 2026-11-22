@@ -242,7 +242,7 @@ While developing locally in `custom-modules/` provides instant zero-build feedba
    *(Note: Set the `"source": "vendor"` field in your module's `module.json` to reflect that it is installed as a Composer package).*
 
 4. **Install via Composer in TallPBX**:
-   Remove the local development folder `custom-modules/my-crm-connector/` to prevent name collision guards from blocking the vendor package. Then add your Git repository and require the package in TallPBX's root `composer.json`:
+   Return to the TallPBX checkout (`/var/www/tallpbx` on the appliance). Remove the local development folder `custom-modules/my-crm-connector/` to prevent name collision guards from blocking the vendor package. Then run the Composer commands there to update TallPBX's root `composer.json`.
    ```bash
    # Add private repository (if hosted privately on GitHub)
    composer config repositories.crm-connector vcs https://github.com/your-org/tallpbx-crm-connector.git
@@ -267,7 +267,7 @@ When creating translation keys for a module:
 2. **Root Action Keys**: Generic action labels (`save`, `delete`, `edit`, `cancel`, `enabled`, `disabled`, `status`, `actions`) belong strictly in root `lang/{locale}/admin.php` and must never be defined in module dictionaries.
 3. **Optional Locale Coverage**: Modules may provide translations for any subset of the supported languages; missing translations fall back to the fallback locale. Root dictionaries should remain complete across `en`, `es`, and `fr`.
 4. **Header Docblock (Suggested)**: A collision-warning header is suggested for custom and third-party modules to document the cascading merge behavior; it is optional.
-5. **Verification**: Verify that keys follow the runtime collision rule:
+5. **Verification**: From the TallPBX checkout (`/var/www/tallpbx` on the appliance), run the translation parity test to check the runtime collision rule.
    ```bash
    tpbx optimize:clear
    ./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php
@@ -412,14 +412,14 @@ sequenceDiagram
 
 **The cost it removes.** Under PHP-FPM every lookup pays Composer autoloading, provider registration, and container construction before Redis is asked — roughly 44 ms of a ~55 ms hit on the reference 1 vCPU host (§7.5.6). The worker keeps the framework, Eloquent connections, and module contributors in memory, so the same lookup only runs the controller. Measured on the 4-core reference appliance (baseline: PHP-FPM with 12 static workers on the same host): 33.9 requests/second at 100×5 and 66.6 requests/second at 500×25 with zero failed requests, against 10.95 and 3.59 requests/second for the pool. Those figures come from a CLI harness that adds per-batch connection overhead, so they understate an in-process client; the 2,500 req/s design target was not demonstrated.
 
-**How FreeSWITCH reaches it.** The installer writes two `mod_xml_curl` bindings, both authenticated with the same token and tried in file order:
+**How FreeSWITCH reaches it.** A `mod_xml_curl` binding specifies the HTTP endpoint that FreeSWITCH queries for a set of XML sections. The installer configures both endpoints in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` for directory, dialplan, and configuration lookups with the same authentication token. FreeSWITCH tries them in file order.
 
 | Binding | Target | Timeout | Role |
 | :--- | :--- | :--- | :--- |
 | `tallpbx-octane` | `http://127.0.0.1:8090/api/v1/xml-handler` | 1 s | Primary when the worker is running |
 | `tallpbx-fallback` | `http://127.0.0.1/api/v1/xml-handler` (nginx → the fast controller) | 5 s | The shipped default; also used while the worker is down, restarting, or crash-looping; catches `Throwable` in-process to fall back to `index.php` |
 
-The second binding makes a worker restart or crash safe: lookups degrade to PHP-FPM instead of failing registrations, while omitting a separate stock HTTP tier avoids retrying saturation timeouts into `index.php`. The binding set is read only when `mod_xml_curl` loads, so changing which tiers are active requires a FreeSWITCH restart — never a module reload, which frees the binding a live lookup may still be using (operational rule in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*).
+When Octane is stopped, the connection to port 8090 is normally refused immediately and FreeSWITCH sends the lookup to PHP-FPM. A slow Octane request can reach its one-second timeout before fallback. The binding list is loaded into memory when `mod_xml_curl` starts. Starting or stopping the worker changes which endpoint is available. Editing the binding list requires a FreeSWITCH restart because `reloadxml` leaves the existing bindings in memory. [Octane setup and restart procedure](operations.md#octane-xml-worker-optional-performance-mode).
 
 **Lean scope.** The systemd unit starts `octane:start --server=roadrunner` with `TALLPBX_WORKER_ROLE=telephony`. `ModuleServiceProvider` then registers only `App\Support\TelephonyWorkerProviders` — 24 telephony module providers instead of all 60 — so panel, Livewire, Reverb, and billing code never enters worker memory. The panel keeps its own PHP-FPM workers, so call volume cannot starve the administrative UI.
 
@@ -427,7 +427,7 @@ The second binding makes a worker restart or crash safe: lookups degrade to PHP-
 
 **Correctness is unchanged.** The worker resolves the same `XmlHandlerController` and builders, reads and writes the same Redis DB 1 keys, and honours the same `RoutingCacheVersion` bumps (§7.5.4) and 60-second TTL. Both builders wrap their miss path in `Cache::lock(...)->block(3)`, so a registration stampede produces one XML build and the other requests wait for it instead of issuing duplicate queries. `tests/Feature/Http/XmlHandlerOctaneParityTest.php` asserts byte-identical documents against standard dispatch, and `tests/Feature/Octane/TenantStateIsolationTest.php` covers the cross-tenant cleanup.
 
-**Rollback posture.** The stock entry ships commented beside the fast location in both nginx templates, so a deployment can return to the full-application path with a block swap and an nginx reload (operations → Fast XML Handler Path).
+**Rollback posture.** In the port 80 `server` block of `/etc/nginx/sites-available/pbx`, the stock entry ships commented beside the fast `location = /api/v1/xml-handler` block. [Switch back to the full-application path](operations.md#disabling-it-rollback-to-stock-mode).
 
 ---
 
@@ -875,7 +875,7 @@ flowchart TD
 2. **The endpoint appends and returns.** The controller validates the token, appends the payload with `XADD`, and returns 200 immediately. No Eloquent, no SQL, no serialisation work on the request path.
 3. **The worker digests.** `tpbx cdr:work`, owned by `tallpbx-cdr-worker.service`, reads up to 100 entries with `XRANGE`, parses them, writes the batch in a single transaction using an idempotent upsert keyed on `(call_uuid, leg)`, and deletes the entries with `XDEL` **only after the commit succeeds**. Delivery is at-least-once; the unique index makes the retry harmless.
 
-**How the endpoint is served.** nginx points the exact `/api/v1/cdr` location at `public/cdr-fast.php`, which boots a container from five service providers through `App\Support\CdrFastBootstrap` and the shared `App\Support\MinimalBootstrap` base (the XML fast entry uses the same base). No database, encryption, view or module providers are registered, because the request only verifies a token and appends to Redis; the controller returns `JsonResponse` directly so the `response()` helper cannot pull the view factory back in. The entry fails open to `index.php` (writing fallback diagnostic entries to `storage/logs/cdr-fast-fallback.log`), so a fault costs speed and never a record, and the stock location ships commented underneath for a one-block rollback. The provider allowlist and the stream bytes are pinned by tests (`CdrFastEntryTest`), the same way the XML entry is pinned by its byte-equality suites.
+**How the endpoint is served.** In the port 80 `server` block of `/etc/nginx/sites-available/pbx`, nginx points the exact `/api/v1/cdr` location at `public/cdr-fast.php`, which boots a container from five service providers through `App\Support\CdrFastBootstrap` and the shared `App\Support\MinimalBootstrap` base (the XML fast entry uses the same base). No database, encryption, view or module providers are registered, because the request only verifies a token and appends to Redis; the controller returns `JsonResponse` directly so the `response()` helper cannot pull the view factory back in. The entry fails open to `index.php` (writing fallback diagnostic entries to `/var/www/tallpbx/storage/logs/cdr-fast-fallback.log`), so a fault costs speed and never a record, and the stock location ships commented underneath for a one-block rollback. The provider allowlist and the stream bytes are pinned by tests (`CdrFastEntryTest`), the same way the XML entry is pinned by its byte-equality suites.
 
 ### 17.3 Failure modes and the designed response
 
@@ -901,8 +901,8 @@ The exposure is not "how much is Redis holding" but "how long passes between `XA
 
 Two supporting rules belong with them:
 
-- **Do not relax `stop-writes-on-bgsave-error`.** A refused write becomes a 503, a 503 becomes a spool file, and a spool file is recoverable. A falsely accepted write is unrecoverable.
-- **Set `vm.overcommit_memory=1`.** Under the default heuristic a `fork()` for `BGSAVE` can fail even when memory is free; with write-stopping enabled that failure turns into `MISCONF`, every write is refused, and the spool starts filling for a reason nobody expects. The installer writes and verifies this setting in the same durability script.
+- **Keep `stop-writes-on-bgsave-error yes` in `/etc/redis/redis.conf`.** A refused write becomes a 503, a 503 becomes a spool file, and a spool file is recoverable. A falsely accepted write is unrecoverable.
+- **Set `vm.overcommit_memory=1` in `/etc/sysctl.d/99-tallpbx-redis.conf`.** Under the default heuristic a `fork()` for `BGSAVE` can fail even when memory is free; with write-stopping enabled that failure turns into `MISCONF`, every write is refused, and the spool starts filling for a reason nobody expects. The installer writes and verifies this setting in the same durability script.
 
 ### 17.5 Open follow-ups
 

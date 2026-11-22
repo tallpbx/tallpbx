@@ -217,7 +217,7 @@ Configures high-throughput CDR ingestion (`mod_json_cdr`) and Redis Stream buffe
 
 ### 2.8 Laravel Octane Persistent XML Worker Engine
 
-Configures the optional persistent **Laravel Octane worker** (a persistent PHP application server that keeps Laravel booted in memory across requests) serving FreeSWITCH XML curl requests on loopback port 8090.
+These settings configure the optional Laravel Octane worker, which keeps Laravel booted in memory between FreeSWITCH XML lookups. On a standard install, the systemd service controls whether the worker runs. [Enable, verify, or disable the Octane worker](operations.md#octane-xml-worker-optional-performance-mode).
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
@@ -645,7 +645,7 @@ Variables utilized by installation scripts, frontend build tooling, and test run
 
 ### 14.2 Vite Frontend Asset Pipeline
 
-Vite environment variables prefixed with `VITE_` are compiled directly into client-side JavaScript bundles during `npm run build`.
+To apply changes to `VITE_` variables in `/var/www/tallpbx/.env`, run `npm run build` from `/var/www/tallpbx`. Vite compiles these values into the browser's JavaScript files.
 
 | Variable | Type | Default | Consumed By | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
@@ -666,6 +666,8 @@ Vite environment variables prefixed with `VITE_` are compiled directly into clie
 ---
 
 ## 15. Production Sizing & Recommended Settings Reference
+
+These examples show settings for `/var/www/tallpbx/.env`.
 
 ### Minimal / Single-Server PBX (< 50 Extensions)
 ```ini

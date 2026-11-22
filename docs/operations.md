@@ -115,7 +115,7 @@ not prevent a person with MariaDB access from running destructive SQL manually.
 To monitor telephony lookup latency and verify PHP-FPM workers under call bursts:
 - **Check Redis Hit Rates**: `redis-cli info stats | grep -E 'keyspace_hits|keyspace_misses'`
 - **Verify PHP-FPM Sizing**: `grep -E 'pm =|pm.max_children' /etc/php/8.5/fpm/pool.d/www.conf`
-- **Preview a Pool Reconciliation**: `bash scripts/resources/php-fpm-pool.sh --dry-run` reports the ceiling this host's RAM resolves to and which directives would change, without touching the file
+- **Preview a Pool Reconciliation**: `bash /var/www/tallpbx/scripts/resources/php-fpm-pool.sh --dry-run` shows the worker limit for this host and which settings would change in `/etc/php/8.5/fpm/pool.d/www.conf`.
 - **Check Worker Saturation**: `tail -n 50 /var/log/php8.5-fpm.log | grep "server reached pm.max_children"`
 
 For comprehensive load testing runbooks, SIPp feature scenarios, and empirical hardware sizing, see [docs/load-testing-guide.md](load-testing-guide.md) and [docs/load-testing-results.md](load-testing-results.md).
@@ -132,12 +132,10 @@ bucket:
   roughly 20–30 concurrent call setups/second (3–5 XML lookups each).
 - **Failure mode**: when the ceiling is exceeded the limiter returns HTTP 429 and the
   corresponding XML lookup fails — a failed dialplan lookup means a failed call setup.
-- **Tuning**: raise `FS_XML_HANDLER_THROTTLE_LIMIT` for heavy call-center volume, or set
+- **Tuning**: In `/var/www/tallpbx/.env`, raise `FS_XML_HANDLER_THROTTLE_LIMIT` for heavy call-center volume, or set
   `FS_XML_HANDLER_THROTTLE_ENABLED=false` for trusted same-host deployments where the
   endpoint is only reachable from FreeSWITCH and the shared token is enforced.
-- **Upgrading**: if your `.env` explicitly sets `FS_XML_HANDLER_THROTTLE_LIMIT` (copied
-  from an older `.env.example`), that value overrides the raised default — update it to
-  `6000` or remove the line to adopt the new ceiling.
+- **Upgrading**: A value already set for `FS_XML_HANDLER_THROTTLE_LIMIT` in that file overrides the default. Update it to `6000` or remove the line to adopt the default ceiling.
 
 ## How the Firewall Evaluates Traffic
 
@@ -165,7 +163,7 @@ Three master switches at the top of the **Security Center** control global firew
 #### 1. How Observe Mode Works Under the Hood
 When Observe Mode is enabled, the ruleset compiler performs a dynamic transformation:
 * The chain default inbound policy is forced from `drop` to `accept`.
-* Every drop action across built-in pre-filters and custom rules is replaced with:
+* In the generated ruleset at `/etc/tallpbx/firewall.nft`, the compiler replaces drop actions across built-in pre-filters and custom rules with rules like this:
   ```nftables
   counter log prefix "tpbx-observe:<stage> " limit rate 100/minute
   ```
@@ -302,10 +300,10 @@ commands as root. Repair permissions with:
 sudo tpbx permissions:repair --scope=full
 ```
 
-If Laravel itself will not boot, use the emergency fallback:
+If Laravel itself will not boot, use the emergency repair script:
 
 ```bash
-sudo bash scripts/repair-application-permissions.sh
+sudo bash /var/www/tallpbx/scripts/repair-application-permissions.sh
 ```
 
 ### FreeSWITCH Will Not Start
@@ -320,8 +318,8 @@ journalctl -u freeswitch --no-pager -n 50
 Common causes:
 - **Port conflict**: another process is using port 5060. Check with
   `ss -tlnp | grep 5060`.
-- **Missing configuration**: the XML-curl gateway URL may be empty. Re-run
-  `bash scripts/resources/freeswitch.sh --configure-only && systemctl restart freeswitch`.
+- **Missing configuration**: Check the gateway URLs in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`. To regenerate the configuration and restart FreeSWITCH, run
+  `sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only && sudo systemctl restart freeswitch`.
 - **Permission error on media directories**: run
   `sudo tpbx permissions:repair --scope=full`.
 
@@ -431,8 +429,8 @@ Switching the default language dynamically updates `/etc/freeswitch/vars.xml` an
 
 ### Manual APT / Source Fallback
 
-- **Package installations (APT)**: You can also install packages directly via `apt-get install -y freeswitch-sounds-es-ar-mario freeswitch-mod-say-es`, load the module via `fs_cli -x "load mod_say_es"`, and update `vars.xml`.
-- **Source builds**: When compiling FreeSWITCH from source, say modules can be compiled with `make mod_say_<lang>-install`, and official sound archives can be extracted to `/usr/share/freeswitch/sounds/<lang>/`.
+- **Package installations (APT)**: You can also install packages directly via `apt-get install -y freeswitch-sounds-es-ar-mario freeswitch-mod-say-es`, load the module via `fs_cli -x "load mod_say_es"`, and update `/etc/freeswitch/vars.xml`.
+- **Source builds**: Run `make mod_say_<lang>-install` from the FreeSWITCH source tree. The TallPBX installer builds it in `/usr/src/freeswitch`. Extract official sound archives to `/usr/share/freeswitch/sounds/<lang>/`.
 
 ## FreeSWITCH Session Rate (Capacity Tuning)
 
@@ -477,7 +475,7 @@ You can check and adjust the session rate immediately at runtime via `fs_cli` wi
   ```bash
   fs_cli -x "fsctl sps 120"
   ```
-  *(Note: Dynamic `fsctl sps` adjustments take effect instantly in memory. To ensure the new rate persists across service restarts, also update `FS_SESSIONS_PER_SECOND` in `.env`.)*
+  *(Note: Dynamic `fsctl sps` adjustments take effect instantly in memory. To keep the new rate across service restarts, update `FS_SESSIONS_PER_SECOND` in `/var/www/tallpbx/.env`.)*
 
 ## FreeSWITCH Runtime Database (SQLite Default vs. MariaDB)
 
@@ -485,10 +483,10 @@ FreeSWITCH uses disk-backed SQLite in `/var/lib/freeswitch/db` (`FS_DB_DRIVER=sq
 
 You can opt into a separate `freeswitch` MariaDB database (`FS_DB_DRIVER=mariadb`) to completely replace SQLite across `switch.conf`, `db.conf`, `fifo.conf`, `sofia.conf` profiles, `callcenter.conf`, and `voicemail.conf` using FreeSWITCH's native `mod_mariadb` module (note that FreeSWITCH names the XML parameter `odbc-dsn`, even when passing a native `mariadb://...` URI without unixODBC):
 
-- **New installations:** Set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`) before running `scripts/install.sh`. The installer creates the dedicated `freeswitch` database and user, writes `.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` for source builds), and enables `<load module="mod_mariadb"/>` in `pre_load_modules.conf.xml`. Standard installs stay on `sqlite`.
+- **New installations:** In the TallPBX installer checkout, set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or set `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`). Run `scripts/install.sh` from the checkout root. The installer creates the dedicated `freeswitch` database and user, writes the settings to `/var/www/tallpbx/.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` for source builds), and adds `<load module="mod_mariadb"/>` to `/etc/freeswitch/autoload_configs/pre_load_modules.conf.xml` on a standard install.
 - **Existing servers:**
   1. Install `freeswitch-mod-mariadb` (`sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb` on packaged installs, or build `mod_mariadb` with `libmariadb-dev` from source).
-  2. Create a dedicated `freeswitch` database and user in MariaDB (separate from `tallpbx`), or set `FS_DB_DRIVER=mariadb` in `.env` and run `scripts/resources/mariadb.sh`.
+  2. Create the dedicated `freeswitch` database and user using the SQL in the [Telephony Scaling Guide](telephony-capacity-scaling-guide.md#optional-alternative-using-mariadb-instead-of-sqlite).
   3. Set `FS_DB_DRIVER=mariadb`, `FS_DB_*` credentials, and `FS_CORE_NON_SQLITE_DB_REQUIRED=true` in `/var/www/tallpbx/.env`.
   4. Run `sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only`, `tpbx optimize:clear`, and `sudo systemctl restart freeswitch`, then verify with `fs_cli -x "module_exists mod_mariadb"`.
 
@@ -527,7 +525,7 @@ The token is synchronized between two locations:
 
 ### Updating or Rotating the Token
 
-If you generate a new token or change `FS_XML_HANDLER_TOKEN` in `.env`:
+If you generate a new token or change `FS_XML_HANDLER_TOKEN` in `/var/www/tallpbx/.env`, use one of the following procedures.
 
 #### Option 1: Automated Configuration Helper (Recommended)
 
@@ -535,7 +533,7 @@ Update the token in `/var/www/tallpbx/.env`, then run the resource configuration
 
 ```bash
 tpbx optimize:clear
-bash scripts/resources/freeswitch.sh --configure-only
+sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only
 sudo systemctl restart freeswitch
 ```
 
@@ -553,17 +551,48 @@ If editing configuration files by hand:
 
 ## Octane XML Worker (Optional Performance Mode)
 
-FreeSWITCH's directory, dialplan, and configuration lookups can be answered by a resident Octane worker on `127.0.0.1:8090` instead of by PHP-FPM. The worker keeps the application warm between requests and keeps the XML load off PHP-FPM entirely.
+**PHP-FPM is the default.** On a fresh install, nginx and PHP-FPM answer FreeSWITCH's directory, dialplan, and configuration lookups through the fast XML handler. The optional Laravel Octane worker uses RoadRunner to keep Laravel booted in memory between lookups. Reusing that application state reduces lookup latency and can increase completed calls per second when XML processing is the bottleneck. The web panel and call detail record (CDR) ingestion continue to use PHP-FPM. [Laravel Octane documentation](https://laravel.com/docs/13.x/octane#introduction).
 
-**It is optional and ships disabled.** The default installation serves XML through the fast controller (next section). The installer always installs the worker's systemd unit from `scripts/resources/systemd/tallpbx-xml-worker.service`, provisions its application server binary, and writes the two `mod_xml_curl` bindings that form the XML ladder: the Octane worker first (**1 s** timeout), then the fast controller behind nginx (**5 s**). FreeSWITCH re-sends the complete request to each binding, so the POST lookup fields survive every fall-through, and starting or stopping the worker **as a running service** needs **no FreeSWITCH change**. Retiring the binding itself — so lookups never try port 8090 — edits `xml_curl.conf.xml` and does require a FreeSWITCH restart; see [Switching Between the Stock, Fast and Octane XML Paths](#switching-between-the-stock-fast-and-octane-xml-paths).
+The installer sets up the `tallpbx-xml-worker` systemd service and leaves it disabled on fresh installs. It also configures two XML bindings. A binding tells FreeSWITCH which HTTP endpoint to ask for directory, dialplan, or configuration XML. FreeSWITCH tries Octane on `127.0.0.1:8090` first, then retries the full lookup through nginx and PHP-FPM if Octane is unavailable or fails to return usable XML. When the worker is stopped, the loopback connection is normally refused immediately. A slow Octane request can take up to one second to time out before FreeSWITCH tries PHP-FPM, whose timeout is five seconds.
+
+**Enabling, disabling, or restarting the worker requires no FreeSWITCH restart with the installed bindings.** If you edit `xml_curl.conf.xml` to add, remove, or change a binding, validate the file and schedule a FreeSWITCH restart. [Applying binding changes](#stoppingstarting-the-worker-vs-editing-bindings).
 
 ### Enabling It
+
+On the TallPBX host, run:
 
 ```bash
 sudo systemctl enable --now tallpbx-xml-worker
 ```
 
-The first lookup after enabling is served by the worker; nothing else changes. The installer never enables or starts the unit, so an administrator's choice survives installer re-runs.
+This starts the worker now and enables it at boot. FreeSWITCH starts using it as soon as it accepts requests. The installer preserves the service state on subsequent runs.
+
+### Disabling It (Rollback)
+
+```bash
+sudo systemctl disable --now tallpbx-xml-worker
+```
+
+This stops the worker and disables it at boot. FreeSWITCH automatically falls back to the nginx/PHP-FPM handler. Check that `systemctl is-active tallpbx-xml-worker` reports `inactive` and `systemctl is-enabled tallpbx-xml-worker` reports `disabled`. Place a test call to confirm the fallback is serving lookups.
+
+### Check It
+
+```bash
+systemctl is-enabled tallpbx-xml-worker
+systemctl is-active tallpbx-xml-worker
+ss -Hltn 'sport = :8090'
+```
+
+After enabling, expect `enabled`, `active`, and a listener on `127.0.0.1:8090`. If the listener fails to start, check `sudo journalctl -u tallpbx-xml-worker -n 50 --no-pager`. If the journal reports a missing RoadRunner binary, check for an executable `/var/www/tallpbx/rr`. The installer attempts that download and can finish even if it fails.
+
+To check that FreeSWITCH reaches Octane, substitute an existing extension and its SIP domain below and run the lookups on a quiet PBX. `user_exists` should print `true`. Client connections to port `8090` while the lookups run show that FreeSWITCH tried the worker. For an authenticated HTTP test of the worker itself, use the loopback URL in the [load testing guide](load-testing-guide.md#running-the-test).
+
+```bash
+fs_cli -x 'user_exists id <extension> <domain>'
+(for i in $(seq 1 30); do fs_cli -x 'find_user_xml id <extension> <domain>' >/dev/null; done) &
+for i in $(seq 1 20); do ss -Htan 'dport = :8090'; sleep 0.1; done
+wait
+```
 
 ### Expected Gain (1 vCPU / 967 MB reference tier)
 
@@ -581,46 +610,17 @@ Run exactly **one worker per vCPU** — a second worker on one core competes wit
 
 CDR ingestion (`mod_json_cdr`) **always** posts to PHP-FPM (`http://127.0.0.1/api/v1/cdr`); never point it at the worker. When one worker serves both XML and CDR, the CDR posts queue behind lookups and time out (measured 66 % call completion versus 71 % with CDR on PHP-FPM at 10 calls/sec). With the worker handling XML, PHP-FPM is free for CDR — one of the worker's main benefits.
 
-### Check It
-
-```bash
-systemctl status tallpbx-xml-worker
-ss -ltnp | grep 8090
-grep -A3 'binding name="tallpbx-octane"' /etc/freeswitch/autoload_configs/xml_curl.conf.xml
-```
-
-The journal does not record individual requests at the default log level, so it cannot tell you whether the worker is answering. Prove it with connections instead — fire a burst of lookups and watch the worker's port while they run:
-
-```bash
-( for i in $(seq 1 40); do fs_cli -x "find_user_xml id <extension> <domain>" >/dev/null; done ) &
-max=0; for i in $(seq 1 120); do
-  n=$(ss -tan | grep -c ':8090'); [ "$n" -gt "$max" ] && max=$n; sleep 0.05
-done
-wait; echo "peak connections to 8090: $max"
-```
-
-A peak well above zero means FreeSWITCH is fetching from the worker; a peak of zero means the lookup is being answered by the next binding, the fast controller. `fs_cli -x "user_exists id <extension> <domain>"` should also return `true` for a seeded extension.
-
 ### Restart It After a Deployment
 
 ```bash
 sudo systemctl restart tallpbx-xml-worker
 ```
 
-The worker holds compiled PHP in memory, so a code deployment (`git pull`, `composer install`, `tpbx migrate`) needs this restart; `tpbx optimize:clear` alone does not reload it. While it restarts, FreeSWITCH uses the nginx fallback binding, so registrations and calls continue on the PHP path.
-
-### Disabling It (Rollback)
-
-```bash
-sudo systemctl disable --now tallpbx-xml-worker
-```
-
-The next lookup falls through to the fast controller automatically — the binding stays in place and costs one refused loopback connection while the worker is down. The stock tier below remains the last line of defence; nothing else changes.
+After a manual application deployment, restart the worker if you already run it so it loads the new code. FreeSWITCH uses nginx/PHP-FPM while the worker restarts. The TallPBX web updater already restarts the worker when it is running.
 
 ### Tuning Notes
 
-- Worker count, port, job recycling, and the per-worker memory cap live in `.rr.yaml`; the unit starts with `--workers=auto` and `--max-requests=10000`. On a 1 vCPU host `auto` resolves to one worker.
-- The worker serves only `/api/v1/xml-handler`. `/panel`, sessions, Livewire, and Reverb stay on PHP-FPM, and CDR ingestion stays on PHP-FPM too.
+- `/etc/systemd/system/tallpbx-xml-worker.service` sets the listen port and starts the worker with `--workers=auto` and `--max-requests=10000`. On a 1 vCPU host, `auto` resolves to one worker. The per-worker memory cap is in the RoadRunner settings at `/var/www/tallpbx/.rr.yaml`.
 
 ## Fast XML Handler Path (Default)
 
@@ -645,7 +645,7 @@ grep -A5 'location = /api/v1/xml-handler {' /etc/nginx/sites-available/pbx
 
 The stock mode — the full application bootstrapped for every lookup — remains a supported configuration: both site templates ship its block commented directly under the active one, and the fast controller itself falls back to that same full application whenever it throws, so a fault costs speed rather than registrations. It is slower than the fast path (roughly 30 vs 43 lookups/sec, 154 vs 108 ms p50 on the reference tier) but it is the compatibility and debugging escape hatch.
 
-Replace the whole active `location` block with the single-line stock form:
+In `/etc/nginx/sites-available/pbx`, replace the active `location = /api/v1/xml-handler` block in the port 80 `server` block with this stock configuration:
 
 ```nginx
     location = /api/v1/xml-handler { access_log off; try_files $uri /index.php?$query_string; }
@@ -659,7 +659,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ### Enabling It Again
 
-Replace the same block with:
+In `/etc/nginx/sites-available/pbx`, replace the active `location = /api/v1/xml-handler` block in the port 80 `server` block with this fast-handler configuration:
 
 ```nginx
     location = /api/v1/xml-handler {
@@ -667,7 +667,7 @@ Replace the same block with:
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $realpath_root/xml-handler-fast.php;
         fastcgi_param HTTP_AUTHORIZATION $http_authorization;
-        fastcgi_read_timeout 2s;
+        fastcgi_read_timeout 5s;
         fastcgi_pass unix:/var/run/php/php8.5-fpm.sock;
     }
 ```
@@ -689,11 +689,11 @@ Q='section=directory&tag_name=user&key_name=user&key_value=2000&domain=example.c
 curl -s "http://127.0.0.1/api/v1/xml-handler?$Q" -H "X-FS-Token: $TOKEN" | head -c 80
 ```
 
-To confirm the handler is responding at all, a `403` means the token check is working and the endpoint is alive; a `500` means the front controller itself failed and the request should have fallen back to the normal application — check `storage/logs/laravel.log`.
+If the response is `403`, check the token in `/var/www/tallpbx/.env`. For a `500` response, check the PHP-FPM journal (`journalctl -u php8.5-fpm`) and the application log at `/var/www/tallpbx/storage/logs/laravel.log` on a standard install.
 
 ## Switching Between the Stock, Fast and Octane XML Paths
 
-Three XML paths exist. In day-to-day operation, switching between **Octane** and **Fast** only starts or stops `tallpbx-xml-worker`; FreeSWITCH only needs a restart if you edit `xml_curl.conf.xml` to add or remove a binding itself.
+With the installed bindings loaded, starting or stopping `tallpbx-xml-worker` switches between **Octane** and **Fast**. A change to `xml_curl.conf.xml` takes effect after a FreeSWITCH restart.
 
 | Path | What answers FreeSWITCH's XML lookups | How it is selected |
 | --- | --- | --- |
@@ -703,19 +703,18 @@ Three XML paths exist. In day-to-day operation, switching between **Octane** and
 
 ### Stopping/Starting the Worker vs. Editing Bindings
 
-Because [scripts/resources/freeswitch.sh](../scripts/resources/freeswitch.sh) ships all three `mod_xml_curl` bindings enabled in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` with `tallpbx-xml-worker` disabled by default:
+The installer puts two bindings in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`, `tallpbx-octane` and `tallpbx-fallback`. Use the [worker service commands](#octane-xml-worker-optional-performance-mode) for routine changes. If you previously removed or commented out `tallpbx-octane`, restore it before expecting FreeSWITCH to use the worker.
 
-- **Switching between Fast and Octane requires only `systemctl`:** `sudo systemctl enable --now tallpbx-xml-worker` switches to Octane, and `sudo systemctl disable --now tallpbx-xml-worker` returns to Fast (lookups hit closed port `8090` and fall through to `tallpbx-fallback`). No `xml_curl.conf.xml` edit or FreeSWITCH restart is needed.
-- **Commenting out or restoring the `tallpbx-octane` binding is optional** (to eliminate even the refused loopback connection to `:8090`), and **editing `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` requires a FreeSWITCH restart** because FreeSWITCH reads that file only when `mod_xml_curl` loads:
+FreeSWITCH reads the binding file when `mod_xml_curl` loads. The capacity tests required a full restart when changing the Octane binding because `reloadxml` leaves the previous binding list in memory. If the on-disk bindings are correct but were edited since FreeSWITCH started, validate the file and restart FreeSWITCH during a maintenance window. The restart interrupts active calls.
 
 ```bash
-sudo systemctl restart freeswitch
+sudo tpbx freeswitch:validate-xml-curl && sudo systemctl restart freeswitch
 ```
 
-The restart loads the module with the new binding list while no lookup is in flight.
+After the restart, check `fs_cli -x 'status'` and repeat the [lookup check](#check-it) or place a test call.
 
 > **Never switch bindings with `reload mod_xml_curl` on a switch that may be serving calls.**
-> That command unloads the module and frees the memory that holds its bindings, while a registration or call may already be mid-lookup against one of them. The lookup then reads freed memory and FreeSWITCH dies with a segmentation fault, dropping every registration and call on the host at once. `reloadxml` is not a substitute either: it re-reads FreeSWITCH's static XML tree, not the binding file, so the switch keeps answering from the old bindings.
+> The capacity tests recorded segmentation faults when `reload mod_xml_curl` unloaded a binding while a registration or call was still using it.
 
 ### Fast to Stock Is an nginx Change Only
 
@@ -730,13 +729,13 @@ No FreeSWITCH restart and no `xml_curl.conf.xml` binding change are involved.
 ### Confirm Which Path Is Live
 
 ```bash
-# Active binding lines only; a commented-out binding does not match.
-grep -cE '^[[:space:]]*<binding name="tallpbx-octane"' /etc/freeswitch/autoload_configs/xml_curl.conf.xml
+# Print the names of the configured bindings without exposing the XML token.
+sudo php -r '$xml = simplexml_load_file("/etc/freeswitch/autoload_configs/xml_curl.conf.xml"); foreach ($xml->bindings->binding as $binding) { echo $binding["name"], PHP_EOL; }'
 systemctl is-active tallpbx-xml-worker
 grep -A5 'location = /api/v1/xml-handler {' /etc/nginx/sites-available/pbx
 ```
 
-A binding count of `1` **and** `tallpbx-xml-worker` reporting `active` means Octane answers first; if the worker is `inactive` (or the binding count is `0`), lookups fall through to the nginx location, which then decides between `xml-handler-fast.php` and `index.php`.
+The standard binding order is `tallpbx-octane` followed by `tallpbx-fallback`. With those bindings loaded, FreeSWITCH tries the worker first. If the worker is `inactive`, nginx handles the lookup through `xml-handler-fast.php` or `index.php`, depending on its `location` block. To see whether a live lookup reaches the worker, use the [Octane lookup check](#check-it).
 
 ## Call Detail Records (CDR) Pipeline
 
@@ -774,7 +773,7 @@ A steadily growing `XLEN` means the worker is not keeping up. The worker logs a 
 
 `tpbx cdr:health`, scheduled every five minutes, reports the same signals as three lines — `spooled_posts`, `backlog`, `failed_posts` — and exits non-zero when any of them breaches its threshold, so a silent failure lands in the scheduler log instead of nowhere. All three default to zero on a healthy host; the options `--spool-dir`, `--stream`, `--warn-pending`, `--nginx-error-log`, `--log-lines` (default 2000), and `--window` override the paths and thresholds. `failed_posts` counts only failures inside the last `--window` minutes (default 15), so older history in the log does not keep the check red.
 
-The fast entry's fallback is silent by design: when `cdr-fast.php` throws, the request is re-served by the full application and the caller still receives a normal 200. Every fallback appends one line to `storage/logs/cdr-fast-fallback.log`, so `wc -l` on that file tells you whether the fast entry has been quietly falling back; an absent or empty file means it never has.
+When the fast CDR handler throws, the full application handles the request. Each fallback appends a line to `/var/www/tallpbx/storage/logs/cdr-fast-fallback.log`. Use `wc -l /var/www/tallpbx/storage/logs/cdr-fast-fallback.log` to count recorded fallbacks.
 
 ### When the Worker Stops
 
@@ -786,20 +785,20 @@ Records that arrived while it was down are digested as soon as it returns; nothi
 
 ### Failure Spool and Quarantine
 
-The drain command reads `*.json` files from the failure spool, stores them through the same parser as the live stream, and removes each file only after its row is committed:
+The drain command reads `*.json` files from the default failure spool at `/var/log/freeswitch/json_cdr/failed/`, stores them through the same parser as the live stream, and removes each file only after its row is committed:
 
 ```bash
 tpbx cdr:drain-spool                 # one batch of up to 100 files, skipping files younger than 2 seconds
 tpbx cdr:drain-spool --batch=500     # larger batch after a long outage
 ```
 
-Records land in `quarantine/` instead of the database when the payload cannot be parsed, has no call UUID, or names a domain that no tenant owns. Each file is the untouched payload:
+The worker quarantines records when the payload cannot be parsed, has no call UUID, or names a domain that no tenant owns. List the files containing the original payloads:
 
 ```bash
 ls -l /var/log/freeswitch/json_cdr/quarantine/
 ```
 
-After correcting the cause (for example, assigning the domain to a tenant), move a corrected file back into `failed/` and the next drain imports it. Reviewed quarantine files can be deleted; they are only kept for diagnosis. Sizing is modest — roughly 10 KB per call leg — and the spool only fills while deliveries are failing.
+After correcting the cause (for example, assigning the domain to a tenant), move the corrected file to `/var/log/freeswitch/json_cdr/failed/` for the next drain to import. Reviewed quarantine files can be deleted. The spool uses roughly 10 KB per call leg and grows while deliveries are failing.
 
 ### Fast Entry and Rollback
 
@@ -807,7 +806,7 @@ CDR posts are served by a trimmed entry point (`public/cdr-fast.php`, backed by 
 
 The entry fails open: any error inside it re-serves the request through `index.php`, and if the full application fails too, FreeSWITCH retries and then spools the record to disk. A fault therefore costs speed, never a record.
 
-Rollback is the stock block that ships commented underneath the active location in `/etc/nginx/sites-available/pbx`. Replace the active block with it and reload nginx; no FreeSWITCH, database, or stream change is involved:
+In `/etc/nginx/sites-available/pbx`, find `location = /api/v1/cdr` in the port 80 `server` block. Replace it with the stock configuration commented directly below it. Validate and reload nginx to apply the rollback:
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
@@ -818,10 +817,10 @@ To confirm which path served a post, `access_log` is off for this location by de
 ### Rotating the Ingestion Token
 
 1. Generate a new secret and save it as `FREESWITCH_CDR_TOKEN` in `/var/www/tallpbx/.env`.
-2. Re-render the FreeSWITCH side and reload the module:
+2. Regenerate `/etc/freeswitch/autoload_configs/json_cdr.conf.xml` with the configuration helper, then reload the module:
    ```bash
    tpbx optimize:clear
-   bash scripts/resources/freeswitch.sh --configure-only
+   sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only
    fs_cli -x "unload mod_json_cdr"
    fs_cli -x "load mod_json_cdr"
    ```
@@ -833,7 +832,7 @@ Comment out `<load module="mod_json_cdr"/>` in `/etc/freeswitch/autoload_configs
 
 ### Tuning
 
-* **High call volume:** the endpoint accepts 6,000 requests per minute per IP by default (two legs per call). Raise `FREESWITCH_CDR_THROTTLE_LIMIT` for more than roughly 20 calls per second, then run `tpbx optimize:clear`.
+* **High call volume:** the endpoint accepts 6,000 requests per minute per IP by default (two legs per call). To raise the limit, set `FREESWITCH_CDR_THROTTLE_LIMIT` in `/var/www/tallpbx/.env`, then run `tpbx optimize:clear`.
 * **Redis memory:** the stream shares the instance's memory cap. A large backlog plus the cache can approach the limit; draining the stream or raising `maxmemory` in `/etc/redis/redis.conf` is the remedy.
 * **Recording playback:** recordings must sit under the media roots (`media-storage.store_root` / `spool_root`, by default `/var/lib/tallpbx/media`). The panel refuses to stream any path outside those roots.
 
@@ -876,7 +875,7 @@ TallPBX provides a unified, UI-driven Certificate Manager under the main navigat
 
 ### Headless CLI Helper Scripts (Terminal Fallback)
 
-For terminal-only or headless environments without web panel access, standalone helper scripts remain available under `scripts/resources/`:
+For a server without web panel access, use the helper scripts in `/var/www/tallpbx/scripts/resources/`.
 
 #### 1. Let's Encrypt (Single Domain HTTP-01)
 Requires port 80 to be open and reachable from the internet:
@@ -889,7 +888,7 @@ bash letsencrypt.sh --domain pbx.example.com --staging     # staging test, no ra
 ```
 
 #### 2. Wildcard Certificate (Cloudflare DNS-01)
-Use a wildcard certificate (`*.example.com`) when hosting multiple tenants across subdomains or when port 80 is blocked by a restrictive firewall or carrier NAT:
+Use a wildcard certificate (`*.example.com`) when hosting multiple tenants across subdomains or when port 80 is blocked by a restrictive firewall or carrier NAT. The helper stores its Cloudflare credentials in `/etc/letsencrypt/cloudflare.ini`.
 ```bash
 cd /var/www/tallpbx/scripts/resources
 
@@ -901,17 +900,17 @@ bash letsencrypt.sh --wildcard --domain pbx.example.com
 ```
 
 #### 3. Manual Commercial Certificate Placement
-For certificates purchased from a third-party CA, place `fullchain.pem` and `privkey.pem` under `/etc/letsencrypt/live/<domain>/` and reload Nginx:
+For a third-party certificate, use the Certificate Manager's import option or configure it manually. To configure it manually, place `fullchain.pem` and `privkey.pem` under `/etc/letsencrypt/live/<domain>/`. In the HTTPS `server` block of `/etc/nginx/sites-available/pbx`, point `ssl_certificate` to `fullchain.pem` and `ssl_certificate_key` to `privkey.pem` using their full paths. Then validate and reload nginx:
 ```bash
-nginx -t && systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ### Automated Renewal Schedule
-The TallPBX scheduler runs `certificates:renew` daily at 03:30 AM without overlapping:
+The TallPBX scheduler runs `certificates:renew` daily at 03:30 AM. It writes command output to `/var/www/tallpbx/storage/logs/certificates-renewal.log`. Check that the scheduler is running:
 ```bash
 systemctl status tallpbx-scheduler
 ```
-Renewal output and audit logs are recorded to `storage/logs/certificates-renewal.log` and visible in the Certificate Manager UI under the **Audit Logs** tab.
+The Certificate Manager's **Audit Logs** tab shows certificate activity.
 
 ### Bounded Security Helper Model
 All cryptographic operations, file deployments to `/etc/nginx/` and `/etc/freeswitch/tls/`, and daemon reloads run through the bounded root helper `/usr/local/sbin/tallpbx-certificate` via strict sudoers rules (`/etc/sudoers.d/tallpbx-certificate`), adhering to TallPBX's strict privilege isolation architecture.

@@ -27,8 +27,10 @@ by default, or a remote store you select. A completed archive is accompanied by
 `backup-manifest.json`, which records the format version, the selected scopes,
 the SHA-256 checksum, and the archive size.
 
-- **Location on the appliance**: `<backup-storage.root>/` (default
-  `/var/lib/tallpbx/backups`).
+- The default local file store puts each archive and manifest in
+  `/var/lib/tallpbx/backups/backups/<backup-id>/<timestamp>-<uuid>/`.
+  On other file stores, the path relative to the store root is
+  `backups/<backup-id>/<timestamp>-<uuid>/`.
 - **Retention**: each profile keeps `retention_count` completed runs; older runs
   are pruned automatically.
 - **Encryption**: archives are **not encrypted by TallPBX**. If they leave the
@@ -117,7 +119,7 @@ requester's name and email captured at request time.
 | Extract or snapshot | Nothing destructive ran; maintenance mode was never entered | Not needed |
 | Import | Database and/or files replaced; maintenance mode is **on** and stays on | **Manual** — restore the snapshot from `pre_restore_snapshot_path`, then `tpbx up` |
 | After import (migrate, reconcile, health check) | Database replaced, health check failed | **Manual** — the row and journal both say `failed`; inspect the reason, correct the service or schema, re-run the health check by repeating the restore |
-| Web tier did not answer `/up` | The app was put back into maintenance mode deliberately | **Manual** — fix the web tier, then `php artisan up` |
+| Web tier did not answer `/up` | The app was put back into maintenance mode deliberately | **Manual** — fix the web tier, then `tpbx up` |
 
 A restore that fails **never** leaves the appliance taking live traffic: the
 catch path records the failure in the journal first, then reconciles the row,

@@ -202,8 +202,9 @@ and French (June).
 
 The installer will also prompt for which language FreeSWITCH should use as its
 system-wide default sound prompt language. You can change this at any time
-after installation with `tpbx pbx:sounds:default <language>` or through
-`vars.xml`; see [docs/operations.md](docs/operations.md#freeswitch-sound-prompt-languages) for details.
+after installation with `tpbx pbx:sounds:default <language>` or by editing
+`/etc/freeswitch/vars.xml` on a standard install.
+[FreeSWITCH sound prompt language setup](docs/operations.md#freeswitch-sound-prompt-languages).
 
 ### Post-Installation Next Steps
 
@@ -226,7 +227,7 @@ the old program first; that does not touch your database or recordings.
 
 ### Redis Cache & Session Storage
 
-Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=60`), protecting MariaDB during call bursts. The installer also enforces a safe universal memory ceiling (`maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`), ensuring short-lived intrusion counters and dialplan cache keys expire naturally and can be safely evicted under attack floods without risking system out-of-memory errors. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `.env`, run `tpbx optimize:clear && tpbx optimize`.
+Redis provides in-memory storage for sessions, cache, dynamic intrusion bans, and FreeSWITCH XML handler caching. Fresh installs configure it automatically (`FS_XML_HANDLER_CACHE_TTL=60`), protecting MariaDB during call bursts. The installer also enforces a safe universal memory ceiling (`maxmemory 256mb` and `maxmemory-policy volatile-lru` in `/etc/redis/redis.conf`), ensuring short-lived intrusion counters and dialplan cache keys expire naturally and can be safely evicted under attack floods without risking system out-of-memory errors. Keep `redis-server` running in production; if Redis is down, the PBX continues basic routing while dynamic login and ban tracking pauses. After changing cache or session settings in `/var/www/tallpbx/.env`, run `tpbx optimize:clear && tpbx optimize`.
 
 ### FreeSWITCH Session Rate
 
@@ -234,7 +235,9 @@ Fresh installs cap new calls at FreeSWITCH's default of `60` sessions per second
 
 ### PHP-FPM Worker Sizing
 
-PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer detects host RAM and automatically tunes the PHP-FPM worker pool in `/etc/php/8.5/fpm/pool.d/www.conf`.
+PHP-FPM serves the web panel, call detail records, and FreeSWITCH XML lookups by default. The installer detects host RAM and automatically tunes the PHP-FPM worker pool in `/etc/php/8.5/fpm/pool.d/www.conf`.
+
+The installer also sets up the optional Laravel Octane XML worker and leaves it disabled on fresh installs. [Octane setup and verification](docs/operations.md#octane-xml-worker-optional-performance-mode).
 
 **Every setting the installer writes, in full:**
 
@@ -249,7 +252,7 @@ PHP-FPM serves the web panel and FreeSWITCH HTTP XML handlers. The installer det
 
 In plain terms: **one worker at boot, growing to at most three under load on a 1 GB server (six on 2 GB, twelve on 4 GB+), and shrinking back to at most two when quiet.**
 
-The same six values are re-applied later by `appliance:sync-host`, which runs the installer's own reconciler (`scripts/resources/php-fpm-pool.sh`) after a snapshot restore or an IP change. A server restored onto differently sized hardware therefore comes back with a pool that fits the new machine instead of keeping the ceiling from the machine the snapshot was taken on. A host whose RAM does not match any published tier can be pinned to one with `PHP_FPM_MAX_CHILDREN` in `.env`; editing `/etc/php/*/fpm/pool.d/www.conf` by hand lasts only until the next install or restore.
+The same six values are re-applied later by `appliance:sync-host`, which runs the installer's own reconciler (`scripts/resources/php-fpm-pool.sh`) after a snapshot restore or an IP change. A server restored onto differently sized hardware therefore comes back with a pool that fits the new machine instead of keeping the ceiling from the machine the snapshot was taken on. For a host whose RAM does not match a published tier, set `PHP_FPM_MAX_CHILDREN` in `/var/www/tallpbx/.env` to pin it to a tier. Manual edits to `/etc/php/*/fpm/pool.d/www.conf` last only until the next install or restore.
 
 **Measured capacity with exactly these settings** (full default firewall, warm 60-second lookup cache, 60-second cells):
 
@@ -300,7 +303,11 @@ The installer sets file ownership and permissions automatically. After a manual 
 sudo tpbx permissions:repair --scope=full
 ```
 
-Never run broad `chown` or `chmod` commands across the repository. If Laravel cannot boot, use the emergency fallback script: `sudo bash scripts/repair-application-permissions.sh`.
+Never run broad `chown` or `chmod` commands across the repository. If Laravel cannot boot, run the emergency fallback script.
+
+```bash
+sudo bash /var/www/tallpbx/scripts/repair-application-permissions.sh
+```
 
 #### Configuration Files & Privilege Separation
 
@@ -470,7 +477,8 @@ nano /etc/default/tallpbx   # update the SWITCH_TOKEN line
 ### Git Conflicts During Upgrade
 
 Git may refuse the update when the server has local changes that conflict with
-the new code. Do not delete those changes — save them, update, then restore:
+the new code. To preserve those changes during the update, run the following
+commands from `/var/www/tallpbx`.
 
 ```bash
 # Save local changes, including new files:

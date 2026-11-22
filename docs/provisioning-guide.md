@@ -28,9 +28,9 @@ The endpoint is served by the `provision` module route:
 | `PROVISIONING_HTTP_AUTH_PASSWORD` | `provisioning.http_auth_password` | HTTP **Basic** password. |
 | `PROVISIONING_CIDR` | `provisioning.cidr` | Comma-separated CIDRs allowed to request a configuration. Other addresses get `403`. |
 
-Set `PROVISIONING_CIDR` to the phone network before enabling the switch in
-production — a phone that can fetch its configuration is a phone that could
-fetch someone else's if it guessed a MAC.
+Before enabling provisioning in production, set `PROVISIONING_CIDR` in
+`/var/www/tallpbx/.env` to the phone network. A phone that can fetch its
+configuration could fetch someone else's if it guessed a MAC.
 
 Only Basic authentication is enforced. There is no Digest path in the
 middleware, so a phone configured for Digest must be pointed at Basic instead.
@@ -72,6 +72,8 @@ Reboot or re-request provisioning on the phone.
 - An internal call to the extension rings the handset.
 
 ## 5. Troubleshooting
+
+Provisioning settings are in `/var/www/tallpbx/.env`.
 
 | Symptom | Cause | Fix |
 | :--- | :--- | :--- |

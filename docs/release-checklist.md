@@ -1,9 +1,10 @@
 # Release Checklist
 
 A release ships only after every item below has been executed **on the appliance
-that will run the code**. The CI workflow (`.github/workflows/tests.yml`) is a
-manual environment-parity check, not the gate; it is dispatched by hand and its
-result does not replace the local run.
+that will run the code**. Run the release commands from `/var/www/tallpbx`.
+The CI workflow (`.github/workflows/tests.yml`) is a manual environment-parity
+check, not the gate; it is dispatched by hand and its result does not replace the
+local run.
 
 ## 1. Scope
 
@@ -27,7 +28,7 @@ git rev-parse HEAD            # record the full SHA below
 
 ## 3. Commands run
 
-Run each command once, in this order, from `/var/www/tallpbx`:
+Run each command once in this order:
 
 ```bash
 tpbx optimize:clear
