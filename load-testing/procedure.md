@@ -2,7 +2,7 @@
 
 The ordered run. Each step ends with a checkpoint that must pass before the next step; a failed checkpoint is a stop, not something to work around.
 
-Everything in `code font` is a command you run on the orchestrator unless it is prefixed with `ssh "$PBX_HOST"`.
+Run the commands from the root of your TallPBX checkout on the orchestrator. The `ssh` commands run their payloads on the specified host.
 
 ---
 
@@ -109,21 +109,23 @@ bash load-testing/scripts/load-test-matrix.sh \
 
 ---
 
-## Step 6 — Remaining variants
+## Step 6 — Compare the default and optional XML handlers
 
-One invocation per variant, each applying its own switches. `matrix.php` defines exactly five variants — `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, and `v-octane` — and the runner accepts one `--variant=<name>` per invocation:
+The default fast PHP-FPM handler loads only the telephony modules needed to answer FreeSWITCH's routing and account lookups. Optional Laravel Octane loads the same modules and keeps the application in memory between requests. In production, FreeSWITCH can fall back to PHP-FPM if Octane is unavailable. The fast PHP-FPM handler itself can hand a request to the full Laravel application used by the web panel if it catches an application error.
+
+Run both handlers on every hardware tier with the same build, database, XML workload, cache policy, and PHP-FPM pool. From the TallPBX checkout root on the orchestrator, run:
 
 ```bash
-for variant in v-stock-static v-fast v-fast-default v-octane; do
-  bash load-testing/scripts/load-test-matrix.sh \
-    --tier=h1-1c1g --variant="$variant" --phase=xml \
-    --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
-done
+bash load-testing/scripts/load-test-matrix.sh --list --compare-xml-handlers
+
+bash load-testing/scripts/load-test-matrix.sh \
+  --tier=h1-1c1g --compare-xml-handlers --phase=xml \
+  --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
 ```
 
-**Checkpoint per variant:** same as Step 5, plus the report path proves where the load went — `v-octane` cells are labelled against `127.0.0.1:8090`, every other variant against nginx.
+Repeat the command with the matching `PBX_HOST` and `--tier` for each hardware configuration. Use `--variant` for separate diagnostic runs. Check that both comparison handlers produced all requested reports and that `failures.log` is empty. The Octane reports use `127.0.0.1:8090`, and the PHP-FPM reports use the nginx endpoint.
 
-> Switching to or from `v-octane` changes the `mod_xml_curl` binding, and the switch validates configuration via `tpbx freeswitch:validate-xml-curl` and applies that with a FreeSWITCH **restart** (`systemctl restart freeswitch`), never a module reload (`fs_cli -x 'reload mod_xml_curl'`): unloading the module while a lookup is in flight frees the binding the lookup is using and kills the switch. A `v-fast` or `v-stock` switch only rewrites the nginx location and needs no restart. The rule and its reasoning are in `docs/operations.md` → *Switching Between the Stock, Fast and Octane XML Paths*.
+On the test host, the harness starts or stops the Octane service and temporarily selects one XML endpoint in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`. Isolating the endpoint keeps a SIP test from silently falling back to the other handler. The harness restarts FreeSWITCH whenever it changes that file and restores the original settings and worker state on exit. On a standard appliance, starting or stopping Octane uses the bindings already in memory. [Operations guide for binding changes](../docs/operations.md#stoppingstarting-the-worker-vs-editing-bindings).
 
 > Repeat noise on a 1 vCPU host is about 10 %. Differences smaller than that between two variants are not findings. Raise `--repeats` before drawing a conclusion from a small gap.
 
@@ -133,16 +135,18 @@ done
 
 The XML tests generate no SIP events, so the ESL listener and Reverb must be idle. That is worth checking rather than assuming: a service quietly consuming CPU would put a floor under every number and make the variant comparison meaningless.
 
-Start the sampler on the PBX, then run the cells, then stop it:
+Set `SERIES` to your series name in the orchestrator shell and export it. Start the sampler on the PBX, then run the cells and copy the sample into the local series directory.
 
 ```bash
-ssh "$PBX_HOST" 'nohup bash /root/cpuwatch.sh --sample 2 420 "xml-run" > /root/xml-monitor.csv 2>/dev/null &'
+ssh "$PBX_HOST" 'nohup bash /var/www/tallpbx/load-testing/scripts/tools/cpuwatch.sh --sample 2 420 "xml-run" > /root/xml-monitor.csv 2>/dev/null &'
 
 bash load-testing/scripts/load-test-matrix.sh \
   --tier=h1-1c1g --variant=v-stock-static --phase=xml \
   --profile=100x5 --ttl=production-60 --section=dialplan --repeats=3
 
-scp "$PBX_HOST":/root/xml-monitor.csv load-testing/results/<series>/<tier>/monitoring/
+monitoring_dir="load-testing/results/${SERIES}/h1-1c1g/monitoring"
+mkdir -p "$monitoring_dir"
+scp "$PBX_HOST":/root/xml-monitor.csv "$monitoring_dir/"
 ```
 
 **Acceptance criteria:**
@@ -155,16 +159,17 @@ The recorded run is in `monitoring/` beside the tier artifacts.
 
 ---
 
-## Step 8 — SIP phases
+## Step 8 — Compare call capacity
+
+From the TallPBX checkout root on the orchestrator, set `PBX_HOST` to the test server and `SIPP_HOST` to the load generator. Run the ladder once per hardware tier. Both handlers place the same calls at each offered rate, using the same 60-second test window by default.
 
 ```bash
-bash load-testing/scripts/load-test-matrix.sh \
-  --tier=h1-1c1g --variant=v-stock-static --phase=sip --cps=5
+bash load-testing/scripts/drivers/run-ladder.sh --tier=h1-1c1g
 ```
 
-**Checkpoint:** the SIPp log under `<tier>/<variant>/sip-cps<n>/` shows the expected scenarios completing, and `failures.log` stays empty.
+The ladder checks each mode separately. It moves on until both handlers complete under 95% of offered calls at three consecutive rates or the configured rates run out. A missing result, setup failure, or failed call-detail record check stops the ladder with an error. For one rate, use `load-testing/scripts/load-test-matrix.sh --tier=h1-1c1g --compare-xml-handlers --phase=sip --cps=5`.
 
-This is the only phase where ESL profile, broadcast throttling and CDR transport can change a number, because it is the only phase that produces events.
+Check both `ladder.csv` files and `failures.log` under `load-testing/results/<series>/<tier>/` before reporting a comparison. For sizing, report the highest tested rate that completed every call and state the run duration and workload. Keep lower completion rates in the detailed report.
 
 ---
 
@@ -179,7 +184,7 @@ To validate complex telephony routing patterns beyond basic 1-to-1 extension cal
      --include-extended-fixtures --include-media-fixtures'
    ```
 
-2. **Run extended scenario validation from the generator:**
+2. **Run extended scenario validation from the generator.** First copy the seeded CSV into `storage/app/load-tests/sipp-users.csv` relative to the generator's checkout at `/var/www/tallpbx`. [Copying the CSV from the PBX](../docs/load-testing-guide.md#best-practices-for-reliable-sip-load-testing).
    ```bash
    ssh "$SIPP_HOST" 'cd /var/www/tallpbx && \
      PBX_HOST="$PBX_HOST" LOAD_GENERATOR_IP="$SIPP_HOST" \
@@ -240,6 +245,8 @@ A cell failure never aborts the series: the runner records it in `failures.log` 
 Series summaries and written analyses are recorded as new dated sections in `docs/load-testing-results.md` (or series-specific narrative files like `docs/load-testing-<series>.md`), citing the consolidated comparison datasets committed under `load-testing/results/consolidated/` and the backing run directory.
 
 Every table in the report cites the `load-testing/results/<series>/…` path its numbers came from, so any figure can be traced back to a cell file and from there to a manifest.
+
+For each hardware tier in a capacity series, record both handlers at the same offered rates. Mark any missing run explicitly and include the date, build, hardware, registered account count, offered duration, completion count, cache policy, and runtime database in the comparison or its linked report.
 
 ---
 

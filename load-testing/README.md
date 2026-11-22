@@ -9,6 +9,8 @@ This directory is the **reproducible benchmark harness** (structured so an AI ag
 
 If a harness rule or capacity-measurement detail conflicts with another document, this directory wins.
 
+TallPBX uses a fast PHP-FPM handler by default to answer FreeSWITCH's XML lookups for accounts and call routes. It loads only the telephony modules. Laravel Octane is an optional performance mode that loads the same list and keeps the application in memory between requests. On a standard install, FreeSWITCH falls back to PHP-FPM when Octane is unavailable. If the fast PHP-FPM handler catches an application error, its worker runs the full Laravel application used by the web panel. [XML worker setup](../docs/operations.md#octane-xml-worker-optional-performance-mode).
+
 ---
 
 ## If you are an AI agent, read these in this order
@@ -56,22 +58,26 @@ Read the scripts only when the documents do not answer a question:
 
 ## The short version
 
+Run these commands from the root of your TallPBX checkout on the orchestrator, with `PBX_HOST` set to the PBX address.
+
 ```bash
 # 1. Confirm the host under test carries this branch and a clean tree
 ssh root@"$PBX_HOST" 'cd /var/www/tallpbx && git rev-parse --short HEAD && git status --porcelain'
 
 # 2. See exactly what a cell would run
 bash load-testing/scripts/load-test-matrix.sh --dry-run \
-  --tier=h1-1c1g --variant=v-stock-static --phase=xml --profile=100x5 \
+  --tier=h1-1c1g --compare-xml-handlers --phase=xml --profile=100x5 \
   --ttl=production-60 --section=dialplan --repeats=1
 
 # 3. Measure it
 PBX_HOST="$PBX_HOST" bash load-testing/scripts/load-test-matrix.sh \
-  --tier=h1-1c1g --variant=v-stock-static --phase=xml \
+  --tier=h1-1c1g --compare-xml-handlers --phase=xml \
   --profile=100x5 --ttl=production-60 --section=dialplan --repeats=1
 ```
 
 The run writes a manifest, applies each switch and asserts it, runs the cell, records a lookup probe, pulls the artifacts, restores the baseline, and prints where the data went.
+
+Run the PHP-FPM and Octane comparison on every hardware tier. For SIP capacity, use `PBX_HOST="$PBX_HOST" SIPP_HOST="$SIPP_HOST" bash load-testing/scripts/drivers/run-ladder.sh --tier=h1-1c1g`, then repeat for each tier with its own PBX host. `bash load-testing/scripts/load-test-matrix.sh --list --compare-xml-handlers` shows the full comparison matrix. Publish both results or mark the comparison incomplete. [Call capacity procedure](procedure.md#step-8--compare-call-capacity).
 
 ---
 
@@ -80,8 +86,11 @@ The run writes a manifest, applies each switch and asserts it, runs the cell, re
 ```
 storage/app/load-tests/                        (git-ignored, PBX scratch space)
     sipp-users.csv         seeded endpoint accounts and credentials
-    sipp-users-auth.csv    auth CSV for SIPp scenarios
     dialplan.xml           temporary XML dumps from single commands
+
+storage/app/load-tests/sipp-e2e-<timestamp>/   (git-ignored, generator scratch space)
+    sipp-users-auth.csv    auth CSV for this SIPp run
+    summary.md            outcome and paths to the run's artifacts
 
 load-testing/results/<series>/<tier>/          (git-ignored, local working data)
     manifest.json          what host, build and configuration the run had
@@ -109,7 +118,7 @@ Series narrative reports live in `docs/load-testing-results.md` (as a new dated 
 
 | Axis | Options | Where defined |
 |:--|:--|:--|
-| Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `load-testing/matrix.php` → `tiers` |
+| Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 4 vCPU/8 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `load-testing/matrix.php` → `tiers` |
 | XML-serving variant | `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, `v-octane` | → `variants` |
 | Load profile | `25x1`, `100x5`, `500x25`, `1000x25` (`--rates=5,10,15,20,25`), `1000x25-8020` | → `xml_profiles` |
 | Cache policy / TTL presets | `default` (`300s / 60s`), `tuned` (`1800s / 600s`), `production-60` (`60s / 60s`), `extended-30` (`30s / 30s`), `cold`, `dialplan-off`, `cache-hit-60`, `uncached-redis` (`0s / 0s`, store `redis`), `uncached-db` (`0s / 0s`, store `null`) | → `cache_ttl_profiles` |

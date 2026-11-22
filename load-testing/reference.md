@@ -86,6 +86,8 @@ Every abbreviation and jargon term used in this directory, in plain language. No
 
 ## Runner flags
 
+Run the matrix from the root of your TallPBX checkout on the orchestrator.
+
 ```bash
 bash load-testing/scripts/load-test-matrix.sh [options]
 ```
@@ -96,11 +98,12 @@ bash load-testing/scripts/load-test-matrix.sh [options]
 | `--dry-run` | Print the exact command per cell without executing it |
 | `--tier=<id>` | Restrict to one hardware tier. Required to execute |
 | `--variant=<id>` | Restrict to one XML-serving variant |
+| `--compare-xml-handlers` | Run `v-fast-default` and `v-octane` with the same PHP-FPM pool. Runs XML and SIP by default. Use `--phase=xml` or `--phase=sip` to select one phase |
 | `--phase=xml\|sip\|ablation` | Restrict to one phase |
 | `--ablation=<id>` | Restrict to one ablation experiment (`fs-db`, `fs-loglevel`, `esl-subscriptions`, `broadcast-throttle`, etc.) |
 | `--section=dialplan\|directory\|mixed` | Restrict the XML battery to one request section |
 | `--profile=<id>` / `--profiles=<list>` | Restrict to one or more load profiles (default `1000x25,1000x25-8020`; also `25x1`, `100x5`, `500x25`) |
-| `--ttl=<id>` | Restrict to one cache policy (`production-60`, `cold`, …) |
+| `--ttl=<id>` | Restrict XML tests to one cache policy (`production-60`, `cold`, …). A paired SIP run defaults to `production-60` |
 | `--repeats=<n>` | Repetitions per cell (default 3) |
 | `--cps=<n>` | Offered calls per second for SIP and ablation cells (default 5) |
 
@@ -244,10 +247,9 @@ The manifest is rewritten at the start of every invocation. A tier measured acro
 ## Mechanics that are easy to get wrong
 
 - **SSH connection reuse drains stdin.** Every remote call uses `ssh -n`. Without it the first cell silently ends the `while read` loop that is driving it, and the remaining profiles never run.
-- **Each switch is a separate remote process.** `apply_*` and `assert_*` are independent invocations; the snapshot they write lives in `/var/lib/tallpbx/load-test-state`, which is what lets a later process restore the baseline.
-- **The restore trap only arms on request.** `SWITCH_RESTORE_ON_EXIT=1` is set by the runner for the teardown; a single-shot `switch.sh` call never restores implicitly, so applying one switch by hand stays applied.
+- **Each switch is a separate remote process.** The runner shares a snapshot directory under `/var/lib/tallpbx/load-test-matrix.lock/` across the switch calls in one run. The lock prevents two runs from changing settings on the same PBX. Teardown removes it after a successful restore. A single-shot `switch.sh` call by hand defaults to `/var/lib/tallpbx/load-test-state`.
 - **Per-variant URL.** `v-octane` posts to `PBX_OCTANE_URL`; every other variant posts to `PBX_URL`. Posting an Octane cell at nginx measures PHP-FPM and would be mislabelled.
-- **`v-octane` still applies `fpm:static`** for consistency, although FPM is not in its path.
+- **Both comparison variants use the installed dynamic PHP-FPM pool.** The pool still processes call records in the Octane variant. The test selects one XML endpoint so that the SIP result can be attributed to its handler.
 - **`--ttl` and `--profile` narrow the battery, not the matrix.** The matrix still lists all six cache policies; the flag only selects which run in this invocation.
 
 ---
@@ -256,7 +258,7 @@ The manifest is rewritten at the start of every invocation. A tier measured acro
 
 ### `load-testing/scripts/tools/cpuwatch.sh`
 
-Attributes CPU and memory to each service. Two modes:
+Run from `/var/www/tallpbx` on the PBX to sample CPU and memory for each service.
 
 ```bash
 # One aggregate window
@@ -288,6 +290,8 @@ Interpretation: if both services report `ticks=0` under XML-only load and the al
 | `tests/Feature/Pbx/LoadTestManifestCommandTest.php` | The manifest has all sections, a 40-character SHA, and no verbatim secret |
 | `tests/Feature/Pbx/LoadTestSwitchScriptTest.php` | Every `apply_*` has an `assert_*`, the restore is trapped, the probe exists, and nothing touches `nftables` |
 | `tests/Feature/Pbx/LoadTestMatrixRunnerTest.php` | Listing completeness, dry-run never executes, filter validation, per-variant URL, the probe is wired in, `--ttl` narrows the battery |
+
+Run these checks from the root of the TallPBX checkout.
 
 ```bash
 ./vendor/bin/pest tests/Feature/Pbx --parallel

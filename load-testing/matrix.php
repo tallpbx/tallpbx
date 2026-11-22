@@ -23,9 +23,7 @@ return [
     |   - v-fast, v-stock-static, v-stock-dynamic: Static pool and baseline profiles
     |     retained for sweep benchmarking and ablation comparisons.
     |
-    | Stage A measures every variant on the shared-CPU tiers and ends at the
-    | decision gate (Task 10). Stage B re-runs only the configuration frozen
-    | at that gate, on dedicated-CPU tiers.
+    | Compare both active serving modes on shared and dedicated hardware.
     */
 
     /*
@@ -78,6 +76,17 @@ return [
             'fpm_alt' => 'dynamic',
             'fpm_alt_children' => 6,
         ],
+        'h4-4c8g' => [
+            'stage' => 'a',
+            'vcpu' => 4,
+            'ram_mb' => 8192,
+            'cpu' => 'shared',
+            'swap_mb' => 2048,
+            'fpm' => 'static',
+            'fpm_children' => 12,
+            'fpm_alt' => 'dynamic',
+            'fpm_alt_children' => 12,
+        ],
         'h2d-2c8g' => [
             'stage' => 'b',
             'vcpu' => 2,
@@ -86,8 +95,8 @@ return [
             'swap_mb' => 2048,
             'fpm' => 'static',
             'fpm_children' => 12,
-            'fpm_alt' => null,
-            'fpm_alt_children' => null,
+            'fpm_alt' => 'dynamic',
+            'fpm_alt_children' => 12,
         ],
         'h4d-4c16g' => [
             'stage' => 'b',
@@ -97,8 +106,8 @@ return [
             'swap_mb' => 2048,
             'fpm' => 'static',
             'fpm_children' => 24,
-            'fpm_alt' => null,
-            'fpm_alt_children' => null,
+            'fpm_alt' => 'dynamic',
+            'fpm_alt_children' => 12,
         ],
     ],
 
@@ -120,7 +129,7 @@ return [
     | runner aborts the cell when one of them cannot be asserted.
     |   fpm:<mode>            PHP-FPM pool mode
     |   xml-path:<stock|fast> nginx front controller for /api/v1/xml-handler
-    |   octane:<on|off>       tallpbx-octane XML binding on 127.0.0.1:8090
+    |   octane:<only|off>     XML service under test on the benchmark host
     */
 
     'variants' => [
@@ -145,7 +154,7 @@ return [
         // Opt-in resident RoadRunner worker mode for low-latency XML serving.
         'v-octane' => [
             'label' => 'Persistent RoadRunner worker',
-            'requires' => ['fpm:static', 'xml-path:stock', 'octane:on'],
+            'requires' => ['fpm:dynamic', 'xml-path:fast', 'octane:only'],
         ],
     ],
 

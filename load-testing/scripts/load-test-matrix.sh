@@ -130,6 +130,7 @@ CDR_EXPECT_RECORDS="${CDR_EXPECT_RECORDS:-1}"
 
 TIER=""
 VARIANT=""
+COMPARE_XML_HANDLERS=0
 PHASE=""
 SECTION=""
 PROFILE=""
@@ -144,10 +145,8 @@ LADDER_SECONDS="${LADDER_SECONDS:-60}"
 LIST_MODE=0
 DRY_RUN=0
 
-# The matrix cache is scratch, not evidence: raw per-cell fragments under
-# load-testing/results/<series>/ are git-ignored working artifacts while
-# consolidated CSVs under load-testing/results/consolidated/ are committed.
-MATRIX_CACHE="${MATRIX_CACHE:-${TMPDIR:-/tmp}/tallpbx-load-matrix-${SERIES}.json}"
+SWITCH_RUN_STATE=""
+SWITCH_LOCK="/var/lib/tallpbx/load-test-matrix.lock"
 
 # Lookups are memoised: building a dry-run touches every profile field, and one
 # PHP process per field would dominate the runtime.
@@ -164,22 +163,6 @@ MATRIX_LOADED=0
 # Matrix access
 # ------------------------------------------------------------------------------
 
-# Dump the declarative matrix to JSON once per series so later reads are cheap.
-#
-# The matrix is a plain PHP array in the test tooling, not an application
-# configuration, so it is read directly rather than through the framework's
-# configuration repository.
-matrix_cache() {
-    if [ ! -f "$MATRIX_CACHE" ]; then
-        mkdir -p "$(dirname "$MATRIX_CACHE")"
-        php -r '
-            echo json_encode(require $argv[1], JSON_THROW_ON_ERROR);
-        ' "${ROOT_DIR}/load-testing/matrix.php" > "$MATRIX_CACHE"
-    fi
-
-    printf '%s' "$MATRIX_CACHE"
-}
-
 # Flatten the matrix into dot-path lookups in one PHP pass.
 #
 # Type V lines carry a scalar value, type K lines carry the ordered key names
@@ -189,8 +172,7 @@ matrix_load() {
         return 0
     fi
 
-    local file type a b c
-    file="$(matrix_cache)"
+    local type a b c
 
     while IFS=$'\t' read -r type a b c; do
         case "$type" in
@@ -198,7 +180,7 @@ matrix_load() {
             K) MATRIX_KEY_CACHE["$a:$b"]="$c" ;;
         esac
     done < <(php -r '
-        $m = json_decode((string) file_get_contents($argv[1]), true);
+        $m = require $argv[1];
 
         $walk = function (string $prefix, $node) use (&$walk): void {
             if (is_array($node)) {
@@ -220,7 +202,7 @@ matrix_load() {
         };
 
         $walk("", $m);
-    ' "$file")
+    ' "${ROOT_DIR}/load-testing/matrix.php")
 
     MATRIX_LOADED=1
 }
@@ -321,6 +303,7 @@ Usage: load-test-matrix.sh [options]
   --dry-run              Print the exact command per cell without executing
   --tier=<id>            Restrict to one hardware tier (required to execute)
   --variant=<id>         Restrict to one XML-serving variant
+  --compare-xml-handlers Run default PHP-FPM and Octane for the same XML and SIP tests
   --phase=<xml|sip|ablation>  Restrict to one phase
   --ablation=<id>        Restrict the ablation phase to one knob (fs-db, esl-subscriptions, ...)
   --section=<dialplan|directory|mixed>  Restrict the XML battery to one section
@@ -361,6 +344,7 @@ parse_args() {
             --dry-run) DRY_RUN=1 ;;
             --tier=*) TIER="${arg#*=}" ;;
             --variant=*) VARIANT="${arg#*=}" ;;
+            --compare-xml-handlers) COMPARE_XML_HANDLERS=1 ;;
             --phase=*) PHASE="${arg#*=}" ;;
             --section=*) SECTION="${arg#*=}" ;;
             --profile=*) PROFILE="${arg#*=}" ;;
@@ -389,6 +373,11 @@ validate_filters() {
     variants="$(matrix_keys variants)"
     ttls="$(matrix_keys cache_ttl_profiles)"
 
+    if [ "$COMPARE_XML_HANDLERS" = "1" ] && { [ -n "$VARIANT" ] || [ "$PHASE" = "ablation" ] || [ -n "$ABLATION_FILTER" ]; }; then
+        printf '%s\n' '--compare-xml-handlers cannot be combined with a single variant or ablation.' >&2
+        return 2
+    fi
+
     if [ -n "$TIER" ] && ! grep -qxF "$TIER" <<< "$tiers"; then
         printf 'Unknown tier: %s\n' "$TIER" >&2
         return 2
@@ -409,8 +398,23 @@ validate_filters() {
         return 2
     fi
 
+    if [ -n "$PROFILE" ] && ! matrix_keys xml_profiles | grep -qxF "$PROFILE"; then
+        printf 'Unknown XML profile: %s\n' "$PROFILE" >&2
+        return 2
+    fi
+
+    if [ -n "$SECTION" ] && ! matrix_list_sections | grep -qxF "$SECTION"; then
+        printf 'Unknown XML section: %s\n' "$SECTION" >&2
+        return 2
+    fi
+
     if ! [[ "$REPEATS" =~ ^[0-9]+$ ]] || [ "$REPEATS" -lt 1 ]; then
         printf 'Repeats must be a positive integer\n' >&2
+        return 2
+    fi
+
+    if ! [[ "$CPS" =~ ^[1-9][0-9]*$ && "$LADDER_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+        printf 'CPS and LADDER_SECONDS must be positive integers\n' >&2
         return 2
     fi
 
@@ -434,6 +438,11 @@ selected_variants() {
         return
     fi
 
+    if [ "$COMPARE_XML_HANDLERS" = "1" ]; then
+        printf '%s\n' v-fast-default v-octane
+        return
+    fi
+
     matrix_keys variants
 }
 
@@ -441,6 +450,11 @@ selected_variants() {
 selected_phases() {
     if [ -n "$PHASE" ]; then
         printf '%s\n' "$PHASE"
+        return
+    fi
+
+    if [ "$COMPARE_XML_HANDLERS" = "1" ]; then
+        printf '%s\n' xml sip
         return
     fi
 
@@ -564,6 +578,10 @@ sip_run_dir() {
         return
     fi
 
+    if [ "$COMPARE_XML_HANDLERS" = "1" ] && [ -n "$SWITCH_RUN_STATE" ]; then
+        dir="${dir}/${SWITCH_RUN_STATE##*/}"
+    fi
+
     printf '%s\n' "${SIPP_APP_DIR}/storage/app/load-tests/${SERIES}/${tier}/${dir}/sip-cps${CPS}"
 }
 
@@ -602,6 +620,16 @@ sipp_summary_passed() {
 
     # The suite must have run at least one step.
     grep -qE '^- [^:]+: passed' "$summary"
+}
+
+# SIPp exits 1 when some calls failed. A full tally from that step can still
+# measure capacity saturation after registration and a passing smoke test.
+sipp_capacity_measured() {
+    local summary="$1"
+
+    grep -qxF -- '- register: passed' "$summary" \
+        && grep -qxF -- '- extension-calls: failed with exit code 1' "$summary" \
+        && ! grep -qE '^- (outbound-calls|register): (failed|aborted)' "$summary"
 }
 
 # Read the gateway host the load-test tenant's outbound route points at.
@@ -759,6 +787,10 @@ switch_command() {
         quoted+=" $(printf '%q' "$arg")"
     done
 
+    if [ -n "$SWITCH_RUN_STATE" ]; then
+        printf 'SWITCH_STATE_DIR=%q ' "$SWITCH_RUN_STATE"
+    fi
+
     printf 'APP_DIR=%s bash %s %s%s' \
         "$(printf '%q' "$REMOTE_APP_DIR")" \
         "$(printf '%q' "$REMOTE_APP_DIR/load-testing/scripts/lib/switch.sh")" \
@@ -786,7 +818,7 @@ apply_variant() {
                 switch_call apply_xml_path "${requirement#xml-path:}" || return 1
                 ;;
             octane:*)
-                switch_call apply_octane_binding "${requirement#octane:}" || return 1
+                switch_call apply_xml_worker "${requirement#octane:}" || return 1
                 ;;
             *)
                 printf 'UNKNOWN-REQUIREMENT %s\n' "$requirement" >&2
@@ -802,7 +834,7 @@ apply_variant() {
 
 # Return the XML handler URL one variant must be measured against.
 #
-# Five variants are served by nginx, so the shared URL is correct for them.
+# Most variants are served by nginx, so the shared URL is correct for them.
 # The Octane variant switches FreeSWITCH to the persistent worker, which is a
 # different HTTP server on port 8090; posting to nginx would measure the pool
 # instead and mislabel the result.
@@ -810,7 +842,7 @@ xml_url_for_variant() {
     local variant="$1" requirement
 
     while IFS= read -r requirement; do
-        if [ "$requirement" = "octane:on" ]; then
+        if [ "$requirement" = "octane:only" ]; then
             printf '%s\n' "$PBX_OCTANE_URL"
             return 0
         fi
@@ -1215,7 +1247,12 @@ teardown_tier() {
     trap - EXIT INT TERM
 
     printf 'Restoring the PBX baseline\n' >&2
-    switch_call restore_baseline || printf 'WARNING: baseline restore reported a failure\n' >&2
+    if switch_call restore_baseline; then
+        run_on_pbx "rm -rf -- $(printf '%q' "$SWITCH_RUN_STATE") && rmdir -- $(printf '%q' "$SWITCH_LOCK")" || exit_code=1
+    else
+        printf 'Baseline restore failed. Snapshots are on the PBX in %s\n' "$SWITCH_RUN_STATE" >&2
+        exit_code=1
+    fi
 
     if [ "$PBX_HOST" != "local" ] && [ -d "${ARTIFACT_ROOT}/${TIER}" ]; then
         scp $SSH_OPTS -P "$SSH_PORT" -r "${PBX_HOST}:${REMOTE_ARTIFACT_ROOT}/${TIER}/." "${ARTIFACT_ROOT}/${TIER}/" >/dev/null 2>&1 \
@@ -1243,13 +1280,19 @@ teardown_tier() {
         fi
     fi
 
-    return "$exit_code"
+    exit "$exit_code"
 }
 
 # Build a short readiness probe for the XML handler.
 readiness_command() {
+    local variant="$1"
+
     printf 'cd %q && php artisan pbx:load-test:dialplan --tenant=%q --url=%q --requests=%q --concurrency=%q --scenario=%q --section=%q --report=%q' \
-        "$REMOTE_APP_DIR" "$LOAD_TENANT" "$PBX_URL" 5 1 internal dialplan "/tmp/tallpbx-readiness.json"
+        "$REMOTE_APP_DIR" "$LOAD_TENANT" "$(xml_url_for_variant "$variant")" 5 1 internal dialplan "${SWITCH_RUN_STATE}/readiness.json"
+
+    if [ -n "$PBX_XML_TOKEN" ]; then
+        printf ' --token=%q' "$PBX_XML_TOKEN"
+    fi
 }
 
 # Wait until the XML handler answers after a switch change.
@@ -1258,10 +1301,10 @@ readiness_command() {
 # answered with 502. That failure belongs to the switch, not to the
 # measurement, so the runner waits it out instead of recording a fake result.
 wait_for_xml_ready() {
-    local attempt
+    local variant="$1" attempt
 
     for attempt in $(seq 1 15); do
-        if run_on_pbx "$(readiness_command)" >/dev/null 2>&1; then
+        if run_on_pbx "$(readiness_command "$variant")" >/dev/null 2>&1; then
             return 0
         fi
 
@@ -1269,6 +1312,16 @@ wait_for_xml_ready() {
     done
 
     return 1
+}
+
+apply_cache_policy() {
+    local ttl_id="$1"
+
+    switch_call apply_ttl \
+        "$(matrix_value cache_ttl_profiles "$ttl_id" dialplan)" \
+        "$(matrix_value cache_ttl_profiles "$ttl_id" contributor)" \
+        "$(matrix_value cache_ttl_profiles "$ttl_id" directory)" \
+        "$(matrix_value cache_ttl_profiles "$ttl_id" acl)"
 }
 
 # Run the XML battery for one variant: every profile x TTL x section x repeat.
@@ -1282,10 +1335,6 @@ run_xml_phase() {
         return 1
     fi
 
-    if ! wait_for_xml_ready; then
-        printf 'XML-HANDLER-NOT-READY after applying %s\n' "$variant" >&2
-    fi
-
     # Warm-up cells: the first requests after a switch are always slower,
     # because the pool has just restarted and the worker has just booted. One
     # small pass is not enough to absorb a fresh worker, so two run — still
@@ -1294,11 +1343,10 @@ run_xml_phase() {
     warmup_ttl_id="$(warmup_ttl)"
     warmup_section="$(selected_sections | head -n1)"
 
-    switch_call apply_ttl \
-        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" dialplan)" \
-        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" contributor)" \
-        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" directory)" \
-        "$(matrix_value cache_ttl_profiles "$warmup_ttl_id" acl)" >/dev/null 2>&1 || true
+    if ! apply_cache_policy "$warmup_ttl_id" || ! wait_for_xml_ready "$variant"; then
+        cell_failed "${TIER}/${variant}/xml (cache policy or handler readiness)"
+        return 1
+    fi
 
     for warmup_pass in 1 2; do
         warmup_log="${ARTIFACT_ROOT}/${TIER}/logs/${TIER}_${variant}_warmup-${warmup_pass}.log"
@@ -1320,14 +1368,10 @@ run_xml_phase() {
 
                 # Applying the TTL once per profile keeps the cell boundary
                 # explicit even when two profiles share the same values.
-                switch_call apply_ttl \
-                    "$(matrix_value cache_ttl_profiles "$ttl_id" dialplan)" \
-                    "$(matrix_value cache_ttl_profiles "$ttl_id" contributor)" \
-                    "$(matrix_value cache_ttl_profiles "$ttl_id" directory)" \
-                    "$(matrix_value cache_ttl_profiles "$ttl_id" acl)" || {
-                    cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section}"
+                if ! apply_cache_policy "$ttl_id" || ! wait_for_xml_ready "$variant"; then
+                    cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section} (cache policy or handler readiness)"
                     continue
-                }
+                fi
 
                 for repeat in $(seq 1 "$REPEATS"); do
                     label="${TIER}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}"
@@ -1390,7 +1434,7 @@ warm_directory() {
 # none of them.
 run_sip_phase() {
     local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file cpu_csv
-    local successful failed already_failed=0 fs_pid_before fs_pid_after
+    local successful failed fs_pid_before fs_pid_after run_status
 
     # A cell measured behind a half-applied switch is a plausible but
     # meaningless number, so a failed switch fails the cell instead: a
@@ -1400,8 +1444,8 @@ run_sip_phase() {
         return 1
     fi
 
-    if ! wait_for_freeswitch; then
-        cell_failed "${TIER}/${variant}/sip-cps${CPS} (freeswitch not ready)"
+    if ! wait_for_xml_ready "$variant" || ! wait_for_freeswitch; then
+        cell_failed "${TIER}/${variant}/sip-cps${CPS} (XML handler or FreeSWITCH not ready)"
         return 1
     fi
 
@@ -1410,6 +1454,7 @@ run_sip_phase() {
     label="${TIER}/${variant}/sip-cps${CPS}"
 
     mkdir -p "$local_run_dir"
+    rm -f -- "${local_run_dir}/summary.md" "${local_run_dir}/extension-calls.log" "${local_run_dir}/cdr-gate.txt"
 
     # The directory lookup is the first thing a registering endpoint waits for.
     warm_directory
@@ -1456,6 +1501,7 @@ run_sip_phase() {
         printf 'FS-RESTARTED label=%s pid=%s->%s\n' "$label" "$fs_pid_before" "$fs_pid_after" \
             | tee "${local_run_dir}/fs-restart.txt" >&2
         cell_failed "${label}-fs-restart"
+        return 1
     fi
 
     # The sampler writes on the PBX; pull it beside the cell artifacts so the
@@ -1466,17 +1512,21 @@ run_sip_phase() {
 
     # The artifacts are pulled before the cell is judged, because the summary
     # arrives with them and a stale summary would decide the wrong thing.
-    pull_sipp_artifacts "$remote_run_dir" "$local_run_dir" \
-        || printf 'WARNING: could not pull SIPp artifacts from %s\n' "$SIPP_HOST" >&2
+    if ! pull_sipp_artifacts "$remote_run_dir" "$local_run_dir"; then
+        cell_failed "${label} (could not pull SIPp artifacts)"
+        return 1
+    fi
 
     # The summary is the measurement's own account of itself, so it decides the
     # cell. The session that carried the run can drop while a long step is in
     # progress, and a transport failure is not a measurement failure.
-    if ! sipp_summary_passed "${local_run_dir}/summary.md"; then
+    if sipp_summary_passed "${local_run_dir}/summary.md" && grep -qxF -- '- outbound-calls: passed' "${local_run_dir}/summary.md"; then
+        if [ "$run_status" != "0" ]; then
+            printf 'WARNING: the generator session dropped during %s, but every step passed\n' "$label" >&2
+        fi
+    elif ! sipp_capacity_measured "${local_run_dir}/summary.md"; then
         cell_failed "$label"
-        already_failed=1
-    elif [ "$run_status" != "0" ]; then
-        printf 'WARNING: the generator session dropped during %s, but every step passed\n' "$label" >&2
+        return 1
     fi
 
     # SIPp's tally says how many rows the database must gain, so it is read
@@ -1490,16 +1540,10 @@ run_sip_phase() {
     successful="${counts%% *}"
     failed="${counts##* }"
 
-    # One row per rung: the stop rule (three consecutive rungs under 95 %
-    # completion) is applied from this record, not from memory.
-    ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
-    mkdir -p "$(dirname "$ladder_file")"
-
-    if [ ! -f "$ladder_file" ]; then
-        printf 'recorded_at,cps,successful,failed,label\n' > "$ladder_file"
+    if [ "$((successful + failed))" -ne "$((CPS * LADDER_SECONDS))" ]; then
+        cell_failed "${label} (SIPp tallied ${successful} successful and ${failed} failed calls; expected $((CPS * LADDER_SECONDS)))"
+        return 1
     fi
-
-    printf '%s,%s,%s,%s,%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" >> "$ladder_file"
 
     after="$(cdrs_wait_for "$before" "$successful")"
     printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
@@ -1512,7 +1556,18 @@ run_sip_phase() {
         return 1
     fi
 
-    return "$already_failed"
+    # One row per rung: the stop rule (three consecutive rungs under 95 %
+    # completion) is applied from this record, not from memory.
+    ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
+    mkdir -p "$(dirname "$ladder_file")"
+
+    if [ ! -f "$ladder_file" ]; then
+        printf 'recorded_at,cps,successful,failed,label\n' > "$ladder_file"
+    fi
+
+    printf '%s,%s,%s,%s,%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" >> "$ladder_file"
+
+    return 0
 }
 
 # Run the single-knob ablations the switch library can drive.
@@ -1617,8 +1672,8 @@ run_sip_smoke() {
         return 1
     fi
 
-    if ! wait_for_freeswitch; then
-        printf 'SMOKE-FAILED %s/%s (freeswitch not ready)\n' "$TIER" "$variant" >&2
+    if ! wait_for_xml_ready "$variant" || ! wait_for_freeswitch; then
+        printf 'SMOKE-FAILED %s/%s (XML handler or FreeSWITCH not ready)\n' "$TIER" "$variant" >&2
         return 1
     fi
 
@@ -1691,16 +1746,28 @@ execute_cells() {
         exit 2
     fi
 
-    mkdir -p "${ARTIFACT_ROOT}/${TIER}"
-    trap teardown_tier EXIT INT TERM
-
-    # A failure list from an earlier run would misreport this one.
-    : > "${ARTIFACT_ROOT}/${TIER}/failures.log"
-
     if ! preflight_remote; then
         printf 'Preflight failed; no measurement was taken on %s.\n' "$TIER" >&2
         exit 1
     fi
+
+    if ! SWITCH_RUN_STATE="$(run_on_pbx "mkdir ${SWITCH_LOCK} && { mktemp -d ${SWITCH_LOCK}/run.XXXXXXXX || { rmdir ${SWITCH_LOCK}; exit 1; }; }")"; then
+        printf 'Could not acquire the PBX test lock at %s.\n' "$SWITCH_LOCK" >&2
+        return 1
+    fi
+
+    if ! [[ "$SWITCH_RUN_STATE" =~ ^/var/lib/tallpbx/load-test-matrix\.lock/run\.[[:alnum:]]{8}$ ]]; then
+        printf 'Unexpected snapshot path from PBX. Check %s.\n' "$SWITCH_LOCK" >&2
+        return 1
+    fi
+
+    trap teardown_tier EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+
+    mkdir -p "${ARTIFACT_ROOT}/${TIER}"
+    # A failure list from an earlier run would misreport this one.
+    : > "${ARTIFACT_ROOT}/${TIER}/failures.log"
 
     prepare_tier
     seed_tenant
@@ -1718,6 +1785,12 @@ execute_cells() {
             case "$phase" in
                 xml) run_xml_phase "$variant" || failures=$((failures + 1)) ;;
                 sip)
+                    if [ "$COMPARE_XML_HANDLERS" = "1" ] && ! apply_cache_policy "${TTL:-production-60}"; then
+                        cell_failed "${TIER}/${variant}/sip (cache policy)"
+                        failures=$((failures + 1))
+                        continue
+                    fi
+
                     smoke_gate="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke/cdr-gate.txt"
 
                     if [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
@@ -1734,8 +1807,8 @@ execute_cells() {
         done < <(selected_phases)
     done < <(selected_variants)
 
-    if [ "$failures" -gt 0 ]; then
-        printf '%s phase(s) reported failures; see %s/failures.log\n' "$failures" "${ARTIFACT_ROOT}/${TIER}" >&2
+    if [ "$failures" -gt 0 ] || [ -s "${ARTIFACT_ROOT}/${TIER}/failures.log" ]; then
+        printf 'One or more measurements failed; see %s/failures.log\n' "${ARTIFACT_ROOT}/${TIER}" >&2
         return 1
     fi
 

@@ -6,7 +6,7 @@ Five variants (`v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, 
 bash load-testing/scripts/lib/switch.sh <command> [arguments]
 ```
 
-Every command runs on the PBX. From the orchestrator the runner wraps it in SSH automatically (see `reference.md`).
+When invoking a switch by hand, run it from `/var/www/tallpbx` on the PBX. The matrix runner invokes switches on the PBX over SSH. [Runner reference](reference.md).
 
 ---
 
@@ -16,7 +16,8 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 |:--|:--|:--|
 | `apply_fpm_profile` | `static\|dynamic <children>` | PHP-FPM pool mode and worker count. A dynamic profile also applies the installer's idle floor (`pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`) so a cell measuring "the shipped default" is faithful |
 | `apply_xml_path` | `stock\|fast` | nginx entry file for `/api/v1/xml-handler` |
-| `apply_octane_binding` | `on\|off` | Which `xml_curl` gateway FreeSWITCH consults |
+| `apply_octane_binding` | `on\|off\|only` | Which XML endpoint FreeSWITCH can use |
+| `apply_xml_worker` | `off\|only` | Octane service state and the selected endpoint for a test |
 | `apply_ttl` | `<dialplan> <contributor> [directory] [acl]` | XML cache lifetimes |
 | `apply_fs_loglevel` | `debug\|info\|notice\|warning\|err` | FreeSWITCH file log ceiling |
 | `apply_fs_db_mode` | `sqlite\|mariadb\|disk\|tmpfs` | FreeSWITCH runtime database driver (`sqlite` default vs. `mariadb`; `disk`/`tmpfs` kept for storage ablations) |
@@ -25,7 +26,7 @@ Every command runs on the PBX. From the orchestrator the runner wraps it in SSH 
 | `probe_lookup` | `<extension> <domain> [count]` | Nothing — it measures one directory lookup |
 | `restore_baseline` | — | Reverts everything this library changed |
 
-Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` have no twin by design.
+The switch helpers check the settings they apply. `probe_lookup` reads timing and `restore_baseline` uses the captured settings.
 
 ---
 
@@ -47,16 +48,15 @@ Each `apply_*` has an `assert_*` twin. `probe_lookup` and `restore_baseline` hav
 
 ## `apply_octane_binding`
 
-- **Argument:** `on` or `off`.
-- **File:** `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` — the whole `<binding name="tallpbx-octane">` block is commented or uncommented.
-- **Assertion:** verified via `tpbx freeswitch:validate-xml-curl` and FreeSWITCH is restarted (`systemctl restart freeswitch`), never by reloading `mod_xml_curl` (unloading the module while lookups are in-flight causes segfaults).
-- **Effect:** whether FreeSWITCH's own lookups go to the persistent worker on `:8090` or to nginx.
-- **Caveat:** the shipped file declares **both** gateways active, so `on` reproduces the installed state. An Octane *cell* must also post its HTTP load at `:8090`; the runner does this per variant and it is recorded in the report path.
+- **Argument:** `on` enables both endpoints, `off` selects PHP-FPM, and `only` selects Octane. The benchmark runner calls `apply_xml_worker` to set the worker service and select one endpoint together.
+- **File:** `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`. Each binding defines an address FreeSWITCH can ask for XML.
+- **Verification:** the helper validates the edited configuration and restarts FreeSWITCH when it changes. The runner checks the selected HTTP endpoint with authenticated requests before measuring. The Octane test uses port `8090`.
+- **Restore:** the run restores the original configuration and whether `tallpbx-xml-worker` was active. The service's boot setting remains as configured on the host.
 
 ## `apply_ttl`
 
 - **Argument:** four integers — `dialplan`, `contributor`, then optional `directory`, `acl`. `0` disables that cache. Pre-configured presets include `default` (300s / 60s), `tuned` (1800s / 600s), `production-60` (60s / 60s), `extended-30` (30s / 30s), and `uncached-db` (0s / 0s, store `null`). Load profiles such as `1000x25` (1000 requests, concurrency 25, tested across rates 5, 10, 15, 20, 25) evaluate these retention ceilings.
-- **File:** `.env` (`FS_XML_HANDLER_*_CACHE_TTL`), followed by `config:clear`.
+- **File:** `/var/www/tallpbx/.env` (`FS_XML_HANDLER_*_CACHE_TTL`), followed by `config:clear` and a restart of the Octane worker if it is running and values changed.
 - **Assertion:** `assert_ttl` reads Laravel's resolved runtime configuration: `config('freeswitch.xml_handler.dialplan_cache_ttl')`, `config('freeswitch.xml_handler.dialplan_contributor_cache_ttl')`, `config('freeswitch.xml_handler.directory_cache_ttl')`, and `config('freeswitch.xml_handler.directory_cache_store')`.
 - **Effect:** how often PHP must rebuild an answer, and with that how much database work a lookup costs.
 - **Caveat:** only `dialplan` and `contributor` affect dialplan XML generation. Changing `directory` and `acl` while measuring the dialplan section changes nothing measurable — that is why `extended-30` and `production-60` land inside each other's noise.
@@ -118,8 +118,8 @@ lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 | `v-stock-static` | `static 5` | stock | off |
 | `v-fast` | `static 5` | **fast** | off |
 | `v-fast-default` | `dynamic` (installer default: 1–3 workers on 1 GB) | **fast** | off |
-| `v-octane` | `static 5` | stock | **on** |
+| `v-octane` | `dynamic` (same installer limits as `v-fast-default`) | **fast** | **Octane only for XML** |
 
 `load-testing/matrix.php` is the authority; the runner reads the `requires` list per variant and applies each entry in order.
 
-> `v-octane` applies `fpm:static` for consistency, but FPM is not in the XML path for that variant — the cell posts to `:8090`. Treat the pool setting as inert there.
+The fast PHP-FPM handler loads only the telephony modules. Optional Octane loads the same list and keeps the application in memory. On a standard appliance, FreeSWITCH falls back to PHP-FPM when Octane is unavailable, and the fast PHP-FPM handler can run the full web-panel application on an error. The benchmark isolates the selected XML endpoint. PHP-FPM still handles other work such as call records during the Octane test, so both comparisons use the same pool settings.

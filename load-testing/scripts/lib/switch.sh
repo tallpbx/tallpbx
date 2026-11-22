@@ -91,10 +91,6 @@ restore_file() {
 }
 
 # Remember an nginx file a cell rewrote so the teardown can put it back.
-#
-# Backups live next to the original (${file}.loadtest.bak) because nginx
-# paths are discovered at apply time; the list is what makes restoration
-# possible from a different process.
 remember_nginx_file() {
     local file="$1"
 
@@ -664,9 +660,10 @@ BODY
 
 # Replace the XML handler location body in one nginx file.
 rewrite_xml_location() {
-    local file="$1" body_file="$2" backup="${file}.loadtest.bak"
+    local file="$1" body_file="$2" key
 
-    [ -f "$backup" ] || cp -p "$file" "$backup"
+    key="$(printf '%s' "$file" | sha256sum | cut -d' ' -f1)"
+    snapshot_once "nginx-${key}" "$file"
 
     awk -v body_file="$body_file" '
         /^[[:space:]]*location = \/api\/v1\/xml-handler[[:space:]]*\{/ {
@@ -969,16 +966,18 @@ assert_esl_profile() {
 
 # Report whether the tallpbx-octane binding is active in xml_curl.conf.xml.
 octane_binding_state() {
-    local file="${1:-$FS_XML_CURL_CONF}" active
+    local file="${1:-$FS_XML_CURL_CONF}"
 
-    active="$(grep -cE '^[[:space:]]*<binding name="tallpbx-octane"' "$file" 2>/dev/null || true)"
-
-    if [ "${active:-0}" -gt 0 ]; then
+    if grep -qE '^[[:space:]]*<binding name="tallpbx-octane"' "$file" 2>/dev/null; then
         printf 'on'
         return 0
     fi
 
     printf 'off'
+}
+
+fallback_binding_active() {
+    grep -qE '^[[:space:]]*<binding name="tallpbx-fallback"' "${1:-$FS_XML_CURL_CONF}"
 }
 
 # Refuse an xml_curl configuration whose bindings lack a gateway-url.
@@ -1044,12 +1043,12 @@ restart_freeswitch_for_binding_change() {
 # mod_xml_curl tries bindings in file order and would otherwise answer every
 # request from the RoadRunner worker.
 apply_octane_binding() {
-    local state="${1:-}"
+    local state="${1:-}" temporary
 
     case "$state" in
-        on | off) ;;
+        on | off | only) ;;
         *)
-            fail_switch "octane binding must be on or off (got '${state}')"
+            fail_switch "octane binding must be on, off or only (got '${state}')"
             return 1
             ;;
     esac
@@ -1065,43 +1064,35 @@ apply_octane_binding() {
     # state the runtime already matches it, so no rewrite, no restart and no
     # registration churn. Every cell used to unload the module here even when
     # nothing changed, which is what killed the switch during the ladder.
-    if [ "$(octane_binding_state)" = "$state" ]; then
+    if xml_bindings_match "$state"; then
         log "octane XML binding already ${state}; nothing to change"
         assert_octane_binding "$state"
         return $?
     fi
 
-    # Rewriting an already-commented block would nest comment markers, which
-    # XML forbids, so an idempotent apply skips straight to the assertion.
-    if [ "$(octane_binding_state)" != "$state" ]; then
-        awk -v state="$state" '
-        /<binding name="tallpbx-octane">/ { active = 1 }
+    temporary="$(mktemp "${FS_XML_CURL_CONF}.loadtest.XXXXXX")"
+    cp -p "$FS_XML_CURL_CONF" "$temporary"
+    if ! awk -v state="$state" '
+        /<binding name="tallpbx-octane">/ { inside = 1; enable = (state != "off") }
+        /<binding name="tallpbx-fallback">/ { inside = 1; enable = (state != "only") }
         {
-            if (active) {
-                if (state == "on") {
-                    line = $0
-                    gsub(/^[[:space:]]*<!--[[:space:]]*/, "", line)
-                    gsub(/[[:space:]]*-->[[:space:]]*$/, "", line)
-                    print line
-                } else {
-                    print "<!-- " $0 " -->"
-                }
-            } else {
-                print
+            if (inside) {
+                sub(/^[[:space:]]*<!--[[:space:]]*/, "    ")
+                sub(/[[:space:]]*-->[[:space:]]*$/, "")
+                if (!enable) $0 = "<!-- " $0 " -->"
+                if ($0 ~ /<\/binding>/) inside = 0
             }
-            if (active && $0 ~ /<\/binding>/) {
-                active = 0
-            }
+            print
         }
-        ' "$FS_XML_CURL_CONF" > "${FS_XML_CURL_CONF}.loadtest.tmp"
-
-        mv "${FS_XML_CURL_CONF}.loadtest.tmp" "$FS_XML_CURL_CONF"
-    fi
-
-    if ! assert_xml_curl_config; then
-        fail_switch "xml_curl config has a binding without gateway-url"
+        ' "$FS_XML_CURL_CONF" > "$temporary" \
+        || ! assert_xml_curl_config "$temporary" \
+        || ! xml_bindings_match "$state" "$temporary"; then
+        rm -f -- "$temporary"
+        fail_switch "could not configure ${state} XML binding in ${FS_XML_CURL_CONF}"
         return 1
     fi
+
+    mv "$temporary" "$FS_XML_CURL_CONF"
 
     if ! restart_freeswitch_for_binding_change; then
         fail_switch "FreeSWITCH did not come back after the binding restart"
@@ -1112,18 +1103,56 @@ apply_octane_binding() {
     assert_octane_binding "$state"
 }
 
-# Prove the binding block is active or commented out as requested.
+xml_bindings_match() {
+    local state="$1" file="${2:-$FS_XML_CURL_CONF}" current
+
+    current="$(octane_binding_state "$file")"
+
+    case "$state" in
+        only) [ "$current" = "on" ] && ! fallback_binding_active "$file" ;;
+        on) [ "$current" = "on" ] && fallback_binding_active "$file" ;;
+        off) [ "$current" = "off" ] && fallback_binding_active "$file" ;;
+    esac
+}
+
 assert_octane_binding() {
-    local state="${1:-}" current
+    local state="${1:-}"
 
-    current="$(octane_binding_state)"
-
-    if [ "$current" != "$state" ]; then
-        fail_switch "octane binding expected ${state} but xml_curl.conf.xml reports ${current}"
+    if ! xml_bindings_match "$state" || ! assert_xml_curl_config; then
+        fail_switch "xml_curl.conf.xml does not match the requested ${state} XML binding"
         return 1
     fi
 
     log "asserted Octane XML binding ${state}"
+}
+
+# Keep each benchmark on its intended XML backend and preserve boot settings.
+apply_xml_worker() {
+    local state="$1" baseline="${STATE_DIR}/xml-worker.baseline" current
+
+    if [ "$state" != "off" ] && [ "$state" != "only" ]; then
+        fail_switch "XML worker mode must be off or only"
+        return 1
+    fi
+
+    current="$(systemctl show --property=ActiveState --value tallpbx-xml-worker)" || return 1
+    case "$current" in
+        active | inactive | failed) ;;
+        *) fail_switch "could not determine the state of tallpbx-xml-worker"; return 1 ;;
+    esac
+
+    [ -f "$baseline" ] || printf '%s\n' "$current" > "$baseline"
+
+    if [ "$state" = "only" ]; then
+        systemctl start tallpbx-xml-worker || return 1
+        systemctl is-active --quiet tallpbx-xml-worker || return 1
+        apply_octane_binding only
+    else
+        apply_octane_binding off || return 1
+        if [ "$current" = "active" ]; then
+            systemctl stop tallpbx-xml-worker || return 1
+        fi
+    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -1162,6 +1191,14 @@ apply_ttl() {
         return 1
     fi
 
+    if [ "$(env_get FS_XML_HANDLER_DIALPLAN_CACHE_TTL)" = "$dialplan" ] \
+        && [ "$(env_get FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL)" = "$contributor" ] \
+        && { [ -z "$directory" ] || [ "$(env_get FS_XML_HANDLER_DIRECTORY_CACHE_TTL)" = "$directory" ]; } \
+        && { [ -z "$acl" ] || [ "$(env_get FS_XML_HANDLER_ACL_CACHE_TTL)" = "$acl" ]; }; then
+        assert_ttl "$dialplan" "$contributor" "$directory" "$acl"
+        return $?
+    fi
+
     snapshot_env
     env_set FS_XML_HANDLER_DIALPLAN_CACHE_TTL "$dialplan"
     env_set FS_XML_HANDLER_CONTRIBUTOR_CACHE_TTL "$contributor"
@@ -1170,7 +1207,11 @@ apply_ttl() {
     [ -n "$acl" ] && env_set FS_XML_HANDLER_ACL_CACHE_TTL "$acl"
 
     log "applied cache TTLs dialplan=${dialplan} contributor=${contributor}${directory:+ directory=${directory}}${acl:+ acl=${acl}}"
-    assert_ttl "$dialplan" "$contributor" "$directory" "$acl"
+    assert_ttl "$dialplan" "$contributor" "$directory" "$acl" || return 1
+
+    if systemctl is-active --quiet tallpbx-xml-worker; then
+        systemctl restart tallpbx-xml-worker
+    fi
 }
 
 # Prove the application resolves the requested cache TTLs.
@@ -1331,13 +1372,21 @@ restore_baseline() {
 
     log "restoring baseline configuration"
 
-    local file level mode xml_before xml_after
+    local file key level mode xml_before xml_after
     local esl_before throttle_before esl_after throttle_after
 
     esl_before="$(env_get FS_ESL_EVENT_PROFILE)"
     throttle_before="$(env_get FS_BROADCAST_THROTTLE_MS)"
 
     restore_env
+
+    if [ -f "${STATE_DIR}/xml-worker.baseline" ]; then
+        if grep -qx active "${STATE_DIR}/xml-worker.baseline"; then
+            systemctl restart tallpbx-xml-worker || exit_code=1
+        elif systemctl is-active --quiet tallpbx-xml-worker; then
+            systemctl stop tallpbx-xml-worker || exit_code=1
+        fi
+    fi
 
     esl_after="$(env_get FS_ESL_EVENT_PROFILE)"
     throttle_after="$(env_get FS_BROADCAST_THROTTLE_MS)"
@@ -1354,16 +1403,17 @@ restore_baseline() {
     restore_file xml-curl-conf
     xml_after="$(sha256sum "$FS_XML_CURL_CONF" 2>/dev/null | awk '{print $1}')"
     if [ "$xml_before" != "$xml_after" ]; then
-        restart_freeswitch_for_binding_change >/dev/null 2>&1 || log "binding restart after restore failed"
+        restart_freeswitch_for_binding_change >/dev/null 2>&1 || exit_code=1
     fi
 
-    # nginx files keep their backup next to the original; the recorded list
-    # is what survives between the apply process and this one.
     if [ -f "${STATE_DIR}/nginx-files.list" ]; then
         while IFS= read -r file; do
             [ -n "$file" ] || continue
 
-            if [ -f "${file}.loadtest.bak" ]; then
+            key="$(printf '%s' "$file" | sha256sum | cut -d' ' -f1)"
+            if [ -f "${STATE_DIR}/nginx-${key}.bak" ]; then
+                restore_file "nginx-${key}"
+            elif [ -f "${file}.loadtest.bak" ]; then
                 cp -p "${file}.loadtest.bak" "$file"
                 log "restored ${file}"
             fi
@@ -1403,7 +1453,11 @@ restore_baseline() {
 
     service_reload "$(php_fpm_service)" >/dev/null 2>&1 || true
 
-    log "baseline restored"
+    if [ "$exit_code" -eq 0 ]; then
+        log "baseline restored"
+    else
+        log "baseline restore failed; snapshots are in ${STATE_DIR}"
+    fi
 
     return "$exit_code"
 }
@@ -1417,7 +1471,8 @@ Usage: switch.sh <command> [arguments]
   apply_fs_loglevel <debug|info|notice|warning|err|crit|alert>   assert_fs_loglevel <level>
   apply_fs_db_mode <sqlite|mariadb|disk|tmpfs>    assert_fs_db_mode <sqlite|mariadb|disk|tmpfs>
   apply_xml_path <stock|fast>                     assert_xml_path <stock|fast>
-  apply_octane_binding <on|off>                   assert_octane_binding <on|off>
+  apply_octane_binding <on|off|only>              assert_octane_binding <on|off|only>
+  apply_xml_worker <off|only>
   apply_ttl <dialplan> <contributor> [directory] [acl]   assert_ttl <dialplan> <contributor> [directory] [acl]
   apply_esl_profile <essential|full>              assert_esl_profile <essential|full> [before]
   apply_broadcast_throttle <ms>                   assert_broadcast_throttle <ms> [before]
@@ -1445,6 +1500,7 @@ main() {
         apply_xml_path | apply-xml-path) apply_xml_path "$@" ;;
         assert_xml_path | assert-xml-path) assert_xml_path "$@" ;;
         apply_octane_binding | apply-octane-binding) apply_octane_binding "$@" ;;
+        apply_xml_worker) apply_xml_worker "$@" ;;
         assert_xml_curl_config | assert-xml-curl-config) assert_xml_curl_config "$@" ;;
         octane_binding_state | octane-binding-state) octane_binding_state "$@" ;;
         assert_octane_binding | assert-octane-binding) assert_octane_binding "$@" ;;

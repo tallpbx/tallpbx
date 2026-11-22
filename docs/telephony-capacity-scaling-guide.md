@@ -67,7 +67,7 @@ The single most impactful step for scaling past 10 CPS is adding a second comput
 
 * **Single-Core Ceiling**: **5 calls/sec supported**, failing at 6 calls/sec (~30 concurrent active calls). Independent of pool shape: every worker count from one to five passes 5 and loses at least a third of the calls at 6.
 * **Dual-Core Sizing (2 vCPU / 2 GB RAM)**: Separates FreeSWITCH's real-time VoIP threads from background PHP daemons and database writes. **Doubles the supported rate to 10 calls/sec** (measured, 600/600), failing at 12 calls/sec — not the 15–20 calls/sec previously projected. Worker count is second-order here: five pool shapes measured within 34–44 % at the boundary, while PHP-FPM alone demanded 2.25 cores.
-* **Quad-Core Sizing (4 vCPU / 8 GB RAM, Cloud VPS / Appliance)**: Sized for **15–25 calls/sec sustained** under PHP-FPM baseline (`pm = dynamic`, dynamic ceiling 12 workers). The `30–60+ CPS` (~150–350 concurrent active calls) figure with the persistent Laravel Octane worker on port 8090 is a **projection, not a measurement** — no published run covers that rate.
+* **Quad-Core Sizing (4 shared vCPU / 8 GB RAM)**: The November 10, 2026 benchmark measured XML lookups with both handlers and passed the functional call scenarios. A paired 60-second call-rate result is still needed to recommend a call rate for this tier. [Measured call capacity and XML lookup speed](load-testing-results.md).
 
 ---
 
@@ -108,12 +108,12 @@ During peak call rates, `CHANNEL_EXECUTE`, `CHANNEL_EXECUTE_COMPLETE`, `CHANNEL_
 ```
 
 #### Configuration & Command-Line Controls:
-1. **Environment Profile Selection**:
+1. **Environment Profile Selection** in `/var/www/tallpbx/.env` on the PBX
    - `FS_ESL_EVENT_PROFILE=essential` (default): Subscribes to the 10 essential call lifecycle, keepalive, and registration events.
    - `FS_ESL_EVENT_PROFILE=full`: Re-enables all 25 event types (alias: `all`).
-2. **Custom Event Lists**:
+2. **Custom Event Lists** in the same file
    - `FS_ESL_SUBSCRIBE=CHANNEL_CREATE,CHANNEL_ANSWER,CHANNEL_HANGUP_COMPLETE`: Explicit comma-separated override.
-3. **CLI Options**:
+3. **CLI Options** from `/var/www/tallpbx` on the PBX
    - `php artisan freeswitch:listen --profile=essential`
    - `php artisan freeswitch:listen --profile=full`
    - `php artisan freeswitch:listen --events=CHANNEL_CREATE,CHANNEL_HANGUP_COMPLETE`
@@ -144,7 +144,7 @@ If a deployment encounters SQLite lock contention (`SQLite is BUSY`) or needs sh
 When `FS_DB_DRIVER=mariadb`, TallPBX automatically emits the `mariadb://...` DSN across `switch.conf` (`core.db`), `db.conf` (`call_limit.db`), `fifo.conf` (`fifo.db`), `sofia.conf` profiles (`sofia_reg_*.db`, unless overridden in profile settings), `callcenter.conf` (`callcenter.db`), and `voicemail.conf` (`voicemail_default.db`). In November 2026 contention benchmarks ([`load-testing-results.md`](load-testing-results.md#november-2026-refresh-sqlite-vs-mariadb-mod_mariadb-option-1-2-tier-xml-and-2-vcpu-baselines)), `1 vCPU / 1 GB` at `2 CPS` favored disk SQLite (`120/120`, `0` lock errors, lower MariaDB CPU), whereas `2 vCPU / 2 GB` under `8 CPS` calls + `8 req/s` registration churn + voicemail + `fs_cli` polling triggered `10` `SQLite is BUSY` warnings on SQLite versus **`0` on MariaDB** (`480/480` calls, `480/480` registrations, and full `MEDIA_FLOW=1 EXTENDED=1` parity), and at `10 CPS` with `v-octane`, SQLite failed (`583/600`) while MariaDB passed **`600/600` (`100%`, `300 ms` p50)**. (If `tallpbx-xml-worker` is running, restart it alongside `freeswitch` after changing `FS_DB_DRIVER` so the Octane worker does not serve cached SQLite `sofia.conf` DSNs.)
 
 - **New installations (opt-in; `sqlite` remains the default):**
-  Set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`) before running `scripts/install.sh`. The installer creates the dedicated `freeswitch` database and user, writes `FS_DB_*` into `.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` on source builds), and enables `<load module="mod_mariadb"/>` in `pre_load_modules.conf.xml`.
+  From the root of the TallPBX checkout, set `FSPBX_FREESWITCH_DB_DRIVER=mariadb` (or `freeswitch_db_driver=mariadb` in `scripts/resources/config.sh`) before running `scripts/install.sh`. The installer creates the dedicated `freeswitch` database and user, writes `FS_DB_*` into `.env`, installs `freeswitch-mod-mariadb` (`libmariadb-dev` / `mod_mariadb` on source builds), and enables `<load module="mod_mariadb"/>` in `pre_load_modules.conf.xml`.
 
 - **Existing installations:**
   1. **Install `mod_mariadb` in FreeSWITCH:**
@@ -152,7 +152,7 @@ When `FS_DB_DRIVER=mariadb`, TallPBX automatically emits the `mariadb://...` DSN
        ```bash
        sudo apt-get update && sudo apt-get install -y freeswitch-mod-mariadb
        ```
-     - **Source builds:** Already compiled if installed with updated `scripts/resources/freeswitch.sh` (`libmariadb-dev` + `databases/mod_mariadb`); otherwise install `libmariadb-dev`, enable `databases/mod_mariadb` in `modules.conf`, and run `make mod_mariadb-install`.
+     - **Source builds:** The updated `scripts/resources/freeswitch.sh` compiles `mod_mariadb`. For an older TallPBX source build, install `libmariadb-dev`, enable `databases/mod_mariadb` in `/usr/src/freeswitch/modules.conf`, and run `make mod_mariadb-install` from `/usr/src/freeswitch`.
   2. **Create the dedicated `freeswitch` MariaDB database and user** (separate from TallPBX's `tallpbx` database; `scripts/resources/mariadb.sh` creates only `tallpbx` unless `FSPBX_FREESWITCH_DB_DRIVER=mariadb` or `FS_DB_DRIVER=mariadb`):
      ```sql
      CREATE DATABASE freeswitch CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -160,7 +160,7 @@ When `FS_DB_DRIVER=mariadb`, TallPBX automatically emits the `mariadb://...` DSN
      GRANT ALL PRIVILEGES ON freeswitch.* TO 'freeswitch'@'127.0.0.1';
      FLUSH PRIVILEGES;
      ```
-  3. **Configure TallPBX `.env`:**
+  3. **Set the database connection** in `/var/www/tallpbx/.env` on the PBX.
      ```dotenv
      FS_DB_DRIVER=mariadb
      FS_DB_HOST=127.0.0.1
@@ -211,9 +211,11 @@ FreeSWITCH's stock configuration defaults to verbose debug logging (`<param name
 
 ### Phase 5: XML Handler Persistence & 2-Tier Binding Ladder
 
-TallPBX configures a 2-tier binding ladder in `xml_curl.conf.xml`:
+TallPBX configures a 2-tier binding ladder in `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`:
 1. **`tallpbx-octane`** (`http://127.0.0.1:8090`, timeout 1s): Opt-in persistent Octane worker (`tallpbx-xml-worker.service`) using `--workers=auto` (matches host vCPU count). Serves lookups in 1–2 ms from memory.
 2. **`tallpbx-fallback`** (`http://127.0.0.1:80/api/v1/xml-handler`, timeout 5s): The shipped production default front controller (`public/xml-handler-fast.php`) executing via Nginx and PHP-FPM, with in-process `Throwable` fallback to `index.php` for code errors.
+
+The installer leaves the worker disabled. [Octane service commands and verification](operations.md#octane-xml-worker-optional-performance-mode).
 
 ---
 
@@ -232,7 +234,7 @@ For measured throughput and latency figures per tier, see [`load-testing-results
 
 ## 5. Verification Commands
 
-To verify call capacity scalability without regressions, run the standardized capacity ladder from the load generator:
+Run the service checks on the PBX. Run the capacity ladder in step 4 from the root of the TallPBX checkout on the load generator.
 
 ```bash
 # 1. Confirm FreeSWITCH runtime database filesystem (disk-backed ext4/xfs by default)

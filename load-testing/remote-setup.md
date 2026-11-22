@@ -17,6 +17,8 @@ export SIPP_HOST=<generator-address>
 export SSH_IDENTITY=<path-to-key>      # optional; ambient SSH config is enough
 ```
 
+Use the PBX shell for sections 3–11 and 13. Run relative script commands there from `/var/www/tallpbx`. Section 12 runs on the load generator.
+
 ---
 
 ## 1. Build parity
@@ -112,7 +114,7 @@ journalctl -u freeswitch-listener --since '-2 min' --no-pager | grep -iE 'profil
 cd /var/www/tallpbx && php -r 'require "vendor/autoload.php"; $a=require "bootstrap/app.php"; $a->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo config("freeswitch.event_profile")." events=".count(config("freeswitch.subscribe")).PHP_EOL;'
 ```
 
-**Effect on the series:** none for XML-only cells — the listener receives no events while no calls run. It matters for SIP cells and for CPU contention once events flow. Measure the difference with `scripts/tools/ab-esl-reverb.sh`.
+**Effect on the series:** none for XML-only cells — the listener receives no events while no calls run. It matters for SIP cells and for CPU contention once events flow. Measure the difference with `load-testing/scripts/tools/ab-esl-reverb.sh`.
 
 ---
 
@@ -164,7 +166,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## 7. XML entry file (stock vs fast controller)
 
-The decision is one nginx location block.
+On an installer-managed PBX, the nginx location block is in `/etc/nginx/sites-available/pbx`.
 
 **stock** — `try_files` falls through to `index.php`, so every lookup boots the framework:
 
@@ -194,7 +196,7 @@ location = /api/v1/xml-handler {
 
 ## 8. Laravel Octane binding and port 8090 (`xml_curl.conf.xml` Two-Binding Fallback)
 
-**Laravel Octane** (a persistent PHP application server that keeps Laravel booted in memory across requests) is an opt-in XML worker on `:8090`. `xml_curl.conf.xml` ships with the **two-tier** binding ladder. FreeSWITCH consults the gateways in file order:
+**Laravel Octane** (a persistent PHP application server that keeps Laravel booted in memory across requests) is an opt-in XML worker on `:8090`. `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` ships with the **two-tier** binding ladder. FreeSWITCH consults the gateways in file order:
 
 ```xml
 <configuration name="xml_curl.conf" description="cURL XML Gateway">
@@ -218,10 +220,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8090/api/v1/xm
 curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1/api/v1/xml-handler  -d '<xml/>'
 ```
 
-**Apply:** `load-testing/scripts/lib/switch.sh apply_octane_binding on|off` (validates with `tpbx freeswitch:validate-xml-curl` and restarts FreeSWITCH via `systemctl restart freeswitch`, never reloading `mod_xml_curl` while lookups are live).
-**Prove:** `load-testing/scripts/lib/switch.sh assert_octane_binding on|off` and `tpbx freeswitch:validate-xml-curl`.
-
-**Measurement rule:** an Octane cell must post to `http://127.0.0.1:8090/api/v1/xml-handler`. The runner does this automatically for the `v-octane` variant; posting to nginx would measure PHP-FPM and label it Octane.
+The paired runner starts the Octane service on the benchmark host, selects the Octane endpoint for the Octane run, and verifies it with authenticated XML requests on `http://127.0.0.1:8090/api/v1/xml-handler`. It selects the nginx endpoint for PHP-FPM and restores the original configuration and service state afterward. Run the paired comparison from the orchestration host. [Comparison commands](procedure.md#step-6--compare-the-default-and-optional-xml-handlers).
 
 ---
 
@@ -234,8 +233,9 @@ mountpoint /var/lib/freeswitch/db && findmnt -n -o FSTYPE --target /var/lib/free
 
 Disk-backed SQLite (`FS_DB_DRIVER=sqlite`) is the shipped default; MariaDB (`FS_DB_DRIVER=mariadb`) is the opt-in external runtime database via `mod_mariadb`. (`tmpfs` remains supported in `switch.sh` only for reproducing historical storage ablations, not as a deployment choice.)
 
-**Apply:** `scripts/lib/switch.sh apply_fs_db_mode sqlite|mariadb` (or `disk|tmpfs`).  
-**Prove:** `scripts/lib/switch.sh assert_fs_db_mode sqlite|mariadb` (or `disk|tmpfs`).
+**Apply:** `load-testing/scripts/lib/switch.sh apply_fs_db_mode sqlite|mariadb` (or `disk|tmpfs`).
+
+**Prove:** `load-testing/scripts/lib/switch.sh assert_fs_db_mode sqlite|mariadb` (or `disk|tmpfs`).
 
 ---
 
@@ -247,8 +247,8 @@ grep -E '^FS_XML_HANDLER_(DIALPLAN|CONTRIBUTOR|DIRECTORY|ACL)_CACHE_TTL=' /var/w
 
 Four lifetimes: `dialplan` (the finished answer), `contributor` (shared building blocks), `directory` (registrations, users), `acl` (profile access lists). Only the first two affect dialplan XML generation.
 
-**Apply:** `scripts/lib/switch.sh apply_ttl <dialplan> <contributor> [directory] [acl]`, followed by `config:clear`.
-**Prove:** `scripts/lib/switch.sh assert_ttl`.
+**Apply:** `load-testing/scripts/lib/switch.sh apply_ttl <dialplan> <contributor> [directory] [acl]`, followed by `config:clear`.
+**Prove:** `load-testing/scripts/lib/switch.sh assert_ttl`.
 
 ---
 
@@ -358,7 +358,7 @@ grep -E '^(APP_URL|FS_DEFAULT_SIP_REALM)=' .env
 mysql -N -e 'select domain, purpose from tenant_domains;' tallpbx
 ```
 
-**Apply**, in this order:
+Set `NEW_IP` to the PBX's new address. Run the following in order from `/var/www/tallpbx` on the PBX:
 
 ```bash
 # 1. The two .env values.
@@ -399,13 +399,13 @@ A run is only comparable when these are what the manifest says they are:
 
 | Setting | Baseline | Where |
 |:--|:--|:--|
-| FreeSWITCH log level | `notice` | `switch.conf.xml`, `vars.xml` |
-| ESL profile | `essential` | `.env` |
-| Broadcast throttle | unset (500 ms) | `.env` |
-| PHP-FPM | `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3`, `pm.max_requests = 10000` (installer default) | `pool.d/www.conf`, written by `scripts/resources/php-fpm-pool.sh` |
-| XML entry file | fast (`xml-handler-fast.php`) | nginx `location` |
-| Octane binding | as installed (both gateways declared) | `xml_curl.conf.xml` |
+| FreeSWITCH log level | `notice` | `FS_LOG_LEVEL` in `/var/www/tallpbx/.env` and `loglevel` in `/etc/freeswitch/autoload_configs/switch.conf.xml` |
+| ESL profile | `essential` | `/var/www/tallpbx/.env` |
+| Broadcast throttle | unset (500 ms) | `/var/www/tallpbx/.env` |
+| PHP-FPM | `pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3`, `pm.max_requests = 10000` (installer default) | `/etc/php/8.5/fpm/pool.d/www.conf` |
+| XML entry file | fast (`xml-handler-fast.php`) | `location = /api/v1/xml-handler` in `/etc/nginx/sites-available/pbx` |
+| Octane binding | as installed (both gateways declared) | `/etc/freeswitch/autoload_configs/xml_curl.conf.xml` |
 | Runtime database | disk | `/var/lib/freeswitch/db` |
-| Cache TTLs | unset (config defaults) | `.env` |
+| Cache TTLs | unset (config defaults) | `/var/www/tallpbx/.env` |
 
 Every one of these is asserted by the runner before a cell runs, and restored by its teardown afterwards.

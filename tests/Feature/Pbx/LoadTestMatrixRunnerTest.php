@@ -54,13 +54,96 @@ describe('load test matrix runner', function (): void {
     });
 
     it('is a syntactically valid bash script', function (): void {
-        foreach (['load-testing/scripts/load-test-matrix.sh', 'load-testing/scripts/lib/manifest.sh'] as $script) {
+        foreach (['load-testing/scripts/load-test-matrix.sh', 'load-testing/scripts/lib/manifest.sh', 'load-testing/scripts/drivers/run-ladder.sh'] as $script) {
             $process = new Process(['bash', '-n', base_path($script)], base_path());
             $process->run();
 
             expect($process->isSuccessful())->toBeTrue($script.': '.$process->getErrorOutput());
         }
     });
+
+    it('schedules both XML handlers for HTTP and calls on every hardware tier', function (): void {
+        $process = matrixRunnerProcess(['--list', '--compare-xml-handlers'], $this->artifactRoot);
+
+        expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+        $rows = preg_split('/\R/', trim($process->getOutput()));
+        $tiers = ['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h4-4c8g', 'h2d-2c8g', 'h4d-4c16g'];
+        $expected = [];
+
+        foreach ($tiers as $tier) {
+            foreach (['v-fast-default', 'v-octane'] as $variant) {
+                foreach (['xml', 'sip'] as $phase) {
+                    $expected[] = [$tier, $variant, $phase];
+                }
+            }
+        }
+
+        expect(array_map(fn (string $row): array => preg_split('/\s+/', trim($row)), $rows))->toBe($expected);
+    });
+
+    it('prevents a single handler or diagnostic ablation from replacing a comparison', function (string $option): void {
+        $process = matrixRunnerProcess(['--list', '--compare-xml-handlers', $option], $this->artifactRoot);
+
+        expect($process->getExitCode())->toBe(2)
+            ->and($process->getErrorOutput())->toContain('--compare-xml-handlers');
+    })->with(['--variant=v-fast-default', '--phase=ablation']);
+
+    it('requires fresh results from both handlers and keeps testing while either meets the threshold', function (string $mode): void {
+        $bin = $this->artifactRoot.'/bin';
+        File::ensureDirectoryExists($bin);
+        File::put($bin.'/bash', <<<'BASH'
+            #!/bin/bash
+            set -eu
+            [ "$1" = load-testing/scripts/load-test-matrix.sh ]
+            [ "$2" = --tier=h4-4c8g ]
+            [ "$3" = --compare-xml-handlers ]
+            [ "$4" = --phase=sip ]
+            rate="${5#--cps=}"
+            if [ "$FIXTURE_MODE" = 'runner error' ]; then
+                exit 1
+            fi
+            for variant in v-fast-default v-octane; do
+                if [ "$FIXTURE_MODE" = 'missing Octane' ] && [ "$variant" = v-octane ]; then
+                    continue
+                fi
+                dir="$ARTIFACT_ROOT/h4-4c8g/$variant-fpm-dynamic12"
+                mkdir -p "$dir"
+                if [ ! -f "$dir/ladder.csv" ]; then
+                    printf 'recorded_at,cps,successful,failed,label\n' > "$dir/ladder.csv"
+                fi
+                completed=80
+                if [ "$variant" = v-octane ] && [ "$rate" -le 8 ]; then
+                    completed=100
+                fi
+                printf 'fixture,%s,%s,%s,h4-4c8g/%s/sip-cps%s\n' \
+                    "$rate" "$completed" "$((100 - completed))" "$variant" "$rate" >> "$dir/ladder.csv"
+            done
+            BASH);
+        chmod($bin.'/bash', 0755);
+
+        $process = new Process(['/bin/bash', base_path('load-testing/scripts/drivers/run-ladder.sh'), '--tier=h4-4c8g'], base_path(), [
+            'PATH' => $bin.':'.getenv('PATH'),
+            'ARTIFACT_ROOT' => $this->artifactRoot.'/results',
+            'PBX_HOST' => 'fixture-pbx.test',
+            'SIPP_HOST' => 'fixture-generator.test',
+            'FIXTURE_MODE' => $mode,
+        ]);
+        $process->run();
+
+        if ($mode === 'missing Octane') {
+            expect($process->getExitCode())->toBe(1)
+                ->and($process->getErrorOutput())->toContain('Missing or ambiguous comparison result at 2 calls/sec');
+        } elseif ($mode === 'runner error') {
+            expect($process->getExitCode())->toBe(1)
+                ->and($process->getErrorOutput())->toContain('Comparison failed at 2 calls/sec');
+        } else {
+            expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
+                ->and($process->getOutput())->toContain('8 calls/sec: PHP-FPM 80.0%, Octane 100.0%')
+                ->toContain('20 calls/sec: PHP-FPM 80.0%, Octane 80.0%')
+                ->not->toContain('25 calls/sec');
+        }
+    })->with(['paired results', 'missing Octane', 'runner error']);
 
     it('lists every tier and variant for each phase', function (): void {
         $process = matrixRunnerProcess(['--list'], $this->artifactRoot);
@@ -73,7 +156,7 @@ describe('load test matrix runner', function (): void {
             ->values()
             ->all();
 
-        $tiers = ['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h2d-2c8g', 'h4d-4c16g'];
+        $tiers = ['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h4-4c8g', 'h2d-2c8g', 'h4d-4c16g'];
         $variants = ['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-fast-default', 'v-octane'];
         $phases = ['xml', 'sip', 'ablation'];
 
@@ -529,7 +612,7 @@ describe('load test matrix runner', function (): void {
     it('restores the baseline from a teardown trap and never mutates nftables', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 
-        expect($script)->toContain('trap teardown_tier EXIT INT TERM')
+        expect($script)->toContain('trap teardown_tier EXIT')
             ->and($script)->toContain('switch_call restore_baseline')
             ->and($script)->toContain('CELL-FAILED');
 
@@ -612,6 +695,76 @@ XML);
         unlink($on);
         unlink($off);
     });
+
+    it('isolates each XML backend and restores the original worker state and binding file', function (string $initialState): void {
+        $bin = $this->artifactRoot.'/bin';
+        $autoload = $this->artifactRoot.'/freeswitch/autoload_configs';
+        File::ensureDirectoryExists($bin);
+        File::ensureDirectoryExists($autoload);
+        File::put($bin.'/systemctl', <<<'BASH'
+            #!/bin/bash
+            set -eu
+            printf '%s\n' "$*" >> "$FIXTURE_DIR/systemctl.log"
+            case "$*" in
+                'show --property=ActiveState --value tallpbx-xml-worker') cat "$FIXTURE_DIR/worker-state" ;;
+                'start tallpbx-xml-worker'|'restart tallpbx-xml-worker') echo active > "$FIXTURE_DIR/worker-state" ;;
+                'stop tallpbx-xml-worker') echo inactive > "$FIXTURE_DIR/worker-state" ;;
+                'is-active --quiet tallpbx-xml-worker') grep -qx active "$FIXTURE_DIR/worker-state" ;;
+                'restart freeswitch'|'reload php'*|'is-active --quiet php'*) exit 0 ;;
+                *) exit 1 ;;
+            esac
+            BASH);
+        File::put($bin.'/fs_cli', "#!/bin/bash\nprintf 'UP\n'\n");
+        File::put($bin.'/nginx', "#!/bin/bash\nexit 1\n");
+        foreach (['systemctl', 'fs_cli', 'nginx'] as $command) {
+            chmod($bin.'/'.$command, 0755);
+        }
+
+        $file = $autoload.'/xml_curl.conf.xml';
+        $original = <<<'XML'
+            <configuration name="xml_curl.conf">
+              <bindings>
+                <binding name="tallpbx-octane">
+                  <param name="gateway-url" value="http://127.0.0.1:8090/api/v1/xml-handler"/>
+                </binding>
+                <binding name="tallpbx-fallback">
+                  <param name="gateway-url" value="http://127.0.0.1/api/v1/xml-handler"/>
+                </binding>
+              </bindings>
+            </configuration>
+            XML;
+        File::put($file, $original);
+        chmod($file, 0640);
+        File::put($this->artifactRoot.'/worker-state', $initialState."\n");
+
+        $switch = function (string ...$arguments) use ($bin): void {
+            $process = new Process(['/bin/bash', base_path('load-testing/scripts/lib/switch.sh'), ...$arguments], base_path(), [
+                'PATH' => $bin.':'.getenv('PATH'),
+                'APP_DIR' => $this->artifactRoot,
+                'FS_CONF_DIR' => $this->artifactRoot.'/freeswitch',
+                'SWITCH_STATE_DIR' => $this->artifactRoot.'/switch-state',
+                'FIXTURE_DIR' => $this->artifactRoot,
+            ]);
+            $process->run();
+            expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+        };
+
+        $switch('apply_xml_worker', 'off');
+        $switch('assert_octane_binding', 'off');
+        expect(trim(File::get($this->artifactRoot.'/worker-state')))->toBe('inactive');
+
+        $switch('apply_xml_worker', 'only');
+        $switch('assert_octane_binding', 'only');
+        expect(trim(File::get($this->artifactRoot.'/worker-state')))->toBe('active')
+            ->and(File::get($file))->toContain('<!--     <binding name="tallpbx-fallback">');
+
+        $switch('restore_baseline');
+        clearstatcache(true, $file);
+        expect(File::get($file))->toBe($original)
+            ->and(fileperms($file) & 0777)->toBe(0640)
+            ->and(trim(File::get($this->artifactRoot.'/worker-state')))->toBe($initialState)
+            ->and(substr_count(File::get($this->artifactRoot.'/systemctl.log'), 'restart freeswitch'))->toBe(3);
+    })->with(['inactive', 'active']);
 
     it('leaves the switch alone when the binding already matches', function (): void {
         $lib = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));

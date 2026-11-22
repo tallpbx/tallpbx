@@ -13,6 +13,7 @@ Operational manual for benchmarking, stress testing, and validating telephony pe
   - [Test 1: Dialplan XML Routing (HTTP)](#test-1-dialplan-xml-routing-http)
   - [Test 2: End-to-End Live Calls (SIP & RTP)](#test-2-end-to-end-live-calls-sip--rtp)
 - [Quick Start: Standard Test Workflow](#quick-start-standard-test-workflow)
+- [Testing the Optional Laravel Octane Worker](#testing-the-optional-laravel-octane-worker)
 - [Interpreting Test Metrics](#interpreting-test-metrics)
 - [Lab Setup & Network Topology](#lab-setup--network-topology)
   - [Two-Host Architecture](#two-host-architecture)
@@ -43,9 +44,10 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 
 1. **Obfuscate Public IP Addresses**: In all test reports, public documentation, and committed logs, obfuscate public IP addresses to show only the last octet (e.g. `x.x.x.200` or `...YYY`).
 2. **Avoid Special Characters in Remote Passwords**: When seeding a remote PBX over SSH (`tpbx pbx:load-test:seed` or `tallpbx`, which wrap native `artisan pbx:load-test:seed`), avoid unescaped shell metacharacters (such as `!`) in the password argument (e.g., use alphanumeric `LoadTest1234`). In this guide, `tpbx` is used. Unescaped exclamation points are stripped by Bash history expansion, causing credential mismatches that result in `403 Forbidden` on SIP REGISTER.
-3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `storage/app/load-tests/sipp-users.csv` on the PBX filesystem (`storage/app/load-tests/` is local scratch space). Before running `load-testing/scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1` on the load generator, copy the CSV to the generator host:
+3. **Synchronize `sipp-users.csv` to the Generator**: The seeding command writes `/var/www/tallpbx/storage/app/load-tests/sipp-users.csv` on the PBX. On the load generator, change to the root of your TallPBX checkout and set `PBX_HOST` to the PBX address. Copy the CSV before running `load-testing/scripts/pbx-sipp-validate.sh` with `SKIP_SEED=1`.
    ```bash
-   scp root@<PBX_HOST>:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv storage/app/load-tests/sipp-users.csv
+   mkdir -p storage/app/load-tests
+   scp "root@${PBX_HOST}:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv" storage/app/load-tests/sipp-users.csv
    ```
 4. **Allow the PBX on the Generator Firewall If One Is Running**: When testing outbound gateway routing and media playback, FreeSWITCH bridges calls to the generator host (UAS ports UDP 5088, 5090, RTP 6000). Because these are unsolicited inbound UDP packets, stateful default-drop firewalls on the generator will block them.
 
@@ -102,7 +104,7 @@ For routine benchmarking, run tests in this logical sequence:
 4. **Execute Test 2 (Basic SIPp Call Flow)**: Verify registration, extension-to-extension calls, and outbound routing.
 5. **Execute Test 2 (Media Flow)**: Verify call recording (`*732`), music-on-hold, and IVR announcements.
 6. **Execute Test 2 (Extended Parity)**: Verify ring groups, voicemail, conferences, call forwards, and time conditions.
-7. **Review Results**: Check `summary.md` and log files in `storage/app/load-tests/` on the PBX.
+7. **Review Results**: Check `summary.md` and the SIPp logs in the run directory under `storage/app/load-tests/` on the load generator.
 
 ### Quick Commands
 
@@ -112,24 +114,34 @@ tpbx pbx:load-test:seed \
   --tenant=load-test-beta --domain=<PBX_IP> \
   --extensions=100 --start=2000 --password='LoadTest1234' --reset
 
-# 2. Run XML routing throughput test (100 requests, 5 concurrency)
+# 2. On the PBX, run the XML routing throughput test (100 requests, 5 concurrency)
 tpbx pbx:load-test:dialplan \
   --tenant=load-test-beta --url=http://127.0.0.1/api/v1/xml-handler \
   --scenario=mixed --section=dialplan --requests=100 --concurrency=5 \
   --token="$FS_XML_HANDLER_TOKEN"
 
-# 2b. Directory lookups or a realistic call mix, with app-side timing
-#     (requires FS_XML_HANDLER_TIMING_HEADERS=true on the PBX)
+# 2b. On the PBX, measure a realistic call mix with app-side timing
+#     (requires FS_XML_HANDLER_TIMING_HEADERS=true in /var/www/tallpbx/.env)
 tpbx pbx:load-test:dialplan \
   --tenant=load-test-beta --url=http://127.0.0.1/api/v1/xml-handler \
   --section=mixed --scenario=internal --requests=300 --concurrency=5 \
   --timing --token="$FS_XML_HANDLER_TOKEN"
 
-# 3. Run SIPp end-to-end validation suite from the load generator
+# 3. Run SIPp end-to-end validation from the TallPBX checkout root on the load generator
 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 ```
 
 ---
+
+## Testing the Optional Laravel Octane Worker
+
+TallPBX's default fast PHP-FPM handler loads only the telephony modules required to answer FreeSWITCH's XML lookups. Laravel Octane is an optional performance mode that loads the same list and keeps the application in memory between requests. FreeSWITCH uses PHP-FPM when Octane is unavailable. If the fast PHP-FPM handler catches an application error, its worker falls back to the full Laravel application used by the web panel.
+
+For a quick manual check on a test PBX, start Octane with `sudo systemctl start tallpbx-xml-worker` and return to PHP-FPM with `sudo systemctl stop tallpbx-xml-worker`. The installed FreeSWITCH configuration already knows both addresses. If you edit `/etc/freeswitch/autoload_configs/xml_curl.conf.xml`, restart FreeSWITCH before measuring SIP calls so it reads the new endpoints. [Octane setup and verification](operations.md#octane-xml-worker-optional-performance-mode).
+
+For a direct HTTP comparison, run the same [XML test](#running-the-test) on the PBX with each URL and record the serving mode. Use `http://127.0.0.1/api/v1/xml-handler` for PHP-FPM and `http://127.0.0.1:8090/api/v1/xml-handler` for Octane. The SIPp test exercises whichever path FreeSWITCH uses for live lookups. Keep the call scenario and cache settings the same across runs.
+
+Use the paired capacity harness for published comparisons. It runs both handlers at the same call rates for each hardware tier, checks the selected handler before measuring, and restores the PBX settings afterward. [Paired call capacity procedure](../load-testing/procedure.md#step-8--compare-call-capacity).
 
 ## Interpreting Test Metrics
 
@@ -150,7 +162,7 @@ When evaluating benchmark output:
 - **`db_queries`** — average and maximum database queries per lookup.
 - **`by_section`** — per-section counts and `request_ms` p50/p95 (dialplan vs. directory).
 
-Timing headers are opt-in twice: set `FS_XML_HANDLER_TIMING_HEADERS=true` on the PBX **and** pass `--timing` (which sends `X-TallPBX-Timing: 1`). Never enable the flag on production appliances.
+Set `FS_XML_HANDLER_TIMING_HEADERS=true` in `/var/www/tallpbx/.env` on the test PBX and pass `--timing` (which sends `X-TallPBX-Timing: 1`). Never enable the flag on production appliances.
 
 `--section` selects which XML section the run exercises: `dialplan` (default), `directory` (REGISTER/INVITE auth lookups), or `mixed` (two directory lookups per dialplan lookup, mirroring a real call flow). The report records `target.section` and `target.section_counts`.
 
@@ -222,7 +234,7 @@ ss -lunp | grep -E ':5060|:5080'
 
 ## Reproducing Full Capacity Matrices
 
-The commands below run individual XML or SIPp tests against a single host. If you want to reproduce the multi-tier TallPBX capacity series (or run automated sweeps across PHP-FPM, Fast Controller, and Octane variants with verified configuration switches), use the dedicated benchmark harness in **[`load-testing/README.md`](../load-testing/README.md)** (and [`load-testing/remote-setup.md`](../load-testing/remote-setup.md) for provisioning a clean Debian 13 benchmark host).
+The commands below run individual tests. To reproduce a capacity series, provision a clean benchmark host for each tier and compare the default fast PHP-FPM handler and optional Laravel Octane at each offered call rate. [Benchmark harness](../load-testing/README.md) · [Debian 13 benchmark host setup](../load-testing/remote-setup.md).
 
 ---
 
@@ -288,6 +300,8 @@ tpbx pbx:load-test:dialplan \
   --report=storage/app/load-tests/dialplan-500x25.json
 ```
 
+For Octane, run this command on the PBX and change `--url` to `http://127.0.0.1:8090/api/v1/xml-handler`. Give the Octane run its own `--label` and `--report` path. [Testing the optional Laravel Octane worker](#testing-the-optional-laravel-octane-worker).
+
 **Available Scenarios:**
 - `mixed`: Realistic round-robin blend of internal extension, inbound DID, and outbound gateway lookups.
 - `internal`: Internal extension-to-extension routing lookups only.
@@ -304,6 +318,8 @@ The dialplan test command streams live progress, prints a summary table to the c
 - **Redis Memory Telemetry**: Captures active `used_memory_human`, configured `maxmemory_human` (e.g. 256M cap), `maxmemory_policy` (`volatile-lru`), and `evicted_keys`. This verifies that Redis memory stays within configured bounds during sustained high-concurrency bursts and confirms whether key eviction occurred under load.
 
 ### Relevant .env Configuration
+
+These settings are in `/var/www/tallpbx/.env` on the PBX.
 
 ```dotenv
 # Token authentication for FreeSWITCH XML handler
@@ -329,7 +345,7 @@ FS_SESSIONS_PER_SECOND=60
 
 ### Cache Sweep & Hit Rate Benchmarking
 
-To benchmark all 5 standard cache tiers on your host and measure exact Redis keyspace hit rates:
+To benchmark all five cache tiers and measure Redis keyspace hit rates, run the sweep from `/var/www/tallpbx` on the test PBX.
 
 ```bash
 bash load-testing/scripts/run-cache-sweep.sh
@@ -369,7 +385,7 @@ The script runs a standardized 5-tier test (Cold baseline, Dialplan route cache 
 
 ### Running the Automated Suite (`pbx-sipp-validate.sh`)
 
-Execute the validation suite from the load generator host:
+Run the validation suite from the root of the TallPBX checkout on the load generator.
 
 ```bash
 # Basic run: Registration, internal extension calls, and outbound routing
@@ -382,7 +398,7 @@ MEDIA_FLOW=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/p
 EXTENDED=1 PBX_HOST=<PBX_IP> LOAD_GENERATOR_IP=<GEN_IP> load-testing/scripts/pbx-sipp-validate.sh
 ```
 
-A successful run exits `0` and creates an artifact directory under `storage/app/load-tests/sipp-e2e-*` containing `summary.md`, CSV timings, and error logs.
+A successful run exits `0` and writes `summary.md`, CSV timings, and error logs to `storage/app/load-tests/sipp-e2e-*` in the generator's checkout by default.
 
 ### Runner Configuration Variables
 
@@ -437,8 +453,10 @@ echo json_encode(["exists" => $a !== null, "password_ok" => $a?->auth_password =
 
 ### 2. Verify Authentication CSV on Generator
 
+From the generator's TallPBX checkout root, set `RUN_DIR` to the failed run's artifact directory. The default is `storage/app/load-tests/sipp-e2e-<timestamp>`.
+
 ```bash
-head -n 2 storage/app/load-tests/sipp-users-auth.csv
+head -n 2 "${RUN_DIR}/sipp-users-auth.csv"
 ```
 Expected output:
 ```text
@@ -468,6 +486,8 @@ The `internal` profile must report `RUNNING`.
 
 ### 5. Prove One Single Call Before Running Load
 
+From the generator's TallPBX checkout root, use the same `RUN_DIR` as in step 2.
+
 ```bash
 # Start background UAS listener on port 5066
 sipp -sf load-testing/tools/sipp/uas-auto-answer-capacity.xml -i <GEN_IP> -p 5066 -m 1 <PBX_IP> &
@@ -476,7 +496,7 @@ sleep 1
 
 # Fire a single test call
 sipp <PBX_IP> -sf load-testing/tools/sipp/uac-extension-capacity.xml \
-  -inf storage/app/load-tests/sipp-users-auth.csv \
+  -inf "${RUN_DIR}/sipp-users-auth.csv" \
   -i <GEN_IP> -p 5158 -r 1 -m 1 -l 1
 
 wait $uas_pid
@@ -491,17 +511,17 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 
 | Symptom | Suspected Bottleneck | Verification Command | Remediation Action |
 | :--- | :--- | :--- | :--- |
-| **Rising setup latency; CPU near 100%** | FreeSWITCH CPU starvation | `top` / `htop` on PBX | Lower logging level (`notice`); upgrade to 2+ vCPUs. |
-| **`server reached pm.max_children`** | PHP-FPM worker starvation | `tail -n 50 /var/log/php8.5-fpm.log` | Raise `pm.max_children` for the tier (installer default is `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and reload PHP-FPM. |
-| **`503 Maximum Calls In Progress`** | FreeSWITCH session throttle | `fs_cli -x "fsctl sps"` | Increase `FS_SESSIONS_PER_SECOND=120` in `.env`. |
-| **`403 Forbidden` on REGISTRATION** | Credential or realm mismatch | Inspect `register.log` | Regenerate seed data and re-sync `sipp-users-auth.csv`. |
+| **Rising setup latency; CPU near 100%** | FreeSWITCH CPU starvation | `top` / `htop` on PBX | Set FreeSWITCH logging to `notice` or upgrade to 2+ vCPUs. [PBX log settings](../load-testing/remote-setup.md#3-freeswitch-logging-notice). |
+| **`server reached pm.max_children`** | PHP-FPM worker starvation | `tail -n 50 /var/log/php8.5-fpm.log` | Raise `pm.max_children` for the tier in `/etc/php/8.5/fpm/pool.d/www.conf` and reload PHP-FPM (installer default is `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+). |
+| **`503 Maximum Calls In Progress`** | FreeSWITCH session throttle | `fs_cli -x "fsctl sps"` | Set `FS_SESSIONS_PER_SECOND=120` in `/var/www/tallpbx/.env` on the PBX. |
+| **`403 Forbidden` on REGISTRATION** | Credential or realm mismatch | Inspect `register.log` in the generator's run directory. | Regenerate seed data and [copy `sipp-users.csv` to the generator](#best-practices-for-reliable-sip-load-testing). The runner rebuilds `sipp-users-auth.csv` for each run. |
 | **`503 NORMAL_TEMPORARY_FAILURE`** | Early voicemail NOTIFY race | UAS log shows unexpected NOTIFY | Wait 8s after registration before starting the UAS listener. |
 | **`CHAN_NOT_IMPLEMENTED`** | Direct raw bridge string | `freeswitch.log` | Use `loopback/${destination}/${context}` channel format. |
 
 ### Common Failures & Remediation
 
 1. **High Concurrency XML Latency**:
-   On single-core VPS nodes, XML generation under concurrency 25 hits a CPU limit of ~14–16 req/sec. Deploy 2+ vCPUs with the shipped dynamic FPM pool (`pm.max_children = 6`) or enable the optional Octane worker (`tallpbx-xml-worker`) to scale beyond 15 calls/sec (25+ CPS).
+   On single-core VPS nodes, check CPU usage and PHP-FPM saturation during the run. If XML lookups are the bottleneck, compare the shipped PHP-FPM setup with the [optional Octane worker](#testing-the-optional-laravel-octane-worker). In the published 2 vCPU / 2 GB test at 12 calls/sec, Octane completed all 720 calls. The 25+ calls/sec estimate is a projection from XML throughput. [Capacity planning and measured results](load-testing-results.md#capacity-planning-rules).
 2. **Delayed Audio or Dropped Packets**:
    Ensure RTP media ports (`16384-32768/udp`) are open in the firewall. If testing over WireGuard, verify MTU (`1420`) to prevent UDP fragmentation.
 3. **Stuck Channels After Teardown**:

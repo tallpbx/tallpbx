@@ -36,8 +36,8 @@ function loadTestMatrix(): array
 describe('load test matrix configuration', function (): void {
     it('defines every hardware tier and serving variant', function (): void {
         expect(array_keys(loadTestMatrix()['tiers']))
-            ->toBe(['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h2d-2c8g', 'h4d-4c16g'])
-            ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'a')->count())->toBe(3)
+            ->toBe(['h1-1c1g', 'h1-1c2g', 'h2-2c2g', 'h4-4c8g', 'h2d-2c8g', 'h4d-4c16g'])
+            ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'a')->count())->toBe(4)
             ->and(collect(loadTestMatrix()['tiers'])->where('stage', 'b')->count())->toBe(2)
             ->and(array_keys(loadTestMatrix()['variants']))
             ->toBe(['v-stock-dynamic', 'v-stock-static', 'v-fast', 'v-fast-default', 'v-octane']);
@@ -67,16 +67,16 @@ describe('load test matrix configuration', function (): void {
         // a pool shape nobody deploys.
         $installerCeiling = static fn (int $ramMb): int => $ramMb >= 3500 ? 12 : ($ramMb >= 1800 ? 6 : 3);
 
-        $stageA = collect(loadTestMatrix()['tiers'])->where('stage', 'a');
+        $tiers = collect(loadTestMatrix()['tiers']);
 
-        $measured = $stageA
+        $measured = $tiers
             ->map(fn (array $tier): array => [
                 'mode' => $tier['fpm_alt'],
                 'ceiling' => $tier['fpm_alt_children'],
             ])
             ->all();
 
-        $shipped = $stageA
+        $shipped = $tiers
             ->map(fn (array $tier): array => [
                 'mode' => 'dynamic',
                 'ceiling' => $installerCeiling((int) $tier['ram_mb']),
@@ -84,6 +84,13 @@ describe('load test matrix configuration', function (): void {
             ->all();
 
         expect($measured)->toBe($shipped);
+    });
+
+    it('holds the PHP-FPM pool and nginx handler steady in an XML handler comparison', function (): void {
+        $variants = loadTestMatrix()['variants'];
+
+        expect($variants['v-fast-default']['requires'])->toBe(['fpm:dynamic', 'xml-path:fast', 'octane:off'])
+            ->and($variants['v-octane']['requires'])->toBe(['fpm:dynamic', 'xml-path:fast', 'octane:only']);
     });
 
     it('lists every SIPp scenario that ships in load-testing/tools/sipp', function (): void {
