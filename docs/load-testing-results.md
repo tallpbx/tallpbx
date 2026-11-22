@@ -65,12 +65,21 @@ The charts and tables below compare **PHP-FPM** against **Laravel Octane** acros
 Each pair in the chart and first table compares both handlers on the same server at the same offered call rate over 60 seconds. Under these rates, PHP-FPM queues lookups and drops calls while Octane keeps typical call setup well under one second.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#f97316, #2563eb"
+---
 xychart-beta
-    title "Median Call Setup Latency: PHP-FPM vs. Octane (ms, lower is better)"
-    x-axis ["1c 6CPS FPM", "1c 6CPS Octane", "2c 12CPS FPM", "2c 12CPS Octane", "2c 10CPS+ FPM", "2c 10CPS+ Octane"]
+    title "Median Call Setup Latency: Octane vs. PHP-FPM (ms, lower is better)"
+    x-axis ["1 vCPU 6 CPS", "2 vCPU 12 CPS", "2 vCPU 10 CPS+"]
     y-axis "Median Setup Latency (ms)" 0 --> 6500
-    bar [2108, 280, 3844, 284, 6180, 964]
+    bar [2108, 3844, 6180]
+    bar [280, 284, 964]
 ```
+
+*Blue (bottom): Laravel Octane median latency · Orange (above): additional PHP-FPM latency (full bar height = PHP-FPM total).*
 
 | Test server | Date | Workload (60 sec) | PHP-FPM median / p95 | Octane median / p95 |
 | --- | --- | --- | ---: | ---: |
@@ -103,12 +112,21 @@ Even when every call succeeds, setup latency climbs sharply as PHP-FPM approache
 Direct HTTP lookup benchmarks isolate how fast TallPBX answers FreeSWITCH directory and dialplan requests without call audio or SIP signaling overhead.
 
 ```mermaid
+---
+config:
+  themeVariables:
+    xyChart:
+      plotColorPalette: "#f97316, #2563eb"
+---
 xychart-beta
-    title "Median XML Lookup Latency: PHP-FPM vs. Octane (ms, lower is better)"
-    x-axis ["1c 100x5 FPM", "1c 100x5 Octane", "2c 500x25 FPM", "2c 500x25 Octane", "4c 100x5 FPM", "4c 100x5 Octane", "4c 500x25 FPM", "4c 500x25 Octane"]
+    title "Median XML Lookup Latency: Octane vs. PHP-FPM (ms, lower is better)"
+    x-axis ["1 vCPU 100x5", "2 vCPU 500x25", "4 vCPU 100x5", "4 vCPU 500x25"]
     y-axis "Median Lookup Latency (ms)" 0 --> 400
-    bar [108, 14, 181.4, 31.9, 152.2, 43.2, 368.7, 113.7]
+    bar [108, 181.4, 152.2, 368.7]
+    bar [14, 31.9, 43.2, 113.7]
 ```
+
+*Blue (bottom): Laravel Octane median latency · Orange (above): additional PHP-FPM latency (full bar height = PHP-FPM total).*
 
 | Test server | Date | Workload | PHP-FPM median / p95 | Octane median / p95 |
 | --- | --- | --- | ---: | ---: |

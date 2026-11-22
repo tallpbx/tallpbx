@@ -232,7 +232,8 @@ def build_markdown(
             xml_index[(row["tier"], row["workload"], row["variant"])] = row
 
     xml_chart_labels: list[str] = []
-    xml_chart_values: list[str] = []
+    xml_fpm_values: list[str] = []
+    xml_oct_values: list[str] = []
 
     for tier in tiers:
         label = f"{tier_meta[tier]['vcpu']} vCPU / {tier_meta[tier]['ram_mb'] // 1024} GB RAM"
@@ -247,25 +248,58 @@ def build_markdown(
             oct_lat = f"**{oct_row['p50_ms']} / {oct_row['p95_ms']} ms**" if oct_row else "—"
             lines.append(f"| {label} | `{profile}` | {fpm_rps} | {oct_rps} | {fpm_lat} | {oct_lat} |")
             if profile == "500x25" and fpm and oct_row:
-                short_tier = f"{tier_meta[tier]['vcpu']}c"
-                xml_chart_labels.extend([f'"{short_tier} FPM"', f'"{short_tier} Octane"'])
-                xml_chart_values.extend([fpm["p50_ms"], oct_row["p50_ms"]])
+                short_tier = f"{tier_meta[tier]['vcpu']} vCPU 500x25"
+                xml_chart_labels.append(f'"{short_tier}"')
+                xml_fpm_values.append(fpm["p50_ms"])
+                xml_oct_values.append(oct_row["p50_ms"])
 
     if xml_chart_labels:
-        max_y = max(float(v) for v in xml_chart_values)
+        fpm_floats = [float(v) for v in xml_fpm_values]
+        oct_floats = [float(v) for v in xml_oct_values]
+        max_y = max(fpm_floats + oct_floats)
         y_top = int(((max_y // 50) + 2) * 50)
-        lines.extend(
-            [
-                "",
-                "```mermaid",
-                "xychart-beta",
-                '    title "Median XML Lookup Latency at 500x25 Mixed: PHP-FPM vs. Octane (ms, lower is better)"',
-                f"    x-axis [{', '.join(xml_chart_labels)}]",
-                f'    y-axis "Median Lookup Latency (ms)" 0 --> {y_top}',
-                f"    bar [{', '.join(xml_chart_values)}]",
-                "```",
-            ]
-        )
+        can_overlay = all(f >= o for f, o in zip(fpm_floats, oct_floats))
+        if can_overlay:
+            lines.extend(
+                [
+                    "",
+                    "```mermaid",
+                    "---",
+                    "config:",
+                    "  themeVariables:",
+                    "    xyChart:",
+                    '      plotColorPalette: "#f97316, #2563eb"',
+                    "---",
+                    "xychart-beta",
+                    '    title "Median XML Lookup Latency at 500x25 Mixed: Octane vs. PHP-FPM (ms, lower is better)"',
+                    f"    x-axis [{', '.join(xml_chart_labels)}]",
+                    f'    y-axis "Median Lookup Latency (ms)" 0 --> {y_top}',
+                    f"    bar [{', '.join(xml_fpm_values)}]",
+                    f"    bar [{', '.join(xml_oct_values)}]",
+                    "```",
+                    "",
+                    "*Blue (bottom): Laravel Octane median latency · Orange (above): additional PHP-FPM latency (full bar height = PHP-FPM total).*",
+                ]
+            )
+        else:
+            paired_labels: list[str] = []
+            paired_vals: list[str] = []
+            for lbl, fv, ov in zip(xml_chart_labels, xml_fpm_values, xml_oct_values):
+                raw = lbl.strip('"')
+                paired_labels.extend([f'"{raw} FPM"', f'"{raw} Octane"'])
+                paired_vals.extend([fv, ov])
+            lines.extend(
+                [
+                    "",
+                    "```mermaid",
+                    "xychart-beta",
+                    '    title "Median XML Lookup Latency at 500x25 Mixed: PHP-FPM vs. Octane (ms, lower is better)"',
+                    f"    x-axis [{', '.join(paired_labels)}]",
+                    f'    y-axis "Median Lookup Latency (ms)" 0 --> {y_top}',
+                    f"    bar [{', '.join(paired_vals)}]",
+                    "```",
+                ]
+            )
 
     lines.extend(
         [
