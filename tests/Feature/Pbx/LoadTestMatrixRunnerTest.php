@@ -920,11 +920,13 @@ XML);
         $seriesDir = $this->artifactRoot.'/series-20261121';
         $commit = str_repeat('a', 40);
         $tierPool = ['h1-1c1g' => 'dynamic3', 'h2-2c2g' => 'dynamic6', 'h4-4c8g' => 'dynamic12'];
+        $tierFirstRate = ['h1-1c1g' => 2, 'h2-2c2g' => 5, 'h4-4c8g' => 5];
 
         foreach ($tierPool as $tier => $pool) {
             $tierDir = $seriesDir.'/'.$tier;
             File::ensureDirectoryExists($tierDir);
             File::put($tierDir.'/failures.log', '');
+            File::put($tierDir.'/extended-validation.log', "- register: passed\n- ring-group-calls: passed\n");
             File::put($tierDir.'/manifest.json', json_encode([
                 'recorded_at' => '2026-11-21T19:00:00Z',
                 'build' => ['branch' => '5.x', 'commit' => $commit, 'dirty' => false],
@@ -954,12 +956,16 @@ XML);
                 }
 
                 $isOctane = $variant === 'v-octane';
+                $cps = $tierFirstRate[$tier];
                 File::put("{$vdir}/ladder.csv", implode("\n", [
                     'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms',
                     sprintf(
-                        '2026-11-21T19:05:00Z,5,300,0,%s/%s/sip-cps5,%s,%s,%s,%s,%s,%s',
+                        '2026-11-21T19:05:00Z,%d,%d,0,%s/%s/sip-cps%d,%s,%s,%s,%s,%s,%s',
+                        $cps,
+                        $cps * 60,
                         $tier,
                         $variant,
+                        $cps,
                         $isOctane ? '45.0' : '220.0',
                         $isOctane ? '95.0' : '610.0',
                         $isOctane ? '150.0' : '900.0',
@@ -1014,5 +1020,17 @@ XML);
 
         expect($mismatch->isSuccessful())->toBeFalse()
             ->and($mismatch->getErrorOutput())->toContain('different git commits');
+
+        // Remove extended-validation.log on one tier: consolidation must fail.
+        File::delete($seriesDir.'/h4-4c8g/extended-validation.log');
+        $missingExt = new Process([
+            'python3',
+            base_path('load-testing/scripts/tools/consolidate-series.py'),
+            $seriesDir,
+        ], base_path());
+        $missingExt->run();
+
+        expect($missingExt->isSuccessful())->toBeFalse()
+            ->and($missingExt->getErrorOutput())->toContain('missing extended-validation.log');
     });
 });

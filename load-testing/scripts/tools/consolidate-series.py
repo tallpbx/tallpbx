@@ -561,6 +561,36 @@ def main() -> int:
                 errors.append(
                     f"mismatched SIP ladder CPS rates between handlers in {tier}: {sip_rates_by_variant}"
                 )
+            else:
+                measured_rates = next(iter(unique_rate_sets), ())
+                expected_ladder = matrix["tiers"][tier].get("cps_ladder", matrix["cps_ladder"])
+                if measured_rates and expected_ladder and measured_rates[0] != expected_ladder[0]:
+                    errors.append(
+                        f"SIP ladder in {tier} started at {measured_rates[0]} CPS instead of expected baseline {expected_ladder[0]} CPS"
+                    )
+
+                # Require at least one matched 100%-completed (non-dropping) rate
+                # for both handlers on every tier so call-setup latency has a true
+                # apples-to-apples comparison without PHP-FPM overload queueing.
+                tier_sip_rows = [r for r in csv_rows if r["tier"] == tier and r["phase"] == "sip"]
+                rates_by_variant_clean: dict[str, set[str]] = {v: set() for v in required_variants}
+                for r in tier_sip_rows:
+                    if r["failed"] == "0" and int(r["offered"]) > 0:
+                        rates_by_variant_clean[r["variant"]].add(r["rate_cps"])
+                common_clean = set.intersection(*rates_by_variant_clean.values()) if required_variants else set()
+                if not common_clean:
+                    errors.append(
+                        f"no matched 100%-completed (non-dropping) SIP rate for both handlers in {tier}"
+                    )
+
+        if std.get("include_extended_validation", False):
+            ext_log = tier_dir / "extended-validation.log"
+            if not ext_log.is_file():
+                errors.append(f"missing extended-validation.log in {tier_dir}")
+            else:
+                ext_text = ext_log.read_text(encoding="utf-8", errors="replace")
+                if "failed" in ext_text.lower() or "aborted" in ext_text.lower():
+                    errors.append(f"extended-validation.log reports failure/abort in {tier_dir}")
 
     unique_commits = set(commits.values())
     if len(unique_commits) > 1:

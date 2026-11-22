@@ -165,12 +165,25 @@ if [ "$SKIP_XML" = "0" ]; then
             --section="$XML_SECTION" \
             --repeats="$XML_REPEATS"
     done
+
+    # Fail fast before spending time on the SIP ladder if any XML cell failed.
+    if [ -s "${ARTIFACT_ROOT}/${TIER}/failures.log" ]; then
+        printf 'XML comparison recorded failures in %s/%s/failures.log — fix before running SIP.\n' "$ARTIFACT_ROOT" "$TIER" >&2
+        cat "${ARTIFACT_ROOT}/${TIER}/failures.log" >&2
+        exit 1
+    fi
 fi
 
 if [ "$SKIP_SIP" = "0" ]; then
     printf '=== SIP Capacity & Per-Call Latency Ladder: %s (EXTENSIONS=%s, LADDER_SECONDS=%s) ===\n' \
         "$TIER" "$EXTENSIONS" "$LADDER_SECONDS"
     bash load-testing/scripts/drivers/run-ladder.sh --tier="$TIER"
+
+    if [ -s "${ARTIFACT_ROOT}/${TIER}/failures.log" ]; then
+        printf 'SIP ladder recorded failures in %s/%s/failures.log.\n' "$ARTIFACT_ROOT" "$TIER" >&2
+        cat "${ARTIFACT_ROOT}/${TIER}/failures.log" >&2
+        exit 1
+    fi
 fi
 
 if [ "$SKIP_EXTENDED" = "0" ]; then
@@ -179,18 +192,40 @@ if [ "$SKIP_EXTENDED" = "0" ]; then
     if [ -n "${SSH_IDENTITY:-}" ]; then
         ssh_opts="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes ${ssh_opts}"
     fi
-    # Seed extended + media fixtures on the PBX and run the 14-scenario check on SIPP_HOST.
+
+    pbx_addr="${PBX_HOST#*@}"
+    sipp_addr="${SIPP_HOST#*@}"
+    sip_domain="${DOMAIN:-}"
+    if [ -z "$sip_domain" ]; then
+        # Resolve the realm FreeSWITCH actually serves registrations under.
+        # shellcheck disable=SC2086
+        sip_domain="$(ssh -n $ssh_opts "$PBX_HOST" "grep -E '^FS_DEFAULT_SIP_REALM=' /var/www/tallpbx/.env | head -n1 | cut -d= -f2-" 2>/dev/null || true)"
+        sip_domain="$(printf '%s' "$sip_domain" | tr -d '[:space:]')"
+        sip_domain="${sip_domain//\"/}"
+        sip_domain="${sip_domain//\'/}"
+    fi
+    sip_domain="${sip_domain:-$pbx_addr}"
+
+    # Seed extended + media fixtures on the PBX using its real SIP realm and
+    # sync the generated credential CSV to the SIPp load generator.
     # shellcheck disable=SC2086
-    ssh $ssh_opts "$PBX_HOST" \
-        "cd /var/www/tallpbx && php artisan pbx:load-test:seed --tenant=load-test-beta --domain=$(printf '%q' "$PBX_HOST") --extensions=$(printf '%q' "$EXTENSIONS") --start=2000 --password=LoadTest1234 --sipp-host=$(printf '%q' "$SIPP_HOST") --include-extended-fixtures --include-media-fixtures"
+    ssh -n $ssh_opts "$PBX_HOST" \
+        "cd /var/www/tallpbx && php artisan pbx:load-test:seed --tenant=load-test-beta --domain=$(printf '%q' "$sip_domain") --extensions=$(printf '%q' "$EXTENSIONS") --start=2000 --password=LoadTest1234 --sipp-host=$(printf '%q' "$sipp_addr") --include-extended-fixtures --include-media-fixtures"
     # shellcheck disable=SC2086
     scp $ssh_opts "${PBX_HOST}:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv" "${ARTIFACT_ROOT}/${TIER}/sipp-users-extended.csv"
     # shellcheck disable=SC2086
+    ssh -n $ssh_opts "$SIPP_HOST" "mkdir -p /var/www/tallpbx/storage/app/load-tests"
+    # shellcheck disable=SC2086
     scp $ssh_opts "${ARTIFACT_ROOT}/${TIER}/sipp-users-extended.csv" "${SIPP_HOST}:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv"
     # shellcheck disable=SC2086
-    ssh $ssh_opts "$SIPP_HOST" \
-        "cd /var/www/tallpbx && PBX_HOST=$(printf '%q' "$PBX_HOST") LOAD_GENERATOR_IP=$(printf '%q' "$SIPP_HOST") TENANT=load-test-beta DOMAIN=$(printf '%q' "$PBX_HOST") EXTENSIONS=$(printf '%q' "$EXTENSIONS") SKIP_SEED=1 EXTENDED=1 MEDIA_FLOW=1 bash load-testing/scripts/pbx-sipp-validate.sh" \
+    ssh -n $ssh_opts "$SIPP_HOST" \
+        "cd /var/www/tallpbx && PBX_HOST=$(printf '%q' "$pbx_addr") LOAD_GENERATOR_IP=$(printf '%q' "${LOAD_GENERATOR_IP:-$sipp_addr}") TENANT=load-test-beta DOMAIN=$(printf '%q' "$sip_domain") EXTENSIONS=$(printf '%q' "$EXTENSIONS") SKIP_SEED=1 EXTENDED=1 MEDIA_FLOW=1 bash load-testing/scripts/pbx-sipp-validate.sh" \
         | tee "${ARTIFACT_ROOT}/${TIER}/extended-validation.log"
+
+    if grep -iqE '^- [^:]+: (failed|aborted)|FAIL' "${ARTIFACT_ROOT}/${TIER}/extended-validation.log"; then
+        printf 'Extended validation reported failures in %s/%s/extended-validation.log — fix before proceeding.\n' "$ARTIFACT_ROOT" "$TIER" >&2
+        exit 1
+    fi
 fi
 
 printf '\nStandard tier comparison complete for %s under %s/%s.\n' "$TIER" "$ARTIFACT_ROOT" "$TIER"

@@ -13,17 +13,26 @@ TallPBX uses a fast PHP-FPM handler by default to answer FreeSWITCH's XML lookup
 
 ---
 
+## Start Here — Running the Unified Comparison Series
+
+To run a complete, apples-to-apples **PHP-FPM** vs. **Laravel Octane** benchmark series across all three standard hardware tiers (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`), retire legacy multi-date data, and replace the published tables and charts in [`docs/load-testing-results.md`](../docs/load-testing-results.md), follow the single self-contained runbook:
+
+👉 **[`load-testing/run-unified-series.md`](run-unified-series.md)**
+
+---
+
 ## If you are an AI agent, read these in this order
 
 | Order | File | Why |
 |:--|:--|:--|
 | 1 | `README.md` (this file) | What exists, where results go, and the rules you must not break |
-| 2 | `decisions.md` | Why each default is what it is, and which alternative was rejected |
-| 3 | `status.md` | What has actually been measured, what is pending, and what is still open |
-| 4 | `remote-setup.md` | Every host setting, with the command that applies it and the command that proves it |
-| 5 | `configurations.md` | What each switch physically changes, and what its assertion reads back |
-| 6 | `procedure.md` | The ordered run, with a verification checkpoint after each step |
-| 7 | `reference.md` | Flags, environment variables, artifact layout, JSON fields, failure markers, and a **glossary** defining every abbreviation used in this directory |
+| 2 | [`run-unified-series.md`](run-unified-series.md) | **Primary end-to-end execution checklist** for running all standard tiers under one `SERIES`, validating parity with `consolidate-series.py`, retiring legacy data, and replacing `docs/load-testing-results.md` |
+| 3 | `decisions.md` | Why each default is what it is, and which alternative was rejected |
+| 4 | `status.md` | What has actually been measured, what is pending, and what is still open |
+| 5 | `remote-setup.md` | Every host setting, with the command that applies it and the command that proves it |
+| 6 | `configurations.md` | What each switch physically changes, and what its assertion reads back |
+| 7 | `procedure.md` | Detailed step-by-step reference and failure-marker troubleshooting (`Step 10`) |
+| 8 | `reference.md` | Flags, environment variables, artifact layout, JSON fields, and a **glossary** defining every abbreviation used in this directory |
 
 Read the scripts only when the documents do not answer a question:
 
@@ -48,8 +57,9 @@ Read the scripts only when the documents do not answer a question:
 2. **Never start a cell without a manifest.** Every tier run begins by writing `manifest.json`; a number without a manifest is not evidence.
 3. **Never trust an `apply_*` without its `assert_*`.** A switch that silently did not take effect produces a plausible but meaningless number. `SWITCH-FAILED` fails that cell on purpose.
 4. **Never commit host credentials.** No IP addresses, key names, key paths or passwords belong in this directory. The operator supplies `PBX_HOST` and the SSH identity; the runner uses the ambient SSH configuration.
-5. **Write the series record into `docs/load-testing-results.md`** as a new dated section, and distill the series data into the consolidated CSVs under `load-testing/results/consolidated/`. Keep the committed record to a few documents — the results document plus the consolidated data files — so future re-analysis has one comparable dataset instead of scattered reports.
-6. **Never commit raw measurement fragments.** One series produces thousands of per-cell files — SIPp traces, CSVs, JSON reports, transport logs — that are unreviewable and bloat every clone. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored; keep them that way. What IS repository content: the distilled, cross-scenario comparison data under `/load-testing/results/consolidated/` — `*-cells.csv` (per-cell metrics), `*-services.csv` (per-service CPU and RAM) and `*-setup-latency.csv` (per-call setup times) — appended to by every series, plus the written record in `docs/`. Staging a run with `git add -A` is how this rule gets broken: stage the consolidated data, the report and the code, never the raw run directory.
+5. **Never ignore a failed test or bypass a validation gate.** When any cell, ladder rung, extended scenario, or `consolidate-series.py` check fails, stop, diagnose and fix the root cause, and re-run cleanly. Never use `--skip-*` or `--allow-incomplete` to publish a partial or broken series; if a blocker cannot be resolved, stop and report it to the user.
+6. **Write the series record into `docs/load-testing-results.md`** as a new dated section, and distill the series data into the consolidated CSVs under `load-testing/results/consolidated/`. Keep the committed record to a few documents — the results document plus the consolidated data files — so future re-analysis has one comparable dataset instead of scattered reports.
+7. **Never commit raw measurement fragments.** One series produces thousands of per-cell files — SIPp traces, CSVs, JSON reports, transport logs — that are unreviewable and bloat every clone. `/load-testing/results/` and `/storage/app/load-tests/` are git-ignored; keep them that way. What IS repository content: the distilled, cross-scenario comparison data under `/load-testing/results/consolidated/` — `*-cells.csv` (per-cell metrics), `*-services.csv` (per-service CPU and RAM) and `*-setup-latency.csv` (per-call setup times) — appended to by every series, plus the written record in `docs/`. Staging a run with `git add -A` is how this rule gets broken: stage the consolidated data, the report and the code, never the raw run directory.
 
    Three guards enforce this, and removing any of them is a defect:
    - `.gitignore` ignores both trees except `/load-testing/results/consolidated/`;
