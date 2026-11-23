@@ -9,6 +9,17 @@ PBX_PORT="${PBX_PORT:-5060}"
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # The load-testing directory: the SIPp scenarios live beside this script.
 LOAD_TESTING_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+sipp_harness_digest() (
+  export LC_ALL=C
+  cd "${LOAD_TESTING_DIR}"
+  sha256sum scripts/pbx-sipp-validate.sh tools/sipp/*.xml | sha256sum | cut -d ' ' -f 1
+)
+
+if [[ "${1:-}" == "--fingerprint" ]]; then
+  sipp_harness_digest
+  exit
+fi
 LOAD_GENERATOR_IP="${LOAD_GENERATOR_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 TENANT="${TENANT:-load-test-beta}"
 # Default to the configured PBX realm; an empty value omits --domain entirely
@@ -78,6 +89,15 @@ fi
 
 mkdir -p "${RUN_DIR}"
 
+if [[ -n "${BENCHMARK_ATTEMPT:-}" ]]; then
+  actual_digest="$(sipp_harness_digest)"
+  if [[ "${actual_digest}" != "${BENCHMARK_SIPP_SHA256:?Missing expected SIPp harness digest}" ]]; then
+    echo "SIPp harness fingerprint mismatch" >&2
+    exit 2
+  fi
+  printf 'BENCHMARK-SIPP %s %s\n' "${BENCHMARK_ATTEMPT}" "${actual_digest}" | tee "${RUN_DIR}/harness.txt"
+fi
+
 REGISTER_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/register.xml"
 # The scenario the extension-call step drives. The default places a 30-second
 # conversation inside every call; a capacity rung overrides this with the
@@ -86,6 +106,7 @@ REGISTER_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/register.xml"
 UAC_SCENARIO="${UAC_SCENARIO:-${LOAD_TESTING_DIR}/tools/sipp/uac-extension.xml}"
 OUTBOUND_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-outbound.xml"
 UAS_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uas-auto-answer.xml"
+EXTENSION_UAS_SCENARIO="${EXTENSION_UAS_SCENARIO:-${UAS_SCENARIO}}"
 MEDIA_CLIENT_HANGUP_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-media-client-hangup.xml"
 MEDIA_SERVER_HANGUP_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-media-server-hangup.xml"
 # Extended SIPp scenarios for parity audit modules (gated by EXTENDED=1)
@@ -100,7 +121,7 @@ CALL_BLOCK_UAC_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-call-block.xml"
 CSV_ABSOLUTE="${APP_DIR}/${CSV_PATH}"
 AUTH_CSV_ABSOLUTE="${RUN_DIR}/sipp-users-auth.csv"
 
-for required_file in "${REGISTER_SCENARIO}" "${UAC_SCENARIO}" "${OUTBOUND_UAC_SCENARIO}" "${UAS_SCENARIO}" "${MEDIA_CLIENT_HANGUP_SCENARIO}" "${MEDIA_SERVER_HANGUP_SCENARIO}"; do
+for required_file in "${REGISTER_SCENARIO}" "${UAC_SCENARIO}" "${OUTBOUND_UAC_SCENARIO}" "${UAS_SCENARIO}" "${EXTENSION_UAS_SCENARIO}" "${MEDIA_CLIENT_HANGUP_SCENARIO}" "${MEDIA_SERVER_HANGUP_SCENARIO}"; do
   if [[ ! -f "${required_file}" ]]; then
     echo "Missing SIPp scenario: ${required_file}" >&2
     exit 2
@@ -191,10 +212,10 @@ run_step() {
   echo >> "${RUN_DIR}/${name}.command"
 
   if (cd "${RUN_DIR}" && "$@") > "${RUN_DIR}/${name}.log" 2>&1; then
-    echo "- ${name}: passed" >> "${RUN_DIR}/summary.md"
+    echo "- ${name}: passed" | tee -a "${RUN_DIR}/summary.md"
   else
     local exit_code=$?
-    echo "- ${name}: failed with exit code ${exit_code}" >> "${RUN_DIR}/summary.md"
+    echo "- ${name}: failed with exit code ${exit_code}" | tee -a "${RUN_DIR}/summary.md"
     return "${exit_code}"
   fi
 }
@@ -329,7 +350,7 @@ run_step register \
 extension_uas_pid="$(start_background extension-registered-uas \
   timeout "${UAS_TIMEOUT}" sipp \
     -nostdin \
-    -sf "${UAS_SCENARIO}" \
+    -sf "${EXTENSION_UAS_SCENARIO}" \
     -i "${LOAD_GENERATOR_IP}" \
     -p "${EXTENSION_UAS_LOCAL_PORT}" \
     -trace_err \
@@ -354,6 +375,11 @@ outbound_uas_pid="$(start_background outbound-gateway-uas \
 
 sleep 5
 
+sip_trace=()
+if [[ "${SIP_TRACE_MESSAGES:-0}" == "1" ]]; then
+  sip_trace=(-trace_msg)
+fi
+
 run_step extension-calls \
   timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
     -nostdin \
@@ -364,6 +390,7 @@ run_step extension-calls \
     -r "${CALL_RATE}" \
     -l "${MAX_SIMULTANEOUS}" \
     -m "${CALLS}" \
+    "${sip_trace[@]}" \
     -trace_err \
     -trace_counts \
     -trace_stat \

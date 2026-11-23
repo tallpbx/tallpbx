@@ -3,8 +3,8 @@
 Follow this runbook start to finish to execute one clean, apples-to-apples **PHP-FPM** vs. [**Laravel Octane**](https://laravel.com/docs/octane) (optional persistent PHP worker keeping the telephony XML handler in memory between FreeSWITCH lookups) benchmark series across all three standard shared-CPU tiers — **`h1-1c1g`**, **`h2-2c2g`**, and **`h4-4c8g`** — on **one clean Git commit SHA**, validate completeness, retire legacy multi-date capacity data, and replace the published tables and charts in [`docs/load-testing-results.md`](../docs/load-testing-results.md).
 
 > **Non-negotiable safety & completion rules (from [`load-testing/README.md`](README.md#rules-you-must-not-break)):**
-> 1. **Stop and fix every failure — never ignore or skip past a broken step.** If any command exits non-zero, `failures.log` is non-empty, or `extended-validation.log` shows a failed/aborted scenario, **STOP immediately**, inspect the logs (`logs/`, `driver-logs/`, `failures.log`, and [`procedure.md` Step 10](procedure.md#step-10--when-something-fails)), fix the root cause, clear the failed tier directory, and re-run that tier cleanly before advancing.
-> 2. **Never bypass validation gates.** Do not pass `--skip-xml`, `--skip-sip`, `--skip-extended`, or `--allow-incomplete` to push a partial or failing run into published docs. A series is publishable **only** when `consolidate-series.py` exits `0` without `--allow-incomplete`. If a blocker cannot be fixed automatically (e.g., broken VM, missing SSH access, cloud provider quota), stop and report the exact blocker to the user instead of moving on.
+> 1. **Stop at the first execution failure.** Preserve the failed tier directory and inspect its logs. Fix the cause before retrying. Move the failed tier directory outside the series and retry that tier only when the pinned commit is unchanged. If the fix changes the PBX or harness commit, start a new series. [Failure diagnostics](procedure.md#step-10--when-something-fails).
+> 2. **Require a clean default export for publication.** Use the default tier set and omit `--allow-incomplete`. Run the extended suite on the first tier. Later tiers can use `--skip-extended` after a complete pass has been saved under the same series and commit.
 > 3. **Never mutate live `nftables` state** (`nft add/insert/delete/flush`). Manage firewall rules only through `tpbx security:apply` / Security Center.
 > 4. **Never commit raw per-cell artifacts** (`load-testing/results/<series>/` or `storage/app/load-tests/`). Never use `git add -A`. Commit only consolidated CSVs under `load-testing/results/consolidated/` and docs/code.
 > 5. **Never expose full public IP addresses** in docs or committed logs (obfuscate to last octet, e.g. `x.x.x.218`).
@@ -54,12 +54,26 @@ ssh "$SIPP_HOST" 'hostname && nproc && command -v sipp'
 Every tier runs the exact same declarative contract (`standard_comparison` in [`load-testing/matrix.php`](matrix.php)):
 
 - **Matched XML lookup battery (`v-fast-default` vs. `v-octane`):** `100x5` and `1000x25` (`mixed`, `production-60`, 3 repeats) recording `req/sec`, `p50`, `p95`, and `max`.
-- **Matched 60-second SIP capacity & individual call latency ladder (`EXTENSIONS=30`, `LADDER_SECONDS=60`):** Targeted per-tier rates covering light baseline, non-dropping apples-to-apples right below PHP-FPM's ceiling, crossover, and Octane boundary—recording completion %, CDR gate, per-service CPU, and per-call `setup` (`INVITE` → `200 OK`) + `teardown` (`BYE` → `200 OK`) `p50`/`p95`/`max` latency:
+- **Matched 60-second SIP capacity and latency ladder** with 30 accounts. Each rung records completion, CDR reconciliation, service CPU, and per-call setup and teardown latency.
   - `h1-1c1g` (1 vCPU / 1 GB): `[2, 4, 5, 6, 8]` CPS
   - `h2-2c2g` (2 vCPU / 2 GB): `[5, 8, 10, 12, 15, 20]` CPS
   - `h4-4c8g` (4 shared vCPU / 8 GB): `[5, 10, 15, 20, 25, 30, 40]` CPS
-  - Stops automatically after 2 consecutive rungs where both handlers complete `< 95%`, or immediately if both drop `< 80%`.
+  - Each handler stops after two consecutive rungs below 95% completion or one rung below 80%. A measured overload rung stays in the comparison.
 - **14-scenario functional + media verification (`EXTENDED=1 MEDIA_FLOW=1`).**
+
+### Checks before the capacity ladder
+
+1. Run the tier driver with `--dry-run` to preview the matrix without placing calls. Use the same clean commit on the orchestrator and PBX. The driver creates a fresh tier attempt and fingerprints the SIPp runner and scenarios on the generator.
+2. The driver runs XML validation and, on the tier selected for the extended suite, checks the named functional and media verdicts before starting the ladder. A log line starting with `Running` records only the start. A pass is recorded as `- <step>: passed`.
+3. Before either handler starts the ladder, the driver places two test calls through each handler. The capacity responder waits for BYE immediately after ACK. Both calls must receive `200 OK` for the initial BYE. If the check fails, inspect `<variant>/capacity-preflight/extension-calls.log` and the SIP message trace before retrying. The short calls carry no capacity result.
+
+### Evidence and retries
+
+- `comparison.json` binds the tier attempt to the series, PBX commit, and generator fingerprint. The driver marks it complete after the requested phases finish.
+- `driver-logs/sip-events.tsv` records preflights, started and measured rungs, and early stops. A started rung without a measurement is an execution failure. The orchestrator keeps the event log and failure records separate from PBX artifact copies.
+- `<variant>/sip-cps<rate>/harness.txt` identifies the generator files used for each rung. Each rung must account for `rate × 60` offered calls and record setup and teardown p50, p95, and maximum latency.
+- To check a completed 1-vCPU attempt before running another tier, run `python3 load-testing/scripts/tools/consolidate-series.py "load-testing/results/${SERIES}" --tiers=h1-1c1g`. This diagnostic expects the extended suite to have run on that tier.
+- For historical extended runs, recover the original generator `summary.md` if the local log contains only progress. Preserve the original artifacts and any operator-confirmed result. A missing local copy alone does not justify repeating a known successful test.
 
 ### 2A — Tier 1: `h1-1c1g` (1 vCPU / 1 GB RAM)
 
@@ -93,12 +107,12 @@ bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=h4-4c8g --series
 
 Run [`consolidate-series.py`](scripts/tools/consolidate-series.py) against the completed `SERIES` directory. It enforces six hard pass/fail gates and exits non-zero if **any** gap exists:
 
-1. All three standard tiers (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`) are present with clean 40-char `manifest.json` build metadata and **identical Git commit SHA** (`dirty=false`).
-2. `failures.log` is empty on every tier.
+1. All three tiers have completed attempt records, clean PBX manifests on one commit, and matching generator fingerprints. Each XML report and SIP measurement belongs to its tier attempt.
+2. Each SIP ladder has a passing two-call preflight for both handlers, a complete record of each attempted rung, and no execution failure.
 3. Both `v-fast-default` and `v-octane` completed both XML profiles (`100x5` and `1000x25` `mixed`, `production-60`, 3 repeats, 100% HTTP 200) with `p50`, `p95`, and `max` latency.
 4. Both handlers have matched SIP `ladder.csv` rungs starting at each tier's light baseline, including **at least one 100%-completed (non-dropping) apples-to-apples rate** on every tier.
-5. Every SIP rung records both `setup` (`INVITE` → `200 OK`) and `teardown` (`BYE` → `200 OK`) `p50`/`p95`/`max` latency.
-6. At least one tier in the series (typically `h1-1c1g`, the tightest host) has a clean `extended-validation.log` with zero failed/aborted scenarios across the 14-scenario functional & media pass (subsequent resized tiers on the same build SHA may pass `--skip-extended`).
+5. Every rung accounts for the configured offered call count and has setup and teardown p50, p95, and maximum latency. Any early stop follows the configured thresholds.
+6. At least one tier records a passing verdict for every named extended and media step, including registration setup, on the same pinned harness.
 
 ```bash
 python3 load-testing/scripts/tools/consolidate-series.py \

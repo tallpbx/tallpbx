@@ -49,7 +49,7 @@ SSH_PORT="${SSH_PORT:-22}"
 # a rung for 2.5 hours with no output and no failure to record.
 SSH_OPTS="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=4}"
 REMOTE_APP_DIR="${REMOTE_APP_DIR:-/var/www/tallpbx}"
-REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load-tests/${SERIES}}"
+REMOTE_ARTIFACT_ROOT="${REMOTE_ARTIFACT_ROOT:-${REMOTE_APP_DIR}/storage/app/load-tests/${SERIES}${BENCHMARK_ATTEMPT:+/${BENCHMARK_ATTEMPT}}}"
 PBX_URL="${PBX_URL:-http://127.0.0.1/api/v1/xml-handler}"
 # Permanent copy of the raw artifacts.
 #
@@ -908,7 +908,7 @@ xml_command() {
     directory="$(matrix_value cache_ttl_profiles "$ttl_id" directory)"
     acl="$(matrix_value cache_ttl_profiles "$ttl_id" acl)"
 
-    label="${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
+    label="${BENCHMARK_ATTEMPT:+${BENCHMARK_ATTEMPT}/}${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
     report="${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
     url="$(xml_url_for_variant "$variant")"
 
@@ -929,7 +929,7 @@ verify_command() {
     local report label requests url
 
     report="${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/${profile_id}-${ttl_id}-${section}-r${repeat}.json"
-    label="${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
+    label="${BENCHMARK_ATTEMPT:+${BENCHMARK_ATTEMPT}/}${tier}/${variant}/${profile_id}-${ttl_id}-${section}"
     requests="$(matrix_value xml_profiles "$profile_id" requests)"
     url="$(xml_url_for_variant "$variant")"
 
@@ -1017,13 +1017,40 @@ ablation_run_dir() {
 # outbound call as a gateway canary.
 sip_command() {
     local run_dir="$1"
-    local calls=$((CPS * LADDER_SECONDS))
+    local calls="${2:-$((CPS * LADDER_SECONDS))}"
 
-    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q CALLS=%q MAX_SIMULTANEOUS=%q OUTBOUND_CALLS=1 UAC_SCENARIO=%q RUN_DIR=%q bash %q' \
+    printf 'cd %q && PBX_HOST=%q TENANT=%q DOMAIN=%q EXTENSIONS=%q START=%q PASSWORD=%q SKIP_SEED=1 CALL_RATE=%q CALLS=%q MAX_SIMULTANEOUS=%q OUTBOUND_CALLS=1 UAC_SCENARIO=%q EXTENSION_UAS_SCENARIO=%q BENCHMARK_ATTEMPT=%q BENCHMARK_SIPP_SHA256=%q SIP_TRACE_MESSAGES=%q RUN_DIR=%q bash %q' \
         "$SIPP_APP_DIR" "$SIPP_PBX_HOST" "$LOAD_TENANT" "$LOAD_DOMAIN" "$LOAD_EXTENSIONS" "$LOAD_START" \
         "$LOAD_PASSWORD" "$CPS" "$calls" "$calls" \
         "${SIPP_APP_DIR}/load-testing/tools/sipp/uac-extension-capacity.xml" \
+        "${SIPP_APP_DIR}/load-testing/tools/sipp/uas-auto-answer-capacity.xml" \
+        "${BENCHMARK_ATTEMPT:-}" "${BENCHMARK_SIPP_SHA256:-}" "${SIP_TRACE_MESSAGES:-0}" \
         "$run_dir" "${SIPP_APP_DIR}/load-testing/scripts/pbx-sipp-validate.sh"
+}
+
+benchmark_sip_event() {
+    if [ -n "${BENCHMARK_ATTEMPT:-}" ]; then
+        printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "${ARTIFACT_ROOT}/${TIER}/driver-logs/sip-events.tsv"
+    fi
+}
+
+check_capacity_teardown() {
+    local dir="$1" remote_dir="$2" status=0
+
+    mkdir -p "$dir" || return 1
+    release_sipp_ports
+    warm_directory
+    run_on_sipp "$(CPS=1 SIP_TRACE_MESSAGES=1 sip_command "$remote_dir" 2)" > "$dir/sipp.log" 2>&1 || status=$?
+    pull_sipp_artifacts "$remote_dir" "$dir" || return 1
+    [ "$status" -eq 0 ] && sipp_summary_passed "$dir/summary.md" && awk '
+        $2 == "BYE" && $4 == "B-RTD2" {
+            bye = ($5 == 2 && $6 == 0 && $7 == 0)
+        }
+        $2 == "200" && $4 == "E-RTD2" {
+            reply = ($5 == 2 && $6 == 0 && $7 == 0)
+        }
+        END { exit !(bye && reply) }
+    ' "$dir/extension-calls.log"
 }
 
 # Where the smoke preflight writes its artifacts.
@@ -1260,20 +1287,30 @@ prepare_tier() {
 
     printf 'Preparing tier %s (%s vCPU / %s MB)\n' "$TIER" "$vcpu" "$ram_mb" >&2
 
-    manifest_write "$destination"
+    manifest_write "$destination" || return 1
 
     # Read the manifest back where the runner can see it.
     if [ "$PBX_HOST" = "local" ]; then
         # A local run already writes into the artifact tree; only copy when the
         # two roots really differ.
         if [ "$destination" != "${ARTIFACT_ROOT}/${TIER}/manifest.json" ]; then
-            cp "$destination" "${ARTIFACT_ROOT}/${TIER}/manifest.json"
+            cp "$destination" "${ARTIFACT_ROOT}/${TIER}/manifest.json" || return 1
         fi
     else
-        scp $SSH_OPTS -P "$SSH_PORT" "${PBX_HOST}:${destination}" "${ARTIFACT_ROOT}/${TIER}/manifest.json" >/dev/null
+        scp $SSH_OPTS -P "$SSH_PORT" "${PBX_HOST}:${destination}" "${ARTIFACT_ROOT}/${TIER}/manifest.json" >/dev/null || return 1
     fi
 
-    manifest_assert_tier "${ARTIFACT_ROOT}/${TIER}/manifest.json" "$vcpu" "$ram_mb"
+    manifest_assert_tier "${ARTIFACT_ROOT}/${TIER}/manifest.json" "$vcpu" "$ram_mb" || return 1
+
+    if [ -n "${BENCHMARK_ATTEMPT:-}" ]; then
+        php -r '
+            $build = json_decode(file_get_contents($argv[1]), true)["build"];
+            if (($build["commit"] ?? "") !== $argv[2] || ($build["dirty"] ?? true) !== false) {
+                fwrite(STDERR, "PBX checkout does not match the clean benchmark commit.".PHP_EOL);
+                exit(1);
+            }
+        ' "${ARTIFACT_ROOT}/${TIER}/manifest.json" "$BENCHMARK_COMMIT"
+    fi
 }
 
 # Seed the synthetic load-test tenant once per tier.
@@ -1302,8 +1339,13 @@ teardown_tier() {
     fi
 
     if [ "$PBX_HOST" != "local" ] && [ -d "${ARTIFACT_ROOT}/${TIER}" ]; then
-        scp $SSH_OPTS -P "$SSH_PORT" -r "${PBX_HOST}:${REMOTE_ARTIFACT_ROOT}/${TIER}/." "${ARTIFACT_ROOT}/${TIER}/" >/dev/null 2>&1 \
-            || printf 'WARNING: could not pull artifacts from %s\n' "$PBX_HOST" >&2
+        # The orchestrator owns logs and verdicts. The PBX owns variant reports.
+        if ! scp $SSH_OPTS -P "$SSH_PORT" -r "${PBX_HOST}:${REMOTE_ARTIFACT_ROOT}/${TIER}/v-*" "${ARTIFACT_ROOT}/${TIER}/" >/dev/null 2>&1; then
+            printf 'WARNING: could not pull variant reports from %s\n' "$PBX_HOST" >&2
+            if [ -n "${BENCHMARK_ATTEMPT:-}" ]; then
+                exit_code=1
+            fi
+        fi
     fi
 
     # The measurement hosts are disposable and their addresses are not public
@@ -1502,12 +1544,8 @@ warm_directory() {
 # compares the calls SIPp completed with the rows the database gained. Without
 # that gate a cell can report every call answered while the pipeline recorded
 # none of them.
-run_sip_phase() {
-    local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file cpu_csv
-    local successful failed fs_pid_before fs_pid_after run_status
-    local saved_cps="$CPS" rate consecutive=0 executed_rates=() rate_list=()
-    local pct below95 below80
-
+prepare_sip_variant() {
+    local variant="$1"
     # A cell measured behind a half-applied switch is a plausible but
     # meaningless number, so a failed switch fails the cell instead: a
     # configuration that did not take must never reach the results.
@@ -1520,11 +1558,37 @@ run_sip_phase() {
         cell_failed "${TIER}/${variant}/sip-cps${CPS} (XML handler or FreeSWITCH not ready)"
         return 1
     fi
+}
 
-    # Prepare the generator once per variant instead of re-seeding and copying
-    # scenarios on every CPS rung; release_sipp_ports still runs before each
-    # rung to guarantee clean UAS port binding.
-    if ! sipp_prepare_generator; then
+run_sip_preflights() {
+    local variant preflight_dir remote_preflight_dir
+
+    if ! apply_cache_policy "${TTL:-production-60}" || ! sipp_prepare_generator; then
+        cell_failed "${TIER}/generator"
+        return 1
+    fi
+
+    while IFS= read -r variant; do
+        prepare_sip_variant "$variant" || return 1
+        preflight_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/capacity-preflight"
+        remote_preflight_dir="$(CPS=1 sip_run_dir "$TIER" "$variant")"
+        if ! check_capacity_teardown "$preflight_dir" "${remote_preflight_dir%/*}/capacity-preflight"; then
+            cell_failed "${TIER}/${variant}/capacity-preflight (BYE must receive 200 OK without retransmission)"
+            return 1
+        fi
+        benchmark_sip_event preflight "$variant" 0 || return 1
+    done < <(selected_variants)
+}
+
+run_sip_phase() {
+    local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file cpu_csv
+    local successful failed fs_pid_before fs_pid_after run_status
+    local saved_cps="$CPS" rate consecutive=0 rate_list=()
+    local pct below95 below80
+
+    prepare_sip_variant "$variant" || return 1
+
+    if [ -z "${BENCHMARK_ATTEMPT:-}" ] && ! sipp_prepare_generator; then
         cell_failed "${TIER}/generator"
         return 1
     fi
@@ -1545,8 +1609,9 @@ run_sip_phase() {
         local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}"
         label="${TIER}/${variant}/sip-cps${CPS}"
 
-        mkdir -p "$local_run_dir"
-        rm -f -- "${local_run_dir}/summary.md" "${local_run_dir}/extension-calls.log" "${local_run_dir}/cdr-gate.txt"
+        benchmark_sip_event started "$variant" "$CPS" || return 1
+        mkdir -p "$local_run_dir" || return 1
+        rm -f -- "${local_run_dir}/summary.md" "${local_run_dir}/extension-calls.log" "${local_run_dir}/cdr-gate.txt" "${local_run_dir}/harness.txt" || return 1
 
         release_sipp_ports
 
@@ -1668,19 +1733,25 @@ run_sip_phase() {
             fi
         fi
 
+        if [ -n "${BENCHMARK_ATTEMPT:-}" ] && { [ -z "$setup_max" ] || [ -z "$teardown_max" ]; }; then
+            cell_failed "${label} (missing setup or teardown RTT samples)"
+            CPS="$saved_cps"
+            return 1
+        fi
+
         # One row per rung: the stop rule is applied from these verified counts.
         ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
-        mkdir -p "$(dirname "$ladder_file")"
+        mkdir -p "$(dirname "$ladder_file")" || return 1
 
         if [ ! -f "$ladder_file" ]; then
-            printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$ladder_file"
+            printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$ladder_file" || return 1
         fi
 
         printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" \
-            "$setup_p50" "$setup_p95" "$setup_max" "$teardown_p50" "$teardown_p95" "$teardown_max" >> "$ladder_file"
+            "$setup_p50" "$setup_p95" "$setup_max" "$teardown_p50" "$teardown_p95" "$teardown_max" >> "$ladder_file" || return 1
 
-        executed_rates+=("$CPS")
+        benchmark_sip_event measured "$variant" "$CPS" || return 1
         IFS=$'\t' read -r pct below95 below80 <<< "$(awk -v s="$successful" -v f="$failed" 'BEGIN { p = 100.0 * s / (s + f); printf "%.1f\t%d\t%d\n", p, (p < 95.0), (p < 80.0) }')"
         printf '  %s calls/sec [%s]: %s%% (%s/%s, setup p50=%sms p95=%sms, teardown p50=%sms p95=%sms)\n' \
             "$CPS" "$variant" "$pct" "$successful" "$((successful + failed))" \
@@ -1692,6 +1763,7 @@ run_sip_phase() {
         # its collapse point while Octane continues higher.
         if [ "$STOP_ON_DROP" = "1" ]; then
             if [ "$below80" = "1" ]; then
+                benchmark_sip_event stopped "$variant" "$CPS" || return 1
                 printf '  %s dropped below 80%% at %s calls/sec; stopping this handler.\n' "$variant" "$CPS"
                 break
             fi
@@ -1703,6 +1775,7 @@ run_sip_phase() {
             fi
 
             if [ "$consecutive" -ge 2 ]; then
+                benchmark_sip_event stopped "$variant" "$CPS" || return 1
                 printf '  %s completed under 95%% at two consecutive rates; stopping this handler.\n' "$variant"
                 break
             fi
@@ -1912,8 +1985,11 @@ execute_cells() {
     # A failure list from an earlier run would misreport this one.
     : > "${ARTIFACT_ROOT}/${TIER}/failures.log"
 
-    prepare_tier
-    seed_tenant
+    prepare_tier || return 1
+    seed_tenant || return 1
+    if [ -n "${BENCHMARK_ATTEMPT:-}" ] && [ "$PHASE" = "sip" ]; then
+        run_sip_preflights || return 1
+    fi
 
     # The SIP smoke preflight runs before any series cell: a broken chain is
     # found in two minutes rather than after the first 30-minute series has
@@ -1946,7 +2022,12 @@ execute_cells() {
                         continue
                     fi
 
-                    run_sip_phase "$variant" || failures=$((failures + 1)) ;;
+                    if ! run_sip_phase "$variant"; then
+                        if [ -n "${BENCHMARK_ATTEMPT:-}" ]; then
+                            return 1
+                        fi
+                        failures=$((failures + 1))
+                    fi ;;
                 ablation) run_ablation_phase "$variant" || failures=$((failures + 1)) ;;
             esac
         done < <(selected_phases)

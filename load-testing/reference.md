@@ -189,10 +189,15 @@ A cell failure is recorded in `failures.log` and the series continues. Only a pr
 
 ```
 load-testing/results/<series>/<tier>/
+├── comparison.json                         standard comparison attempt record
 ├── manifest.json
 ├── failures.log
+├── driver-logs/sip-events.tsv               preflights and rung outcomes
+├── extended-validation.log                scenario verdicts, when requested
 ├── logs/<tier>_<variant>_<profile>-<ttl>-<section>-r<n>.log
 └── <variant>/
+    ├── capacity-preflight/                   two-call teardown check
+    ├── sip-cps<rate>/harness.txt              generator fingerprint and attempt
     ├── <profile>-<ttl>-<section>-r<n>.json     one cell
     └── probe-<profile>-<ttl>.txt               one lookup probe
 ```

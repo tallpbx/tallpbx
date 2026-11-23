@@ -14,7 +14,7 @@ Older releases (1.0.0 through 4.2.1) are archived in [docs/changelog/CHANGELOG-1
 - Firewall Observe Mode now tags new kernel log entries with `tpbx-observe:`. The Security Center and `tpbx security:observe` still read entries with the previous prefix. On an existing appliance, install the updated helper with `sudo install -m 0750 -o root -g www-data /var/www/tallpbx/scripts/resources/tallpbx-security /usr/local/sbin/tallpbx-security`, then reapply the rules in the Security Center or run `tpbx security:apply` to start using the new tag.
 
 ### Fixed
-- The load-test harness can now run matched PHP-FPM and Octane comparisons on each hardware tier, including the 4 vCPU / 8 GB shared tier. The SIP ladder requires a verified result from each handler at every measured rate.
+- The load-test harness now preserves failed SIP rungs, verifies the build and generator files, and checks that extended scenarios produced passing verdicts. Both XML handlers must pass a short SIP teardown check before the capacity ladder starts.
 
 ## [5.4.0] - 2026-11-17
 

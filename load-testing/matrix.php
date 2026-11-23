@@ -313,6 +313,13 @@ return [
         'sip_extensions' => 30,
         'sip_duration_seconds' => 60,
         'include_extended_validation' => true,
+        'extended_steps' => [
+            'register', 'extension-calls', 'outbound-calls',
+            'recording-media', 'moh-media', 'announcement-media', 'extended-register',
+            'ring-group-calls', 'voicemail-calls', 'conference-calls',
+            'call-forward-calls', 'time-condition-calls', 'follow-me-calls',
+            'emergency-calls', 'call-block-calls',
+        ],
     ],
 
     /*

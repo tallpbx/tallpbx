@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import statistics
 import subprocess
@@ -99,7 +100,8 @@ def parse_float(raw: str | None) -> float | None:
     if raw is None or raw.strip() == "":
         return None
     try:
-        return float(raw.strip())
+        value = float(raw.strip())
+        return value if math.isfinite(value) else None
     except ValueError:
         return None
 
@@ -110,11 +112,16 @@ def summarize_xml_profile(
     ttl: str,
     section: str,
     expected_repeats: int,
+    workload: dict[str, Any],
+    comparison: dict[str, Any],
+    variant: str,
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """Aggregate repeat JSON reports for one XML profile."""
     errors: list[str] = []
-    files = sorted(variant_dir.glob(f"{profile}-{ttl}-{section}-r*.json"))
-    if len(files) < expected_repeats:
+    stem = f"{profile}-{ttl}-{section}"
+    files = sorted(variant_dir.glob(f"{stem}-r*.json"))
+    expected_names = {f"{stem}-r{n}.json" for n in range(1, expected_repeats + 1)}
+    if {path.name for path in files} != expected_names:
         errors.append(
             f"missing XML reports in {variant_dir.name}: expected {expected_repeats}x "
             f"{profile}-{ttl}-{section}-r*.json, found {len(files)}"
@@ -131,14 +138,31 @@ def summarize_xml_profile(
 
     for report_file in files:
         data = json.loads(report_file.read_text(encoding="utf-8"))
+        run = data.get("run", {})
+        short_commit = str(run.get("git_commit") or "")
+        label = f"{comparison.get('attempt')}/{comparison.get('tier')}/{variant}/{stem}"
+        if (
+            not re.fullmatch(r"[0-9a-f]{12,40}", short_commit)
+            or not str(comparison.get("commit", "")).startswith(short_commit)
+            or run.get("git_dirty") is not False
+            or run.get("label") != label
+        ):
+            errors.append(f"XML build or attempt mismatch in {report_file}")
         offered = int(data.get("total_requests", 0))
         completed = int(data.get("successful_responses", 0))
         failed = int(data.get("failed_responses", 0))
         total_offered += offered
         total_completed += completed
         total_failed += failed
-        if failed > 0 or float(data.get("success_rate_percent", 0)) < 100.0:
-            errors.append(f"non-100% XML report: {report_file}")
+        if (
+            offered != int(workload["requests"])
+            or data.get("concurrency") != int(workload["concurrency"])
+            or data.get("target", {}).get("section") != section
+            or completed != offered
+            or failed != 0
+            or data.get("status_counts") != {"200": offered}
+        ):
+            errors.append(f"incorrect XML workload or HTTP response counts in {report_file}")
 
         rps = parse_float(str(data.get("requests_per_second", "")))
         lat = data.get("latency_ms", {})
@@ -168,7 +192,9 @@ def summarize_xml_profile(
     }, errors
 
 
-def parse_ladder_csv(variant_dir: Path) -> tuple[list[dict[str, Any]], list[str]]:
+def parse_ladder_csv(
+    variant_dir: Path, duration: int, label_prefix: str, provenance: str
+) -> tuple[list[dict[str, Any]], list[str]]:
     """Read SIP ladder rows including per-call setup and teardown latency."""
     errors: list[str] = []
     ladder_path = variant_dir / "ladder.csv"
@@ -179,10 +205,21 @@ def parse_ladder_csv(variant_dir: Path) -> tuple[list[dict[str, Any]], list[str]
     with ladder_path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
-            cps = int(row["cps"])
-            completed = int(row["successful"])
-            failed = int(row["failed"])
+            try:
+                cps = int(row["cps"])
+                completed = int(row["successful"])
+                failed = int(row["failed"])
+            except (KeyError, ValueError, TypeError):
+                errors.append(f"invalid SIP counts in {ladder_path}:{reader.line_num}")
+                continue
             offered = completed + failed
+            if cps <= 0 or min(completed, failed) < 0 or offered != cps * duration:
+                errors.append(f"{ladder_path}: expected {cps * duration} offered calls at {cps} CPS, got {offered}")
+            if row.get("label") != f"{label_prefix}/sip-cps{cps}":
+                errors.append(f"unexpected SIP label at {cps} CPS in {ladder_path}")
+            stamp = variant_dir / f"sip-cps{cps}" / "harness.txt"
+            if not stamp.is_file() or stamp.read_text(encoding="utf-8").strip() != provenance:
+                errors.append(f"SIP harness or attempt mismatch at {cps} CPS in {ladder_path}")
             setup_p50 = parse_float(row.get("setup_p50_ms"))
             setup_p95 = parse_float(row.get("setup_p95_ms"))
             setup_max = parse_float(row.get("setup_max_ms"))
@@ -190,10 +227,12 @@ def parse_ladder_csv(variant_dir: Path) -> tuple[list[dict[str, Any]], list[str]
             td_p95 = parse_float(row.get("teardown_p95_ms"))
             td_max = parse_float(row.get("teardown_max_ms"))
 
-            if setup_p50 is None or setup_p95 is None:
-                errors.append(f"missing setup p50/p95 at {cps} CPS in {ladder_path}")
-            if td_p50 is None or td_p95 is None:
-                errors.append(f"missing teardown p50/p95 at {cps} CPS in {ladder_path}")
+            for name, values in (
+                ("setup", (setup_p50, setup_p95, setup_max)),
+                ("teardown", (td_p50, td_p95, td_max)),
+            ):
+                if any(value is None for value in values) or not 0 <= values[0] <= values[1] <= values[2]:
+                    errors.append(f"invalid {name} latency at {cps} CPS in {ladder_path}")
 
             rows.append(
                 {
@@ -214,6 +253,33 @@ def parse_ladder_csv(variant_dir: Path) -> tuple[list[dict[str, Any]], list[str]
     if not rows:
         errors.append(f"empty ladder.csv in {variant_dir}")
     return rows, errors
+
+
+def validate_ladder_events(
+    variant: str, rows: list[dict[str, Any]], planned: list[int], events: list[str]
+) -> list[str]:
+    rates = [row["cps"] for row in rows]
+    if not rates or rates != planned[:len(rates)]:
+        return [f"{variant} ran SIP rates {rates}; expected an ordered prefix of {planned}"]
+
+    expected = [f"preflight\t{variant}\t0"]
+    consecutive = 0
+    for index, row in enumerate(rows):
+        rate = row["cps"]
+        expected.extend((f"started\t{variant}\t{rate}", f"measured\t{variant}\t{rate}"))
+        pct = row["completion_pct"]
+        consecutive = consecutive + 1 if pct < 95 else 0
+        if pct < 80 or consecutive >= 2:
+            expected.append(f"stopped\t{variant}\t{rate}")
+            if index != len(rows) - 1:
+                return [f"{variant} continued past the SIP stop threshold at {rate} CPS"]
+            break
+    else:
+        if rates != planned:
+            return [f"{variant} stopped before completing the planned SIP rates without meeting the stop rule"]
+
+    actual = [line for line in events if line.split("\t")[1:2] == [variant]]
+    return [] if actual == expected else [f"{variant} has missing, duplicate or out-of-order SIP rung events"]
 
 
 def summarize_cpu_csv(cpu_csv: Path) -> dict[str, float]:
@@ -520,7 +586,11 @@ def main() -> int:
     commits: dict[str, str] = {}
     dates: list[str] = []
     csv_rows: list[dict[str, str]] = []
-    extended_logs_found = 0
+    extended_passes = 0
+    duration = int(std["sip_duration_seconds"])
+    digests: set[str] = set()
+    attempts: set[str] = set()
+    series_ids: set[str] = set()
 
     for tier in required_tiers:
         if tier not in matrix["tiers"]:
@@ -535,6 +605,38 @@ def main() -> int:
         failures_log = tier_dir / "failures.log"
         if failures_log.is_file() and failures_log.read_text(encoding="utf-8").strip():
             errors.append(f"non-empty failures.log in {tier_dir}")
+        driver_log = tier_dir / "driver-logs" / "ladder-single-pass.log"
+        if driver_log.is_file() and re.search(r"(?m)^CELL-FAILED\s", driver_log.read_text(encoding="utf-8")):
+            errors.append(f"SIP driver recorded a failed cell in {driver_log}")
+
+        comparison_path = tier_dir / "comparison.json"
+        comparison = {}
+        if comparison_path.is_file():
+            comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+        series_id = comparison.get("series")
+        if (
+            comparison.get("complete") is not True
+            or not isinstance(series_id, str) or not series_id
+            or comparison.get("tier") != tier
+            or comparison.get("sip_extensions") != std["sip_extensions"]
+            or comparison.get("sip_duration_seconds") != duration
+        ):
+            errors.append(f"missing or incomplete standard comparison record in {tier_dir}")
+        else:
+            series_ids.add(series_id)
+        attempt = str(comparison.get("attempt") or "")
+        digest = str(comparison.get("sipp_sha256") or "")
+        if not re.fullmatch(r"attempt\.[a-zA-Z0-9]{8}", attempt) or attempt in attempts:
+            errors.append(f"missing, invalid or duplicate attempt ID in {comparison_path}")
+        attempts.add(attempt)
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            errors.append(f"invalid SIPp harness digest in {comparison_path}")
+        digests.add(digest)
+        provenance = f"BENCHMARK-SIPP {attempt} {digest}"
+        events_path = tier_dir / "driver-logs" / "sip-events.tsv"
+        events = events_path.read_text(encoding="utf-8").splitlines() if events_path.is_file() else []
+        if any(line.split("\t")[1:2] not in [[variant] for variant in required_variants] for line in events):
+            errors.append(f"unknown handler in {events_path}")
 
         manifest_path = tier_dir / "manifest.json"
         if not manifest_path.is_file():
@@ -545,12 +647,14 @@ def main() -> int:
         build = manifest.get("build", {})
         commit = str(build.get("commit") or "")
         dirty = build.get("dirty")
-        if len(commit) != 40:
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
             errors.append(f"invalid or missing 40-char build.commit in {manifest_path}")
         else:
             commits[tier] = commit
         if dirty is not False:
             errors.append(f"dirty or unknown build state in {manifest_path} (dirty={dirty})")
+        if comparison.get("commit") != commit:
+            errors.append(f"PBX build does not match the comparison record in {tier_dir}")
 
         recorded_at = str(manifest.get("recorded_at") or "")
         date_str = recorded_at[:10] if len(recorded_at) >= 10 else ""
@@ -575,7 +679,10 @@ def main() -> int:
                 continue
 
             for profile in xml_profiles:
-                summary, xml_errs = summarize_xml_profile(vdir, profile, xml_ttl, xml_section, xml_repeats)
+                summary, xml_errs = summarize_xml_profile(
+                    vdir, profile, xml_ttl, xml_section, xml_repeats,
+                    matrix["xml_profiles"][profile], comparison, variant,
+                )
                 errors.extend(xml_errs)
                 if summary:
                     csv_rows.append(
@@ -615,8 +722,13 @@ def main() -> int:
                         }
                     )
 
-            ladder_rows, sip_errs = parse_ladder_csv(vdir)
+            ladder_rows, sip_errs = parse_ladder_csv(vdir, duration, f"{tier}/{variant}", provenance)
             errors.extend(sip_errs)
+            planned = matrix["tiers"][tier].get("cps_ladder", matrix["cps_ladder"])
+            errors.extend(validate_ladder_events(variant, ladder_rows, planned, events))
+            stamp = vdir / "capacity-preflight" / "harness.txt"
+            if not stamp.is_file() or stamp.read_text(encoding="utf-8").strip() != provenance:
+                errors.append(f"SIP preflight harness or attempt mismatch in {vdir}")
             sip_rates_by_variant[variant] = [r["cps"] for r in ladder_rows]
 
             for lrow in ladder_rows:
@@ -664,7 +776,6 @@ def main() -> int:
             # collapse point (allowing the higher-capacity handler, e.g. Octane,
             # to continue to higher rungs without forcing PHP-FPM to time out
             # well past its failure boundary).
-            expected_ladder = matrix["tiers"][tier].get("cps_ladder", matrix["cps_ladder"])
             rate_lists = [rates for rates in sip_rates_by_variant.values() if rates]
             if len(rate_lists) < len(required_variants):
                 errors.append(f"missing SIP ladder rows for one or more handlers in {tier}: {sip_rates_by_variant}")
@@ -675,12 +786,6 @@ def main() -> int:
                     errors.append(
                         f"mismatched SIP ladder CPS prefix between handlers in {tier}: {sip_rates_by_variant}"
                     )
-                else:
-                    common_prefix = next(iter(prefixes))
-                    if expected_ladder and common_prefix[0] != expected_ladder[0]:
-                        errors.append(
-                            f"SIP ladder in {tier} started at {common_prefix[0]} CPS instead of expected baseline {expected_ladder[0]} CPS"
-                        )
 
                 # Require at least one matched 100%-completed (non-dropping) rate
                 # for both handlers on every tier so call-setup latency has a true
@@ -699,17 +804,28 @@ def main() -> int:
         if std.get("include_extended_validation", False):
             ext_log = tier_dir / "extended-validation.log"
             if ext_log.is_file():
-                extended_logs_found += 1
                 ext_text = ext_log.read_text(encoding="utf-8", errors="replace")
-                if re.search(r"(?im)^- [^:]+: (failed|aborted)|\bFAIL\b", ext_text):
-                    errors.append(f"extended-validation.log reports failure/abort in {tier_dir}")
+                verdicts = re.findall(r"(?m)^- ([^:\n]+): ((?:passed|failed|aborted)[^\n]*)$", ext_text)
+                expected = [(step, "passed") for step in std["extended_steps"]]
+                if sorted(verdicts) != sorted(expected):
+                    errors.append(f"incomplete or failed extended validation in {ext_log}")
+                elif [line for line in ext_text.splitlines() if line.startswith("BENCHMARK-SIPP ")] != [provenance]:
+                    errors.append(f"extended validation harness or attempt mismatch in {ext_log}")
+                else:
+                    extended_passes += 1
 
-    if std.get("include_extended_validation", False) and extended_logs_found == 0:
-        errors.append(f"missing extended-validation.log in series {series_dir} (at least one tier must pass the 14-scenario functional & media suite)")
+    if std.get("include_extended_validation", False) and extended_passes == 0:
+        errors.append(f"missing extended-validation.log with a complete passing functional and media suite in {series_dir}")
 
     unique_commits = set(commits.values())
     if len(unique_commits) > 1:
         errors.append(f"tiers ran on different git commits (cannot combine into one clean series): {commits}")
+    if len(digests) > 1:
+        errors.append("tiers recorded different SIPp harness digests")
+    if len(series_ids) > 1:
+        errors.append("tiers recorded different series IDs")
+    if len(series_ids) == 1:
+        series_name = next(iter(series_ids))
 
     if errors:
         for err in errors:
@@ -738,7 +854,7 @@ def main() -> int:
         print(f"Wrote Markdown comparison tables to {md_path}")
 
     if not args.csv_out and not args.markdown_out:
-        print(f"Validated {series_name}: {len(required_tiers)} tiers, {len(csv_rows)} rows, 0 errors.")
+        print(f"Checked {series_name}: {len(required_tiers)} tiers, {len(csv_rows)} rows, {len(errors)} errors.")
 
     return 0
 

@@ -438,7 +438,8 @@ describe('load test matrix runner', function (): void {
         // seconds and cannot measure capacity.
         expect($process->getOutput())
             ->toContain('CALLS=300')
-            ->toContain('uac-extension-capacity.xml');
+            ->toContain('uac-extension-capacity.xml')
+            ->toContain('uas-auto-answer-capacity.xml');
     });
 
     it('lets the runner choose the SIPp scenario on the generator', function (): void {
@@ -869,6 +870,25 @@ XML);
             ->and(trim($teardown->getOutput()))->toContain("\t3\t26.0\t26.0\t");
     });
 
+    it('changes the SIPp harness fingerprint when a copied scenario changes', function (): void {
+        $bundle = $this->artifactRoot.'/load-testing';
+        File::ensureDirectoryExists($bundle.'/scripts');
+        File::ensureDirectoryExists($bundle.'/tools');
+        File::copyDirectory(base_path('load-testing/tools/sipp'), $bundle.'/tools/sipp');
+        $script = $bundle.'/scripts/pbx-sipp-validate.sh';
+        File::copy(base_path('load-testing/scripts/pbx-sipp-validate.sh'), $script);
+
+        $original = new Process(['bash', base_path('load-testing/scripts/pbx-sipp-validate.sh'), '--fingerprint']);
+        $copy = new Process(['bash', $script, '--fingerprint']);
+        $original->mustRun();
+        $copy->mustRun();
+        expect($copy->getOutput())->toBe($original->getOutput());
+
+        File::append($bundle.'/tools/sipp/uas-auto-answer-capacity.xml', "\n<!-- changed on generator -->\n");
+        $copy->mustRun();
+        expect($copy->getOutput())->not->toBe($original->getOutput());
+    });
+
     it('records and reports per-call setup and teardown latency in ladder runs', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
         expect($script)
@@ -936,14 +956,32 @@ XML);
     it('consolidates a uniform multi-tier series and rejects mismatched commits or missing tiers', function (): void {
         $seriesDir = $this->artifactRoot.'/series-20261121';
         $commit = str_repeat('a', 40);
+        $digest = str_repeat('c', 64);
         $tierPool = ['h1-1c1g' => 'dynamic3', 'h2-2c2g' => 'dynamic6', 'h4-4c8g' => 'dynamic12'];
-        $tierFirstRate = ['h1-1c1g' => 2, 'h2-2c2g' => 5, 'h4-4c8g' => 5];
+        $matrix = require base_path('load-testing/matrix.php');
 
         foreach ($tierPool as $tier => $pool) {
             $tierDir = $seriesDir.'/'.$tier;
-            File::ensureDirectoryExists($tierDir);
+            $attempt = 'attempt.'.str_pad((string) $matrix['tiers'][$tier]['vcpu'], 8, '0', STR_PAD_LEFT);
+            $provenance = "BENCHMARK-SIPP {$attempt} {$digest}\n";
+            $events = [];
+            File::ensureDirectoryExists($tierDir.'/driver-logs');
             File::put($tierDir.'/failures.log', '');
-            File::put($tierDir.'/extended-validation.log', "- register: passed\n- ring-group-calls: passed\n");
+            File::put($tierDir.'/driver-logs/ladder-single-pass.log', 'Ladder complete');
+            File::put($tierDir.'/extended-validation.log', $provenance.implode('', array_map(
+                fn (string $step): string => "- {$step}: passed\n",
+                $matrix['standard_comparison']['extended_steps'],
+            )));
+            File::put($tierDir.'/comparison.json', json_encode([
+                'series' => basename($seriesDir),
+                'tier' => $tier,
+                'attempt' => $attempt,
+                'commit' => $commit,
+                'sipp_sha256' => $digest,
+                'complete' => true,
+                'sip_extensions' => 30,
+                'sip_duration_seconds' => 60,
+            ]));
             File::put($tierDir.'/manifest.json', json_encode([
                 'recorded_at' => '2026-11-21T19:00:00Z',
                 'build' => ['branch' => '5.x', 'commit' => $commit, 'dirty' => false],
@@ -959,6 +997,14 @@ XML);
                         $isOctane = $variant === 'v-octane';
                         File::put("{$vdir}/{$profile}-production-60-mixed-r{$r}.json", json_encode([
                             'total_requests' => $reqs,
+                            'concurrency' => $matrix['xml_profiles'][$profile]['concurrency'],
+                            'target' => ['section' => 'mixed'],
+                            'status_counts' => ['200' => $reqs],
+                            'run' => [
+                                'label' => "{$attempt}/{$tier}/{$variant}/{$profile}-production-60-mixed",
+                                'git_commit' => substr($commit, 0, 12),
+                                'git_dirty' => false,
+                            ],
                             'successful_responses' => $reqs,
                             'failed_responses' => 0,
                             'success_rate_percent' => 100.0,
@@ -973,8 +1019,21 @@ XML);
                 }
 
                 $isOctane = $variant === 'v-octane';
-                $cps = $tierFirstRate[$tier];
+                [$cps, $stopCps] = $matrix['tiers'][$tier]['cps_ladder'];
                 File::ensureDirectoryExists("{$vdir}/sip-cps{$cps}");
+                File::ensureDirectoryExists("{$vdir}/sip-cps{$stopCps}");
+                File::ensureDirectoryExists("{$vdir}/capacity-preflight");
+                File::put("{$vdir}/capacity-preflight/harness.txt", $provenance);
+                File::put("{$vdir}/sip-cps{$cps}/harness.txt", $provenance);
+                File::put("{$vdir}/sip-cps{$stopCps}/harness.txt", $provenance);
+                $events = array_merge($events, [
+                    "preflight\t{$variant}\t0",
+                    "started\t{$variant}\t{$cps}",
+                    "measured\t{$variant}\t{$cps}",
+                    "started\t{$variant}\t{$stopCps}",
+                    "measured\t{$variant}\t{$stopCps}",
+                    "stopped\t{$variant}\t{$stopCps}",
+                ]);
                 File::put("{$vdir}/sip-cps{$cps}/cpu.csv", implode("\n", [
                     'label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb',
                     'test,1,freeswitch,38.0,80.0,70.0',
@@ -1003,8 +1062,11 @@ XML);
                         $isOctane ? '16.0' : '38.0',
                         $isOctane ? '25.0' : '60.0',
                     ),
+                    sprintf('2026-11-21T19:06:00Z,%d,%d,%d,%s/%s/sip-cps%d,90,120,160,10,20,50',
+                        $stopCps, $stopCps * 45, $stopCps * 15, $tier, $variant, $stopCps),
                 ])."\n");
             }
+            File::put($tierDir.'/driver-logs/sip-events.tsv', implode("\n", $events)."\n");
         }
 
         $csvOut = $this->artifactRoot.'/out/consolidated.csv';
@@ -1036,6 +1098,27 @@ XML);
             ->and(File::get($mdOut))->toContain('bar [75.0, 75.0, 75.0]')
             ->and(File::get($mdOut))->toContain('bar [12.0, 12.0, 12.0]')
             ->and(File::get($mdOut))->toContain('4 vCPU / 8 GB RAM');
+
+        $tierDir = $seriesDir.'/h1-1c1g';
+        $ladder = $tierDir.'/v-fast-default-fpm-dynamic3/ladder.csv';
+        $xml = $tierDir.'/v-fast-default-fpm-dynamic3/100x5-production-60-mixed-r1.json';
+        $assertRejected = function (string $path, string $value, string $error) use ($ok): void {
+            $original = File::get($path);
+            File::put($path, $value);
+            $ok->run();
+            File::put($path, $original);
+
+            expect($ok->isSuccessful())->toBeFalse()
+                ->and($ok->getErrorOutput())->toContain($error);
+        };
+
+        $assertRejected($ladder, str_replace(',2,120,0,', ',2,1,0,', File::get($ladder)), 'expected 120 offered calls');
+        $assertRejected($ladder, str_replace(',38.0,60.0', ',38.0,', File::get($ladder)), 'invalid teardown latency');
+        $assertRejected($xml, str_replace(str_repeat('a', 12), str_repeat('b', 12), File::get($xml)), 'XML build or attempt mismatch');
+        $assertRejected($tierDir.'/extended-validation.log', "Running register...\n", 'incomplete or failed extended validation');
+        $assertRejected($tierDir.'/driver-logs/ladder-single-pass.log', "CELL-FAILED h1-1c1g/v-fast-default/sip-cps6\n", 'SIP driver recorded a failed cell');
+        $assertRejected($tierDir.'/driver-logs/sip-events.tsv', '', 'missing, duplicate or out-of-order SIP rung events');
+        $assertRejected($tierDir.'/v-fast-default-fpm-dynamic3/sip-cps2/harness.txt', "different generator files\n", 'SIP harness or attempt mismatch');
 
         // Mutate one tier's commit SHA: consolidation must reject mixed-build cobbling.
         File::put($seriesDir.'/h4-4c8g/manifest.json', json_encode([

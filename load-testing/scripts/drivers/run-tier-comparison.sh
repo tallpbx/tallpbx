@@ -106,6 +106,7 @@ eval "$(php -r '
     printf("SIP_DURATION=%d\n", (int) $std["sip_duration_seconds"]);
     printf("XML_PROFILES=(%s)\n", implode(" ", array_map("escapeshellarg", $std["xml_profiles"])));
     printf("STD_TIERS=(%s)\n", implode(" ", array_map("escapeshellarg", $std["tiers"])));
+    printf("EXTENDED_STEPS=(%s)\n", implode(" ", array_map("escapeshellarg", $std["extended_steps"])));
 ' load-testing/matrix.php "$TIER")"
 
 if [ -n "$REPEATS_OVERRIDE" ]; then
@@ -131,12 +132,12 @@ if [ "$DRY_RUN" = "1" ]; then
         printf 'SERIES=%s ARTIFACT_ROOT=%s bash load-testing/scripts/load-test-matrix.sh --tier=%s --compare-xml-handlers --phase=xml --profile=%s --ttl=%s --section=%s --repeats=%s\n' \
             "$SERIES" "$ARTIFACT_ROOT" "$TIER" "$xml_profiles_csv" "$XML_TTL" "$XML_SECTION" "$XML_REPEATS"
     fi
-    if [ "$SKIP_SIP" = "0" ]; then
-        printf 'SERIES=%s ARTIFACT_ROOT=%s EXTENSIONS=%s LADDER_SECONDS=%s bash load-testing/scripts/drivers/run-ladder.sh --tier=%s\n' \
-            "$SERIES" "$ARTIFACT_ROOT" "$EXTENSIONS" "$LADDER_SECONDS" "$TIER"
-    fi
     if [ "$SKIP_EXTENDED" = "0" ]; then
         printf 'EXTENDED=1 MEDIA_FLOW=1 SKIP_SEED=1 PBX_HOST=<pbx> LOAD_GENERATOR_IP=<sipp> bash load-testing/scripts/pbx-sipp-validate.sh # 14-scenario functional & media pass\n'
+    fi
+    if [ "$SKIP_SIP" = "0" ]; then
+        printf 'SERIES=%s ARTIFACT_ROOT=%s EXTENSIONS=%s LADDER_SECONDS=%s bash load-testing/scripts/drivers/run-ladder.sh --tier=%s # verifies both SIP handlers before the ladder\n' \
+            "$SERIES" "$ARTIFACT_ROOT" "$EXTENSIONS" "$LADDER_SECONDS" "$TIER"
     fi
     printf 'python3 load-testing/scripts/tools/consolidate-series.py %s --csv-out=load-testing/results/consolidated/%s-comparison.csv\n' \
         "$ARTIFACT_ROOT" "$SERIES"
@@ -145,11 +146,52 @@ fi
 
 : "${PBX_HOST:?Set PBX_HOST to the target PBX IP or hostname}"
 export PBX_HOST
+if [ -n "${SSH_IDENTITY:-}" ]; then
+    export SSH_OPTS="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes ${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10}"
+fi
 
 if [ "$SKIP_SIP" = "0" ] || [ "$SKIP_EXTENDED" = "0" ]; then
     : "${SIPP_HOST:?Set SIPP_HOST to the SIPp generator IP or hostname}"
     export SIPP_HOST
 fi
+
+if [ -n "$(git status --porcelain)" ]; then
+    printf 'Use a clean checkout for a standard comparison.\n' >&2
+    exit 1
+fi
+
+BENCHMARK_COMMIT="$(git rev-parse HEAD)"
+BENCHMARK_SIPP_SHA256="$(bash load-testing/scripts/pbx-sipp-validate.sh --fingerprint)"
+tier_dir="${ARTIFACT_ROOT}/${TIER}"
+mkdir -p "$ARTIFACT_ROOT"
+if ! mkdir "$tier_dir"; then
+    printf 'Tier artifacts already exist. Use a fresh series or move that tier directory aside before retrying.\n' >&2
+    exit 1
+fi
+attempt_dir="$(mktemp -d "${tier_dir}/attempt.XXXXXXXX")"
+BENCHMARK_ATTEMPT="${attempt_dir##*/}"
+export BENCHMARK_ATTEMPT BENCHMARK_COMMIT BENCHMARK_SIPP_SHA256
+if [ -n "${SIPP_HOST:-}" ] && [ "$SIPP_HOST" != "local" ]; then
+    export SIPP_APP_DIR="${SIPP_APP_DIR:-/var/www/tallpbx}/storage/app/load-tests/${BENCHMARK_ATTEMPT}"
+fi
+
+write_comparison_record() {
+    php -r '
+        echo json_encode([
+            "series" => $argv[1],
+            "tier" => $argv[2],
+            "attempt" => $argv[3],
+            "commit" => $argv[4],
+            "sipp_sha256" => $argv[5],
+            "complete" => $argv[6] === "true",
+            "sip_extensions" => (int) $argv[7],
+            "sip_duration_seconds" => (int) $argv[8],
+        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;
+    ' "$SERIES" "$TIER" "$BENCHMARK_ATTEMPT" "$BENCHMARK_COMMIT" "$BENCHMARK_SIPP_SHA256" "$1" "$EXTENSIONS" "$LADDER_SECONDS" > "${attempt_dir}/comparison.json"
+    mv "${attempt_dir}/comparison.json" "${tier_dir}/comparison.json"
+}
+
+write_comparison_record false
 
 if [ "$SKIP_XML" = "0" ]; then
     xml_profiles_csv="$(IFS=,; printf '%s' "${XML_PROFILES[*]}")"
@@ -172,24 +214,9 @@ if [ "$SKIP_XML" = "0" ]; then
     fi
 fi
 
-if [ "$SKIP_SIP" = "0" ]; then
-    printf '=== SIP Capacity & Per-Call Latency Ladder: %s (EXTENSIONS=%s, LADDER_SECONDS=%s) ===\n' \
-        "$TIER" "$EXTENSIONS" "$LADDER_SECONDS"
-    bash load-testing/scripts/drivers/run-ladder.sh --tier="$TIER"
-
-    if [ -s "${ARTIFACT_ROOT}/${TIER}/failures.log" ]; then
-        printf 'SIP ladder recorded failures in %s/%s/failures.log.\n' "$ARTIFACT_ROOT" "$TIER" >&2
-        cat "${ARTIFACT_ROOT}/${TIER}/failures.log" >&2
-        exit 1
-    fi
-fi
-
 if [ "$SKIP_EXTENDED" = "0" ]; then
     printf '=== Extended & Media Functional Validation (14 scenarios): %s ===\n' "$TIER"
     ssh_opts="${SSH_OPTS:--o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10}"
-    if [ -n "${SSH_IDENTITY:-}" ]; then
-        ssh_opts="-i ${SSH_IDENTITY} -o IdentitiesOnly=yes ${ssh_opts}"
-    fi
 
     pbx_addr="${PBX_HOST#*@}"
     sipp_addr="${SIPP_HOST#*@}"
@@ -197,7 +224,7 @@ if [ "$SKIP_EXTENDED" = "0" ]; then
     if [ -z "$sip_domain" ]; then
         # Resolve the realm FreeSWITCH actually serves registrations under.
         # shellcheck disable=SC2086
-        sip_domain="$(ssh -n $ssh_opts "$PBX_HOST" "grep -E '^FS_DEFAULT_SIP_REALM=' /var/www/tallpbx/.env | head -n1 | cut -d= -f2-" 2>/dev/null || true)"
+        sip_domain="$(ssh -n $ssh_opts -p "${SSH_PORT:-22}" "$PBX_HOST" "grep -E '^FS_DEFAULT_SIP_REALM=' /var/www/tallpbx/.env | head -n1 | cut -d= -f2-" 2>/dev/null || true)"
         sip_domain="$(printf '%s' "$sip_domain" | tr -d '[:space:]')"
         sip_domain="${sip_domain//\"/}"
         sip_domain="${sip_domain//\'/}"
@@ -207,22 +234,48 @@ if [ "$SKIP_EXTENDED" = "0" ]; then
     # Seed extended + media fixtures on the PBX using its real SIP realm and
     # sync the generated credential CSV to the SIPp load generator.
     # shellcheck disable=SC2086
-    ssh -n $ssh_opts "$PBX_HOST" \
-        "cd /var/www/tallpbx && php artisan pbx:load-test:seed --tenant=load-test-beta --domain=$(printf '%q' "$sip_domain") --extensions=$(printf '%q' "$EXTENSIONS") --start=2000 --password=LoadTest1234 --sipp-host=$(printf '%q' "$sipp_addr") --include-extended-fixtures --include-media-fixtures"
+    ssh -n $ssh_opts -p "${SSH_PORT:-22}" "$PBX_HOST" \
+        "cd /var/www/tallpbx && [ \"\$(git rev-parse HEAD)\" = $(printf '%q' "$BENCHMARK_COMMIT") ] && [ -z \"\$(git status --porcelain)\" ] && php artisan pbx:load-test:seed --tenant=load-test-beta --domain=$(printf '%q' "$sip_domain") --extensions=$(printf '%q' "$EXTENSIONS") --start=2000 --password=LoadTest1234 --sipp-host=$(printf '%q' "$sipp_addr") --include-extended-fixtures --include-media-fixtures"
     # shellcheck disable=SC2086
-    scp $ssh_opts "${PBX_HOST}:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv" "${ARTIFACT_ROOT}/${TIER}/sipp-users-extended.csv"
+    scp $ssh_opts -P "${SSH_PORT:-22}" "${PBX_HOST}:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv" "${tier_dir}/sipp-users-extended.csv"
+    sipp_port="${SIPP_SSH_PORT:-${SSH_PORT:-22}}"
+    extended_root="$SIPP_APP_DIR"
     # shellcheck disable=SC2086
-    ssh -n $ssh_opts "$SIPP_HOST" "mkdir -p /var/www/tallpbx/storage/app/load-tests"
+    ssh -n $ssh_opts -p "$sipp_port" "$SIPP_HOST" "cd /var/www/tallpbx && mkdir -p $(printf '%q' "${extended_root}/load-testing/scripts") $(printf '%q' "${extended_root}/load-testing/tools") $(printf '%q' "${extended_root}/storage/app/load-tests")"
     # shellcheck disable=SC2086
-    scp $ssh_opts "${ARTIFACT_ROOT}/${TIER}/sipp-users-extended.csv" "${SIPP_HOST}:/var/www/tallpbx/storage/app/load-tests/sipp-users.csv"
+    scp $ssh_opts -P "$sipp_port" -r load-testing/tools/sipp "${SIPP_HOST}:${extended_root}/load-testing/tools/"
     # shellcheck disable=SC2086
-    ssh -n $ssh_opts "$SIPP_HOST" \
-        "cd /var/www/tallpbx && PBX_HOST=$(printf '%q' "$pbx_addr") LOAD_GENERATOR_IP=$(printf '%q' "${LOAD_GENERATOR_IP:-$sipp_addr}") TENANT=load-test-beta DOMAIN=$(printf '%q' "$sip_domain") EXTENSIONS=$(printf '%q' "$EXTENSIONS") SKIP_SEED=1 EXTENDED=1 MEDIA_FLOW=1 bash load-testing/scripts/pbx-sipp-validate.sh" \
-        | tee "${ARTIFACT_ROOT}/${TIER}/extended-validation.log"
+    scp $ssh_opts -P "$sipp_port" load-testing/scripts/pbx-sipp-validate.sh "${SIPP_HOST}:${extended_root}/load-testing/scripts/"
+    # shellcheck disable=SC2086
+    scp $ssh_opts -P "$sipp_port" "${tier_dir}/sipp-users-extended.csv" "${SIPP_HOST}:${extended_root}/storage/app/load-tests/sipp-users.csv"
+    # shellcheck disable=SC2086
+    ssh -n $ssh_opts -p "$sipp_port" "$SIPP_HOST" \
+        "cd $(printf '%q' "$extended_root") && PBX_HOST=$(printf '%q' "$pbx_addr") LOAD_GENERATOR_IP=$(printf '%q' "${LOAD_GENERATOR_IP:-$sipp_addr}") TENANT=load-test-beta DOMAIN=$(printf '%q' "$sip_domain") EXTENSIONS=$(printf '%q' "$EXTENSIONS") BENCHMARK_ATTEMPT=$(printf '%q' "$BENCHMARK_ATTEMPT") BENCHMARK_SIPP_SHA256=$(printf '%q' "$BENCHMARK_SIPP_SHA256") SKIP_SEED=1 EXTENDED=1 MEDIA_FLOW=1 bash load-testing/scripts/pbx-sipp-validate.sh" \
+        | tee "${tier_dir}/extended-validation.log"
 
-    if grep -iqE '^- [^:]+: (failed|aborted)|FAIL' "${ARTIFACT_ROOT}/${TIER}/extended-validation.log"; then
-        printf 'Extended validation reported failures in %s/%s/extended-validation.log — fix before proceeding.\n' "$ARTIFACT_ROOT" "$TIER" >&2
+    if ! diff -u <(printf -- '- %s: passed\n' "${EXTENDED_STEPS[@]}" | sort) \
+        <(sed -nE '/^- [^:]+: (passed|failed|aborted)/p' "${tier_dir}/extended-validation.log" | sort); then
+        printf 'Extended validation did not pass every required step. See %s/extended-validation.log.\n' "$tier_dir" >&2
         exit 1
+    fi
+fi
+
+if [ "$SKIP_SIP" = "0" ]; then
+    printf '=== SIP Capacity & Per-Call Latency Ladder: %s (EXTENSIONS=%s, LADDER_SECONDS=%s) ===\n' \
+        "$TIER" "$EXTENSIONS" "$LADDER_SECONDS"
+    bash load-testing/scripts/drivers/run-ladder.sh --tier="$TIER"
+
+    if [ -s "${tier_dir}/failures.log" ]; then
+        printf 'SIP ladder recorded failures in %s/failures.log.\n' "$tier_dir" >&2
+        cat "${tier_dir}/failures.log" >&2
+        exit 1
+    fi
+fi
+
+if [ "$SKIP_XML" = "0" ] && [ "$SKIP_SIP" = "0" ]; then
+    write_comparison_record true
+    if [ "$SKIP_EXTENDED" = "0" ]; then
+        python3 load-testing/scripts/tools/consolidate-series.py "$ARTIFACT_ROOT" --tiers="$TIER"
     fi
 fi
 

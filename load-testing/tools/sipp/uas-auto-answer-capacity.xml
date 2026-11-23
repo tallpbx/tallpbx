@@ -43,7 +43,6 @@ a=rtpmap:8 PCMA/8000
   </send>
 
   <recv request="ACK"/>
-  <pause/>
   <recv request="BYE"/>
 
   <send>
