@@ -52,6 +52,15 @@ CSV_COLUMNS = [
     "teardown_p50_ms",
     "teardown_p95_ms",
     "teardown_max_ms",
+    "fs_cpu_pct",
+    "php_fpm_cpu_pct",
+    "octane_cpu_pct",
+    "esl_cpu_pct",
+    "reverb_cpu_pct",
+    "cdr_worker_cpu_pct",
+    "mariadb_cpu_pct",
+    "redis_cpu_pct",
+    "nginx_cpu_pct",
     "fs_db",
     "cache_policy",
 ]
@@ -204,6 +213,49 @@ def parse_ladder_csv(variant_dir: Path) -> tuple[list[dict[str, Any]], list[str]
     if not rows:
         errors.append(f"empty ladder.csv in {variant_dir}")
     return rows, errors
+
+
+def summarize_cpu_csv(cpu_csv: Path) -> dict[str, float]:
+    """Return active-window mean CPU% per service class from cpuwatch.sh --sample CSV.
+
+    Filters to intervals where freeswitch or php-fpm/octane-worker showed >1% CPU
+    so post-call idle tail time in the cpuwatch window does not dilute busy load.
+    """
+    if not cpu_csv.is_file():
+        return {}
+
+    by_epoch: dict[str, dict[str, float]] = {}
+    with cpu_csv.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            ts = (row.get("epoch") or row.get("timestamp") or "").strip()
+            cls = (row.get("class") or "").strip()
+            cpu = parse_float(row.get("cpu_pct"))
+            if not ts or not cls or cpu is None:
+                continue
+            by_epoch.setdefault(ts, {})[cls] = cpu
+
+    active_samples = [
+        sample
+        for sample in by_epoch.values()
+        if (sample.get("freeswitch", 0.0) + sample.get("php-fpm", 0.0) + sample.get("octane-worker", 0.0)) >= 2.0
+    ]
+    samples = active_samples if active_samples else list(by_epoch.values())
+    if not samples:
+        return {}
+
+    classes = (
+        "freeswitch",
+        "php-fpm",
+        "octane-worker",
+        "esl-listener",
+        "reverb",
+        "cdr-worker",
+        "mariadb",
+        "redis",
+        "nginx",
+    )
+    return {cls: statistics.fmean(s.get(cls, 0.0) for s in samples) for cls in classes}
 
 
 def build_markdown(
@@ -398,6 +450,36 @@ def build_markdown(
                 ]
             )
 
+    lines.extend(
+        [
+            "",
+            "### Per-Service CPU Attribution at Highest 100%-Completed Call Rate",
+            "",
+            "| Test server | Handler | Max 100% rate | FreeSWITCH | PHP-FPM | Octane | ESL | Reverb | CDR Worker | MariaDB | Redis | nginx |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+
+    for tier in tiers:
+        label = f"{tier_meta[tier]['vcpu']} vCPU / {tier_meta[tier]['ram_mb'] // 1024} GB RAM"
+        rates = sorted(cps for (t, cps) in sip_by_tier_cps if t == tier)
+        for variant, vlabel in (("v-fast-default", "PHP-FPM"), ("v-octane", "Octane")):
+            best_row: dict[str, str] | None = None
+            for cps in rates:
+                row = sip_by_tier_cps[(tier, cps)].get(variant)
+                if row and row["failed"] == "0" and int(row["offered"]) > 0:
+                    best_row = row
+            if not best_row:
+                continue
+            def pct_cell(key: str) -> str:
+                return f"{best_row[key]}%" if best_row.get(key) else "—"
+            lines.append(
+                f"| {label} | {vlabel} | {best_row['rate_cps']} calls/sec | "
+                f"{pct_cell('fs_cpu_pct')} | {pct_cell('php_fpm_cpu_pct')} | {pct_cell('octane_cpu_pct')} | "
+                f"{pct_cell('esl_cpu_pct')} | {pct_cell('reverb_cpu_pct')} | {pct_cell('cdr_worker_cpu_pct')} | "
+                f"{pct_cell('mariadb_cpu_pct')} | {pct_cell('redis_cpu_pct')} | {pct_cell('nginx_cpu_pct')} |"
+            )
+
     lines.append("")
     return "\n".join(lines)
 
@@ -517,6 +599,15 @@ def main() -> int:
                             "teardown_p50_ms": "",
                             "teardown_p95_ms": "",
                             "teardown_max_ms": "",
+                            "fs_cpu_pct": "",
+                            "php_fpm_cpu_pct": "",
+                            "octane_cpu_pct": "",
+                            "esl_cpu_pct": "",
+                            "reverb_cpu_pct": "",
+                            "cdr_worker_cpu_pct": "",
+                            "mariadb_cpu_pct": "",
+                            "redis_cpu_pct": "",
+                            "nginx_cpu_pct": "",
                             "fs_db": str(fs_db),
                             "cache_policy": xml_ttl,
                         }
@@ -527,6 +618,7 @@ def main() -> int:
             sip_rates_by_variant[variant] = [r["cps"] for r in ladder_rows]
 
             for lrow in ladder_rows:
+                cpu_means = summarize_cpu_csv(vdir / f"sip-cps{lrow['cps']}" / "cpu.csv")
                 csv_rows.append(
                     {
                         "series": series_name,
@@ -550,6 +642,15 @@ def main() -> int:
                         "teardown_p50_ms": fmt(lrow["teardown_p50_ms"]),
                         "teardown_p95_ms": fmt(lrow["teardown_p95_ms"]),
                         "teardown_max_ms": fmt(lrow["teardown_max_ms"]),
+                        "fs_cpu_pct": fmt(cpu_means.get("freeswitch")),
+                        "php_fpm_cpu_pct": fmt(cpu_means.get("php-fpm")),
+                        "octane_cpu_pct": fmt(cpu_means.get("octane-worker")),
+                        "esl_cpu_pct": fmt(cpu_means.get("esl-listener")),
+                        "reverb_cpu_pct": fmt(cpu_means.get("reverb")),
+                        "cdr_worker_cpu_pct": fmt(cpu_means.get("cdr-worker")),
+                        "mariadb_cpu_pct": fmt(cpu_means.get("mariadb")),
+                        "redis_cpu_pct": fmt(cpu_means.get("redis")),
+                        "nginx_cpu_pct": fmt(cpu_means.get("nginx")),
                         "fs_db": str(fs_db),
                         "cache_policy": xml_ttl,
                     }

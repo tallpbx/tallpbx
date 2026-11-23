@@ -957,6 +957,19 @@ XML);
 
                 $isOctane = $variant === 'v-octane';
                 $cps = $tierFirstRate[$tier];
+                File::ensureDirectoryExists("{$vdir}/sip-cps{$cps}");
+                File::put("{$vdir}/sip-cps{$cps}/cpu.csv", implode("\n", [
+                    'label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb',
+                    'test,1,freeswitch,38.0,80.0,70.0',
+                    sprintf('test,1,php-fpm,%s,60.0,45.0', $isOctane ? '8.0' : '44.0'),
+                    sprintf('test,1,octane-worker,%s,85.0,62.0', $isOctane ? '22.0' : '0.0'),
+                    'test,1,esl-listener,5.0,25.0,15.0',
+                    'test,1,reverb,1.0,40.0,28.0',
+                    'test,1,cdr-worker,3.5,55.0,42.0',
+                    'test,1,mariadb,7.5,70.0,62.0',
+                    'test,1,redis,2.5,12.0,5.0',
+                    'test,1,nginx,1.0,10.0,3.5',
+                ])."\n");
                 File::put("{$vdir}/ladder.csv", implode("\n", [
                     'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms',
                     sprintf(
@@ -998,6 +1011,9 @@ XML);
             ->and(File::get($mdOut))->toContain('Non-Dropping Call Setup Latency (100% Completed for Both Handlers)')
             ->and(File::get($mdOut))->toContain('bar [220.0, 220.0, 220.0]')
             ->and(File::get($mdOut))->toContain('bar [45.0, 45.0, 45.0]')
+            ->and(File::get($csvOut))->toContain('octane_cpu_pct')
+            ->and(File::get($mdOut))->toContain('Per-Service CPU Attribution at Highest 100%-Completed Call Rate')
+            ->and(File::get($mdOut))->toContain('22.0%')
             ->and(File::get($mdOut))->toContain('🟧 **Laravel Octane**')
             ->and(File::get($mdOut))->toContain('🟦 **PHP-FPM**')
             ->and(File::get($mdOut))->toContain('bar [75.0, 75.0, 75.0]')

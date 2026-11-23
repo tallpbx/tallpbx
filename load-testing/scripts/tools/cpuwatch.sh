@@ -45,7 +45,7 @@ classify() {
     case "$cmd" in
         *"freeswitch:listen"*) printf 'esl-listener' ;;
         *"reverb:start"*) printf 'reverb' ;;
-        *"octane:start"* | *"rr serve"*) printf 'octane-worker' ;;
+        *"octane:start"* | *"roadrunner-worker"* | *"/rr "*" serve"* | *"rr serve"*) printf 'octane-worker' ;;
         *"cdr:work"*) printf 'cdr-worker' ;;
         *"queue:work"*) printf 'queue-worker' ;;
         *"schedule:work"*) printf 'scheduler' ;;
