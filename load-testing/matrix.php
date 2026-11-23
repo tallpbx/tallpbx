@@ -176,7 +176,6 @@ return [
     'xml_profiles' => [
         '25x1' => ['label' => 'Warm-up', 'requests' => 25, 'concurrency' => 1],
         '100x5' => ['label' => 'Moderate burst', 'requests' => 100, 'concurrency' => 5],
-        '500x25' => ['label' => 'Heavy burst', 'requests' => 500, 'concurrency' => 25],
         '1000x25' => ['label' => 'Sustained ceiling', 'requests' => 1000, 'concurrency' => 25],
     ],
 
@@ -307,7 +306,7 @@ return [
     'standard_comparison' => [
         'tiers' => ['h1-1c1g', 'h2-2c2g', 'h4-4c8g'],
         'variants' => ['v-fast-default', 'v-octane'],
-        'xml_profiles' => ['100x5', '500x25', '1000x25'],
+        'xml_profiles' => ['100x5', '1000x25'],
         'xml_section' => 'mixed',
         'xml_ttl' => 'production-60',
         'xml_repeats' => 3,

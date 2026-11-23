@@ -115,7 +115,7 @@ describe('load test matrix configuration', function (): void {
 
         expect($std['tiers'])->toBe(['h1-1c1g', 'h2-2c2g', 'h4-4c8g'])
             ->and($std['variants'])->toBe(['v-fast-default', 'v-octane'])
-            ->and($std['xml_profiles'])->toBe(['100x5', '500x25', '1000x25'])
+            ->and($std['xml_profiles'])->toBe(['100x5', '1000x25'])
             ->and($std['xml_section'])->toBe('mixed')
             ->and($std['xml_ttl'])->toBe('production-60')
             ->and($std['xml_repeats'])->toBe(3)

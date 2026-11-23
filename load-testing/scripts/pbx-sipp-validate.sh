@@ -250,6 +250,7 @@ run_media_step() {
 
   if run_step "${name}" \
     timeout "${MEDIA_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${scenario}" \
       -inf "${media_csv}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -311,6 +312,7 @@ trap cleanup EXIT
 
 run_step register \
   timeout "${REGISTER_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+    -nostdin \
     -sf "${REGISTER_SCENARIO}" \
     -inf "${AUTH_CSV_ABSOLUTE}" \
     -i "${LOAD_GENERATOR_IP}" \
@@ -326,6 +328,7 @@ run_step register \
 
 extension_uas_pid="$(start_background extension-registered-uas \
   timeout "${UAS_TIMEOUT}" sipp \
+    -nostdin \
     -sf "${UAS_SCENARIO}" \
     -i "${LOAD_GENERATOR_IP}" \
     -p "${EXTENSION_UAS_LOCAL_PORT}" \
@@ -338,6 +341,7 @@ extension_uas_pid="$(start_background extension-registered-uas \
 
 outbound_uas_pid="$(start_background outbound-gateway-uas \
   timeout "${UAS_TIMEOUT}" sipp \
+    -nostdin \
     -sf "${UAS_SCENARIO}" \
     -i "${LOAD_GENERATOR_IP}" \
     -p "${SIPP_UAS_PORT}" \
@@ -352,6 +356,7 @@ sleep 5
 
 run_step extension-calls \
   timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+    -nostdin \
     -sf "${UAC_SCENARIO}" \
     -inf "${AUTH_CSV_ABSOLUTE}" \
     -i "${LOAD_GENERATOR_IP}" \
@@ -368,6 +373,7 @@ run_step extension-calls \
 
 run_step outbound-calls \
   timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+    -nostdin \
     -sf "${OUTBOUND_UAC_SCENARIO}" \
     -inf "${AUTH_CSV_ABSOLUTE}" \
     -i "${LOAD_GENERATOR_IP}" \
@@ -403,6 +409,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
   # Refresh registrations so extended tests have valid Sofia contact records.
   run_step extended-register \
     timeout "${REGISTER_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${REGISTER_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -418,6 +425,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   extension_uas_pid="$(start_background extension-registered-uas \
     timeout 1200 sipp \
+      -nostdin \
       -sf "${UAS_SCENARIO}" \
       -i "${LOAD_GENERATOR_IP}" \
       -p "${EXTENSION_UAS_LOCAL_PORT}" \
@@ -430,6 +438,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   outbound_uas_pid="$(start_background outbound-gateway-uas \
     timeout 1200 sipp \
+      -nostdin \
       -sf "${UAS_SCENARIO}" \
       -i "${LOAD_GENERATOR_IP}" \
       -p "${SIPP_UAS_PORT}" \
@@ -444,6 +453,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step ring-group-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${RING_GROUP_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -460,6 +470,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step voicemail-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${VOICEMAIL_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -476,6 +487,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step conference-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${CONFERENCE_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -492,6 +504,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step call-forward-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${CALL_FORWARD_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -508,6 +521,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step time-condition-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${TIME_CONDITION_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -524,6 +538,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step follow-me-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${FOLLOW_ME_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -540,6 +555,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step emergency-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${EMERGENCY_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \
@@ -556,6 +572,7 @@ if [[ "${EXTENDED}" == "1" ]]; then
 
   run_step call-block-calls \
     timeout "${UAC_TIMEOUT}" sipp "${PBX_HOST}:${PBX_PORT}" \
+      -nostdin \
       -sf "${CALL_BLOCK_UAC_SCENARIO}" \
       -inf "${AUTH_CSV_ABSOLUTE}" \
       -i "${LOAD_GENERATOR_IP}" \

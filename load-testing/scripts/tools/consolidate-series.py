@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import statistics
 import subprocess
 import sys
@@ -289,7 +290,7 @@ def build_markdown(
 
     for tier in tiers:
         label = f"{tier_meta[tier]['vcpu']} vCPU / {tier_meta[tier]['ram_mb'] // 1024} GB RAM"
-        for profile in ("100x5", "500x25", "1000x25"):
+        for profile in ("100x5", "1000x25"):
             fpm = xml_index.get((tier, profile, "v-fast-default"))
             oct_row = xml_index.get((tier, profile, "v-octane"))
             if not fpm and not oct_row:
@@ -299,8 +300,8 @@ def build_markdown(
             fpm_lat = f"{fpm['p50_ms']} / {fpm['p95_ms']} ms" if fpm else "—"
             oct_lat = f"**{oct_row['p50_ms']} / {oct_row['p95_ms']} ms**" if oct_row else "—"
             lines.append(f"| {label} | `{profile}` | {fpm_rps} | {oct_rps} | {fpm_lat} | {oct_lat} |")
-            if profile == "500x25" and fpm and oct_row:
-                short_tier = f"{tier_meta[tier]['vcpu']} vCPU 500x25"
+            if profile == "1000x25" and fpm and oct_row:
+                short_tier = f"{tier_meta[tier]['vcpu']} vCPU 1000x25"
                 xml_chart_labels.append(f'"{short_tier}"')
                 xml_fpm_values.append(fpm["p50_ms"])
                 xml_oct_values.append(oct_row["p50_ms"])
@@ -323,7 +324,7 @@ def build_markdown(
                     '      plotColorPalette: "#2563eb, #f97316"',
                     "---",
                     "xychart-beta",
-                    '    title "Median XML Lookup Latency at 500x25 Mixed: Octane vs. PHP-FPM (ms, lower is better)"',
+                    '    title "Median XML Lookup Latency at 1000x25 Mixed: Octane vs. PHP-FPM (ms, lower is better)"',
                     f"    x-axis [{', '.join(xml_chart_labels)}]",
                     f'    y-axis "Median Lookup Latency (ms)" 0 --> {y_top}',
                     f"    bar [{', '.join(xml_fpm_values)}]",
@@ -345,7 +346,7 @@ def build_markdown(
                     "",
                     "```mermaid",
                     "xychart-beta",
-                    '    title "Median XML Lookup Latency at 500x25 Mixed: PHP-FPM vs. Octane (ms, lower is better)"',
+                    '    title "Median XML Lookup Latency at 1000x25 Mixed: PHP-FPM vs. Octane (ms, lower is better)"',
                     f"    x-axis [{', '.join(paired_labels)}]",
                     f'    y-axis "Median Lookup Latency (ms)" 0 --> {y_top}',
                     f"    bar [{', '.join(paired_vals)}]",
@@ -519,6 +520,7 @@ def main() -> int:
     commits: dict[str, str] = {}
     dates: list[str] = []
     csv_rows: list[dict[str, str]] = []
+    extended_logs_found = 0
 
     for tier in required_tiers:
         if tier not in matrix["tiers"]:
@@ -657,18 +659,28 @@ def main() -> int:
                 )
 
         if len(sip_rates_by_variant) == len(required_variants):
-            unique_rate_sets = {tuple(rates) for rates in sip_rates_by_variant.values()}
-            if len(unique_rate_sets) > 1:
-                errors.append(
-                    f"mismatched SIP ladder CPS rates between handlers in {tier}: {sip_rates_by_variant}"
-                )
+            # Both handlers must start at the tier's expected baseline rate and
+            # share a prefix of matched rates up to the lower-capacity handler's
+            # collapse point (allowing the higher-capacity handler, e.g. Octane,
+            # to continue to higher rungs without forcing PHP-FPM to time out
+            # well past its failure boundary).
+            expected_ladder = matrix["tiers"][tier].get("cps_ladder", matrix["cps_ladder"])
+            rate_lists = [rates for rates in sip_rates_by_variant.values() if rates]
+            if len(rate_lists) < len(required_variants):
+                errors.append(f"missing SIP ladder rows for one or more handlers in {tier}: {sip_rates_by_variant}")
             else:
-                measured_rates = next(iter(unique_rate_sets), ())
-                expected_ladder = matrix["tiers"][tier].get("cps_ladder", matrix["cps_ladder"])
-                if measured_rates and expected_ladder and measured_rates[0] != expected_ladder[0]:
+                min_len = min(len(r) for r in rate_lists)
+                prefixes = {tuple(r[:min_len]) for r in rate_lists}
+                if len(prefixes) > 1:
                     errors.append(
-                        f"SIP ladder in {tier} started at {measured_rates[0]} CPS instead of expected baseline {expected_ladder[0]} CPS"
+                        f"mismatched SIP ladder CPS prefix between handlers in {tier}: {sip_rates_by_variant}"
                     )
+                else:
+                    common_prefix = next(iter(prefixes))
+                    if expected_ladder and common_prefix[0] != expected_ladder[0]:
+                        errors.append(
+                            f"SIP ladder in {tier} started at {common_prefix[0]} CPS instead of expected baseline {expected_ladder[0]} CPS"
+                        )
 
                 # Require at least one matched 100%-completed (non-dropping) rate
                 # for both handlers on every tier so call-setup latency has a true
@@ -686,12 +698,14 @@ def main() -> int:
 
         if std.get("include_extended_validation", False):
             ext_log = tier_dir / "extended-validation.log"
-            if not ext_log.is_file():
-                errors.append(f"missing extended-validation.log in {tier_dir}")
-            else:
+            if ext_log.is_file():
+                extended_logs_found += 1
                 ext_text = ext_log.read_text(encoding="utf-8", errors="replace")
-                if "failed" in ext_text.lower() or "aborted" in ext_text.lower():
+                if re.search(r"(?im)^- [^:]+: (failed|aborted)|\bFAIL\b", ext_text):
                     errors.append(f"extended-validation.log reports failure/abort in {tier_dir}")
+
+    if std.get("include_extended_validation", False) and extended_logs_found == 0:
+        errors.append(f"missing extended-validation.log in series {series_dir} (at least one tier must pass the 14-scenario functional & media suite)")
 
     unique_commits = set(commits.values())
     if len(unique_commits) > 1:

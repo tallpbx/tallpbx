@@ -102,7 +102,7 @@ bash load-testing/scripts/load-test-matrix.sh [options]
 | `--phase=xml\|sip\|ablation` | Restrict to one phase |
 | `--ablation=<id>` | Restrict to one ablation experiment (`fs-db`, `fs-loglevel`, `esl-subscriptions`, `broadcast-throttle`, etc.) |
 | `--section=dialplan\|directory\|mixed` | Restrict the XML battery to one request section |
-| `--profile=<id>` / `--profiles=<list>` | Restrict to one or more load profiles (default `1000x25,1000x25-8020`; also `25x1`, `100x5`, `500x25`) |
+| `--profile=<id>` / `--profiles=<list>` | Restrict to one or more load profiles (default `1000x25,1000x25-8020`; also `25x1`, `100x5`) |
 | `--ttl=<id>` | Restrict XML tests to one cache policy (`production-60`, `cold`, …). A paired SIP run defaults to `production-60` |
 | `--repeats=<n>` | Repetitions per cell (default 3) |
 | `--cps=<n>` | Offered calls per second for SIP and ablation cells (default 5) |
@@ -212,7 +212,7 @@ recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,t
 - `setup_p50_ms` / `setup_p95_ms` / `setup_max_ms`: individual call setup latency (initial `INVITE` through `407` auth, XML lookups, and `200 OK` answer) summarized from SIPp's `setup` RTD rows in `*_rtt.csv`.
 - `teardown_p50_ms` / `teardown_p95_ms` / `teardown_max_ms`: individual call teardown latency (`BYE` → `200 OK`) summarized from SIPp's `teardown` RTD rows in `*_rtt.csv`.
 - Inspect any SIP cell directory directly with `python3 load-testing/scripts/tools/rtt-stats.py --rtd=setup <cell-dir>` and `--rtd=teardown <cell-dir>`.
-- Run the single uniform `standard_comparison` contract (`100x5`, `500x25`, `1000x25` `mixed` XML + 60-second SIP ladder with `EXTENSIONS=30` + 14-scenario extended/media validation) for each tier under a shared `SERIES` with `bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=<id> --series=<name>`.
+- Run the single uniform `standard_comparison` contract (`100x5` and `1000x25` `mixed` XML + 60-second SIP ladder with `EXTENSIONS=30` + 14-scenario extended/media validation) for each tier under a shared `SERIES` with `bash load-testing/scripts/drivers/run-tier-comparison.sh --tier=<id> --series=<name>`.
 - Validate cross-tier build parity & completeness across `h1-1c1g`, `h2-2c2g`, and `h4-4c8g` and generate one standardized consolidated CSV + Markdown tables/charts with `python3 load-testing/scripts/tools/consolidate-series.py load-testing/results/<series> --csv-out=... --markdown-out=...`.
 
 ---

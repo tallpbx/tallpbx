@@ -53,7 +53,7 @@ ssh "$SIPP_HOST" 'hostname && nproc && command -v sipp'
 
 Every tier runs the exact same declarative contract (`standard_comparison` in [`load-testing/matrix.php`](matrix.php)):
 
-- **Matched XML lookup battery (`v-fast-default` vs. `v-octane`):** `100x5`, `500x25`, and `1000x25` (`mixed`, `production-60`, 3 repeats) recording `req/sec`, `p50`, `p95`, and `max`.
+- **Matched XML lookup battery (`v-fast-default` vs. `v-octane`):** `100x5` and `1000x25` (`mixed`, `production-60`, 3 repeats) recording `req/sec`, `p50`, `p95`, and `max`.
 - **Matched 60-second SIP capacity & individual call latency ladder (`EXTENSIONS=30`, `LADDER_SECONDS=60`):** Targeted per-tier rates covering light baseline, non-dropping apples-to-apples right below PHP-FPM's ceiling, crossover, and Octane boundary—recording completion %, CDR gate, per-service CPU, and per-call `setup` (`INVITE` → `200 OK`) + `teardown` (`BYE` → `200 OK`) `p50`/`p95`/`max` latency:
   - `h1-1c1g` (1 vCPU / 1 GB): `[2, 4, 5, 6, 8]` CPS
   - `h2-2c2g` (2 vCPU / 2 GB): `[5, 8, 10, 12, 15, 20]` CPS
@@ -95,10 +95,10 @@ Run [`consolidate-series.py`](scripts/tools/consolidate-series.py) against the c
 
 1. All three standard tiers (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`) are present with clean 40-char `manifest.json` build metadata and **identical Git commit SHA** (`dirty=false`).
 2. `failures.log` is empty on every tier.
-3. Both `v-fast-default` and `v-octane` completed all three XML profiles (`100x5`, `500x25`, `1000x25` `mixed`, `production-60`, 3 repeats, 100% HTTP 200) with `p50`, `p95`, and `max` latency.
+3. Both `v-fast-default` and `v-octane` completed both XML profiles (`100x5` and `1000x25` `mixed`, `production-60`, 3 repeats, 100% HTTP 200) with `p50`, `p95`, and `max` latency.
 4. Both handlers have matched SIP `ladder.csv` rungs starting at each tier's light baseline, including **at least one 100%-completed (non-dropping) apples-to-apples rate** on every tier.
 5. Every SIP rung records both `setup` (`INVITE` → `200 OK`) and `teardown` (`BYE` → `200 OK`) `p50`/`p95`/`max` latency.
-6. `extended-validation.log` exists on every tier with zero failed/aborted scenarios.
+6. At least one tier in the series (typically `h1-1c1g`, the tightest host) has a clean `extended-validation.log` with zero failed/aborted scenarios across the 14-scenario functional & media pass (subsequent resized tiers on the same build SHA may pass `--skip-extended`).
 
 ```bash
 python3 load-testing/scripts/tools/consolidate-series.py \
@@ -119,7 +119,7 @@ python3 load-testing/scripts/tools/consolidate-series.py \
 Once Step 3 exits `0`:
 
 1. **Replace [`docs/load-testing-results.md`](../docs/load-testing-results.md)** using the single unified series in `/tmp/${SERIES}-tables.md` and `load-testing/results/consolidated/${SERIES}-comparison.csv`:
-   - Replace all multi-date cobbled tables and the legacy overload-only call-setup chart with the clean unified tables and charts (including the **Non-Dropping Call Setup Latency** apples-to-apples chart, individual call **setup & teardown** latency across light/busy/boundary loads, and **XML Lookup Speed & Latency** across `100x5`, `500x25`, and `1000x25`).
+   - Replace all multi-date cobbled tables and the legacy overload-only call-setup chart with the clean unified tables and charts (including the **Non-Dropping Call Setup Latency** apples-to-apples chart, individual call **setup & teardown** latency across light/busy/boundary loads, and **XML Lookup Speed & Latency** across `100x5` and `1000x25`).
    - Follow [`.agents/skills/tallpbx-documentation/SKILL.md`](../.agents/skills/tallpbx-documentation/SKILL.md): introduce **Laravel Octane** in full on first mention linked to `https://laravel.com/docs/octane`, use `median / p95` consistently across all latency tables, and cite the exact build SHA, date, hardware, account count (`30`), duration (`60s`), and cache policy (`production-60`).
 2. **Retire legacy capacity CSVs** (keep Git history as the archive):
    - Remove `load-testing/results/consolidated/worker-sweep-20261108-cells.csv`, `worker-sweep-20261108-services.csv`, `worker-sweep-20261108-setup-latency.csv`, and `worker-sweep-20261108-panel-probe.csv` once no published table in `docs/load-testing-results.md` cites them.

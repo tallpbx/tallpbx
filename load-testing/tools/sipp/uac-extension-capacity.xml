@@ -97,7 +97,10 @@ Content-Length: 0
     ]]>
   </send>
 
-  <pause/>
+  <!-- Brief hold after ACK so FreeSWITCH mod_sofia finishes transitioning the
+       answered leg before BYE arrives. A 0 ms pause causes UDP ACK/BYE races
+       that trigger 5-second BYE retransmissions and skew teardown latency. -->
+  <pause milliseconds="250"/>
 
   <send retrans="500" start_rtd="teardown">
     <![CDATA[

@@ -83,7 +83,7 @@ if [ -z "$SIPP_PBX_HOST" ]; then
     if [ "$PBX_HOST" = "local" ]; then
         SIPP_PBX_HOST="127.0.0.1"
     else
-        SIPP_PBX_HOST="$PBX_HOST"
+        SIPP_PBX_HOST="${PBX_HOST#*@}"
     fi
 fi
 
@@ -107,7 +107,7 @@ SIPP_UAS_PORT="${SIPP_UAS_PORT:-5088}"
 if [ "$SIPP_HOST" = "local" ] || [ -z "$SIPP_HOST" ]; then
     SIPP_UAS_HOST="127.0.0.1"
 else
-    SIPP_UAS_HOST="$SIPP_HOST"
+    SIPP_UAS_HOST="${SIPP_HOST#*@}"
 fi
 
 # The base directory of the gate and probe tools that run on this host.
@@ -142,6 +142,9 @@ CPS="${CPS:-5}"
 # long a rung sustains load: 5 calls/second for 60 seconds = 300 calls. A
 # ten-call burst finishes in seconds and says nothing about capacity.
 LADDER_SECONDS="${LADDER_SECONDS:-60}"
+SKIP_SMOKE=0
+STOP_ON_DROP=0
+MATCHED_SIP_RATES=""
 LIST_MODE=0
 DRY_RUN=0
 
@@ -307,10 +310,12 @@ Usage: load-test-matrix.sh [options]
   --phase=<xml|sip|ablation>  Restrict to one phase
   --ablation=<id>        Restrict the ablation phase to one knob (fs-db, esl-subscriptions, ...)
   --section=<dialplan|directory|mixed>  Restrict the XML battery to one section
-  --profile=<id>         Restrict the XML battery to one load profile (25x1, 100x5, ...)
+  --profile=<id[,id...]> Restrict the XML battery to one or more load profiles (100x5,1000x25)
   --ttl=<id>             Restrict the XML battery to one cache policy (production-60, ...)
   --repeats=<n>          Repetitions per cell (default 3)
-  --cps=<n>              Offered calls per second for the SIP and ablation phases (default 5)
+  --cps=<n[,n...]>       Offered calls per second (single value or comma-separated ladder)
+  --skip-smoke           Skip the separate SIP smoke preflight (used when running a full ladder from baseline)
+  --stop-on-drop         Stop advancing a multi-rate SIP ladder once the lead handler drops < 80% or 2x < 95%
 
 Environment:
   PBX_HOST               SSH target of the PBX under test ('local' runs in place)
@@ -352,6 +357,8 @@ parse_args() {
             --ablation=*) ABLATION_FILTER="${arg#*=}" ;;
             --repeats=*) REPEATS="${arg#*=}" ;;
             --cps=*) CPS="${arg#*=}" ;;
+            --skip-smoke) SKIP_SMOKE=1 ;;
+            --stop-on-drop) STOP_ON_DROP=1 ;;
             -h | --help | help)
                 usage
                 exit 0
@@ -398,9 +405,15 @@ validate_filters() {
         return 2
     fi
 
-    if [ -n "$PROFILE" ] && ! matrix_keys xml_profiles | grep -qxF "$PROFILE"; then
-        printf 'Unknown XML profile: %s\n' "$PROFILE" >&2
-        return 2
+    if [ -n "$PROFILE" ]; then
+        local p
+        while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            if ! matrix_keys xml_profiles | grep -qxF "$p"; then
+                printf 'Unknown XML profile: %s\n' "$p" >&2
+                return 2
+            fi
+        done < <(tr ',' '\n' <<< "$PROFILE")
     fi
 
     if [ -n "$SECTION" ] && ! matrix_list_sections | grep -qxF "$SECTION"; then
@@ -413,12 +426,35 @@ validate_filters() {
         return 2
     fi
 
-    if ! [[ "$CPS" =~ ^[1-9][0-9]*$ && "$LADDER_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
-        printf 'CPS and LADDER_SECONDS must be positive integers\n' >&2
+    if ! [[ "$LADDER_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+        printf 'LADDER_SECONDS must be a positive integer\n' >&2
         return 2
     fi
 
+    local c
+    while IFS= read -r c; do
+        if ! [[ "$c" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'CPS values must be positive integers (got: %s)\n' "$CPS" >&2
+            return 2
+        fi
+    done < <(tr ',' '\n' <<< "$CPS")
+
     return 0
+}
+
+# Print the selected XML profiles in order, honouring comma-separated --profile.
+selected_profiles() {
+    if [ -n "$PROFILE" ]; then
+        tr ',' '\n' <<< "$PROFILE" | awk 'NF'
+        return
+    fi
+
+    matrix_keys xml_profiles
+}
+
+# Print the selected CPS rates in order, honouring comma-separated --cps.
+selected_cps_rates() {
+    tr ',' '\n' <<< "$CPS" | awk 'NF'
 }
 
 # Print the selected tiers, one per line.
@@ -439,7 +475,15 @@ selected_variants() {
     fi
 
     if [ "$COMPARE_XML_HANDLERS" = "1" ]; then
-        printf '%s\n' v-fast-default v-octane
+        # When driving a single-pass multi-rate SIP ladder with --stop-on-drop,
+        # run Octane first so the higher-capacity handler determines the exact
+        # matched rate list, then run PHP-FPM on those identical rates with only
+        # two variant switches total.
+        if [ "$PHASE" = "sip" ] && [ "$STOP_ON_DROP" = "1" ]; then
+            printf '%s\n' v-octane v-fast-default
+        else
+            printf '%s\n' v-fast-default v-octane
+        fi
         return
     fi
 
@@ -657,7 +701,7 @@ pbx_gateway_host() {
 release_sipp_ports() {
     local cleanup
 
-    cleanup="pkill -f 'sipp [-]sf' >/dev/null 2>&1 || true
+    cleanup="pkill -f 'sipp .*[-]sf' >/dev/null 2>&1 || true
 for port in 5066 5088; do
     for attempt in \$(seq 1 20); do
         ss -lun 2>/dev/null | grep -q \":\${port} \" || break
@@ -1085,8 +1129,6 @@ dry_run_cells() {
 
                         for section in $(selected_sections); do
                             while IFS= read -r profile_id; do
-                                [ -z "$PROFILE" ] || [ "$PROFILE" = "$profile_id" ] || continue
-
                                 while IFS= read -r ttl_id; do
                                     [ -z "$TTL" ] || [ "$TTL" = "$ttl_id" ] || continue
 
@@ -1098,15 +1140,20 @@ dry_run_cells() {
                                     # lookup probe is what a real call waits for.
                                     printf '  %s\n' "$(probe_command)"
                                 done < <(matrix_keys cache_ttl_profiles)
-                            done < <(matrix_keys xml_profiles)
+                            done < <(selected_profiles)
                         done
                         ;;
                     sip)
                         # A rung's completion says how many calls finished,
                         # not where the CPU went, so every rung is wrapped in
                         # the same per-service sample the ablation cells use.
-                        printf '  %s\n' "$(cpuwatch_command "${tier}/${variant}/sip-cps${CPS}" "${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/sip-cps${CPS}-cpu.csv" $((LADDER_SECONDS + 120)))"
-                        printf '  %s\n' "$(sip_command "$(sip_run_dir "$tier" "$variant")")"
+                        local saved_cps="$CPS" rate
+                        while IFS= read -r rate; do
+                            CPS="$rate"
+                            printf '  %s\n' "$(cpuwatch_command "${tier}/${variant}/sip-cps${CPS}" "${REMOTE_ARTIFACT_ROOT}/${tier}/$(variant_dir "$tier" "$variant")/sip-cps${CPS}-cpu.csv" $((LADDER_SECONDS + 120)))"
+                            printf '  %s\n' "$(sip_command "$(sip_run_dir "$tier" "$variant")")"
+                        done < <(selected_cps_rates)
+                        CPS="$saved_cps"
                         ;;
                     ablation)
                         while IFS= read -r ablation; do
@@ -1357,21 +1404,44 @@ run_xml_phase() {
         fi
     done
 
+    local profile_index=0
+
     while IFS= read -r section; do
         while IFS= read -r profile_id; do
-            if [ -n "$PROFILE" ] && [ "$PROFILE" != "$profile_id" ]; then
-                continue
-            fi
-
             while IFS= read -r ttl_id; do
                 [ -z "$TTL" ] || [ "$TTL" = "$ttl_id" ] || continue
 
-                # Applying the TTL once per profile keeps the cell boundary
-                # explicit even when two profiles share the same values.
-                if ! apply_cache_policy "$ttl_id" || ! wait_for_xml_ready "$variant"; then
-                    cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section} (cache policy or handler readiness)"
-                    continue
+                # When multiple profiles run in one pass, isolate each profile's
+                # cache window cleanly with a quick cache clear + single 25x1
+                # warm-up (~3s) so every profile starts from the exact same
+                # freshly-warmed TTL state without re-seeding or restarting.
+                if [ "$profile_index" -gt 0 ]; then
+                    if ! run_on_pbx "cd $(printf '%q' "$REMOTE_APP_DIR") && php artisan cache:clear >/dev/null" >/dev/null 2>&1; then
+                        printf 'WARNING: cache:clear failed before %s/%s/%s\n' "$TIER" "$variant" "$profile_id" >&2
+                    fi
+
+                    if [ "$ttl_id" != "$warmup_ttl_id" ]; then
+                        if ! apply_cache_policy "$ttl_id" || ! wait_for_xml_ready "$variant"; then
+                            cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section} (cache policy or handler readiness)"
+                            continue
+                        fi
+                        warmup_ttl_id="$ttl_id"
+                    fi
+
+                    warmup_log="${ARTIFACT_ROOT}/${TIER}/logs/${TIER}_${variant}_warmup-${profile_id}.log"
+                    mkdir -p "$(dirname "$warmup_log")"
+                    if ! run_on_pbx "$(xml_command "$TIER" "$variant" "$WARMUP_PROFILE" "$ttl_id" "$section" "w-${profile_id}")" > "$warmup_log" 2>&1; then
+                        printf 'WARMUP-FAILED %s/%s before %s\n' "$TIER" "$variant" "$profile_id" >&2
+                    fi
+                elif [ "$ttl_id" != "$warmup_ttl_id" ]; then
+                    if ! apply_cache_policy "$ttl_id" || ! wait_for_xml_ready "$variant"; then
+                        cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section} (cache policy or handler readiness)"
+                        continue
+                    fi
+                    warmup_ttl_id="$ttl_id"
                 fi
+
+                profile_index=$((profile_index + 1))
 
                 for repeat in $(seq 1 "$REPEATS"); do
                     label="${TIER}/${variant}/${profile_id}-${ttl_id}-${section}-r${repeat}"
@@ -1402,7 +1472,7 @@ run_xml_phase() {
                     cell_failed "${TIER}/${variant}/${profile_id}-${ttl_id}-${section}-probe"
                 fi
             done < <(matrix_keys cache_ttl_profiles)
-        done < <(matrix_keys xml_profiles)
+        done < <(selected_profiles)
     done < <(selected_sections)
 }
 
@@ -1435,6 +1505,8 @@ warm_directory() {
 run_sip_phase() {
     local variant="$1" remote_run_dir local_run_dir label before after counts ladder_file cpu_csv
     local successful failed fs_pid_before fs_pid_after run_status
+    local saved_cps="$CPS" rate consecutive=0 executed_rates=() rate_list=()
+    local pct below95 below80
 
     # A cell measured behind a half-applied switch is a plausible but
     # meaningless number, so a failed switch fails the cell instead: a
@@ -1449,147 +1521,195 @@ run_sip_phase() {
         return 1
     fi
 
-    remote_run_dir="$(sip_run_dir "$TIER" "$variant")"
-    local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}"
-    label="${TIER}/${variant}/sip-cps${CPS}"
-
-    mkdir -p "$local_run_dir"
-    rm -f -- "${local_run_dir}/summary.md" "${local_run_dir}/extension-calls.log" "${local_run_dir}/cdr-gate.txt"
-
-    # The directory lookup is the first thing a registering endpoint waits for.
-    warm_directory
-
-    # The generator is prepared for every cell: the scenarios, the validation
-    # script and a credential file that matches the tenant being measured.
-    # Preparation also rewrites the outbound route to point at the generator,
-    # and skipping it on a later cell leaves that route pointing at
-    # 127.0.0.1 on the PBX, where nothing listens.
+    # Prepare the generator once per variant instead of re-seeding and copying
+    # scenarios on every CPS rung; release_sipp_ports still runs before each
+    # rung to guarantee clean UAS port binding.
     if ! sipp_prepare_generator; then
         cell_failed "${TIER}/generator"
         return 1
     fi
 
-    before="$(cdr_row_count)"
-    printf '%s\n' "$before" > "${local_run_dir}/cdr-before.txt"
-
-    if [ -z "$before" ]; then
-        printf 'CDR-UNAVAILABLE cannot read the CDR row count on %s\n' "$PBX_HOST" >&2
-        cell_failed "${label}-cdr"
-        return 1
+    if [ -n "$MATCHED_SIP_RATES" ]; then
+        while IFS= read -r rate; do
+            [ -n "$rate" ] && rate_list+=("$rate")
+        done < <(tr ',' '\n' <<< "$MATCHED_SIP_RATES")
+    else
+        while IFS= read -r rate; do
+            [ -n "$rate" ] && rate_list+=("$rate")
+        done < <(selected_cps_rates)
     fi
 
-    # Per-service CPU across the cell window, on the PBX: the same sampler
-    # the ablation cells use, so a rung's cost is attributable by process
-    # rather than inferred from completion alone. The sample outlives the
-    # window on purpose; the CSV is trimmed by timestamp when read.
-    cpu_csv="${REMOTE_ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}-cpu.csv"
+    for rate in "${rate_list[@]}"; do
+        CPS="$rate"
+        remote_run_dir="$(sip_run_dir "$TIER" "$variant")"
+        local_run_dir="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}"
+        label="${TIER}/${variant}/sip-cps${CPS}"
 
-    run_on_pbx "$(cpuwatch_command "${TIER}/${variant}/sip-cps${CPS}" "$cpu_csv" $((LADDER_SECONDS + 120)))" >/dev/null 2>&1 \
-        || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
+        mkdir -p "$local_run_dir"
+        rm -f -- "${local_run_dir}/summary.md" "${local_run_dir}/extension-calls.log" "${local_run_dir}/cdr-gate.txt"
 
-    # A restart during the window invalidates the cell: the in-flight call is
-    # rejected and the registrations it depends on are rebuilt underneath it.
-    fs_pid_before="$(freeswitch_main_pid)"
+        release_sipp_ports
 
-    run_status=0
+        # The directory lookup is the first thing a registering endpoint waits for.
+        warm_directory
 
-    run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || run_status=$?
+        before="$(cdr_row_count)"
+        printf '%s\n' "$before" > "${local_run_dir}/cdr-before.txt"
 
-    fs_pid_after="$(freeswitch_main_pid)"
-
-    if [ -n "$fs_pid_before" ] && [ "$fs_pid_before" != "$fs_pid_after" ]; then
-        printf 'FS-RESTARTED label=%s pid=%s->%s\n' "$label" "$fs_pid_before" "$fs_pid_after" \
-            | tee "${local_run_dir}/fs-restart.txt" >&2
-        cell_failed "${label}-fs-restart"
-        return 1
-    fi
-
-    # The sampler writes on the PBX; pull it beside the cell artifacts so the
-    # report reads CPU from the same directory as the tally it explains.
-    # shellcheck disable=SC2086
-    scp $SSH_OPTS -P "$SSH_PORT" "${PBX_HOST}:${cpu_csv}" "${local_run_dir}/cpu.csv" >/dev/null 2>&1 \
-        || printf 'WARNING: could not pull the CPU sample for %s\n' "$label" >&2
-
-    # The artifacts are pulled before the cell is judged, because the summary
-    # arrives with them and a stale summary would decide the wrong thing.
-    if ! pull_sipp_artifacts "$remote_run_dir" "$local_run_dir"; then
-        cell_failed "${label} (could not pull SIPp artifacts)"
-        return 1
-    fi
-
-    # The summary is the measurement's own account of itself, so it decides the
-    # cell. The session that carried the run can drop while a long step is in
-    # progress, and a transport failure is not a measurement failure.
-    if sipp_summary_passed "${local_run_dir}/summary.md" && grep -qxF -- '- outbound-calls: passed' "${local_run_dir}/summary.md"; then
-        if [ "$run_status" != "0" ]; then
-            printf 'WARNING: the generator session dropped during %s, but every step passed\n' "$label" >&2
-        fi
-    elif ! sipp_capacity_measured "${local_run_dir}/summary.md"; then
-        cell_failed "$label"
-        return 1
-    fi
-
-    # SIPp's tally says how many rows the database must gain, so it is read
-    # before the wait: without it there is nothing to wait for.
-    if ! counts="$(bash "${TOOLS_DIR}/cdr-gate.sh" sipp-counts "${local_run_dir}/extension-calls.log" 2>"${local_run_dir}/cdr-gate.err")"; then
-        printf 'CDR-GATE FAILED label=%s reason=no-tally\n' "$label" | tee "${local_run_dir}/cdr-gate.txt" >&2
-        cell_failed "${label}-cdr"
-        return 1
-    fi
-
-    successful="${counts%% *}"
-    failed="${counts##* }"
-
-    if [ "$((successful + failed))" -ne "$((CPS * LADDER_SECONDS))" ]; then
-        cell_failed "${label} (SIPp tallied ${successful} successful and ${failed} failed calls; expected $((CPS * LADDER_SECONDS)))"
-        return 1
-    fi
-
-    after="$(cdrs_wait_for "$before" "$successful")"
-    printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
-
-    if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
-        --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
-        --expect-records="$CDR_EXPECT_RECORDS" \
-        --label="$label" | tee "${local_run_dir}/cdr-gate.txt"; then
-        cell_failed "${label}-cdr"
-        return 1
-    fi
-
-    # Extract individual call setup and teardown latency percentiles from SIPp's
-    # RTT traces so every ladder rung captures caller experience alongside call
-    # completion counts.
-    local setup_p50="" setup_p95="" setup_max="" teardown_p50="" teardown_p95="" teardown_max="" rtt_row=""
-
-    if command -v python3 >/dev/null 2>&1 && [ -f "${TOOLS_DIR}/rtt-stats.py" ]; then
-        rtt_row="$(python3 "${TOOLS_DIR}/rtt-stats.py" --rtd=setup "$local_run_dir" 2>/dev/null || true)"
-        if [ -n "$rtt_row" ]; then
-            setup_p50="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $4}')"
-            setup_p95="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $6}')"
-            setup_max="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $7}')"
+        if [ -z "$before" ]; then
+            printf 'CDR-UNAVAILABLE cannot read the CDR row count on %s\n' "$PBX_HOST" >&2
+            cell_failed "${label}-cdr"
+            CPS="$saved_cps"
+            return 1
         fi
 
-        rtt_row="$(python3 "${TOOLS_DIR}/rtt-stats.py" --rtd=teardown "$local_run_dir" 2>/dev/null || true)"
-        if [ -n "$rtt_row" ]; then
-            teardown_p50="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $4}')"
-            teardown_p95="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $6}')"
-            teardown_max="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $7}')"
+        # Per-service CPU across the cell window, on the PBX: the same sampler
+        # the ablation cells use, so a rung's cost is attributable by process
+        # rather than inferred from completion alone. The sample outlives the
+        # window on purpose; the CSV is trimmed by timestamp when read.
+        cpu_csv="${REMOTE_ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-cps${CPS}-cpu.csv"
+
+        run_on_pbx "$(cpuwatch_command "${TIER}/${variant}/sip-cps${CPS}" "$cpu_csv" $((LADDER_SECONDS + 120)))" >/dev/null 2>&1 \
+            || printf 'WARNING: could not start the CPU sample for %s\n' "$label" >&2
+
+        # A restart during the window invalidates the cell: the in-flight call is
+        # rejected and the registrations it depends on are rebuilt underneath it.
+        fs_pid_before="$(freeswitch_main_pid)"
+
+        run_status=0
+
+        run_on_sipp "$(sip_command "$remote_run_dir")" > "${local_run_dir}/sipp.log" 2>&1 || run_status=$?
+
+        fs_pid_after="$(freeswitch_main_pid)"
+
+        if [ -n "$fs_pid_before" ] && [ "$fs_pid_before" != "$fs_pid_after" ]; then
+            printf 'FS-RESTARTED label=%s pid=%s->%s\n' "$label" "$fs_pid_before" "$fs_pid_after" \
+                | tee "${local_run_dir}/fs-restart.txt" >&2
+            cell_failed "${label}-fs-restart"
+            CPS="$saved_cps"
+            return 1
         fi
-    fi
 
-    # One row per rung: the stop rule (three consecutive rungs under 95 %
-    # completion) is applied from this record, not from memory.
-    ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
-    mkdir -p "$(dirname "$ladder_file")"
+        # The sampler writes on the PBX; pull it beside the cell artifacts so the
+        # report reads CPU from the same directory as the tally it explains.
+        # shellcheck disable=SC2086
+        scp $SSH_OPTS -P "$SSH_PORT" "${PBX_HOST}:${cpu_csv}" "${local_run_dir}/cpu.csv" >/dev/null 2>&1 \
+            || printf 'WARNING: could not pull the CPU sample for %s\n' "$label" >&2
 
-    if [ ! -f "$ladder_file" ]; then
-        printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$ladder_file"
-    fi
+        # The artifacts are pulled before the cell is judged, because the summary
+        # arrives with them and a stale summary would decide the wrong thing.
+        if ! pull_sipp_artifacts "$remote_run_dir" "$local_run_dir"; then
+            cell_failed "${label} (could not pull SIPp artifacts)"
+            CPS="$saved_cps"
+            return 1
+        fi
 
-    printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
-        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" \
-        "$setup_p50" "$setup_p95" "$setup_max" "$teardown_p50" "$teardown_p95" "$teardown_max" >> "$ladder_file"
+        # The summary is the measurement's own account of itself, so it decides the
+        # cell. The session that carried the run can drop while a long step is in
+        # progress, and a transport failure is not a measurement failure.
+        if sipp_summary_passed "${local_run_dir}/summary.md" && grep -qxF -- '- outbound-calls: passed' "${local_run_dir}/summary.md"; then
+            if [ "$run_status" != "0" ]; then
+                printf 'WARNING: the generator session dropped during %s, but every step passed\n' "$label" >&2
+            fi
+        elif ! sipp_capacity_measured "${local_run_dir}/summary.md"; then
+            cell_failed "$label"
+            CPS="$saved_cps"
+            return 1
+        fi
 
+        # SIPp's tally says how many rows the database must gain, so it is read
+        # before the wait: without it there is nothing to wait for.
+        if ! counts="$(bash "${TOOLS_DIR}/cdr-gate.sh" sipp-counts "${local_run_dir}/extension-calls.log" 2>"${local_run_dir}/cdr-gate.err")"; then
+            printf 'CDR-GATE FAILED label=%s reason=no-tally\n' "$label" | tee "${local_run_dir}/cdr-gate.txt" >&2
+            cell_failed "${label}-cdr"
+            CPS="$saved_cps"
+            return 1
+        fi
+
+        successful="${counts%% *}"
+        failed="${counts##* }"
+
+        if [ "$((successful + failed))" -ne "$((CPS * LADDER_SECONDS))" ]; then
+            cell_failed "${label} (SIPp tallied ${successful} successful and ${failed} failed calls; expected $((CPS * LADDER_SECONDS)))"
+            CPS="$saved_cps"
+            return 1
+        fi
+
+        after="$(cdrs_wait_for "$before" "$successful")"
+        printf '%s\n' "$after" > "${local_run_dir}/cdr-after.txt"
+
+        if ! bash "${TOOLS_DIR}/cdr-gate.sh" verdict \
+            --before="$before" --after="$after" --successful="$successful" --failed="$failed" \
+            --expect-records="$CDR_EXPECT_RECORDS" \
+            --label="$label" | tee "${local_run_dir}/cdr-gate.txt"; then
+            cell_failed "${label}-cdr"
+            CPS="$saved_cps"
+            return 1
+        fi
+
+        # Extract individual call setup and teardown latency percentiles from SIPp's
+        # RTT traces so every ladder rung captures caller experience alongside call
+        # completion counts.
+        local setup_p50="" setup_p95="" setup_max="" teardown_p50="" teardown_p95="" teardown_max="" rtt_row=""
+
+        if command -v python3 >/dev/null 2>&1 && [ -f "${TOOLS_DIR}/rtt-stats.py" ]; then
+            rtt_row="$(python3 "${TOOLS_DIR}/rtt-stats.py" --rtd=setup "$local_run_dir" 2>/dev/null || true)"
+            if [ -n "$rtt_row" ]; then
+                setup_p50="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $4}')"
+                setup_p95="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $6}')"
+                setup_max="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $7}')"
+            fi
+
+            rtt_row="$(python3 "${TOOLS_DIR}/rtt-stats.py" --rtd=teardown "$local_run_dir" 2>/dev/null || true)"
+            if [ -n "$rtt_row" ]; then
+                teardown_p50="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $4}')"
+                teardown_p95="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $6}')"
+                teardown_max="$(printf '%s\n' "$rtt_row" | awk -F'\t' '{print $7}')"
+            fi
+        fi
+
+        # One row per rung: the stop rule is applied from these verified counts.
+        ladder_file="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/ladder.csv"
+        mkdir -p "$(dirname "$ladder_file")"
+
+        if [ ! -f "$ladder_file" ]; then
+            printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$ladder_file"
+        fi
+
+        printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CPS" "$successful" "$failed" "$label" \
+            "$setup_p50" "$setup_p95" "$setup_max" "$teardown_p50" "$teardown_p95" "$teardown_max" >> "$ladder_file"
+
+        executed_rates+=("$CPS")
+        IFS=$'\t' read -r pct below95 below80 <<< "$(awk -v s="$successful" -v f="$failed" 'BEGIN { p = 100.0 * s / (s + f); printf "%.1f\t%d\t%d\n", p, (p < 95.0), (p < 80.0) }')"
+        printf '  %s calls/sec [%s]: %s%% (%s/%s, setup p50=%sms p95=%sms, teardown p50=%sms p95=%sms)\n' \
+            "$CPS" "$variant" "$pct" "$successful" "$((successful + failed))" \
+            "${setup_p50:-n/a}" "${setup_p95:-n/a}" "${teardown_p50:-n/a}" "${teardown_p95:-n/a}"
+
+        # Stop advancing this handler's ladder once it drops below 80%
+        # completion (or hits two consecutive rungs below 95%) so a saturated
+        # handler (typically PHP-FPM) does not hang for 300s on rates well past
+        # its collapse point while Octane continues higher.
+        if [ "$STOP_ON_DROP" = "1" ]; then
+            if [ "$below80" = "1" ]; then
+                printf '  %s dropped below 80%% at %s calls/sec; stopping this handler.\n' "$variant" "$CPS"
+                break
+            fi
+
+            if [ "$below95" = "1" ]; then
+                consecutive=$((consecutive + 1))
+            else
+                consecutive=0
+            fi
+
+            if [ "$consecutive" -ge 2 ]; then
+                printf '  %s completed under 95%% at two consecutive rates; stopping this handler.\n' "$variant"
+                break
+            fi
+        fi
+    done
+
+    CPS="$saved_cps"
     return 0
 }
 
@@ -1816,7 +1936,9 @@ execute_cells() {
 
                     smoke_gate="${ARTIFACT_ROOT}/${TIER}/$(variant_dir "$TIER" "$variant")/sip-smoke/cdr-gate.txt"
 
-                    if [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
+                    if [ "$SKIP_SMOKE" = "1" ]; then
+                        printf 'SMOKE-SKIPPED %s/%s (--skip-smoke)\n' "$TIER" "$variant" >&2
+                    elif [ -f "$smoke_gate" ] && grep -q '^CDR-GATE ok' "$smoke_gate"; then
                         printf 'SMOKE-ALREADY-PASSED %s/%s (see %s)\n' "$TIER" "$variant" "$smoke_gate" >&2
                     elif ! run_sip_smoke "$variant"; then
                         printf 'SIP smoke preflight failed for %s/%s; no series cell was measured.\n' "$TIER" "$variant" >&2

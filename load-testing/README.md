@@ -110,7 +110,7 @@ python3 load-testing/scripts/tools/consolidate-series.py \
 ```
 
 Every tier runs the exact same matched PHP-FPM (`v-fast-default`) vs. Octane (`v-octane`) battery with identical dynamic PHP-FPM pools:
-1. **XML lookup throughput & latency:** `100x5`, `500x25`, and `1000x25` (`mixed`, `production-60`, 3 repeats) recording `req/sec`, `p50`, `p95`, and `max`.
+1. **XML lookup throughput & latency:** `100x5` and `1000x25` (`mixed`, `production-60`, 3 repeats) recording `req/sec`, `p50`, `p95`, and `max`.
 2. **60-second SIP call capacity & per-call latency ladder (`run-ladder.sh`, `EXTENSIONS=30`):** completion %, CDR gate, per-service CPU, and individual call `setup` (`INVITE` → `200 OK`) + `teardown` (`BYE` → `200 OK`) `p50`/`p95`/`max` latency in `ladder.csv`.
 3. **14-scenario functional & media pass (`EXTENDED=1 MEDIA_FLOW=1`).**
 
@@ -157,7 +157,7 @@ Series narrative reports live in `docs/load-testing-results.md` (as a new dated 
 |:--|:--|:--|
 | Hardware tier | 1 vCPU/1 GB shared, 1 vCPU/2 GB shared, 2 vCPU/2 GB shared, 4 vCPU/8 GB shared, 2 vCPU/8 GB dedicated, 4 vCPU/16 GB dedicated | `load-testing/matrix.php` → `tiers` |
 | XML-serving variant | `v-stock-dynamic`, `v-stock-static`, `v-fast`, `v-fast-default`, `v-octane` | → `variants` |
-| Load profile | `25x1`, `100x5`, `500x25`, `1000x25` (`--rates=5,10,15,20,25`), `1000x25-8020` | → `xml_profiles` |
+| Load profile | `25x1`, `100x5`, `1000x25` (`--rates=5,10,15,20,25`), `1000x25-8020` | → `xml_profiles` |
 | Cache policy / TTL presets | `default` (`300s / 60s`), `tuned` (`1800s / 600s`), `production-60` (`60s / 60s`), `extended-30` (`30s / 30s`), `cold`, `dialplan-off`, `cache-hit-60`, `uncached-redis` (`0s / 0s`, store `redis`), `uncached-db` (`0s / 0s`, store `null`) | → `cache_ttl_profiles` |
 | SIP scenarios | 14 feature scenarios plus a call-rate ladder | → `sip_scenarios` |
 

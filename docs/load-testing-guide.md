@@ -291,13 +291,13 @@ tpbx pbx:load-test:dialplan \
   --tenant=load-test-beta \
   --url=http://<PBX_HOST>/api/v1/xml-handler \
   --scenario=mixed \
-  --requests=500 \
+  --requests=1000 \
   --concurrency=25 \
   --token="$FS_XML_HANDLER_TOKEN" \
-  --label="moderate-office-burst" \
+  --label="sustained-office-burst" \
   --max-failure-rate=0 \
   --max-average-ms=1000 \
-  --report=storage/app/load-tests/dialplan-500x25.json
+  --report=storage/app/load-tests/dialplan-1000x25.json
 ```
 
 For Octane, run this command on the PBX and change `--url` to `http://127.0.0.1:8090/api/v1/xml-handler`. Give the Octane run its own `--label` and `--report` path. [Testing the optional Laravel Octane worker](#testing-the-optional-laravel-octane-worker).
@@ -311,7 +311,7 @@ For Octane, run this command on the PBX and change `--url` to `http://127.0.0.1:
 
 ### Telemetry & Output Reports
 
-The dialplan test command streams live progress, prints a summary table to the console, and (when `--report` is specified) writes a JSON benchmark report (e.g. `storage/app/load-tests/dialplan-500x25.json`):
+The dialplan test command streams live progress, prints a summary table to the console, and (when `--report` is specified) writes a JSON benchmark report (e.g. `storage/app/load-tests/dialplan-1000x25.json`):
 - **Throughput & Latency**: Measures requests per second, mean, min, max, median (`p50`), 95th percentile (`p95`), and 99th percentile (`p99`) response latencies.
 - **HTTP Status Codes**: Tracks total counts of `200 OK`, `4xx` client errors, and `5xx` server/gateway errors.
 - **System Environment**: Records PHP version, OPcache status, CPU core count, and system load averages (`1m`, `5m`, `15m`).

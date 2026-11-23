@@ -113,7 +113,7 @@ bash load-testing/scripts/load-test-matrix.sh \
 
 The default fast PHP-FPM handler loads only the telephony modules needed to answer FreeSWITCH's routing and account lookups. Optional Laravel Octane loads the same modules and keeps the application in memory between requests. In production, FreeSWITCH can fall back to PHP-FPM if Octane is unavailable. The fast PHP-FPM handler itself can hand a request to the full Laravel application used by the web panel if it catches an application error.
 
-Run both handlers on **every** standard hardware tier (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`, plus any provisioned dedicated tier) under **one shared `SERIES` name** with the exact same Git commit SHA, database, XML workload (`100x5`, `500x25`, and `1000x25` `mixed`, `production-60`, 3 repeats — declared in `standard_comparison` in `load-testing/matrix.php`), and dynamic PHP-FPM pool. Never run different XML profiles or sections on different tiers. From the TallPBX checkout root on the orchestrator, preview or run:
+Run both handlers on **every** standard hardware tier (`h1-1c1g`, `h2-2c2g`, `h4-4c8g`, plus any provisioned dedicated tier) under **one shared `SERIES` name** with the exact same Git commit SHA, database, XML workload (`100x5` and `1000x25` `mixed`, `production-60`, 3 repeats — declared in `standard_comparison` in `load-testing/matrix.php`), and dynamic PHP-FPM pool. Never run different XML profiles or sections on different tiers. From the TallPBX checkout root on the orchestrator, preview or run:
 
 ```bash
 export SERIES="series-$(date -u +%Y%m%d)"
@@ -164,7 +164,7 @@ The recorded run is in `monitoring/` beside the tier artifacts.
 
 ## Step 8 — Compare call capacity
 
-From the TallPBX checkout root on the orchestrator, set `SERIES` (shared across all tiers), `PBX_HOST`, and `SIPP_HOST`. Run the full uniform tier comparison (XML `100x5`/`500x25`/`1000x25` + 60-second SIP ladder with `EXTENSIONS=30` + 14-scenario extended/media validation) once per hardware tier — covering **`h1-1c1g`**, **`h2-2c2g`**, and **`h4-4c8g`** on the **exact same commit SHA**. Both handlers place the same calls at each offered rate over the same 60-second window.
+From the TallPBX checkout root on the orchestrator, set `SERIES` (shared across all tiers), `PBX_HOST`, and `SIPP_HOST`. Run the full uniform tier comparison (XML `100x5`/`1000x25` + 60-second SIP ladder with `EXTENSIONS=30` + 14-scenario extended/media validation on the baseline tier) once per hardware tier — covering **`h1-1c1g`**, **`h2-2c2g`**, and **`h4-4c8g`** on the **exact same commit SHA**. Both handlers place the same calls at each offered rate over the same 60-second window.
 
 ```bash
 export SERIES="series-$(date -u +%Y%m%d)"

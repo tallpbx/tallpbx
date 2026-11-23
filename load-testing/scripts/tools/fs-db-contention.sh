@@ -105,6 +105,7 @@ fi
 # 1. Initial registration of the call endpoints on UAS_LOCAL_PORT.
 (cd "$RUN_DIR" && timeout 120 sipp "${PBX_HOST}:${PBX_PORT}" \
     -sf "${LOAD_TESTING_DIR}/tools/sipp/register.xml" \
+    -nostdin \
     -inf "$AUTH_CALLS" \
     -i "$LOAD_GENERATOR_IP" \
     -p "$UAS_LOCAL_PORT" \
@@ -115,6 +116,7 @@ fi
 # 2. Start auto-answer UAS on UAS_LOCAL_PORT.
 (cd "$RUN_DIR" && timeout $((DURATION_SECONDS + 90)) sipp \
     -sf "${LOAD_TESTING_DIR}/tools/sipp/uas-auto-answer-capacity.xml" \
+    -nostdin \
     -i "$LOAD_GENERATOR_IP" \
     -p "$UAS_LOCAL_PORT" \
     -trace_err -trace_counts -trace_stat) > "${RUN_DIR}/uas.log" 2>&1 &
@@ -131,6 +133,7 @@ reg_total=$((REGISTER_CHURN_RATE * DURATION_SECONDS))
 if [ "$REGISTER_CHURN_RATE" -gt 0 ] && [ "$reg_total" -gt 0 ]; then
     (cd "$RUN_DIR" && timeout $((DURATION_SECONDS + 60)) sipp "${PBX_HOST}:${PBX_PORT}" \
         -sf "${LOAD_TESTING_DIR}/tools/sipp/register.xml" \
+        -nostdin \
         -inf "$AUTH_REG" \
         -i "$LOAD_GENERATOR_IP" \
         -p "$REGISTER_CHURN_PORT" \
@@ -145,6 +148,7 @@ vm_total=$((VOICEMAIL_RATE * DURATION_SECONDS / 2))
 if [ "$VOICEMAIL_RATE" -gt 0 ] && [ "$vm_total" -gt 0 ] && [ -f "${LOAD_TESTING_DIR}/tools/sipp/uac-voicemail.xml" ]; then
     (cd "$RUN_DIR" && timeout $((DURATION_SECONDS + 60)) sipp "${PBX_HOST}:${PBX_PORT}" \
         -sf "${LOAD_TESTING_DIR}/tools/sipp/uac-voicemail.xml" \
+        -nostdin \
         -inf "$AUTH_CALLS" \
         -i "$LOAD_GENERATOR_IP" \
         -p "$VOICEMAIL_UAC_PORT" \
@@ -172,6 +176,7 @@ call_total=$((CALL_RATE * DURATION_SECONDS))
 set +e
 (cd "$RUN_DIR" && timeout $((DURATION_SECONDS + 90)) sipp "${PBX_HOST}:${PBX_PORT}" \
     -sf "${LOAD_TESTING_DIR}/tools/sipp/uac-extension-capacity.xml" \
+    -nostdin \
     -inf "$AUTH_CALLS" \
     -i "$LOAD_GENERATOR_IP" \
     -p "$UAC_CALL_PORT" \

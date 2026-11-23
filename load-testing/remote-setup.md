@@ -306,6 +306,7 @@ command -v sipp && tc qdisc show | head -3
 | `nofile` 65535 | 1024 (or 1024/1048576) | One descriptor per socket; at `1024` SIPp fails to open its own call legs and the run measures the limit, not the PBX |
 | no firewall | host dependent | A generator that filters its own traffic silently caps every variant at the same ceiling |
 | no traffic shaping | `fq_codel` default | Anything else adds latency the PBX did not cause |
+| `sipp -nostdin` | stdin polled by default | Under non-interactive SSH (`ssh -n`, `stdin=/dev/null`), SIPp's `poll()` loop busy-spins on EOF at 99% CPU (starving co-located UAS responders on 1 vCPU generators); every scripted `sipp` call must pass `-nostdin` |
 
 Each setting is proven above rather than assumed. A run started without these measures the generator.
 

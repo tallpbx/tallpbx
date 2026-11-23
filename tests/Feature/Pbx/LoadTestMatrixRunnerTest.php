@@ -104,11 +104,13 @@ describe('load test matrix runner', function (): void {
             [ "$2" = --tier=h4-4c8g ]
             [ "$3" = --compare-xml-handlers ]
             [ "$4" = --phase=sip ]
-            rate="${5#--cps=}"
+            rates="${5#--cps=}"
+            [ "$6" = --skip-smoke ]
+            [ "$7" = --stop-on-drop ]
             if [ "$FIXTURE_MODE" = 'runner error' ]; then
                 exit 1
             fi
-            for variant in v-fast-default v-octane; do
+            for variant in v-octane v-fast-default; do
                 if [ "$FIXTURE_MODE" = 'missing Octane' ] && [ "$variant" = v-octane ]; then
                     continue
                 fi
@@ -117,14 +119,28 @@ describe('load test matrix runner', function (): void {
                 if [ ! -f "$dir/ladder.csv" ]; then
                     printf 'recorded_at,cps,successful,failed,label\n' > "$dir/ladder.csv"
                 fi
-                completed=80
-                if [ "$FIXTURE_MODE" = 'both below 80' ]; then
-                    completed=70
-                elif [ "$variant" = v-octane ] && [ "$rate" -le 10 ]; then
-                    completed=100
-                fi
-                printf 'fixture,%s,%s,%s,h4-4c8g/%s/sip-cps%s\n' \
-                    "$rate" "$completed" "$((100 - completed))" "$variant" "$rate" >> "$dir/ladder.csv"
+                consecutive=0
+                for rate in ${rates//,/ }; do
+                    completed=80
+                    if [ "$FIXTURE_MODE" = 'both below 80' ]; then
+                        completed=70
+                    elif [ "$variant" = v-octane ] && [ "$rate" -le 10 ]; then
+                        completed=100
+                    fi
+                    printf 'fixture,%s,%s,%s,h4-4c8g/%s/sip-cps%s\n' \
+                        "$rate" "$completed" "$((100 - completed))" "$variant" "$rate" >> "$dir/ladder.csv"
+                    if [ "$completed" -lt 80 ]; then
+                        break
+                    fi
+                    if [ "$completed" -lt 95 ]; then
+                        consecutive=$((consecutive + 1))
+                    else
+                        consecutive=0
+                    fi
+                    if [ "$consecutive" -ge 2 ]; then
+                        break
+                    fi
+                done
             done
             BASH);
         chmod($bin.'/bash', 0755);
@@ -143,16 +159,16 @@ describe('load test matrix runner', function (): void {
                 ->and($process->getErrorOutput())->toContain('Missing or ambiguous comparison result at 5 calls/sec');
         } elseif ($mode === 'runner error') {
             expect($process->getExitCode())->toBe(1)
-                ->and($process->getErrorOutput())->toContain('Comparison failed at 5 calls/sec');
+                ->and($process->getErrorOutput())->toContain('SIP ladder failed for h4-4c8g');
         } elseif ($mode === 'both below 80') {
             expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
                 ->and($process->getOutput())->toContain('Both handlers dropped below 80% completion at 5 calls/sec')
-                ->not->toContain('10 calls/sec');
+                ->not->toContain('10 calls/sec:');
         } else {
             expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
                 ->and($process->getOutput())->toContain('10 calls/sec: PHP-FPM 80.0%, Octane 100.0%')
-                ->toContain('20 calls/sec: PHP-FPM 80.0%, Octane 80.0%')
-                ->not->toContain('25 calls/sec');
+                ->toContain('20 calls/sec: PHP-FPM (stopped earlier), Octane 80.0%')
+                ->not->toContain('25 calls/sec:');
         }
     })->with(['paired results', 'missing Octane', 'runner error', 'both below 80']);
 
@@ -864,18 +880,21 @@ XML);
         File::put($bin.'/bash', <<<'BASH'
             #!/bin/bash
             set -eu
-            rate="${5#--cps=}"
+            rates="${5#--cps=}"
             for variant in v-fast-default v-octane; do
                 dir="$ARTIFACT_ROOT/h4-4c8g/$variant-fpm-dynamic12"
                 mkdir -p "$dir"
                 if [ ! -f "$dir/ladder.csv" ]; then
                     printf 'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms\n' > "$dir/ladder.csv"
                 fi
-                if [ "$variant" = v-octane ]; then
-                    printf 'fixture,%s,80,20,h4-4c8g/%s/sip-cps%s,42.5,91.0,140.0,8.2,15.4,24.0\n' "$rate" "$variant" "$rate" >> "$dir/ladder.csv"
-                else
-                    printf 'fixture,%s,80,20,h4-4c8g/%s/sip-cps%s,215.0,640.0,980.0,19.5,41.0,72.0\n' "$rate" "$variant" "$rate" >> "$dir/ladder.csv"
-                fi
+                for rate in ${rates//,/ }; do
+                    if [ "$variant" = v-octane ]; then
+                        printf 'fixture,%s,80,20,h4-4c8g/%s/sip-cps%s,42.5,91.0,140.0,8.2,15.4,24.0\n' "$rate" "$variant" "$rate" >> "$dir/ladder.csv"
+                    else
+                        printf 'fixture,%s,80,20,h4-4c8g/%s/sip-cps%s,215.0,640.0,980.0,19.5,41.0,72.0\n' "$rate" "$variant" "$rate" >> "$dir/ladder.csv"
+                    fi
+                    break
+                done
             done
             BASH);
         chmod($bin.'/bash', 0755);
@@ -907,9 +926,7 @@ XML);
 
             expect($process->isSuccessful())->toBeTrue($process->getErrorOutput())
                 ->and($process->getOutput())
-                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=100x5 --ttl=production-60 --section=mixed --repeats=3')
-                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=500x25 --ttl=production-60 --section=mixed --repeats=3')
-                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=1000x25 --ttl=production-60 --section=mixed --repeats=3')
+                ->toContain('--tier='.$tier.' --compare-xml-handlers --phase=xml --profile=100x5,1000x25 --ttl=production-60 --section=mixed --repeats=3')
                 ->toContain('EXTENSIONS=30 LADDER_SECONDS=60 bash load-testing/scripts/drivers/run-ladder.sh --tier='.$tier)
                 ->toContain('EXTENDED=1 MEDIA_FLOW=1')
                 ->toContain('consolidate-series.py');
@@ -937,7 +954,7 @@ XML);
                 $vdir = $tierDir.'/'.$variant.'-fpm-'.$pool;
                 File::ensureDirectoryExists($vdir);
 
-                foreach (['100x5' => 100, '500x25' => 500, '1000x25' => 1000] as $profile => $reqs) {
+                foreach (['100x5' => 100, '1000x25' => 1000] as $profile => $reqs) {
                     for ($r = 1; $r <= 3; $r++) {
                         $isOctane = $variant === 'v-octane';
                         File::put("{$vdir}/{$profile}-production-60-mixed-r{$r}.json", json_encode([
@@ -1037,8 +1054,10 @@ XML);
         expect($mismatch->isSuccessful())->toBeFalse()
             ->and($mismatch->getErrorOutput())->toContain('different git commits');
 
-        // Remove extended-validation.log on one tier: consolidation must fail.
-        File::delete($seriesDir.'/h4-4c8g/extended-validation.log');
+        // Remove extended-validation.log across all tiers: consolidation must fail.
+        foreach (array_keys($tierPool) as $tier) {
+            File::delete($seriesDir.'/'.$tier.'/extended-validation.log');
+        }
         $missingExt = new Process([
             'python3',
             base_path('load-testing/scripts/tools/consolidate-series.py'),

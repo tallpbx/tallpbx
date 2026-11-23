@@ -7,7 +7,7 @@
 # shared SERIES directory so every tier produces identical, directly comparable
 # datasets on the exact same build SHA:
 #
-#   1. Matched XML lookup throughput & latency (`100x5`, `500x25`, `1000x25`,
+#   1. Matched XML lookup throughput & latency (`100x5` and `1000x25`,
 #      `mixed`, `production-60`, 3 repeats) for both PHP-FPM (`v-fast-default`)
 #      and Laravel Octane (`v-octane`) with identical dynamic PHP-FPM pools.
 #   2. Matched 60-second SIP call capacity & per-call `setup` + `teardown`
@@ -127,10 +127,9 @@ if [ "$DRY_RUN" = "1" ]; then
     printf '=== Standard Comparison Plan: %s (%s vCPU / %s MB) [SERIES=%s] ===\n' \
         "$TIER" "$TIER_VCPU" "$TIER_RAM_MB" "$SERIES"
     if [ "$SKIP_XML" = "0" ]; then
-        for profile in "${XML_PROFILES[@]}"; do
-            printf 'SERIES=%s ARTIFACT_ROOT=%s bash load-testing/scripts/load-test-matrix.sh --tier=%s --compare-xml-handlers --phase=xml --profile=%s --ttl=%s --section=%s --repeats=%s\n' \
-                "$SERIES" "$ARTIFACT_ROOT" "$TIER" "$profile" "$XML_TTL" "$XML_SECTION" "$XML_REPEATS"
-        done
+        xml_profiles_csv="$(IFS=,; printf '%s' "${XML_PROFILES[*]}")"
+        printf 'SERIES=%s ARTIFACT_ROOT=%s bash load-testing/scripts/load-test-matrix.sh --tier=%s --compare-xml-handlers --phase=xml --profile=%s --ttl=%s --section=%s --repeats=%s\n' \
+            "$SERIES" "$ARTIFACT_ROOT" "$TIER" "$xml_profiles_csv" "$XML_TTL" "$XML_SECTION" "$XML_REPEATS"
     fi
     if [ "$SKIP_SIP" = "0" ]; then
         printf 'SERIES=%s ARTIFACT_ROOT=%s EXTENSIONS=%s LADDER_SECONDS=%s bash load-testing/scripts/drivers/run-ladder.sh --tier=%s\n' \
@@ -153,18 +152,17 @@ if [ "$SKIP_SIP" = "0" ] || [ "$SKIP_EXTENDED" = "0" ]; then
 fi
 
 if [ "$SKIP_XML" = "0" ]; then
-    for profile in "${XML_PROFILES[@]}"; do
-        printf '=== XML Comparison: %s profile=%s section=%s ttl=%s repeats=%s ===\n' \
-            "$TIER" "$profile" "$XML_SECTION" "$XML_TTL" "$XML_REPEATS"
-        bash load-testing/scripts/load-test-matrix.sh \
-            --tier="$TIER" \
-            --compare-xml-handlers \
-            --phase=xml \
-            --profile="$profile" \
-            --ttl="$XML_TTL" \
-            --section="$XML_SECTION" \
-            --repeats="$XML_REPEATS"
-    done
+    xml_profiles_csv="$(IFS=,; printf '%s' "${XML_PROFILES[*]}")"
+    printf '=== XML Comparison (single pass): %s profiles=%s section=%s ttl=%s repeats=%s ===\n' \
+        "$TIER" "$xml_profiles_csv" "$XML_SECTION" "$XML_TTL" "$XML_REPEATS"
+    bash load-testing/scripts/load-test-matrix.sh \
+        --tier="$TIER" \
+        --compare-xml-handlers \
+        --phase=xml \
+        --profile="$xml_profiles_csv" \
+        --ttl="$XML_TTL" \
+        --section="$XML_SECTION" \
+        --repeats="$XML_REPEATS"
 
     # Fail fast before spending time on the SIP ladder if any XML cell failed.
     if [ -s "${ARTIFACT_ROOT}/${TIER}/failures.log" ]; then

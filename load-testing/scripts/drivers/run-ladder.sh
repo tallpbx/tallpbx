@@ -109,44 +109,66 @@ format_handler_summary() {
     fi
 }
 
-consecutive=0
-while IFS= read -r cps; do
-    log="${logdir}/ladder-cps${cps}.log"
-    printf 'Running %s at %s calls/sec with both XML handlers\n' "$tier" "$cps"
+cps_csv="$(paste -sd, <<< "$ladder_rates")"
+first_cps="$(head -n1 <<< "$ladder_rates")"
+log="${logdir}/ladder-single-pass.log"
+printf 'Running %s single-pass SIP ladder (%s calls/sec) with both XML handlers\n' "$tier" "$cps_csv"
 
-    if ! bash load-testing/scripts/load-test-matrix.sh --tier="$tier" --compare-xml-handlers --phase=sip --cps="$cps" > "$log" 2>&1; then
-        printf 'Comparison failed at %s calls/sec. See %s\n' "$cps" "$log" >&2
-        exit 1
+if ! bash load-testing/scripts/load-test-matrix.sh \
+    --tier="$tier" \
+    --compare-xml-handlers \
+    --phase=sip \
+    --cps="$cps_csv" \
+    --skip-smoke \
+    --stop-on-drop > "$log" 2>&1; then
+    printf 'SIP ladder failed for %s. See %s\n' "$tier" "$log" >&2
+    tail -n 30 "$log" >&2 || true
+    exit 1
+fi
+
+matched_rungs=0
+while IFS= read -r cps; do
+    fpm="$(read_completion v-fast-default "$cps" 2>/dev/null || true)"
+    octane="$(read_completion v-octane "$cps" 2>/dev/null || true)"
+
+    if [ -z "$fpm" ] && [ -z "$octane" ]; then
+        continue
     fi
 
-    if ! fpm="$(read_completion v-fast-default "$cps")" || ! octane="$(read_completion v-octane "$cps")"; then
+    if [ "$cps" = "$first_cps" ] && { [ -z "$fpm" ] || [ -z "$octane" ]; }; then
         printf 'Missing or ambiguous comparison result at %s calls/sec. See %s\n' "$cps" "$log" >&2
         exit 1
     fi
 
-    IFS=$'\t' read -r fpm_pct fpm_below95 fpm_below80 fpm_sp50 fpm_sp95 fpm_tp50 fpm_tp95 <<< "$fpm"
-    IFS=$'\t' read -r oct_pct oct_below95 oct_below80 oct_sp50 oct_sp95 oct_tp50 oct_tp95 <<< "$octane"
+    if [ -n "$fpm" ] && [ -n "$octane" ]; then
+        matched_rungs=$((matched_rungs + 1))
+        IFS=$'\t' read -r fpm_pct fpm_below95 fpm_below80 fpm_sp50 fpm_sp95 fpm_tp50 fpm_tp95 <<< "$fpm"
+        IFS=$'\t' read -r oct_pct oct_below95 oct_below80 oct_sp50 oct_sp95 oct_tp50 oct_tp95 <<< "$octane"
 
-    printf '%s calls/sec: PHP-FPM %s, Octane %s\n' \
-        "$cps" \
-        "$(format_handler_summary "$fpm_pct" "$fpm_sp50" "$fpm_sp95" "$fpm_tp50" "$fpm_tp95")" \
-        "$(format_handler_summary "$oct_pct" "$oct_sp50" "$oct_sp95" "$oct_tp50" "$oct_tp95")"
+        printf '%s calls/sec: PHP-FPM %s, Octane %s\n' \
+            "$cps" \
+            "$(format_handler_summary "$fpm_pct" "$fpm_sp50" "$fpm_sp95" "$fpm_tp50" "$fpm_tp95")" \
+            "$(format_handler_summary "$oct_pct" "$oct_sp50" "$oct_sp95" "$oct_tp50" "$oct_tp95")"
 
-    if [ "$fpm_below80" = "1" ] && [ "$oct_below80" = "1" ]; then
-        printf 'Both handlers dropped below 80%% completion at %s calls/sec; stopping ladder.\n' "$cps"
-        break
-    fi
-
-    if [ "$fpm_below95" = "1" ] && [ "$oct_below95" = "1" ]; then
-        consecutive=$((consecutive + 1))
+        if [ "$fpm_below80" = "1" ] && [ "$oct_below80" = "1" ]; then
+            printf 'Both handlers dropped below 80%% completion at %s calls/sec.\n' "$cps"
+        fi
+    elif [ -n "$octane" ]; then
+        IFS=$'\t' read -r oct_pct oct_below95 oct_below80 oct_sp50 oct_sp95 oct_tp50 oct_tp95 <<< "$octane"
+        printf '%s calls/sec: PHP-FPM (stopped earlier), Octane %s\n' \
+            "$cps" \
+            "$(format_handler_summary "$oct_pct" "$oct_sp50" "$oct_sp95" "$oct_tp50" "$oct_tp95")"
     else
-        consecutive=0
-    fi
-
-    if [ "$consecutive" -ge 2 ]; then
-        printf 'Both handlers completed under 95%% of calls at two consecutive rates.\n'
-        break
+        IFS=$'\t' read -r fpm_pct fpm_below95 fpm_below80 fpm_sp50 fpm_sp95 fpm_tp50 fpm_tp95 <<< "$fpm"
+        printf '%s calls/sec: PHP-FPM %s, Octane (stopped earlier)\n' \
+            "$cps" \
+            "$(format_handler_summary "$fpm_pct" "$fpm_sp50" "$fpm_sp95" "$fpm_tp50" "$fpm_tp95")"
     fi
 done <<< "$ladder_rates"
+
+if [ "$matched_rungs" -eq 0 ]; then
+    printf 'Missing or ambiguous comparison result at %s calls/sec. See %s\n' "$first_cps" "$log" >&2
+    exit 1
+fi
 
 printf 'Paired ladder complete. Results: %s/%s\n' "$ARTIFACT_ROOT" "$tier"
