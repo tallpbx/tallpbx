@@ -207,6 +207,22 @@ describe('sip profile service', function (): void {
             ->toContain('<param name="sip-port" value="5060"/>')
             ->toContain('<param name="sip-ip" value="10.0.0.1"/>')
             ->toContain('<param name="rtp-ip" value="10.0.0.1"/>')
-            ->toContain('<param name="codecs" value="G722,PCMU,PCMA"/>');
+            ->toContain('<param name="codecs" value="G722,PCMU,PCMA"/>')
+            ->toContain('<param name="rtp-timer-name" value="soft"/>');
+    });
+
+    it('respects an explicit rtp-timer-name override in profile settings', function (): void {
+        $profile = SipProfile::factory()->create([
+            'name' => 'internal',
+            'settings' => [
+                'sip-port' => 5060,
+                'rtp-timer-name' => 'none',
+            ],
+        ]);
+
+        $xml = $this->service->generateConfig($profile);
+
+        expect($xml)->toContain('<param name="rtp-timer-name" value="none"/>')
+            ->not->toContain('<param name="rtp-timer-name" value="soft"/>');
     });
 });

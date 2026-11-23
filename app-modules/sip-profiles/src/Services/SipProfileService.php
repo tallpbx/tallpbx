@@ -92,6 +92,14 @@ class SipProfileService implements SipProfileServiceInterface
             }
         }
 
+        // Vanilla FreeSWITCH SIP profiles default to rtp-timer-name=soft. Without
+        // an RTP timer, switch_rtp blocks socket reads for 5 seconds per leg when
+        // no RTP arrives (muted, one-way, or signaling-only calls), delaying BYE
+        // teardown by 5 seconds per leg and triggering repeated BYE retransmits.
+        if (! array_key_exists('rtp-timer-name', $settings)) {
+            $xml .= '    <param name="rtp-timer-name" value="soft"/>'."\n";
+        }
+
         // Direct external database DSN (e.g. mariadb://...) so Sofia
         // registration and dialog state leave SQLite when FS_DB_DRIVER is set.
         if (! array_key_exists('odbc-dsn', $settings)) {

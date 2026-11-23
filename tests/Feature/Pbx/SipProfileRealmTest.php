@@ -83,6 +83,10 @@ describe('tenant sip profile realm', function (): void {
         expect($settings['sip-port'])->toBe('5060')
             ->and($settings['auth-calls'])->toBe('true')
             ->and($settings['apply-inbound-acl'])->toBe('domains')
+            ->and($settings['rtp-timer-name'])->toBe('soft')
             ->and($settings['context'])->toContain('tenant_'.$tenant->id);
+
+        $externalSettings = $settingsFor($tenant, 'external');
+        expect($externalSettings['rtp-timer-name'])->toBe('soft');
     });
 });

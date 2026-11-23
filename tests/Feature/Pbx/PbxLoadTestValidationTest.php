@@ -10,13 +10,21 @@ use App\Models\TenantDomain;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Modules\CallBlocks\Models\CallBlock;
 use Modules\CallCenters\Models\Queue;
+use Modules\CallForwards\Models\CallForward;
+use Modules\Conferences\Models\Conference;
+use Modules\Emergency\Models\Emergency;
 use Modules\Extensions\Models\Extension;
+use Modules\FollowMe\Models\FollowMe;
 use Modules\Gateways\Models\Gateway;
 use Modules\InboundRoutes\Models\InboundRoute;
 use Modules\IvrMenus\Models\IvrMenu;
 use Modules\OutboundRoutes\Models\OutboundRoute;
+use Modules\RingGroups\Models\RingGroup;
 use Modules\SipAccounts\Models\SipAccount;
+use Modules\TimeConditions\Models\TimeCondition;
+use Modules\Voicemails\Models\Voicemail;
 use ReflectionMethod;
 use Symfony\Component\Process\Process;
 
@@ -135,18 +143,21 @@ describe('pbx load test scripts and scenarios', function (): void {
         'uas-auto-answer.xml',
     ]);
 
-    it('measures end-to-end call setup time in the capacity scenario', function (): void {
+    it('measures end-to-end call setup and teardown time in the capacity scenario', function (): void {
         $scenario = (string) file_get_contents(base_path('load-testing/tools/sipp/uac-extension-capacity.xml'));
 
         expect($scenario)->toContain('start_rtd="setup"')
             ->and($scenario)->toContain('rtd="setup"')
-            ->and($scenario)->toContain('<pause/>');
+            ->and($scenario)->toContain('start_rtd="teardown"')
+            ->and($scenario)->toContain('rtd="teardown"')
+            ->and($scenario)->toContain('<pause milliseconds="250"/>');
     });
 
-    it('keeps the capacity destination duration configurable', function (): void {
+    it('accepts BYE immediately after ACK in the capacity destination scenario', function (): void {
         $scenario = (string) file_get_contents(base_path('load-testing/tools/sipp/uas-auto-answer-capacity.xml'));
 
-        expect($scenario)->toContain('<pause/>')
+        expect($scenario)->not->toContain('<pause')
+            ->and($scenario)->toContain('<recv request="ACK"/>')
             ->and($scenario)->toContain('<recv request="BYE"/>');
     });
 });
@@ -272,6 +283,44 @@ describe('pbx load test seed command', function (): void {
             ->and($menu->greeting)->toBe('$${sounds_dir}/en/us/callie/ivr/8000/ivr-thank_you_for_calling.wav')
             ->and($menu->timeout)->toBe(3)
             ->and($menu->enabled)->toBeTrue();
+    });
+
+    it('clears synthetic extended and media fixtures when re-seeding baseline load data', function (): void {
+        $baseOptions = [
+            '--tenant' => 'load-test-cleanup',
+            '--domain' => 'load-cleanup.test',
+            '--extensions' => '5',
+            '--start' => '3500',
+            '--output' => PBX_LOAD_TEST_CSV_PATH,
+        ];
+
+        $this->artisan('pbx:load-test:seed', [
+            ...$baseOptions,
+            '--include-extended-fixtures' => true,
+            '--include-media-fixtures' => true,
+        ])->assertSuccessful();
+
+        $tenant = Tenant::where('slug', 'load-test-cleanup')->firstOrFail();
+
+        expect(CallForward::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeTrue()
+            ->and(FollowMe::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeTrue()
+            ->and(Voicemail::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeTrue()
+            ->and(Queue::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'load_test_moh')->exists())->toBeTrue();
+
+        $this->artisan('pbx:load-test:seed', $baseOptions)->assertSuccessful();
+
+        expect(Tenant::where('slug', 'load-test-cleanup')->value('id'))->toBe($tenant->id)
+            ->and(CallForward::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(FollowMe::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(Voicemail::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(RingGroup::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(TimeCondition::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(Conference::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(Emergency::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(Gateway::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'emergency')->exists())->toBeFalse()
+            ->and(CallBlock::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
+            ->and(Queue::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'load_test_moh')->exists())->toBeFalse()
+            ->and(IvrMenu::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'load_test_announcement')->exists())->toBeFalse();
     });
 });
 

@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Services\DialplanContext;
 use App\Services\TenantDefaultsService;
+use App\Support\RoutingCacheVersion;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -196,10 +197,14 @@ class PbxLoadTestSeedCommand extends Command
 
             if ($includeMediaFixtures) {
                 $this->seedMediaFixtures($tenant->id);
+            } else {
+                $this->clearMediaFixtures($tenant->id);
             }
 
             if ($includeExtendedFixtures) {
                 $this->seedExtendedFixtures($tenant->id, $extensionNumbers, $sippHost, $sippPort);
+            } else {
+                $this->clearExtendedFixtures($tenant->id, $extensionNumbers);
             }
 
             return [
@@ -210,10 +215,14 @@ class PbxLoadTestSeedCommand extends Command
             ];
         });
 
-        $this->writeSippCsv($output, $summary['extension_numbers'], $password, $domain);
-
         /** @var Tenant $tenant */
         $tenant = $summary['tenant'];
+
+        // Invalidate cached dialplan/contributor XML immediately so subsequent
+        // capacity or functional runs never observe stale extended routing rules.
+        RoutingCacheVersion::bump($tenant->id);
+
+        $this->writeSippCsv($output, $summary['extension_numbers'], $password, $domain);
 
         $this->components->info('PBX load-test data is ready.');
         $this->components->twoColumnDetail('Tenant', "{$tenant->name} ({$tenant->slug}, id {$tenant->id})");
@@ -540,5 +549,92 @@ class PbxLoadTestSeedCommand extends Command
                 'enabled' => true,
             ],
         );
+    }
+
+    /**
+     * Remove synthetic media fixtures when seeding without --include-media-fixtures.
+     */
+    private function clearMediaFixtures(int $tenantId): void
+    {
+        Queue::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'load_test_moh')
+            ->delete();
+
+        IvrMenu::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'load_test_announcement')
+            ->delete();
+    }
+
+    /**
+     * Remove synthetic extended fixtures when seeding without --include-extended-fixtures.
+     *
+     * Extended validation seeds unconditional call-forwarding on 2001, follow-me on
+     * 2002, and voicemail on 2003. Leaving those rules behind hijacks baseline
+     * extension-to-extension capacity calls when the SIP ladder runs afterwards.
+     *
+     * @param  array<int, string>  $extensionNumbers
+     */
+    private function clearExtendedFixtures(int $tenantId, array $extensionNumbers): void
+    {
+        $ringGroupIds = RingGroup::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', '2400')
+            ->pluck('id');
+
+        if ($ringGroupIds->isNotEmpty()) {
+            RingGroupExtension::whereIn('ring_group_id', $ringGroupIds)->delete();
+            RingGroup::withoutGlobalScope('tenant')->whereIn('id', $ringGroupIds)->delete();
+        }
+
+        $vmExtension = $extensionNumbers[3] ?? $extensionNumbers[0];
+        Voicemail::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('voicemail_id', $vmExtension)
+            ->delete();
+
+        $cfExt = Extension::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('extension_number', $extensionNumbers[1] ?? '2001')
+            ->first();
+
+        if ($cfExt) {
+            CallForward::withoutGlobalScope('tenant')
+                ->where('tenant_id', $tenantId)
+                ->where('extension_uuid', $cfExt->id)
+                ->where('forward_type', 'unconditional')
+                ->delete();
+        }
+
+        TimeCondition::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', '2401')
+            ->delete();
+
+        FollowMe::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'load_test_follow_me')
+            ->delete();
+
+        Conference::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', '2500')
+            ->delete();
+
+        Emergency::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('caller_id', '15551239876')
+            ->delete();
+
+        Gateway::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'emergency')
+            ->delete();
+
+        CallBlock::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'load_test_block_inbound')
+            ->delete();
     }
 }
