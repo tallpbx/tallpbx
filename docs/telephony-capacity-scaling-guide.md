@@ -17,8 +17,8 @@ Based on empirical benchmarks conducted on a 1 vCPU / 1 GB RAM cloud host with a
 
 Empirical server-to-server SIP capacity testing established three core facts (for the complete tier tables, per-service CPU numbers, and historical static-pool runs, see [`load-testing-results.md`](load-testing-results.md)):
 
-- **Shipped default capacity scales linearly with CPU cores:** With the shipped dynamic PHP-FPM pool (`pm.max_children` = `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and fast XML/CDR entry points, TallPBX completes **5 calls/sec** (300/300) on 1 vCPU / 1 GB and **10 calls/sec** (600/600) on 2 vCPU / 2 GB.
-- **XML generation is NOT the bottleneck:** The optional [**Laravel Octane**](https://laravel.com/docs/octane) worker (a persistent PHP application server that keeps Laravel booted in memory across requests; `tallpbx-xml-worker.service` on port 8090) serves 150+ XML req/sec and clears the PHP-FPM call-rate boundary on both 1 vCPU (6 calls/sec, 360/360) and 2 vCPU (12 calls/sec, 720/720). Even with near-zero XML latency, 1 vCPU still hits a hard core ceiling between ~6 and 10 CPS.
+- **Shipped default capacity scales linearly with CPU cores:** With the shipped dynamic PHP-FPM pool (`pm.max_children` = `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and fast XML/CDR entry points, TallPBX completes **2 calls/sec** (120/120) on 1 vCPU / 1 GB, **10 calls/sec** (600/600) on 2 vCPU / 2 GB, and **25 calls/sec** (1,500/1,500) on 4 shared vCPU / 8 GB.
+- **XML generation is NOT the bottleneck:** The optional [**Laravel Octane**](https://laravel.com/docs/octane) worker (a persistent PHP application server that keeps Laravel booted in memory across requests; `tallpbx-xml-worker.service` on port 8090) serves 201–946 XML req/sec (`100x5`–`1000x25`), doubles 100%-completed capacity on 1 vCPU (**4 calls/sec**, 240/240), reaches **15 calls/sec** (900/900) on 2 vCPU, and holds flat **`68–76 ms`** median call setup through **25–30 calls/sec** on 4 shared vCPU (where **30 two-leg calls/sec** reaches FreeSWITCH's shipped `FS_SESSIONS_PER_SECOND=60` session-rate guardrail at `96.6%` completion). Even with near-zero XML latency, 1 vCPU still hits a hard core ceiling between 6 and 8 CPS.
 - **The 10 CPS wall on 1 vCPU is full-stack CPU exhaustion:**
    At 10 CPS with 50 concurrent in-flight calls, profiling on a 1 vCPU host revealed **0.0% idle CPU** (100% saturation):
    - **`freeswitch:listen` (33.3% CPU)**: Reads, deserializes, and dispatches hundreds of FreeSWITCH ESL JSON events per second across 25 subscribed event types into the Laravel application and database.
@@ -227,7 +227,7 @@ For measured throughput and latency figures per tier, see [`load-testing-results
 | :--- | :--- | :--- |
 | **1 vCPU / 1 GB RAM** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Disk SQLite (default), `notice` logging, dynamic FPM (3 max), optional Octane worker. |
 | **2 vCPU / 2 GB RAM** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max); optional `FS_DB_DRIVER=mariadb` if SQLite lock contention appears. |
-| **4 vCPU / 8 GB RAM** | Sofia UDP receive buffer sizing and network bandwidth. | Octane worker (`--workers=auto`), `mod_hiredis` limits, dynamic FPM (12 max); optional `FS_DB_DRIVER=mariadb`. |
+| **4 vCPU / 8 GB RAM** | Sofia UDP receive buffer sizing and default `FS_SESSIONS_PER_SECOND=60` cap. | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120` when exceeding 25–30 two-leg CPS, `mod_hiredis` limits, dynamic FPM (12 max); optional `FS_DB_DRIVER=mariadb`. |
 | **8 vCPU / 16 GB Dedicated** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), `FS_DB_DRIVER=mariadb` or dedicated DB host. |
 
 ---

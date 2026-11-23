@@ -285,8 +285,9 @@ def validate_ladder_events(
 def summarize_cpu_csv(cpu_csv: Path) -> dict[str, float]:
     """Return active-window mean CPU% per service class from cpuwatch.sh --sample CSV.
 
-    Filters to intervals where freeswitch or php-fpm/octane-worker showed >1% CPU
-    so post-call idle tail time in the cpuwatch window does not dilute busy load.
+    Filters to intervals where freeswitch >= 5% CPU (falling back to combined
+    worker >= 2% if needed) so post-call CDR-settle idle tails do not dilute
+    active load.
     """
     if not cpu_csv.is_file():
         return {}
@@ -305,8 +306,14 @@ def summarize_cpu_csv(cpu_csv: Path) -> dict[str, float]:
     active_samples = [
         sample
         for sample in by_epoch.values()
-        if (sample.get("freeswitch", 0.0) + sample.get("php-fpm", 0.0) + sample.get("octane-worker", 0.0)) >= 2.0
+        if sample.get("freeswitch", 0.0) >= 5.0
     ]
+    if not active_samples:
+        active_samples = [
+            sample
+            for sample in by_epoch.values()
+            if (sample.get("freeswitch", 0.0) + sample.get("php-fpm", 0.0) + sample.get("octane-worker", 0.0)) >= 2.0
+        ]
     samples = active_samples if active_samples else list(by_epoch.values())
     if not samples:
         return {}

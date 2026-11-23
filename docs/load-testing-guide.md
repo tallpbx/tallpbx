@@ -521,7 +521,7 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 ### Common Failures & Remediation
 
 1. **High Concurrency XML Latency**:
-   On single-core VPS nodes, check CPU usage and PHP-FPM saturation during the run. If XML lookups are the bottleneck, compare the shipped PHP-FPM setup with the [optional Octane worker](#testing-the-optional-laravel-octane-worker). In the published 2 vCPU / 2 GB test at 12 calls/sec, Octane completed all 720 calls. The 25+ calls/sec estimate is a projection from XML throughput. [Capacity planning and measured results](load-testing-results.md#capacity-planning-rules).
+   On single-core VPS nodes, check CPU usage and PHP-FPM saturation during the run. If XML lookups are the bottleneck, compare the shipped PHP-FPM setup with the [optional Octane worker](#testing-the-optional-laravel-octane-worker). In the published unified benchmarks, Octane completed 15 calls/sec (900/900) on 2 vCPU / 2 GB and 25 calls/sec (1,500/1,500, 68 ms median setup) on 4 shared vCPU / 8 GB before reaching FreeSWITCH's default `FS_SESSIONS_PER_SECOND=60` guardrail at 30 calls/sec. [Capacity planning and measured results](load-testing-results.md#capacity-planning-rules).
 2. **Delayed Audio or Dropped Packets**:
    Ensure RTP media ports (`16384-32768/udp`) are open in the firewall. If testing over WireGuard, verify MTU (`1420`) to prevent UDP fragmentation.
 3. **Stuck Channels After Teardown**:
