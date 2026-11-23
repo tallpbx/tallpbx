@@ -432,15 +432,23 @@ def build_markdown(
             "",
             "### 60-Second Call Capacity & Individual Call Latency (PHP-FPM vs. Octane)",
             "",
-            "| Test server | Offered rate | PHP-FPM completed | Octane completed | PHP-FPM setup p50 / p95 | Octane setup p50 / p95 | PHP-FPM teardown p50 / p95 | Octane teardown p50 / p95 |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            "| Test server | Offered rate | PHP-FPM completed | Octane completed | PHP-FPM setup p50 / p95 | Octane setup p50 / p95 |",
+            "| --- | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
 
     sip_by_tier_cps: dict[tuple[str, int], dict[str, dict[str, str]]] = {}
+    td_p50_vals: list[float] = []
+    td_p95_vals: list[float] = []
     for row in csv_rows:
         if row["phase"] == "sip":
             sip_by_tier_cps.setdefault((row["tier"], int(row["rate_cps"])), {})[row["variant"]] = row
+            td_p50 = parse_float(row.get("teardown_p50_ms"))
+            td_p95 = parse_float(row.get("teardown_p95_ms"))
+            if td_p50 is not None:
+                td_p50_vals.append(td_p50)
+            if td_p95 is not None:
+                td_p95_vals.append(td_p95)
 
     clean_chart_labels: list[str] = []
     clean_fpm_values: list[str] = []
@@ -458,11 +466,7 @@ def build_markdown(
             oct_comp = f"{oct_row['completed']} / {oct_row['offered']} ({oct_row['completion_pct']}%)" if oct_row else "—"
             fpm_setup = f"{fpm['p50_ms']} / {fpm['p95_ms']} ms" if fpm else "—"
             oct_setup = f"**{oct_row['p50_ms']} / {oct_row['p95_ms']} ms**" if oct_row else "—"
-            fpm_td = f"{fpm['teardown_p50_ms']} / {fpm['teardown_p95_ms']} ms" if fpm else "—"
-            oct_td = f"{oct_row['teardown_p50_ms']} / {oct_row['teardown_p95_ms']} ms" if oct_row else "—"
-            lines.append(
-                f"| {label} | {cps} calls/sec | {fpm_comp} | {oct_comp} | {fpm_setup} | {oct_setup} | {fpm_td} | {oct_td} |"
-            )
+            lines.append(f"| {label} | {cps} calls/sec | {fpm_comp} | {oct_comp} | {fpm_setup} | {oct_setup} |")
             if fpm and oct_row and fpm["failed"] == "0" and oct_row["failed"] == "0":
                 highest_clean_pair = (cps, fpm, oct_row)
 
@@ -471,6 +475,16 @@ def build_markdown(
             clean_chart_labels.append(f'"{tier_meta[tier]["vcpu"]} vCPU {clean_cps} CPS"')
             clean_fpm_values.append(clean_fpm["p50_ms"])
             clean_oct_values.append(clean_oct["p50_ms"])
+
+    if td_p50_vals and td_p95_vals:
+        td_p50_str = f"{min(td_p50_vals):.1f}" if min(td_p50_vals) == max(td_p50_vals) else f"{min(td_p50_vals):.1f}–{max(td_p50_vals):.1f}"
+        td_p95_str = f"{min(td_p95_vals):.1f}" if min(td_p95_vals) == max(td_p95_vals) else f"{min(td_p95_vals):.1f}–{max(td_p95_vals):.1f}"
+        lines.extend(
+            [
+                "",
+                f"Call teardown (`BYE` → `200 OK`) was verified on every completed call ({td_p50_str} ms median / {td_p95_str} ms p95; recorded per rung in the consolidated CSV).",
+            ]
+        )
 
     if clean_chart_labels:
         fpm_floats = [float(v) for v in clean_fpm_values]

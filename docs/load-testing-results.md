@@ -50,28 +50,30 @@ xychart-beta
 
 ### Complete SIP Call Capacity & Latency Ladder (`EXTENSIONS=30`, `60s`)
 
-Each ladder started at light load and stepped upward until a handler dropped below 80% completion (or recorded two consecutive rungs below 95%). Setup and teardown latencies cover completed calls.
+Each ladder started at light load and stepped upward until a handler dropped below 80% completion (or recorded two consecutive rungs below 95%). Call setup latencies cover completed calls.
 
-| Test server | Offered rate | PHP-FPM completed | Octane completed | PHP-FPM setup median / p95 | Octane setup median / p95 | PHP-FPM teardown median / p95 | Octane teardown median / p95 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 vCPU / 1 GB RAM | 2 calls/sec | 120 / 120 (100.0%) | 120 / 120 (100.0%) | 256.0 / 574.4 ms | **88.0 / 200.4 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 1 vCPU / 1 GB RAM | 4 calls/sec | 239 / 240 (99.6%) | 240 / 240 (100.0%) | 2,812.0 / 11,600.4 ms | **104.0 / 252.2 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 1 vCPU / 1 GB RAM | 5 calls/sec | 171 / 300 (57.0%) | 296 / 300 (98.7%) | 5,760.0 / 16,444.0 ms | **284.0 / 2,031.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 1 vCPU / 1 GB RAM | 6 calls/sec | — | 343 / 360 (95.3%) | — | **1,212.0 / 2,041.6 ms** | — | 4.0 / 8.0 ms |
-| 1 vCPU / 1 GB RAM | 8 calls/sec | — | 207 / 480 (43.1%) | — | **1,792.0 / 3,448.0 ms** | — | 4.0 / 8.0 ms |
-| 2 vCPU / 2 GB RAM | 5 calls/sec | 300 / 300 (100.0%) | 300 / 300 (100.0%) | 180.0 / 296.2 ms | **80.0 / 108.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 2 vCPU / 2 GB RAM | 8 calls/sec | 480 / 480 (100.0%) | 480 / 480 (100.0%) | 542.0 / 1,244.2 ms | **80.0 / 108.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 2 vCPU / 2 GB RAM | 10 calls/sec | 600 / 600 (100.0%) | 600 / 600 (100.0%) | 1,408.0 / 3,801.4 ms | **84.0 / 116.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 2 vCPU / 2 GB RAM | 12 calls/sec | 413 / 720 (57.4%) | 720 / 720 (100.0%) | 4,032.0 / 16,521.6 ms | **96.0 / 128.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 2 vCPU / 2 GB RAM | 15 calls/sec | — | 900 / 900 (100.0%) | — | **196.0 / 440.2 ms** | — | 4.0 / 8.0 ms |
-| 2 vCPU / 2 GB RAM | 20 calls/sec | — | 863 / 1,200 (71.9%) | — | **2,144.0 / 3,303.6 ms** | — | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 5 calls/sec | 300 / 300 (100.0%) | 300 / 300 (100.0%) | 124.0 / 136.2 ms | **64.0 / 76.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 10 calls/sec | 600 / 600 (100.0%) | 600 / 600 (100.0%) | 128.0 / 156.0 ms | **68.0 / 76.2 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 15 calls/sec | 900 / 900 (100.0%) | 900 / 900 (100.0%) | 140.0 / 192.0 ms | **64.0 / 72.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 20 calls/sec | 1,200 / 1,200 (100.0%) | 1,200 / 1,200 (100.0%) | 152.0 / 216.0 ms | **72.0 / 84.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 25 calls/sec | 1,500 / 1,500 (100.0%) | 1,500 / 1,500 (100.0%) | 1,708.0 / 2,120.0 ms | **68.0 / 84.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 30 calls/sec | 1,108 / 1,800 (61.6%) | 1,738 / 1,800 (96.6%) | 6,300.0 / 16,450.6 ms | **76.0 / 116.0 ms** | 4.0 / 8.0 ms | 4.0 / 8.0 ms |
-| 4 shared vCPU / 8 GB RAM | 40 calls/sec | — | 1,659 / 2,400 (69.1%) | — | **92.0 / 172.0 ms** | — | 4.0 / 8.0 ms |
+| Test server | Offered rate | PHP-FPM completed | Octane completed | PHP-FPM setup median / p95 | Octane setup median / p95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 vCPU / 1 GB RAM | 2 calls/sec | 120 / 120 (100.0%) | 120 / 120 (100.0%) | 256.0 / 574.4 ms | **88.0 / 200.4 ms** |
+| 1 vCPU / 1 GB RAM | 4 calls/sec | 239 / 240 (99.6%) | 240 / 240 (100.0%) | 2,812.0 / 11,600.4 ms | **104.0 / 252.2 ms** |
+| 1 vCPU / 1 GB RAM | 5 calls/sec | 171 / 300 (57.0%) | 296 / 300 (98.7%) | 5,760.0 / 16,444.0 ms | **284.0 / 2,031.0 ms** |
+| 1 vCPU / 1 GB RAM | 6 calls/sec | — | 343 / 360 (95.3%) | — | **1,212.0 / 2,041.6 ms** |
+| 1 vCPU / 1 GB RAM | 8 calls/sec | — | 207 / 480 (43.1%) | — | **1,792.0 / 3,448.0 ms** |
+| 2 vCPU / 2 GB RAM | 5 calls/sec | 300 / 300 (100.0%) | 300 / 300 (100.0%) | 180.0 / 296.2 ms | **80.0 / 108.0 ms** |
+| 2 vCPU / 2 GB RAM | 8 calls/sec | 480 / 480 (100.0%) | 480 / 480 (100.0%) | 542.0 / 1,244.2 ms | **80.0 / 108.0 ms** |
+| 2 vCPU / 2 GB RAM | 10 calls/sec | 600 / 600 (100.0%) | 600 / 600 (100.0%) | 1,408.0 / 3,801.4 ms | **84.0 / 116.0 ms** |
+| 2 vCPU / 2 GB RAM | 12 calls/sec | 413 / 720 (57.4%) | 720 / 720 (100.0%) | 4,032.0 / 16,521.6 ms | **96.0 / 128.0 ms** |
+| 2 vCPU / 2 GB RAM | 15 calls/sec | — | 900 / 900 (100.0%) | — | **196.0 / 440.2 ms** |
+| 2 vCPU / 2 GB RAM | 20 calls/sec | — | 863 / 1,200 (71.9%) | — | **2,144.0 / 3,303.6 ms** |
+| 4 shared vCPU / 8 GB RAM | 5 calls/sec | 300 / 300 (100.0%) | 300 / 300 (100.0%) | 124.0 / 136.2 ms | **64.0 / 76.0 ms** |
+| 4 shared vCPU / 8 GB RAM | 10 calls/sec | 600 / 600 (100.0%) | 600 / 600 (100.0%) | 128.0 / 156.0 ms | **68.0 / 76.2 ms** |
+| 4 shared vCPU / 8 GB RAM | 15 calls/sec | 900 / 900 (100.0%) | 900 / 900 (100.0%) | 140.0 / 192.0 ms | **64.0 / 72.0 ms** |
+| 4 shared vCPU / 8 GB RAM | 20 calls/sec | 1,200 / 1,200 (100.0%) | 1,200 / 1,200 (100.0%) | 152.0 / 216.0 ms | **72.0 / 84.0 ms** |
+| 4 shared vCPU / 8 GB RAM | 25 calls/sec | 1,500 / 1,500 (100.0%) | 1,500 / 1,500 (100.0%) | 1,708.0 / 2,120.0 ms | **68.0 / 84.0 ms** |
+| 4 shared vCPU / 8 GB RAM | 30 calls/sec | 1,108 / 1,800 (61.6%) | 1,738 / 1,800 (96.6%) | 6,300.0 / 16,450.6 ms | **76.0 / 116.0 ms** |
+| 4 shared vCPU / 8 GB RAM | 40 calls/sec | — | 1,659 / 2,400 (69.1%) | — | **92.0 / 172.0 ms** |
+
+Call teardown (`BYE` → `200 OK`) was verified on every completed call and remained constant at **4.0 ms median / 8.0 ms p95** across all tiers, rates, and handlers (recorded per rung in the consolidated CSV).
 
 <a name="performance-metrics--statistics"></a>
 
