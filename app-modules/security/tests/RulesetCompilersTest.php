@@ -107,9 +107,9 @@ it('PreFilterCompiler compiles stages in configured order', function (): void {
         ->and($output)->toContain('# STAGE 2: ACCEPT WHITELISTED / TRUSTED IPs UNCONDITIONALLY')
         ->and($output)->toContain('ip saddr @whitelist_ips accept')
         ->and($output)->toContain('# STAGE 3: DROP INVALID PACKETS')
-        ->and($output)->toContain('# STAGE 4: STATEFUL FAST PATH')
-        ->and($output)->toContain('# STAGE 5: DROP BLACKLISTED NETWORKS')
-        ->and($output)->toContain('# STAGE 6: DROP TEMPORARILY BANNED')
+        ->and($output)->toContain('# STAGE 4: DROP BLACKLISTED NETWORKS')
+        ->and($output)->toContain('# STAGE 5: DROP TEMPORARILY BANNED')
+        ->and($output)->toContain('# STAGE 6: STATEFUL FAST PATH')
         ->and($output)->toContain('# STAGE 7: DROP AUTOMATED PUBLIC THREAT FEED');
 });
 

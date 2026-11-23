@@ -36,6 +36,12 @@ it('generates valid nftables ruleset structure with invariants and default drop 
         ->and($nft)->toContain('set whitelist_ips {')
         ->and($nft)->toContain('set external_blocklist_ips {')
         ->and($nft)->toContain('set external_blocklist_ips6 {')
+        ->and($nft)->toContain('chain raw_prerouting {')
+        ->and($nft)->toContain('type filter hook prerouting priority raw; policy accept;')
+        ->and($nft)->toContain('iifname "lo" notrack')
+        ->and($nft)->toContain('chain raw_output {')
+        ->and($nft)->toContain('type filter hook output priority raw; policy accept;')
+        ->and($nft)->toContain('oifname "lo" notrack')
         ->and($nft)->toContain('chain input {')
         ->and($nft)->toContain('type filter hook input priority -10; policy drop;')
         ->and($nft)->toContain('iif "lo" accept')
@@ -238,21 +244,21 @@ it('compiles IPv6 lists and bans into parallel ipv6 sets with mirrored pipeline 
         ->and($v4Whitelist[1] ?? '')->not->toContain('2001:');
 
     // Pipeline order parity: the v6 whitelist accept precedes the invalid
-    // drop and the stateful fast path, and the v6 blocklists follow the fast
-    // path — the reordered chain (invariants 1–4).
+    // drop, explicit blacklist/bans precede the stateful fast path (severing
+    // active flows immediately), and large threat feeds follow the fast path.
     $whitelist6 = strpos($nft, 'ip6 saddr @whitelist_ips6 accept');
     $invalidDrop = strpos($nft, 'ct state invalid drop');
-    $fastPath = strpos($nft, 'ct state established,related accept');
     $blacklist6 = strpos($nft, 'ip6 saddr @blacklist_ips6 drop');
     $banned6 = strpos($nft, 'ip6 saddr @banned_ips6 drop');
+    $fastPath = strpos($nft, 'ct state established,related accept');
     $feed6 = strpos($nft, 'ip6 saddr @external_blocklist_ips6 counter drop');
     $icmp6 = strpos($nft, 'mld2-listener-report');
 
     expect($whitelist6)->toBeLessThan($invalidDrop)
-        ->and($invalidDrop)->toBeLessThan($fastPath)
-        ->and($fastPath)->toBeLessThan($blacklist6)
+        ->and($invalidDrop)->toBeLessThan($blacklist6)
         ->and($blacklist6)->toBeLessThan($banned6)
-        ->and($banned6)->toBeLessThan($feed6)
+        ->and($banned6)->toBeLessThan($fastPath)
+        ->and($fastPath)->toBeLessThan($feed6)
         ->and($feed6)->toBeLessThan($icmp6);
 });
 
@@ -272,15 +278,15 @@ it('orders the input chain by the final kernel evaluation stages', function (): 
     $nft = (new SecurityConfigGenerator)->generate();
 
     // Walk the final chain in kernel evaluation order: loopback, whitelist,
-    // invalid drop, stateful fast path, blacklist, bans, threat feeds, ICMP,
+    // invalid drop, blacklist, bans, stateful fast path, threat feeds, ICMP,
     // port catalog, custom rules, default policy.
     $needles = [
         'iif "lo" accept',
         'ip saddr @whitelist_ips accept',
         'ct state invalid drop',
-        'ct state established,related accept',
         'ip saddr @blacklist_ips drop',
         'ip saddr @banned_ips drop',
+        'ct state established,related accept',
         'ip saddr @external_blocklist_ips counter drop',
         'icmp type echo-request',
         'udp dport { 5060, 5061, 5080 } accept',

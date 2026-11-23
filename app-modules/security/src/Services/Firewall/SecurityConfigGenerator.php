@@ -150,7 +150,23 @@ class SecurityConfigGenerator
             $lines[] = $line;
         }
 
-        // 4. Chain Input
+        // 4. Raw Loopback Bypass (priority -300, before nf_conntrack at -200)
+        // Loopback traffic is unconditionally accepted at Stage 1 of chain input,
+        // so tracking it in nf_conntrack wastes table slots (especially on 1 GB
+        // hosts where nf_conntrack_max defaults to 8,192) for zero security gain.
+        $lines[] = '    # Bypass connection tracking on the loopback interface (lo)';
+        $lines[] = '    chain raw_prerouting {';
+        $lines[] = '        type filter hook prerouting priority raw; policy accept;';
+        $lines[] = '        iifname "lo" notrack';
+        $lines[] = '    }';
+        $lines[] = '';
+        $lines[] = '    chain raw_output {';
+        $lines[] = '        type filter hook output priority raw; policy accept;';
+        $lines[] = '        oifname "lo" notrack';
+        $lines[] = '    }';
+        $lines[] = '';
+
+        // 5. Chain Input
         $chainPolicy = ($firewallEnabled && ! $observeMode) ? $defaultPolicy : 'accept';
         $lines[] = '    chain input {';
         $lines[] = "        type filter hook input priority -10; policy {$chainPolicy};";

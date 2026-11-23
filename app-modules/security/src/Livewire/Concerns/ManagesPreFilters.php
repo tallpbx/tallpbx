@@ -237,7 +237,7 @@ trait ManagesPreFilters
             'threat_feeds' => [
                 'label' => __('admin.security_threat_feeds_title'),
                 'badge' => '@external_blocklist_ips',
-                'tooltip' => null,
+                'tooltip' => __('admin.security_threat_feeds_tooltip'),
                 'invariant' => false,
                 'enabled' => $threatFeedEnabled,
                 'status_class' => $threatFeedEnabled ? 'bg-error' : 'bg-base-content/25',

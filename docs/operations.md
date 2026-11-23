@@ -141,12 +141,13 @@ bucket:
 
 TallPBX protects the server using an in-kernel Linux firewall (`nftables`). Incoming network connections are checked in a fast, sequential order:
 
-1. **Loopback Traffic**: Connections between local server components (FreeSWITCH, MariaDB, Redis) pass unconditionally.
+1. **Loopback Traffic (`lo`)**: Connections between local server components (FreeSWITCH, nginx, PHP-FPM, MariaDB, Redis) bypass kernel connection tracking (`notrack` at `raw` priority) and pass unconditionally at Stage 1 of the input chain.
 2. **Trusted Whitelist**: Administrator IP addresses, office networks, and VPNs bypass all blocklists.
-3. **Established Connections**: Active phone calls and existing web sessions pass immediately.
-4. **Permanent Blacklist & Active Bans**: Known abusive IPs, country geo-blocks, threat feeds, and brute-force attackers are dropped at line rate.
-5. **Legitimate PBX Services**: Approved traffic is accepted for SIP signaling (ports 5060/5061/5080), voice audio (RTP ports 16384-32768), web admin (ports 80/443), Reverb WebSockets (port 8080), WebRTC WSS (port 7443), TFTP provisioning (UDP port 69), and SSH (port 22).
-6. **Custom Rules & Default Drop**: Any administrator-defined custom rules run next, and unrecognized traffic falls through to the default drop policy.
+3. **Invalid Packets, Permanent Blacklist & Active Bans**: Malformed packets, administrator-blocked IPs, and brute-force attackers are dropped immediately — including active sessions — before the stateful fast path.
+4. **Established Connections**: Active phone calls (RTP audio), existing web/SSH sessions, and return traffic for outbound server connections pass immediately, skipping the large external blocklists, Geo-Blocking CIDR trees, and port rules.
+5. **External Threat Feeds, Protocol Defense & Geo-Blocking**: Automated VoIP fraud feeds, ICMP diagnostics, hardened TFTP rules, and country geo-blocks filter new inbound connections. Because threat feeds and Geo-Blocking are long-term perimeter lists evaluated after Established Connections, updating them does not flush `nf_conntrack`: new connections are blocked immediately, while already-established sessions remain active until they end or expire from kernel connection tracking (up to 120 seconds of inactivity for established UDP flows, or until an active TCP session closes). Use **Permanent Blacklist** or **Active Bans** to sever a live session immediately.
+6. **Legitimate PBX Services**: Approved traffic is accepted for SIP signaling (ports 5060/5061/5080), voice audio (RTP ports 16384-32768), web admin (ports 80/443), Reverb WebSockets (port 8080), WebRTC WSS (port 7443), TFTP provisioning (UDP port 69), and SSH (port 22).
+7. **Custom Rules & Default Drop**: Any administrator-defined custom rules run next, and unrecognized traffic falls through to the default drop policy.
 
 For complete low-level packet flow diagrams and kernel-level specifications, see the [System Architecture & Security Guide](architecture.md#part-ii-security-architecture--linux-kernel-packet-filtering).
 
@@ -219,10 +220,10 @@ Use `tpbx security:observe` to see which firewall rule stage matched each recent
 * `tpbx-observe:tftp` — Unauthorized TFTP write requests (`WRQ`), directory traversal (`../`), or floods.
 * `tpbx-observe:custom` — Matches against administrator-defined custom drop rules.
 
-#### 4. The Loopback Floor Invariant (`iif "lo" accept`)
+#### 4. The Loopback Floor Invariant (`lo notrack` + `iif "lo" accept`)
 When testing Observe Mode, remember that packets sent from the PBX console to itself (e.g. `ping 127.0.0.1` or `curl http://<pbx-ip>`) **will not trigger observe rules**.
 * In Linux networking, all traffic between local IPs routes across the loopback interface (`lo`).
-* Stage 1 of the firewall unconditionally admits loopback traffic (`iif "lo" accept`) to guarantee that the server's database (MariaDB 3306), cache (Redis 6379), and FreeSWITCH IPC can never be severed.
+* Raw hooks (`raw_prerouting` / `raw_output`, priority `raw`) mark `lo` packets `notrack` so local IPC never consumes `nf_conntrack` slots (important on 1 GB hosts where the Linux default table limit is 8,192 entries), and Stage 1 of `chain input` unconditionally admits loopback traffic (`iif "lo" accept`) so the server's database (MariaDB 3306), cache (Redis 6379), web handler, and FreeSWITCH IPC can never be severed.
 * To test observe mode rules, traffic must enter an ingress interface other than `lo` (such as from a computer on the LAN, a WireGuard VPN client, or an isolated test network namespace).
 
 ## Troubleshooting

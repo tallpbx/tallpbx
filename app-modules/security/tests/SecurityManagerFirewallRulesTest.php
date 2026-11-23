@@ -332,7 +332,7 @@ it('moves a pre-filter stage down and back up, persisting the order', function (
     $component->call('movePreFilterDown', 'invalid');
 
     expect(json_decode((string) SecuritySetting::get('pre_filter_order'), true))
-        ->toBe(['loopback', 'whitelist', 'fast_path', 'invalid', 'blacklist', 'banned', 'threat_feeds']);
+        ->toBe(['loopback', 'whitelist', 'blacklist', 'invalid', 'banned', 'fast_path', 'threat_feeds']);
 
     $this->assertDatabaseHas('security_audit_logs', ['action' => 'pre_filter_reordered']);
 

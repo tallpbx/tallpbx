@@ -23,9 +23,9 @@ class PreFilterCompiler
         'loopback',
         'whitelist',
         'invalid',
-        'fast_path',
         'blacklist',
         'banned',
+        'fast_path',
         'threat_feeds',
     ];
 
@@ -319,7 +319,8 @@ class PreFilterCompiler
                 '        ct state invalid '.$this->blocklistCompiler->dropStatement('invalid', $observeMode),
                 '',
             ],
-            // Passes the bulk of ongoing SIP/RTP media with zero set lookups.
+            // Passes the bulk of ongoing SIP/RTP media and outbound return traffic
+            // with zero large-set (threat feeds / GeoIP) or port-catalog lookups.
             'fast_path' => [
                 '        # STAGE {n}: STATEFUL FAST PATH (ONGOING CONNECTIONS PASS INSTANTLY)',
                 '        ct state established,related accept',

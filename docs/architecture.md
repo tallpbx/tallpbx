@@ -449,28 +449,30 @@ When Octane is stopped, the connection to port 8090 is normally refused immediat
 
 When an internet packet reaches the server's network interface, it is evaluated by the Linux kernel **before** any application software (like FreeSWITCH or the web server) ever sees it.
 
-TallPBX compiles an optimized, multi-stage Linux kernel firewall ruleset using native `nftables` (`table inet tallpbx_filter`, hook `input`, priority `-10`).
+TallPBX compiles an optimized, multi-stage Linux kernel firewall ruleset using native `nftables` (`table inet tallpbx_filter`, `raw` chains at priority `-300` for loopback `notrack`, and `chain input` at priority `-10`).
 
 ---
 
 ## 9. Inbound Pipeline Stages Detailed
 
-The Linux kernel evaluates rules strictly in order across the compiled `chain input` pipeline (`SecurityConfigGenerator`):
+Before `chain input` runs, two `raw` chains (`raw_prerouting` and `raw_output`, priority `raw` / `-300`) mark loopback interface traffic (`iifname "lo" notrack` and `oifname "lo" notrack`) to bypass Linux `nf_conntrack` (priority `-200`). Because loopback IPC (`mod_xml_curl`, Redis, MariaDB, FreeSWITCH ESL, and Laravel Reverb) is unconditionally accepted at Stage 1 of `chain input`, skipping connection tracking on `lo` prevents local `TIME_WAIT` sockets from consuming or exhausting the kernel conntrack table (which defaults to 8,192 entries on 1 GB hosts).
+
+The Linux kernel then evaluates rules strictly in order across the compiled `chain input` pipeline (`SecurityConfigGenerator`):
 
 ### 1. Pre-Filter Pipeline (Stages 1–7)
 Toggled as an administrative unit in the **Firewall Rules** tab. Rule 1 (Loopback) is pinned first as an immutable kernel invariant; the next six stages (rules 2–7) are reorderable by administrators (with safety guards preventing drop stages from preceding the whitelist). *(In the UI, the Geo-Blocking row is displayed alongside this table, though in the compiled ruleset it runs after ICMP and TFTP so disabling the Pre-Filters switch never turns off country blocking.)*
-1. **Loopback Interface (`iif "lo" accept`)**: Unconditional access for server processes (PHP-FPM to MariaDB, Redis, and FreeSWITCH ESL). Pinned first with a lock icon; cannot be reordered.
+1. **Loopback Interface (`iif "lo" accept`)**: Unconditional access for server processes (PHP-FPM to MariaDB, Redis, and FreeSWITCH ESL), paired with `lo notrack` at `raw` priority so local IPC never touches `nf_conntrack`. Pinned first with a lock icon; cannot be reordered.
 2. **Trusted Whitelist (`@whitelist_ips accept`)**: Admin IPs, office subnets, and SIP carrier interconnects bypass all lower drop checks.
 3. **Invalid Packet State (`ct state invalid drop`)**: Corrupted headers and illegal TCP flag combinations are discarded immediately.
-4. **Stateful Fast Path (`ct state established,related accept`)**: Established call audio (RTP) and active sessions pass with zero CPU lookup overhead.
-5. **Permanent Blacklist (`@blacklist_ips drop`)**: Explicitly forbidden IPs/CIDRs dropped at line rate via kernel interval trees.
-6. **Active Intrusion Bans (`@banned_ips drop`)**: Dynamic hardware-timed bans triggered by authentication failures or scanner probes.
-7. **External Blocklists (`@external_blocklist_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL) dropped at the perimeter.
+4. **Permanent Blacklist (`@blacklist_ips drop`)**: Explicitly forbidden IPs/CIDRs dropped immediately — placed before the stateful fast path so blacklisting an address severs active sessions on the next packet without relying on conntrack flushing.
+5. **Active Intrusion Bans (`@banned_ips drop`)**: Dynamic hardware-timed bans triggered by authentication failures or scanner probes — also evaluated before the stateful fast path so banned attackers lose active sessions immediately.
+6. **Stateful Fast Path (`ct state established,related accept`)**: Established call audio (RTP), active sessions, and return traffic for outbound server connections pass immediately, skipping the large External Blocklists and Geo-Blocking CIDR trees as well as the port catalog.
+7. **External Blocklists (`@external_blocklist_ips drop`)**: Curated VoIP fraud and scanner networks (e.g. VoIPBL, 50,000–150,000+ CIDRs) dropped at the perimeter for new inbound flows. Feed updates do not flush `nf_conntrack`; already-established flows continue until they end or their conntrack entry expires (up to 120 seconds of inactivity for established UDP flows under Linux's default `nf_conntrack_udp_timeout_stream`, or until an active TCP session closes). Add a specific IP to Permanent Blacklist or Active Intrusion Bans to cut off a live session immediately.
 
 ### 2. Diagnostics, Protocol Defense & Geo-Perimeter (Stages 8–9.5)
 8. **ICMP Ping Diagnostics**: Rate-limited ping requests (5/sec) plus essential IPv6 neighbor discovery (`nd-neighbor-solicit`, `nd-router-advert`).
 9. **Hardened TFTP Defense Profile (UDP 69)**: Protects phone provisioning by dropping upload requests (WRQ opcode 2), directory traversal probes (`../`, `/x`), and flood requests.
-10. **Geo-Blocking Perimeter (`jump geo_perimeter`)**: Compiled after TFTP defense outside `$prefilterEnabled`; traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through; it never issues an unconditional accept.
+10. **Geo-Blocking Perimeter (`jump geo_perimeter`)**: Compiled after TFTP defense outside `$prefilterEnabled` (and intentionally below `fast_path` so RTP media avoids CIDR tree lookups and outbound return traffic is not dropped in *Block All Except Selected* mode); traverses pre-aggregated IPdeny CIDR ranges in either *Block Selected Countries* (`@geo_blocked_ips`, `@geo_blocked_ips6`) or *Block All Except Selected* (`@geo_allowed_ips`, `@geo_allowed_ips6`) mode. Packets from unblocked countries fall through; it never issues an unconditional accept. Like External Blocklists, Geo-Blocking updates apply immediately to new connections without flushing `nf_conntrack` — already-established sessions remain active until they end or their conntrack state expires (up to 120 seconds of inactivity for established UDP flows, or until a TCP session closes).
 
 ### 3. Service Catalog & Fallback (Stages 10–12)
 11. **Core PBX Port Catalog**: Explicit allow rules for SIP (5060/5061/5080), RTP Audio (16384–32768), Web Admin (80/443), Reverb WebSockets (8080), WebRTC WSS (7443), TFTP Provisioning (69), and SSH (22).
@@ -576,7 +578,7 @@ Pinned directly above the tab strip for immediate visibility:
 #### Tab 1: Firewall Rules (`?tab=firewall-rules`)
 * **Pre-Filter Pipeline**: Interactive table showing the 8-rule pre-filter pipeline (pinned loopback rule 1 with lock icon, rules 2–7 reorderable with Up/Down chevrons and a "Reset to recommended order" action, plus the fixed Geo-Blocking rule 8 companion row):
   - **Pre-Filters Switch**: Located directly on the left of the Pre-Filters section title, toggles the built-in pre-filter pipeline. When turned off, a confirmation modal confirms the change and the section is visually greyed out, while an unmissable top-level warning banner with recovery action displays across the Security Center. The Lockout Guard prevents turning it off when the Default Inbound Policy is set to DROP unless custom loopback and connection tracking rules are present.
-  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`) is pinned first with a lock icon (cannot be moved or reordered), guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL.
+  - **Loopback Floor Invariant**: The Loopback stage (`iif "lo" accept`, backed by `lo notrack` in `raw_prerouting`/`raw_output`) is pinned first with a lock icon (cannot be moved or reordered), guaranteeing internal localhost communications between PHP-FPM, MariaDB, Redis, and FreeSWITCH ESL without consuming `nf_conntrack` table slots.
 * **Geo-Blocking Master Cockpit Row**: Positioned following External Blocklists, displays the live state of the dedicated geo perimeter rule, mode indicator (`Block Selected` or `Block All Except`), total count of active ranges, and instant link to Tab 5.
 * **Standard Services Port Catalog**: Telephony and system ports evaluated top-to-bottom:
   - **ICMP Ping Diagnostics**: Configurable source restriction, rate limiting, and stealth mode toggle.
