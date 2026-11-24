@@ -70,6 +70,8 @@ Omit `--domain` entirely to use the appliance's configured realm
 different SIP domain from the one the PBX serves, so every generated REGISTER
 is rejected and the tier reports zero successful calls.
 
+Use a dedicated synthetic tenant. The seeder refuses to change an existing tenant it cannot identify as its own. It tracks optional fixtures by database ID and removes only those records when switching back to baseline load data. If a legacy test tenant still holds untracked extended fixtures, use a fresh test tenant or explicitly reset the identified synthetic tenant.
+
 **Checkpoint:** the command reports the tenant, realm, extension count and the SIPp CSV path. Use an alphanumeric password — an unescaped `!` survives a shell differently over SSH and produces a `403` on REGISTER.
 
 ---

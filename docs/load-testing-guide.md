@@ -57,7 +57,7 @@ Follow these operational guidelines to ensure reproducible benchmarks and avoid 
 5. **Use FreeSWITCH Loopback Channel for Internal Bridges**: FreeSWITCH XML dialplan bridges to internal destinations (such as call forwarding) must use `loopback/${destination}/${context}` rather than raw extension strings to avoid `CHAN_NOT_IMPLEMENTED` failures.
 6. **Terminate Background UAS Listeners Between Runs**: In multi-scenario scripts, clean up background UAS processes before starting new listeners on ports 5066 and 5088 to prevent `errno 98 (Address already in use)` socket binding collisions.
 7. **Allocate Dedicated Client Ports on Shared Hosts**: When the load generator host also runs FreeSWITCH, SIPp UAC scenarios must avoid ports 5060 (Sofia internal), 5080 (Sofia external), and 5088 (gateway UAS). Use local ports 5100+ (`EXTENDED_UAC_LOCAL_PORT=5100`).
-8. **Keep PHP-FPM Worker Defaults**: TallPBX configures `/etc/php/8.5/fpm/pool.d/www.conf` as a dynamic pool sized from detected RAM (`pm = dynamic`, `pm.start_servers = 1`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 2`, `pm.max_children = 3` on 1 GB, `6` on 2 GB, `12` on 4 GB+, `pm.max_requests = 10000`). Do not raise `pm.max_children` blindly — on single-core hosts, extra PHP workers deepen CPU queueing and reduce completed calls. Supported baseline rates are **5 calls/sec on 1 vCPU** and **10 calls/sec on 2 vCPU** (see [`load-testing-results.md`](load-testing-results.md)).
+8. **Keep PHP-FPM worker defaults.** TallPBX sizes `/etc/php/8.5/fpm/pool.d/www.conf` from detected RAM with `pm = dynamic` and a limit of 3 workers on 1 GB, 6 on 2 GB, and 12 on 4 GB or more. In the unified benchmark, the default handler completed every offered call at 2, 10, and 25 calls/sec on 1, 2, and 4 shared vCPU, respectively. Use those results as reference points when measuring your workload. [Capacity results](load-testing-results.md)
 9. **Set Long Registration Leases**: The SIP registration scenario (`load-testing/tools/sipp/register.xml`) must use a 1-hour lease (`Expires: 3600`) so registrations do not expire mid-test.
 
 ---
@@ -513,7 +513,7 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 | :--- | :--- | :--- | :--- |
 | **Rising setup latency; CPU near 100%** | FreeSWITCH CPU starvation | `top` / `htop` on PBX | Set FreeSWITCH logging to `notice` or upgrade to 2+ vCPUs. [PBX log settings](../load-testing/remote-setup.md#3-freeswitch-logging-notice). |
 | **`server reached pm.max_children`** | PHP-FPM worker starvation | `tail -n 50 /var/log/php8.5-fpm.log` | Raise `pm.max_children` for the tier in `/etc/php/8.5/fpm/pool.d/www.conf` and reload PHP-FPM (installer default is `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+). |
-| **`503 Maximum Calls In Progress`** | FreeSWITCH session throttle | `fs_cli -x "fsctl sps"` | Set `FS_SESSIONS_PER_SECOND=120` in `/var/www/tallpbx/.env` on the PBX. |
+| **`503 Maximum Calls In Progress`** | FreeSWITCH could not accept the session | Check `fs_cli -x "fsctl sps"`, `fs_cli -x status`, and the FreeSWITCH log | A `Throttle Error!` log entry identifies the session-rate limit. A session count at its maximum indicates a concurrent-session limit. |
 | **`403 Forbidden` on REGISTRATION** | Credential or realm mismatch | Inspect `register.log` in the generator's run directory. | Regenerate seed data and [copy `sipp-users.csv` to the generator](#best-practices-for-reliable-sip-load-testing). The runner rebuilds `sipp-users-auth.csv` for each run. |
 | **`503 NORMAL_TEMPORARY_FAILURE`** | Early voicemail NOTIFY race | UAS log shows unexpected NOTIFY | Wait 8s after registration before starting the UAS listener. |
 | **`CHAN_NOT_IMPLEMENTED`** | Direct raw bridge string | `freeswitch.log` | Use `loopback/${destination}/${context}` channel format. |
@@ -521,7 +521,7 @@ Confirm `Successful call | 1` and `Failed call | 0` before initiating higher-rat
 ### Common Failures & Remediation
 
 1. **High Concurrency XML Latency**:
-   On single-core VPS nodes, check CPU usage and PHP-FPM saturation during the run. If XML lookups are the bottleneck, compare the shipped PHP-FPM setup with the [optional Octane worker](#testing-the-optional-laravel-octane-worker). In the published unified benchmarks, Octane completed 15 calls/sec (900/900) on 2 vCPU / 2 GB and 25 calls/sec (1,500/1,500, 68 ms median setup) on 4 shared vCPU / 8 GB before reaching FreeSWITCH's default `FS_SESSIONS_PER_SECOND=60` guardrail at 30 calls/sec. [Capacity planning and measured results](load-testing-results.md#capacity-planning-rules).
+   On single-core VPS nodes, check CPU usage and PHP-FPM saturation during the run. If XML lookups are the bottleneck, compare the shipped PHP-FPM setup with the [optional Octane worker](#testing-the-optional-laravel-octane-worker). In the unified benchmark, Octane completed 900/900 calls at 15 calls/sec on 2 vCPU / 2 GB and 1,500/1,500 at 25 calls/sec on 4 shared vCPU / 8 GB. On the larger tier at 30 calls/sec, it completed 1,738/1,800 with 76 ms median setup. [Capacity planning and measured results](load-testing-results.md#capacity-planning-rules)
 2. **Delayed Audio or Dropped Packets**:
    Ensure RTP media ports (`16384-32768/udp`) are open in the firewall. If testing over WireGuard, verify MTU (`1420`) to prevent UDP fragmentation.
 3. **Stuck Channels After Teardown**:

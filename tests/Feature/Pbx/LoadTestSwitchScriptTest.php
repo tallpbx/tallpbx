@@ -65,6 +65,31 @@ describe('load test switch helpers', function (): void {
         );
     });
 
+    it('requires FreeSWITCH to acknowledge the requested runtime log level', function (string $reply, bool $accepted): void {
+        $process = new Process(['bash', '-c', <<<'BASH'
+            . "$1"
+            fs_cli() {
+                printf '%s\n' "$STUB_REPLY"
+            }
+            fs_log_probe() {
+                [[ "$2" == *-KEEP ]]
+            }
+            apply_fs_loglevel notice
+            BASH,
+            'test-log-level', base_path('load-testing/scripts/lib/switch.sh'),
+        ], env: [
+            'SWITCH_STATE_DIR' => sys_get_temp_dir(),
+            'STUB_REPLY' => $reply,
+        ]);
+        $process->run();
+
+        expect($process->isSuccessful())->toBe($accepted);
+    })->with([
+        ['+OK log level: NOTICE [5]', true],
+        ['+OK log level: DISABLE [-1]', false],
+        ['-ERR unable to set log level', false],
+    ]);
+
     it('applies the shipped dynamic floor, not just the worker ceiling', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/lib/switch.sh'));
 

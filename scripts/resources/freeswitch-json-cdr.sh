@@ -38,6 +38,22 @@ render_json_cdr_config() {
     sed "s|__TALLPBX_CDR_TOKEN__|${token}|g" "$template" > "$target"
 }
 
+# fs_cli can exit zero on an API error. Require the module load reply and
+# check the registered module before declaring that the CDR path is ready.
+activate_json_cdr_module() {
+    local reply
+
+    if ! reply="$(fs_cli -x 'reload mod_json_cdr' 2>/dev/null)" \
+        || ! grep -qxF '+OK module loaded' <<< "$reply"; then
+        if ! reply="$(fs_cli -x 'load mod_json_cdr' 2>/dev/null)" \
+            || ! grep -qxF '+OK' <<< "$reply"; then
+            return 1
+        fi
+    fi
+
+    reply="$(fs_cli -x 'module_exists mod_json_cdr' 2>/dev/null)" && [ "$reply" = "true" ]
+}
+
 # Create the failure spool and quarantine directories.
 #
 # failed/ receives deliveries that exhausted their retries; quarantine/ holds

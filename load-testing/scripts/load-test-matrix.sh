@@ -870,6 +870,12 @@ apply_variant() {
                 ;;
         esac
     done < <(matrix_list variants "$variant" requires)
+
+    # Binding changes can restart FreeSWITCH. Verify the benchmark log level
+    # after the switches have settled and before this handler is measured.
+    if [ -n "${BENCHMARK_ATTEMPT:-}" ]; then
+        switch_call apply_fs_loglevel "$(matrix_value standard_comparison fs_log_level)" || return 1
+    fi
 }
 
 # ------------------------------------------------------------------------------

@@ -69,8 +69,8 @@ it('installs and configures mod_json_cdr from the freeswitch step', function ():
         ->and($script)->toContain('ensure_json_cdr_spool_dirs')
         ->and($script)->toContain('render_json_cdr_config')
         ->and($script)->toContain('chmod 0640 "${conf_dir}/autoload_configs/json_cdr.conf.xml"')
-        ->and($script)->toContain("fs_cli -x 'reload mod_json_cdr'")
-        ->and($script)->toContain("fs_cli -x 'load mod_json_cdr'")
+        ->and($script)->toContain('if ! activate_json_cdr_module; then')
+        ->and(substr_count($script, 'configure_json_cdr || exit 1'))->toBe(2)
         // No configuration is deployed without a token: the rendered file
         // would otherwise authenticate nobody and every post would 401.
         ->and($script)->toContain('FREESWITCH_CDR_TOKEN is empty; skipping json_cdr.conf.xml generation');
@@ -82,6 +82,31 @@ it('installs and configures mod_json_cdr from the freeswitch step', function ():
         ->and(strpos($configureOnlyBlock, 'configure_json_cdr'))
         ->toBeLessThan(strpos($configureOnlyBlock, 'configure_dynamic_xml'));
 });
+
+it('checks the FreeSWITCH API reply and confirms that the CDR module was loaded', function (bool $loaded): void {
+    $command = <<<'BASH'
+        calls="$(mktemp)"
+        fs_cli() {
+            case "$2" in
+                'reload mod_json_cdr') printf '+OK Reloading XML\n-ERR loading module [unavailable]\n' ;;
+                'load mod_json_cdr')
+                    printf 'Attempted fallback\n' > "$calls"
+                    printf '+OK Reloading XML\n+OK\n'
+                    ;;
+                'module_exists mod_json_cdr') printf '%s\n' "$STUB_LOADED" ;;
+            esac
+        }
+        activate_json_cdr_module
+        printf 'Activation status %d\n' "$?"
+        cat "$calls"
+        rm -f "$calls"
+        BASH;
+
+    $output = runJsonCdrHelper('STUB_LOADED='.($loaded ? 'true' : 'false').'; '.$command);
+
+    expect($output)->toContain('Attempted fallback')
+        ->and($output)->toContain($loaded ? 'Activation status 0' : 'Activation status 1');
+})->with([true, false]);
 
 it('renders the versioned template with the token and refuses an empty one', function (): void {
     $template = base_path('scripts/freeswitch/json_cdr.conf.xml');

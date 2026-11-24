@@ -137,7 +137,8 @@ describe('pbx load test manifest command', function (): void {
             ->and($manifest['host']['cpu_cores'])->toBe(2)
             ->and($manifest['host']['hostname'])->toBeString()
             ->and($manifest['runtime']['freeswitch_version'])->toContain('1.11.4')
-            ->and($manifest['runtime']['freeswitch_log_level'])->toBe('notice')
+            ->and($manifest['runtime'])->not->toHaveKey('freeswitch_log_level')
+            ->and($manifest['configuration']['freeswitch']['log_level'])->toBe('notice')
             ->and($manifest['runtime']['redis_version'])->toContain('7.0.15')
             ->and($manifest['runtime']['mariadb_version'])->toContain('11.1.2')
             ->and($manifest['configuration']['php_fpm'])->toBe([

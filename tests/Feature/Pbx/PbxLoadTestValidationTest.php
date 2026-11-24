@@ -258,6 +258,20 @@ describe('pbx load test seed command', function (): void {
             ->and(Extension::withoutGlobalScope('tenant')->where('tenant_id', $secondTenantId)->count())->toBe(3);
     });
 
+    it('refuses to seed or reset an existing tenant without load-test ownership', function (bool $reset): void {
+        $tenant = Tenant::factory()->create(['slug' => 'load-test-office', 'name' => 'Office PBX']);
+
+        $this->artisan('pbx:load-test:seed', [
+            '--tenant' => $tenant->slug,
+            '--domain' => 'office.test',
+            '--reset' => $reset,
+            '--output' => PBX_LOAD_TEST_CSV_PATH,
+        ])->assertFailed();
+
+        expect($tenant->fresh()?->name)->toBe('Office PBX')
+            ->and(File::exists(base_path(PBX_LOAD_TEST_CSV_PATH)))->toBeFalse();
+    })->with([false, true]);
+
     it('can seed optional media-flow fixtures for SIPp RTP validation', function (): void {
         $this->artisan('pbx:load-test:seed', [
             '--tenant' => 'load-test-media',
@@ -307,7 +321,20 @@ describe('pbx load test seed command', function (): void {
             ->and(Voicemail::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeTrue()
             ->and(Queue::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'load_test_moh')->exists())->toBeTrue();
 
-        $this->artisan('pbx:load-test:seed', $baseOptions)->assertSuccessful();
+        $fixture = Gateway::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenant->id)
+            ->where('name', 'emergency')
+            ->firstOrFail();
+        $fixture->delete();
+
+        $replacement = Gateway::withoutGlobalScope('tenant')->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'emergency',
+            'host' => 'voice.example.test',
+            'profile' => 'external',
+        ]);
+
+        $this->artisan('pbx:load-test:seed', [...$baseOptions, '--start' => '3600'])->assertSuccessful();
 
         expect(Tenant::where('slug', 'load-test-cleanup')->value('id'))->toBe($tenant->id)
             ->and(CallForward::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
@@ -317,7 +344,7 @@ describe('pbx load test seed command', function (): void {
             ->and(TimeCondition::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
             ->and(Conference::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
             ->and(Emergency::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
-            ->and(Gateway::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'emergency')->exists())->toBeFalse()
+            ->and(Gateway::withoutGlobalScope('tenant')->find($replacement->id)?->host)->toBe('voice.example.test')
             ->and(CallBlock::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->exists())->toBeFalse()
             ->and(Queue::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'load_test_moh')->exists())->toBeFalse()
             ->and(IvrMenu::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->where('name', 'load_test_announcement')->exists())->toBeFalse();

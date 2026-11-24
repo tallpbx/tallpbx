@@ -257,7 +257,7 @@ lookup_count=30 find_user_ms=1594 status_ms=66 net_ms=1528
 
 ## Manifest fields
 
-`build` (commit, dirty flag, branch), `host` (hostname, OS, kernel, cores, RAM, swap), `runtime` (PHP, FreeSWITCH, Redis, MariaDB versions), `configuration` (FPM pool, log level, XML path, cache TTLs, `.env` with secrets redacted), `firewall` (table present, policy, accepted ports), `recorded_at`.
+`build` (commit, dirty flag, branch), `host` (hostname, OS, kernel, cores, RAM, swap), `runtime` (PHP, FreeSWITCH, Redis, MariaDB versions), `configuration` (FPM pool, configured log level, XML path, cache TTLs, `.env` with secrets redacted), `firewall` (table present, policy, accepted ports), `recorded_at`. The standard runner verifies the live log level separately after each handler switch.
 
 The manifest is rewritten at the start of every invocation. A tier measured across several invocations keeps only the last one.
 
@@ -287,11 +287,9 @@ bash load-testing/scripts/tools/cpuwatch.sh 20 "idle check"
 bash load-testing/scripts/tools/cpuwatch.sh --sample 2 420 "xml-run"
 ```
 
-The sampling mode writes `label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb` to stdout, so a run can be watched rather than guessed at: it shows whether a service was idle for the whole run or busy during part of it.
+The sampling mode writes `label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb,elapsed_seconds`. `epoch` is the elapsed time from the start of sampling. CPU utilization is based on the change in process CPU counters over the measured time between snapshots. The consolidator weights each window by its elapsed time and leaves CPU fields blank for legacy samples without that timing. Processes that exit between snapshots can leave CPU time unobserved.
 
-Classes: `freeswitch`, `php-fpm`, `octane`, `redis`, `mariadb`, `nginx`, `reverb`, `horizon`, `esl-listener`.
-
-A class reporting zero CPU is genuinely idle: one clock tick is 10 ms, so a two-second sample cannot hide more than 0.5 % of a core.
+Service classes include `freeswitch`, `php-fpm`, `octane-worker`, `redis`, `mariadb`, `nginx`, `reverb`, `esl-listener`, `cdr-worker`, `queue-worker`, and `scheduler`.
 
 ### `load-testing/scripts/tools/ab-esl-reverb.sh`
 

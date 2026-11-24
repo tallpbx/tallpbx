@@ -312,9 +312,8 @@ fs_next_verbose_level() {
 
 # Write one probe line at a level and report whether the file log kept it.
 #
-# `fsctl loglevel` reports DISABLE on FreeSWITCH 1.11.4 even while logging is
-# working, so parsing it produces a false failure. Emitting a known line and
-# looking for it is the only trustworthy read-back.
+# Without an argument, `fsctl loglevel` disables logging on the benchmarked
+# FreeSWITCH build. Use a known log message to verify the running level.
 fs_log_probe() {
     local level="$1" marker="$2"
 
@@ -326,7 +325,7 @@ fs_log_probe() {
 
 # Apply a runtime FreeSWITCH log level and prove it with a probe pair.
 apply_fs_loglevel() {
-    local level="${1:-}"
+    local level="${1:-}" reply
 
     case "$level" in
         debug | info | notice | warning | err | crit | alert) ;;
@@ -339,7 +338,8 @@ apply_fs_loglevel() {
     # The runtime level cannot be read back reliably, so the baseline is the
     # level the application declares in .env; restore_baseline re-applies it.
 
-    if ! fs_cli -x "fsctl loglevel ${level}" >/dev/null 2>&1; then
+    if ! reply="$(fs_cli -x "fsctl loglevel ${level}" 2>/dev/null)" \
+        || [[ "$reply" != "+OK log level: ${level^^} ["*"]" ]]; then
         fail_switch "fsctl loglevel ${level} was rejected by FreeSWITCH"
         return 1
     fi
@@ -1128,7 +1128,7 @@ assert_octane_binding() {
 
 # Keep each benchmark on its intended XML backend and preserve boot settings.
 apply_xml_worker() {
-    local state="$1" baseline="${STATE_DIR}/xml-worker.baseline" current
+    local state="${1:-}" baseline="${STATE_DIR}/xml-worker.baseline" current
 
     if [ "$state" != "off" ] && [ "$state" != "only" ]; then
         fail_switch "XML worker mode must be off or only"
@@ -1146,13 +1146,30 @@ apply_xml_worker() {
     if [ "$state" = "only" ]; then
         systemctl start tallpbx-xml-worker || return 1
         systemctl is-active --quiet tallpbx-xml-worker || return 1
-        apply_octane_binding only
+        apply_octane_binding only || return 1
     else
         apply_octane_binding off || return 1
         if [ "$current" = "active" ]; then
             systemctl stop tallpbx-xml-worker || return 1
         fi
     fi
+
+    assert_xml_worker "$state"
+}
+
+assert_xml_worker() {
+    local state="${1:-}" current
+
+    current="$(systemctl show --property=ActiveState --value tallpbx-xml-worker)" || return 1
+    case "${state}:${current}" in
+        only:active | off:inactive | off:failed) ;;
+        *)
+            fail_switch "XML worker mode ${state} does not match service state ${current}"
+            return 1
+            ;;
+    esac
+
+    assert_octane_binding "$state"
 }
 
 # ------------------------------------------------------------------------------
@@ -1472,7 +1489,7 @@ Usage: switch.sh <command> [arguments]
   apply_fs_db_mode <sqlite|mariadb|disk|tmpfs>    assert_fs_db_mode <sqlite|mariadb|disk|tmpfs>
   apply_xml_path <stock|fast>                     assert_xml_path <stock|fast>
   apply_octane_binding <on|off|only>              assert_octane_binding <on|off|only>
-  apply_xml_worker <off|only>
+  apply_xml_worker <off|only>                     assert_xml_worker <off|only>
   apply_ttl <dialplan> <contributor> [directory] [acl]   assert_ttl <dialplan> <contributor> [directory] [acl]
   apply_esl_profile <essential|full>              assert_esl_profile <essential|full> [before]
   apply_broadcast_throttle <ms>                   assert_broadcast_throttle <ms> [before]
@@ -1500,7 +1517,8 @@ main() {
         apply_xml_path | apply-xml-path) apply_xml_path "$@" ;;
         assert_xml_path | assert-xml-path) assert_xml_path "$@" ;;
         apply_octane_binding | apply-octane-binding) apply_octane_binding "$@" ;;
-        apply_xml_worker) apply_xml_worker "$@" ;;
+        apply_xml_worker | apply-xml-worker) apply_xml_worker "$@" ;;
+        assert_xml_worker | assert-xml-worker) assert_xml_worker "$@" ;;
         assert_xml_curl_config | assert-xml-curl-config) assert_xml_curl_config "$@" ;;
         octane_binding_state | octane-binding-state) octane_binding_state "$@" ;;
         assert_octane_binding | assert-octane-binding) assert_octane_binding "$@" ;;

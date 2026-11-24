@@ -540,6 +540,37 @@ describe('load test matrix runner', function (): void {
         expect($process->getOutput())->toMatch('/\( nohup bash [^\n]*cpuwatch\.sh[^\n]*& \) <\/dev\/null/');
     });
 
+    it('uses elapsed measurement windows to aggregate CPU and withholds legacy samples', function (): void {
+        File::ensureDirectoryExists($this->artifactRoot);
+        $timed = $this->artifactRoot.'/timed-cpu.csv';
+        File::put($timed, implode("\n", [
+            'label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb,elapsed_seconds',
+            'test,1,freeswitch,10,40,30,1',
+            'test,1,php-fpm,20,40,30,1',
+            'test,2,freeswitch,10,40,30,3',
+            'test,2,php-fpm,60,40,30,3',
+            'test,3,freeswitch,0,40,30,1',
+            'test,3,php-fpm,140,40,30,1',
+        ])."\n");
+        $legacy = $this->artifactRoot.'/legacy-cpu.csv';
+        File::put($legacy, "label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb\ntest,1,freeswitch,381.5,40,30\n");
+
+        $process = new Process(['python3', '-c', <<<'PYTHON'
+            import json, pathlib, runpy, sys
+            summarize = runpy.run_path(sys.argv[1])["summarize_cpu_csv"]
+            print(json.dumps([summarize(pathlib.Path(path)) for path in sys.argv[2:]]))
+            PYTHON,
+            base_path('load-testing/scripts/tools/consolidate-series.py'),
+            $timed,
+            $legacy,
+        ]);
+        $process->mustRun();
+        [$timedCpu, $legacyCpu] = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+
+        expect($timedCpu['php-fpm'])->toBe(50.0)
+            ->and($legacyCpu)->toBe([]);
+    });
+
     it('refuses to measure across a freeswitch restart', function (): void {
         $script = (string) file_get_contents(base_path('load-testing/scripts/load-test-matrix.sh'));
 
@@ -778,11 +809,11 @@ XML);
         };
 
         $switch('apply_xml_worker', 'off');
-        $switch('assert_octane_binding', 'off');
+        $switch('assert_xml_worker', 'off');
         expect(trim(File::get($this->artifactRoot.'/worker-state')))->toBe('inactive');
 
         $switch('apply_xml_worker', 'only');
-        $switch('assert_octane_binding', 'only');
+        $switch('assert_xml_worker', 'only');
         expect(trim(File::get($this->artifactRoot.'/worker-state')))->toBe('active')
             ->and(File::get($file))->toContain('<!--     <binding name="tallpbx-fallback">');
 
@@ -1035,16 +1066,16 @@ XML);
                     "stopped\t{$variant}\t{$stopCps}",
                 ]);
                 File::put("{$vdir}/sip-cps{$cps}/cpu.csv", implode("\n", [
-                    'label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb',
-                    'test,1,freeswitch,38.0,80.0,70.0',
-                    sprintf('test,1,php-fpm,%s,60.0,45.0', $isOctane ? '8.0' : '44.0'),
-                    sprintf('test,1,octane-worker,%s,85.0,62.0', $isOctane ? '22.0' : '0.0'),
-                    'test,1,esl-listener,5.0,25.0,15.0',
-                    'test,1,reverb,1.0,40.0,28.0',
-                    'test,1,cdr-worker,3.5,55.0,42.0',
-                    'test,1,mariadb,7.5,70.0,62.0',
-                    'test,1,redis,2.5,12.0,5.0',
-                    'test,1,nginx,1.0,10.0,3.5',
+                    'label,epoch,class,cpu_pct,ram_held_mb,ram_attributed_mb,elapsed_seconds',
+                    'test,1,freeswitch,38.0,80.0,70.0,1.2',
+                    sprintf('test,1,php-fpm,%s,60.0,45.0,1.2', $isOctane ? '8.0' : '44.0'),
+                    sprintf('test,1,octane-worker,%s,85.0,62.0,1.2', $isOctane ? '22.0' : '0.0'),
+                    'test,1,esl-listener,5.0,25.0,15.0,1.2',
+                    'test,1,reverb,1.0,40.0,28.0,1.2',
+                    'test,1,cdr-worker,3.5,55.0,42.0,1.2',
+                    'test,1,mariadb,7.5,70.0,62.0,1.2',
+                    'test,1,redis,2.5,12.0,5.0,1.2',
+                    'test,1,nginx,1.0,10.0,3.5,1.2',
                 ])."\n");
                 File::put("{$vdir}/ladder.csv", implode("\n", [
                     'recorded_at,cps,successful,failed,label,setup_p50_ms,setup_p95_ms,setup_max_ms,teardown_p50_ms,teardown_p95_ms,teardown_max_ms',

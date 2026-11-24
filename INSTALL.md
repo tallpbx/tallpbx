@@ -262,7 +262,7 @@ The same six values are re-applied later by `appliance:sync-host`, which runs th
 | 2 vCPU / 2 GB | **10 calls/sec** (600 of 600) | 12 calls/sec (57.4 %) | **15 calls/sec** (900 of 900) |
 | 4 shared vCPU / 8 GB | **25 calls/sec** (1,500 of 1,500) | 30 calls/sec (61.6 %) | **25 calls/sec** (1,500 of 1,500; 96.6 % at 30 calls/sec under default `FS_SESSIONS_PER_SECOND=60`) |
 
-On a single core, **fewer PHP-FPM workers perform better at the failure boundary** because extra workers deepen CPU queueing rather than adding throughput, while moving XML lookups onto the optional `octane-worker` leaves PHP-FPM dedicated to CDR posts and doubles 100%-completed call capacity on 1 GB hosts. On two or four cores, `pm.max_children` scales with detected RAM (6 on 2 GB, 12 on 4 GB+). Full method, latency, and per-service CPU attribution: [`docs/load-testing-results.md`](docs/load-testing-results.md).
+In the historical single-core worker sweep, lower PHP-FPM worker limits completed more calls at the failure boundary. In the unified benchmark, the optional `octane-worker` serves XML lookups while PHP-FPM still handles CDR posts. See the full method and latency results before sizing a production workload. [Benchmark results](docs/load-testing-results.md)
 
 #### Why Worker Sizing Matters for a Phone System
 

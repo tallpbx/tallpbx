@@ -2,12 +2,7 @@
 
 ## Overview
 
-This document provides the authoritative implementation and engineering guide for scaling TallPBX telephony call setup capacity beyond **10 Calls per Second (CPS)** (~35 to 60 concurrent active calls). 
-
-Based on empirical benchmarks conducted on a 1 vCPU / 1 GB RAM cloud host with a dedicated SIPp load generator, this document explains:
-1. Why single-core PBX deployments encounter a physical CPU saturation boundary at ~10 CPS.
-2. The specific subsystems responsible for the compute bottleneck.
-3. The architectural implementation plan to unlock 20, 30, and 60+ CPS.
+This guide covers TallPBX call setup capacity and the settings that affect it. The November 23 benchmark compared three server sizes with a separate SIPp load generator. Use the saved results as sizing evidence, then verify the call mix and offered rate you expect to serve. [Measured call capacity and XML lookup speed](load-testing-results.md)
 
 ---
 
@@ -15,18 +10,9 @@ Based on empirical benchmarks conducted on a 1 vCPU / 1 GB RAM cloud host with a
 
 ### What We Learned from Empirical Load Testing
 
-Empirical server-to-server SIP capacity testing established three core facts (for the complete tier tables, per-service CPU numbers, and historical static-pool runs, see [`load-testing-results.md`](load-testing-results.md)):
-
-- **Shipped default capacity scales linearly with CPU cores:** With the shipped dynamic PHP-FPM pool (`pm.max_children` = `3` on 1 GB, `6` on 2 GB, `12` on 4 GB+) and fast XML/CDR entry points, TallPBX completes **2 calls/sec** (120/120) on 1 vCPU / 1 GB, **10 calls/sec** (600/600) on 2 vCPU / 2 GB, and **25 calls/sec** (1,500/1,500) on 4 shared vCPU / 8 GB.
-- **XML generation is NOT the bottleneck:** The optional [**Laravel Octane**](https://laravel.com/docs/octane) worker (a persistent PHP application server that keeps Laravel booted in memory across requests; `tallpbx-xml-worker.service` on port 8090) serves 201–946 XML req/sec (`100x5`–`1000x25`), doubles 100%-completed capacity on 1 vCPU (**4 calls/sec**, 240/240), reaches **15 calls/sec** (900/900) on 2 vCPU, and holds flat **`68–76 ms`** median call setup through **25–30 calls/sec** on 4 shared vCPU (where **30 two-leg calls/sec** reaches FreeSWITCH's shipped `FS_SESSIONS_PER_SECOND=60` session-rate guardrail at `96.6%` completion). Even with near-zero XML latency, 1 vCPU still hits a hard core ceiling between 6 and 8 CPS.
-- **The 10 CPS wall on 1 vCPU is full-stack CPU exhaustion:**
-   At 10 CPS with 50 concurrent in-flight calls, profiling on a 1 vCPU host revealed **0.0% idle CPU** (100% saturation):
-   - **`freeswitch:listen` (33.3% CPU)**: Reads, deserializes, and dispatches hundreds of FreeSWITCH ESL JSON events per second across 25 subscribed event types into the Laravel application and database.
-   - **`freeswitch` Core Engine (33.3% CPU)**: Sofia SIP UDP socket processing, timer threads, SDP offer/answer negotiation, RTP media socket management, and dialplan state-machine execution.
-   - **`reverb:start` (25.0% CPU)**: Broadcasts real-time call state updates to the administrative web panel over WebSockets.
-   - **Kernel Software Interrupts & UDP Context Switching (8.3% – 16% CPU)**: Network interface processing for incoming/outgoing SIP and RTP UDP packets (`ksoftirqd`).
-- **Static XML files do not solve the bottleneck:**
-   Static XML files on disk only add disk I/O wait cycles (`wa%`). Because Octane and memory caches already serve dynamic XML from memory faster than disk reads, changing the format of dialplans does not reduce the 80%+ of CPU spent on SIP signaling, RTP streams, ESL event consumption, and WebSockets.
+- **PHP-FPM completed more calls on larger tested hosts.** With the shipped dynamic worker pool, the highest tested rates with every call completed were **2, 10, and 25 calls/sec** on 1, 2, and 4 shared vCPU, respectively. The tiers also differed in RAM and PHP-FPM worker limits.
+- **The optional [Laravel Octane](https://laravel.com/docs/octane) worker reduced setup delay.** It keeps the application booted in memory for FreeSWITCH XML requests. It completed every call at **4 calls/sec** on 1 vCPU and **15 calls/sec** on 2 vCPU. On 4 shared vCPU, both handlers completed every call at **25 calls/sec**. Median setup was **68 ms** with Octane and **1,708 ms** with PHP-FPM.
+- **Call completion and setup latency capture different effects.** At **30 calls/sec** on 4 shared vCPU, Octane completed **96.6%** of calls with a **76 ms** median setup. FreeSWITCH was configured for 60 new sessions/sec. The SIP responses alone leave the cause of the 62 failed calls unverified. [Benchmark conditions and complete ladder](load-testing-results.md)
 
 ---
 
@@ -61,13 +47,13 @@ Empirical server-to-server SIP capacity testing established three core facts (fo
 
 ## 3. Implementation Steps
 
-### Phase 1: Hardware & Compute Sizing (Immediate 2× to 4× Capacity Leap)
+### Phase 1: Hardware and compute sizing
 
-The single most impactful step for scaling past 10 CPS is adding a second compute core.
+The November 23 comparisons used 30 registered accounts, 60-second offered call windows, and disk-backed SQLite. Use the completion counts and setup latency together when selecting a tier. [Unified benchmark](load-testing-results.md)
 
-* **Single-Core Ceiling**: **5 calls/sec supported**, failing at 6 calls/sec (~30 concurrent active calls). Independent of pool shape: every worker count from one to five passes 5 and loses at least a third of the calls at 6.
-* **Dual-Core Sizing (2 vCPU / 2 GB RAM)**: Separates FreeSWITCH's real-time VoIP threads from background PHP daemons and database writes. **Doubles the supported rate to 10 calls/sec** (measured, 600/600), failing at 12 calls/sec — not the 15–20 calls/sec previously projected. Worker count is second-order here: five pool shapes measured within 34–44 % at the boundary, while PHP-FPM alone demanded 2.25 cores.
-* **Quad-Core Sizing (4 shared vCPU / 8 GB RAM)**: The November 10, 2026 benchmark measured XML lookups with both handlers and passed the functional call scenarios. A paired 60-second call-rate result is still needed to recommend a call rate for this tier. [Measured call capacity and XML lookup speed](load-testing-results.md).
+* **1 vCPU / 1 GB** completed every call at 2 calls/sec with PHP-FPM and 4 calls/sec with Octane. At 4 calls/sec, PHP-FPM completed 239 of 240 with a setup p95 of 11.6 seconds.
+* **2 vCPU / 2 GB** completed every call at 10 calls/sec with PHP-FPM and 15 calls/sec with Octane.
+* **4 shared vCPU / 8 GB** completed all 1,500 calls at 25 calls/sec with either handler. Setup p95 was 2,120 ms with PHP-FPM and 84 ms with Octane at that rate.
 
 ---
 
@@ -131,7 +117,7 @@ When multiple channel events occur in rapid succession, [`BroadcastDashboardStat
 
 ### Phase 3: Runtime Database and Persistence Options (Disk SQLite Default vs. MariaDB)
 
-**Shipped Default — Disk-Backed SQLite:** TallPBX leaves FreeSWITCH's `/var/lib/freeswitch/db` directory on local disk with `FS_DB_DRIVER=sqlite` (see [../config/freeswitch.php](../config/freeswitch.php) and the [operations guide](operations.md#freeswitch-runtime-database-sqlite-default-vs-mariadb)). Current shipped benchmarks achieve **5 CPS** (1 vCPU) and **10 CPS** (2 vCPU) on disk-backed SQLite, bounded by full-stack CPU saturation rather than disk I/O. A historical disk-versus-RAM experiment did not raise the capacity ceiling.
+TallPBX defaults to disk-backed SQLite for FreeSWITCH's runtime database at `/var/lib/freeswitch/db`. The unified benchmark used this default on all three tiers. See the separate runtime database comparison below for workloads with registration churn and voicemail activity. [Runtime database configuration](operations.md#freeswitch-runtime-database-sqlite-default-vs-mariadb)
 
 **Why RAM-backed SQLite is not a deployment option:**
 1. **Reboot data loss:** `/var/lib/freeswitch/db` holds persistent and operational databases alongside `core.db` — including `voicemail_default.db`, `sofia_reg_internal.db`, `sofia_reg_external.db`, `callcenter.db`, `fifo.db`, and `call_limit.db`. Mounting the directory on a bare `tmpfs` wipes voicemail index data and active state across every reboot.
@@ -227,7 +213,7 @@ For measured throughput and latency figures per tier, see [`load-testing-results
 | :--- | :--- | :--- |
 | **1 vCPU / 1 GB RAM** | Single-core CPU contention between FreeSWITCH, ESL, and MariaDB. | Disk SQLite (default), `notice` logging, dynamic FPM (3 max), optional Octane worker. |
 | **2 vCPU / 2 GB RAM** | Kernel interrupt balancing and ESL event flood. | Octane worker (`--workers=auto`), ESL event pruning, dynamic FPM (6 max); optional `FS_DB_DRIVER=mariadb` if SQLite lock contention appears. |
-| **4 vCPU / 8 GB RAM** | Sofia UDP receive buffer sizing and default `FS_SESSIONS_PER_SECOND=60` cap. | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120` when exceeding 25–30 two-leg CPS, `mod_hiredis` limits, dynamic FPM (12 max); optional `FS_DB_DRIVER=mariadb`. |
+| **4 vCPU / 8 GB RAM** | Sofia UDP receive buffers and the configured session-rate limit. | Octane worker (`--workers=auto`), dynamic PHP-FPM (12 max), and review of `FS_SESSIONS_PER_SECOND` if logs confirm throttling. |
 | **8 vCPU / 16 GB Dedicated** | FreeSWITCH session limits (`FS_SESSIONS_PER_SECOND`). | Octane worker (`--workers=auto`), `FS_SESSIONS_PER_SECOND=120`, dynamic FPM (12 max), `FS_DB_DRIVER=mariadb` or dedicated DB host. |
 
 ---
@@ -244,7 +230,7 @@ findmnt -n -o FSTYPE --target /var/lib/freeswitch/db
 fs_cli -x "module_exists mod_mariadb"
 
 # 2. Verify FreeSWITCH production logging level
-fs_cli -x "fsctl loglevel"
+bash /var/www/tallpbx/load-testing/scripts/lib/switch.sh assert_fs_loglevel notice
 
 # 3. Verify Octane worker is active
 systemctl status tallpbx-xml-worker

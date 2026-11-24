@@ -292,26 +292,32 @@ def summarize_cpu_csv(cpu_csv: Path) -> dict[str, float]:
     if not cpu_csv.is_file():
         return {}
 
-    by_epoch: dict[str, dict[str, float]] = {}
+    by_epoch: dict[str, tuple[float, dict[str, float]]] = {}
     with cpu_csv.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
             ts = (row.get("epoch") or row.get("timestamp") or "").strip()
             cls = (row.get("class") or "").strip()
             cpu = parse_float(row.get("cpu_pct"))
-            if not ts or not cls or cpu is None:
+            elapsed = parse_float(row.get("elapsed_seconds"))
+            # Older samplers wrote only the requested sleep, so their measured
+            # CPU ticks cannot be converted to reliable utilization percentages.
+            if not ts or not cls or cpu is None or cpu < 0 or elapsed is None or elapsed <= 0:
                 continue
-            by_epoch.setdefault(ts, {})[cls] = cpu
+            duration, sample = by_epoch.setdefault(ts, (elapsed, {}))
+            if duration != elapsed or cls in sample:
+                return {}
+            sample[cls] = cpu
 
     active_samples = [
-        sample
-        for sample in by_epoch.values()
+        (elapsed, sample)
+        for elapsed, sample in by_epoch.values()
         if sample.get("freeswitch", 0.0) >= 5.0
     ]
     if not active_samples:
         active_samples = [
-            sample
-            for sample in by_epoch.values()
+            (elapsed, sample)
+            for elapsed, sample in by_epoch.values()
             if (sample.get("freeswitch", 0.0) + sample.get("php-fpm", 0.0) + sample.get("octane-worker", 0.0)) >= 2.0
         ]
     samples = active_samples if active_samples else list(by_epoch.values())
@@ -329,7 +335,11 @@ def summarize_cpu_csv(cpu_csv: Path) -> dict[str, float]:
         "redis",
         "nginx",
     )
-    return {cls: statistics.fmean(s.get(cls, 0.0) for s in samples) for cls in classes}
+    total_elapsed = sum(elapsed for elapsed, _ in samples)
+    return {
+        cls: sum(elapsed * sample.get(cls, 0.0) for elapsed, sample in samples) / total_elapsed
+        for cls in classes
+    }
 
 
 def build_markdown(
@@ -538,16 +548,7 @@ def build_markdown(
                 ]
             )
 
-    lines.extend(
-        [
-            "",
-            "### Per-Service CPU Attribution at Highest 100%-Completed Call Rate",
-            "",
-            "| Test server | Handler | Max 100% rate | FreeSWITCH | PHP-FPM | Octane | ESL | Reverb | CDR Worker | MariaDB | Redis | nginx |",
-            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-        ]
-    )
-
+    cpu_rows: list[str] = []
     for tier in tiers:
         label = f"{tier_meta[tier]['vcpu']} vCPU / {tier_meta[tier]['ram_mb'] // 1024} GB RAM"
         rates = sorted(cps for (t, cps) in sip_by_tier_cps if t == tier)
@@ -557,16 +558,28 @@ def build_markdown(
                 row = sip_by_tier_cps[(tier, cps)].get(variant)
                 if row and row["failed"] == "0" and int(row["offered"]) > 0:
                     best_row = row
-            if not best_row:
+            if not best_row or not best_row["fs_cpu_pct"]:
                 continue
             def pct_cell(key: str) -> str:
                 return f"{best_row[key]}%" if best_row.get(key) else "—"
-            lines.append(
+            cpu_rows.append(
                 f"| {label} | {vlabel} | {best_row['rate_cps']} calls/sec | "
                 f"{pct_cell('fs_cpu_pct')} | {pct_cell('php_fpm_cpu_pct')} | {pct_cell('octane_cpu_pct')} | "
                 f"{pct_cell('esl_cpu_pct')} | {pct_cell('reverb_cpu_pct')} | {pct_cell('cdr_worker_cpu_pct')} | "
                 f"{pct_cell('mariadb_cpu_pct')} | {pct_cell('redis_cpu_pct')} | {pct_cell('nginx_cpu_pct')} |"
             )
+
+    if cpu_rows:
+        lines.extend(
+            [
+                "",
+                "### Per-Service CPU Attribution at Highest 100%-Completed Call Rate",
+                "",
+                "| Test server | Handler | Max 100% rate | FreeSWITCH | PHP-FPM | Octane | ESL | Reverb | CDR Worker | MariaDB | Redis | nginx |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+                *cpu_rows,
+            ]
+        )
 
     lines.append("")
     return "\n".join(lines)
@@ -858,7 +871,7 @@ def main() -> int:
         out_path = Path(args.csv_out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
+            writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS, lineterminator="\n")
             writer.writeheader()
             writer.writerows(csv_rows)
         print(f"Wrote {len(csv_rows)} consolidated rows to {out_path}")

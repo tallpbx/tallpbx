@@ -310,6 +310,7 @@ return [
         'xml_section' => 'mixed',
         'xml_ttl' => 'production-60',
         'xml_repeats' => 3,
+        'fs_log_level' => 'notice',
         'sip_extensions' => 30,
         'sip_duration_seconds' => 60,
         'include_extended_validation' => true,

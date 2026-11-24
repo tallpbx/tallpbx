@@ -102,6 +102,7 @@ eval "$(php -r '
     printf("XML_SECTION=%s\n", escapeshellarg((string) $std["xml_section"]));
     printf("XML_TTL=%s\n", escapeshellarg((string) $std["xml_ttl"]));
     printf("XML_REPEATS=%d\n", (int) $std["xml_repeats"]);
+    printf("FS_BENCHMARK_LOG_LEVEL=%s\n", escapeshellarg($std["fs_log_level"]));
     printf("SIP_EXTENSIONS=%d\n", (int) $std["sip_extensions"]);
     printf("SIP_DURATION=%d\n", (int) $std["sip_duration_seconds"]);
     printf("XML_PROFILES=(%s)\n", implode(" ", array_map("escapeshellarg", $std["xml_profiles"])));
@@ -127,6 +128,7 @@ export LADDER_SECONDS="${LADDER_SECONDS:-$SIP_DURATION}"
 if [ "$DRY_RUN" = "1" ]; then
     printf '=== Standard Comparison Plan: %s (%s vCPU / %s MB) [SERIES=%s] ===\n' \
         "$TIER" "$TIER_VCPU" "$TIER_RAM_MB" "$SERIES"
+    printf 'FreeSWITCH log level after each handler switch: %s\n' "$FS_BENCHMARK_LOG_LEVEL"
     if [ "$SKIP_XML" = "0" ]; then
         xml_profiles_csv="$(IFS=,; printf '%s' "${XML_PROFILES[*]}")"
         printf 'SERIES=%s ARTIFACT_ROOT=%s bash load-testing/scripts/load-test-matrix.sh --tier=%s --compare-xml-handlers --phase=xml --profile=%s --ttl=%s --section=%s --repeats=%s\n' \
@@ -186,8 +188,9 @@ write_comparison_record() {
             "complete" => $argv[6] === "true",
             "sip_extensions" => (int) $argv[7],
             "sip_duration_seconds" => (int) $argv[8],
+            "freeswitch_log_level" => $argv[9],
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;
-    ' "$SERIES" "$TIER" "$BENCHMARK_ATTEMPT" "$BENCHMARK_COMMIT" "$BENCHMARK_SIPP_SHA256" "$1" "$EXTENSIONS" "$LADDER_SECONDS" > "${attempt_dir}/comparison.json"
+    ' "$SERIES" "$TIER" "$BENCHMARK_ATTEMPT" "$BENCHMARK_COMMIT" "$BENCHMARK_SIPP_SHA256" "$1" "$EXTENSIONS" "$LADDER_SECONDS" "$FS_BENCHMARK_LOG_LEVEL" > "${attempt_dir}/comparison.json"
     mv "${attempt_dir}/comparison.json" "${tier_dir}/comparison.json"
 }
 

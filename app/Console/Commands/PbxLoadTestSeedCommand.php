@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Setting;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Services\DialplanContext;
@@ -12,6 +13,7 @@ use App\Support\RoutingCacheVersion;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Modules\CallBlocks\Models\CallBlock;
 use Modules\CallCenters\Models\Queue;
@@ -53,6 +55,21 @@ use Modules\Voicemails\Models\Voicemail;
 #[Description('Create repeatable PBX data and SIPp CSV credentials for beta call-load testing')]
 class PbxLoadTestSeedCommand extends Command
 {
+    private const string FIXTURE_STATE_KEY = 'pbx_load_test.fixtures';
+
+    private const string TENANT_NAME = 'PBX Load Test';
+
+    private const string OUTBOUND_FIXTURE_DESCRIPTION = 'Synthetic SIPp UAS gateway for outbound load tests.';
+
+    private const string EMERGENCY_FIXTURE_DESCRIPTION = 'Synthetic emergency gateway for SIPp 911 validation.';
+
+    private const array MEDIA_FIXTURE_MODELS = [Queue::class, IvrMenu::class];
+
+    private const array EXTENDED_FIXTURE_MODELS = [
+        RingGroup::class, Voicemail::class, CallForward::class, TimeCondition::class,
+        FollowMe::class, Conference::class, Emergency::class, Gateway::class, CallBlock::class,
+    ];
+
     /**
      * Create repeatable tenant, extension, route, and SIPp credential data.
      */
@@ -85,19 +102,38 @@ class PbxLoadTestSeedCommand extends Command
         $includeMediaFixtures = (bool) $this->option('include-media-fixtures');
         $includeExtendedFixtures = (bool) $this->option('include-extended-fixtures');
 
-        if ($this->option('reset')) {
-            Tenant::where('slug', $slug)->delete();
-        }
+        $reset = (bool) $this->option('reset');
+        $summary = DB::transaction(function () use ($slug, $domain, $extensionCount, $start, $password, $sippHost, $sippPort, $includeMediaFixtures, $includeExtendedFixtures, $tenantDefaults, $dialplanContext, $reset): ?array {
+            $tenant = Tenant::where('slug', $slug)->lockForUpdate()->first();
+            $state = $tenant ? Setting::forTenant($tenant->id)->where('key', self::FIXTURE_STATE_KEY)->first() : null;
 
-        $summary = DB::transaction(function () use ($slug, $domain, $extensionCount, $start, $password, $sippHost, $sippPort, $includeMediaFixtures, $includeExtendedFixtures, $tenantDefaults, $dialplanContext): array {
-            $tenant = Tenant::updateOrCreate(
-                ['slug' => $slug],
-                [
-                    'name' => 'PBX Load Test',
-                    'purpose' => Tenant::PURPOSE_CUSTOMER,
-                    'enabled' => true,
-                ],
-            );
+            if ($tenant && ! $state) {
+                if (! $this->isLegacyLoadTestTenant($tenant)) {
+                    $this->error("Tenant [{$slug}] already exists and does not belong to the load-test seeder.");
+
+                    return null;
+                }
+
+                if (! $reset && Gateway::withoutGlobalScope('tenant')
+                    ->where('tenant_id', $tenant->id)
+                    ->where('name', 'emergency')
+                    ->where('description', self::EMERGENCY_FIXTURE_DESCRIPTION)
+                    ->exists()) {
+                    $this->error("Load-test tenant [{$slug}] has legacy extended fixtures without ownership records. Use a fresh test tenant or --reset this synthetic tenant.");
+
+                    return null;
+                }
+            }
+
+            if ($tenant && $reset) {
+                $tenant->delete();
+                $tenant = null;
+                $state = null;
+            }
+
+            $tenant ??= new Tenant(['slug' => $slug]);
+            $tenant->fill(['name' => self::TENANT_NAME, 'enabled' => true])->save();
+            $fixtures = $state ? json_decode($state->value, true, flags: JSON_THROW_ON_ERROR) : ['media' => [], 'extended' => []];
 
             /** @var TenantDomain $tenantDomain */
             $tenantDomain = TenantDomain::updateOrCreate(
@@ -164,7 +200,7 @@ class PbxLoadTestSeedCommand extends Command
                     'name' => 'sipp-load-uac',
                 ],
                 [
-                    'description' => 'Synthetic SIPp UAS gateway for outbound load tests.',
+                    'description' => self::OUTBOUND_FIXTURE_DESCRIPTION,
                     'host' => $sippHost,
                     'port' => $sippPort,
                     'username' => null,
@@ -196,16 +232,21 @@ class PbxLoadTestSeedCommand extends Command
             );
 
             if ($includeMediaFixtures) {
-                $this->seedMediaFixtures($tenant->id);
+                $this->seedMediaFixtures($tenant->id, $fixtures['media']);
             } else {
-                $this->clearMediaFixtures($tenant->id);
+                $this->clearFixtures($tenant->id, $fixtures['media'], self::MEDIA_FIXTURE_MODELS);
             }
 
             if ($includeExtendedFixtures) {
-                $this->seedExtendedFixtures($tenant->id, $extensionNumbers, $sippHost, $sippPort);
+                $this->seedExtendedFixtures($tenant->id, $extensionNumbers, $sippHost, $sippPort, $fixtures['extended']);
             } else {
-                $this->clearExtendedFixtures($tenant->id, $extensionNumbers);
+                $this->clearFixtures($tenant->id, $fixtures['extended'], self::EXTENDED_FIXTURE_MODELS);
             }
+
+            Setting::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'key' => self::FIXTURE_STATE_KEY],
+                ['type' => 'json', 'value' => json_encode($fixtures, JSON_THROW_ON_ERROR)],
+            );
 
             return [
                 'tenant' => $tenant,
@@ -214,6 +255,10 @@ class PbxLoadTestSeedCommand extends Command
                 'extension_numbers' => $extensionNumbers,
             ];
         });
+
+        if ($summary === null) {
+            return self::FAILURE;
+        }
 
         /** @var Tenant $tenant */
         $tenant = $summary['tenant'];
@@ -322,14 +367,31 @@ class PbxLoadTestSeedCommand extends Command
         fclose($handle);
     }
 
+    private function isLegacyLoadTestTenant(Tenant $tenant): bool
+    {
+        return $tenant->purpose === Tenant::PURPOSE_CUSTOMER
+            && $tenant->name === self::TENANT_NAME
+            && Gateway::withoutGlobalScope('tenant')
+                ->where('tenant_id', $tenant->id)
+                ->where('name', 'sipp-load-uac')
+                ->where('description', self::OUTBOUND_FIXTURE_DESCRIPTION)
+                ->exists()
+            && InboundRoute::withoutGlobalScope('tenant')
+                ->where('tenant_id', $tenant->id)
+                ->where('destination_number', '15551230000')
+                ->where('name', 'SIPp inbound DID to first extension')
+                ->exists();
+    }
+
     /**
      * Seed optional media destinations for SIPp/RTP validation.
+     *
+     * @param  array<class-string<Model>, string>  $owned
      */
-    private function seedMediaFixtures(int $tenantId): void
+    private function seedMediaFixtures(int $tenantId, array &$owned): void
     {
-        Queue::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(Queue::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => 'load_test_moh',
             ],
             [
@@ -340,9 +402,8 @@ class PbxLoadTestSeedCommand extends Command
             ],
         );
 
-        IvrMenu::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(IvrMenu::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => 'load_test_announcement',
             ],
             [
@@ -364,13 +425,13 @@ class PbxLoadTestSeedCommand extends Command
      * ContextWideDialplanXmlContributor module has runtime test data.
      *
      * @param  array<int, string>  $extensionNumbers
+     * @param  array<class-string<Model>, string>  $owned
      */
-    private function seedExtendedFixtures(int $tenantId, array $extensionNumbers, string $sippHost, int $sippPort): void
+    private function seedExtendedFixtures(int $tenantId, array $extensionNumbers, string $sippHost, int $sippPort, array &$owned): void
     {
         // Ring group: simultaneous ring to first 3 extensions
-        $ringGroup = RingGroup::withoutGlobalScope('tenant')->updateOrCreate(
+        $ringGroup = $this->seedFixture(RingGroup::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => '2400',
             ],
             [
@@ -392,19 +453,22 @@ class PbxLoadTestSeedCommand extends Command
             RingGroupExtension::updateOrCreate(
                 [
                     'ring_group_id' => $ringGroup->id,
-                    'extension_uuid' => $ext->id,
+                    'position' => $index + 1,
                 ],
                 [
-                    'position' => $index + 1,
+                    'extension_uuid' => $ext->id,
                 ],
             );
         }
 
+        RingGroupExtension::where('ring_group_id', $ringGroup->id)
+            ->where('position', '>', $ringGroupExtensions->count())
+            ->delete();
+
         // Voicemail mailbox for the 4th extension (index 3)
         $vmExtension = $extensionNumbers[3] ?? $extensionNumbers[0];
-        Voicemail::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(Voicemail::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'voicemail_id' => $vmExtension,
             ],
             [
@@ -427,9 +491,8 @@ class PbxLoadTestSeedCommand extends Command
             ->first();
 
         if ($cfExt) {
-            CallForward::withoutGlobalScope('tenant')->updateOrCreate(
+            $this->seedFixture(CallForward::class, $tenantId, $owned,
                 [
-                    'tenant_id' => $tenantId,
                     'extension_uuid' => $cfExt->id,
                     'forward_type' => 'unconditional',
                 ],
@@ -442,9 +505,8 @@ class PbxLoadTestSeedCommand extends Command
         }
 
         // Always-match time condition → extension 2000
-        TimeCondition::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(TimeCondition::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => '2401',
             ],
             [
@@ -459,9 +521,8 @@ class PbxLoadTestSeedCommand extends Command
         );
 
         // Follow-me: extension 2002 → external number
-        FollowMe::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(FollowMe::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => 'load_test_follow_me',
             ],
             [
@@ -473,9 +534,8 @@ class PbxLoadTestSeedCommand extends Command
         );
 
         // Conference room
-        Conference::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(Conference::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => '2500',
             ],
             [
@@ -487,9 +547,8 @@ class PbxLoadTestSeedCommand extends Command
         );
 
         // Emergency config
-        Emergency::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(Emergency::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'caller_id' => '15551239876',
             ],
             [
@@ -501,13 +560,12 @@ class PbxLoadTestSeedCommand extends Command
 
         // Gateway for emergency routing — FreeSWITCH needs a gateway named
         // 'emergency' on the external profile to route 911/112 calls.
-        Gateway::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(Gateway::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => 'emergency',
             ],
             [
-                'description' => 'Synthetic emergency gateway for SIPp 911 validation.',
+                'description' => self::EMERGENCY_FIXTURE_DESCRIPTION,
                 'host' => $sippHost,
                 'port' => $sippPort,
                 'username' => null,
@@ -523,9 +581,8 @@ class PbxLoadTestSeedCommand extends Command
         );
 
         // Call block: reject numbers starting with 15550000
-        CallBlock::withoutGlobalScope('tenant')->updateOrCreate(
+        $this->seedFixture(CallBlock::class, $tenantId, $owned,
             [
-                'tenant_id' => $tenantId,
                 'name' => 'load_test_block_inbound',
             ],
             [
@@ -552,89 +609,45 @@ class PbxLoadTestSeedCommand extends Command
     }
 
     /**
-     * Remove synthetic media fixtures when seeding without --include-media-fixtures.
+     * Create or update an optional record owned by this tenant's load-test seeder.
+     *
+     * @param  class-string<Model>  $model
+     * @param  array<class-string<Model>, string>  $owned
+     * @param  array<string, mixed>  $identity
+     * @param  array<string, mixed>  $attributes
      */
-    private function clearMediaFixtures(int $tenantId): void
+    private function seedFixture(string $model, int $tenantId, array &$owned, array $identity, array $attributes): Model
     {
-        Queue::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', 'load_test_moh')
-            ->delete();
+        $id = $owned[$model] ?? null;
+        $query = $model::withoutGlobalScope('tenant')->where('tenant_id', $tenantId);
+        $existing = (clone $query)->where($identity)->first();
 
-        IvrMenu::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', 'load_test_announcement')
-            ->delete();
+        if ($existing && (string) $existing->getKey() !== $id) {
+            throw new \RuntimeException("The load-test seeder cannot overwrite an unowned {$existing->getTable()} record for tenant {$tenantId}.");
+        }
+
+        $fixture = ($id !== null ? $query->find($id) : null) ?? new $model;
+        $fixture->fill(['tenant_id' => $tenantId, ...$identity, ...$attributes])->save();
+        $owned[$model] = (string) $fixture->getKey();
+
+        return $fixture;
     }
 
     /**
-     * Remove synthetic extended fixtures when seeding without --include-extended-fixtures.
-     *
-     * Extended validation seeds unconditional call-forwarding on 2001, follow-me on
-     * 2002, and voicemail on 2003. Leaving those rules behind hijacks baseline
-     * extension-to-extension capacity calls when the SIP ladder runs afterwards.
-     *
-     * @param  array<int, string>  $extensionNumbers
+     * @param  array<class-string<Model>, string>  $owned
+     * @param  list<class-string<Model>>  $models
      */
-    private function clearExtendedFixtures(int $tenantId, array $extensionNumbers): void
+    private function clearFixtures(int $tenantId, array &$owned, array $models): void
     {
-        $ringGroupIds = RingGroup::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', '2400')
-            ->pluck('id');
-
-        if ($ringGroupIds->isNotEmpty()) {
-            RingGroupExtension::whereIn('ring_group_id', $ringGroupIds)->delete();
-            RingGroup::withoutGlobalScope('tenant')->whereIn('id', $ringGroupIds)->delete();
+        foreach ($models as $model) {
+            if (isset($owned[$model])) {
+                $model::withoutGlobalScope('tenant')
+                    ->where('tenant_id', $tenantId)
+                    ->whereKey($owned[$model])
+                    ->delete();
+            }
         }
 
-        $vmExtension = $extensionNumbers[3] ?? $extensionNumbers[0];
-        Voicemail::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('voicemail_id', $vmExtension)
-            ->delete();
-
-        $cfExt = Extension::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('extension_number', $extensionNumbers[1] ?? '2001')
-            ->first();
-
-        if ($cfExt) {
-            CallForward::withoutGlobalScope('tenant')
-                ->where('tenant_id', $tenantId)
-                ->where('extension_uuid', $cfExt->id)
-                ->where('forward_type', 'unconditional')
-                ->delete();
-        }
-
-        TimeCondition::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', '2401')
-            ->delete();
-
-        FollowMe::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', 'load_test_follow_me')
-            ->delete();
-
-        Conference::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', '2500')
-            ->delete();
-
-        Emergency::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('caller_id', '15551239876')
-            ->delete();
-
-        Gateway::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', 'emergency')
-            ->delete();
-
-        CallBlock::withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->where('name', 'load_test_block_inbound')
-            ->delete();
+        $owned = [];
     }
 }

@@ -57,3 +57,20 @@ SH;
         'redis',
     ])."\n");
 });
+
+it('normalizes CPU counter deltas by the measured interval and process start time', function (): void {
+    $probe = <<<'BASH'
+        set -euo pipefail
+        eval "$(sed -n '/^compare()/,/^}/p' "$1")"
+        dir="$(mktemp -d)"
+        trap 'rm -rf "$dir"' EXIT
+        printf '%s\n' 'uptime 100.00' '100:8000 php-fpm 600 1024 512' '101:9000 php-fpm 30 1024 512' > "$dir/before"
+        printf '%s\n' 'uptime 102.50' '100:8000 php-fpm 850 1024 512' '101:10100 php-fpm 60 1024 512' '102:5000 php-fpm 2000 1024 512' > "$dir/after"
+        CLK_TCK=100 MODE=sample LABEL=fixture compare "$dir/before" "$dir/after" 100.00
+        BASH;
+
+    $process = new Process(['bash', '-c', $probe, 'cpuwatch-probe', base_path('load-testing/scripts/tools/cpuwatch.sh')]);
+    $process->mustRun();
+
+    expect(trim($process->getOutput()))->toBe('fixture,2.50,php-fpm,124.00,3.0,1.5,2.50');
+});

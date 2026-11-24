@@ -120,7 +120,6 @@ class PbxLoadTestManifestCommand extends Command
             'php_version' => PHP_VERSION,
             'laravel_version' => app()->version(),
             'freeswitch_version' => $this->probe($runner, ['fs_cli', '-x', 'version']),
-            'freeswitch_log_level' => $this->probe($runner, ['fs_cli', '-x', 'fsctl loglevel']),
             'redis_version' => $this->probe($runner, ['redis-server', '-v']),
             'mariadb_version' => $this->probe($runner, ['mariadb', '--version']),
         ];

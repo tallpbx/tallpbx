@@ -67,11 +67,14 @@ Every tier runs the exact same declarative contract (`standard_comparison` in [`
 2. The driver runs XML validation and, on the tier selected for the extended suite, checks the named functional and media verdicts before starting the ladder. A log line starting with `Running` records only the start. A pass is recorded as `- <step>: passed`.
 3. Before either handler starts the ladder, the driver places two test calls through each handler. The capacity responder waits for BYE immediately after ACK. Both calls must receive `200 OK` for the initial BYE. If the check fails, inspect `<variant>/capacity-preflight/extension-calls.log` and the SIP message trace before retrying. The short calls carry no capacity result.
 
+The runner applies and verifies FreeSWITCH's `notice` log level after each handler switch. Use the logging check in the host setup guide for manual verification. Calling `fsctl loglevel` without a level disables logging on the benchmarked FreeSWITCH build. [FreeSWITCH logging checks](remote-setup.md#3-freeswitch-logging-notice)
+
 ### Evidence and retries
 
 - `comparison.json` binds the tier attempt to the series, PBX commit, and generator fingerprint. The driver marks it complete after the requested phases finish.
 - `driver-logs/sip-events.tsv` records preflights, started and measured rungs, and early stops. A started rung without a measurement is an execution failure. The orchestrator keeps the event log and failure records separate from PBX artifact copies.
 - `<variant>/sip-cps<rate>/harness.txt` identifies the generator files used for each rung. Each rung must account for `rate × 60` offered calls and record setup and teardown p50, p95, and maximum latency.
+- Publish CPU utilization only from samples with a measured `elapsed_seconds` interval. Older exports can be regenerated with blank CPU fields while retaining their call and XML measurements.
 - To check a completed 1-vCPU attempt before running another tier, run `python3 load-testing/scripts/tools/consolidate-series.py "load-testing/results/${SERIES}" --tiers=h1-1c1g`. This diagnostic expects the extended suite to have run on that tier.
 - For historical extended runs, recover the original generator `summary.md` if the local log contains only progress. Preserve the original artifacts and any operator-confirmed result. A missing local copy alone does not justify repeating a known successful test.
 

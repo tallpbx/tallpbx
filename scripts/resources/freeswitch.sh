@@ -101,10 +101,6 @@ load_required_freeswitch_modules() {
     fs_cli -x 'reload mod_callcenter' >/dev/null 2>&1 || fs_cli -x 'load mod_callcenter' >/dev/null 2>&1 || true
     fs_cli -x 'load mod_local_stream' >/dev/null 2>&1 || true
 
-    if [ -f "$(freeswitch_conf_dir)/autoload_configs/json_cdr.conf.xml" ]; then
-        fs_cli -x 'reload mod_json_cdr' >/dev/null 2>&1 || fs_cli -x 'load mod_json_cdr' >/dev/null 2>&1 || true
-    fi
-
     # Load language-specific say grammar modules if their binaries are present on disk
     if [ -f /usr/lib/freeswitch/mod/mod_say_es.so ] || [ -f /usr/local/freeswitch/mod/mod_say_es.so ]; then
         fs_cli -x 'load mod_say_es' >/dev/null 2>&1 || true
@@ -616,16 +612,16 @@ configure_json_cdr() {
     mkdir -p "${conf_dir}/autoload_configs"
     if ! render_json_cdr_config "${app_dir}/scripts/freeswitch/json_cdr.conf.xml" \
         "${conf_dir}/autoload_configs/json_cdr.conf.xml" "$cdr_token"; then
-        warning "Could not render json_cdr.conf.xml"
-        return 0
+        error "Could not render json_cdr.conf.xml"
+        return 1
     fi
 
     chown freeswitch:freeswitch "$modules_conf" "${conf_dir}/autoload_configs/json_cdr.conf.xml" 2>/dev/null || true
     chmod 0640 "${conf_dir}/autoload_configs/json_cdr.conf.xml" 2>/dev/null || true
 
-    if command -v fs_cli >/dev/null 2>&1; then
-        fs_cli -x 'reloadxml' >/dev/null 2>&1 || true
-        fs_cli -x 'reload mod_json_cdr' >/dev/null 2>&1 || fs_cli -x 'load mod_json_cdr' >/dev/null 2>&1 || true
+    if ! activate_json_cdr_module; then
+        error "Could not activate mod_json_cdr. Check that FreeSWITCH is running and review its log."
+        return 1
     fi
 }
 
@@ -635,7 +631,7 @@ if [ "${1:-}" = "--configure-only" ]; then
     configure_freeswitch_switch_defaults
     configure_freeswitch_database_driver
     configure_freeswitch_sound_defaults
-    configure_json_cdr
+    configure_json_cdr || exit 1
     configure_dynamic_xml
     systemctl daemon-reload 2>/dev/null || true
     exit 0
@@ -1117,7 +1113,7 @@ fi
 configure_freeswitch_switch_defaults
 configure_freeswitch_database_driver
 configure_freeswitch_sound_defaults
-configure_json_cdr
+configure_json_cdr || exit 1
 configure_dynamic_xml
 set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALLED_METHOD "$freeswitch_install_method"
 

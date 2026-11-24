@@ -62,14 +62,14 @@ ssh "$PBX_HOST" 'cd /var/www/tallpbx && \
 
 ## 3. FreeSWITCH logging: `notice`
 
-Default is `info`, which logs every XML lookup and makes the host spend CPU writing to disk.
+TallPBX defaults to `notice`. A stock FreeSWITCH configuration can use the more verbose `info` level, which logs XML lookups and adds disk writes during a benchmark.
 
 **Apply** (both files, then a restart — a reload does not re-open the log handle reliably):
 
 ```bash
 sudo sed -i -E 's|(<param name="loglevel" value=")info("/>)|<param name="loglevel" value="notice"/>|' \
   /etc/freeswitch/autoload_configs/switch.conf.xml
-sudo sed -i -E 's|(data="console_loglevel=)info(")|console_loglevel=notice|' /etc/freeswitch/vars.xml
+sudo sed -i -E 's|(data="console_loglevel=)info(")|\1notice\2|' /etc/freeswitch/vars.xml
 sudo systemctl restart freeswitch
 ```
 
@@ -90,7 +90,7 @@ grep -c PROBE-INFO   /var/log/freeswitch/freeswitch.log   # expect 0
 grep -E '^FS_LOG_LEVEL=' /var/www/tallpbx/.env            # expect notice
 ```
 
-> `fs_cli -x "fsctl loglevel"` reports `DISABLE` on FreeSWITCH 1.11.4 even while logging works. Never use it as the assertion.
+> Calling `fsctl loglevel` without a level disables logging on the benchmarked FreeSWITCH build. Use the log markers above to check the current level.
 
 The level name is `err`, not `error`; the accepted order is `alert, crit, err, warning, notice, info, debug`, and it is a ceiling (records above it are discarded before any logger sees them).
 
