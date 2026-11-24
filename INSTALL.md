@@ -254,14 +254,15 @@ In plain terms: **one worker at boot, growing to at most three under load on a 1
 
 The same six values are re-applied later by `appliance:sync-host`, which runs the installer's own reconciler (`scripts/resources/php-fpm-pool.sh`) after a snapshot restore or an IP change. A server restored onto differently sized hardware therefore comes back with a pool that fits the new machine instead of keeping the ceiling from the machine the snapshot was taken on. For a host whose RAM does not match a published tier, set `PHP_FPM_MAX_CHILDREN` in `/var/www/tallpbx/.env` to pin it to a tier. Manual edits to `/etc/php/*/fpm/pool.d/www.conf` last only until the next install or restore.
 
-**Measured capacity with exactly these settings** (full default firewall, warm 60-second lookup cache, 60-second cells):
+**Measured 60-second call capacity with these settings** (default firewall active, warm 60-second lookup cache, CDR ingestion enabled, 30 registered extensions; series-20261123-r2):
 
-| Host | Supported rate | First failing rate | Completion at the failing rate |
+| Host | Default PHP-FPM (100% completed) | First PHP-FPM drop rung | Optional Laravel Octane (100% completed) |
 | :--- | :--- | :--- | :--- |
-| 1 vCPU / 1 GB | **5 calls/sec** (300 of 300) | 6 calls/sec | 70 % |
-| 2 vCPU / 2 GB | **10 calls/sec** (600 of 600) | 12 calls/sec | 41.5 % |
+| 1 vCPU / 1 GB | **2 calls/sec** (120 of 120) | 4 calls/sec (99.6 %; 57.0 % at 5 calls/sec) | **4 calls/sec** (240 of 240) |
+| 2 vCPU / 2 GB | **10 calls/sec** (600 of 600) | 12 calls/sec (57.4 %) | **15 calls/sec** (900 of 900) |
+| 4 shared vCPU / 8 GB | **25 calls/sec** (1,500 of 1,500) | 30 calls/sec (61.6 %) | **25 calls/sec** (1,500 of 1,500; 96.6 % at 30 calls/sec under default `FS_SESSIONS_PER_SECOND=60`) |
 
-Two results shape the default. On a single core, **fewer workers is better at the failure boundary** — completion rose from 38 % with five static workers to 97 % with one, because extra workers only deepen a queue that is already limited by the CPU. On two cores the pool shape stops mattering: five shapes measured within 34–44 % at the boundary while PHP-FPM alone demanded 2.25 cores, so the ceiling is set by available CPU rather than by worker count. In both cases the dynamic pool above is the right configuration, and `pm.max_children` follows detected RAM. Method, per-service CPU and full tables: [`docs/load-testing-results.md`](docs/load-testing-results.md).
+On a single core, **fewer PHP-FPM workers perform better at the failure boundary** because extra workers deepen CPU queueing rather than adding throughput, while moving XML lookups onto the optional `octane-worker` leaves PHP-FPM dedicated to CDR posts and doubles 100%-completed call capacity on 1 GB hosts. On two or four cores, `pm.max_children` scales with detected RAM (6 on 2 GB, 12 on 4 GB+). Full method, latency, and per-service CPU attribution: [`docs/load-testing-results.md`](docs/load-testing-results.md).
 
 #### Why Worker Sizing Matters for a Phone System
 
@@ -285,11 +286,11 @@ Because this is a real-time hotpath, **instant responsiveness is crucial**. If a
 
 ##### Why These Numbers and Not Debian's Defaults
 
-Debian ships `pm = dynamic` with `pm.start_servers = 2`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 3` and `pm.max_children = 5`. TallPBX keeps Debian's mode but tightens the numbers, based on a worker-count measurement sweep on the minimal 1 vCPU / 1 GB reference host (2026-11-08; full results in [`docs/load-testing-results.md`](docs/load-testing-results.md)):
+Debian ships `pm = dynamic` with `pm.start_servers = 2`, `pm.min_spare_servers = 1`, `pm.max_spare_servers = 3` and `pm.max_children = 5`. TallPBX keeps Debian's mode but tightens the numbers, based on an isolated XML-lookup worker-count sweep on the minimal 1 vCPU / 1 GB reference host (2026-11-08, prior to adding HTTP `mod_json_cdr` ingestion on PHP-FPM; current end-to-end results are in [`docs/load-testing-results.md`](docs/load-testing-results.md)):
 
-- **More workers lose calls at the limit.** At the call rate where the system starts to fail, completion rose as workers were removed: 38 % of calls completed with 5 workers versus 97 % with 1 worker. On a single busy core, extra workers only deepen the request queue, so more lookups miss FreeSWITCH's 5-second `mod_xml_curl` timeout.
-- **Debian's wider worker range churns.** With a ceiling of 5 and up to 3 idle workers, processes are forked and retired at burst edges — and each new worker pays a 200–500 ms start cost exactly when the queue is deepest. In measurement it was the only configuration that lost calls at the supported rate (235 of 300 completed), while the settings above completed 300 of 300.
-- **A quiet phone system needs almost nothing.** Every worker count tested — even a single worker — completed 300 of 300 calls at the supported rate of 5 calls/sec, because the warm lookup cache makes each lookup a fast in-memory hit.
+- **More workers lose calls at the limit.** At the call rate where the system started to saturate, completion rose as workers were removed: 38 % of calls completed with 5 workers versus 97 % with 1 worker. On a single busy core, extra workers only deepen the request queue, so more lookups miss FreeSWITCH's 5-second `mod_xml_curl` timeout.
+- **Debian's wider worker range churns.** With a ceiling of 5 and up to 3 idle workers, processes are forked and retired at burst edges — and each new worker pays a 200–500 ms start cost exactly when the queue is deepest. In that XML-pool sweep, Debian's wider pool was the only configuration that lost calls below the saturation ceiling (235 of 300 completed vs 300 of 300 for the dynamic `max 3` pool).
+- **A quiet phone system needs almost nothing.** With full CDR ingestion enabled in the current unified series (`series-20261123-r2`), this dynamic `max 3` pool sustains **2 calls/sec** at `100 %` (`99.6 %` at 4 calls/sec) on PHP-FPM alone and **4 calls/sec** at `100 %` with Laravel Octane enabled.
 
 The earlier pre-forked `static` baseline ("5 static workers on 1 GB") is retired: static spends its memory 24/7 and, at the failure boundary, completed fewer calls than the dynamic settings above.
 

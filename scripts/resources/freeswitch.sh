@@ -101,6 +101,10 @@ load_required_freeswitch_modules() {
     fs_cli -x 'reload mod_callcenter' >/dev/null 2>&1 || fs_cli -x 'load mod_callcenter' >/dev/null 2>&1 || true
     fs_cli -x 'load mod_local_stream' >/dev/null 2>&1 || true
 
+    if [ -f "$(freeswitch_conf_dir)/autoload_configs/json_cdr.conf.xml" ]; then
+        fs_cli -x 'reload mod_json_cdr' >/dev/null 2>&1 || fs_cli -x 'load mod_json_cdr' >/dev/null 2>&1 || true
+    fi
+
     # Load language-specific say grammar modules if their binaries are present on disk
     if [ -f /usr/lib/freeswitch/mod/mod_say_es.so ] || [ -f /usr/local/freeswitch/mod/mod_say_es.so ]; then
         fs_cli -x 'load mod_say_es' >/dev/null 2>&1 || true
@@ -157,6 +161,11 @@ configure_freeswitch_switch_defaults() {
     if [ -f "$logfile_conf" ]; then
         # Ensure logfile map retains debug so temporary runtime diagnosis via 'fsctl loglevel debug' works
         sed -i 's#<map name="all" value="console,info,notice,warning,err,crit,alert"/>#<map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>#' "$logfile_conf"
+    fi
+
+    local vars_xml="${conf_dir}/vars.xml"
+    if [ -f "$vars_xml" ]; then
+        sed -i "s#<X-PRE-PROCESS cmd=\"set\" data=\"console_loglevel=[^\"]*\"/>#<X-PRE-PROCESS cmd=\"set\" data=\"console_loglevel=${log_level}\"/>#" "$vars_xml" 2>/dev/null || true
     fi
 
     if command -v fs_cli >/dev/null 2>&1; then
@@ -610,6 +619,14 @@ configure_json_cdr() {
         warning "Could not render json_cdr.conf.xml"
         return 0
     fi
+
+    chown freeswitch:freeswitch "$modules_conf" "${conf_dir}/autoload_configs/json_cdr.conf.xml" 2>/dev/null || true
+    chmod 0640 "${conf_dir}/autoload_configs/json_cdr.conf.xml" 2>/dev/null || true
+
+    if command -v fs_cli >/dev/null 2>&1; then
+        fs_cli -x 'reloadxml' >/dev/null 2>&1 || true
+        fs_cli -x 'reload mod_json_cdr' >/dev/null 2>&1 || fs_cli -x 'load mod_json_cdr' >/dev/null 2>&1 || true
+    fi
 }
 
 if [ "${1:-}" = "--configure-only" ]; then
@@ -618,8 +635,8 @@ if [ "${1:-}" = "--configure-only" ]; then
     configure_freeswitch_switch_defaults
     configure_freeswitch_database_driver
     configure_freeswitch_sound_defaults
-    configure_dynamic_xml
     configure_json_cdr
+    configure_dynamic_xml
     systemctl daemon-reload 2>/dev/null || true
     exit 0
 fi
@@ -1100,8 +1117,8 @@ fi
 configure_freeswitch_switch_defaults
 configure_freeswitch_database_driver
 configure_freeswitch_sound_defaults
-configure_dynamic_xml
 configure_json_cdr
+configure_dynamic_xml
 set_secure_env_value "$INSTALLER_STATE_FILE" FSPBX_FREESWITCH_INSTALLED_METHOD "$freeswitch_install_method"
 
 verbose "FreeSWITCH installation complete"

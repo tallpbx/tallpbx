@@ -595,17 +595,19 @@ for i in $(seq 1 20); do ss -Htan 'dport = :8090'; sleep 0.1; done
 wait
 ```
 
-### Expected Gain (1 vCPU / 967 MB reference tier)
+### Expected Gain (1 vCPU / 1 GB RAM reference tier, `series-20261123-r2`)
 
-| Metric | Fast controller (default) | Octane worker |
+| Metric | Fast PHP-FPM (default) | Octane worker |
 |---|---|---|
-| XML lookups (100 requests, 5 concurrent) | 43.1 req/sec | **187 req/sec** |
-| Lookup latency avg / p50 / p95 | 110 / 108 / 120 ms | **15 / 14 / 25 ms** |
-| Call setup p50 at 8 calls/sec | 128 ms | **84 ms** |
-| Call completion at 8 calls/sec | 100 % (calls) | ~100 % |
-| RAM | none resident | **81 MB held / 58 MB attributed** |
+| XML lookups (`100x5` mixed, `production-60`) | 42.79 req/sec | **201.28 req/sec** |
+| XML lookups (`1000x25` mixed, `production-60`) | 42.59 req/sec | **216.70 req/sec** |
+| Lookup latency median / p95 (`100x5` mixed) | 73.4 / 116.5 ms | **13.1 / 21.9 ms** |
+| Max 100% call rate (60s, CDR enabled) | 2 calls/sec (120 / 120) | **4 calls/sec (240 / 240)** |
+| Call setup median / p95 at 2 calls/sec | 256.0 / 574.4 ms | **88.0 / 200.4 ms** |
+| Call completion & setup median at 4 calls/sec | 99.6 % (2,812.0 ms) | **100.0 % (104.0 ms)** |
+| Resident worker RAM | none resident | **~81 MB held / ~58 MB attributed** |
 
-Run exactly **one worker per vCPU** — a second worker on one core competes with FreeSWITCH and roughly doubles the memory. On the 967 MB tier the worker costs roughly 8 % of RAM; if memory is the binding constraint, the fast controller alone already keeps the tier's practical ceiling.
+Run **one worker per vCPU** (`--workers=auto`) — extra workers on a single core compete with FreeSWITCH and increase memory use. On 1 vCPU / 1 GB RAM, `octane-worker` uses roughly 6–8 % of RAM while doubling sustained 100 % call capacity (**2 → 4 calls/sec**, and `95.3 %` at 6 calls/sec) because XML lookups no longer queue behind CDR posts in PHP-FPM. See [`load-testing-results.md`](load-testing-results.md) for 2 vCPU (`10 → 15 calls/sec`) and 4 shared vCPU (`25 calls/sec`, `1,708 → 68 ms` median setup) results.
 
 ### CDR Always Uses PHP-FPM
 
@@ -629,7 +631,7 @@ A normal request boots the whole application — roughly 90 service providers, i
 
 **It is the shipped default.** `scripts/resources/nginx.sh` and the Let's Encrypt site templates serve `/api/v1/xml-handler` from `xml-handler-fast.php`, and FreeSWITCH's second `mod_xml_curl` binding — the one used whenever the optional Octane worker is disabled or down — lands there. Code exceptions inside `xml-handler-fast.php` are caught in-process (`catch (Throwable)`) and served by `index.php` (logged to the PHP error log), without retrying saturation timeouts over HTTP.
 
-Measured on the 1 vCPU / 967 MB reference host (100 requests at 5 concurrent, dialplan render, median of three runs, 2026-11-05 slim-boot code): throughput **30.1 → 43.1 requests/second**, p50 **154 → 108 ms**, p95 172 → 120 ms, peak memory per request **32 → 26 MB**. Under call load, call completion at 5 calls/sec rose from 34 % (stock path, 2026-11-04) to **92 %**, and 8 calls/sec completes at **100 %** with 108–128 ms p50 setup time. CDR ingestion remains on PHP-FPM, where `POST /api/v1/cdr` is served by the dedicated 5-provider `public/cdr-fast.php` entry (`App\Support\CdrFastBootstrap`) to buffer records directly into Redis without full framework boot overhead; at sustained 5+ calls/sec these posts share PHP-FPM workers with XML lookups — see the Octane worker section for the trade-off and the option that frees PHP-FPM by moving XML to the worker.
+In an isolated front-controller micro-benchmark on the 1 vCPU reference tier (2026-11-05 slim-boot comparison against full `index.php` bootstrap), switching directory and dialplan lookups to `public/xml-handler-fast.php` raised raw PHP-FPM XML throughput from `30.1 → 43.1` requests/second and reduced peak per-request memory from `32 → 26 MB`. In the current unified benchmark series (`series-20261123-r2`, 1 vCPU / 1 GB RAM with `production-60` lookup caching and `public/cdr-fast.php` CDR ingestion active), the fast PHP-FPM handler sustains **42.79 req/sec** (`73.4 ms` median, `116.5 ms` p95) on `100x5` mixed lookups, completing **100 %** at **2 calls/sec** (`256.0 ms` setup median) and **99.6 %** at **4 calls/sec** on PHP-FPM alone, or **100 %** at **4 calls/sec** (`104.0 ms` setup median) when paired with the Octane XML worker. CDR ingestion remains on PHP-FPM, where `POST /api/v1/cdr` is served by the dedicated 5-provider `public/cdr-fast.php` entry (`App\Support\CdrFastBootstrap`) to buffer records directly into Redis without full framework boot overhead; above 2 calls/sec on 1 vCPU these posts contend with XML lookups for PHP-FPM workers — see the Octane worker section above for the option that frees PHP-FPM by moving XML to the worker.
 
 If the fast path throws for any reason, the same request is served by the normal application, so a fault costs speed rather than registrations.
 

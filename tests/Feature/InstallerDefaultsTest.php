@@ -1312,3 +1312,24 @@ it('resolves an alternate password key from installer state without breaking DB_
         @rmdir($temporaryDirectory);
     }
 });
+
+it('keeps INSTALLER_TOTAL_STEPS synchronized with the number of run_step calls', function (): void {
+    $installer = (string) file_get_contents(base_path('scripts/install.sh'));
+
+    preg_match('/^INSTALLER_TOTAL_STEPS=(\d+)$/m', $installer, $declared);
+    $stepCalls = preg_match_all('/^\s*(?:if\s+!\s+)?run_step\s+"/m', $installer);
+
+    expect((int) ($declared[1] ?? 0))->toBe(7)
+        ->and($stepCalls)->toBe((int) ($declared[1] ?? 0));
+});
+
+it('synchronizes console_loglevel in vars.xml with configure_freeswitch_switch_defaults', function (): void {
+    $freeswitch = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    preg_match('/^configure_freeswitch_switch_defaults\(\)\s*\{([\s\S]*?)^\}/m', $freeswitch, $match);
+    $body = $match[1] ?? '';
+
+    expect($body)->not->toBe('')
+        ->and($body)->toContain('vars_xml="${conf_dir}/vars.xml"')
+        ->and($body)->toContain('console_loglevel=${log_level}');
+});

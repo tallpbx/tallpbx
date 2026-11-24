@@ -63,7 +63,7 @@ FENCE = re.compile(r"^```")
 # Commands worth checking. Anything else in a fenced block is left alone.
 CMD_NPM = re.compile(r"\b(?:npm|pnpm|yarn|bun)\s+run\s+([A-Za-z0-9:_.-]+)")
 CMD_MAKE = re.compile(r"\bmake\s+([A-Za-z0-9_.-]+)")
-CMD_SCRIPT = re.compile(r"(?:^|\s)(\./[A-Za-z0-9_./-]+|(?:python3?|node|bash|sh|ruby)\s+([A-Za-z0-9_./-]+\.[A-Za-z0-9]+))")
+CMD_SCRIPT = re.compile(r"(?:^|\s)((?:\./|/var/www/tallpbx/)[A-Za-z0-9_./-]+|(?:python3?|node|bash|sh|ruby)\s+(?:-[A-Za-z0-9]+\s+)*([A-Za-z0-9_./-]+\.[A-Za-z0-9]+))")
 
 MD_LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
 BACKTICK = re.compile(r"`([^`\n]+)`")
@@ -81,16 +81,21 @@ ENV_IN_CODE = [
     re.compile(r"""getenv\(\s*['"]([A-Z][A-Z0-9_]*)['"]"""),
     re.compile(r"""ENV\[\s*['"]([A-Z][A-Z0-9_]*)['"]"""),
     re.compile(r"""Deno\.env\.get\(\s*['"]([A-Z][A-Z0-9_]*)['"]"""),
+    re.compile(r"""\benv\(\s*['"]([A-Z][A-Z0-9_]*)['"]"""),
+    re.compile(r"""\$_(?:ENV|SERVER)\[\s*['"]([A-Z][A-Z0-9_]*)['"]\s*\]"""),
+    re.compile(r"""\$\{([A-Z][A-Z0-9_]{2,})(?::[-=?+][^}]*)?\}"""),
+    re.compile(r"""\b(?:get_env_value|set_env_value|set_secure_env_value|resolve_boolean_env_value)\s+\S+\s+([A-Z][A-Z0-9_]{2,})\b"""),
 ]
 ENV_NAME = re.compile(r"\b([A-Z][A-Z0-9_]{2,})\b")
 
-# Import forms across the languages handled above. Four alternatives, so findall
-# returns tuples and the caller takes the first non-empty group.
+# Import forms across the languages handled above. Alternatives use capture groups,
+# so findall returns tuples and the caller takes the first non-empty group.
 IMPORT_SPEC = re.compile(
     r"""(?:from|import)\s+['"]([^'"]+)['"]"""
     r"""|require\(\s*['"]([^'"]+)['"]\s*\)"""
     r"""|^\s*from\s+([A-Za-z0-9_.]+)\s+import"""
-    r"""|^\s*import\s+([A-Za-z0-9_.]+)""",
+    r"""|^\s*import\s+([A-Za-z0-9_.]+)"""
+    r"""|^\s*use\s+([A-Za-z0-9_\\]+)""",
     re.M)
 
 warnings: list[str] = []
@@ -164,14 +169,47 @@ def fenced_blocks(text: str) -> list[tuple[int, str]]:
     return out
 
 
+def fenced_blocks_with_cwd(text: str, repo: Path) -> list[tuple[int, str, str]]:
+    """Yield (line_number, cwd, line) for lines inside fenced code blocks."""
+    out: list[tuple[int, str, str]] = []
+    inside = False
+    cwd = ""
+    repo_root = repo.as_posix().rstrip("/")
+    repo_prefix = repo_root + "/"
+    for i, line in enumerate(text.splitlines(), start=1):
+        if FENCE.match(line.strip()):
+            inside = not inside
+            cwd = ""
+            continue
+        if not inside:
+            continue
+        m = re.match(r"^\s*cd\s+([^\s;&|]+)", line)
+        if m:
+            target = m.group(1).strip("'\"")
+            if target in ("/var/www/tallpbx", repo_root):
+                cwd = ""
+            elif target.startswith("/var/www/tallpbx/"):
+                cwd = target.removeprefix("/var/www/tallpbx/").strip("/")
+            elif target.startswith(repo_prefix):
+                cwd = target[len(repo_prefix):].strip("/")
+            elif not target.startswith("/") and (repo / target).is_dir():
+                cwd = target.strip("/")
+            else:
+                cwd = ""
+        out.append((i, cwd, line))
+    return out
+
+
 def env_names_from_code(repo: Path, files: list[str]) -> dict[str, list[str]]:
     """Env var names the code reads, mapped to every location that reads them."""
     found: dict[str, list[str]] = {}
     for rel in files:
-        if Path(rel).suffix not in CODE_EXTS or any(p in SKIP_DIRS for p in Path(rel).parts):
+        if Path(rel).suffix not in CODE_EXTS and not (rel.startswith("scripts/") and Path(rel).suffix == ""):
+            continue
+        if any(p in SKIP_DIRS for p in Path(rel).parts):
             continue
         text = read(repo / rel)
-        if not text or "env" not in text.lower():
+        if not text or ("env" not in text.lower() and "$" not in text):
             continue
         for i, line in enumerate(text.splitlines(), start=1):
             for pattern in ENV_IN_CODE:
@@ -189,9 +227,11 @@ def unreferenced_modules(repo: Path, files: list[str]) -> set[str]:
     it under-reports rather than accusing live code of being dead.
     """
     code = [f for f in files
-            if Path(f).suffix in CODE_EXTS and not any(p in SKIP_DIRS for p in Path(f).parts)]
+            if (Path(f).suffix in CODE_EXTS or (f.startswith("scripts/") and Path(f).suffix == ""))
+            and not any(p in SKIP_DIRS for p in Path(f).parts)]
     entrypoint = re.compile(
-        r"(^|/)(server|main|index|app|cli|__init__|__main__|conftest|setup|wsgi|asgi)\.[A-Za-z]+$",
+        r"(^|/)(server|main|index|app|cli|__init__|__main__|conftest|setup|wsgi|asgi)\.[A-Za-z]+$"
+        r"|(^|/)(config|routes|bootstrap|database|public|scripts|app|app-modules|tests)/",
         re.I)
     imported: set[str] = set()
     for rel in code:
@@ -204,7 +244,7 @@ def unreferenced_modules(repo: Path, files: list[str]) -> set[str]:
                 continue
             imported.add(Path(ref).name.lower())
             imported.add(Path(ref).stem.lower())
-            for part in re.split(r"[./\:]", ref):
+            for part in re.split(r"[./\\:]", ref):
                 if part:
                     imported.add(part.lower())
     out = set()
@@ -282,7 +322,9 @@ def build(repo: Path, files: list[str], check_paths: bool = False) -> dict:
             continue
 
         # 1. commands
-        for lineno, line in fenced_blocks(text):
+        repo_root = repo.as_posix().rstrip("/")
+        repo_prefix = repo_root + "/"
+        for lineno, cwd, line in fenced_blocks_with_cwd(text, repo):
             for script in set(CMD_NPM.findall(line)):
                 if not all_npm:
                     continue
@@ -298,7 +340,22 @@ def build(repo: Path, files: list[str], check_paths: bool = False) -> dict:
                         f"documents `make {target}`, which is not a target in the Makefile.",
                         source="Makefile")
             for whole, inner in CMD_SCRIPT.findall(line):
-                candidate = (inner or whole).lstrip("./")
+                raw = (inner or whole).strip()
+                if not raw or PLACEHOLDER.search(raw):
+                    continue
+                if raw in ("/var/www/tallpbx", repo_root):
+                    continue
+                if raw.startswith("/var/www/tallpbx/"):
+                    candidate = raw.removeprefix("/var/www/tallpbx/")
+                elif raw.startswith(repo_prefix):
+                    candidate = raw[len(repo_prefix):]
+                elif raw.startswith("/"):
+                    continue
+                elif raw.startswith("./"):
+                    rel_part = raw[2:]
+                    candidate = f"{cwd}/{rel_part}" if cwd else rel_part
+                else:
+                    candidate = f"{cwd}/{raw}" if cwd else raw
                 if not candidate or PLACEHOLDER.search(candidate):
                     continue
                 if candidate.endswith("/") or any(part in SKIP_DIRS

@@ -68,9 +68,19 @@ it('installs and configures mod_json_cdr from the freeswitch step', function ():
         ->and($script)->toContain('ensure_freeswitch_module_enabled "$modules_conf" "mod_json_cdr"')
         ->and($script)->toContain('ensure_json_cdr_spool_dirs')
         ->and($script)->toContain('render_json_cdr_config')
+        ->and($script)->toContain('chmod 0640 "${conf_dir}/autoload_configs/json_cdr.conf.xml"')
+        ->and($script)->toContain("fs_cli -x 'reload mod_json_cdr'")
+        ->and($script)->toContain("fs_cli -x 'load mod_json_cdr'")
         // No configuration is deployed without a token: the rendered file
         // would otherwise authenticate nobody and every post would 401.
         ->and($script)->toContain('FREESWITCH_CDR_TOKEN is empty; skipping json_cdr.conf.xml generation');
+
+    preg_match('/if \[ "\$\{1:-\}" = "--configure-only" \]; then([\s\S]*?)^fi/m', $script, $configureOnlyMatch);
+    $configureOnlyBlock = $configureOnlyMatch[1] ?? '';
+
+    expect($configureOnlyBlock)->not->toBe('')
+        ->and(strpos($configureOnlyBlock, 'configure_json_cdr'))
+        ->toBeLessThan(strpos($configureOnlyBlock, 'configure_dynamic_xml'));
 });
 
 it('renders the versioned template with the token and refuses an empty one', function (): void {

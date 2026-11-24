@@ -34,4 +34,4 @@ Label short smoke tests, sustained SIP runs, XML-only throughput, and projection
 
 ## Upstream skills
 
-The two bundled skills come from [GitHub Awesome Copilot](https://github.com/github/awesome-copilot/tree/f10fdb8b2660ce85c98f220b2f1ca24653768a5c/skills). Each copy includes the upstream MIT license. To update them, review a newer upstream revision and replace the corresponding skill files and bundled audit script together.
+The two bundled skills come from [GitHub Awesome Copilot](https://github.com/github/awesome-copilot/tree/f10fdb8b2660ce85c98f220b2f1ca24653768a5c/skills). Each copy includes the upstream MIT license. To update them, review a newer upstream revision and replace the corresponding skill files, preserving the TallPBX local adaptations in [`.agents/skills/docs-sync-audit/scripts/docs_drift.py`](../docs-sync-audit/scripts/docs_drift.py) for PHP/Laravel (`env()`, PSR-4/config entrypoints) and `/var/www/tallpbx/` fenced script paths.

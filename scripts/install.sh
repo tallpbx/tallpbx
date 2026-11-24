@@ -743,11 +743,11 @@ fi
 FAILED_STEPS=()
 
 # Total number of major installer steps, used for the progress counter.
-INSTALLER_TOTAL_STEPS=6
+INSTALLER_TOTAL_STEPS=7
 INSTALLER_CURRENT_STEP=0
 
 # Run an installer step and track whether it succeeded or failed.
-# Shows a [1/6] progress counter so the operator can see how far along the
+# Shows a [1/7] progress counter so the operator can see how far along the
 # install is.
 run_step () {
     local step_name="$1"
