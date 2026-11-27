@@ -113,7 +113,7 @@ sudo systemctl restart systemd-journald
 
 ### FreeSWITCH application log
 
-FreeSWITCH rotates `/var/log/freeswitch/freeswitch.log` internally at **250 MB per file** and keeps up to **10 rotated files**. The installer applies these values to `/etc/freeswitch/autoload_configs/logfile.conf.xml`.
+FreeSWITCH rotates `/var/log/freeswitch/freeswitch.log` internally at **250 MB per file** and keeps at most **10 log files**. The installer applies these values to `/etc/freeswitch/autoload_configs/logfile.conf.xml` and reloads `mod_logfile` so they take effect without restarting FreeSWITCH.
 
 To apply the values on an existing server without re-running the full installer:
 
@@ -126,6 +126,8 @@ sudo fs_cli -x 'reload mod_logfile'
 ### Laravel application logs
 
 Laravel writes dated daily files under `/var/www/tallpbx/storage/logs/` and keeps 10 days of history. See [env-reference.md](env-reference.md#101-logging-stack--retention).
+
+This retention applies to the default `daily` channel. If you deliberately set `LOG_CHANNEL=single`, Laravel keeps writing one unbounded `storage/logs/laravel.log`, so that file must be managed separately.
 
 ### Package-managed logs
 

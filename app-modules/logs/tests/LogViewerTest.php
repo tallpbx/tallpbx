@@ -233,6 +233,51 @@ it('reads large logs in bounded memory', function () {
     expect(memory_get_peak_usage() - $baseline)->toBeLessThan(12 * 1024 * 1024);
 });
 
+it('handles lines that straddle the chunk boundary', function () {
+    $pads = [10, 4000, 65000, 70000, 200];
+    $lines = [];
+    for ($i = 0; $i < 60; $i++) {
+        $lines[] = "[2026-07-06 10:00:00] local.INFO: {$i} ".str_repeat('x', $pads[$i % 5]);
+    }
+    file_put_contents($this->testLogPath, implode("\n", $lines)."\n");
+
+    $expected = implode("\n", array_slice($lines, -10));
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(LogViewer::class)
+        ->set('selectedFile', 'test-logs.log')
+        ->set('lines', 10)
+        ->assertViewHas('logContent', function ($content) use ($expected) {
+            return $content === $expected;
+        });
+});
+
+it('bounds memory and truncates a single enormous line', function () {
+    $handle = fopen($this->testLogPath, 'wb');
+    fwrite($handle, "[2026-07-06 10:00:00] local.INFO: before\n");
+    $block = str_repeat('Z', 1024 * 1024);
+    for ($i = 0; $i < 20; $i++) {
+        fwrite($handle, $block); // one ~20 MB line with no newline
+    }
+    fwrite($handle, "\n[2026-07-06 10:00:01] local.INFO: after\n");
+    fclose($handle);
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(LogViewer::class);
+
+    memory_reset_peak_usage();
+    $baseline = memory_get_usage();
+
+    $component->set('selectedFile', 'test-logs.log')->set('lines', 50)
+        ->assertViewHas('logContent', function ($content) {
+            return str_contains($content, 'before')
+                && str_contains($content, 'after')
+                && str_contains($content, '[truncated]');
+        });
+
+    // The line is ~20 MB; it must be truncated, not buffered whole.
+    expect(memory_get_peak_usage() - $baseline)->toBeLessThan(12 * 1024 * 1024);
+});
+
 // ─── Path Traversal Protection ──────────────────────────────────
 
 it('rejects path traversal attempts in selected file', function () {

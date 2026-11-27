@@ -101,7 +101,7 @@
             class="relative card bg-base-100 border border-base-300"
         >
             {{-- Loading indicator --}}
-            <div wire:loading class="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-base-100/70 backdrop-blur-xs">
+            <div wire:loading.delay.longest class="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-base-100/70 backdrop-blur-xs">
                 <div class="flex items-center gap-2 text-sm text-base-content/70">
                     <span class="loading loading-spinner loading-sm text-primary"></span>
                     {{ __('Loading...') }}

@@ -183,22 +183,22 @@ class LogViewer extends Component
 
         // Skip the scan entirely when the file and view parameters are
         // unchanged since the last render (for example an auto-refresh tick on
-        // a quiet log). The cache key embeds size+mtime so any change to the
-        // file or the filters always produces a fresh result.
-        clearstatcache(true, $filePath);
+        // a quiet log). The key embeds the resolved path plus size+mtime so a
+        // changed file or a different install always produces a fresh result.
+        clearstatcache(true, $resolvedPath);
         $signature = [
-            $this->selectedFile,
+            $resolvedPath,
             $this->filterLevel,
             $this->search,
             $this->lines,
-            (int) filesize($filePath),
-            (int) filemtime($filePath),
+            (int) filesize($resolvedPath),
+            (int) filemtime($resolvedPath),
         ];
 
         $this->logContent = Cache::remember(
             'log-viewer:'.md5(serialize($signature)),
-            now()->addMinutes(5),
-            fn (): string => $this->tailFilteredLines($filePath),
+            now()->addMinute(),
+            fn (): string => $this->tailFilteredLines($resolvedPath),
         );
     }
 
@@ -238,21 +238,52 @@ class LogViewer extends Component
             $searchLower = $this->search !== '' ? mb_strtolower($this->search) : null;
 
             $chunkSize = 65536;
-            $carry = '';       // incomplete line fragment at the left scan edge
-            $collected = [];   // matching lines, newest first
+            $maxLineLength = 262144; // 256 KiB: cap per-line buffering on huge lines
+
+            $carry = '';         // current partial line (right portion), in order
+            $collected = [];     // matching lines, newest first
             $position = $end;
+            $discarding = false; // skipping the left remainder of an oversized line
 
             while ($position > 0 && count($collected) < $this->lines) {
                 $readSize = min($chunkSize, $position);
                 $position -= $readSize;
-                fseek($handle, $position);
-                $chunk = fread($handle, $readSize);
 
-                if ($chunk === false || $chunk === '') {
+                // Read exactly $readSize bytes, tolerating short reads (network
+                // filesystems may return fewer bytes than requested).
+                fseek($handle, $position);
+                $chunk = '';
+
+                while (strlen($chunk) < $readSize) {
+                    $piece = fread($handle, $readSize - strlen($chunk));
+
+                    if ($piece === false || $piece === '') {
+                        break;
+                    }
+
+                    $chunk .= $piece;
+                }
+
+                if ($chunk === '') {
                     break;
                 }
 
                 $text = $chunk.$carry;
+
+                if ($discarding) {
+                    // Skip the left remainder of an oversized line until its
+                    // terminating newline, then resume with the line before it.
+                    $newline = strrpos($text, "\n");
+
+                    if ($newline === false) {
+                        continue; // still inside the oversized line
+                    }
+
+                    $discarding = false;
+                    $text = substr($text, 0, $newline);
+                    $carry = '';
+                }
+
                 $parts = explode("\n", $text);
 
                 if ($position > 0) {
@@ -264,12 +295,26 @@ class LogViewer extends Component
 
                 foreach (array_reverse($parts) as $line) {
                     if ($this->lineMatches($line, $levelPattern, $searchLower)) {
-                        $collected[] = $line;
+                        $collected[] = $this->truncateLine($line, $maxLineLength);
 
                         if (count($collected) >= $this->lines) {
-                            break;
+                            break 2;
                         }
                     }
+                }
+
+                // A single line with no newline within the cap would otherwise
+                // grow without bound (and rescan quadratically). Emit its known
+                // tail once, then skip the rest of the line instead.
+                if (strlen($carry) > $maxLineLength) {
+                    $truncated = $this->truncateLine($carry, $maxLineLength);
+
+                    if ($this->lineMatches($truncated, $levelPattern, $searchLower)) {
+                        $collected[] = $truncated;
+                    }
+
+                    $carry = '';
+                    $discarding = true;
                 }
             }
 
@@ -277,6 +322,18 @@ class LogViewer extends Component
         } finally {
             fclose($handle);
         }
+    }
+
+    /**
+     * Truncate an unusually long log line for display, appending a marker.
+     */
+    private function truncateLine(string $line, int $maxLength): string
+    {
+        if (strlen($line) <= $maxLength) {
+            return $line;
+        }
+
+        return substr($line, 0, $maxLength).' … [truncated]';
     }
 
     /**

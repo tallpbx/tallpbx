@@ -848,15 +848,21 @@ listener_record_count() {
 # this record is the only runtime evidence of what it actually subscribed to
 # and whether broadcast debouncing is in force.
 listener_last_record() {
-    local latest_log
+    local latest_log record
 
-    latest_log="$(ls -1t "${APP_DIR}/storage/logs"/laravel*.log 2>/dev/null | head -n 1 || true)"
+    # A restart that crosses midnight writes its new record to whichever daily
+    # file is current, so walk newest-first and return the first hit instead of
+    # assuming the newest file contains it.
+    for latest_log in $(ls -1t "${APP_DIR}/storage/logs"/laravel*.log 2>/dev/null); do
+        record="$(grep 'FreeSWITCH ESL listener started' "$latest_log" 2>/dev/null | tail -1)"
 
-    if [ -z "$latest_log" ]; then
-        return 0
-    fi
+        if [ -n "$record" ]; then
+            printf '%s\n' "$record"
+            return 0
+        fi
+    done
 
-    grep 'FreeSWITCH ESL listener started' "$latest_log" 2>/dev/null | tail -1 || true
+    return 0
 }
 
 # Apply the broadcast debounce window, in milliseconds.

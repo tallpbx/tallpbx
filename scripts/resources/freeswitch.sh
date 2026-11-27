@@ -21,6 +21,8 @@ cd "$(dirname "$0")"
 . ./environment.sh
 # Helpers for the JSON CDR gateway (mod_json_cdr) and its failure spool.
 . ./freeswitch-json-cdr.sh
+# Bounded logfile.conf.xml rollover/retention (tested directly).
+. ./freeswitch-logfile.sh
 
 # Find the active FreeSWITCH configuration directory for either package or
 # source installations, falling back to the package location on fresh systems.
@@ -153,25 +155,10 @@ configure_freeswitch_switch_defaults() {
         sed -i "/<settings>/a\\    <param name=\"loglevel\" value=\"${log_level}\"/>" "$switch_conf"
     fi
 
-    local logfile_conf="${conf_dir}/autoload_configs/logfile.conf.xml"
-    if [ -f "$logfile_conf" ]; then
-        # Keep FreeSWITCH's own file rollover bounded to 250 MB per file and 10
-        # rotated files. This is applied on fresh installs and re-runs.
-        if grep -q 'name="rollover"' "$logfile_conf"; then
-            sed -i 's#<param name="rollover" value="[^"]*"/>#<param name="rollover" value="262144000"/>#' "$logfile_conf"
-        else
-            sed -i '/<profile name="default">/,/<\/profile>/ s#</settings>#        <param name="rollover" value="262144000"/>\n    </settings>#' "$logfile_conf"
-        fi
-
-        if grep -q 'name="maximum-rotate"' "$logfile_conf"; then
-            sed -i 's#<param name="maximum-rotate" value="[^"]*"/>#<param name="maximum-rotate" value="10"/>#' "$logfile_conf"
-        else
-            sed -i '/<profile name="default">/,/<\/profile>/ s#</settings>#        <param name="maximum-rotate" value="10"/>\n    </settings>#' "$logfile_conf"
-        fi
-
-        # Ensure logfile map retains debug so temporary runtime diagnosis via 'fsctl loglevel debug' works
-        sed -i 's#<map name="all" value="console,info,notice,warning,err,crit,alert"/>#<map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>#' "$logfile_conf"
-    fi
+    # Keep FreeSWITCH's own file rollover bounded to 250 MB per file and at most
+    # 10 log files. Applied on fresh installs and re-runs; active params are
+    # rewritten in place and commented-out defaults are left alone.
+    configure_logfile_rollover "${conf_dir}/autoload_configs/logfile.conf.xml"
 
     local vars_xml="${conf_dir}/vars.xml"
     if [ -f "$vars_xml" ]; then
@@ -181,6 +168,9 @@ configure_freeswitch_switch_defaults() {
     if command -v fs_cli >/dev/null 2>&1; then
         fs_cli -x "fsctl sps ${sessions_per_second}" >/dev/null 2>&1 || true
         fs_cli -x "fsctl loglevel ${log_level}" >/dev/null 2>&1 || true
+        # mod_logfile reads rollover/maximum-rotate only at module load, so a
+        # reload is required for the bounded values written above to take effect.
+        fs_cli -x "reload mod_logfile" >/dev/null 2>&1 || true
     fi
 
     verbose "FreeSWITCH core defaults configured: sessions-per-second=${sessions_per_second}, loglevel=${log_level}"

@@ -340,11 +340,15 @@ grep -q "^FS_HIREDIS_MARKER_ENABLED=" .env 2>/dev/null \
 # Laravel application logs now default to dated daily files kept for 10 days.
 # New installs receive these values from .env.example. On installer re-runs,
 # move only the previous stack/single default to the new daily default and
-# preserve any other logging choice.
-if [ "$(get_env_value .env LOG_CHANNEL)" = "stack" ] && [ "$(get_env_value .env LOG_STACK)" = "single" ]; then
+# preserve any other logging choice. Values may be quoted or carry stray
+# whitespace/CR from hand-edited files, so normalize before comparing.
+log_channel="$(get_env_value .env LOG_CHANNEL | tr -d "\"' \r")"
+log_stack="$(get_env_value .env LOG_STACK | tr -d "\"' \r")"
+
+if [ "$log_channel" = "stack" ] && [ "$log_stack" = "single" ]; then
     set_env_value .env LOG_CHANNEL daily
     grep -q "^LOG_DAILY_DAYS=" .env 2>/dev/null || echo "LOG_DAILY_DAYS=10" >> .env
-    sed -i "/^LOG_STACK=single$/d" .env
+    sed -i "/^LOG_STACK=/d" .env
 else
     grep -q "^LOG_CHANNEL=" .env 2>/dev/null || echo "LOG_CHANNEL=daily" >> .env
     grep -q "^LOG_DAILY_DAYS=" .env 2>/dev/null || echo "LOG_DAILY_DAYS=10" >> .env
