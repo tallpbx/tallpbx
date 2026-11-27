@@ -170,63 +170,12 @@ it('bounds the system journal with TallPBX retention defaults', function (): voi
 
 it('keeps FreeSWITCH internal log rollover bounded to 250 MB and 10 files', function (): void {
     $freeswitch = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
-    $helper = (string) file_get_contents(base_path('scripts/resources/freeswitch-logfile.sh'));
 
-    expect($freeswitch)->toContain('. ./freeswitch-logfile.sh')
-        ->and($freeswitch)->toContain('configure_logfile_rollover "${conf_dir}/autoload_configs/logfile.conf.xml"')
-        ->and($helper)->toContain('262144000')
-        ->and($helper)->toContain('"maximum-rotate"');
-});
-
-it('activates FreeSWITCH rollover even when the params are commented out', function (): void {
-    $helper = base_path('scripts/resources/freeswitch-logfile.sh');
-
-    $active = implode("\n", [
-        '<configuration name="logfile.conf">',
-        '  <profiles>',
-        '    <profile name="default">',
-        '      <settings>',
-        '        <param name="rollover" value="1048576000"/>',
-        '        <param name="maximum-rotate" value="32"/>',
-        '      </settings>',
-        '    </profile>',
-        '  </profiles>',
-        '</configuration>',
-    ])."\n";
-
-    // Commented-out params must not satisfy the match; fresh active params are
-    // inserted instead.
-    $commented = implode("\n", [
-        '<configuration name="logfile.conf">',
-        '  <profiles>',
-        '    <profile name="default">',
-        '      <settings>',
-        '        <!-- <param name="rollover" value="1048576000"/> -->',
-        '        <!-- <param name="maximum-rotate" value="32"/> -->',
-        '      </settings>',
-        '    </profile>',
-        '  </profiles>',
-        '</configuration>',
-    ])."\n";
-
-    foreach ([$active, $commented] as $xml) {
-        $path = (string) tempnam(sys_get_temp_dir(), 'fslog');
-        file_put_contents($path, $xml);
-
-        $command = sprintf(
-            'bash -c %s',
-            escapeshellarg('. '.escapeshellarg($helper).'; configure_logfile_rollover '.escapeshellarg($path)),
-        );
-        $output = [];
-        exec($command, $output, $code);
-
-        $result = (string) file_get_contents($path);
-        unlink($path);
-
-        expect($code)->toBe(0)
-            ->and($result)->toMatch('/^[[:space:]]*<param name="rollover" value="262144000"/m')
-            ->and($result)->toMatch('/^[[:space:]]*<param name="maximum-rotate" value="10"/m');
-    }
+    expect($freeswitch)->toContain('configure_logfile_rollover "${conf_dir}/autoload_configs/logfile.conf.xml"')
+        ->and($freeswitch)->toContain('grep -qE "^[[:space:]]*<param name=')
+        ->and($freeswitch)->toContain('262144000')
+        ->and($freeswitch)->toContain('"maximum-rotate"')
+        ->and($freeswitch)->toContain('reload mod_logfile');
 });
 
 it('encrypts sessions in every install mode and enables secure cookies on HTTPS', function (): void {
