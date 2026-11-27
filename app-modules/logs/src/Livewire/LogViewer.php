@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Logs\Livewire;
 
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +22,7 @@ use Livewire\Component;
  * - Configure number of tail lines (50–1000)
  * - Filter by log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
  * - Search/filter log content by text
- * - Auto-refresh via wire:poll.5s
+ * - Auto-refresh via wire:poll.5s (poll is only wired while the toggle is on)
  *
  * Security:
  * - Path traversal protection: only allows paths within storage/logs/ with .log extension
@@ -180,36 +181,118 @@ class LogViewer extends Component
             return;
         }
 
-        // Read the file
-        $content = file_get_contents($filePath);
+        // Skip the scan entirely when the file and view parameters are
+        // unchanged since the last render (for example an auto-refresh tick on
+        // a quiet log). The cache key embeds size+mtime so any change to the
+        // file or the filters always produces a fresh result.
+        clearstatcache(true, $filePath);
+        $signature = [
+            $this->selectedFile,
+            $this->filterLevel,
+            $this->search,
+            $this->lines,
+            (int) filesize($filePath),
+            (int) filemtime($filePath),
+        ];
 
-        if ($content === false) {
-            $this->logContent = '';
+        $this->logContent = Cache::remember(
+            'log-viewer:'.md5(serialize($signature)),
+            now()->addMinutes(5),
+            fn (): string => $this->tailFilteredLines($filePath),
+        );
+    }
 
-            return;
+    /**
+     * Read the newest matching lines from the tail of a log file using a
+     * bounded, backward chunked scan.
+     *
+     * Memory use is proportional to the number of retained lines, not the file
+     * size, so large logs that previously exhausted memory_limit (via a full
+     * file_get_contents()/explode() read) now load safely. The level and search
+     * filters are applied while scanning so only matching lines are retained.
+     */
+    private function tailFilteredLines(string $filePath): string
+    {
+        $handle = fopen($filePath, 'rb');
+
+        if ($handle === false) {
+            return '';
         }
 
-        // Split into lines
-        $lines = explode("\n", $content);
+        try {
+            $fileSize = (int) filesize($filePath);
 
-        // Apply level filter
-        if ($this->filterLevel !== '') {
-            $levelPattern = '/\.'.preg_quote($this->filterLevel, '/').':/i';
-            $lines = array_values(array_filter($lines, fn (string $line) => preg_match($levelPattern, $line)));
+            if ($fileSize === 0) {
+                return '';
+            }
+
+            // A trailing newline terminates the final line; it does not start a
+            // phantom empty line. Trim it so line counting matches `tail -n`.
+            fseek($handle, $fileSize - 1);
+            $lastByte = fread($handle, 1);
+            $end = ($lastByte === "\n") ? $fileSize - 1 : $fileSize;
+
+            $levelPattern = $this->filterLevel !== ''
+                ? '/\.'.preg_quote($this->filterLevel, '/').':/i'
+                : null;
+            $searchLower = $this->search !== '' ? mb_strtolower($this->search) : null;
+
+            $chunkSize = 65536;
+            $carry = '';       // incomplete line fragment at the left scan edge
+            $collected = [];   // matching lines, newest first
+            $position = $end;
+
+            while ($position > 0 && count($collected) < $this->lines) {
+                $readSize = min($chunkSize, $position);
+                $position -= $readSize;
+                fseek($handle, $position);
+                $chunk = fread($handle, $readSize);
+
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+
+                $text = $chunk.$carry;
+                $parts = explode("\n", $text);
+
+                if ($position > 0) {
+                    // The leftmost fragment may continue further left; retain it.
+                    $carry = array_shift($parts) ?? '';
+                } else {
+                    $carry = '';
+                }
+
+                foreach (array_reverse($parts) as $line) {
+                    if ($this->lineMatches($line, $levelPattern, $searchLower)) {
+                        $collected[] = $line;
+
+                        if (count($collected) >= $this->lines) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return implode("\n", array_reverse($collected));
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    /**
+     * Determine whether a single log line passes the active level and search filters.
+     */
+    private function lineMatches(string $line, ?string $levelPattern, ?string $searchLower): bool
+    {
+        if ($levelPattern !== null && ! preg_match($levelPattern, $line)) {
+            return false;
         }
 
-        // Apply search filter
-        if ($this->search !== '') {
-            $lines = array_values(array_filter($lines, fn (string $line) => str_contains(
-                mb_strtolower($line),
-                mb_strtolower($this->search),
-            )));
+        if ($searchLower !== null && ! str_contains(mb_strtolower($line), $searchLower)) {
+            return false;
         }
 
-        // Take only the last N lines
-        $lines = array_slice($lines, -$this->lines);
-
-        $this->logContent = implode("\n", $lines);
+        return true;
     }
 
     /**

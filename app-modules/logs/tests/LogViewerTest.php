@@ -177,6 +177,62 @@ it('toggles auto-refresh', function () {
         ->assertSet('autoRefresh', true);
 });
 
+it('only wires the refresh poll when auto-refresh is enabled', function () {
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(LogViewer::class)
+        ->assertDontSee('wire:poll.5s', false)
+        ->set('autoRefresh', true)
+        ->assertSee('wire:poll.5s', false)
+        ->set('autoRefresh', false)
+        ->assertDontSee('wire:poll.5s', false);
+});
+
+// ─── Bounded Tail Reading ───────────────────────────────────────
+
+it('returns the newest lines in chronological order', function () {
+    $lines = [];
+    for ($i = 0; $i < 50; $i++) {
+        $lines[] = "[2026-07-06 10:00:00] local.INFO: Line {$i}";
+    }
+    file_put_contents($this->testLogPath, implode("\n", $lines)."\n");
+
+    $expected = implode("\n", [
+        '[2026-07-06 10:00:00] local.INFO: Line 47',
+        '[2026-07-06 10:00:00] local.INFO: Line 48',
+        '[2026-07-06 10:00:00] local.INFO: Line 49',
+    ]);
+
+    Livewire::actingAs($this->admin, 'admin')
+        ->test(LogViewer::class)
+        ->set('selectedFile', 'test-logs.log')
+        ->set('lines', 3)
+        ->assertViewHas('logContent', function ($content) use ($expected) {
+            return $content === $expected;
+        });
+});
+
+it('reads large logs in bounded memory', function () {
+    // Write a log far larger than the buffer budget, without allocating one
+    // huge string while producing it.
+    $line = "[2026-07-06 10:00:00] local.INFO: filler line for the memory test\n";
+    $block = str_repeat($line, 10000); // ~0.5 MB
+    $handle = fopen($this->testLogPath, 'wb');
+    for ($i = 0; $i < 80; $i++) {
+        fwrite($handle, $block); // ~40 MB total
+    }
+    fclose($handle);
+
+    $component = Livewire::actingAs($this->admin, 'admin')->test(LogViewer::class);
+
+    memory_reset_peak_usage();
+    $baseline = memory_get_usage();
+
+    $component->set('selectedFile', 'test-logs.log')->set('lines', 50);
+
+    // The file is ~40 MB; a full-file read would blow far past this budget.
+    expect(memory_get_peak_usage() - $baseline)->toBeLessThan(12 * 1024 * 1024);
+});
+
 // ─── Path Traversal Protection ──────────────────────────────────
 
 it('rejects path traversal attempts in selected file', function () {

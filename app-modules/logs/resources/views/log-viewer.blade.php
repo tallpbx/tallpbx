@@ -97,7 +97,7 @@
 
         {{-- Log Content --}}
         <div
-            wire:poll.5s="pollRefresh"
+            @if ($autoRefresh) wire:poll.5s="pollRefresh" @endif
             class="relative card bg-base-100 border border-base-300"
         >
             {{-- Loading indicator --}}
