@@ -1,618 +1,168 @@
 # IVR Parity Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Execute the tasks in order using the implementation workflow agreed for the change. Each task has a test or evidence gate. Keep each planned commit runnable on the TallPBX `5.x` series.
 
-**Goal:** Close the IVR gap so an administrator can build a FusionPBX/FreePBX-equivalent auto-attendant from the panel, executed by FreeSWITCH's native IVR engine.
+**Goal**
 
-**Architecture:** Typed destinations resolve to FreeSWITCH menu entries rendered into the dynamically served `ivr.conf`; each menu gets a dialplan stub extension that answers, applies presentation settings, and calls `application="ivr"` keyed by the menu UUID. The broken `bind_digit_action`/`read` path is deleted.
+Give TallPBX administrators interactive auto-attendants with typed destinations, reusable prompts, and tenant-safe call routing while preserving existing announcement menus and inbound routes.
 
-**Tech Stack:** Laravel 13, Livewire 4, Pest 4, MariaDB, FreeSWITCH 1.11 (`mod_dptools` ivr, `mod_xml_curl`), SIPp.
+**Architecture**
 
-**Spec:** `docs/superpowers/specs/2026-11-27-ivr-parity-design.md`
+FreeSWITCH's native IVR collects digits and manages navigation and retries. A TallPBX dialplan entry starts the menu. FreeSWITCH asks TallPBX's XML Handler for that call's menu tree, and generated dialplan actions route the call in the owning tenant's context. Announcement-only menus play once and follow their exit action or hang up.
 
-## Global Constraints
+**Tech stack**
 
-- Every PHP file starts with `declare(strict_types=1);`; every class and method has a plain-language PHPDoc.
-- Tenant isolation: every query uses `withoutGlobalScope('tenant')` + explicit `tenant_id` filter.
-- XML values escaped with `ENT_XML1 | ENT_QUOTES`; no `${` may appear in generated `ivr.conf` entry params.
-- No static FreeSWITCH XML files on disk; all XML through the XML Handler (`mod_xml_curl`).
-- Media stored as files with paths in DB; never blobs.
-- `ivr_menus.extension` values: digits only, unique per tenant, must not shadow `extensions.extension_number`, `feature_codes.code`, `call_flows.extension`, or another menu.
-- `ivr.conf` menu names are menu UUIDs and the generator serves all tenants regardless of domain for `key_value = ivr.conf`.
-- UI: DaisyUI semantic tokens only, `toggle-sm`, `badge-xs font-mono`, present-continuous toggle labels, `wire:loading` pointer locks and spinners.
-- Translations: `en`/`es`/`fr` full parity in `app-modules/ivr-menus/lang/<locale>/admin.php`.
-- After any change: `tpbx optimize:clear`. PHP changes: `./vendor/bin/pint --dirty`. Tests: `./vendor/bin/pest <path>`.
+Laravel 13, Livewire 4, Pest 4, MariaDB, FreeSWITCH 1.11, SIPp.
 
-## Review Focus
+**Design**
 
-1. **Option-less menu, direct dial off** — announcement plays, call hangs up cleanly; no `read`/digit loop and no `ivr` invoked when no entries would exist (menu with zero entries still plays greet-long then exits via max-timeouts).
-2. **Two tenants with identical menu names** — `ivr.conf` is UUID-keyed and complete for both tenants; no tenant can reference the other's menu or destinations.
-3. **Target disabled/deleted after save** — an option or fallback whose target no longer resolves is skipped with a log warning; the dialplan still answers and the remaining entries work.
-4. **Caller never presses a digit** — timeout counter reaches `max-timeouts`, `exec-on-max-timeouts` runs (or the call exits cleanly); never an infinite prompt loop.
-5. **Menu extension collides with a dialable number** — save is rejected with a clear validation message naming the colliding record type.
+[IVR parity design](../specs/2026-11-27-ivr-parity-design.md)
 
----
+## Global constraints
 
-### Task 1: Schema, models, media categories, factories
+- Follow `AGENTS.md`, including the existing UI and permission conventions, strict types, PHPDoc, focused Pint and Pest checks, and `tpbx optimize:clear` after code changes.
+- Serve routing artifacts through the XML Handler and `mod_xml_curl`. Escape XML attributes with `ENT_XML1 | ENT_QUOTES` and validate FreeSWITCH arguments for their own format. Keep `ivr.conf` entry arguments concrete.
+- Apply an explicit tenant constraint whenever bypassing a tenant scope. When a child row lacks `tenant_id`, scope through its parent. UUIDs identify records and the call's verified tenant context determines access.
+- Keep `file-stores` as the hard IVR module dependency. Keep media in managed local files. Allow tenant recordings as an optional shared source and support inline uploads for installs without the recordings module.
+- Require a digit-only extension of at most 20 characters on newly saved menus. Enforce menu-to-menu uniqueness with a database constraint and check other dialable records before saving. Keep existing menus reachable during the upgrade.
+- Keep PHP-FPM's fast XML Handler and the optional [Laravel Octane](https://laravel.com/docs/octane) XML worker on the same runtime contract. The fast handler can fall back to the full application on an exception. Use the existing XML route and test representative requests through the serving paths. [Operations guide](../../operations.md#octane-xml-worker-optional-performance-mode)
+- Add matching English, Spanish, and French keys with the UI that uses them. Use `AdminSeeder` for panel test permissions.
 
-**Files:**
-- Create: `app-modules/ivr-menus/database/migrations/2026_11_27_000001_add_parity_columns_to_ivr_tables.php`
-- Modify: `app-modules/ivr-menus/src/Models/IvrMenu.php`, `app-modules/ivr-menus/src/Models/IvrMenuOption.php`
-- Modify: `app-modules/file-stores/src/Enums/MediaCategory.php`, `app-modules/file-stores/src/Services/MediaAssetAuthorizationService.php:20-30`
-- Modify: `app-modules/ivr-menus/src/Database/Factories/IvrMenuFactory.php`, `IvrMenuOptionFactory.php`
-- Test: `app-modules/ivr-menus/tests/IvrMenuModelTest.php`
+## Acceptance cases
 
-**Interfaces:**
-- Produces: `IvrMenu` fillable includes `extension, greet_short, invalid_sound, exit_sound, inter_digit_timeout, max_timeouts, direct_dial, ringback, cid_prefix, exit_kind, exit_data, invalid_kind, invalid_data, timeout_kind, timeout_data`; `IvrMenu::mediaAssets(): MorphMany`; `IvrMenuOption` fillable includes `description, return_to_menu`.
-
-- [ ] **Step 1: Write the failing test**
-
-```php
-it('exposes parity columns and casts', function (): void {
-    $menu = IvrMenu::factory()->create([
-        'extension' => '2600', 'direct_dial' => true, 'max_timeouts' => 4,
-        'exit_kind' => 'extension', 'exit_data' => '2000',
-    ]);
-    expect($menu->fresh())
-        ->extension->toBe('2600')
-        ->direct_dial->toBeTrue()
-        ->max_timeouts->toBe(4)
-        ->exit_kind->toBe('extension');
-
-    $option = IvrMenuOption::factory()->create([
-        'ivr_menu_id' => $menu->id, 'return_to_menu' => true, 'description' => 'Sales',
-    ]);
-    expect($option->fresh()->return_to_menu)->toBeTrue()
-        ->and($option->fresh()->description)->toBe('Sales');
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenuModelTest.php`
-Expected: FAIL — unknown column `extension`.
-
-- [ ] **Step 3: Implement migration and models**
-
-Migration: add the columns from the spec's data-model table to `ivr_menus` (all `nullable` or with the spec defaults) plus `description` (text, nullable) and `return_to_menu` (boolean, default false) to `ivr_menu_options`; `down()` drops them. Update fillables/casts (`direct_dial`, `return_to_menu` boolean; integer casts for the three timeout/retry columns). Replace `mediaAsset(): MorphOne` with `mediaAssets(): MorphMany` (`morphMany(MediaAsset::class, 'owner')->withoutGlobalScope('tenant')`) and keep `managedAsset(MediaCategory $category): ?MediaAsset` as a helper returning the first matching asset. Add `MediaCategory` cases `IvrGreetingShort`, `IvrInvalidPrompt`, `IvrExitPrompt` (values `ivr-greeting-short`, `ivr-invalid-prompt`, `ivr-exit-prompt`) and map all four IVR categories to `ivr-menus.view` in `MediaAssetAuthorizationService`. Factories: default `extension => (string) fake()->unique()->numberBetween(2500, 2699)`, `direct_dial => false`, `max_timeouts => 3`, `inter_digit_timeout => 3`; option factory adds `description => fake()->optional()->sentence()`, `return_to_menu => false`.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenuModelTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app-modules/ivr-menus app-modules/file-stores
-git commit -m "feat(ivr): add parity schema, media categories, and model casts"
-```
+| Case | Required result | Task |
+| --- | --- | --- |
+| Existing menu with no extension and a named inbound route | Upgrade preserves the route and the greeting plays once. A later extension assignment keeps stored typed routes valid. | 1, 4, 7 |
+| Inbound caller dials an extension or a digit that overlaps direct dial | Only an enabled, eligible extension in the owning tenant can be reached. A configured option wins for its exact sequence. | 3, 4, 7 |
+| Destination answers and hangs up, is busy, or never answers | Destination types that support return replay the IVR once if the caller is still connected. Terminal destinations leave the menu. | 4, 7 |
+| Menu has no effective entries, invalid input, or no input | An announcement plays once. An interactive menu exhausts the selected counter and invokes one applicable fallback or exits cleanly. | 4, 7 |
+| Tenant uses a shared realm or requests another tenant's menu, recording, or destination | The PBX-provided tenant context determines access. Other tenants' records stay out of the response and cannot be reached. | 0, 2–4, 7 |
+| An option target disappears or a prompt upload fails partway | A stale target is omitted. A failed write leaves earlier menu, option, and prompt data playable. Retired files can be cleaned up safely on retry. | 2–4, 7 |
 
 ---
 
-### Task 2: Destination kind enum and renderer
-
-**Files:**
-- Create: `app-modules/ivr-menus/src/Enums/IvrDestinationKind.php`
-- Create: `app-modules/ivr-menus/src/Support/IvrDestinationRenderer.php`
-- Test: `app-modules/ivr-menus/tests/IvrDestinationRendererTest.php`
-
-**Interfaces:**
-- Produces: `IvrDestinationKind: string` cases `Extension, RingGroup, Voicemail, Conference, Queue, External, Playback, Ivr, MenuAction` (values equal to the `DestinationResolver::KIND_*` strings; `playback`, `ivr`, `menu_action` are module-local); `IvrDestinationKind::selectable(): array<int, self>`.
-- Produces: `IvrDestinationRenderer::render(IvrDestinationKind $kind, string $identifier, int $tenantId, string $tenantDomain): ?array{entry_action: string, param: string}` — `entry_action` is `menu-exec-app`, `menu-sub`, `menu-play-sound`, `menu-top`, `menu-back`, or `menu-exit`; returns `null` when unresolvable.
-- Produces: `IvrDestinationRenderer::execString(IvrDestinationKind $kind, string $identifier, int $tenantId, string $tenantDomain): ?string` — `"<application> <data>"` for exit/`exec-on-*`; `null` for non-executable kinds (Playback returns `"playback <path>"`).
-
-- [ ] **Step 1: Write the failing tests**
-
-```php
-it('renders transfer-style kinds through the resolver', function (): void {
-    // extension 2000 exists for the tenant; voicemail 2003 with domain
-    expect($renderer->render(IvrDestinationKind::Extension, '2000', $tenant->id, 'sip.example.com'))
-        ->toBe(['entry_action' => 'menu-exec-app', 'param' => 'transfer user/2000']);
-});
+### Task 0 — Record the native IVR request and call semantics
 
-it('renders voicemail with a concrete domain and no channel variables', function (): void {
-    $rendered = $renderer->render(IvrDestinationKind::Voicemail, '2003', $tenant->id, 'sip.example.com');
-    expect($rendered['param'])->toBe('voicemail default sip.example.com 2003')
-        ->and($rendered['param'])->not->toContain('${');
-});
+**Inputs**
 
-it('maps ivr and menu actions to navigation entries', function (): void {
-    expect($renderer->render(IvrDestinationKind::Ivr, $otherMenu->id, $tenant->id, 'sip.example.com'))
-        ->toBe(['entry_action' => 'menu-sub', 'param' => $otherMenu->id]);
-    expect($renderer->render(IvrDestinationKind::MenuAction, 'back', $tenant->id, 'sip.example.com'))
-        ->toBe(['entry_action' => 'menu-back', 'param' => '']);
-});
+`app/Http/Controllers/Api/XmlHandlerController.php`, `app/Services/DialplanContext.php`, and the installed FreeSWITCH build.
 
-it('returns null for deleted or disabled targets', function (): void {
-    expect($renderer->render(IvrDestinationKind::Extension, '9999', $tenant->id, 'sip.example.com'))->toBeNull();
-});
+- [ ] In a disposable TallPBX lab, use a throwaway fixture served by the authenticated XML Handler to invoke native `ivr`. Capture `mod_xml_curl` requests during an internal IVR call and an inbound call, with credentials and call data redacted. Record the actual request method and field names for `Menu-Name`, caller context, and configuration name. FreeSWITCH attaches the menu name and channel data each time `ivr` executes. [FreeSWITCH 1.11 source](https://github.com/signalwire/freeswitch/blob/v1.11.0/src/mod/applications/mod_dptools/mod_dptools.c#L2156-L2189)
+- [ ] Confirm that both call paths can provide a tenant-scoped context. If the inbound call starts in a shared context, have the tenant-resolved inbound route transfer to the owning tenant's internal context before invoking the IVR. Confirm this in the capture. A request with missing, ambiguous, or conflicting ownership must produce an empty menu response.
+- [ ] Record the installed version, captured request shape, and evidence for a terminal transfer, a returning bridge, and an invalid or timeout fallback. Carry the request shape into the Task 4 tests. Use the tested FreeSWITCH build for the final live gate.
 
-it('renders playback as path, menu-play-sound handled by caller', function (): void {
-    // playback identifier = raw path when not a recording id
-    expect($renderer->render(IvrDestinationKind::Playback, '/sounds/hours.wav', $tenant->id, 'sip.example.com'))
-        ->toBe(['entry_action' => 'menu-exec-app', 'param' => 'playback /sounds/hours.wav']);
-});
-```
+### Task 1 — Add backward-compatible schema and menu identifiers
 
-- [ ] **Step 2: Run tests to verify they fail**
+**Files**
 
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrDestinationRendererTest.php`
-Expected: FAIL — class not found.
+`app-modules/ivr-menus/database/migrations/`, `app-modules/ivr-menus/src/Models/IvrMenu.php`, `app-modules/ivr-menus/src/Models/IvrMenuOption.php`, and their factories.
 
-- [ ] **Step 3: Implement enum and renderer**
+- [ ] Add `IvrMenuModelTest.php` with a pre-upgrade fixture. Assert its name is copied to `legacy_name`, its extension remains nullable, and its greeting, enabled state, and options survive. Assert that different tenants may share extension `2600` and that the database rejects two menus with that extension in one tenant.
+- [ ] Run `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenuModelTest.php` and confirm the new checks fail before the migration.
+- [ ] Add the menu and option columns and defaults in the design, including the composite unique index on `tenant_id, extension`. Copy the old name to `legacy_name` for rows present during migration. Keep new rows' `legacy_name` null and keep it outside panel input. Add casts and deterministic factories. Keep the existing `mediaAsset()` relation and current XML callers working at this checkpoint.
+- [ ] Audit stored custom IVR option values and references in the target 5.x upgrade fixtures. Convert only known legacy actions with equivalent typed behavior and record any entries requiring explicit operator mapping before cutover. Preserve all original rows until they are mapped.
+- [ ] Re-run the model tests, existing greeting storage test, and IVR XML fixtures. Commit the additive schema.
 
-`render()`: `MenuAction` maps `top|back|exit` → `menu-top|menu-back|menu-exit` (param `''`). `Ivr` → `menu-sub` with the target menu UUID. `Playback` → resolve a `recordings` module path when the identifier matches a recording id, else raw path; entry action `menu-exec-app`, param `playback <path>`. All other kinds call `DestinationResolver::resolve($kind->value, $identifier, $tenantId)`; post-process `data` by replacing `${domain}` and `${domain_name}` with `$tenantDomain`; if `${` remains, return `null`. `execString()` uses the same resolution and returns `"{$application} {$data}"`.
+### Task 2 — Save options and prompt sources with recoverable media handling
 
-- [ ] **Step 4: Run tests to verify they pass**
+**Files**
 
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrDestinationRendererTest.php`
-Expected: PASS.
+`app-modules/ivr-menus/src/Services/IvrMenuService.php` and its interface, new `IvrMenuPrompt` model, migration and cleanup job, and the IVR prompt categories and permission mapping in `app-modules/file-stores/src/`.
 
-- [ ] **Step 5: Commit**
+**Service contract**
 
-```bash
-git add app-modules/ivr-menus/src/Enums app-modules/ivr-menus/src/Support app-modules/ivr-menus/tests/IvrDestinationRendererTest.php
-git commit -m "feat(ivr): add typed destination renderer for FreeSWITCH menu entries"
-```
+`create(array $data, array $options = [], array $promptUploads = []): IvrMenu` and `update(IvrMenu $menu, array $data, ?array $options = null, array $promptUploads = []): IvrMenu`. An option row contains `digit`, `action`, `action_data`, `description`, `return_to_menu`, `order`, and `enabled`. Omitted options preserve existing rows. An explicit empty list clears them. Uploads are keyed by prompt slot and contain the validated local source path, original filename, and MIME type.
 
----
+- [ ] Add `IvrMenuServiceWriteTest.php` and extend `IvrGreetingStorageTest.php`. Cover omitted versus empty options, model events for option-only saves and deletes, retention of stable option IDs for unchanged digits, two stored prompt categories on one menu, and replacement of only one category. Induce a failure after staging an upload and confirm the previous menu, options, and prompt bytes survive. Induce a cleanup failure and verify retry marks the retired asset `Missing` and removes its file.
+- [ ] Test one shared tenant recording used by two menus. Assert that deleting either menu leaves that recording available, another tenant's recording cannot be selected, and a disabled or deleted recording never falls back to a stale filename.
+- [ ] Run the two targeted tests and confirm failures in the new behavior.
+- [ ] Keep the existing one-asset-per-owner contract in `file-stores`. Give each private prompt upload an immutable `IvrMenuPrompt` owner UUID with a tenant, slot, nullable menu link, and lifecycle state. Store the local file as pending. In the outer menu transaction, lock the menu for update, save the menu and options, attach the pending revision, and retire the previous private revision for that slot. Keep each referenced recording as a recording UUID in the menu's `prompt_recordings` mapping.
+- [ ] Use the existing local managed store and the retryable media deletion job for retired assets. Record retirement in the transaction and schedule cleanup after commit. Reconcile pending uploads abandoned by a failed or interrupted save and retired uploads whose cleanup dispatch failed. Check state under a lock before cleanup, and keep replaced files available for the active routing-cache lifetime so cached actions can finish lookup. When deleting a menu, record retirement before removing it and keep sufficient durable metadata for cleanup to finish. Preserve the old greeting relation and its legacy-path read until the runtime reads in Task 4 use the new prompt resolver.
+- [ ] Validate dialable numbers in the service as well as the form. Check enabled and disabled records in the tenant for reserved numbers, including extensions, feature codes, call flows, other menus and their legacy aliases, and exact dialable destinations already claimed by a higher-priority contributor. Reserve a menu's legacy name against reuse by another menu in the same tenant. Report the conflicting type. Exercise the database constraint for simultaneous menu writes.
+- [ ] Re-run the media and service tests and `tests/Feature/Observers/RoutingCacheObserverTest.php`. Commit the write and cleanup behavior.
 
-### Task 3: Dialplan stub and return-helper extensions
+### Task 3 — Define typed, tenant-safe destination actions
 
-**Files:**
-- Modify: `app-modules/ivr-menus/src/Services/IvrMenuService.php:104-166` (replace `generateDialplanXml`; delete `resolveGreetingPath` legacy path use in favor of `managedAsset`)
-- Test: `app-modules/ivr-menus/tests/IvrDialplanXmlTest.php`
+**Files**
 
-**Interfaces:**
-- Consumes: `IvrDestinationRenderer::execString()` from Task 2; `IvrMenu::mediaAssets()` from Task 1.
-- Produces: stub extension named `ivr_<uuid>` matching `^<extension>$` with actions `answer`, `sleep 1000`, `hangup_after_bridge=true`, optional `ringback`/`transfer_ringback`/CID-prefix sets, `ivr <uuid>`, optional exit action; helper extensions `ivr_return_<option uuid>` matching `^ivr_return_<option uuid>$` that execute the option destination and `transfer <menu extension>`.
+New `app-modules/ivr-menus/src/Enums/IvrDestinationKind.php` and `app-modules/ivr-menus/src/Support/IvrDestinationRenderer.php`, `app/Services/DestinationResolver.php`, and the affected call-center and bridge runtime producers.
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] Add `IvrDestinationRendererTest.php` and extend `tests/Feature/Pbx/Services/PbxRoutingServicesTest.php`. Cover every kind, deleted/disabled and foreign-tenant targets, nested IVR validation, recording UUIDs versus separately selected host-approved sound paths, and an unavailable optional module. Assert that same-name queues and conference bridges from two tenants resolve to distinct runtime identities. Assert that a queue's resolved name exactly matches its `callcenter.conf` registration and ordinary dialplan route.
+- [ ] Run the tests and observe failures for missing typed rendering and the bare queue name.
+- [ ] Define `IvrDestinationKind` for extension, ring group, voicemail, conference, queue, external number, playback, submenu, and menu navigation. In `IvrDestinationRenderer::resolve(IvrDestinationKind $kind, string $identifier, int $tenantId): ?array`, produce an allowlisted FreeSWITCH application/data pair for executable targets and return null for invalid or unavailable targets. Resolve navigation and submenu entries explicitly. Reuse the tenant-scoped route resolver where its output matches the target's runtime contract. Catch expected stale-target lookup failures and log the menu or option ID and kind without the private destination data.
+- [ ] For IVR extension and ring-group bridges, resolve tenant-correct dial strings and preserve target eligibility. For voicemail, use the target tenant's correct local mailbox/domain binding. For external destinations, accept only validated phone numbers and use the tenant's normal outbound route and gateway rules.
+- [ ] Use UUID-based FreeSWITCH queue and conference-room identifiers wherever names can collide. Update the configuration renderer, normal callers, and resolver together for each changed identifier, including any queue membership or agent consumers found by the call-site audit. Preserve display names, profiles, and PIN behavior. Inventory any saved raw FreeSWITCH references that need a mapping, then cover the existing direct queue or conference route in the same change.
+- [ ] Re-run the renderer, routing, and affected module tests. Commit the matching configuration and consumers together.
 
-```php
-it('emits an extension-matched stub that invokes the ivr app', function (): void {
-    $menu = IvrMenu::factory()->create(['extension' => '2600', 'enabled' => true]);
-    $xml = $service->generateDialplanXml($menu->tenant_id, 'tenant_'.$menu->tenant_id.'_internal', '2600');
+### Task 4 — Switch dialplan and scoped `ivr.conf` rendering together
 
-    expect($xml)
-        ->toContain('<extension name="ivr_'.$menu->id.'">')
-        ->toContain('expression="^2600$"')
-        ->toContain('application="ivr" data="'.$menu->id.'"')
-        ->not->toContain('bind_digit_action')
-        ->not->toContain('touchexec');
-});
+**Files**
 
-it('applies ringback and cid prefix only when configured', function (): void {
-    // menu with ringback 'us-ring', cid_prefix 'IVR'
-    expect($xml)->toContain('data="ringback=tone_stream://%(2000,4000,440,480)"')
-        ->toContain('data="caller_id_name=IVR#${caller_id_name}"');
-});
+`app-modules/ivr-menus/src/Services/IvrMenuService.php`, `app/Http/Controllers/Api/XmlHandlerController.php`, `app/Services/Xml/SofiaConfigXmlBuilder.php`, `app/Services/DestinationResolver.php`, and `app-modules/call-flows/src/Services/CallFlowService.php`.
 
-it('emits helper extensions only for return_to_menu transfer options', function (): void {
-    // option returns true, kind extension, target 2000
-    expect($xml)->toContain('extension name="ivr_return_'.$option->id.'"')
-        ->toContain('data="transfer 2000"')       // executed inside the helper
-        ->toContain('data="transfer 2600"');      // back to the stub
-});
+- [ ] Write failing tests in `app-modules/ivr-menus/tests/IvrDialplanXmlTest.php`, `tests/Feature/Http/XmlHandlerFixtureTest.php`, `tests/Feature/Pbx/PbxXmlValidationTest.php`, and `tests/Feature/Pbx/DialplanDestinationIntegrationTest.php`. Test the captured GET and POST request data, known and mismatched context, two tenants with shared realm and identical menu names, nesting, disabled menus, stale targets, and absence of `${` in entry arguments. Assert that a known caller gets only its root and reachable same-tenant submenus. Assert other configuration keys retain their behavior.
+- [ ] Add XML assertions for the older named inbound route, numeric dialing, renumbering, literal option versus direct dial, invalid/timeout versus general exit, missing greeting, one-shot announcement, and a returning bridge. Assert the exact action order and transfer context. Cover `CallFlowService` in both tenant contexts for the transfer affected by this change.
+- [ ] Run `./vendor/bin/pest app-modules/ivr-menus/tests/IvrDialplanXmlTest.php tests/Feature/Http/XmlHandlerFixtureTest.php tests/Feature/Pbx/PbxXmlValidationTest.php tests/Feature/Pbx/DialplanDestinationIntegrationTest.php` and observe the legacy output failures.
+- [ ] Render a stable `ivr_entry_<menu UUID>` entry plus exact matches for the assigned extension and pre-upgrade name alias. Quote legacy names as literal regex values before XML escaping. Resolve existing stored identifiers by UUID, then legacy name, then current name. Return `transfer ivr_entry_<uuid> XML <tenant internal context>` even when an upgraded menu has no number. Normalize the affected call-flow transfer to the correct tenant context. Verify the original name alias still works after renaming or renumbering the menu.
+- [ ] In the XML Handler, special-case only `ivr.conf` and resolve the requested root inside the tenant established by Task 0. Return its reachable enabled same-tenant submenus and bound traversal with a visited set. Return an empty valid configuration on unknown, disabled, mismatched, or unscoped requests. Add no cross-tenant fallback or switch-wide cache. Take account of the routing-cache revision for generated dialplan when an option, destination, recording, or prompt changes.
+- [ ] Build terminal entries and both retry-exhaustion hooks as a single transfer to a tenant-scoped action extension. Require a channel marker set by the owning IVR entry or an equivalent dialplan condition that proves the call entered this tenant's IVR. Each retry hook executes its menu's resolved destination, then falls back to that menu's general exit or hangup only when the retry destination is missing or stale. End cleanly when a terminal application returns. Normal native exit and one-shot announcements use the general exit once. A fallback transfer leaves the menu and owns the call's next action.
+- [ ] Allow return for playback and resolvable extension or ring-group bridges. Playback uses `menu-play-sound`. A bridge return action sets `hangup_after_bridge=false` and permits continuation for the supported busy/no-answer outcomes, bridges once, then transfers back to the option's source menu if the caller is still connected. Never chain two transfers in one extension. Submenu navigation uses native back/top actions and the return flag is unavailable for terminal destinations. A submenu with no effective entries plays once through its announcement entry.
+- [ ] Build direct dial from exact, eligible tenant extension numbers, excluding the exact sequences of configured effective options. Target the tenant internal route. Use the length of the longest effective option or eligible number as the minimum `digit-len` and test shorter input at the inter-digit timeout. Keep numeric options and supported DTMF navigation keys consistent with FreeSWITCH's terminator setting. Escape and order all emitted values deterministically.
+- [ ] Use the same effective menu data in both generators. For an option-less menu with direct dial off, or a menu whose effective entries all disappeared, play the greeting once and run its exit or hangup without invoking `ivr`. Handle a missing or unreadable greeting deterministically with its configured exit or hangup. Retain an interactive menu's invalid and timeout retry controls once entries exist. Set presentation settings on entry without stacking the CID prefix on a return.
+- [ ] Re-run the XML, routing, and cache observer tests. Commit the runtime switch as one unit.
 
-it('skips disabled menus and menus without an extension', function (): void {
-    // two menus: disabled / extension null
-    expect($service->generateDialplanXml($tenantId, $context, '2600'))->toBeNull();
-});
-```
+### Task 5 — Expose menu, prompt, and option editing
 
-- [ ] **Step 2: Run tests to verify they fail**
+**Files**
 
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrDialplanXmlTest.php`
-Expected: FAIL — current output still contains `bind_digit_action`.
+`app-modules/ivr-menus/src/Livewire/IvrMenusEdit.php`, `app-modules/ivr-menus/src/Livewire/Validation/IvrMenuValidation.php`, `app-modules/ivr-menus/resources/views/ivr-menus-edit.blade.php`, and module translations.
 
-- [ ] **Step 3: Implement the generator**
+- [ ] Add `IvrMenusEditorTest.php` and `IvrOptionsEditorTest.php`. Cover legacy hydration and numbering, collisions with extensions, feature codes, call flows, and menus, fallback validation, distinct prompt sources, omitted uploads, duplicate digit strings, absent or foreign targets, row removal and reordering, and which destinations support return. Verify option-only saves trigger the appropriate routing invalidation after commit. Use the repository's `AdminSeeder` setup for panel actors.
+- [ ] Run the two files and confirm the new behavior fails.
+- [ ] Inspect existing peer forms and use their DaisyUI sizes, semantic colors, tooltip/error treatments and loading feedback. Add the extension, timeout/retry controls, direct-dial toggle, ringback preset, CID prefix, exit/invalid/timeout selectors, and repeatable option rows. Use the design's preset values for both ringback variables. Enforce destination-specific input rules, supported DTMF lengths, valid prompt sources, and digit uniqueness against the persisted owner. An entry greeting must be playable on new saves.
+- [ ] Offer an enabled recording from the current tenant when the module is available, a private audio upload, or a host-approved FreeSWITCH sound/path for each prompt. Show its current source and keep it when the replacement is omitted. Add matching `en`, `es`, and `fr` translations with the form.
+- [ ] Re-run both tests and `tests/Feature/Architecture/TranslationParityTest.php`. Commit the form and its translations together.
 
-Query enabled menus with `extension` not null, eager-load options and media assets, order by name. Emit stubs then helper extensions; skip unresolvable options with `Log::warning`. Use `IvrDestinationRenderer::execString()` for the exit action and helper bodies (helper body = rendered exec string per action; for a transfer-kind option the helper executes `transfer <target>` then `transfer <menu extension>`). Escape every value with `ENT_XML1 | ENT_QUOTES`.
+### Task 6 — Show extension and deletion state in the list
 
-- [ ] **Step 4: Run tests to verify they pass**
+**Files**
 
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrDialplanXmlTest.php`
-Expected: PASS.
+`app-modules/ivr-menus/src/Livewire/IvrMenusList.php`, `app-modules/ivr-menus/resources/views/ivr-menus-list.blade.php`, and module translations.
 
-- [ ] **Step 5: Commit**
+- [ ] Add `IvrMenusListTest.php` covering the extension column, a visible label for upgraded menus awaiting a number, option count, and removal of a deleted menu from subsequent XML lookups. Confirm post-commit routing invalidation and scheduling of any required switch reload.
+- [ ] Run the test and see the new assertions fail.
+- [ ] Add the extension column and translated state using standard badges and loading feedback. Send reload work after commit only where needed for dependent switch configuration. A new IVR lookup must reflect the deletion through database state and routing invalidation.
+- [ ] Re-run the list and translation tests. Commit the list UI and its translations together.
 
-```bash
-git add app-modules/ivr-menus/src/Services/IvrMenuService.php app-modules/ivr-menus/tests/IvrDialplanXmlTest.php
-git commit -m "feat(ivr): replace broken digit loop with ivr-app stubs and return helpers"
-```
+### Task 7 — Prove the feature through live SIP calls
 
----
+**Files**
 
-### Task 4: Service write path — option sync and asset cleanup
+`app/Console/Commands/PbxLoadTestSeedCommand.php`, `tests/Feature/Pbx/PbxLoadTestValidationTest.php`, new scenarios in `load-testing/tools/sipp/`, `load-testing/scripts/pbx-sipp-validate.sh`, and `docs/load-testing-guide.md`.
 
-**Files:**
-- Modify: `app-modules/ivr-menus/src/Services/IvrMenuService.php`, `app-modules/ivr-menus/src/Services/IvrMenuServiceInterface.php`
-- Test: `app-modules/ivr-menus/tests/IvrMenuServiceWriteTest.php`
+- [ ] Follow the [harness guide](../../../load-testing/README.md). Seed two separately owned fixtures, keeping the announcement on `2600` with no options and using `2601` for an interactive menu. Seed repeatably with the existing fixture ownership and reset rules. Assert both fixtures and option mappings in Pest.
+- [ ] Deliver negotiated DTMF to the interactive fixture. For the queue option, assert the exact queue-join event correlated to the tested call, or require an expected destination SIP leg to receive and answer its INVITE. Assert that the same scenario fails when the digit-to-target mapping is removed or wrong. Keep the announcement scenario's one-prompt and server hangup check separate.
+- [ ] Add a live functional IVR mode to the SIPp harness and document its setup, fixtures, verdicts, and artifacts. Preserve the existing standard comparison matrix as a separate benchmark contract and keep `-nostdin` for SIPp. Exercise shell and XML syntax checks before the lab run.
+- [ ] On the target FreeSWITCH build, verify internal and inbound digit routing, a returning answered bridge and busy/no-answer path, literal precedence, direct dial, nested back/top, isolated same-name targets, voicemail, invalid and no-input fallbacks including a multi-word destination, general exit, a stale destination, and a pre-upgrade announcement route. Record destination-specific evidence and verify that a caller hangup during a bridge prevents re-entry.
+- [ ] Record the tested SHA, commands, switch version, case verdicts and log artifacts. A SIP response from the IVR itself establishes that the menu answered. A named destination verdict establishes that the option routed. Successful live verdicts are required before a parity claim or release.
+- [ ] Re-run `./vendor/bin/pest tests/Feature/Pbx/PbxLoadTestValidationTest.php`, run `bash -n load-testing/scripts/pbx-sipp-validate.sh`, and run `xmllint --noout` on all new scenarios. Commit the fixtures, harness, and guide.
 
-**Interfaces:**
-- Produces: `create(array $data, array $options = []): IvrMenu` and `update(IvrMenu $menu, array $data, array $options = []): IvrMenu`; option row shape `['digit' => string, 'action' => string, 'action_data' => ?string, 'description' => ?string, 'return_to_menu' => bool, 'order' => int, 'enabled' => bool]`.
-- Produces: `delete()` requests deletion of every owned `MediaAsset` through `MediaStorageServiceInterface::requestDeletion()`.
+### Task 8 — Document administrator impact and verify the change
 
-- [ ] **Step 1: Write the failing tests**
+**Files**
 
-```php
-it('creates a menu with options in one transaction', function (): void {
-    $menu = $service->create(['tenant_id' => $tenant->id, 'name' => 'Main', 'extension' => '2600'],
-        [['digit' => '1', 'action' => 'extension', 'action_data' => '2000', 'return_to_menu' => false, 'order' => 0, 'enabled' => true]]);
-    expect($menu->options)->toHaveCount(1);
-});
+`docs/parity-comparison.md`, `CHANGELOG.md`, and the IVR administrator documentation referenced by the parity comparison.
 
-it('replaces options on update and keeps unrelated assets', function (): void {
-    $menu = $service->create([...], [['digit' => '1', 'action' => 'extension', 'action_data' => '2000']]);
-    $service->update($menu, ['name' => 'Renamed'], [['digit' => '2', 'action' => 'extension', 'action_data' => '2001']]);
-    expect($menu->fresh()->options->pluck('digit')->all())->toBe(['2']);
-});
-
-it('deletes every owned media asset with the menu', function (): void {
-    $assetA = app(MediaStorageServiceInterface::class)->storeLocal($menu, MediaCategory::IvrGreeting, $sourceA, 'a.wav', 'audio/wav');
-    $assetB = app(MediaStorageServiceInterface::class)->storeLocal($menu, MediaCategory::IvrGreetingShort, $sourceB, 'b.wav', 'audio/wav');
-    $service->delete($menu);
-    expect(MediaAsset::find($assetA->id))->toBeNull()->and(MediaAsset::find($assetB->id))->toBeNull();
-});
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenuServiceWriteTest.php`
-Expected: FAIL — signature mismatch.
-
-- [ ] **Step 3: Implement**
-
-Wrap writes in `DB::transaction()`; `update()` deletes option rows absent from the payload and upserts the rest by digit. `delete()` iterates `mediaAssets` before `$menu->delete()`.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenuServiceWriteTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app-modules/ivr-menus/src/Services app-modules/ivr-menus/tests/IvrMenuServiceWriteTest.php
-git commit -m "feat(ivr): persist options transactionally and clean up owned media"
-```
-
----
-
-### Task 5: `ivr.conf` generator rewrite
-
-**Files:**
-- Modify: `app/Services/Xml/SofiaConfigXmlBuilder.php:330-411`
-- Test: `tests/Feature/Http/XmlHandlerFixtureTest.php` (update `serves ivr.conf with tenant IVR menu entries`, add cases), `tests/Feature/Pbx/PbxXmlValidationTest.php:213-219`
-
-**Interfaces:**
-- Consumes: `IvrDestinationRenderer::render()` and `IvrMenu::mediaAssets()`.
-- Produces: `<menu name="<uuid>" …>` with `greet-long`, `greet-short`, `invalid-sound`, `exit-sound`, `timeout` (ms), `inter-digit-timeout` (ms), `max-failures`, `max-timeouts`, `digit-len`, optional `exec-on-max-failures`/`exec-on-max-timeouts`; entries in option order; direct-dial regex entry last; all tenants served for `ivr.conf` regardless of domain.
-
-- [ ] **Step 1: Write the failing tests**
-
-```php
-it('serves ivr.conf menus keyed by uuid for all tenants', function (): void {
-    // two tenants, same menu name 'Main'
-    expect($xml)
-        ->toContain('<menu name="'.$menuA->id.'"')
-        ->toContain('<menu name="'.$menuB->id.'"')
-        ->toContain('exec-on-max-timeouts="transfer 0"');
-});
-
-it('renders entries, nesting, playback and direct dial in order', function (): void {
-    expect($xml)
-        ->toContain('<entry action="menu-exec-app" digits="1" param="transfer user/2000"/>')
-        ->toContain('<entry action="menu-sub" digits="2" param="'.$menuB->id.'"/>')
-        ->toContain('<entry action="menu-play-sound" digits="3" param="/sounds/hours.wav"/>')
-        ->toContain('<entry action="menu-exec-app" digits="/^(\d{2,10})$/" param="transfer $1"/>');
-});
-
-it('never emits channel variables in entry params', function (): void {
-    expect($xml)->not->toContain('${');
-});
-
-it('renders a practical digit-len when direct dial is enabled', function (): void {
-    // tenant extensions are 4 digits, direct_dial true, digit_length 0
-    expect($xml)->toContain('digit-len="4"');
-});
-
-it('renders an option-less menu as an announcement', function (): void {
-    // menu with greeting and zero options
-    expect($xml)->toContain('<menu name="'.$menu->id.'"')
-        ->toContain('greet-long="/sounds/welcome.wav"')
-        ->not->toContain('<entry');
-});
-
-it('omits an unresolvable option but keeps the menu', function (): void {
-    // option points at a deleted extension
-    expect($xml)->toContain('<menu name="'.$menu->id.'"')
-        ->not->toContain('digits="9"');
-});
-
-it('renders retry counters from the menu', function (): void {
-    // menu with max_failures 3, max_timeouts 4
-    expect($xml)->toContain('max-failures="3"')->toContain('max-timeouts="4"');
-});
-```
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `./vendor/bin/pest tests/Feature/Http/XmlHandlerFixtureTest.php --filter=ivr`
-Expected: FAIL — names are friendly names, no attributes/entries of the new shape.
-
-- [ ] **Step 3: Implement**
-
-Drop the tenant/domain filter for `ivr.conf` (always all enabled menus; keep the no-domain fail-closed behavior for other config keys untouched). `tenantDomainFor(int $tenantId): string` = enabled `TenantDomain` with `purpose = 'sip_realm'`, else first enabled domain, else `''`. `digit-len` = `digit_length > 0 ? digit_length : (direct_dial ? max extension length clamped 2–10 : 0)`. Entries: option rows in `order`; `return_to_menu` playback → `menu-play-sound`; `return_to_menu` transfer → `transfer ivr_return_<option uuid>`; direct-dial regex entry appended last. `exec-on-max-*` values from `execString()`; omit when null.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `./vendor/bin/pest tests/Feature/Http/XmlHandlerFixtureTest.php --filter=ivr && ./vendor/bin/pest tests/Feature/Pbx/PbxXmlValidationTest.php`
-Expected: PASS after updating the two legacy assertions to the new shape.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/Services/Xml/SofiaConfigXmlBuilder.php tests/Feature/Http/XmlHandlerFixtureTest.php tests/Feature/Pbx/PbxXmlValidationTest.php
-git commit -m "feat(xml): render full IVR menu definitions into ivr.conf"
-```
-
----
-
-### Task 6: Resolver transfer and call-flow context fix
-
-**Files:**
-- Modify: `app/Services/DestinationResolver.php:188-207`, `app-modules/call-flows/src/Services/CallFlowService.php:65`
-- Test: `tests/Feature/Pbx/DialplanDestinationIntegrationTest.php:110-130`, `tests/Feature/Pbx/Services/PbxRoutingServicesTest.php` (add IVR resolver case)
-
-**Interfaces:**
-- Produces: `resolveIvr()` returns `['application' => 'transfer', 'data' => '<menu extension>']`; throws `InvalidArgumentException` when the menu has no extension.
-
-- [ ] **Step 1: Write the failing tests**
-
-```php
-it('resolves an ivr destination to its stub extension', function (): void {
-    $menu = IvrMenu::factory()->create(['tenant_id' => $tenant->id, 'extension' => '2600', 'enabled' => true]);
-    expect(app(DestinationResolver::class)->resolve(DestinationResolver::KIND_IVR, '2600', $tenant->id))
-        ->toBe(['application' => 'transfer', 'data' => '2600']);
-});
-
-it('rejects an ivr menu without an extension', function (): void {
-    // menu with extension null -> throws InvalidArgumentException containing 'no extension'
-})->throws(InvalidArgumentException::class);
-```
-
-and update the integration assertion to `data="transfer 2600"`.
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `./vendor/bin/pest tests/Feature/Pbx/Services/PbxRoutingServicesTest.php --filter=ivr && ./vendor/bin/pest tests/Feature/Pbx/DialplanDestinationIntegrationTest.php --filter=ivr`
-Expected: FAIL — current data is `<name> XML <name>`.
-
-- [ ] **Step 3: Implement**
-
-Resolver: look up by name or id as today, throw when `extension` is null, return the transfer pair. `CallFlowService`: `transfer {$safeDest}` (no `XML default`). Keep escaping.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run the two commands from Step 2.
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/Services/DestinationResolver.php app-modules/call-flows/src/Services/CallFlowService.php tests/Feature/Pbx
-git commit -m "feat(routing): transfer into IVR stub extensions; fix call-flow context"
-```
-
----
-
-### Task 7: Edit form — menu-level parity fields and prompts
-
-**Files:**
-- Modify: `app-modules/ivr-menus/src/Livewire/IvrMenusEdit.php`, `app-modules/ivr-menus/src/Livewire/Validation/IvrMenuValidation.php`, `app-modules/ivr-menus/resources/views/ivr-menus-edit.blade.php`
-- Test: `app-modules/ivr-menus/tests/IvrMenusEditorTest.php`
-
-**Interfaces:**
-- Consumes: `IvrMenuServiceInterface::create/update` option-aware signatures (Task 4).
-- Produces: public properties `extension`, `greetShortUpload`, `invalidSoundUpload`, `exitSoundUpload`, `interDigitTimeout`, `maxTimeouts`, `directDial`, `ringback`, `cidPrefix`, `exitKind`, `exitDestination`, `invalidKind`, `invalidDestination`, `timeoutKind`, `timeoutDestination`; `rules()` validates the dialable-collision set.
-
-- [ ] **Step 1: Write the failing tests** — Livewire component test using the `AdminSeeder` permission convention (AGENTS.md). Pin at least:
-
-```php
-it('saves parity fields and prompts', function (): void {
-    $this->actingAs($this->admin, 'admin')
-        ->post(...)  // use Livewire::test(IvrMenusEdit::class) per existing module tests
-    expect(IvrMenu::first())->extension->toBe('2600')
-        ->and(IvrMenu::first()->direct_dial)->toBeTrue();
-});
-
-it('rejects an extension that shadows a feature code', function (): void {
-    FeatureCode::factory()->create(['tenant_id' => $this->tenant->id, 'code' => '2600']);
-    // assert validation error on 'extension'
-});
-```
-
-Also cover: non-digit extension rejected; collision with `extensions.extension_number` and `call_flows.extension`; uploads stored with the new categories and resolved paths written; existing prompt kept when no upload.
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenusEditorTest.php`
-Expected: FAIL — unknown properties.
-
-- [ ] **Step 3: Implement component, validation, Blade**
-
-Props, mount hydration, save data assembly (resolve tenant, dispatch `ReloadFreeSwitchXml`), collision rules (extensions, `feature_codes.code`, `call_flows.extension`, menus), prompt uploads via `MediaStorageServiceInterface::storeLocal()` with the new categories, fallback kind/target pairs. Blade: Prompts card (four file inputs + current-path hints), Behavior grid (toggle `toggle-sm toggle-success` with "Enabled/Disabled" label, direct dial toggle, ringback select, CID prefix, two timeout fields), Fallbacks section (kind select + target input each). Follow existing tooltip/error components.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenusEditorTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app-modules/ivr-menus/src/Livewire app-modules/ivr-menus/resources/views/ivr-menus-edit.blade.php app-modules/ivr-menus/tests/IvrMenusEditorTest.php
-git commit -m "feat(ivr): expose parity fields, prompts and fallbacks in the editor"
-```
-
----
-
-### Task 8: Option editor rows
-
-**Files:**
-- Modify: `app-modules/ivr-menus/src/Livewire/IvrMenusEdit.php`, `app-modules/ivr-menus/resources/views/ivr-menus-edit.blade.php`
-- Test: `app-modules/ivr-menus/tests/IvrOptionsEditorTest.php`
-
-**Interfaces:**
-- Produces: public array `options` of rows (`digit`, `action`, `action_data`, `description`, `return_to_menu`, `order`, `enabled`); `addOption()`, `removeOption(int $index)`, `moveOption(int $index, int $direction)`; save passes `options` to the service; `withValidator` rejects duplicate digits and unresolvable destinations via the renderer.
-
-- [ ] **Step 1: Write the failing tests** — pin at least:
-
-```php
-it('adds and removes option rows', function (): void {
-    Livewire::test(IvrMenusEdit::class)
-        ->call('addOption')->set('options.0.digit', '1')
-        ->set('options.0.action', 'extension')->set('options.0.action_data', '2000')
-        ->call('save')
-        ->assertHasNoErrors();
-    expect(IvrMenuOption::where('digit', '1')->exists())->toBeTrue();
-});
-
-it('rejects duplicate digits and unresolvable destinations', function (): void {
-    // two rows digit '1'; then one row with action_data '9999'
-});
-```
-
-Also cover: remove/reorder rows; submenu rows ignore `return_to_menu`; save passes rows to the service in `order`.
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrOptionsEditorTest.php`
-Expected: FAIL.
-
-- [ ] **Step 3: Implement** — repeater state + Blade rows (digit input `input-bordered w-full font-mono`, kind select from `IvrDestinationKind::selectable()`, target input/select, description input, return toggle, enabled toggle, up/down icon buttons, delete icon button with row-dim `wire:loading.class="opacity-40 pointer-events-none"`), validation wiring, tenant-scoped target checks.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrOptionsEditorTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app-modules/ivr-menus
-git commit -m "feat(ivr): add digit-to-destination option editor"
-```
-
----
-
-### Task 9: List page extension column and delete reload
-
-**Files:**
-- Modify: `app-modules/ivr-menus/src/Livewire/IvrMenusList.php`, `app-modules/ivr-menus/resources/views/ivr-menus-list.blade.php`
-- Test: `app-modules/ivr-menus/tests/IvrMenusListTest.php`
-
-- [ ] **Step 1: Write the failing tests** — list shows `extension` and options count; `deleteMenu()` dispatches `ReloadFreeSwitchXml` (`Queue::fake()` + `Queue::assertPushed`).
-
-- [ ] **Step 2: Run tests to verify they fail**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenusListTest.php`
-Expected: FAIL — no extension column, no dispatch.
-
-- [ ] **Step 3: Implement** — add the column (`badge-xs font-mono`), dispatch `ReloadFreeSwitchXml::dispatch('IVR menu deleted')` after successful delete.
-
-- [ ] **Step 4: Run tests to verify they pass**
-
-Run: `./vendor/bin/pest app-modules/ivr-menus/tests/IvrMenusListTest.php`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app-modules/ivr-menus
-git commit -m "feat(ivr): show extensions and reload XML after deletion"
-```
-
----
-
-### Task 10: Translations
-
-**Files:**
-- Modify: `app-modules/ivr-menus/lang/en/admin.php`, `lang/es/admin.php`, `lang/fr/admin.php`
-
-- [ ] **Step 1: Add keys** — extension, prompt labels for the three new prompts, behavior labels (inter-digit timeout, max timeouts, direct dial, ringback, CID prefix, fallback exit/invalid/timeout, destination kind, target, return to menu, add option, remove option, move up/down), and validation messages — in all three locales with identical key sets.
-
-- [ ] **Step 2: Verify parity**
-
-Run: `./vendor/bin/pest tests/Feature/Architecture/TranslationParityTest.php`
-Expected: PASS.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add app-modules/ivr-menus/lang
-git commit -m "feat(ivr): add en/es/fr translations for parity fields"
-```
-
----
-
-### Task 11: Load-test fixtures and SIPp digit scenario
-
-**Files:**
-- Modify: `app/Console/Commands/PbxLoadTestSeedCommand.php:405-416`
-- Create: `load-testing/tools/sipp/uac-ivr-digit.xml`
-- Modify: `load-testing/scripts/pbx-sipp-validate.sh:55-57,417-422`
-- Modify: `docs/load-testing-guide.md` (media flow destination list)
-
-**Interfaces:**
-- Produces: seeded menu `load_test_announcement` with `extension = 2600` and one option (`digit = 1`, `action = queue`, `action_data = load_test_moh`); `MEDIA_ANNOUNCEMENT_DESTINATION` default becomes `2600`; new `IVR_DIGIT_SCENARIO` and an `ivr-digit` media step.
-
-- [ ] **Step 1: Update the seeder** — add `extension => '2600'` and the option row (delete-then-create so re-seeding stays idempotent).
-
-- [ ] **Step 2: Create the SIPp scenario** — copy `uac-media-server-hangup.xml`, dial `[field0]` (passed destination), after the greeting `pause` 3000 ms then `send` DTMF `1`, then pause and hang up. Keep `-nostdin` usage in the script; no scenario-side stdin.
-
-- [ ] **Step 3: Wire the script** — default `MEDIA_ANNOUNCEMENT_DESTINATION="${MEDIA_ANNOUNCEMENT_DESTINATION:-2600}"`; add `IVR_DIGIT_SCENARIO="${LOAD_TESTING_DIR}/tools/sipp/uac-ivr-digit.xml"`; add `run_media_step ivr-digit "${IVR_DIGIT_SCENARIO}" "${MEDIA_ANNOUNCEMENT_DESTINATION}" "$((MEDIA_UAC_LOCAL_PORT + 6))" "$((MEDIA_RTP_PORT + 6))"` inside the `MEDIA_FLOW` block.
-
-- [ ] **Step 4: Verify statically**
-
-Run: `bash -n load-testing/scripts/pbx-sipp-validate.sh && xmllint --noout load-testing/tools/sipp/uac-ivr-digit.xml`
-Expected: both exit 0. (A live `MEDIA_FLOW=1` run happens on the real harness — this task's plan-level gate is syntax only; record the live-run result with the release checklist.)
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/Console/Commands/PbxLoadTestSeedCommand.php load-testing docs/load-testing-guide.md
-git commit -m "test(ivr): seed an extension-backed menu and press a digit in SIPp"
-```
-
----
-
-### Task 12: Documentation, changelog, verification gate
-
-**Files:**
-- Modify: `docs/parity-comparison.md:72`, `CHANGELOG.md` (`[Unreleased]`)
-
-- [ ] **Step 1: Parity row** — replace the IVR row with an evidence-backed claim (greet-long/short, options with typed destinations, invalid/timeout retries with destinations, direct dial, nested menus, exit action) and note the external-destination risk.
-
-- [ ] **Step 2: Changelog** — `Added` (interactive options, direct dial, nesting, fallbacks, prompts), `Changed` (native `ivr` engine; menus dialed by extension number, not name; `ivr.conf` UUID keys), `Fixed` (delete reload; parity overclaim), and a note that this requires `tpbx migrate`.
-
-- [ ] **Step 3: Run the verification gate**
+- [ ] Explain prompt reuse, dialable extensions, and the handling of upgraded menus and legacy aliases. Record `tpbx migrate` and any required operator mapping for previously raw IVR or named runtime destinations. Document in the parity row and changelog that a public IVR option can place a billable outbound call subject to the tenant's configured outbound rules. Base the parity row on live results and state the supported return behaviors precisely.
+- [ ] Run the project verification gate on the completed implementation. Run the full parallel suite once for the cross-subsystem change and follow the shared XML hot-path smoke check in `AGENTS.md`.
 
 ```bash
 tpbx optimize:clear
 ./vendor/bin/pint --dirty
-./vendor/bin/pest app-modules/ivr-menus tests/Feature/Pbx tests/Feature/Http/XmlHandlerFixtureTest.php tests/Feature/Architecture/TranslationParityTest.php
+./vendor/bin/pest app-modules/ivr-menus tests/Feature/Pbx tests/Feature/Http/XmlHandlerFixtureTest.php tests/Feature/Observers/RoutingCacheObserverTest.php tests/Feature/Architecture/TranslationParityTest.php
 tpbx route:list --name=ivr-menus
+tpbx app:test --smoke
+tpbx test --compact --parallel
 ```
 
-Expected: Pint clean; all tests pass; four routes listed. Full suite (`tpbx test --compact --parallel`) once before commit per AGENTS.md.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add docs/parity-comparison.md CHANGELOG.md
-git commit -m "docs(ivr): record parity and release notes for interactive IVRs"
-```
+- [ ] Verify the three existing authorized IVR panel routes, check the recorded live verdicts from Task 7, and commit the evidence-backed documentation. Use the [release checklist](../../release-checklist.md) when the change ships.
