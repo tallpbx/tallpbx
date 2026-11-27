@@ -133,6 +133,48 @@ it('ships production-safe debug and session defaults in the environment template
         ->and($example)->not->toContain('SESSION_CONNECTION=cache');
 });
 
+it('defaults Laravel application logs to ten daily files across the template, config, installer, and docs', function (): void {
+    $example = (string) file_get_contents(base_path('.env.example'));
+    $loggingConfig = (string) file_get_contents(base_path('config/logging.php'));
+    $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+    $reference = (string) file_get_contents(base_path('docs/env-reference.md'));
+
+    expect($example)->toContain('LOG_CHANNEL=daily')
+        ->and($example)->toContain('LOG_DAILY_DAYS=10')
+        ->and($example)->not->toContain('LOG_CHANNEL=stack')
+        ->and($example)->not->toContain('LOG_STACK=single')
+        ->and($loggingConfig)->toContain("env('LOG_CHANNEL', 'daily')")
+        ->and($loggingConfig)->toContain("env('LOG_DAILY_DAYS', 10)")
+        ->and($tallScript)->toContain('LOG_CHANNEL=daily')
+        ->and($tallScript)->toContain('LOG_DAILY_DAYS=10')
+        ->and($tallScript)->toContain('get_env_value .env LOG_CHANNEL')
+        ->and($tallScript)->toContain('get_env_value .env LOG_STACK')
+        ->and($reference)->toContain('storage/logs/laravel-YYYY-MM-DD.log')
+        ->and($reference)->toContain('`LOG_DAILY_DAYS` | `integer` | `10`');
+});
+
+it('bounds the system journal with TallPBX retention defaults', function (): void {
+    $template = (string) file_get_contents(base_path('scripts/resources/systemd/tallpbx-journald.conf'));
+    $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
+
+    expect($template)->toContain('[Journal]')
+        ->and($template)->toContain('SystemMaxUse=1G')
+        ->and($template)->toContain('MaxRetentionSec=30day')
+        ->and($template)->toContain('SystemMaxFileSize=100M')
+        ->and($template)->toContain('SystemMaxFiles=10')
+        ->and($tallScript)->toContain('scripts/resources/systemd/tallpbx-journald.conf')
+        ->and($tallScript)->toContain('/etc/systemd/journald.conf.d/tallpbx.conf')
+        ->and($tallScript)->toContain('if [ ! -f /etc/systemd/journald.conf.d/tallpbx.conf ]')
+        ->and($tallScript)->toContain('systemctl restart systemd-journald');
+});
+
+it('keeps FreeSWITCH internal log rollover bounded to 250 MB and 10 files', function (): void {
+    $freeswitch = (string) file_get_contents(base_path('scripts/resources/freeswitch.sh'));
+
+    expect($freeswitch)->toContain('s#<param name="rollover" value="[^"]*"/>#<param name="rollover" value="262144000"/>#')
+        ->and($freeswitch)->toContain('s#<param name="maximum-rotate" value="[^"]*"/>#<param name="maximum-rotate" value="10"/>#');
+});
+
 it('encrypts sessions in every install mode and enables secure cookies on HTTPS', function (): void {
     $tallScript = (string) file_get_contents(base_path('scripts/resources/tall.sh'));
     $tlsScript = (string) file_get_contents(base_path('scripts/resources/letsencrypt.sh'));

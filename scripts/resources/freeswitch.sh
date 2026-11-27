@@ -155,6 +155,20 @@ configure_freeswitch_switch_defaults() {
 
     local logfile_conf="${conf_dir}/autoload_configs/logfile.conf.xml"
     if [ -f "$logfile_conf" ]; then
+        # Keep FreeSWITCH's own file rollover bounded to 250 MB per file and 10
+        # rotated files. This is applied on fresh installs and re-runs.
+        if grep -q 'name="rollover"' "$logfile_conf"; then
+            sed -i 's#<param name="rollover" value="[^"]*"/>#<param name="rollover" value="262144000"/>#' "$logfile_conf"
+        else
+            sed -i '/<profile name="default">/,/<\/profile>/ s#</settings>#        <param name="rollover" value="262144000"/>\n    </settings>#' "$logfile_conf"
+        fi
+
+        if grep -q 'name="maximum-rotate"' "$logfile_conf"; then
+            sed -i 's#<param name="maximum-rotate" value="[^"]*"/>#<param name="maximum-rotate" value="10"/>#' "$logfile_conf"
+        else
+            sed -i '/<profile name="default">/,/<\/profile>/ s#</settings>#        <param name="maximum-rotate" value="10"/>\n    </settings>#' "$logfile_conf"
+        fi
+
         # Ensure logfile map retains debug so temporary runtime diagnosis via 'fsctl loglevel debug' works
         sed -i 's#<map name="all" value="console,info,notice,warning,err,crit,alert"/>#<map name="all" value="console,debug,info,notice,warning,err,crit,alert"/>#' "$logfile_conf"
     fi

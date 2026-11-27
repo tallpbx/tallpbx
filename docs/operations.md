@@ -88,6 +88,49 @@ replacement host — is in [backup-restore-guide.md](backup-restore-guide.md).
 Read it before confirming a restore: a restore replaces the database and the
 selected file trees and has no automatic rollback.
 
+## Log Retention
+
+TallPBX keeps package-managed logs at their package defaults and bounds the two large system log sources itself. This avoids one-size-fits-all retention while keeping the biggest disk consumers predictable.
+
+### System journal
+
+The installer installs `/etc/systemd/journald.conf.d/tallpbx.conf` with these limits:
+
+| Setting | Value | Meaning |
+| --- | :---: | --- |
+| `SystemMaxUse` | `1G` | Total journal storage is capped at 1 GB. |
+| `MaxRetentionSec` | `30day` | Journal entries are kept for up to 30 days. |
+| `SystemMaxFileSize` | `100M` | Each journal file rotates at 100 MB. |
+| `SystemMaxFiles` | `10` | At most 10 journal files are kept. |
+
+journald enforces these limits itself; `logrotate` does not manage `/var/log/journal`. On an existing server, install the template and restart journald:
+
+```bash
+sudo install -d -m 0755 /etc/systemd/journald.conf.d
+sudo install -m 0644 /var/www/tallpbx/scripts/resources/systemd/tallpbx-journald.conf /etc/systemd/journald.conf.d/tallpbx.conf
+sudo systemctl restart systemd-journald
+```
+
+### FreeSWITCH application log
+
+FreeSWITCH rotates `/var/log/freeswitch/freeswitch.log` internally at **250 MB per file** and keeps up to **10 rotated files**. The installer applies these values to `/etc/freeswitch/autoload_configs/logfile.conf.xml`.
+
+To apply the values on an existing server without re-running the full installer:
+
+```bash
+sudo bash /var/www/tallpbx/scripts/resources/freeswitch.sh --configure-only
+sudo fs_cli -x 'reloadxml'
+sudo fs_cli -x 'reload mod_logfile'
+```
+
+### Laravel application logs
+
+Laravel writes dated daily files under `/var/www/tallpbx/storage/logs/` and keeps 10 days of history. See [env-reference.md](env-reference.md#101-logging-stack--retention).
+
+### Package-managed logs
+
+nginx, PHP-FPM, Redis, MariaDB, apt, dpkg, stunnel, and accounting logs keep their package-provided `logrotate` policies. Those policies include service-specific reload hooks, so they should not be replaced with one blanket TallPBX rule.
+
 ## Health Checks and Testing
 
 After installation — and at any time — run the smoke check to confirm the
@@ -692,7 +735,7 @@ Q='section=directory&tag_name=user&key_name=user&key_value=2000&domain=example.c
 curl -s "http://127.0.0.1/api/v1/xml-handler?$Q" -H "X-FS-Token: $TOKEN" | head -c 80
 ```
 
-If the response is `403`, check the token in `/var/www/tallpbx/.env`. For a `500` response, check the PHP-FPM journal (`journalctl -u php8.5-fpm`) and the application log at `/var/www/tallpbx/storage/logs/laravel.log` on a standard install.
+If the response is `403`, check the token in `/var/www/tallpbx/.env`. For a `500` response, check the PHP-FPM journal (`journalctl -u php8.5-fpm`) and the current application log under `/var/www/tallpbx/storage/logs/` (dated files such as `laravel-YYYY-MM-DD.log` are kept for 10 days).
 
 ## Switching Between the Stock, Fast and Octane XML Paths
 

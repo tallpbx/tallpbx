@@ -82,11 +82,12 @@ if [[ $EXIT_CODE -eq 124 || $EXIT_CODE -eq 137 ]]; then
     echo "--- Active Pest & Chromium Processes ---" >&2
     ps aux | grep -E 'chrome|pest|playwright' | grep -v grep >&2 || true
     echo "" >&2
-    echo "--- Recent Application Exception Log (storage/logs/laravel.log) ---" >&2
-    if [[ -f storage/logs/laravel.log ]]; then
-        tail -n 25 storage/logs/laravel.log >&2
+    echo "--- Recent Application Exception Log (storage/logs/laravel-*.log) ---" >&2
+    latest_log="$(ls -1t storage/logs/laravel*.log 2>/dev/null | head -n 1 || true)"
+    if [[ -n "$latest_log" && -f "$latest_log" ]]; then
+        tail -n 25 "$latest_log" >&2
     else
-        echo "No storage/logs/laravel.log found." >&2
+        echo "No storage/logs/laravel*.log found." >&2
     fi
     echo "================================================================================" >&2
     pkill -f "playwright" 2>/dev/null || true

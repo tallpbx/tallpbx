@@ -27,7 +27,7 @@ Laravel Boost runs as an active Model Context Protocol (MCP) server for this wor
 - **Database Schema & Structure**: Use `database-schema` to inspect table structure, column types, and foreign keys before writing migrations or Eloquent models (do NOT grep migration files or query information_schema manually).
 - **Database Queries**: Use `database-query` to execute read-only queries against the application database instead of writing raw SQL in `tinker` or `mysql` CLI.
 - **Official Documentation**: Use `search-docs` to look up official Laravel, Livewire, Pest, Tailwind, and ecosystem documentation and syntax before implementing version-sensitive APIs (e.g. `queries=["livewire form validation", "rate limiting"]`).
-- **Error & Log Inspection**: Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces instead of reading `storage/logs/laravel.log`.
+- **Error & Log Inspection**: Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces instead of reading `storage/logs/laravel-*.log`.
 - **Browser & UI Diagnostics**: Use `browser-logs` to read recent browser logs, errors, and console exceptions when debugging frontend/Livewire behavior.
 - **Absolute URLs**: Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs before presenting them.
 - **House Rules**: Use `record-rule` only when the user explicitly requests recording a project rule to `.ai/rules`.

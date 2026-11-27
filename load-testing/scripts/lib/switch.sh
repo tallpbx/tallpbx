@@ -827,16 +827,17 @@ restart_listener() {
     return 1
 }
 
-# Count the listener start-up records in the application log.
+# Count the listener start-up records in the application's daily Laravel logs.
 #
 # Used to prove a restart produced a *new* record, so an assertion never
 # passes on a line left over from an earlier configuration.
 listener_record_count() {
     local count
 
-    # grep -c prints 0 and exits non-zero when nothing matches, so the output
-    # is captured rather than appended to a fallback.
-    count="$(grep -c 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs/laravel.log" 2>/dev/null)"
+    # Sum matching lines across the current and previous daily logs. grep
+    # exits non-zero when nothing matches, so the failure is swallowed and the
+    # count falls back to 0.
+    count="$( { grep -h 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs"/laravel*.log 2>/dev/null || true; } | wc -l | tr -d ' ')"
 
     printf '%s\n' "${count:-0}"
 }
@@ -847,7 +848,15 @@ listener_record_count() {
 # this record is the only runtime evidence of what it actually subscribed to
 # and whether broadcast debouncing is in force.
 listener_last_record() {
-    grep 'FreeSWITCH ESL listener started' "${APP_DIR}/storage/logs/laravel.log" 2>/dev/null | tail -1
+    local latest_log
+
+    latest_log="$(ls -1t "${APP_DIR}/storage/logs"/laravel*.log 2>/dev/null | head -n 1 || true)"
+
+    if [ -z "$latest_log" ]; then
+        return 0
+    fi
+
+    grep 'FreeSWITCH ESL listener started' "$latest_log" 2>/dev/null | tail -1 || true
 }
 
 # Apply the broadcast debounce window, in milliseconds.

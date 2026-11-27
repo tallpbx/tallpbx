@@ -16,7 +16,7 @@ Agents MUST prefer Boost tools over shell commands, Tinker scripts, or manual fi
 - **Database Schema**: Use `database-schema` to inspect table definitions, columns, and foreign keys before writing migrations or Eloquent models.
 - **Database Queries**: Use `database-query` for read-only database queries instead of running raw SQL in Tinker.
 - **Documentation**: Use `search-docs` to check official Laravel, Livewire, Pest, and Tailwind documentation before writing version-sensitive APIs.
-- **Error & Log Inspection**: Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces instead of parsing `storage/logs/laravel.log`.
+- **Error & Log Inspection**: Use `last-error` and `read-log-entries` to inspect recent application exceptions and stack traces instead of parsing `storage/logs/laravel-*.log`.
 - **Browser Diagnostics**: Use `browser-logs` to inspect browser console diagnostics during frontend/Livewire testing.
 
 ## Laravel Pint Code Style & Syntax Linting

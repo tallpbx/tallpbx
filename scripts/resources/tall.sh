@@ -337,6 +337,19 @@ grep -q "^FS_HIREDIS_LIMIT_MAX=" .env 2>/dev/null \
 grep -q "^FS_HIREDIS_MARKER_ENABLED=" .env 2>/dev/null \
     || echo "FS_HIREDIS_MARKER_ENABLED=false" >> .env
 
+# Laravel application logs now default to dated daily files kept for 10 days.
+# New installs receive these values from .env.example. On installer re-runs,
+# move only the previous stack/single default to the new daily default and
+# preserve any other logging choice.
+if [ "$(get_env_value .env LOG_CHANNEL)" = "stack" ] && [ "$(get_env_value .env LOG_STACK)" = "single" ]; then
+    set_env_value .env LOG_CHANNEL daily
+    grep -q "^LOG_DAILY_DAYS=" .env 2>/dev/null || echo "LOG_DAILY_DAYS=10" >> .env
+    sed -i "/^LOG_STACK=single$/d" .env
+else
+    grep -q "^LOG_CHANNEL=" .env 2>/dev/null || echo "LOG_CHANNEL=daily" >> .env
+    grep -q "^LOG_DAILY_DAYS=" .env 2>/dev/null || echo "LOG_DAILY_DAYS=10" >> .env
+fi
+
 # --- Build application assets and update the database ---
 # Build browser assets after all Node packages are present. The build writes
 # generated files only; it does not change application or customer data.
@@ -476,6 +489,15 @@ if [ -f /var/www/tallpbx/scripts/tallpbx-cdr-worker.service ]; then
 fi
 if [ -f /var/www/tallpbx/scripts/tallpbx-reverb.service ]; then
     cp /var/www/tallpbx/scripts/tallpbx-reverb.service /etc/systemd/system/
+fi
+
+# Bound the system journal so service logs cannot grow without a clear limit.
+# The file is only installed when missing, so installer re-runs keep any
+# administrator tuning. Restarting journald applies the limits to new entries.
+if [ ! -f /etc/systemd/journald.conf.d/tallpbx.conf ] && [ -f /var/www/tallpbx/scripts/resources/systemd/tallpbx-journald.conf ]; then
+    install -d -m 0755 /etc/systemd/journald.conf.d
+    install -m 0644 /var/www/tallpbx/scripts/resources/systemd/tallpbx-journald.conf /etc/systemd/journald.conf.d/tallpbx.conf
+    systemctl restart systemd-journald 2>/dev/null || true
 fi
 
 # Reload systemd once after all unit files are installed, then enable and start

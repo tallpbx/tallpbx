@@ -153,7 +153,7 @@ it('records a visible audit entry when the conntrack flush fails', function (): 
     $banService->ban('192.0.2.79', 'sip_auth', 'Flush failure path', 3600);
 
     // A flush failure is not rolled back (the new-flow block stays active),
-    // but it must be visible to operators — not buried in laravel.log.
+    // but it must be visible to operators — not buried in the application logs.
     $this->assertDatabaseHas('security_audit_logs', [
         'action' => 'conntrack_flush_failed',
         'ip_address' => '192.0.2.79',

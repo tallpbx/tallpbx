@@ -544,12 +544,14 @@ Configures application error reporting, log rotation, security telemetry, and re
 
 ### 10.1 Logging Stack & Retention
 
+By default, Laravel writes dated daily log files under `storage/logs/` and keeps 10 days of history.
+
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `LOG_CHANNEL` | `string` | `stack` | `logging.default` | Active logging channel (`stack`, `single`, `daily`, `syslog`, `stderr`). |
-| `LOG_STACK` | `string` | `single` | `logging.channels.stack.channels` | Comma-delimited list of logging channels aggregated into the stack logger. |
-| `LOG_LEVEL` | `string` | `debug` | `logging.channels.single.level` | Minimum error severity recorded to disk (`debug`, `info`, `notice`, `warning`, `error`, `critical`, `alert`, `emergency`). In high-traffic production systems, set to `info` or `warning` to reduce disk I/O. |
-| `LOG_DAILY_DAYS` | `integer` | `14` | `logging.channels.daily.days` | Number of daily rotated log files retained before automatic deletion. |
+| `LOG_CHANNEL` | `string` | `daily` | `logging.default` | Active logging channel (`daily`, `single`, `stack`, `syslog`, `stderr`). The default `daily` channel writes dated files such as `storage/logs/laravel-YYYY-MM-DD.log` and retains `LOG_DAILY_DAYS` files. |
+| `LOG_STACK` | `string` | `daily` | `logging.channels.stack.channels` | Comma-delimited list of logging channels aggregated into the stack logger. Only used when `LOG_CHANNEL=stack`. |
+| `LOG_LEVEL` | `string` | `debug` | `logging.channels.{single,daily}.level` | Minimum error severity recorded to disk (`debug`, `info`, `notice`, `warning`, `error`, `critical`, `alert`, `emergency`). In high-traffic production systems, set to `info` or `warning` to reduce disk I/O. |
+| `LOG_DAILY_DAYS` | `integer` | `10` | `logging.channels.daily.days` | Number of daily dated Laravel log files retained before automatic deletion, including the current day. |
 | `LOG_STDERR_FORMATTER` | `string` | `null` | `logging.channels.stderr.formatter` | Custom log formatter class applied to stderr stream outputs. |
 | `LOG_SYSLOG_FACILITY` | `integer` | `LOG_USER` | `logging.channels.syslog.facility` | POSIX syslog facility level used when dispatching events to host `rsyslog` or `systemd-journald`. |
 | `LOG_DEPRECATIONS_CHANNEL` | `string` | `'null'` | `logging.deprecations.channel` | Dedicated log channel for PHP or framework deprecation warnings. |
@@ -578,7 +580,7 @@ Manages transactional emails (password resets, voicemail notifications with audi
 
 | Variable | Type | Default | Config Key | Description & Security Implications |
 | :--- | :--- | :--- | :--- | :--- |
-| `MAIL_MAILER` | `string` | `log` | `mail.default` | Active email transport (`smtp`, `sendmail`, `mailgun`, `postmark`, `resend`, `log`, `array`). In development, `log` writes emails to `storage/logs/laravel.log`. |
+| `MAIL_MAILER` | `string` | `log` | `mail.default` | Active email transport (`smtp`, `sendmail`, `mailgun`, `postmark`, `resend`, `log`, `array`). In development, `log` writes emails to the current daily Laravel log under `storage/logs/`. |
 | `MAIL_HOST` | `string` | `127.0.0.1` | `mail.mailers.smtp.host` | Outbound SMTP server hostname. |
 | `MAIL_PORT` | `integer` | `2525` | `mail.mailers.smtp.port` | Outbound SMTP server port (standard ports: `587` for STARTTLS, `465` for TLS). |
 | `MAIL_USERNAME` | `string` | `null` | `mail.mailers.smtp.username` | Outbound SMTP authentication username. |
